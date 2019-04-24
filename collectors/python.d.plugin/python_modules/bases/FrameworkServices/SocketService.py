@@ -94,7 +94,6 @@ class SocketService(SimpleService):
 
         try:
             self.debug('connecting socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
-            # self._sock.setblocking(False)
             self._sock.settimeout(self.connect_timeout)
             self.debug('set socket connect timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(sa)
@@ -122,7 +121,6 @@ class SocketService(SimpleService):
         try:
             self.debug('attempting DGRAM unix socket "{0}"'.format(self.unix_socket))
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-            # self._sock.setblocking(False)
             self._sock.settimeout(self.connect_timeout)
             self.debug('set socket connect timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(self.unix_socket)
@@ -135,7 +133,6 @@ class SocketService(SimpleService):
         try:
             self.debug('attempting STREAM unix socket "{0}"'.format(self.unix_socket))
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self._sock.setblocking(False)
             self._sock.settimeout(self.connect_timeout)
             self.debug('set socket connect timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(self.unix_socket)
