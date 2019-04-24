@@ -378,9 +378,37 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
     return descr->page;
 }
 
-void rrdeng_get_statistics(struct rrdengine_instance *ctx, char *str, size_t size)
+void rrdeng_get_27_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
-    (void)get_rrdeng_statistics(ctx, str, size);
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    array[0] = (uint64_t)ctx->stats.metric_API_producers;
+    array[1] = (uint64_t)ctx->stats.metric_API_consumers;
+    array[2] = (uint64_t)pg_cache->page_descriptors;
+    array[3] = (uint64_t)pg_cache->populated_pages;
+    array[4] = (uint64_t)pg_cache->commited_page_index.nr_commited_pages;
+    array[5] = (uint64_t)ctx->stats.pg_cache_insertions;
+    array[6] = (uint64_t)ctx->stats.pg_cache_deletions;
+    array[7] = (uint64_t)ctx->stats.pg_cache_hits;
+    array[8] = (uint64_t)ctx->stats.pg_cache_misses;
+    array[9] = (uint64_t)ctx->stats.pg_cache_backfills;
+    array[10] = (uint64_t)ctx->stats.pg_cache_evictions;
+    array[11] = (uint64_t)ctx->stats.before_compress_bytes;
+    array[12] = (uint64_t)ctx->stats.after_compress_bytes;
+    array[13] = (uint64_t)ctx->stats.before_decompress_bytes;
+    array[14] = (uint64_t)ctx->stats.after_decompress_bytes;
+    array[15] = (uint64_t)ctx->stats.io_write_bytes;
+    array[16] = (uint64_t)ctx->stats.io_write_requests;
+    array[17] = (uint64_t)ctx->stats.io_read_bytes;
+    array[18] = (uint64_t)ctx->stats.io_read_requests;
+    array[19] = (uint64_t)ctx->stats.io_write_extent_bytes;
+    array[20] = (uint64_t)ctx->stats.io_write_extents;
+    array[21] = (uint64_t)ctx->stats.io_read_extent_bytes;
+    array[22] = (uint64_t)ctx->stats.io_read_extents;
+    array[23] = (uint64_t)ctx->stats.datafile_creations;
+    array[24] = (uint64_t)ctx->stats.datafile_deletions;
+    array[25] = (uint64_t)ctx->stats.journalfile_creations;
+    array[26] = (uint64_t)ctx->stats.journalfile_deletions;
 }
 
 /* Releases reference to page */

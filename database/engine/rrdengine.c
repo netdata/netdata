@@ -611,7 +611,7 @@ void timer_cb(uv_timer_t* handle)
 #ifdef NETDATA_INTERNAL_CHECKS
     {
         char buf[4096];
-        debug(D_RRDENGINE, get_rrdeng_statistics(ctx, buf, sizeof(buf)));
+        debug(D_RRDENGINE, "%s", get_rrdeng_statistics(ctx, buf, sizeof(buf)));
     }
 #endif
 }
