@@ -16,7 +16,9 @@ else:
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
-DEFAULT_SOCKET_TIMEOUT = 3
+DEFAULT_CONNECT_TIMEOUT = 3.0
+DEFAULT_READ_TIMEOUT = 3.0
+DEFAULT_WRITE_TIMEOUT = 3.0
 
 
 class SocketService(SimpleService):
@@ -34,6 +36,9 @@ class SocketService(SimpleService):
         self.__socket_config = None
         self.__empty_request = "".encode()
         SimpleService.__init__(self, configuration=configuration, name=name)
+        self.connect_timeout = configuration.get('connect_timeout', DEFAULT_CONNECT_TIMEOUT)
+        self.read_timeout = configuration.get('read_timeout', DEFAULT_READ_TIMEOUT)
+        self.write_timeout = configuration.get('write_timeout', DEFAULT_WRITE_TIMEOUT)
 
     def _socket_error(self, message=None):
         if self.unix_socket is not None:
@@ -89,9 +94,9 @@ class SocketService(SimpleService):
 
         try:
             self.debug('connecting socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
-            self._sock.setblocking(False)
-            self._sock.settimeout(DEFAULT_SOCKET_TIMEOUT)
-            self.debug('set socket timeout to: {0}'.format(self._sock.gettimeout()))
+            # self._sock.setblocking(False)
+            self._sock.settimeout(self.connect_timeout)
+            self.debug('set socket connect timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(sa)
         except (socket.error, ssl.SSLError) as error:
             self.error('Failed to connect to "{address}", port {port}, error: {error}'.format(address=sa[0],
@@ -117,9 +122,9 @@ class SocketService(SimpleService):
         try:
             self.debug('attempting DGRAM unix socket "{0}"'.format(self.unix_socket))
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-            self._sock.setblocking(False)
-            self._sock.settimeout(DEFAULT_SOCKET_TIMEOUT)
-            self.debug('set socket timeout to: {0}'.format(self._sock.gettimeout()))
+            # self._sock.setblocking(False)
+            self._sock.settimeout(self.connect_timeout)
+            self.debug('set socket connect timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(self.unix_socket)
             self.debug('connected DGRAM unix socket "{0}"'.format(self.unix_socket))
             return True
@@ -131,8 +136,8 @@ class SocketService(SimpleService):
             self.debug('attempting STREAM unix socket "{0}"'.format(self.unix_socket))
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self._sock.setblocking(False)
-            self._sock.settimeout(DEFAULT_SOCKET_TIMEOUT)
-            self.debug('set socket timeout to: {0}'.format(self._sock.gettimeout()))
+            self._sock.settimeout(self.connect_timeout)
+            self.debug('set socket connect timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(self.unix_socket)
             self.debug('connected STREAM unix socket "{0}"'.format(self.unix_socket))
             return True
@@ -190,6 +195,8 @@ class SocketService(SimpleService):
         # Send request if it is needed
         if self.request != self.__empty_request:
             try:
+                self.debug('set socket write timeout to: {0}'.format(self._sock.gettimeout()))
+                self._sock.settimeout(self.write_timeout)
                 self.debug('sending request: {0}'.format(request or self.request))
                 self._sock.send(request or self.request)
             except Exception as error:
@@ -210,6 +217,8 @@ class SocketService(SimpleService):
         while True:
             self.debug('receiving response')
             try:
+                self.debug('set socket read timeout to: {0}'.format(self._sock.gettimeout()))
+                self._sock.settimeout(self.read_timeout)
                 buf = self._sock.recv(4096)
             except Exception as error:
                 self._socket_error('failed to receive response: {0}'.format(error))
