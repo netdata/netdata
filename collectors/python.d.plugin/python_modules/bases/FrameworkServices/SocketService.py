@@ -16,9 +16,9 @@ else:
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
-DEFAULT_CONNECT_TIMEOUT = 3.0
-DEFAULT_READ_TIMEOUT = 3.0
-DEFAULT_WRITE_TIMEOUT = 3.0
+DEFAULT_CONNECT_TIMEOUT = 2.0
+DEFAULT_READ_TIMEOUT = 2.0
+DEFAULT_WRITE_TIMEOUT = 2.0
 
 
 class SocketService(SimpleService):
