@@ -57,6 +57,7 @@ static void generate_datafilepath(struct rrdengine_datafile *datafile, char *str
 
 int destroy_data_file(struct rrdengine_datafile *datafile)
 {
+    struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     int i, ret, fd;
     char path[1024];
@@ -83,11 +84,14 @@ int destroy_data_file(struct rrdengine_datafile *datafile)
     assert(0 == req.result);
     uv_fs_req_cleanup(&req);
 
+    ++ctx->stats.datafile_deletions;
+
     return 0;
 }
 
 int create_data_file(struct rrdengine_datafile *datafile)
 {
+    struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     uv_file file;
     int i, ret, fd;
@@ -127,6 +131,9 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     datafile->file = file;
     datafile->pos = sizeof(*superblock);
+    ctx->stats.io_write_bytes += sizeof(*superblock);
+    ++ctx->stats.io_write_requests;
+    ++ctx->stats.datafile_creations;
 
     return 0;
 }
@@ -168,6 +175,7 @@ static int check_data_file_superblock(uv_file file)
 
 static int load_data_file(struct rrdengine_datafile *datafile)
 {
+    struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     uv_file file;
     int i, ret, fd;
@@ -195,6 +203,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     ret = check_data_file_superblock(file);
     if (ret)
         goto error;
+    ctx->stats.io_read_bytes += sizeof(struct rrdeng_df_sb);
+    ++ctx->stats.io_read_requests;
 
     datafile->file = file;
     datafile->pos = file_size;

@@ -17,6 +17,9 @@ struct rrdeng_page_cache_descr;
 #define ALIGN_BYTES_FLOOR(x) (((x) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
 #define ALIGN_BYTES_CEILING(x) ((((x) + RRDENG_BLOCK_SIZE - 1) / RRDENG_BLOCK_SIZE) * RRDENG_BLOCK_SIZE)
 
+typedef uintptr_t rrdeng_stats_t;
+#define rrd_stat_atomic_add(p, n) do {(void) __atomic_fetch_add(p, n, __ATOMIC_RELAXED);} while(0);
+
 struct completion {
     uv_mutex_t mutex;
     uv_cond_t cond;
@@ -66,5 +69,6 @@ static inline void crc32set(void *crcp, uLong crc)
 
 extern void print_page_cache_descr(struct rrdeng_page_cache_descr *page_cache_descr);
 extern int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
+extern char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
 
 #endif /* NETDATA_RRDENGINELIB_H */

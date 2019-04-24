@@ -295,6 +295,7 @@ static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_
     descr->page = NULL;
     descr->flags &= ~RRD_PAGE_POPULATED;
     pg_cache_release_pages_unsafe(ctx, 1);
+    ++ctx->stats.pg_cache_evictions;
 }
 
 /*
@@ -357,6 +358,7 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
     uv_rwlock_wrunlock(&page_index->lock);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
+    ++ctx->stats.pg_cache_deletions;
     --pg_cache->page_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
@@ -484,6 +486,7 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     uv_rwlock_wrunlock(&page_index->lock);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
+    ++ctx->stats.pg_cache_insertions;
     ++pg_cache->page_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 }
@@ -703,6 +706,7 @@ struct rrdeng_page_cache_descr *
             descr->flags &= ~RRD_PAGE_LOCKED;
             pg_cache_wake_up_waiters_unsafe(descr);
             uv_mutex_unlock(&descr->mutex);
+            rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
             return descr;
         }
         uv_rwlock_rdunlock(&page_index->lock);
@@ -720,6 +724,7 @@ struct rrdeng_page_cache_descr *
     if (!(flags & RRD_PAGE_DIRTY))
         pg_cache_replaceQ_set_hot(ctx, descr);
     pg_cache_release_pages(ctx, 1);
+    rrd_stat_atomic_add(&ctx->stats.pg_cache_hits, 1);
     return descr;
 }
 
@@ -770,8 +775,6 @@ void init_page_cache(struct rrdengine_instance *ctx)
 
     pg_cache->page_descriptors = 0;
     pg_cache->populated_pages = 0;
-    pg_cache->consumers = 0;
-    pg_cache->producers = 0;
     assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
     init_metrics_index(ctx);

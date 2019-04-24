@@ -77,11 +77,8 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
             descr->handle = NULL;
             if (descr->page_length) {
 #ifdef NETDATA_INTERNAL_CHECKS
-                uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-                --pg_cache->producers; /* DEBUG STAT */
-                uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+                rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 #endif
-
                 /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
                 ++descr->refcnt;
                 rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
@@ -114,11 +111,8 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         descr->start_time = point_in_time;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-        ++pg_cache->producers; /* DEBUG STAT */
-        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+        rrd_stat_atomic_add(&ctx->stats.metric_API_producers, 1);
 #endif
-
         pg_cache_insert(ctx, handle->page_index, descr);
     } else {
         pg_cache_add_new_metric_time(handle->page_index, descr);
@@ -143,11 +137,8 @@ void rrdeng_store_metric_finalize(RRDDIM *rd)
             struct page_cache *pg_cache = &ctx->pg_cache;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-            uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-            --pg_cache->producers; /* DEBUG STAT */
-            uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+            rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 #endif
-
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
             if (handle->prev_descr) {
                 /* unpin old second page */
@@ -209,11 +200,8 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
                  point_in_time > descr->end_time)) {
         if (descr) {
 #ifdef NETDATA_INTERNAL_CHECKS
-            uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-            --pg_cache->consumers; /* DEBUG STAT */
-            uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+            rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, -1);
 #endif
-
             pg_cache_put(descr);
             handle->descr = NULL;
         }
@@ -223,9 +211,7 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
             goto out;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
-        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-        ++pg_cache->consumers; /* DEBUG STAT */
-        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+        rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, 1);
 #endif
         handle->descr = descr;
     }
@@ -274,9 +260,7 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
     if (descr) {
         struct page_cache *pg_cache = &ctx->pg_cache;
 #ifdef NETDATA_INTERNAL_CHECKS
-        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-        --pg_cache->consumers; /* DEBUG STAT */
-        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+        rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, -1);
 #endif
         pg_cache_put(descr);
     }
@@ -394,6 +378,11 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
     return descr->page;
 }
 
+void rrdeng_get_statistics(struct rrdengine_instance *ctx, char *str, size_t size)
+{
+    (void)get_rrdeng_statistics(ctx, str, size);
+}
+
 /* Releases reference to page */
 void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
 {
@@ -412,6 +401,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     if (NULL == ctxp) {
         /* for testing */
         ctx = &default_global_ctx;
+        memset(ctx, 0, sizeof(*ctx));
     } else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
     }

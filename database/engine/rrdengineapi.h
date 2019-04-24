@@ -26,6 +26,7 @@ extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_han
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
 extern time_t rrdeng_metric_latest_time(RRDDIM *rd);
 extern time_t rrdeng_metric_oldest_time(RRDDIM *rd);
+extern void rrdeng_get_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
 
 /* must call once before using anything */
 extern int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,

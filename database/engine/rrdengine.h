@@ -14,6 +14,7 @@
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
+#include <stdint.h>
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -112,6 +113,37 @@ struct rrdengine_worker_config {
     struct rrdeng_cmdqueue cmd_queue;
 };
 
+/*
+ * Debug statistics not used by code logic.
+ * They only describe operations since DB engine instance load time.
+ */
+struct rrdengine_statistics {
+    rrdeng_stats_t metric_API_producers;
+    rrdeng_stats_t metric_API_consumers;
+    rrdeng_stats_t pg_cache_insertions;
+    rrdeng_stats_t pg_cache_deletions;
+    rrdeng_stats_t pg_cache_hits;
+    rrdeng_stats_t pg_cache_misses;
+    rrdeng_stats_t pg_cache_backfills;
+    rrdeng_stats_t pg_cache_evictions;
+    rrdeng_stats_t before_decompress_bytes;
+    rrdeng_stats_t after_decompress_bytes;
+    rrdeng_stats_t before_compress_bytes;
+    rrdeng_stats_t after_compress_bytes;
+    rrdeng_stats_t io_write_bytes;
+    rrdeng_stats_t io_write_requests;
+    rrdeng_stats_t io_read_bytes;
+    rrdeng_stats_t io_read_requests;
+    rrdeng_stats_t io_write_extent_bytes;
+    rrdeng_stats_t io_write_extents;
+    rrdeng_stats_t io_read_extent_bytes;
+    rrdeng_stats_t io_read_extents;
+    rrdeng_stats_t datafile_creations;
+    rrdeng_stats_t datafile_deletions;
+    rrdeng_stats_t journalfile_creations;
+    rrdeng_stats_t journalfile_deletions;
+};
+
 struct rrdengine_instance {
     rrdengine_state_t rrdengine_state;
     struct rrdengine_worker_config worker_config;
@@ -125,6 +157,8 @@ struct rrdengine_instance {
     uint64_t max_disk_space;
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
+
+    struct rrdengine_statistics stats;
 };
 
 extern void sanity_check(void);
