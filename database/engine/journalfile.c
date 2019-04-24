@@ -51,6 +51,8 @@ void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
     journalfile->pos += RRDENG_BLOCK_SIZE;
     ctx->disk_space += RRDENG_BLOCK_SIZE;
     ctx->commit_log.buf = NULL;
+    ctx->stats.io_write_bytes += RRDENG_BLOCK_SIZE;
+    ++ctx->stats.io_write_requests;
 }
 
 void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned size)
@@ -100,6 +102,7 @@ void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengin
 
 int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
+    struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     int ret, fd;
     char path[1024];
@@ -127,11 +130,14 @@ int destroy_journal_file(struct rrdengine_journalfile *journalfile, struct rrden
     assert(0 == req.result);
     uv_fs_req_cleanup(&req);
 
+    ++ctx->stats.journalfile_deletions;
+
     return 0;
 }
 
 int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
+    struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     uv_file file;
     int i, ret, fd;
@@ -170,6 +176,9 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
 
     journalfile->file = file;
     journalfile->pos = sizeof(*superblock);
+    ctx->stats.io_write_bytes += sizeof(*superblock);
+    ++ctx->stats.io_write_requests;
+    ++ctx->stats.journalfile_creations;
 
     return 0;
 }
@@ -367,6 +376,8 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
         }
         assert(req.result >= 0);
         uv_fs_req_cleanup(&req);
+        ctx->stats.io_read_bytes += size_bytes;
+        ++ctx->stats.io_read_requests;
 
         //pos_i = pos;
         //while (pos_i < pos + size_bytes) {
@@ -418,6 +429,8 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     ret = check_journal_file_superblock(file);
     if (ret)
         goto error;
+    ctx->stats.io_read_bytes += sizeof(struct rrdeng_jf_sb);
+    ++ctx->stats.io_read_requests;
 
     journalfile->file = file;
     journalfile->pos = file_size;

@@ -102,9 +102,6 @@ struct page_cache { /* TODO: add statistics */
 
     unsigned page_descriptors;
     unsigned populated_pages;
-    /* Debug Statistics */
-    unsigned consumers;
-    unsigned producers;
 };
 
 extern void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_cache_descr *descr);

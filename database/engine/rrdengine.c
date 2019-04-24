@@ -71,15 +71,17 @@ void read_extent_cb(uv_fs_t* req)
         uncompressed_buf = mallocz(uncompressed_payload_length);
         ret = LZ4_decompress_safe(xt_io_descr->buf + payload_offset, uncompressed_buf,
                                   payload_length, uncompressed_payload_length);
+        ctx->stats.before_decompress_bytes += payload_length;
+        ctx->stats.after_decompress_bytes += ret;
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
         /* care, we don't hold the descriptor mutex */
     }
 
-    ret = posix_memalign(&page, RRDFILE_ALIGNMENT, RRDENG_BLOCK_SIZE);
-    if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
-    }
     for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
+        ret = posix_memalign(&page, RRDFILE_ALIGNMENT, RRDENG_BLOCK_SIZE);
+        if (unlikely(ret)) {
+            fatal("posix_memalign:%s", strerror(ret));
+        }
         descr = xt_io_descr->descr_array[i];
         for (j = 0, page_offset = 0; j < count; ++j) {
             /* care, we don't hold the descriptor mutex */
@@ -127,9 +129,10 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
                            unsigned count,
                            uint8_t release_descr)
 {
+    struct rrdengine_instance *ctx = wc->ctx;
     int i, ret;
-    unsigned size_bytes, pos;
-    uint32_t payload_length;
+    unsigned size_bytes, pos, real_io_size;
+//    uint32_t payload_length;
     struct rrdeng_page_cache_descr *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
     struct rrdengine_datafile *datafile;
@@ -148,7 +151,7 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     for (i = 0 ; i < count; ++i) {
         uv_mutex_lock(&descr[i]->mutex);
         descr[i]->flags |= RRD_PAGE_READ_PENDING;
-        payload_length = descr[i]->page_length;
+//        payload_length = descr[i]->page_length;
         uv_mutex_unlock(&descr[i]->mutex);
 
         xt_io_descr->descr_array[i] = descr[i];
@@ -161,9 +164,15 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
     /* xt_io_descr->descr_commit_idx_array[0] */
     xt_io_descr->release_descr = release_descr;
 
-    xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, ALIGN_BYTES_CEILING(size_bytes));
+    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
+    xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     ret = uv_fs_read(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, pos, read_extent_cb);
     assert (-1 != ret);
+    ctx->stats.io_read_bytes += real_io_size;
+    ++ctx->stats.io_read_requests;
+    ctx->stats.io_read_extent_bytes += real_io_size;
+    ++ctx->stats.io_read_extents;
+    ctx->stats.pg_cache_backfills += count;
 }
 
 static void commit_data_extent(struct rrdengine_worker_config* wc, struct extent_io_descriptor *xt_io_descr)
@@ -275,7 +284,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     struct rrdengine_instance *ctx = wc->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
     int i, ret, compressed_size, max_compressed_size = 0;
-    unsigned count, size_bytes, pos;
+    unsigned count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, payload_offset;
     struct rrdeng_page_cache_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
@@ -387,6 +396,8 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     default: /* Compress */
         compressed_size = LZ4_compress_default(xt_io_descr->buf + payload_offset, compressed_buf,
                                                uncompressed_payload_length, max_compressed_size);
+        ctx->stats.before_compress_bytes += uncompressed_payload_length;
+        ctx->stats.after_compress_bytes += compressed_size;
         debug(D_RRDENGINE, "LZ4 compressed %"PRIu32" bytes to %d bytes.", uncompressed_payload_length, compressed_size);
         (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
         free(compressed_buf);
@@ -405,9 +416,14 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     crc = crc32(crc, xt_io_descr->buf, size_bytes - sizeof(*trailer));
     crc32set(trailer->checksum, crc);
 
-    xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, ALIGN_BYTES_CEILING(size_bytes));
+    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
+    xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, datafile->pos, flush_pages_cb);
     assert (-1 != ret);
+    ctx->stats.io_write_bytes += real_io_size;
+    ++ctx->stats.io_write_requests;
+    ctx->stats.io_write_extent_bytes += real_io_size;
+    ++ctx->stats.io_write_extents;
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
@@ -592,9 +608,12 @@ void timer_cb(uv_timer_t* handle)
             bytes_written = do_flush_pages(wc, 0, NULL);
         }
     }
-    debug(D_RRDENGINE, "Page Statistics: total=%u, populated=%u, commited=%u API consumers=%u/producers=%u",
-          pg_cache->page_descriptors, pg_cache->populated_pages, pg_cache->commited_page_index.nr_commited_pages,
-          pg_cache->consumers, pg_cache->producers);
+#ifdef NETDATA_INTERNAL_CHECKS
+    {
+        char buf[4096];
+        debug(D_RRDENGINE, get_rrdeng_statistics(ctx, buf, sizeof(buf)));
+    }
+#endif
 }
 
 /* Flushes dirty pages when timer expires */
