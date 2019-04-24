@@ -16,6 +16,9 @@ else:
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
+DEFAULT_SOCKET_TIMEOUT = 3
+
+
 class SocketService(SimpleService):
     def __init__(self, configuration=None, name=None):
         self._sock = None
@@ -86,6 +89,9 @@ class SocketService(SimpleService):
 
         try:
             self.debug('connecting socket to "{address}", port {port}'.format(address=sa[0], port=sa[1]))
+            self._sock.setblocking(False)
+            self._sock.settimeout(DEFAULT_SOCKET_TIMEOUT)
+            self.debug('set socket timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(sa)
         except (socket.error, ssl.SSLError) as error:
             self.error('Failed to connect to "{address}", port {port}, error: {error}'.format(address=sa[0],
@@ -111,6 +117,9 @@ class SocketService(SimpleService):
         try:
             self.debug('attempting DGRAM unix socket "{0}"'.format(self.unix_socket))
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            self._sock.setblocking(False)
+            self._sock.settimeout(DEFAULT_SOCKET_TIMEOUT)
+            self.debug('set socket timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(self.unix_socket)
             self.debug('connected DGRAM unix socket "{0}"'.format(self.unix_socket))
             return True
@@ -121,6 +130,9 @@ class SocketService(SimpleService):
         try:
             self.debug('attempting STREAM unix socket "{0}"'.format(self.unix_socket))
             self._sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self._sock.setblocking(False)
+            self._sock.settimeout(DEFAULT_SOCKET_TIMEOUT)
+            self.debug('set socket timeout to: {0}'.format(self._sock.gettimeout()))
             self._sock.connect(self.unix_socket)
             self.debug('connected STREAM unix socket "{0}"'.format(self.unix_socket))
             return True
@@ -155,11 +167,6 @@ class SocketService(SimpleService):
         except Exception:
             self._sock = None
             self.__socket_config = None
-
-        if self._sock is not None:
-            self._sock.setblocking(0)
-            self._sock.settimeout(5)
-            self.debug('set socket timeout to: {0}'.format(self._sock.gettimeout()))
 
     def _disconnect(self):
         """
