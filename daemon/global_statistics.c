@@ -567,13 +567,22 @@ void global_statistics_charts(void) {
             else
                 rrdset_next(st_compression);
 
+            static unsigned long long old_compressed_content_size = 0;
+            static unsigned long long old_content_size = 0;
+            unsigned long long ratio;
             unsigned long long compressed_content_size = stats_array[12];
             unsigned long long content_size = stats_array[11];
-            unsigned long long ratio;
+            unsigned long long compressed_content_size_delta;
+            unsigned long long content_size_delta;
 
-            if (content_size) {
+            compressed_content_size_delta = compressed_content_size - old_compressed_content_size;
+            content_size_delta = content_size - old_content_size;
+            old_compressed_content_size = compressed_content_size;
+            old_content_size = content_size;
+
+            if (content_size_delta) {
                 // allow negative savings
-                ratio = ((content_size - compressed_content_size) * 100 * 1000) / content_size;
+                ratio = ((content_size_delta - compressed_content_size_delta) * 100 * 1000) / content_size_delta;
             } else {
                 ratio = 0;
             }
@@ -609,13 +618,22 @@ void global_statistics_charts(void) {
             else
                 rrdset_next(st_pg_cache_hit_ratio);
 
+            static unsigned long long old_hits = 0;
+            static unsigned long long old_misses = 0;
             unsigned long long hits = stats_array[7];
             unsigned long long misses = stats_array[8];
+            unsigned long long hits_delta;
+            unsigned long long misses_delta;
             unsigned long long ratio;
 
-            if (hits + misses) {
+            hits_delta = hits - old_hits;
+            misses_delta = misses - old_misses;
+            old_hits = hits;
+            old_misses = misses;
+
+            if (hits_delta + misses_delta) {
                 // allow negative savings
-                ratio = (hits * 100 * 1000) / (hits + misses);
+                ratio = (hits_delta * 100 * 1000) / (hits_delta + misses_delta);
             } else {
                 ratio = 0;
             }
