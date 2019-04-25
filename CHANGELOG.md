@@ -8,6 +8,7 @@
 - Fix dependency installation for Fedora 30 [\#5831](https://github.com/netdata/netdata/issues/5831)
 - netdata/packaging/ci: Investigate pipeline failure [\#5733](https://github.com/netdata/netdata/issues/5733)
 - \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
+- python SocketService: lack of connect timeout, python.d.plugin hangs [\#5541](https://github.com/netdata/netdata/issues/5541)
 
 **Closed issues:**
 
@@ -18,6 +19,7 @@
 
 **Merged pull requests:**
 
+- SocketService: set socket operation timeout before connecting [\#5911](https://github.com/netdata/netdata/pull/5911) ([ilyam8](https://github.com/ilyam8))
 - NEW: allow additional name argument passing to urllib3 request in UrlService [\#5893](https://github.com/netdata/netdata/pull/5893) ([andvgal](https://github.com/andvgal))
 - Extend netdata info API call [\#5889](https://github.com/netdata/netdata/pull/5889) ([cakrit](https://github.com/cakrit))
 - Add ioping plugin [\#5725](https://github.com/netdata/netdata/pull/5725) ([vlvkobal](https://github.com/vlvkobal))
