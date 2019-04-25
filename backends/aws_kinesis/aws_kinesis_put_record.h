@@ -7,7 +7,9 @@
 extern "C" {
 #endif
 
-int put_record(char *region, char *auth_key_id, char *secure_key, char *stream_name, char *partition_key, char *data, size_t data_len);
+int put_record(const char *region, const char *auth_key_id, const char *secure_key,
+               const char *stream_name, const char *partition_key,
+               const char *data, size_t data_len);
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,8 @@
 
 #define KINESIS_PARTITION_KEY_LEN 256
 
+extern int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_p, char **stream_name_p);
+
 extern int format_dimension_collected_kinesis_plaintext(
           BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use

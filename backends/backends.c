@@ -234,10 +234,12 @@ void *backends_main(void *ptr) {
 
     int default_port = 0;
     int sock = -1;
-    int do_kinesis = 0;
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
+
+    int do_kinesis = 0;
+    char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
 
     // ------------------------------------------------------------------------
     // collect configuration options
@@ -263,12 +265,6 @@ void *backends_main(void *ptr) {
 
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
     hosts_pattern  = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
-
-    // TODO: move Kinesis configuration to a separate .config file
-    const char *kinesis_region            = config_get(CONFIG_SECTION_BACKEND, "kinesis region", "us-east-1");
-    const char *kinesis_auth_key_id       = config_get(CONFIG_SECTION_BACKEND, "kinesis auth key id", "");
-    const char *kinesis_secure_key        = config_get(CONFIG_SECTION_BACKEND, "kinesis secure key", "");
-    const char *kinesis_stream_name       = config_get(CONFIG_SECTION_BACKEND, "kinesis stream name", "");
 
     // ------------------------------------------------------------------------
     // validate configuration options
@@ -325,6 +321,11 @@ void *backends_main(void *ptr) {
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
 
         do_kinesis = 1;
+
+        if(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name)) {
+            error("BACKEND: kinesis backend type is set but cannot read its configuration from %s/aws_kinesis.conf", netdata_configured_user_config_dir);
+            goto cleanup;
+        }
 
         backend_response_checker = process_kinesis_response;
         if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
@@ -520,8 +521,8 @@ void *backends_main(void *ptr) {
 
             snprintf(partition_key, KINESIS_PARTITION_KEY_LEN, "netdata_%llu", partition_key_seq++);
 
-            // while(there is data in buffer) {
-                put_record(kinesis_region, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, buffer_tostring(b), buffer_strlen(b));
+            // while(there is data in the buffer) {
+                put_record(destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, buffer_tostring(b), buffer_strlen(b));
                 buffer_flush(b);
             // }
         }
