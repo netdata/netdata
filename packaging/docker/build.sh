@@ -20,8 +20,13 @@ DEVEL_ARCHS=(amd64)
 ARCHS="${!ARCH_MAP[@]}"
 
 if [ -z ${REPOSITORY} ]; then
-	echo "REPOSITORY not set, build cannot proceed"
-	exit 1
+	REPOSITORY="${TRAVIS_REPO_SLUG}"
+	if [ -z ${REPOSITORY} ]; then
+		echo "REPOSITORY not set, build cannot proceed"
+		exit 1
+	else
+		echo "REPOSITORY was not detected, attempted to use TRAVIS_REPO_SLUG setting: ${TRAVIS_REPO_SLUG}"
+	fi
 fi
 
 # When development mode is set, build on DEVEL_ARCHS

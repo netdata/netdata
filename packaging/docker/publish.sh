@@ -22,8 +22,13 @@ ARCHS="${!ARCH_MAP[@]}"
 DOCKER_CMD="docker --config ${WORKDIR}"
 
 if [ -z ${REPOSITORY} ]; then
-	echo "REPOSITORY not set, publishing cannot proceed"
-	exit 1
+	REPOSITORY="${TRAVIS_REPO_SLUG}"
+	if [ -z ${REPOSITORY} ]; then
+		echo "REPOSITORY not set, publish cannot proceed"
+		exit 1
+	else
+		echo "REPOSITORY was not detected, attempted to use TRAVIS_REPO_SLUG setting: ${TRAVIS_REPO_SLUG}"
+	fi
 fi
 
 # When development mode is set, build on DEVEL_ARCHS
