@@ -79,4 +79,6 @@ extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
 extern int netdata_anonymous_statistics_enabled;
 
+int netdata_ready;
+
 #endif /* NETDATA_COMMON_H */

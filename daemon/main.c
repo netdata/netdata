@@ -650,6 +650,43 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
+int get_system_info () {
+    char *script;
+    script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
+    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
+    if (unlikely(access(script, R_OK) != 0)) {
+        info("System info script %s not found.",script);
+        freez(script);
+        return 1;
+    }
+
+    pid_t command_pid;
+
+    info("Executing %s", script);
+
+    FILE *fp = mypopen(script, &command_pid);
+    if(fp) {
+        char buffer[200 + 1];
+        while (fgets(buffer, 200, fp) != NULL) {
+            char *name=buffer;
+            char *value=buffer;
+            while (*value && *value != '=') value++;
+            if (*value=='=') {
+                *value='\0';
+                value++;
+                char *newline = value + strlen(value) - 1;
+                (*newline)='\0';
+            }
+            if (name && value && *name && *value) {
+                info("%s=%s", name, value);
+                setenv(name, value, 1);
+            }
+        }
+        mypclose(fp, command_pid);
+    }
+    freez(script);
+    return 0;
+}
 
 void send_statistics( const char *action, const char *action_result, const char *action_data) {
     static char *as_script;
@@ -697,6 +734,7 @@ int main(int argc, char **argv) {
     int dont_fork = 0;
     size_t default_stacksize;
 
+    netdata_ready=0;
     // set the name for logging
     program_name = "netdata";
 
@@ -1053,7 +1091,7 @@ int main(int argc, char **argv) {
     // initialize the log files
     open_all_log_files();
 	netdata_anonymous_statistics_enabled=-1;
-	send_statistics("START","-", "-");
+    if (get_system_info() == 0) send_statistics("START","-", "-");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1113,7 +1151,7 @@ int main(int argc, char **argv) {
     }
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
-
+    netdata_ready = 1;
 
     // ------------------------------------------------------------------------
     // unblock signals

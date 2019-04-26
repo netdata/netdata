@@ -58,6 +58,11 @@ function docker_get_name_api() {
 		warning "Can't find ${DOCKER_HOST}"
 		return 1
 	fi
+	if ! command -v jq >/dev/null 2>&1; then
+		warning "Can't find jq command line tool. jq is required for netdata to retrieve docker container name using ${DOCKER_HOST} API, falling back to docker ps"
+		return 1
+	fi
+
 	info "Running API command: /containers/${id}/json"
 	JSON=$(echo -e "GET /containers/${id}/json HTTP/1.0\\r\\n" | nc -U "${DOCKER_HOST}" | grep '^{.*')
 	NAME=$(echo "$JSON" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
@@ -71,12 +76,17 @@ function k8s_get_name() {
 		id="${1##*/}"
 	fi
 	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
-	NAME="$(
-curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
-jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_\(.status.containerStatuses[0].name) \(.status.containerStatuses[0].containerID)"' |
-grep "$id" |
-cut -d' ' -f1
-)"
+	if command -v jq >/dev/null 2>&1; then
+		NAME="$(
+		curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
+		jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_\(.status.containerStatuses[0].name) \(.status.containerStatuses[0].containerID)"' |
+		grep "$id" |
+		cut -d' ' -f1
+		)"
+	else
+		warning "jq command not available, k8s_get_name() cannot execute. Please install jq should you wish for k8s to be fully functional"
+	fi
+
 	if [ -z "${NAME}" ]; then
 		warning "cannot find the name of k8s pod with containerID '${id}'. Setting name to ${id} and disabling it"
 		NAME="${id}"

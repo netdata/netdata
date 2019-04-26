@@ -30,6 +30,7 @@ plugin|lang|O/S|runs as|modular|description
 [cups.plugin](cups.plugin/)|`C`|any|external|-|monitors **CUPS**
 [diskspace.plugin](diskspace.plugin/)|`C`|linux|internal|-|collects disk space usage metrics on Linux mount points
 [fping.plugin](fping.plugin/)|`C`|any|external|-|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
+[ioping.plugin](ioping.plugin/)|`C`|any|external|-|measures disk read/write latency.
 [freebsd.plugin](freebsd.plugin/)|`C`|freebsd|internal|yes|collects resource usage and performance data on FreeBSD systems
 [freeipmi.plugin](freeipmi.plugin/)|`C`|linux, freebsd|external|-|collects metrics from enterprise hardware sensors, on Linux and FreeBSD servers.
 [idlejitter.plugin](idlejitter.plugin/)|`C`|any|internal|-|measures CPU latency and jitter on all operating systems
