@@ -80,6 +80,8 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
         }
     }
 
+    fclose(fp);
+
     if(!auth_key_id || !*auth_key_id || !secure_key || !*secure_key || !stream_name || !*stream_name) {
         error("BACKEND: mandatory Kinesis parameters are not configured:%s%s%s",
               (auth_key_id && *auth_key_id) ? "" : " auth key id,",

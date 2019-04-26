@@ -516,20 +516,21 @@ void *backends_main(void *ptr) {
         after = before;
 
         if(do_kinesis) {
-            static unsigned long long partition_key_seq = 0;
-            char partition_key[KINESIS_PARTITION_KEY_MAX + 1];
-
-            snprintf(partition_key, KINESIS_PARTITION_KEY_MAX, "netdata_%llu", partition_key_seq++);
-            size_t partition_key_len = strlen(partition_key);
+            unsigned long long partition_key_seq = 0;
 
             size_t buffer_len = buffer_strlen(b);
             size_t sent = 0;
 
             while(sent < buffer_len) {
+                char partition_key[KINESIS_PARTITION_KEY_MAX + 1];
+                snprintf(partition_key, KINESIS_PARTITION_KEY_MAX, "netdata_%llu", partition_key_seq++);
+                size_t partition_key_len = strnlen(partition_key, KINESIS_PARTITION_KEY_MAX);
+
                 const char *first_char = buffer_tostring(b) + sent;
+
                 size_t record_len = 0;
 
-                // split buffer to chunks of maximum allowed size
+                // split buffer into chunks of maximum allowed size
                 if(buffer_len - sent < KINESIS_RECORD_MAX - partition_key_len) {
                     record_len = buffer_len - sent;
                 }
