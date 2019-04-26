@@ -101,6 +101,13 @@ NETDATA.unitsConversion = {
             'TiB': 1024,
             'PiB': 1024 * 1024,
             'EiB': 1024 * 1024 * 1024
+        },
+        'num': {
+            'num': 1,
+            'num (K)': 1000,
+            'num (M)': 1000000,
+            'num (G)': 1000000000,
+            'num (T)': 1000000000000
         }
         /*
         'milliseconds': {
