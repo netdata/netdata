@@ -454,7 +454,14 @@ class Ata190(BaseAtaSmartAttribute):
 
 
 class Ata194(BaseAtaSmartAttribute):
+    # https://github.com/netdata/netdata/issues/3041
+    # https://github.com/netdata/netdata/issues/5919
+    #
+    # The low byte is the current temperature, the third lowest is the maximum, and the fifth lowest is the minimum
     def value(self):
+        value = int(self.raw_value)
+        if value > 1e6:
+            return value & 0xFF
         return min(int(self.normalized_value), int(self.raw_value))
 
 
