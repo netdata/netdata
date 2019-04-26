@@ -15,6 +15,10 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
     char *secure_key = *secure_key_p;
     char *stream_name = *stream_name_p;
 
+    if(auth_key_id) freez(auth_key_id);
+    if(secure_key) freez(secure_key);
+    if(stream_name) freez(stream_name);
+
     int line = 0;
 
     char filename[FILENAME_MAX + 1];

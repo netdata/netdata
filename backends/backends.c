@@ -517,14 +517,34 @@ void *backends_main(void *ptr) {
 
         if(do_kinesis) {
             static unsigned long long partition_key_seq = 0;
-            char partition_key[KINESIS_PARTITION_KEY_LEN + 1];
+            char partition_key[KINESIS_PARTITION_KEY_MAX + 1];
 
-            snprintf(partition_key, KINESIS_PARTITION_KEY_LEN, "netdata_%llu", partition_key_seq++);
+            snprintf(partition_key, KINESIS_PARTITION_KEY_MAX, "netdata_%llu", partition_key_seq++);
+            size_t partition_key_len = strlen(partition_key);
 
-            // while(there is data in the buffer) {
-                put_record(destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, buffer_tostring(b), buffer_strlen(b));
-                buffer_flush(b);
-            // }
+            size_t buffer_len = buffer_strlen(b);
+            size_t sent = 0;
+
+            while(sent < buffer_len) {
+                const char *first_char = buffer_tostring(b) + sent;
+                size_t record_len = 0;
+
+                // split buffer to chunks of maximum allowed size
+                if(buffer_len - sent < KINESIS_RECORD_MAX - partition_key_len) {
+                    record_len = buffer_len - sent;
+                }
+                else {
+                    record_len = KINESIS_RECORD_MAX - partition_key_len;
+                    while(*(first_char + record_len) != '\n' && record_len) record_len--;
+                }
+
+                info("KINESIS: put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, buffer = %zu, record = %zu",
+                     destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, buffer_len, record_len);
+                put_record(destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, first_char, record_len);
+
+                sent += record_len;
+            }
+            buffer_flush(b);
         }
         else {
             // ------------------------------------------------------------------------
