@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Cross-arch docker publish helper script
 # Needs docker in version >18.02 due to usage of manifests
 #
@@ -15,12 +15,21 @@ fi
 
 WORKDIR="$(mktemp -d)" # Temporary folder, removed after script is done
 VERSION="$1"
-REPOSITORY="${REPOSITORY:-netdata}"
 declare -A ARCH_MAP
 ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
 ARCHS="${!ARCH_MAP[@]}"
 DOCKER_CMD="docker --config ${WORKDIR}"
+
+if [ -z ${REPOSITORY} ]; then
+	REPOSITORY="${TRAVIS_REPO_SLUG}"
+	if [ -z ${REPOSITORY} ]; then
+		echo "REPOSITORY not set, publish cannot proceed"
+		exit 1
+	else
+		echo "REPOSITORY was not detected, attempted to use TRAVIS_REPO_SLUG setting: ${TRAVIS_REPO_SLUG}"
+	fi
+fi
 
 # When development mode is set, build on DEVEL_ARCHS
 if [ ! -z ${DEVEL+x} ]; then
