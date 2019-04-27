@@ -432,8 +432,10 @@ static inline void do_dimension(
         //storage_number n = rd->values[slot];
 #ifdef NETDATA_INTERNAL_CHECKS
         if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
             if (now != handle.rrdeng.now)
                 error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)handle.rrdeng.now, (long)now);
+#endif
         } else if (rrdset_time2slot(st, now) != (long unsigned)handle.slotted.slot) {
             error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)handle.slotted.slot, rrdset_time2slot(st, now));
         }
