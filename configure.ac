@@ -126,7 +126,7 @@ AC_ARG_ENABLE(
 )
 AC_ARG_ENABLE(
     [dbengine],
-    [AS_HELP_STRING([--disable-dbengine], [enable netdata dbengine @<:@default autodetect@:>@])],
+    [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
     [enable_dbengine="detect"]
 )
