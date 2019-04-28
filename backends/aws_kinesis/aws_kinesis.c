@@ -63,11 +63,15 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
         if(!value) value = "";
 
         // strip quotes
-        if(*value == '"' || *value == '\'') value++;
-        s = value;
-        while(*s) s++;
-        if(s != value) s--;
-        if(*s == '"' || *s == '\'') *s = '\0';
+        if(*value == '"' || *value == '\'') {
+            value++;
+
+            s = value;
+            while(*s) s++;
+            if(s != value) s--;
+
+            if(*s == '"' || *s == '\'') *s = '\0';
+        }
 
         if(name[0] == 'a' && !strcmp(name, "auth key id")) {
             auth_key_id = strdupz(value);

@@ -7,12 +7,13 @@
 #include <aws/kinesis/KinesisClient.h>
 #include <aws/kinesis/model/PutRecordRequest.h>
 #include "aws_kinesis_put_record.h"
+#include <iostream>
 
 using namespace Aws;
 
 int put_record(const char *region, const char *auth_key_id, const char *secure_key,
                const char *stream_name, const char *partition_key,
-               const char *data, size_t data_len) {
+               const char *data, size_t data_len, char *error_message) {
     SDKOptions options;
 
     InitAPI(options);
@@ -32,11 +33,11 @@ int put_record(const char *region, const char *auth_key_id, const char *secure_k
 
         Kinesis::Model::PutRecordOutcome outcome = client.PutRecord(request);
 
-        // if(!outcome.IsSuccess()) {
-        //     if(outcome.GetError().GetErrorType() == DynamoDBErrors::RESOURCE_IN_USE) {
-
-        //     }
-        // }
+        if(!outcome.IsSuccess()) {
+            outcome.GetError().GetMessage().copy(error_message, ERROR_LINE_MAX);
+            ShutdownAPI(options);
+            return 1;
+        }
     }
 
     ShutdownAPI(options);

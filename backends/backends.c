@@ -539,12 +539,41 @@ void *backends_main(void *ptr) {
                     while(*(first_char + record_len) != '\n' && record_len) record_len--;
                 }
 
+                char error_message[ERROR_LINE_MAX + 1];
+
                 info("KINESIS: put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, buffer = %zu, record = %zu",
                      destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, buffer_len, record_len);
-                put_record(destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, first_char, record_len);
+                if(put_record(destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, first_char, record_len, error_message)) {
+                    // oops! we couldn't send (all or some of the) data
+                    error("BACKEND: %s", error_message);
+                    error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes. Will re-connect.",
+                          destination, buffer_len, sent);
 
-                sent += record_len;
+                    chart_transmission_failures++;
+
+                    // increment the counter we check for data loss
+                    failures++;
+
+                    if(failures > buffer_on_failures) {
+                        // too bad! we are going to lose data
+                        chart_lost_bytes += buffer_strlen(b);
+                        error("BACKEND: reached %d backend failures. Flushing buffers to protect this host - this results in data loss on back-end server '%s'", failures, destination);
+                        buffer_flush(b);
+                        buffer_len = 0;
+                        failures = 0;
+                        chart_data_lost_events++;
+                        chart_lost_metrics = chart_buffered_metrics;
+                    }
+                }
+                else {
+                    sent += record_len;
+                }
+
+                if(unlikely(netdata_exit)) break;
             }
+
+            chart_sent_bytes += sent;
+
             buffer_flush(b);
         }
         else {
