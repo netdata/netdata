@@ -46,7 +46,7 @@ fi
 MANIFEST_LIST="${REPOSITORY}:${VERSION}"
 
 # There is no reason to continue if we cannot log in to docker hub
-if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PASS+x} ]; then
+if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PWD+x} ]; then
     echo "No docker hub username or password found, aborting without publishing"
     exit 1
 fi
@@ -70,7 +70,7 @@ echo "Manifest list : ${MANIFEST_LIST}"
 echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 
 # Login to docker hub to allow futher operations
-echo "$DOCKER_PASS" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
+echo "$DOCKER_PWD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
 for ARCH in ${ARCHS[@]}; do
