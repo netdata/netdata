@@ -327,11 +327,11 @@ void *backends_main(void *ptr) {
             goto cleanup;
         }
 
-        backend_response_checker = process_kinesis_response;
+        backend_response_checker = process_json_response;
         if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-            backend_request_formatter = format_dimension_collected_kinesis_plaintext;
+            backend_request_formatter = format_dimension_collected_json_plaintext;
         else
-            backend_request_formatter = format_dimension_stored_kinesis_plaintext;
+            backend_request_formatter = format_dimension_stored_json_plaintext;
 
     }
     else {
@@ -543,7 +543,7 @@ void *backends_main(void *ptr) {
 
                 info("KINESIS: put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, buffer = %zu, record = %zu",
                      destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, buffer_len, record_len);
-                if(put_record(destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, first_char, record_len, error_message)) {
+                if(kinesis_put_record(destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name, partition_key, first_char, record_len, error_message)) {
                     // oops! we couldn't send (all or some of the) data
                     error("BACKEND: %s", error_message);
                     error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes. Will re-connect.",
@@ -567,6 +567,7 @@ void *backends_main(void *ptr) {
                 }
                 else {
                     sent += record_len;
+                    chart_receptions++;
                 }
 
                 if(unlikely(netdata_exit)) break;

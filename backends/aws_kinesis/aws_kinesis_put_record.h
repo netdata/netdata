@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-int put_record(const char *region, const char *auth_key_id, const char *secure_key,
+int kinesis_put_record(const char *region, const char *auth_key_id, const char *secure_key,
                const char *stream_name, const char *partition_key,
                const char *data, size_t data_len, char *error_message);
 
