@@ -469,7 +469,8 @@ class Service(SimpleService):
             self.metrics_to_collect.extend(COMMANDS)
         if 'wiredTiger' in server_status:
             self.metrics_to_collect.extend(WIREDTIGER)
-        if 'Collection' in server_status['locks']:
+        has_locks = 'locks' in server_status
+        if has_locks and 'Collection' in server_status['locks']:
             self.metrics_to_collect.extend(LOCKS)
 
     def create_charts_(self, server_status):
@@ -496,13 +497,14 @@ class Service(SimpleService):
             self.order.remove('command_total_rate')
             self.order.remove('command_failed_rate')
 
-        if 'Collection' not in server_status['locks']:
+        has_no_locks = 'locks' not in server_status
+        if has_no_locks or 'Collection' not in server_status['locks']:
             self.order.remove('locks_collection')
             self.order.remove('locks_database')
             self.order.remove('locks_global')
             self.order.remove('locks_metadata')
 
-        if 'oplog' not in server_status['locks']:
+        if has_no_locks or 'oplog' not in server_status['locks']:
             self.order.remove('locks_oplog')
 
         for dbase in self.databases:
