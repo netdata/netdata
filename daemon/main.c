@@ -864,6 +864,38 @@ int main(int argc, char **argv) {
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
+#ifdef ENABLE_DBENGINE
+                            {
+                                int ret;
+                                RRDHOST *host;
+
+                                debug(D_RRDHOST, "Initializing localhost with hostname 'unittest-dbengine'");
+                                host = rrdhost_find_or_create(
+                                        "unittest-dbengine"
+                                        , "unittest-dbengine"
+                                        , "unittest-dbengine"
+                                        , os_type
+                                        , netdata_configured_timezone
+                                        , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+                                        , program_name
+                                        , program_version
+                                        , default_rrd_update_every
+                                        , default_rrd_history_entries
+                                        , RRD_MEMORY_MODE_DBENGINE
+                                        , default_health_enabled
+                                        , default_rrdpush_enabled
+                                        , default_rrdpush_destination
+                                        , default_rrdpush_api_key
+                                        , default_rrdpush_send_charts_matching
+                                );
+                                ret = test_dbengine(host);
+                                rrd_wrlock();
+                                rrdhost_delete_charts(host);
+                                rrdhost_free(host);
+                                rrd_unlock();
+                                if (ret) return 1;
+                            }
+#endif
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }

@@ -134,8 +134,6 @@ void rrdeng_store_metric_finalize(RRDDIM *rd)
     if (descr) {
         descr->handle = NULL;
         if (descr->page_length) {
-            struct page_cache *pg_cache = &ctx->pg_cache;
-
 #ifdef NETDATA_INTERNAL_CHECKS
             rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 #endif
@@ -176,7 +174,6 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
 {
     struct rrdeng_query_handle *handle;
     struct rrdengine_instance *ctx;
-    struct page_cache *pg_cache;
     struct rrdeng_page_cache_descr *descr;
     storage_number *page, ret;
     unsigned position;
@@ -187,7 +184,6 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         return SN_EMPTY_SLOT;
     }
     ctx = handle->ctx;
-    pg_cache = &ctx->pg_cache;
     point_in_time = handle->now * USEC_PER_SEC;
     descr = handle->descr;
 
@@ -258,7 +254,6 @@ void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle)
     ctx = handle->ctx;
     descr = handle->descr;
     if (descr) {
-        struct page_cache *pg_cache = &ctx->pg_cache;
 #ifdef NETDATA_INTERNAL_CHECKS
         rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, -1);
 #endif
@@ -320,9 +315,6 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_cache
                         Word_t page_correlation_id)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    int i;
-    struct rrdeng_cmd cmd;
-    struct rrdeng_page_cache_descr *tmp;
     Pvoid_t *PValue;
 
     if (unlikely(NULL == descr)) {
@@ -344,8 +336,6 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_cache
 void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle)
 {
     struct rrdeng_page_cache_descr *descr;
-    void *page;
-    int ret;
 
     debug(D_RRDENGINE, "----------------------\nReading existing page:\n----------------------");
     descr = pg_cache_lookup(ctx, NULL, id, INVALID_TIME);
@@ -363,8 +353,6 @@ void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **
 void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time, void **handle)
 {
     struct rrdeng_page_cache_descr *descr;
-    void *page;
-    int ret;
 
     debug(D_RRDENGINE, "----------------------\nReading existing page:\n----------------------");
     descr = pg_cache_lookup(ctx, NULL, id, point_in_time);
@@ -414,6 +402,7 @@ void rrdeng_get_27_statistics(struct rrdengine_instance *ctx, unsigned long long
 /* Releases reference to page */
 void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
 {
+    (void)ctx;
     pg_cache_put((struct rrdeng_page_cache_descr *)handle);
 }
 

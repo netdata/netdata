@@ -1566,3 +1566,109 @@ int unit_test(long delay, long shift)
 
     return ret;
 }
+
+#ifdef ENABLE_DBENGINE
+static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)
+{
+    rd->last_collected_time.tv_sec = now;
+    rd->last_collected_time.tv_usec = 0;
+    rd->collected_value = value;
+    rd->updated = 1;
+
+    rd->collections_counter++;
+
+    collected_number v = (value >= 0) ? value : -value;
+    if(unlikely(v > rd->collected_value_max)) rd->collected_value_max = v;
+}
+
+int test_dbengine(RRDHOST *host)
+{
+    const int CHARTS = 128;
+    const int DIMS = 16; /* That gives us 2048 metrics */
+    const int POINTS = 16384; /* This produces 128MiB of metric data */
+    const int QUERY_BATCH = 4096;
+    uint8_t same;
+    int i, j, k, c, errors;
+    RRDSET *st[CHARTS];
+    RRDDIM *rd[CHARTS][DIMS];
+    char name[101];
+    time_t time_now;
+    collected_number last;
+    struct rrddim_query_handle handle;
+    calculated_number value, expected;
+    storage_number n;
+
+    fprintf(stderr, "\nRunning DB-engine test\n");
+
+    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+
+    for (i = 0 ; i < CHARTS ; ++i) {
+        snprintfz(name, 100, "dbengine-chart-%d", i);
+
+        // create the chart
+        st[i] = rrdset_create(host, "netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                NULL, 1, 1, RRDSET_TYPE_LINE);
+        rrdset_flag_set(st[i], RRDSET_FLAG_DEBUG);
+        rrdset_flag_set(st[i], RRDSET_FLAG_STORE_FIRST);
+        for (j = 0 ; j < DIMS ; ++j) {
+            snprintfz(name, 100, "dim-%d", j);
+
+            rd[i][j] = rrddim_add(st[i], name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+    }
+
+    // feed it with the test data
+    time_now = 1;
+    last = 0;
+    for (i = 0 ; i < CHARTS ; ++i) {
+        for (j = 0 ; j < DIMS ; ++j) {
+            rd[i][j]->last_collected_time.tv_sec =
+            st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
+            rd[i][j]->last_collected_time.tv_usec =
+                    st[i]->last_collected_time.tv_usec = st[i]->last_updated.tv_usec = 0;
+        }
+    }
+    for(c = 0; c < POINTS ; ++c) {
+        ++time_now; // time_now = c + 2
+        for (i = 0 ; i < CHARTS ; ++i) {
+            st[i]->usec_since_last_update = USEC_PER_SEC;
+
+            for (j = 0; j < DIMS; ++j) {
+                last = i * DIMS * POINTS + j * POINTS + c;
+                rrddim_set_by_pointer_fake_time(rd[i][j], last, time_now);
+            }
+            rrdset_done(st[i]);
+        }
+    }
+
+    // check the result
+    errors = 0;
+
+    for(c = 0; c < POINTS ; c += QUERY_BATCH) {
+        time_now = c + 2;
+        for (i = 0 ; i < CHARTS ; ++i) {
+            for (j = 0; j < DIMS; ++j) {
+                rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH);
+                for (k = 0; k < QUERY_BATCH; ++k) {
+                    last = i * DIMS * POINTS + j * POINTS + c + k;
+                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+
+                    n = rd[i][j]->state->query_ops.next_metric(&handle);
+                    value = unpack_storage_number(n);
+
+                    same = (calculated_number_round(value * 10000000.0) == calculated_number_round(expected * 10000000.0)) ? 1 : 0;
+                    if(!same) {
+                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
+                                        CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
+                                st[i]->name, rd[i][j]->name, (unsigned long)time_now + k, expected, value);
+                        errors++;
+                    }
+                }
+                rd[i][j]->state->query_ops.finalize(&handle);
+            }
+        }
+    }
+
+    return errors;
+}
+#endif

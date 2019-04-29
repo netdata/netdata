@@ -59,7 +59,7 @@ int destroy_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
-    int i, ret, fd;
+    int ret, fd;
     char path[1024];
 
     ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
@@ -94,7 +94,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     uv_file file;
-    int i, ret, fd;
+    int ret, fd;
     struct rrdeng_df_sb *superblock;
     uv_buf_t iov;
     char path[1024];
@@ -178,7 +178,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     uv_file file;
-    int i, ret, fd;
+    int ret, fd;
     uint64_t file_size;
     char path[1024];
 
@@ -316,8 +316,6 @@ void create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, uns
 /* Page cache must already be initialized. */
 int init_data_files(struct rrdengine_instance *ctx)
 {
-    struct rrdengine_datafile *datafile;
-    struct rrdengine_journalfile *journalfile;
     int ret;
 
     ret = scan_data_files(ctx);
