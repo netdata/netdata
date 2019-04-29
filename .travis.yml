@@ -86,13 +86,13 @@ jobs:
     - echo "Last commit:" && git log -1
     - echo "GIT Describe:" && git describe
     - echo "packaging/version:" && cat packaging/version
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make dist
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make dist
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
     - .travis/run_install_with_dist_file.sh
-    - docker run -it -v "${PWD}:/code:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /code "netdata/os-test:ubuntu1804" make distclean
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make distclean
     git:
       depth: false
     after_script: rm -rf /tmp/netdata-makedist-test
@@ -118,15 +118,19 @@ jobs:
     after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
 
   - name: Run netdata lifecycle, on ubuntu 18.04 (Containerized)
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:ubuntu1804" bats --tap tests/lifecycle.bats
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:ubuntu1804" bats --tap tests/lifecycle.bats
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata lifecycle test script failed on ubuntu 18.04"
 
+  - name: Run netdata lifecycle from stable to current, on CentOS 7 (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on CentOS 7"
+
   - name: Build/install for CentOS 6 (Containerized)
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
     after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 6"
 
   - name: Build/install for CentOS 7 (Containerized)
-    script: docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
     after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
 
 
