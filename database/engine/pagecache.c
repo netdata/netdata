@@ -258,7 +258,6 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    struct rrdeng_page_cache_descr *in_flight_descr;
     unsigned count = 0;
     int ret = 0;
 
@@ -289,8 +288,6 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
 /* The caller must hold the page cache and the page descriptor locks in that order */
 static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_page_cache_descr *descr)
 {
-    struct page_cache *pg_cache = &ctx->pg_cache;
-
     free(descr->page);
     descr->page = NULL;
     descr->flags &= ~RRD_PAGE_POPULATED;
@@ -312,7 +309,6 @@ static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned long old_flags;
     struct rrdeng_page_cache_descr *descr;
-    int ret;
 
     uv_rwlock_wrlock(&pg_cache->replaceQ.lock);
     for (descr = pg_cache->replaceQ.head ; NULL != descr ; descr = descr->next) {
@@ -640,7 +636,6 @@ struct rrdeng_page_cache_descr *
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_cache_descr *descr = NULL;
-    int ret;
     unsigned long flags;
     Pvoid_t *PValue;
     struct pg_cache_page_index *page_index;

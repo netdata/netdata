@@ -28,10 +28,10 @@ void read_extent_cb(uv_fs_t* req)
     struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
     struct rrdeng_page_cache_descr *descr;
-    int i, j, ret;
-    unsigned count, pos;
-    void *page, *payload, *uncompressed_buf = NULL;
-    uint32_t payload_length, payload_offset, offset, page_offset, uncompressed_payload_length;
+    int ret;
+    unsigned i, j, count;
+    void *page, *uncompressed_buf = NULL;
+    uint32_t payload_length, payload_offset, page_offset, uncompressed_payload_length;
     struct rrdengine_datafile *datafile;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
@@ -130,10 +130,9 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
                            uint8_t release_descr)
 {
     struct rrdengine_instance *ctx = wc->ctx;
-    int i, ret;
-    unsigned size_bytes, pos, real_io_size;
+    int ret;
+    unsigned i, size_bytes, pos, real_io_size;
 //    uint32_t payload_length;
-    struct rrdeng_page_cache_descr *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
     struct rrdengine_datafile *datafile;
 
@@ -233,8 +232,8 @@ void flush_pages_cb(uv_fs_t* req)
     struct extent_io_descriptor *xt_io_descr;
     struct rrdeng_page_cache_descr *descr;
     struct rrdengine_datafile *datafile;
-    int i, ret;
-    unsigned count;
+    int ret;
+    unsigned i, count;
     Word_t commit_id;
 
     xt_io_descr = req->data;
@@ -283,8 +282,9 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 {
     struct rrdengine_instance *ctx = wc->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
-    int i, ret, compressed_size, max_compressed_size = 0;
-    unsigned count, size_bytes, pos, real_io_size;
+    int ret;
+    int compressed_size, max_compressed_size = 0;
+    unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, payload_offset;
     struct rrdeng_page_cache_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
@@ -342,7 +342,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
         max_compressed_size = LZ4_compressBound(uncompressed_payload_length);
         compressed_buf = mallocz(max_compressed_size);
-        size_bytes = payload_offset + MAX(uncompressed_payload_length, max_compressed_size) + sizeof(*trailer);
+        size_bytes = payload_offset + MAX(uncompressed_payload_length, (unsigned)max_compressed_size) + sizeof(*trailer);
         break;
     }
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
@@ -440,6 +440,7 @@ static void after_delete_old_data(uv_work_t *req, int status)
     struct rrdengine_journalfile *journalfile;
     unsigned bytes;
 
+    (void)status;
     datafile = ctx->datafiles.first;
     journalfile = datafile->journalfile;
     bytes = datafile->pos + journalfile->pos;
@@ -591,7 +592,6 @@ void timer_cb(uv_timer_t* handle)
 {
     struct rrdengine_worker_config* wc = handle->data;
     struct rrdengine_instance *ctx = wc->ctx;
-    struct page_cache *pg_cache = &ctx->pg_cache;
 
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
@@ -724,7 +724,6 @@ void rrdeng_worker(void* arg)
 static void basic_functional_test(struct rrdengine_instance *ctx)
 {
     int i, j, failed_validations;
-    usec_t now_usec;
     uuid_t uuid[NR_PAGES];
     void *buf;
     struct rrdeng_page_cache_descr *handle[NR_PAGES];
@@ -766,19 +765,7 @@ static void basic_functional_test(struct rrdengine_instance *ctx)
  */
 void rrdengine_main(void)
 {
-    int ret, max_size, compressed_size;
-    int fd, i, j;
-    long alignment;
-    void *block, *buf;
-    struct aiocb aio_desc, *aio_descp;
-    uv_file file;
-    uv_fs_t req;
-    uv_buf_t iov;
-    static uv_loop_t* loop;
-    uv_async_t async;
-    char *data = "LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents. LIBUV overwrite file contents.";
-    uv_work_t work_req;
-    const volatile int* flag;
+    int ret;
     struct rrdengine_instance *ctx;
 
     ret = rrdeng_init(&ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);

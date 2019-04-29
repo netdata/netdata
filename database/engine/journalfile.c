@@ -140,7 +140,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     struct rrdengine_instance *ctx = datafile->ctx;
     uv_fs_t req;
     uv_file file;
-    int i, ret, fd;
+    int ret, fd;
     struct rrdeng_jf_sb *superblock;
     uv_buf_t iov;
     char path[1024];
@@ -291,12 +291,10 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                                    void *buf, uint64_t *id, unsigned max_size)
 {
-    unsigned count, payload_length, descr_size, size_bytes;
+    unsigned payload_length, size_bytes;
     int ret;
     /* persistent structures */
-    struct rrdeng_df_extent_header *df_header;
     struct rrdeng_jf_transaction_header *jf_header;
-    struct rrdeng_jf_store_data *jf_metric_data;
     struct rrdeng_jf_transaction_trailer *jf_trailer;
     uLong crc;
 
@@ -348,8 +346,8 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
 static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile)
 {
     uv_file file;
-    uint64_t file_size, data_file_size;
-    int i, ret, fd;
+    uint64_t file_size;//, data_file_size;
+    int ret;
     uint64_t pos, pos_i, max_id, id;
     unsigned size_bytes;
     void *buf;
