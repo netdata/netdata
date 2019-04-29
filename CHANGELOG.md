@@ -9,6 +9,7 @@
 - Alert badge not showing after reverse proxy [\#5900](https://github.com/netdata/netdata/issues/5900)
 - Docker image has plugins not executable for netdata user [\#5890](https://github.com/netdata/netdata/issues/5890)
 - Fix dependency installation for Fedora 30 [\#5831](https://github.com/netdata/netdata/issues/5831)
+- netdata/packaging: Fix pipeline so that it detects possible updater issues [\#5786](https://github.com/netdata/netdata/issues/5786)
 - netdata/packaging/ci: Investigate pipeline failure [\#5733](https://github.com/netdata/netdata/issues/5733)
 - \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
 - python SocketService: lack of connect timeout, python.d.plugin hangs [\#5541](https://github.com/netdata/netdata/issues/5541)
@@ -23,6 +24,7 @@
 **Merged pull requests:**
 
 - smartd\_log: attrs 3, 194 fix [\#5923](https://github.com/netdata/netdata/pull/5923) ([ilyam8](https://github.com/ilyam8))
+- Fix lifecycle script [\#5918](https://github.com/netdata/netdata/pull/5918) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/docker: fix docker permissions and other things [\#5917](https://github.com/netdata/netdata/pull/5917) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - SocketService: set socket operation timeout before connecting [\#5911](https://github.com/netdata/netdata/pull/5911) ([ilyam8](https://github.com/ilyam8))
 - NEW: Energi Core daemon monitoring, suits other Bitcoin forks [\#5894](https://github.com/netdata/netdata/pull/5894) ([andvgal](https://github.com/andvgal))
