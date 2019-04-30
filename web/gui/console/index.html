@@ -11,17 +11,40 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" href="/favicon.ico" />
-    <link rel="stylesheet" href="http://localhost:8080/static/console/main.css" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+    <script crossorigin type="text/javascript" src="https://my-netdata.io/dashboard.js?v=3"></script>
 </head>
 
 <body class="mdc-theme--background mdc-typography">
-    <main id="app" class="console-app" data-host="agent" data-api-base-url="http://localhost:8080"
-        data-api-base-url-v2="http://localhost:8081"></main>
-    <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
-    <script src="http://localhost:8080/static/console/main.bundle.js"></script>
-    <script crossorigin type="text/javascript" src="https://my-netdata.io/dashboard.js?v=3"></script>
+    <main id="app" class="console-app" data-host="agent"></main>
+    <script>
+        function loadJSFile(filename) {
+            const s = document.createElement("script")
+            s.setAttribute("type", "text/javascript")
+            s.setAttribute("src", filename)
+            document.getElementsByTagName("head")[0].appendChild(s)
+        }
+
+        function loadCSSFile(filename) {
+            const l = document.createElement("link")
+            l.setAttribute("rel", "stylesheet")
+            l.setAttribute("type", "text/css")
+            l.setAttribute("href", filename)
+            document.getElementsByTagName("head")[0].appendChild(l)
+        }
+
+        const cloudBaseURL = localStorage.getItem("cloud.baseURL") || "https://netdata.cloud"
+
+        const main = document.getElementById("app")
+        main.setAttribute("data-static-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url-v2", cloudBaseURL)
+
+        loadCSSFile(`${cloudBaseURL}/static/console/main.css`)
+        loadJSFile(`${cloudBaseURL}/static/console/main.bundle.js`)
+    </script>
 </body>
 
 </html>
