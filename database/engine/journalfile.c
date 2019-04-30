@@ -146,7 +146,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     char path[1024];
 
     generate_journalfilepath(datafile, path, sizeof(path));
-    fd = uv_fs_open(NULL, &req, path, UV_FS_O_DIRECT | UV_FS_O_CREAT | UV_FS_O_RDWR | UV_FS_O_TRUNC,
+    fd = uv_fs_open(NULL, &req, path, O_DIRECT | O_CREAT | O_RDWR | O_TRUNC,
                     S_IRUSR | S_IWUSR, NULL);
     if (fd < 0) {
         fatal("uv_fs_fsopen: %s", uv_strerror(fd));
@@ -407,7 +407,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     char path[1024];
 
     generate_journalfilepath(datafile, path, sizeof(path));
-    fd = uv_fs_open(NULL, &req, path, UV_FS_O_DIRECT | UV_FS_O_RDWR, S_IRUSR | S_IWUSR, NULL);
+    fd = uv_fs_open(NULL, &req, path, O_DIRECT | O_RDWR, S_IRUSR | S_IWUSR, NULL);
     if (fd < 0) {
         /* if (UV_ENOENT != fd) */
         error("uv_fs_fsopen: %s", uv_strerror(fd));
