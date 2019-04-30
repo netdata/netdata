@@ -1581,7 +1581,7 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
     if(unlikely(v > rd->collected_value_max)) rd->collected_value_max = v;
 }
 
-int test_dbengine(RRDHOST *host)
+int test_dbengine(void)
 {
     const int CHARTS = 128;
     const int DIMS = 16; /* That gives us 2048 metrics */
@@ -1589,6 +1589,7 @@ int test_dbengine(RRDHOST *host)
     const int QUERY_BATCH = 4096;
     uint8_t same;
     int i, j, k, c, errors;
+    RRDHOST *host;
     RRDSET *st[CHARTS];
     RRDDIM *rd[CHARTS][DIMS];
     char name[101];
@@ -1601,6 +1602,26 @@ int test_dbengine(RRDHOST *host)
     fprintf(stderr, "\nRunning DB-engine test\n");
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+
+    debug(D_RRDHOST, "Initializing localhost with hostname 'unittest-dbengine'");
+    host = rrdhost_find_or_create(
+            "unittest-dbengine"
+            , "unittest-dbengine"
+            , "unittest-dbengine"
+            , os_type
+            , netdata_configured_timezone
+            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , program_name
+            , program_version
+            , default_rrd_update_every
+            , default_rrd_history_entries
+            , RRD_MEMORY_MODE_DBENGINE
+            , default_health_enabled
+            , default_rrdpush_enabled
+            , default_rrdpush_destination
+            , default_rrdpush_api_key
+            , default_rrdpush_send_charts_matching
+    );
 
     for (i = 0 ; i < CHARTS ; ++i) {
         snprintfz(name, 100, "dbengine-chart-%d", i);
@@ -1669,6 +1690,80 @@ int test_dbengine(RRDHOST *host)
         }
     }
 
+    rrd_wrlock();
+    rrdhost_delete_charts(host);
+    rrdhost_free(host);
+    rrd_unlock();
+
     return errors;
+}
+
+void generate_dbengine_dataset(unsigned history_seconds)
+{
+    const int DIMS = 128;
+    int j;
+    RRDHOST *host;
+    RRDSET *st;
+    RRDDIM *rd[DIMS];
+    char name[101];
+    time_t time_current, time_present;
+
+    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_rrdeng_page_cache_mb = 128;
+    default_rrdeng_disk_quota_mb = 1024 * 1024; /* 1 TiB for now */
+
+    debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-dataset'");
+
+    host = rrdhost_find_or_create(
+            "dbengine-dataset"
+            , "dbengine-dataset"
+            , "dbengine-dataset"
+            , os_type
+            , netdata_configured_timezone
+            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , program_name
+            , program_version
+            , default_rrd_update_every
+            , default_rrd_history_entries
+            , RRD_MEMORY_MODE_DBENGINE
+            , default_health_enabled
+            , default_rrdpush_enabled
+            , default_rrdpush_destination
+            , default_rrdpush_api_key
+            , default_rrdpush_send_charts_matching
+    );
+
+    fprintf(stderr, "\nRunning DB-engine workload generator\n");
+
+    // create the chart
+    st = rrdset_create(host, "example", "random", "random", "example", NULL, "random", "random", "random",
+                          NULL, 1, 1, RRDSET_TYPE_LINE);
+    for (j = 0 ; j < DIMS ; ++j) {
+        snprintfz(name, 100, "random%d", j);
+
+        rd[j] = rrddim_add(st, name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    time_present = now_realtime_sec();
+    // feed it with the test data
+    time_current = time_present - history_seconds;
+    for (j = 0 ; j < DIMS ; ++j) {
+        rd[j]->last_collected_time.tv_sec =
+        st->last_collected_time.tv_sec = st->last_updated.tv_sec = time_current;
+        rd[j]->last_collected_time.tv_usec =
+        st->last_collected_time.tv_usec = st->last_updated.tv_usec = 0;
+    }
+    for( ; time_current < time_present; ++time_current) {
+        st->usec_since_last_update = USEC_PER_SEC;
+
+        for (j = 0; j < DIMS; ++j) {
+            rrddim_set_by_pointer_fake_time(rd[j], (time_current + j) % 128, time_current);
+        }
+        rrdset_done(st);
+    }
+    rrd_wrlock();
+    rrdhost_free(host);
+    rrd_unlock();
+
 }
 #endif
