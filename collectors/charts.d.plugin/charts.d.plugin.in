@@ -76,17 +76,6 @@ debug() {
 	[ $debug -eq 1 ] && log DEBUG "${@}"
 }
 
-os_version() {
-	OS_VERSION="unknown"
-	OS_FILE="/etc/os-release"
-	info "Detecting OS version"
-
-	[ -f ${OS_FILE} ] && OS_VERSION=$(cat ${OS_FILE} | grep '^ID=' | sed -e 's/ID=//g')
-
-	info "Detected OS version: ${OS_VERSION}"
-	echo ${OS_VERSION}
-}
-
 # -----------------------------------------------------------------------------
 # check a few commands
 
@@ -292,7 +281,7 @@ run() {
 	if [ "z${1}" = "z-t" -a "${2}" != "0" ]; then
 		t="${2}"
 		shift 2
-		case "$(os_version)" in
+		case "${NETDATA_SYSTEM_OS_ID}" in
 		"alpine")
 			timeout -t ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
 			;;
