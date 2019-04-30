@@ -878,7 +878,9 @@ int main(int argc, char **argv) {
                             optarg += strlen(createdataset_string);
                             history_seconds = (unsigned )strtoull(optarg, NULL, 0);
 
+#ifdef ENABLE_DBENGINE
                             generate_dbengine_dataset(history_seconds);
+#endif
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
