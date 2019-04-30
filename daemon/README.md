@@ -164,6 +164,8 @@ The command line options of the netdata 1.10.0 version are the following:
 
   -W unittest              Run internal unittests and exit.
 
+  -W createdataset=N       Create a DB engine dataset of N seconds and exit.
+
   -W set section option value
                            set netdata.conf option from the command line.
 

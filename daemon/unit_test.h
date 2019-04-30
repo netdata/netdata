@@ -8,6 +8,7 @@ extern int unit_test(long delay, long shift);
 extern int run_all_mockup_tests(void);
 extern int unit_test_str2ld(void);
 extern int unit_test_buffer(void);
-extern int test_dbengine(RRDHOST *host);
+extern int test_dbengine(void);
+extern void generate_dbengine_dataset(unsigned history_seconds);
 
 #endif /* NETDATA_UNIT_TEST_H */

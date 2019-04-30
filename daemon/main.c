@@ -301,6 +301,7 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
@@ -852,6 +853,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+                        char* createdataset_string = "createdataset=";
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -865,39 +867,18 @@ int main(int argc, char **argv) {
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
 #ifdef ENABLE_DBENGINE
-                            {
-                                int ret;
-                                RRDHOST *host;
-
-                                debug(D_RRDHOST, "Initializing localhost with hostname 'unittest-dbengine'");
-                                host = rrdhost_find_or_create(
-                                        "unittest-dbengine"
-                                        , "unittest-dbengine"
-                                        , "unittest-dbengine"
-                                        , os_type
-                                        , netdata_configured_timezone
-                                        , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
-                                        , program_name
-                                        , program_version
-                                        , default_rrd_update_every
-                                        , default_rrd_history_entries
-                                        , RRD_MEMORY_MODE_DBENGINE
-                                        , default_health_enabled
-                                        , default_rrdpush_enabled
-                                        , default_rrdpush_destination
-                                        , default_rrdpush_api_key
-                                        , default_rrdpush_send_charts_matching
-                                );
-                                ret = test_dbengine(host);
-                                rrd_wrlock();
-                                rrdhost_delete_charts(host);
-                                rrdhost_free(host);
-                                rrd_unlock();
-                                if (ret) return 1;
-                            }
+                            if(test_dbengine()) return 1;
 #endif
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
+                        }
+                        else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
+                            unsigned history_seconds;
+
+                            optarg += strlen(createdataset_string);
+                            history_seconds = (unsigned )strtoull(optarg, NULL, 0);
+
+                            generate_dbengine_dataset(history_seconds);
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
