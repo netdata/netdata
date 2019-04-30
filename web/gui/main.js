@@ -4797,7 +4797,7 @@ function renderAccountUI() {
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
                 <li>
-                    <a href="/console/index.html#/" target="_blank" class="btn">
+                    <a href="console/index.html#/" target="_blank" class="btn">
                     <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Console</span>
                     </a>
                 </li>
