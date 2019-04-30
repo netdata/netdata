@@ -107,7 +107,7 @@ def gpu_charts(gpu):
         POWER: {
             'options': [None, 'Power Utilization', 'Watts', fam, 'nvidia_smi.power', 'line'],
             'lines': [
-                ['power_draw', 'power', 1, 100],
+                ['power_draw', 'power', 'absolute', 1, 100],
             ]
         },
         PROCESSES_MEM: {
@@ -335,6 +335,7 @@ class GPU:
         return dict(
             ('gpu{0}_{1}'.format(self.num, k), v) for k, v in data.items() if v is not None and v != BAD_VALUE
         )
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
