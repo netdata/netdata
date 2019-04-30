@@ -238,8 +238,10 @@ void *backends_main(void *ptr) {
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
+#if HAVE_KINESIS
     int do_kinesis = 0;
     char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
+#endif
 
     // ------------------------------------------------------------------------
     // collect configuration options
@@ -318,6 +320,7 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_stored_json_plaintext;
 
     }
+#if HAVE_KINESIS
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
 
         do_kinesis = 1;
@@ -334,6 +337,7 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_stored_json_plaintext;
 
     }
+#endif /* HAVE_KINESIS */
     else {
         error("BACKEND: Unknown backend type '%s'", type);
         goto cleanup;
@@ -515,6 +519,7 @@ void *backends_main(void *ptr) {
         // to add incrementally data to buffer
         after = before;
 
+#if HAVE_KINESIS
         if(do_kinesis) {
             unsigned long long partition_key_seq = 0;
 
@@ -572,6 +577,10 @@ void *backends_main(void *ptr) {
             buffer_flush(b);
         }
         else {
+#else
+        {
+#endif /* HAVE_KINESIS */
+
             // ------------------------------------------------------------------------
             // if we are connected, receive a response, without blocking
 

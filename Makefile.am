@@ -410,6 +410,9 @@ BACKENDS_PLUGIN_FILES = \
     backends/opentsdb/opentsdb.h \
     backends/prometheus/backend_prometheus.c \
     backends/prometheus/backend_prometheus.h \
+    $(NULL)
+
+KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis.c \
     backends/aws_kinesis/aws_kinesis.h \
     backends/aws_kinesis/aws_kinesis_put_record.cc \
@@ -474,7 +477,6 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
-    $(OPTIONAL_KINESIS_LIBS) \
 	$(NULL)
 # TODO: Find more graceful way to add libs for AWS Kinesis
 
@@ -535,4 +537,9 @@ if ENABLE_PLUGIN_XENSTAT
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_XENSTAT_LIBS) \
         $(NULL)
+endif
+
+if ENABLE_BACKEND_KINESIS
+    netdata_SOURCES += $(KINESIS_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
 endif
