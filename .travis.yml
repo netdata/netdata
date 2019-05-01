@@ -139,7 +139,12 @@ jobs:
 
     name: Generate changelog and TAG the release (only on special commit msg)
     before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated"
-    script: .travis/generate_changelog_and_tag_release.sh
+    script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
+    - .travis/generate_changelog_and_tag_release.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Packaging for release failed"
     git:
       depth: false
@@ -159,6 +164,7 @@ jobs:
     - echo "Last commit:" && git log -1
     - echo "GIT Describe:" && git describe
     - echo "packaging/version:" && cat packaging/version
+    - packaging/docker/check_login.sh
     - packaging/docker/build.sh
     - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"
@@ -216,7 +222,12 @@ jobs:
     name: Build & Publish docker images
     before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies"
     script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
     - docker info
+    - packaging/docker/check_login.sh
     - packaging/docker/build.sh
     - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
