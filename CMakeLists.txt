@@ -3,7 +3,7 @@
 # This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.1.0)
 project(netdata C CXX)
 
 find_package(Threads REQUIRED)
@@ -590,6 +590,11 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
 
+ENDIF()
+
+IF(ENABLE_BACKEND_KINESIS)
+    set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
+    set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
 
 IF(IPMI_LIBRARIES)

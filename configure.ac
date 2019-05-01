@@ -637,6 +637,8 @@ if test "${have_libaws_cpp_sdk_core}" = "yes" -a "${have_libcrypto}" = "yes" -a 
     AC_LANG_CPLUSPLUS
     save_LIBS="${LIBS}"
     LIBS="-laws-cpp-sdk-kinesis -laws-cpp-sdk-core ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
+    save_CXXFLAGS="${CXXFLAGS}"
+    CXXFLAGS="${CXXFLAGS} -std=c++11"
 
     AC_TRY_LINK(
     [
@@ -653,6 +655,7 @@ if test "${have_libaws_cpp_sdk_core}" = "yes" -a "${have_libcrypto}" = "yes" -a 
     )
 
     LIBS="${save_LIBS}"
+    CXXFLAGS="${save_CXXFLAGS}"
     AC_LANG_RESTORE
 else
     have_libaws_cpp_sdk_kinesis=no
@@ -681,6 +684,7 @@ if test "${enable_backend_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" 
     enable_backend_kinesis="yes"
     AC_DEFINE([HAVE_KINESIS], [1], [libaws-cpp-sdk-kinesis usability])
     OPTIONAL_KINESIS_CFLAGS="${LIBCRYPTO_CFLAGS} ${LIBSSL_CFLAGS} ${LIBCURL_CFLAGS}"
+    CXX11FLAG="-std=c++11"
     OPTIONAL_KINESIS_LIBS="-laws-cpp-sdk-kinesis -laws-cpp-sdk-core ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
 else
     enable_backend_kinesis="no"
@@ -761,7 +765,7 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
-CXXFLAGS="${CFLAGS}"
+CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
 CPPFLAGS="\
     -DTARGET_OS=${build_target_id} \
