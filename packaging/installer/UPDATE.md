@@ -11,7 +11,7 @@ The update procedure depends on how you installed it:
 
 ### Manual update to get the latest git commit
 
-netdata versions older than `v1.12.0-rc2-52` had a `netdata-updater.sh` script in the root directory of the source code, which has now been deprecated. The manual process that works for all versions to get the latest commit in git is to use the `netdata-installer.sh`. The installer preserves your custom configuration and updates the the information of the installation in the `.environment` file under the user configuration directory.
+netdata versions older than `v1.12.0-rc2-52` had a `netdata-updater.sh` script in the root directory of the source code, which has now been deprecated. The manual process that works for all versions to get the latest commit in git is to use the `netdata-installer.sh`. The installer preserves your custom configuration and updates the information of the installation in the `.environment` file under the user configuration directory.
 
 ```sh
 # go to the git downloaded directory

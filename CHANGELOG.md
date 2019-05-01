@@ -4,8 +4,14 @@
 
 **Fixed bugs:**
 
+- nvidia\_smi wrong power draw numbers [\#5939](https://github.com/netdata/netdata/issues/5939)
+- v1.14.0 is released but status is draft [\#5921](https://github.com/netdata/netdata/issues/5921)
+- Weird WD values [\#5919](https://github.com/netdata/netdata/issues/5919)
 - Alert badge not showing after reverse proxy [\#5900](https://github.com/netdata/netdata/issues/5900)
+- Docker image has plugins not executable for netdata user [\#5890](https://github.com/netdata/netdata/issues/5890)
+- cgroup-network-helper.sh issues in our Docker images [\#5880](https://github.com/netdata/netdata/issues/5880)
 - Fix dependency installation for Fedora 30 [\#5831](https://github.com/netdata/netdata/issues/5831)
+- netdata/packaging: Fix pipeline so that it detects possible updater issues [\#5786](https://github.com/netdata/netdata/issues/5786)
 - netdata/packaging/ci: Investigate pipeline failure [\#5733](https://github.com/netdata/netdata/issues/5733)
 - \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
 - python SocketService: lack of connect timeout, python.d.plugin hangs [\#5541](https://github.com/netdata/netdata/issues/5541)
@@ -19,7 +25,13 @@
 
 **Merged pull requests:**
 
+- nvidia\_smi: power chart algorithm,mul,div fix [\#5940](https://github.com/netdata/netdata/pull/5940) ([ilyam8](https://github.com/ilyam8))
+- Fixing a typo in documentation [\#5936](https://github.com/netdata/netdata/pull/5936) ([smonff](https://github.com/smonff))
+- smartd\_log: attrs 3, 194 fix [\#5923](https://github.com/netdata/netdata/pull/5923) ([ilyam8](https://github.com/ilyam8))
+- Fix lifecycle script [\#5918](https://github.com/netdata/netdata/pull/5918) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/docker: fix docker permissions and other things [\#5917](https://github.com/netdata/netdata/pull/5917) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - SocketService: set socket operation timeout before connecting [\#5911](https://github.com/netdata/netdata/pull/5911) ([ilyam8](https://github.com/ilyam8))
+- NEW: Energi Core daemon monitoring, suits other Bitcoin forks [\#5894](https://github.com/netdata/netdata/pull/5894) ([andvgal](https://github.com/andvgal))
 - NEW: allow additional name argument passing to urllib3 request in UrlService [\#5893](https://github.com/netdata/netdata/pull/5893) ([andvgal](https://github.com/andvgal))
 - Extend netdata info API call [\#5889](https://github.com/netdata/netdata/pull/5889) ([cakrit](https://github.com/cakrit))
 - Add ioping plugin [\#5725](https://github.com/netdata/netdata/pull/5725) ([vlvkobal](https://github.com/vlvkobal))
