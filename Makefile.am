@@ -485,6 +485,11 @@ netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(NULL)
+if ENABLE_BACKEND_KINESIS
+    netdata_LINK = $(CXXLD) $(CXXFLAGS) -o $@
+else
+    netdata_LINK = $(CCLD) $(CFLAGS) -o $@
+endif
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
