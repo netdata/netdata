@@ -118,9 +118,9 @@ void read_extent_cb(uv_fs_t* req)
     if (xt_io_descr->completion)
         complete(xt_io_descr->completion);
 cleanup:
+    uv_fs_req_cleanup(req);
     free(xt_io_descr->buf);
     free(xt_io_descr);
-    uv_fs_req_cleanup(req);
 }
 
 
@@ -268,9 +268,9 @@ void flush_pages_cb(uv_fs_t* req)
     if (xt_io_descr->completion)
         complete(xt_io_descr->completion);
 cleanup:
+    uv_fs_req_cleanup(req);
     free(xt_io_descr->buf);
     free(xt_io_descr);
-    uv_fs_req_cleanup(req);
 }
 
 /*
