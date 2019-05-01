@@ -633,7 +633,8 @@ void rrdeng_worker(void* arg)
 
     rrdeng_init_cmd_queue(wc);
 
-    loop = wc->loop = uv_default_loop();
+    loop = wc->loop = mallocz(sizeof(uv_loop_t));
+    uv_loop_init(loop);
     loop->data = wc;
 
     uv_async_init(wc->loop, &wc->async, async_cb);
@@ -717,6 +718,8 @@ void rrdeng_worker(void* arg)
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */
+    assert(0 == uv_loop_close(loop));
+    free(loop);
 }
 
 
