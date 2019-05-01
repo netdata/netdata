@@ -11,9 +11,9 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     }
     io_descr = req->data;
 
+    uv_fs_req_cleanup(req);
     free(io_descr->buf);
     free(io_descr);
-    uv_fs_req_cleanup(req);
 }
 
 /* Careful to always call this before creating a new journal file */
