@@ -1,6 +1,13 @@
 #!/usr/bin/env sh
 
 # -------------------------------------------------------------------------------------------------
+# detect the kernel
+
+KERNEL_NAME="$(uname -s)"
+KERNEL_VERSION="$(uname -r)"
+ARCHITECTURE="$(uname -m)"
+
+# -------------------------------------------------------------------------------------------------
 # detect the operating system
 
 OS_DETECTION="unknown"
@@ -10,35 +17,41 @@ VERSION_ID="unknown"
 ID="unknown"
 ID_LIKE="unknown"
 
-if [ -f "/etc/os-release" ]; then
-	OS_DETECTION="/etc/os-release"
-	eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release)"
-fi
+if [ "${KERNEL_NAME}" = "Darwin" ]; then
+	# Mac OS
+	OIFS="$IFS"
+	IFS=$'\n'
+	set $(sw_vers) > /dev/null
+	NAME=$(echo $1 | tr "\n" ' ' | sed 's/ProductName:[ ]*//')
+	VERSION=$(echo $2 | tr "\n" ' ' | sed 's/ProductVersion:[ ]*//')
+	ID="mac"
+	ID_LIKE="mac"
+	OS_DETECTION="sw_vers"
+	IFS="$OIFS"
+else
+	if [ -f "/etc/os-release" ]; then
+		OS_DETECTION="/etc/os-release"
+		eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release)"
+	fi
 
-if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
-	if [ -f "/etc/lsb-release" ]; then
-		if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="/etc/lsb-release"; else OS_DETECTION="Mixed"; fi
-		DISTRIB_ID="unknown"
-		DISTRIB_RELEASE="unknown"
-		DISTRIB_CODENAME="unknown"
-		eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
-		if [ "${NAME}" = "unknown" ]; then NAME="${DISTRIB_ID}"; fi
-		if [ "${VERSION}" = "unknown" ]; then VERSION="${DISTRIB_RELEASE}"; fi
-		if [ "${ID}" = "unknown" ]; then ID="${DISTRIB_CODENAME}"; fi
-	elif [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-		if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="lsb_release"; else OS_DETECTION="Mixed"; fi
-		if [ "${NAME}" = "unknown" ]; then NAME="$(lsb_release -is 2>/dev/null)"; fi
-		if [ "${VERSION}" = "unknown" ]; then VERSION="$(lsb_release -rs 2>/dev/null)"; fi
-		if [ "${ID}" = "unknown" ]; then ID="$(lsb_release -cs 2>/dev/null)"; fi
+	if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
+		if [ -f "/etc/lsb-release" ]; then
+			if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="/etc/lsb-release"; else OS_DETECTION="Mixed"; fi
+			DISTRIB_ID="unknown"
+			DISTRIB_RELEASE="unknown"
+			DISTRIB_CODENAME="unknown"
+			eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
+			if [ "${NAME}" = "unknown" ]; then NAME="${DISTRIB_ID}"; fi
+			if [ "${VERSION}" = "unknown" ]; then VERSION="${DISTRIB_RELEASE}"; fi
+			if [ "${ID}" = "unknown" ]; then ID="${DISTRIB_CODENAME}"; fi
+		elif [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+			if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="lsb_release"; else OS_DETECTION="Mixed"; fi
+			if [ "${NAME}" = "unknown" ]; then NAME="$(lsb_release -is 2>/dev/null)"; fi
+			if [ "${VERSION}" = "unknown" ]; then VERSION="$(lsb_release -rs 2>/dev/null)"; fi
+			if [ "${ID}" = "unknown" ]; then ID="$(lsb_release -cs 2>/dev/null)"; fi
+		fi
 	fi
 fi
-
-# -------------------------------------------------------------------------------------------------
-# detect the kernel
-
-KERNEL_NAME="$(uname -s)"
-KERNEL_VERSION="$(uname -r)"
-ARCHITECTURE="$(uname -m)"
 
 # -------------------------------------------------------------------------------------------------
 # detect the virtualization
