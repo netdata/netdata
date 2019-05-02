@@ -49,6 +49,7 @@ include dns_query_time/Makefile.inc
 include dockerd/Makefile.inc
 include dovecot/Makefile.inc
 include elasticsearch/Makefile.inc
+include energid/Makefile.inc
 include example/Makefile.inc
 include exim/Makefile.inc
 include fail2ban/Makefile.inc

@@ -440,6 +440,20 @@ class AtaNormalized(BaseAtaSmartAttribute):
         return self.normalized_value
 
 
+class Ata3(BaseAtaSmartAttribute):
+    def value(self):
+        value = int(self.raw_value)
+        # https://github.com/netdata/netdata/issues/5919
+        #
+        # 3;151;38684000679;
+        # 423 (Average 447)
+        # 38684000679 & 0xFFF -> 423
+        # (38684000679 & 0xFFF0000) >> 16 -> 447
+        if value > 1e6:
+            return value & 0xFFF
+        return value
+
+
 class Ata9(BaseAtaSmartAttribute):
     def value(self):
         value = int(self.raw_value)
@@ -454,7 +468,14 @@ class Ata190(BaseAtaSmartAttribute):
 
 
 class Ata194(BaseAtaSmartAttribute):
+    # https://github.com/netdata/netdata/issues/3041
+    # https://github.com/netdata/netdata/issues/5919
+    #
+    # The low byte is the current temperature, the third lowest is the maximum, and the fifth lowest is the minimum
     def value(self):
+        value = int(self.raw_value)
+        if value > 1e6:
+            return value & 0xFF
         return min(int(self.normalized_value), int(self.raw_value))
 
 
@@ -475,7 +496,9 @@ class SCSIRaw(BaseSCSISmartAttribute):
 def ata_attribute_factory(value):
     name = value[0]
 
-    if name == ATTR9:
+    if name == ATTR3:
+        return Ata3(*value)
+    elif name == ATTR9:
         return Ata9(*value)
     elif name == ATTR190:
         return Ata190(*value)

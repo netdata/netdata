@@ -136,6 +136,18 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     buffer_sprintf(wb, "\n\t]\n}\n");
 }
 
+// generate collectors list for the api/v1/info call
+
+struct collector {
+    char *plugin;
+    char *module;
+};
+
+struct array_printer {
+    int c;
+    BUFFER *wb;
+};
+
 int print_collector(void *entry, void *data) {
     struct array_printer *ap = (struct array_printer *)data;
     BUFFER *wb = ap->wb;
