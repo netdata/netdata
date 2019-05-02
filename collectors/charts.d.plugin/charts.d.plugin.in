@@ -281,7 +281,14 @@ run() {
 	if [ "z${1}" = "z-t" -a "${2}" != "0" ]; then
 		t="${2}"
 		shift 2
-		timeout ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
+		case "${NETDATA_SYSTEM_OS_ID}" in
+		"alpine")
+			timeout -t ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
+			;;
+		*)
+			timeout ${t} "${@}" 2>"${TMP_DIR}/run.${pid}"
+			;;
+		esac
 		ret=$?
 	else
 		"${@}" 2>"${TMP_DIR}/run.${pid}"
