@@ -636,7 +636,10 @@ RRDSET *rrdset_create_custom(
 
     if(unlikely(!st)) {
         st = callocz(1, size);
-        st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
+        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        else
+            st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
     st->plugin_name = plugin?strdupz(plugin):NULL;
