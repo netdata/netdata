@@ -678,9 +678,9 @@ int get_system_info () {
                     char *newline = value + strlen(value) - 1;
                     (*newline) = '\0';
                 }
-                char n[51], v[51];
+                char n[51], v[101];
                 snprintfz(n,50,"%s",name);
-                snprintfz(v,50,"%s",value);
+                snprintfz(v,101,"%s",value);
                 info("%s=%s", n, v);
                 setenv(n, v, 1);
             }
