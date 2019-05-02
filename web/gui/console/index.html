@@ -31,20 +31,22 @@
             document.getElementsByTagName("head")[0].appendChild(l)
         }
 
-        const cloudBaseURL = localStorage.getItem("cloud.baseURL") || "https://netdata.cloud"
-
-        const main = document.getElementById("app")
-        main.setAttribute("data-static-base-url", cloudBaseURL)
-        main.setAttribute("data-api-base-url", cloudBaseURL)
-        main.setAttribute("data-api-base-url-v2", cloudBaseURL)
+        var cloudBaseURL = localStorage.getItem("cloud.baseURL") || "https://netdata.cloud"
 
         loadCSSFile(`${cloudBaseURL}/static/console/main.css?v=1`)
-        loadJSFile(`${cloudBaseURL}/static/console/main.bundle.js?v=1`)
     </script>
 </head>
 
 <body class="mdc-theme--background mdc-typography">
     <main id="app" class="console-app" data-host="agent"></main>
+    <script>
+        const main = document.getElementById("app")
+        main.setAttribute("data-static-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url-v2", cloudBaseURL)
+
+        loadJSFile(`${cloudBaseURL}/static/console/main.bundle.js?v=1`)
+    </script>
 </body>
 
 </html>
