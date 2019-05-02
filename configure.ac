@@ -194,7 +194,7 @@ case "$host_os" in
 freebsd*)
     build_target=freebsd
     build_target_id=2
-    CFLAGS="${CFLAGS} -I/usr/local/include"
+    CFLAGS="${CFLAGS} -I/usr/local/include -L/usr/local/lib"
     ;;
 darwin*)
     build_target=macos
