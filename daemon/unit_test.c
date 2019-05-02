@@ -1599,6 +1599,7 @@ int test_dbengine(void)
     calculated_number value, expected;
     storage_number n;
 
+    error_log_limit_unlimited();
     fprintf(stderr, "\nRunning DB-engine test\n");
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
@@ -1690,9 +1691,9 @@ int test_dbengine(void)
         }
     }
 
+    rrdeng_exit(host->rrdeng_ctx);
     rrd_wrlock();
     rrdhost_delete_charts(host);
-    rrdhost_free(host);
     rrd_unlock();
 
     return errors;
@@ -1712,6 +1713,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     default_rrdeng_page_cache_mb = 128;
     default_rrdeng_disk_quota_mb = 1024 * 1024; /* 1 TiB for now */
 
+    error_log_limit_unlimited();
     debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-dataset'");
 
     host = rrdhost_find_or_create(
