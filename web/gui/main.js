@@ -779,6 +779,11 @@ function renderMyNetdataMenu(machinesArray) {
     } else {
         html += (
             `<div class="agent-item">
+                <i class="fas fa-tv"></i>
+                <a href="console/index.html" target="_blank">Nodes view</a>
+                <div></div>
+            </div>
+            <div class="agent-item">
                 <i class="fas fa-sync"></i>
                 <a href="#" onclick="showSyncModal(); return false">Synchronize with netdata.cloud</a>
                 <div></div>
@@ -4795,10 +4800,10 @@ function renderAccountUI() {
         // <a href="/console/index.html#/charts/${NETDATA.registry.machine_guid}" target="_blank" class="btn">
         container.innerHTML = (
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
-            <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
+            <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">   
                 <li>
                     <a href="console/index.html#/" target="_blank" class="btn">
-                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Console</span>
+                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes view</span>
                     </a>
                 </li>
                 <li>
