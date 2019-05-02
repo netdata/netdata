@@ -889,6 +889,7 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                             generate_dbengine_dataset(history_seconds);
 #endif
+                            return 0;
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
