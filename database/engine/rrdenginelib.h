@@ -20,6 +20,11 @@ struct rrdeng_page_cache_descr;
 typedef uintptr_t rrdeng_stats_t;
 #define rrd_stat_atomic_add(p, n) do {(void) __atomic_fetch_add(p, n, __ATOMIC_RELAXED);} while(0)
 
+#ifndef O_DIRECT
+/* Workaround for OS X */
+#define O_DIRECT (0)
+#endif
+
 struct completion {
     uv_mutex_t mutex;
     uv_cond_t cond;
