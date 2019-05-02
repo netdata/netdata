@@ -15,10 +15,6 @@
     <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
     <script crossorigin type="text/javascript" src="https://my-netdata.io/dashboard.js?v=3"></script>
-</head>
-
-<body class="mdc-theme--background mdc-typography">
-    <main id="app" class="console-app" data-host="agent"></main>
     <script>
         function loadJSFile(filename) {
             const s = document.createElement("script")
@@ -45,6 +41,10 @@
         loadCSSFile(`${cloudBaseURL}/static/console/main.css?v=1`)
         loadJSFile(`${cloudBaseURL}/static/console/main.bundle.js?v=1`)
     </script>
+</head>
+
+<body class="mdc-theme--background mdc-typography">
+    <main id="app" class="console-app" data-host="agent"></main>
 </body>
 
 </html>
