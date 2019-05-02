@@ -18,13 +18,16 @@
     "/info": {
       "get": {
         "summary": "Get netdata basic information",
-        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
+        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization and Container technology information\n* List of active collector plugins and modules\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
         "responses": {
           "200": {
             "description": "netdata basic information",
             "schema": {
               "$ref": "#/definitions/info"
             }
+          },
+          "503": {
+            "description": "netdata daemon not ready (used for health checks)"
           }
         }
       }
@@ -705,6 +708,90 @@
             "host1.example.com",
             "host2.example.com"
           ]
+        },
+        "os_name": {
+          "type": "string",
+          "description": "Operating System Name",
+          "example": "Manjaro Linux"
+        },
+        "os_id": {
+          "type": "string",
+          "description": "Operating System ID",
+          "example": "manjaro"
+        },
+        "os_id_like": {
+          "type": "string",
+          "description": "Known OS similar to this OS",
+          "example": "arch"
+        },
+        "os_version": {
+          "type": "string",
+          "description": "Operating System Version",
+          "example": "18.0.4"
+        },
+        "os_version_id": {
+          "type": "string",
+          "description": "Operating System Version ID",
+          "example": "unknown"
+        },
+        "os_detection": {
+          "type": "string",
+          "description": "OS parameters detection method",
+          "example": "Mixed"
+        },
+        "kernel_name": {
+          "type": "string",
+          "description": "Kernel Name",
+          "example": "Linux"
+        },
+        "kernel_version": {
+          "type": "string",
+          "description": "Kernel Version",
+          "example": "4.19.32-1-MANJARO"
+        },
+        "architecture": {
+          "type": "string",
+          "description": "Kernel architecture",
+          "example": "x86_64"
+        },
+        "virtualization": {
+          "type": "string",
+          "description": "Virtualization Type",
+          "example": "kvm"
+        },
+        "virt_detection": {
+          "type": "string",
+          "description": "Virtualization detection method",
+          "example": "systemd-detect-virt"
+        },
+        "container": {
+          "type": "string",
+          "description": "Container technology",
+          "example": "docker"
+        },
+        "container_detection": {
+          "type": "string",
+          "description": "Container technology detection method",
+          "example": "dockerenv"
+        },
+        "collectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "Array of collector plugins and modules",
+            "properties": {
+              "plugin": {
+                "type": "string",
+                "description": "Collector plugin",
+                "example": "python.d.plugin"
+              },
+              "module": {
+                "type": "string",
+                "description": "Module of the collector plugin",
+                "example": "dockerd"
+              }
+            }
+          }
         },
         "alarms": {
           "type": "object",
