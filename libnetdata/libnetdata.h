@@ -296,6 +296,7 @@ extern char *netdata_configured_host_prefix;
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
 #include "socket/socket.h"
+#include "socket/security.h"
 #include "config/appconfig.h"
 #include "log/log.h"
 #include "procfile/procfile.h"

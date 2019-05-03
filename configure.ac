@@ -273,6 +273,18 @@ OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
 
 # -----------------------------------------------------------------------------
+# OpenSSL Cryptography and SSL/TLS Toolkit
+
+AC_CHECK_LIB(
+    [crypto],
+    [SHA256_Init],
+    [SSL_LIBS="-lcrypto -lssl"]
+)
+
+OPTIONAL_SSL_CLFAGS="${SSL_CFLAGS}"
+OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+
+# -----------------------------------------------------------------------------
 # compiler options
 
 AC_ARG_VAR([SSE_CANDIDATE], [C compiler flags for SSE])
@@ -661,6 +673,7 @@ CPPFLAGS="\
 
 AC_SUBST([OPTIONAL_MATH_CLFAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
+AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CLFAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CLFAGS])
