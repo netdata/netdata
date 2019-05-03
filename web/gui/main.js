@@ -4604,6 +4604,36 @@ function getCloudAccountAgents() {
     });
 }
 
+/** Updates the lastAccessTime and accessCount properties of the agent for the account. */
+function touchAgent() {
+    if (!isSignedIn()) {
+        return [];
+    }
+
+    const touchUrl = `${NETDATA.registry.cloudBaseURL}/api/v1/agents/${NETDATA.registry.machine_guid}/touch?account_id=${cloudAccountID}`;
+    return fetch(
+        touchUrl,
+        {
+            method: "post",
+            body: "",
+            mode: "cors",
+            headers: {
+                "Authorization": `Bearer ${cloudToken}`
+            }
+        }
+    ).then((response) => {
+        if (!response.ok) {
+            throw Error("Cannot touch agent" + JSON.stringify(response));
+        }
+        return response.json();
+    }).then((payload) => {
+
+    }).catch(function (error) {
+        console.log(error);
+        return null;
+    });
+}
+
 // https://github.com/netdata/hub/issues/128
 function postCloudAccountAgents(agentsToSync) {
     if (!isSignedIn()) {
@@ -5006,6 +5036,7 @@ function initCloud() {
         cloudSSOInit();
     }
 
+    touchAgent();
     renderAccountUI();
 }
 
