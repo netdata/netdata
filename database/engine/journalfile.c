@@ -154,6 +154,10 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     assert(req.result >= 0);
     file = req.result;
     uv_fs_req_cleanup(&req);
+#ifdef __APPLE__
+    info("Disabling OS X caching for file \"%s\".", path);
+    fcntl(fd, F_NOCACHE, 1);
+#endif
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
@@ -417,6 +421,10 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     assert(req.result >= 0);
     file = req.result;
     uv_fs_req_cleanup(&req);
+#ifdef __APPLE__
+    info("Disabling OS X caching for file \"%s\".", path);
+    fcntl(fd, F_NOCACHE, 1);
+#endif
     info("Loading journal file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));

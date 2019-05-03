@@ -108,6 +108,10 @@ int create_data_file(struct rrdengine_datafile *datafile)
     assert(req.result >= 0);
     file = req.result;
     uv_fs_req_cleanup(&req);
+#ifdef __APPLE__
+    info("Disabling OS X caching for file \"%s\".", path);
+    fcntl(fd, F_NOCACHE, 1);
+#endif
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
@@ -193,6 +197,10 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     assert(req.result >= 0);
     file = req.result;
     uv_fs_req_cleanup(&req);
+#ifdef __APPLE__
+    info("Disabling OS X caching for file \"%s\".", path);
+    fcntl(fd, F_NOCACHE, 1);
+#endif
     info("Initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
