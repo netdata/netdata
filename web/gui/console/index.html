@@ -12,7 +12,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" href="/favicon.ico" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-    <script crossorigin type="text/javascript" src="https://my-netdata.io/dashboard.js?v=3"></script>
     <script>
         function loadJSFile(filename) {
             const s = document.createElement("script")
@@ -31,7 +30,7 @@
 
         var cloudBaseURL = localStorage.getItem("cloud.baseURL") || "https://netdata.cloud"
 
-        loadCSSFile(`${cloudBaseURL}/static/console/main.css?v=2`)
+        loadCSSFile(`${cloudBaseURL}/static/console/main.css?v=3`)
     </script>
 </head>
 
@@ -43,8 +42,13 @@
         main.setAttribute("data-api-base-url", cloudBaseURL)
         main.setAttribute("data-api-base-url-v2", cloudBaseURL)
 
-        loadJSFile(`${cloudBaseURL}/static/console/main.bundle.js?v=2`)
+        loadJSFile(`${cloudBaseURL}/static/console/main.bundle.js?v=3`)
     </script>
+    <script>
+        var netdataTheme = "slate"
+        var netdataNoBootstrap = true
+    </script>
+    <script crossorigin type="text/javascript" src="https://my-netdata.io/dashboard.js?v=4"></script>
 </body>
 
 </html>
