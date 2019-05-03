@@ -1589,7 +1589,7 @@ int test_dbengine(void)
     const int QUERY_BATCH = 4096;
     uint8_t same;
     int i, j, k, c, errors;
-    RRDHOST *host;
+    RRDHOST *host = NULL;
     RRDSET *st[CHARTS];
     RRDDIM *rd[CHARTS][DIMS];
     char name[101];
@@ -1623,6 +1623,8 @@ int test_dbengine(void)
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
     );
+    if (NULL == host)
+        return 1;
 
     for (i = 0 ; i < CHARTS ; ++i) {
         snprintfz(name, 100, "dbengine-chart-%d", i);
@@ -1703,7 +1705,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
 {
     const int DIMS = 128;
     int j;
-    RRDHOST *host;
+    RRDHOST *host = NULL;
     RRDSET *st;
     RRDDIM *rd[DIMS];
     char name[101];
@@ -1734,6 +1736,8 @@ void generate_dbengine_dataset(unsigned history_seconds)
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
     );
+    if (NULL == host)
+        return;
 
     fprintf(stderr, "\nRunning DB-engine workload generator\n");
 
