@@ -4614,7 +4614,8 @@ function touchAgent() {
     return fetch(
         touchUrl,
         {
-            method: "GET",
+            method: "post",
+            body: "",
             mode: "cors",
             headers: {
                 "Authorization": `Bearer ${cloudToken}`
@@ -4622,7 +4623,7 @@ function touchAgent() {
         }
     ).then((response) => {
         if (!response.ok) {
-            throw Error("Cannot touch agent");
+            throw Error("Cannot touch agent" + JSON.stringify(response));
         }
         return response.json();
     }).then((payload) => {
