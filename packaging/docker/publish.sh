@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#
 # Cross-arch docker publish helper script
 # Needs docker in version >18.02 due to usage of manifests
 #

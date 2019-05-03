@@ -38,8 +38,6 @@ if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
 	exit 0
 fi
 
-git config user.email "${GIT_MAIL}"
-git config user.name "${GIT_USER}"
 git checkout master
 git pull
 
@@ -58,7 +56,7 @@ echo "Changelog created! Adding packaging/version(${NEW_VERSION}) and CHANGELOG.
 echo "${NEW_VERSION}" > packaging/version
 git add packaging/version && echo "1) Added packaging/version to repository" || FAIL=1
 git add CHANGELOG.md && echo "2) Added changelog file to repository" || FAIL=1
-git commit -m '[ci skip] create nightly packages and update changelog' && echo "3) Committed changes to repository" || FAIL=1
+git commit -m '[ci skip] create nightly packages and update changelog' --author "${GIT_USER} <${GIT_MAIL}>" && echo "3) Committed changes to repository" || FAIL=1
 git push "https://${GITHUB_TOKEN}:@${PUSH_URL}" && echo "4) Pushed changes to remote ${PUSH_URL}" || FAIL=1
 
 # In case of a failure, wrap it up and bail out cleanly

@@ -48,8 +48,6 @@ fi
 echo "--- Initialize git configuration ---"
 export GIT_MAIL="bot@netdata.cloud"
 export GIT_USER="netdatabot"
-git config user.email "${GIT_MAIL}"
-git config user.name "${GIT_USER}"
 git checkout master
 git pull
 
@@ -62,7 +60,7 @@ echo "---- GENERATE CHANGELOG -----"
 git add CHANGELOG.md
 
 echo "---- COMMIT AND PUSH CHANGES ----"
-git commit -m "[ci skip] release $GIT_TAG"
+git commit -m "[ci skip] release $GIT_TAG" --author "${GIT_USER} <${GIT_MAIL}>"
 git tag "$GIT_TAG" -a -m "Automatic tag generation for travis build no. $TRAVIS_BUILD_NUMBER"
 git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')" --tags
