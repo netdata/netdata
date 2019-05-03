@@ -38,13 +38,13 @@ function rnd(min, max) {
 
 // Main function
 export default function () {
-    let charts = [ "system.pgpgio", "system.cpu", "system.ram", "system.io" ]
+    let charts = [ "example.random" ]
     let chartmin = 0;
     let chartmax = charts.length - 1; 
     let aftermin = 360;
-    let aftermax = 6000;
+    let aftermax = 3600000;
     let pointsmin = 300;
-    let pointsmax = 600;
+    let pointsmax = 1200;
 
     group("Requests", function () {
         // Execute multiple requests in parallel like a browser, to fetch data for the charts
