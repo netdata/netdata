@@ -4999,7 +4999,6 @@ function syncAgents(callback) {
         return
     }
 
-    touchAgent();
     callback(cloudAgents);
 }
 
@@ -5037,6 +5036,7 @@ function initCloud() {
         cloudSSOInit();
     }
 
+    touchAgent();
     renderAccountUI();
 }
 
