@@ -1704,6 +1704,7 @@ int test_dbengine(void)
 void generate_dbengine_dataset(unsigned history_seconds)
 {
     const int DIMS = 128;
+    const uint64_t EXPECTED_COMPRESSION_RATIO = 94;
     int j;
     RRDHOST *host = NULL;
     RRDSET *st;
@@ -1713,7 +1714,9 @@ void generate_dbengine_dataset(unsigned history_seconds)
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
     default_rrdeng_page_cache_mb = 128;
-    default_rrdeng_disk_quota_mb = 1024 * 1024; /* 1 TiB for now */
+    /* Worst case for uncompressible data */
+    default_rrdeng_disk_quota_mb = (((uint64_t)DIMS) * sizeof(storage_number) * history_seconds) / (1024 * 1024);
+    default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
     error_log_limit_unlimited();
     debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-dataset'");
