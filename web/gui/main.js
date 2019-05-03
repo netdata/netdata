@@ -4627,7 +4627,7 @@ function touchAgent() {
         }
         return response.json();
     }).then((payload) => {
-        console.log("Agent:" + NETDATA.registry.machine_guid + " succesfully touched-" + JSON.stringify(payload));
+
     }).catch(function (error) {
         console.log(error);
         return null;
