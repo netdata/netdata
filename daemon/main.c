@@ -344,7 +344,22 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
+<<<<<<< HEAD
 void log_init(void) {
+=======
+static void security_init(){
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/key.pem",netdata_configured_user_config_dir);
+    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/cert.pem",netdata_configured_user_config_dir);
+    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+
+    security_start_ssl();
+}
+
+static void log_init(void) {
+>>>>>>> c3990172... Start of SSL with Netdata
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
     stdout_filename    = config_get(CONFIG_SECTION_GLOBAL, "debug log",  filename);
@@ -1039,6 +1054,10 @@ int main(int argc, char **argv) {
         // get log filenames and settings
         log_init();
         error_log_limit_unlimited();
+
+        // --------------------------------------------------------------------
+        // get the certificate and start security
+        security_init();
 
         // --------------------------------------------------------------------
         // setup process signals
