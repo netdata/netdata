@@ -241,6 +241,7 @@ void *backends_main(void *ptr) {
 #if HAVE_KINESIS
     int do_kinesis = 0;
     char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
+    kinesis_options *kinesis_options = NULL;
 #endif
 
     // ------------------------------------------------------------------------
@@ -329,6 +330,8 @@ void *backends_main(void *ptr) {
             error("BACKEND: kinesis backend type is set but cannot read its configuration from %s/aws_kinesis.conf", netdata_configured_user_config_dir);
             goto cleanup;
         }
+
+        kinesis_options = kinesis_init();
 
         backend_response_checker = process_json_response;
         if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
@@ -503,6 +506,7 @@ void *backends_main(void *ptr) {
         chart_sent_bytes =
         chart_sent_metrics =
         chart_lost_metrics =
+        chart_receptions =
         chart_transmission_successes =
         chart_transmission_failures =
         chart_data_lost_events =
@@ -736,6 +740,10 @@ void *backends_main(void *ptr) {
     }
 
 cleanup:
+#if HAVE_KINESIS
+    kinesis_shutdown(kinesis_options);
+#endif
+
     if(sock != -1)
         close(sock);
 
