@@ -8,11 +8,11 @@ var failureRate = new Rate("check_failure_rate");
 // Options
 export let options = {
     stages: [
-        // Linearly ramp up from 1 to 50 VUs during first 30s
-        { target: 150, duration: "30s" },
-        // Hold at 150 VUs for the next 1 minute
-        { target: 150, duration: "1m" },
-        // Linearly ramp down from 150 to 0 VUs over the last 10 seconds
+        // Linearly ramp up from 1 to 20 VUs during first 30s
+        { target: 20, duration: "30s" },
+        // Hold at 50 VUs for the next 1 minute
+        { target: 20, duration: "1m" },
+        // Linearly ramp down from 50 to 0 VUs over the last 10 seconds
         { target: 0, duration: "10s" }
     ],
     thresholds: {
@@ -41,20 +41,19 @@ export default function () {
     let charts = [ "example.random" ]
     let chartmin = 0;
     let chartmax = charts.length - 1; 
-    let aftermin = 360;
-    let aftermax = 3600000;
+    let aftermin = 60;
+    let aftermax = 3600;
+    let beforemin = 3503600;
+    let beforemax = 3590000;
     let pointsmin = 300;
-    let pointsmax = 1200;
+    let pointsmax = 3600;
 
     group("Requests", function () {
         // Execute multiple requests in parallel like a browser, to fetch data for the charts
         let resps = http.batch([
             ["GET", "http://localhost:19999/api/v1/info", { tags: { fast: "yes" } }],
             ["GET", "http://localhost:19999/api/v1/charts", { tags: { fast: "yes" } }],
-            ["GET", "http://localhost:19999/api/v1/data?chart="+charts[rnd(chartmin,chartmax)]+"&after=-"+rnd(aftermin,aftermax)+"&points="+rnd(pointsmin,pointsmax)+"&format=json&group=average&gtime=0&options=ms%7Cflip%7Cjsonwrap%7Cnonzero&_="+rnd(1,1000000000000), { }],
-            ["GET", "http://localhost:19999/api/v1/data?chart="+charts[rnd(chartmin,chartmax)]+"&after=-"+rnd(aftermin,aftermax)+"&points="+rnd(pointsmin,pointsmax)+"&format=json&group=average&gtime=0&options=ms%7Cflip%7Cjsonwrap%7Cnonzero&_="+rnd(1,1000000000000), {}],
-            ["GET", "http://localhost:19999/api/v1/data?chart="+charts[rnd(chartmin,chartmax)]+"&after=-"+rnd(aftermin,aftermax)+"&points="+rnd(pointsmin,pointsmax)+"&format=json&group=average&gtime=0&options=ms%7Cflip%7Cjsonwrap%7Cnonzero&_="+rnd(1,1000000000000), {}],
-            ["GET", "http://localhost:19999/api/v1/data?chart="+charts[rnd(chartmin,chartmax)]+"&after=-"+rnd(aftermin,aftermax)+"&points="+rnd(pointsmin,pointsmax)+"&format=json&group=average&gtime=0&options=ms%7Cflip%7Cjsonwrap%7Cnonzero&_="+rnd(1,1000000000000), {}],
+            ["GET", "http://localhost:19999/api/v1/data?chart="+charts[rnd(chartmin,chartmax)]+"&before=-"+rnd(beforemin,beforemax)+"&after=-"+rnd(aftermin,aftermax)+"&points="+rnd(pointsmin,pointsmax)+"&format=json&group=average&gtime=0&options=ms%7Cflip%7Cjsonwrap%7Cnonzero&_="+rnd(1,1000000000000), { }],
             ["GET", "http://localhost:19999/api/v1/alarms", { tags: { fast: "yes" } }]
         ]);
         // Combine check() call with failure tracking
