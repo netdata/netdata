@@ -543,7 +543,7 @@ struct pg_cache_page_index *
     }
 
     for (count = 0 ;
-         descr != NULL ;
+         descr != NULL && is_page_in_time_range(descr, start_time, end_time);
          PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         /* Iterate all pages in range */
