@@ -28,7 +28,7 @@ The python version of the sensors plugin uses `lm-sensors`. Unfortunately the te
 
 netdata also has a bash version of the sensors plugin that can read RPi temperatures. It is disabled by default to avoid the conflicts with the python version.
 
-To enable it, edit `/etc/netdata/charts.d.conf` and uncomment this line:
+To enable it, run `sudo edit-config charts.d.conf` and uncomment this line:
 
 ```sh
 sensors=force

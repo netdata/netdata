@@ -16,12 +16,11 @@ dist_noinst_DATA = \
 
 userhealthconfigdir=$(configdir)/health.d
 dist_userhealthconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
+    .keep \
     $(NULL)
 
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
-    $(top_srcdir)/installer/.keep \
     health.d/adaptec_raid.conf \
     health.d/apache.conf \
     health.d/apcupsd.conf \
@@ -32,6 +31,7 @@ dist_healthconfig_DATA = \
     health.d/boinc.conf \
     health.d/btrfs.conf \
     health.d/ceph.conf \
+    health.d/cgroups.conf \
     health.d/cpu.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \
@@ -39,6 +39,7 @@ dist_healthconfig_DATA = \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/fping.conf \
+    health.d/ioping.conf \
     health.d/fronius.conf \
     health.d/haproxy.conf \
     health.d/httpcheck.conf \
@@ -46,6 +47,7 @@ dist_healthconfig_DATA = \
     health.d/ipfs.conf \
     health.d/ipmi.conf \
     health.d/isc_dhcpd.conf \
+    health.d/kubelet.conf \
     health.d/lighttpd.conf \
     health.d/linux_power_supply.conf \
     health.d/load.conf \
@@ -60,6 +62,7 @@ dist_healthconfig_DATA = \
     health.d/netfilter.conf \
     health.d/nginx.conf \
     health.d/nginx_plus.conf \
+    health.d/phpfpm.conf \
     health.d/portcheck.conf \
     health.d/postgres.conf \
     health.d/qos.conf \
@@ -78,5 +81,6 @@ dist_healthconfig_DATA = \
     health.d/udp_errors.conf \
     health.d/varnish.conf \
     health.d/web_log.conf \
+    health.d/x509check.conf \
     health.d/zfs.conf \
     $(NULL)

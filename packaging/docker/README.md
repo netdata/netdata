@@ -8,6 +8,12 @@
 
 Running netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running netdata on the host.
 
+## Package scrambling in runtime (x86_64 only)
+
+By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting netdata docker container.
+
+For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
+
 ## Run netdata with docker command
 
 Quickly start netdata with the docker command line.
@@ -118,3 +124,35 @@ services:
 You can restrict access by following [official caddy guide](https://caddyserver.com/docs/basicauth) and adding lines to Caddyfile.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+
+### Publish a test image to your own repository
+
+The script `packaging/docker/build-test.sh` can be used to create an image and upload it to a repository of your choosing. 
+
+```
+Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PWD> [-s]
+	-s skip build, just push the image
+Builds an amd64 image and pushes it to the docker hub repository REPOSITORY
+```
+
+This is especially useful when testing a Pull Request for Kubernetes, since you can set `image` to an immutable repository and tag, set the `imagePullPolicy` to `Always` and just keep uploading new images.
+
+Example:
+
+We get a local copy of the Helm chart at https://github.com/netdata/helmchart. We modify `values.yaml` to have the following:
+
+```
+image:
+  repository: cakrit/netdata-prs
+  tag: PR5576
+  pullPolicy: Always
+```
+
+We check out PR5576 and run the following:
+```
+./packaging/docker/build-test.sh -r cakrit/netdata-prs -v PR5576 -u cakrit -p 'XXX'
+```
+
+Then we can run `helm install [path to our helmchart clone]`.
+
+If we make changes to the code, we execute the same `build-test.sh` command, followed by `helm upgrade [name] [path to our helmchart clone]`

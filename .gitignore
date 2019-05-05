@@ -1,3 +1,6 @@
+# Secrets
+gcs-credentials.json
+
 .deps
 .libs
 .dirstamp
@@ -35,6 +38,8 @@ sha256sums.txt
 # netdata binaries
 netdata
 !netdata/
+upload/
+artifacts/
 
 apps.plugin
 !apps.plugin/
@@ -42,16 +47,25 @@ apps.plugin
 freeipmi.plugin
 !freeipmi.plugin/
 
+cups.plugin
+!cups.plugin/
+
+nfacct.plugin
+!nfacct.plugin/
+
+xenstat.plugin
+!xenstat.plugin/
+
 cgroup-network
 !cgroup-network/
 
 # installation artifacts
-installer/.environment.sh
+packaging/installer/.environment.sh
 *.tar.*
 *.run
 
 # netdata makeself downloads
-makeself/tmp/
+packaging/makeself/tmp/
 
 # coverity
 cov-int/
@@ -89,6 +103,8 @@ system/netdata.plist
 system/netdata-freebsd
 system/edit-config
 
+daemon/anonymous-statistics.sh
+
 health/notifications/alarm-notify.sh
 collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh
@@ -96,10 +112,12 @@ collectors/charts.d.plugin/charts.d.plugin
 collectors/node.d.plugin/node.d.plugin
 collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
+collectors/ioping.plugin/ioping.plugin
+collectors/go.d.plugin
 
 # installer generated files
-netdata-uninstaller.sh
-netdata-updater.sh
+/netdata-uninstaller.sh
+/netdata-updater.sh
 
 # cmake files
 cmake-build-debug/
@@ -135,6 +153,7 @@ tests/profile/benchmark-line-parsing
 tests/profile/benchmark-procfile-parser
 tests/profile/benchmark-value-pairs
 tests/profile/statsd-stress
+tests/health_mgmtapi/health-cmdapi-test.sh
 oprofile_data/
 vgcore.*
 callgrind.out.*
@@ -149,3 +168,5 @@ python.d/python-modules-installer.sh
 docs/generator/src
 docs/generator/build
 docs/generator/mkdocs.yml
+
+.environment.sh

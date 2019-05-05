@@ -6,15 +6,24 @@
 from __future__ import division
 import json
 
+from collections import namedtuple
+
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
+
+MEMSTATS_ORDER = [
+    'memstats_heap',
+    'memstats_stack',
+    'memstats_mspan',
+    'memstats_mcache',
+    'memstats_sys',
+    'memstats_live_objects',
+    'memstats_gc_pauses',
+]
 
 MEMSTATS_CHARTS = {
     'memstats_heap': {
-        'options': ['heap', 'memory: size of heap memory structures', 'kB', 'memstats',
+        'options': ['heap', 'memory: size of heap memory structures', 'KiB', 'memstats',
                     'expvar.memstats.heap', 'line'],
         'lines': [
             ['memstats_heap_alloc', 'alloc', 'absolute', 1, 1024],
@@ -22,21 +31,21 @@ MEMSTATS_CHARTS = {
         ]
     },
     'memstats_stack': {
-        'options': ['stack', 'memory: size of stack memory structures', 'kB', 'memstats',
+        'options': ['stack', 'memory: size of stack memory structures', 'KiB', 'memstats',
                     'expvar.memstats.stack', 'line'],
         'lines': [
             ['memstats_stack_inuse', 'inuse', 'absolute', 1, 1024]
         ]
     },
     'memstats_mspan': {
-        'options': ['mspan', 'memory: size of mspan memory structures', 'kB', 'memstats',
+        'options': ['mspan', 'memory: size of mspan memory structures', 'KiB', 'memstats',
                     'expvar.memstats.mspan', 'line'],
         'lines': [
             ['memstats_mspan_inuse', 'inuse', 'absolute', 1, 1024]
         ]
     },
     'memstats_mcache': {
-        'options': ['mcache', 'memory: size of mcache memory structures', 'kB', 'memstats',
+        'options': ['mcache', 'memory: size of mcache memory structures', 'KiB', 'memstats',
                     'expvar.memstats.mcache', 'line'],
         'lines': [
             ['memstats_mcache_inuse', 'inuse', 'absolute', 1, 1024]
@@ -50,7 +59,7 @@ MEMSTATS_CHARTS = {
         ]
     },
     'memstats_sys': {
-        'options': ['sys', 'memory: size of reserved virtual address space', 'kB', 'memstats',
+        'options': ['sys', 'memory: size of reserved virtual address space', 'KiB', 'memstats',
                     'expvar.memstats.sys', 'line'],
         'lines': [
             ['memstats_sys', 'sys', 'absolute', 1, 1024]
@@ -65,8 +74,14 @@ MEMSTATS_CHARTS = {
     }
 }
 
-MEMSTATS_ORDER = ['memstats_heap', 'memstats_stack', 'memstats_mspan', 'memstats_mcache',
-                  'memstats_sys', 'memstats_live_objects', 'memstats_gc_pauses']
+EXPVAR = namedtuple(
+    "EXPVAR",
+    [
+        "key",
+        "type",
+        "id",
+    ]
+)
 
 
 def flatten(d, top='', sep='.'):
@@ -83,7 +98,6 @@ def flatten(d, top='', sep='.'):
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-
         # if memstats collection is enabled, add the charts and their order
         if self.configuration.get('collect_memstats'):
             self.definitions = dict(MEMSTATS_CHARTS)
@@ -116,7 +130,7 @@ class Service(UrlService):
     def _parse_extra_charts_config(self, extra_charts_config):
 
         # a place to store the expvar keys and their types
-        self.expvars = dict()
+        self.expvars = list()
 
         for chart in extra_charts_config:
 
@@ -154,11 +168,8 @@ class Service(UrlService):
                     self.info('Unsupported expvar_type "{0}". Must be "int" or "float"'.format(ev_type))
                     continue
 
-                if ev_key in self.expvars:
-                    self.info('Duplicate expvar key {0}: skipping line.'.format(ev_key))
-                    continue
-
-                self.expvars[ev_key] = (ev_type, line_id)
+                # self.expvars[ev_key] = (ev_type, line_id)
+                self.expvars.append(EXPVAR(ev_key, ev_type, line_id))
 
                 chart_dict['lines'].append(
                     [
@@ -195,21 +206,21 @@ class Service(UrlService):
             #   the rest of the data, thus avoiding needless iterating over the multiply nested memstats dict.
             del (data['memstats'])
             flattened = flatten(data)
-            for k, v in flattened.items():
-                ev = self.expvars.get(k)
-                if not ev:
-                    # expvar is not defined in config, skip it
+
+            for ev in self.expvars:
+                v = flattened.get(ev.key)
+
+                if v is None:
                     continue
+
                 try:
-                    key_type, line_id = ev
-                    if key_type == 'int':
-                        expvars[line_id] = int(v)
-                    elif key_type == 'float':
-                        # if the value type is float, multiply it by 1000 and set line divisor to 1000
-                        expvars[line_id] = float(v) * 100
+                    if ev.type == 'int':
+                        expvars[ev.id] = int(v)
+                    elif ev.type == 'float':
+                        expvars[ev.id] = float(v) * 100
                 except ValueError:
-                    self.info('Failed to parse value for key {0} as {1}, ignoring key.'.format(k, key_type))
-                    del self.expvars[k]
+                    self.info('Failed to parse value for key {0} as {1}, ignoring key.'.format(ev.key, ev.type))
+                    return None
 
         return expvars
 

@@ -7,10 +7,19 @@ from bases.FrameworkServices.ExecutableService import ExecutableService
 
 # default module values (can be overridden per job in `config`)
 update_every = 5
-priority = 60000
+
+CHRONY_COMMAND = 'chronyc -n tracking'
 
 # charts order (can be overridden if you want less charts, or different order)
-ORDER = ['system', 'offsets', 'stratum', 'root', 'frequency', 'residualfreq', 'skew']
+ORDER = [
+    'system',
+    'offsets',
+    'stratum',
+    'root',
+    'frequency',
+    'residualfreq',
+    'skew',
+]
 
 CHARTS = {
     'system': {
@@ -76,9 +85,9 @@ class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
         ExecutableService.__init__(
             self, configuration=configuration, name=name)
-        self.command = 'chronyc -n tracking'
         self.order = ORDER
         self.definitions = CHARTS
+        self.command = CHRONY_COMMAND
 
     def _get_data(self):
         """

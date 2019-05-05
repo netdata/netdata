@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: litespeed netdata python.d module
-# Author: Ilya Maschenko (l2isbad)
+# Author: Ilya Maschenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import glob
@@ -16,11 +16,15 @@ update_every = 10
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
-    'net_throughput_http', 'net_throughput_https',  # net throughput
-    'connections_http', 'connections_https',        # connections
-    'requests', 'requests_processing',              # requests
-    'pub_cache_hits', 'private_cache_hits',         # cache
-    'static_hits'                                   # static
+    'net_throughput_http',   # net throughput
+    'net_throughput_https',  # net throughput
+    'connections_http',      # connections
+    'connections_https',     # connections
+    'requests',              # requests
+    'requests_processing',   # requests
+    'pub_cache_hits',        # cache
+    'private_cache_hits',    # cache
+    'static_hits',           # static
 ]
 
 CHARTS = {

@@ -15,6 +15,9 @@ MAINTAINERCLEANFILES= \
 	$(srcdir)/m4/ltoptions.m4 \
 	$(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
+CLEANFILES= \
+	$(srcdir)/$(distdir).tar.gz
+
 EXTRA_DIST = \
 	.gitignore \
 	.codacy.yml \
@@ -47,7 +50,6 @@ EXTRA_DIST = \
 
 SUBDIRS = \
 	diagrams \
-	makeself \
 	system \
 	tests \
 	$(NULL)
@@ -59,28 +61,12 @@ dist_noinst_DATA= \
 	netdata.cppcheck \
 	netdata.spec \
 	package.json \
-	docs/Add-more-charts-to-netdata.md \
-	docs/Demo-Sites.md \
-	docs/Donations-netdata-has-received.md \
-	docs/Netdata-Security-and-Disclosure-Information.md \
-	docs/Performance.md \
-	docs/Running-behind-apache.md \
-	docs/Running-behind-caddy.md \
-	docs/Running-behind-lighttpd.md \
-	docs/Running-behind-nginx.md \
-	docs/Third-Party-Plugins.md \
-	docs/a-github-star-is-important.md \
-	docs/high-performance-netdata.md \
-	docs/netdata-for-IoT.md \
-	docs/netdata-security.md \
-	docs/Why-Netdata.md \
-	docs/GettingStarted.md \
-	docs/Charts.md \
-	docs/configuration-guide.md \
-	docs/generator/custom \
-	installer/README.md \
-	installer/UNINSTALL.md \
-	installer/UPDATE.md \
+	docs \
+	packaging/version \
+	packaging/go.d.checksums \
+	packaging/installer/README.md \
+	packaging/installer/UNINSTALL.md \
+	packaging/installer/UPDATE.md \
 	netlify.toml \
 	$(NULL)
 
@@ -88,10 +74,13 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
-	kickstart.sh \
-	kickstart-static64.sh \
+	coverity-install.sh \
+	packaging/installer/netdata-updater.sh \
+	packaging/installer/netdata-uninstaller.sh \
+	packaging/installer/kickstart.sh \
+	packaging/installer/kickstart-static64.sh \
+	packaging/installer/functions.sh \
 	netdata-installer.sh \
-	installer/functions.sh \
 	docs/generator/buildhtml.sh \
 	docs/generator/buildyaml.sh \
 	docs/generator/checklinks.sh \
@@ -122,13 +111,15 @@ AM_CFLAGS = \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
+	$(OPTIONAL_CUPS_CFLAGS) \
+	$(OPTIONAL_XENSTAT_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS =
-dist_cache_DATA = installer/.keep
-dist_varlib_DATA = installer/.keep
-dist_registry_DATA = installer/.keep
-dist_log_DATA = installer/.keep
+dist_cache_DATA = packaging/installer/.keep
+dist_varlib_DATA = packaging/installer/.keep
+dist_registry_DATA = packaging/installer/.keep
+dist_log_DATA = packaging/installer/.keep
 plugins_PROGRAMS =
 
 LIBNETDATA_FILES = \
@@ -229,9 +220,19 @@ FREEIPMI_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+CUPS_PLUGIN_FILES = \
+	collectors/cups.plugin/cups_plugin.c \
+	$(LIBNETDATA_FILES) \
+	$(NULL)
+
 NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
-	collectors/nfacct.plugin/plugin_nfacct.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+XENSTAT_PLUGIN_FILES = \
+    collectors/xenstat.plugin/xenstat_plugin.c \
+    $(LIBNETDATA_FILES) \
     $(NULL)
 
 PROC_PLUGIN_FILES = \
@@ -270,6 +271,7 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/sys_devices_system_edac_mc.c \
 	collectors/proc.plugin/sys_devices_system_node.c \
 	collectors/proc.plugin/sys_fs_btrfs.c \
+	collectors/proc.plugin/sys_class_power_supply.c \
     $(NULL)
 
 TC_PLUGIN_FILES = \
@@ -354,6 +356,8 @@ API_PLUGIN_FILES = \
     web/api/formatters/charts2json.h \
     web/api/formatters/rrdset2json.c \
     web/api/formatters/rrdset2json.h \
+    web/api/health/health_cmdapi.c \
+    web/api/health/health_cmdapi.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
     $(NULL)
@@ -391,10 +395,6 @@ WEB_PLUGIN_FILES = \
     web/server/web_server.h \
     web/server/web_client_cache.c \
     web/server/web_client_cache.h \
-    web/server/single/single-threaded.c \
-    web/server/single/single-threaded.h \
-    web/server/multi/multi-threaded.c \
-    web/server/multi/multi-threaded.h \
     web/server/static/static-threaded.c \
     web/server/static/static-threaded.h \
     $(NULL)
@@ -460,7 +460,6 @@ if LINUX
     NETDATA_FILES += \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
-        $(NFACCT_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
@@ -478,7 +477,6 @@ sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
-	$(OPTIONAL_NFACCT_LIBS) \
 	$(NULL)
 
 if ENABLE_PLUGIN_APPS
@@ -504,5 +502,32 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_CUPS
+    plugins_PROGRAMS += cups.plugin
+    cups_plugin_SOURCES = $(CUPS_PLUGIN_FILES)
+    cups_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_CUPS_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_NFACCT
+    plugins_PROGRAMS += nfacct.plugin
+    nfacct_plugin_SOURCES = $(NFACCT_PLUGIN_FILES)
+    nfacct_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_NFACCT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_XENSTAT
+    plugins_PROGRAMS += xenstat.plugin
+    xenstat_plugin_SOURCES = $(XENSTAT_PLUGIN_FILES)
+    xenstat_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_XENSTAT_LIBS) \
         $(NULL)
 endif

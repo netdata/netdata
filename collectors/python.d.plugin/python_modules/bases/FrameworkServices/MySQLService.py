@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description:
-# Author: Ilya Mashchenko (l2isbad)
+# Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from sys import exc_info
@@ -44,6 +44,7 @@ class MySQLService(SimpleService):
                 properties['user'] = conf['user']
             if conf.get('pass'):
                 properties['passwd'] = conf['pass']
+
             if conf.get('socket'):
                 properties['unix_socket'] = conf['socket']
             elif conf.get('host'):
@@ -51,9 +52,14 @@ class MySQLService(SimpleService):
                 properties['port'] = int(conf.get('port', 3306))
             elif conf.get('my.cnf'):
                 if MySQLdb.__name__ == 'pymysql':
+                    # TODO: this is probablt wrong, it depends on version
                     self.error('"my.cnf" parsing is not working for pymysql')
                 else:
                     properties['read_default_file'] = conf['my.cnf']
+
+            if conf.get('ssl'):
+                properties['ssl'] = conf['ssl']
+
             if isinstance(extra_conf, dict) and extra_conf:
                 properties.update(extra_conf)
 
@@ -131,20 +137,22 @@ class MySQLService(SimpleService):
         raw_data = dict()
         queries = dict(self.queries)
         try:
-            with self.__connection as cursor:
-                for name, query in queries.items():
-                    try:
-                        cursor.execute(query)
-                    except (MySQLdb.ProgrammingError, MySQLdb.OperationalError) as error:
-                        if self.__is_error_critical(err_class=exc_info()[0], err_text=str(error)):
-                            raise RuntimeError
-                        self.error('Removed query: {name}[{query}]. Error: error'.format(name=name,
-                                                                                         query=query,
-                                                                                         error=error))
-                        self.queries.pop(name)
-                        continue
-                    else:
-                        raw_data[name] = (cursor.fetchall(), cursor.description) if description else cursor.fetchall()
+            cursor = self.__connection.cursor()
+            for name, query in queries.items():
+                try:
+                    cursor.execute(query)
+                except (MySQLdb.ProgrammingError, MySQLdb.OperationalError) as error:
+                    if self.__is_error_critical(err_class=exc_info()[0], err_text=str(error)):
+                        cursor.close()
+                        raise RuntimeError
+                    self.error('Removed query: {name}[{query}]. Error: error'.format(name=name,
+                                                                                     query=query,
+                                                                                     error=error))
+                    self.queries.pop(name)
+                    continue
+                else:
+                    raw_data[name] = (cursor.fetchall(), cursor.description) if description else cursor.fetchall()
+            cursor.close()
             self.__connection.commit()
         except (MySQLdb.MySQLError, RuntimeError, TypeError, AttributeError):
             self.__connection.close()

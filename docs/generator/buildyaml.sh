@@ -1,7 +1,12 @@
 #!/bin/bash
 
 GENERATOR_DIR="docs/generator"
-cd ${GENERATOR_DIR}/src
+
+docs_dir="${1}"
+site_dir="${2}"
+language="${3}"
+
+cd ${GENERATOR_DIR}/${docs_dir}
 
 # create yaml nav subtree with all the files directly under a specific directory
 # arguments:
@@ -48,8 +53,8 @@ repo_name: GitHub
 edit_uri: blob/master
 site_description: Netdata Documentation
 copyright: Netdata, 2018
-docs_dir: src
-site_dir: build
+docs_dir: '${docs_dir}'
+site_dir: '${site_dir}'
 #use_directory_urls: false
 strict: true
 extra:
@@ -64,6 +69,7 @@ theme:
     name: "material"
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
+    language: '${language}'
 extra_css:
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css"
   - "custom/css/netdata.css"
@@ -94,8 +100,6 @@ markdown_extensions:
  - pymdownx.caret
  - pymdownx.critic
  - pymdownx.details
- - pymdownx.emoji:
-    emoji_generator: !!python/name:pymdownx.emoji.to_svg
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
@@ -116,19 +120,25 @@ nav:'
 
 navpart 1 . README "About"
 
-echo -ne "    - 'docs/Why-Netdata.md'
-    - 'docs/Demo-Sites.md'
+echo -ne "    - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
+    - 'docs/anonymous-statistics.md'
     - 'docs/Donations-netdata-has-received.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
+- Why Netdata:
+    - 'docs/why-netdata/README.md'
+    - 'docs/why-netdata/1s-granularity.md'
+    - 'docs/why-netdata/unlimited-metrics.md'
+    - 'docs/why-netdata/meaningful-presentation.md'
+    - 'docs/why-netdata/immediate-results.md'
 - Installation:
-    - 'installer/README.md'
+    - 'packaging/installer/README.md'
     - 'packaging/docker/README.md'
-    - 'installer/UPDATE.md'
-    - 'installer/UNINSTALL.md'
+    - 'packaging/installer/UPDATE.md'
+    - 'packaging/installer/UNINSTALL.md'
 - 'docs/GettingStarted.md'
 - Running netdata:
     - 'daemon/README.md'
@@ -157,48 +167,68 @@ navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
     - Internal plugins:
 "
-navpart 3 collectors/apps.plugin
+
 navpart 3 collectors/proc.plugin
 navpart 3 collectors/statsd.plugin
 navpart 3 collectors/cgroups.plugin
 navpart 3 collectors/idlejitter.plugin
 navpart 3 collectors/tc.plugin
-navpart 3 collectors/nfacct.plugin
 navpart 3 collectors/checks.plugin
 navpart 3 collectors/diskspace.plugin
 navpart 3 collectors/freebsd.plugin
 navpart 3 collectors/macos.plugin
 
 navpart 2 collectors/plugins.d "" "External plugins"
-navpart 3 collectors/python.d.plugin "" "Python modules" 3
-navpart 3 collectors/node.d.plugin "" "Node.js modules" 3
-echo -ne "        - BASH modules:
+
+echo -ne "        - Go:
+            - 'collectors/go.d.plugin/README.md'
+"
+navpart 4 collectors/go.d.plugin "" "Modules" 3 excludefirstlevel
+
+echo -ne "        - Python:
+            - 'collectors/python.d.plugin/README.md'
+"
+navpart 4 collectors/python.d.plugin "" "Modules" 3 excludefirstlevel
+
+echo -ne "        - Node.js:
+            - 'collectors/node.d.plugin/README.md'
+"
+navpart 4 collectors/node.d.plugin "" "Modules" 3 excludefirstlevel
+
+echo -ne "        - BASH:
             - 'collectors/charts.d.plugin/README.md'
-            - 'collectors/charts.d.plugin/ap/README.md'
-            - 'collectors/charts.d.plugin/apcupsd/README.md'
-            - 'collectors/charts.d.plugin/example/README.md'
-            - 'collectors/charts.d.plugin/libreswan/README.md'
-            - 'collectors/charts.d.plugin/nut/README.md'
-            - 'collectors/charts.d.plugin/opensips/README.md'
-        - Obsolete BASH modules:
-            - 'collectors/charts.d.plugin/mem_apps/README.md'
-            - 'collectors/charts.d.plugin/postfix/README.md'
-            - 'collectors/charts.d.plugin/tomcat/README.md'
-            - 'collectors/charts.d.plugin/sensors/README.md'
-            - 'collectors/charts.d.plugin/cpu_apps/README.md'
-            - 'collectors/charts.d.plugin/squid/README.md'
-            - 'collectors/charts.d.plugin/nginx/README.md'
-            - 'collectors/charts.d.plugin/hddtemp/README.md'
-            - 'collectors/charts.d.plugin/cpufreq/README.md'
-            - 'collectors/charts.d.plugin/mysql/README.md'
-            - 'collectors/charts.d.plugin/exim/README.md'
-            - 'collectors/charts.d.plugin/apache/README.md'
-            - 'collectors/charts.d.plugin/load_average/README.md'
-            - 'collectors/charts.d.plugin/phpfpm/README.md'
+            - Modules:
+                - 'collectors/charts.d.plugin/ap/README.md'
+                - 'collectors/charts.d.plugin/apcupsd/README.md'
+                - 'collectors/charts.d.plugin/example/README.md'
+                - 'collectors/charts.d.plugin/libreswan/README.md'
+                - 'collectors/charts.d.plugin/nut/README.md'
+                - 'collectors/charts.d.plugin/opensips/README.md'
+            - Obsolete Modules:
+                - 'collectors/charts.d.plugin/mem_apps/README.md'
+                - 'collectors/charts.d.plugin/postfix/README.md'
+                - 'collectors/charts.d.plugin/tomcat/README.md'
+                - 'collectors/charts.d.plugin/sensors/README.md'
+                - 'collectors/charts.d.plugin/cpu_apps/README.md'
+                - 'collectors/charts.d.plugin/squid/README.md'
+                - 'collectors/charts.d.plugin/nginx/README.md'
+                - 'collectors/charts.d.plugin/hddtemp/README.md'
+                - 'collectors/charts.d.plugin/cpufreq/README.md'
+                - 'collectors/charts.d.plugin/mysql/README.md'
+                - 'collectors/charts.d.plugin/exim/README.md'
+                - 'collectors/charts.d.plugin/apache/README.md'
+                - 'collectors/charts.d.plugin/load_average/README.md'
+                - 'collectors/charts.d.plugin/phpfpm/README.md'
 "
 
+navpart 3 collectors/apps.plugin
+navpart 3 collectors/cups.plugin
 navpart 3 collectors/fping.plugin
+navpart 3 collectors/ioping.plugin
 navpart 3 collectors/freeipmi.plugin
+navpart 3 collectors/nfacct.plugin
+navpart 3 collectors/xenstat.plugin
+
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'
 "
@@ -226,8 +256,8 @@ echo -ne "- Hacking netdata:
     - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
 "
-navpart 2 makeself "" "" 4
+navpart 2 packaging/makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
 navpart 2 contrib
-navpart 2 tests
+navpart 2 tests "" "" 2
 navpart 2 diagrams/data_structures

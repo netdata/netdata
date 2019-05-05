@@ -70,13 +70,15 @@ extern char *netdata_configured_hostname;
 extern char *netdata_configured_user_config_dir;
 extern char *netdata_configured_stock_config_dir;
 extern char *netdata_configured_log_dir;
-extern char *netdata_configured_plugins_dir_base;
-extern char *netdata_configured_plugins_dir;
+extern char *netdata_configured_primary_plugins_dir;
 extern char *netdata_configured_web_dir;
 extern char *netdata_configured_cache_dir;
 extern char *netdata_configured_varlib_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
+extern int netdata_anonymous_statistics_enabled;
+
+int netdata_ready;
 
 #endif /* NETDATA_COMMON_H */

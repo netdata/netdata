@@ -16,12 +16,14 @@ To collect non-system metrics, netdata supports a plugin architecture. The follo
 - **[Name Servers](#name-servers)** (DNS), like bind, nsd, powerdns, dnsdist
 - **[DHCP Servers](#dhcp-servers)**, like ISC DHCP
 - **[UPS](#ups)**, such as APC UPS, NUT
-- **[RAID](#raid)**, such as linux software raid (mdadm), MegaRAID
+- **[RAID](#raid)**, such as MegaRAID
 - **[Mail Servers](#mail-servers)**, like postfix, exim, dovecot
 - **[File Servers](#file-servers)**, like samba, NFS, ftp, sftp, WebDAV
+- **[Print Servers](#print-servers)**, like CUPS
+- **[Hypervisors](#hypervisors)**, like XenServer, XCP-ng
 - **[System](#system)**, for processes and other system metrics
 - **[Sensors](#sensors)**, like temperature, fans speed, voltage, humidity, HDD/SSD S.M.A.R.T attributes
-- **[Network](#network)**, such as SNMP devices, `fping`, access points, dns_query_time
+- **[Network](#network)**, such as SNMP devices, `fping`, access points, dns_query_time, nfacct
 - **[Time Servers](#time-servers)**, like chrony
 - **[Security](#security)**, like FreeRADIUS, OpenVPN, Fail2ban
 - **[Telephony Servers](#telephony-servers)**, like openSIPS
@@ -42,7 +44,7 @@ netdata comes with **internal** and **external** plugins:
 1. The **internal** ones are written in `C` and run as threads within the netdata daemon.
 2. The **external** ones can be written in any computer language. The netdata daemon spawns these as processes (shown with `ps fax`) and reads their metrics using pipes (so the `stdout` of external plugins is connected to netdata for metrics collection and the `stderr` of external plugins is connected to `/var/log/netdata/error.log`).
 
-To make it easier to develop plugins, and minimize the number of threads and processes running, netdata supports **plugin orchestrators**, each of them supporting one or more data collection **modules**. Currently we ship plugin orchestrators for 4 languages: `C`, `python`, `node.js` and `bash` and 2 more are under development (`go` and `java`). 
+To make it easier to develop plugins, and minimize the number of threads and processes running, netdata supports **plugin orchestrators**, each of them supporting one or more data collection **modules**. Currently we ship plugin orchestrators for 4 languages: `C`, `python`, `node.js` and `bash` and 2 more are under development (`go` and `java`).
 
 #### enabling and disabling plugins
 
@@ -55,6 +57,7 @@ To control which plugins netdata run, edit `netdata.conf` and check the `[plugin
 	# proc = yes
 	# diskspace = yes
 	# cgroups = yes
+	# cups = yes
 	# tc = yes
 	# nfacct = yes
 	# idlejitter = yes
@@ -62,8 +65,10 @@ To control which plugins netdata run, edit `netdata.conf` and check the `[plugin
 	# node.d = yes
 	# python.d = yes
 	# fping = yes
+	# ioping = yes
 	# charts.d = yes
 	# apps = yes
+	# xenstat = yes
 ```
 
 The default for all plugins is the option `enable running new plugins`. So, setting this to `no` will disable all the plugins, except the ones specifically enabled.
@@ -90,7 +95,7 @@ sudo su -s /bin/bash netdata
 ```
 
 Similarly, you can use `charts.d.plugin` for BASH plugins and `node.d.plugin` for node.js plugins.
-Other plugins (like `apps.plugin`, `freeipmi.plugin`, `fping.plugin`) use the native netdata plugin API and can be run directly.
+Other plugins (like `apps.plugin`, `freeipmi.plugin`, `fping.plugin`, `ioping.plugin`) use the native netdata plugin API and can be run directly.
 
 If you need to configure a netdata plugin or module, all user supplied configuration is kept at `/etc/netdata` while the stock versions of all files is at `/usr/lib/netdata/conf.d`.
 To copy a stock file and edit it, run `/etc/netdata/edit-config`. Running this command without an argument, will list the available stock files.
@@ -109,6 +114,7 @@ plugin | language | plugin<br/>configuration | modules<br/>configuration |
 `charts.d.plugin`<br/>(external plugin orchestrator for BASH modules)|`BASH`|`charts.d.conf`|a file for each module in `/etc/netdata/charts.d/`
 `diskspace.plugin`<br/>(internal plugin for collecting Linux mount points usage)|`C`|`netdata.conf` section `[plugin:diskspace]`|N/A
 `fping.plugin`<br/>(external plugin for collecting network latencies)|`C`|`fping.conf`|This plugin is a wrapper for the `fping` command.
+`ioping.plugin`<br/>(external plugin for collecting disk latencies)|`C`|`ioping.conf`|This plugin is a wrapper for the `ioping` command.
 `freeipmi.plugin`<br/>(external plugin for collecting IPMI h/w sensors)|`C`|`netdata.conf` section `[plugin:freeipmi]`
 `idlejitter.plugin`<br/>(internal plugin for monitoring CPU jitter)|`C`|N/A|N/A
 `macos.plugin`<br/>(internal plugin for monitoring MacOS system resources)|`C`|`netdata.conf` section `[plugin:macos]`|one section for each module `[plugin:macos:MODULE]`. Each module may provide additional sections in the form of `[plugin:macos:MODULE:SUBSECTION]`.
@@ -266,7 +272,6 @@ nut|BASH<br/>Shell Script|Connects to a nut server (upsd) to collect real-time U
 
 application|language|notes|
 :---------:|:------:|:----|
-mdstat|python<br/>v2 or v3|Parses `/proc/mdstat` to get mds health metrics.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [mdstat.chart.py](../collectors/python.d.plugin/mdstat)<br/>configuration file: [python.d/mdstat.conf](../collectors/python.d.plugin/mdstat)|
 megacli|python<br/>v2 or v3|Collects adapter, physical drives and battery stats..<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [megacli.chart.py](../collectors/python.d.plugin/megacli)<br/>configuration file: [python.d/megacli.conf](../collectors/python.d.plugin/megacli)|
 
 ---
@@ -292,6 +297,21 @@ NFS Client|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Co
 NFS Server|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
 samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&nbsp;<br/>documentation page: [python.d.plugin module samba](../collectors/python.d.plugin/samba)<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [samba.chart.py](../collectors/python.d.plugin/samba)<br/>configuration file: [python.d/samba.conf](../collectors/python.d.plugin/samba)|
 
+---
+
+### Print Servers
+
+application|language|notes|
+:---------:|:------:|:----|
+CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>netdata plugin: [cups.plugin](../collectors/cups.plugin)
+
+---
+
+### Hypervisors
+
+application|language|notes|
+:---------:|:------:|:----|
+xenstat|C|Collects host and domain statistics for XenServer or XCP-ng hypervisors.<br/>&nbsp;<br/>netdata plugin: [xenstat.plugin](../collectors/xenstat.plugin)
 
 ---
 
@@ -300,6 +320,7 @@ samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&n
 application|language|notes|
 :---------:|:------:|:----|
 apps|C|`apps.plugin` collects resource usage statistics for all processes running in the system. It groups the entire process tree and reports dozens of metrics for CPU utilization, memory footprint, disk I/O, swap memory, network connections, open files and sockets, etc. It reports metrics for application groups, users and user groups.<br/>&nbsp;<br/>[Documentation of `apps.plugin`](../collectors/apps.plugin/).<br/>&nbsp;<br/>netdata plugin: [`apps_plugin.c`](../collectors/apps.plugin)<br/>configuration file: [`apps_groups.conf`](../collectors/apps.plugin)|
+ioping|C|Charts disk latency statistics for a directory/file/device, using the `ioping` command. A recent (probably unreleased) version of ioping is required. The plugin supplied can install it in `/usr/local`.<br/>&nbsp;<br/>netdata plugin: [ioping.plugin](../collectors/ioping.plugin) (this is a shell wrapper to start ioping - once ioping is started, netdata and ioping communicate directly - it can also install the right version of ioping)<br/>configuration file: [ioping.conf](../collectors/ioping.plugin)|
 cpu_apps|BASH<br/>Shell Script|Collects the CPU utilization of select apps.<br/><br/>DEPRECATED IN FAVOR OF `apps.plugin`. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [cpu_apps.chart.sh](../collectors/charts.d.plugin/cpu_apps)<br/>configuration file: [charts.d/cpu_apps.conf](../collectors/charts.d.plugin/cpu_apps)|
 load_average|BASH<br/>Shell Script|Collects the current system load average.<br/><br/>DEPRECATED IN FAVOR OF THE NETDATA INTERNAL ONE. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [load_average.chart.sh](../collectors/charts.d.plugin/load_average)<br/>configuration file: [charts.d/load_average.conf](../collectors/charts.d.plugin/load_average)|
 mem_apps|BASH<br/>Shell Script|Collects the memory footprint of select applications.<br/><br/>DEPRECATED IN FAVOR OF `apps.plugin`. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [mem_apps.chart.sh](../collectors/charts.d.plugin/mem_apps)<br/>configuration file: [charts.d/mem_apps.conf](../collectors/charts.d.plugin/mem_apps)|
@@ -311,7 +332,6 @@ mem_apps|BASH<br/>Shell Script|Collects the memory footprint of select applicati
 
 application|language|notes|
 :---------:|:------:|:----|
-cpufreq|python<br/>v2 or v3|Collects the current CPU frequency from `/sys/devices`.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [cpufreq.chart.py](../collectors/python.d.plugin/cpufreq)<br/>configuration file: [python.d/cpufreq.conf](../collectors/python.d.plugin/cpufreq)|
 cpufreq|BASH<br/>Shell Script|Collects current CPU frequency from `/sys/devices`.<br/><br/>DEPRECATED IN FAVOR OF THE PYTHON ONE. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [cpufreq.chart.sh](../collectors/charts.d.plugin/cpufreq)<br/>configuration file: [charts.d/cpufreq.conf](../collectors/charts.d.plugin/cpufreq)|
 IPMI|C|Collects temperatures, voltages, currents, power, fans and `SEL` events from IPMI using `libipmimonitoring`.<br/>Check [Monitoring IPMI](../collectors/freeipmi.plugin/) for more information<br/>&nbsp;<br/>netdata plugin: [freeipmi.plugin](../collectors/freeipmi.plugin)<br/>configuration file: none required - to enable it, compile/install netdata with `--enable-plugin-freeipmi`|
 hddtemp|python<br/>v2 or v3|Connects to multiple hddtemp servers (local or remote) to collect real-time performance metrics.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [hddtemp.chart.py](../collectors/python.d.plugin/hddtemp)<br/>configuration file: [python.d/hddtemp.conf](../collectors/python.d.plugin/hddtemp)|
@@ -331,6 +351,7 @@ application|language|notes|
 ap|BASH<br/>Shell Script|Uses the `iw` command to provide statistics of wireless clients connected to a wireless access point running on this host (works well with `hostapd`).<br/>&nbsp;<br/>netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [ap.chart.sh](../collectors/charts.d.plugin/ap)<br/>configuration file: [charts.d/ap.conf](../collectors/charts.d.plugin/ap)|
 fping|C|Charts network latency statistics for any number of nodes, using the `fping` command. A recent (probably unreleased) version of fping is required. The plugin supplied can install it in `/usr/local`.<br/>&nbsp;<br/>netdata plugin: [fping.plugin](../collectors/fping.plugin) (this is a shell wrapper to start fping - once fping is started, netdata and fping communicate directly - it can also install the right version of fping)<br/>configuration file: [fping.conf](../collectors/fping.plugin)|
 snmp|node.js|Connects to multiple snmp servers to collect real-time performance metrics.<br/>&nbsp;<br/>netdata plugin: [node.d.plugin](../collectors/node.d.plugin#nodedplugin)<br/>plugin module: [snmp.node.js](../collectors/node.d.plugin/snmp)<br/>configuration file: [node.d/snmp.conf](../collectors/node.d.plugin/snmp)|
+nfacct|C|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`|
 dns_query_time|python<br/>v2 or v3|Provides DNS query time statistics.<br/>&nbsp;<br/>Requires package `dnspython` (`pip install dnspython` or install package `python-dnspython`).<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [dns_query_time.chart.py](../collectors/python.d.plugin/dns_query_time)<br/>configuration file: [python.d/dns_query_time.conf](../collectors/python.d.plugin/dns_query_time)|
 http|python<br />v2 or v3|Monitors a generic web page for status code and returned content in HTML
 port|ptyhon<br />v2 or v3|Checks if a generic TCP port for its availability and response time

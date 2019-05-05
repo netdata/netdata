@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description:  varnish netdata python.d module
-# Author: l2isbad
+# Author: ilyam8
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import re
@@ -8,9 +8,6 @@ import re
 from bases.collection import find_binary
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
 ORDER = [
     'session_connections',
@@ -46,7 +43,7 @@ CHARTS = {
         ]
     },
     'all_time_hit_rate': {
-        'options': [None, 'All History Hit Rate Ratio', 'percent', 'cache performance',
+        'options': [None, 'All History Hit Rate Ratio', 'percentage', 'cache performance',
                     'varnish.all_time_hit_rate', 'stacked'],
         'lines': [
             ['cache_hit', 'hit', 'percentage-of-absolute-row'],
@@ -54,7 +51,7 @@ CHARTS = {
             ['cache_hitpass', 'hitpass', 'percentage-of-absolute-row']]
     },
     'current_poll_hit_rate': {
-        'options': [None, 'Current Poll Hit Rate Ratio', 'percent', 'cache performance',
+        'options': [None, 'Current Poll Hit Rate Ratio', 'percentage', 'cache performance',
                     'varnish.current_poll_hit_rate', 'stacked'],
         'lines': [
             ['cache_hit', 'hit', 'percentage-of-incremental-row'],
@@ -126,7 +123,7 @@ CHARTS = {
         ]
     },
     'memory_usage': {
-        'options': [None, 'Memory Usage', 'MB', 'memory usage', 'varnish.memory_usage', 'stacked'],
+        'options': [None, 'Memory Usage', 'MiB', 'memory usage', 'varnish.memory_usage', 'stacked'],
         'lines': [
             ['memory_free', 'free', 'absolute', 1, 1 << 20],
             ['memory_allocated', 'allocated', 'absolute', 1, 1 << 20]]
@@ -138,6 +135,8 @@ CHARTS = {
         'options': [None, 'Uptime', 'seconds', 'uptime', 'varnish.uptime', 'line']
     }
 }
+
+VARNISHSTAT = 'varnishstat'
 
 
 class Parser:
@@ -175,19 +174,31 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        varnishstat = find_binary('varnishstat')
-        self.command = [varnishstat, '-1'] if varnishstat else None
+        self.instance_name = configuration.get('instance_name')
         self.parser = Parser()
+        self.command = None
+
+    def create_command(self):
+        varnishstat = find_binary(VARNISHSTAT)
+
+        if not varnishstat:
+            self.error("can't locate '{0}' binary or binary is not executable by user netdata".format(VARNISHSTAT))
+            return False
+
+        if self.instance_name:
+            self.command = [varnishstat, '-1', '-n', self.instance_name, '-t', '1']
+        else:
+            self.command = [varnishstat, '-1', '-t', '1']
+        return True
 
     def check(self):
-        if not self.command:
-            self.error("Can't locate 'varnishstat' binary or binary is not executable by user netdata")
+        if not self.create_command():
             return False
 
         # STDOUT is not empty
         reply = self._get_raw_data()
         if not reply:
-            self.error("No output from 'varnishstat'. Not enough privileges?")
+            self.error("No output from 'varnishstat'. Is it running? Not enough privileges?")
             return False
 
         self.parser.init(reply)

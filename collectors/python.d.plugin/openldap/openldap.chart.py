@@ -11,11 +11,11 @@ except ImportError:
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-# default module values (can be overridden per job in `config`)
-priority = 60000
 
 DEFAULT_SERVER = 'localhost'
 DEFAULT_PORT = '389'
+DEFAULT_TLS = False
+DEFAULT_CERT_CHECK = True
 DEFAULT_TIMEOUT = 1
 
 ORDER = [
@@ -36,7 +36,7 @@ CHARTS = {
         ]
     },
     'bytes_sent': {
-        'options': [None, 'Traffic', 'KB/s', 'ldap', 'openldap.traffic_stats', 'line'],
+        'options': [None, 'Traffic', 'KiB/s', 'ldap', 'openldap.traffic_stats', 'line'],
         'lines': [
             ['bytes_sent', 'sent', 'incremental', 1, 1024]
         ]
@@ -136,13 +136,13 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-
         self.server = configuration.get('server', DEFAULT_SERVER)
         self.port = configuration.get('port', DEFAULT_PORT)
         self.username = configuration.get('username')
         self.password = configuration.get('password')
         self.timeout = configuration.get('timeout', DEFAULT_TIMEOUT)
-
+        self.use_tls = configuration.get('use_tls', DEFAULT_TLS)
+        self.cert_check = configuration.get('cert_check', DEFAULT_CERT_CHECK)
         self.alive = False
         self.conn = None
 
@@ -154,8 +154,13 @@ class Service(SimpleService):
 
     def connect(self):
         try:
-            self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
+            if self.use_tls:
+                self.conn = ldap.initialize('ldaps://%s:%s' % (self.server, self.port))
+            else:
+                self.conn = ldap.initialize('ldap://%s:%s' % (self.server, self.port))
             self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
+            if self.use_tls and not self.cert_check:
+                self.conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
             if self.username and self.password:
                 self.conn.simple_bind(self.username, self.password)
         except ldap.LDAPError as error:

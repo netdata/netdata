@@ -11,6 +11,7 @@
 #define DISK_TYPE_PARTITION 2
 #define DISK_TYPE_VIRTUAL   3
 
+#define DEFAULT_PREFERRED_IDS "*"
 #define DEFAULT_EXCLUDED_DISKS "loop* ram*"
 
 static struct disk {
@@ -164,6 +165,7 @@ static int  global_enable_new_disks_detected_at_runtime = CONFIG_BOOLEAN_YES,
         globals_initialized = 0,
         global_cleanup_removed_disks = 1;
 
+static SIMPLE_PATTERN *preferred_ids = NULL;
 static SIMPLE_PATTERN *excluded_disks = NULL;
 
 static unsigned long long int bcache_read_number_with_units(const char *filename) {
@@ -180,6 +182,8 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
                 return (unsigned long long int)(value * 1024.0 * 1024.0);
             else if(*end == 'G')
                 return (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0);
+            else if(*end == 'T')
+                return (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0 * 1024.0);
             else if(unknown_units_error > 0) {
                 error("bcache file '%s' provides value '%s' with unknown units '%s'", filename, buffer, end);
                 unknown_units_error--;
@@ -314,7 +318,9 @@ static inline int is_major_enabled(int major) {
 static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk, char *prefix, int depth) {
     //info("DEVICE-MAPPER ('%s', %lu:%lu): examining directory '%s' (allowed depth %d).", disk, major, minor, path, depth);
 
-    int found = 0;
+    int found = 0, preferred = 0;
+
+    char *first_result = mallocz(result_size);
 
     DIR *dir = opendir(path);
     if (!dir) {
@@ -392,8 +398,16 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
             //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
             snprintfz(result, result_size - 1, "%s%s%s", (prefix)?prefix:"", (prefix)?"_":"", de->d_name);
-            found = 1;
-            break;
+
+            if(!found) {
+                strncpyz(first_result, result, result_size);
+                found = 1;
+            }
+
+            if(simple_pattern_matches(preferred_ids, result)) {
+                preferred = 1;
+                break;
+            }
         }
     }
     closedir(dir);
@@ -403,6 +417,10 @@ failed:
 
     if(!found)
         result[0] = '\0';
+    else if(!preferred)
+        strncpyz(result, first_result, result_size);
+
+    freez(first_result);
 
     return found;
 }
@@ -798,7 +816,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         global_bcache_priority_stats_update_every = (int)config_get_number(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "bcache priority stats update every", global_bcache_priority_stats_update_every);
 
         global_cleanup_removed_disks = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "remove charts of removed disks" , global_cleanup_removed_disks);
-        
+
         char buffer[FILENAME_MAX + 1];
 
         snprintfz(buffer, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/sys/block/%s");
@@ -832,6 +850,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         path_to_veritas_volume_groups = config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "path to /dev/vx/dsk", buffer);
 
         name_disks_by_id = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "name disks by id", name_disks_by_id);
+
+        preferred_ids = simple_pattern_create(
+                config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "preferred disk ids", DEFAULT_PREFERRED_IDS)
+                , NULL
+                , SIMPLE_PATTERN_EXACT
+        );
 
         excluded_disks = simple_pattern_create(
                 config_get(CONFIG_SECTION_PLUGIN_PROC_DISKSTATS, "exclude disks", DEFAULT_EXCLUDED_DISKS)
@@ -960,7 +984,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , family
                         , "disk.io"
                         , "Disk I/O Bandwidth"
-                        , "kilobytes/s"
+                        , "KiB/s"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                         , NETDATA_CHART_PRIO_DISK_IO
@@ -1055,7 +1079,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                         , family
                         , "disk.backlog"
                         , "Disk Backlog"
-                        , "backlog (ms)"
+                        , "milliseconds"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                         , NETDATA_CHART_PRIO_DISK_BACKLOG
@@ -1186,7 +1210,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.await"
                             , "Average Completed I/O Operation Time"
-                            , "ms per operation"
+                            , "milliseconds/operation"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_DISK_AWAIT
@@ -1217,7 +1241,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.avgsz"
                             , "Average Completed I/O Operation Bandwidth"
-                            , "kilobytes per operation"
+                            , "KiB/operation"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_DISK_AVGSZ
@@ -1248,7 +1272,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.svctm"
                             , "Average Service Time"
-                            , "ms per operation"
+                            , "milliseconds/operation"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_DISK_SVCTM
@@ -1385,7 +1409,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.bcache_rates"
                             , "BCache Rates"
-                            , "KB/s"
+                            , "KiB/s"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_BCACHE_RATES
@@ -1412,7 +1436,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.bcache_size"
                             , "BCache Cache Sizes"
-                            , "MB"
+                            , "MiB"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_BCACHE_SIZE
@@ -1437,7 +1461,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                             , family
                             , "disk.bcache_usage"
                             , "BCache Cache Usage"
-                            , "percent"
+                            , "percentage"
                             , PLUGIN_PROC_NAME
                             , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                             , NETDATA_CHART_PRIO_BCACHE_USAGE
@@ -1563,7 +1587,7 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                     , "disk"
                     , NULL
                     , "Disk I/O"
-                    , "kilobytes/s"
+                    , "KiB/s"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_DISKSTATS_NAME
                     , NETDATA_CHART_PRIO_SYSTEM_IO

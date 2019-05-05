@@ -190,7 +190,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO))
         return;
 
-    if(unlikely(mi->flags & MOUNTINFO_READONLY && !m->collected))
+    if(unlikely(mi->flags & MOUNTINFO_READONLY && !m->collected && m->do_space != CONFIG_BOOLEAN_YES && m->do_inodes != CONFIG_BOOLEAN_YES))
         return;
 
     struct statvfs buff_statvfs;
@@ -263,7 +263,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , family
                         , "disk.space"
                         , title
-                        , "GB"
+                        , "GiB"
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
                         , NETDATA_CHART_PRIO_DISKSPACE_SPACE
@@ -303,7 +303,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
                         , family
                         , "disk.inodes"
                         , title
-                        , "Inodes"
+                        , "inodes"
                         , PLUGIN_DISKSPACE_NAME
                         , NULL
                         , NETDATA_CHART_PRIO_DISKSPACE_INODES

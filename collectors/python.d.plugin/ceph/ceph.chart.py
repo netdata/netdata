@@ -9,13 +9,13 @@ try:
 except ImportError:
     CEPH = False
 
-import os
 import json
+import os
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
 update_every = 10
-priority = 60000
 
 ORDER = [
     'general_usage',
@@ -36,7 +36,7 @@ ORDER = [
 
 CHARTS = {
     'general_usage': {
-        'options': [None, 'Ceph General Space', 'KB', 'general', 'ceph.general_usage', 'stacked'],
+        'options': [None, 'Ceph General Space', 'KiB', 'general', 'ceph.general_usage', 'stacked'],
         'lines': [
             ['general_available', 'avail', 'absolute'],
             ['general_usage', 'used', 'absolute']
@@ -49,7 +49,7 @@ CHARTS = {
         ]
     },
     'general_bytes': {
-        'options': [None, 'Ceph General Read/Write Data/s', 'KB', 'general', 'ceph.general_bytes',
+        'options': [None, 'Ceph General Read/Write Data/s', 'KiB/s', 'general', 'ceph.general_bytes',
                     'area'],
         'lines': [
             ['general_read_bytes', 'read', 'absolute', 1, 1024],
@@ -73,7 +73,7 @@ CHARTS = {
         ]
     },
     'pool_usage': {
-        'options': [None, 'Ceph Pools', 'KB', 'pool', 'ceph.pool_usage', 'line'],
+        'options': [None, 'Ceph Pools', 'KiB', 'pool', 'ceph.pool_usage', 'line'],
         'lines': []
     },
     'pool_objects': {
@@ -81,11 +81,11 @@ CHARTS = {
         'lines': []
     },
     'pool_read_bytes': {
-        'options': [None, 'Ceph Read Pool Data/s', 'KB', 'pool', 'ceph.pool_read_bytes', 'area'],
+        'options': [None, 'Ceph Read Pool Data/s', 'KiB/s', 'pool', 'ceph.pool_read_bytes', 'area'],
         'lines': []
     },
     'pool_write_bytes': {
-        'options': [None, 'Ceph Write Pool Data/s', 'KB', 'pool', 'ceph.pool_write_bytes', 'area'],
+        'options': [None, 'Ceph Write Pool Data/s', 'KiB/s', 'pool', 'ceph.pool_write_bytes', 'area'],
         'lines': []
     },
     'pool_read_operations': {
@@ -97,7 +97,7 @@ CHARTS = {
         'lines': []
     },
     'osd_usage': {
-        'options': [None, 'Ceph OSDs', 'KB', 'osd', 'ceph.osd_usage', 'line'],
+        'options': [None, 'Ceph OSDs', 'KiB', 'osd', 'ceph.osd_usage', 'line'],
         'lines': []
     },
     'osd_apply_latency': {
@@ -161,7 +161,7 @@ class Service(SimpleService):
         :return: None
         """
         # Pool lines
-        for pool in sorted(self._get_df()['pools']):
+        for pool in sorted(self._get_df()['pools'], key=lambda x:sorted(x.keys())):
             self.definitions['pool_usage']['lines'].append([pool['name'],
                                                             pool['name'],
                                                             'absolute'])
@@ -182,7 +182,7 @@ class Service(SimpleService):
                                                                       'absolute'])
 
         # OSD lines
-        for osd in sorted(self._get_osd_df()['nodes']):
+        for osd in sorted(self._get_osd_df()['nodes'], key=lambda x:sorted(x.keys())):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
                                                            'absolute'])
@@ -309,7 +309,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'df',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].decode('utf-8'))
 
     def _get_osd_df(self):
         """
@@ -319,7 +319,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd df',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].decode('utf-8').replace('-nan', '"-nan"'))
 
     def _get_osd_perf(self):
         """
@@ -329,7 +329,7 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd perf',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].decode('utf-8'))
 
     def _get_osd_pool_stats(self):
         """
@@ -341,4 +341,4 @@ class Service(SimpleService):
         return json.loads(self.cluster.mon_command(json.dumps({
             'prefix': 'osd pool stats',
             'format': 'json'
-        }), '')[1])
+        }), '')[1].decode('utf-8'))

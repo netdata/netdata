@@ -13,7 +13,7 @@ find_package(PkgConfig REQUIRED)
 #set(CMAKE_BUILD_TYPE "Release")
 
 # set this to see the compilation commands
-#set(CMAKE_VERBOSE_MAKEFILE 1)
+# set(CMAKE_VERBOSE_MAKEFILE 1)
 
 
 # -----------------------------------------------------------------------------
@@ -30,8 +30,8 @@ IF("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
     set(CXX_FORMAT_SIGNEDNESS "-Wformat-signedness")
     set(CXX_FORMAT_SECURITY "-Werror=format-security")
     set(CXX_STACK_PROTECTOR "-fstack-protector-all")
-
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR}")
+    set(CXX_FLAGS_DEBUG "-O0")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR} ${CXX_FLAGS_DEBUG}")
 ELSE()
     message(STATUS "building for: release")
     cmake_policy(SET CMP0069 "NEW")
@@ -136,6 +136,16 @@ pkg_check_modules(NFACCT libnetfilter_acct)
 
 
 # -----------------------------------------------------------------------------
+# Detect libxenstat
+
+pkg_check_modules(XENSTAT libxenstat)
+# later we use:
+# ${XENSTAT_LIBRARIES}
+# ${XENSTAT_CFLAGS_OTHER}
+# ${XENSTAT_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
 # Detect MacOS IOKit/Foundation framework
 
 IF(MACOS)
@@ -221,8 +231,7 @@ set(HEALTH_PLUGIN_FILES
         health/health.h
         health/health_config.c
         health/health_json.c
-        health/health_log.c
-        )
+        health/health_log.c)
 
 set(IDLEJITTER_PLUGIN_FILES
         collectors/idlejitter.plugin/plugin_idlejitter.c
@@ -249,7 +258,10 @@ set(FREEIPMI_PLUGIN_FILES
 
 set(NFACCT_PLUGIN_FILES
         collectors/nfacct.plugin/plugin_nfacct.c
-        collectors/nfacct.plugin/plugin_nfacct.h
+        )
+
+set(XENSTAT_PLUGIN_FILES
+        collectors/xenstat.plugin/xenstat_plugin.c
         )
 
 set(PROC_PLUGIN_FILES
@@ -257,6 +269,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/plugin_proc.c
         collectors/proc.plugin/plugin_proc.h
         collectors/proc.plugin/proc_diskstats.c
+        collectors/proc.plugin/proc_mdstat.c
         collectors/proc.plugin/proc_interrupts.c
         collectors/proc.plugin/proc_softirqs.c
         collectors/proc.plugin/proc_loadavg.c
@@ -287,6 +300,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/sys_devices_system_edac_mc.c
         collectors/proc.plugin/sys_devices_system_node.c
         collectors/proc.plugin/sys_fs_btrfs.c
+        collectors/proc.plugin/sys_class_power_supply.c
         )
 
 set(TC_PLUGIN_FILES
@@ -352,10 +366,6 @@ set(WEB_PLUGIN_FILES
         web/server/web_client.h
         web/server/web_server.c
         web/server/web_server.h
-        web/server/single/single-threaded.c
-        web/server/single/single-threaded.h
-        web/server/multi/multi-threaded.c
-        web/server/multi/multi-threaded.h
         web/server/static/static-threaded.c
         web/server/static/static-threaded.h
         web/server/web_client_cache.c
@@ -409,6 +419,7 @@ set(API_PLUGIN_FILES
         web/api/formatters/charts2json.h
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
+        web/api/health/health_cmdapi.c
         )
 
 set(STREAMING_PLUGIN_FILES
@@ -460,13 +471,6 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         )
 
-IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
-    message(STATUS "nfacct.plugin: enabled (will work only if netdata runs as root)")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DINTERNAL_PLUGIN_NFACCT=1")
-ELSE()
-    message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
-ENDIF()
-
 include_directories(AFTER .)
 
 add_definitions(
@@ -476,8 +480,8 @@ add_definitions(
         -DCONFIG_DIR="/etc/netdata"
         -DLIBCONFIG_DIR="/usr/lib/netdata/conf.d"
         -DLOG_DIR="/var/log/netdata"
-        -DPLUGINS_DIR="/usr/libexec/netdata"
-        -DWEB_DIR="/usr/share/netdata"
+        -DPLUGINS_DIR="/usr/libexec/netdata/plugins.d"
+        -DWEB_DIR="/usr/share/netdata/web"
         -DVARLIB_DIR="/var/lib/netdata"
 )
 
@@ -490,22 +494,12 @@ IF(LINUX)
     add_executable(netdata config.h ${NETDATA_FILES}
             ${CGROUPS_PLUGIN_FILES}
             ${DISKSPACE_PLUGIN_FILES}
-            ${NFACCT_PLUGIN_FILES}
             ${PROC_PLUGIN_FILES}
             ${TC_PLUGIN_FILES}
             )
-    target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES}
-            ${MNL_LIBRARIES}
-            ${NFACCT_LIBRARIES}
-            )
-    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS}
-            ${MNL_INCLUDE_DIRS}
-            ${NFACCT_INCLUDE_DIRS}
-            )
-    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS}
-            ${MNL_CFLAGS_OTHER}
-            ${NFACCT_CFLAGS_OTHER}
-            )
+    target_link_libraries (netdata libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(netdata PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
 
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
     SET(ENABLE_PLUGIN_APPS True)
@@ -534,6 +528,18 @@ ELSE()
     SET(ENABLE_PLUGIN_FREEIPMI False)
 ENDIF()
 
+IF(LINUX AND MNL_LIBRARIES AND NFACCT_LIBRARIES)
+    SET(ENABLE_PLUGIN_NFACCT True)
+ELSE()
+    SET(ENABLE_PLUGIN_NFACCT False)
+ENDIF()
+
+IF(XENSTAT_LIBRARIES)
+    SET(ENABLE_PLUGIN_XENSTAT True)
+ELSE()
+    SET(ENABLE_PLUGIN_XENSTAT False)
+ENDIF()
+
 
 # -----------------------------------------------------------------------------
 # apps.plugin
@@ -556,10 +562,38 @@ IF(ENABLE_PLUGIN_FREEIPMI)
     message(STATUS "freeipmi.plugin: enabled")
     add_executable(freeipmi.plugin config.h ${FREEIPMI_PLUGIN_FILES})
     target_link_libraries (freeipmi.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${IPMI_LIBRARIES})
-    target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
-    target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
+    target_include_directories(freeipmi.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${IPMI_INCLUDE_DIRS})
+    target_compile_options(freeipmi.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${IPMI_CFLAGS_OTHER})
 ELSE()
     message(STATUS "freeipmi.plugin: disabled (depends on libipmimonitoring)")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# nfacct.plugin
+
+IF(ENABLE_PLUGIN_NFACCT)
+    message(STATUS "nfacct.plugin: enabled")
+    add_executable(nfacct.plugin config.h ${NFACCT_PLUGIN_FILES})
+    target_link_libraries (nfacct.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${MNL_LIBRARIES} ${NFACCT_LIBRARIES})
+    target_include_directories(nfacct.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${MNL_INCLUDE_DIRS} ${NFACCT_INCLUDE_DIRS})
+    target_compile_options(nfacct.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${MNL_CFLAGS_OTHER} ${NFACCT_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "nfacct.plugin: disabled (requires libmnl and libnetfilter_acct)")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# xenstat.plugin
+
+IF(ENABLE_PLUGIN_XENSTAT)
+    message(STATUS "xenstat.plugin: enabled")
+    add_executable(xenstat.plugin config.h ${XENSTAT_PLUGIN_FILES})
+    target_link_libraries (xenstat.plugin libnetdata ${NETDATA_COMMON_LIBRARIES} ${XENSTAT_LIBRARIES})
+    target_include_directories(xenstat.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS} ${XENSTAT_INCLUDE_DIRS})
+    target_compile_options(xenstat.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${XENSTAT_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "xenstat.plugin: disabled (requires libxenstat)")
 ENDIF()
 
 
@@ -570,8 +604,8 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
     message(STATUS "cgroup-network: enabled")
     add_executable(cgroup-network config.h ${CGROUP_NETWORK_FILES})
     target_link_libraries (cgroup-network libnetdata ${NETDATA_COMMON_LIBRARIES})
-    target_include_directories(apps.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
-    target_compile_options(apps.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+    target_include_directories(cgroup-network PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(cgroup-network PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: smart netdata python.d module
-# Author: l2isbad, vorph1
+# Author: ilyam8, vorph1
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
@@ -268,7 +268,7 @@ CHARTS = {
         'algo': INCREMENTAL,
     },
     'reserved_block_count': {
-        'options': [None, 'Reserved Block Count', '%', 'wear', 'smartd_log.reserved_block_count', 'line'],
+        'options': [None, 'Reserved Block Count', 'percentage', 'wear', 'smartd_log.reserved_block_count', 'line'],
         'lines': [],
         'attrs': [ATTR170],
         'algo': ABSOLUTE,
@@ -321,7 +321,7 @@ CHARTS = {
 
     },
     'percent_lifetime_used': {
-        'options': [None, 'Percent Lifetime Used', '%', 'wear', 'smartd_log.percent_lifetime_used', 'line'],
+        'options': [None, 'Percent Lifetime Used', 'percentage', 'wear', 'smartd_log.percent_lifetime_used', 'line'],
         'lines': [],
         'attrs': [ATTR202],
         'algo': ABSOLUTE,
@@ -440,6 +440,20 @@ class AtaNormalized(BaseAtaSmartAttribute):
         return self.normalized_value
 
 
+class Ata3(BaseAtaSmartAttribute):
+    def value(self):
+        value = int(self.raw_value)
+        # https://github.com/netdata/netdata/issues/5919
+        #
+        # 3;151;38684000679;
+        # 423 (Average 447)
+        # 38684000679 & 0xFFF -> 423
+        # (38684000679 & 0xFFF0000) >> 16 -> 447
+        if value > 1e6:
+            return value & 0xFFF
+        return value
+
+
 class Ata9(BaseAtaSmartAttribute):
     def value(self):
         value = int(self.raw_value)
@@ -454,7 +468,14 @@ class Ata190(BaseAtaSmartAttribute):
 
 
 class Ata194(BaseAtaSmartAttribute):
+    # https://github.com/netdata/netdata/issues/3041
+    # https://github.com/netdata/netdata/issues/5919
+    #
+    # The low byte is the current temperature, the third lowest is the maximum, and the fifth lowest is the minimum
     def value(self):
+        value = int(self.raw_value)
+        if value > 1e6:
+            return value & 0xFF
         return min(int(self.normalized_value), int(self.raw_value))
 
 
@@ -475,7 +496,9 @@ class SCSIRaw(BaseSCSISmartAttribute):
 def ata_attribute_factory(value):
     name = value[0]
 
-    if name == ATTR9:
+    if name == ATTR3:
+        return Ata3(*value)
+    elif name == ATTR9:
         return Ata9(*value)
     elif name == ATTR190:
         return Ata190(*value)
@@ -586,11 +609,9 @@ class Service(SimpleService):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = deepcopy(CHARTS)
-
         self.log_path = configuration.get('log_path', DEF_PATH)
         self.age = configuration.get('age', DEF_AGE)
         self.exclude = configuration.get('exclude_disks', str()).split()
-
         self.disks = list()
         self.runs = 0
 
@@ -652,6 +673,10 @@ class Service(SimpleService):
         return len(self.disks)
 
     def create_disk_from_file(self, full_name,  current_time):
+        if not full_name.endswith(CSV):
+            self.debug('skipping {0}: not a csv file'.format(full_name))
+            return None
+
         name = os.path.basename(full_name).split('.')[-3]
         path = os.path.join(self.log_path, full_name)
 
@@ -659,10 +684,6 @@ class Service(SimpleService):
             return None
 
         if [p for p in self.exclude if p in name]:
-            return None
-
-        if not full_name.endswith(CSV):
-            self.debug('skipping {0}: not a csv file'.format(full_name))
             return None
 
         if not os.access(path, os.R_OK):

@@ -5,36 +5,37 @@
 
 from bases.FrameworkServices.SocketService import SocketService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
-# default job configuration (overridden by python.d.plugin)
-# config = {'local': {
-#             'update_every': update_every,
-#             'retries': retries,
-#             'priority': priority,
-#             'host': 'localhost',
-#             'port': 11211,
-#             'unix_socket': None
-#          }}
-
-ORDER = ['cache', 'net', 'connections', 'items', 'evicted_reclaimed',
-         'get', 'get_rate', 'set_rate', 'cas', 'delete', 'increment', 'decrement', 'touch', 'touch_rate']
+ORDER = [
+    'cache',
+    'net',
+    'connections',
+    'items',
+    'evicted_reclaimed',
+    'get',
+    'get_rate',
+    'set_rate',
+    'cas',
+    'delete',
+    'increment',
+    'decrement',
+    'touch',
+    'touch_rate',
+]
 
 CHARTS = {
     'cache': {
-        'options': [None, 'Cache Size', 'megabytes', 'cache', 'memcached.cache', 'stacked'],
+        'options': [None, 'Cache Size', 'MiB', 'cache', 'memcached.cache', 'stacked'],
         'lines': [
-            ['avail', 'available', 'absolute', 1, 1048576],
-            ['used', 'used', 'absolute', 1, 1048576]
+            ['avail', 'available', 'absolute', 1, 1 << 20],
+            ['used', 'used', 'absolute', 1, 1 << 20]
         ]
     },
     'net': {
         'options': [None, 'Network', 'kilobits/s', 'network', 'memcached.net', 'area'],
         'lines': [
-            ['bytes_read', 'in', 'incremental', 8, 1024],
-            ['bytes_written', 'out', 'incremental', -8, 1024]
+            ['bytes_read', 'in', 'incremental', 8, 1000],
+            ['bytes_written', 'out', 'incremental', -8, 1000],
         ]
     },
     'connections': {
@@ -126,13 +127,13 @@ CHARTS = {
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         SocketService.__init__(self, configuration=configuration, name=name)
+        self.order = ORDER
+        self.definitions = CHARTS
         self.request = 'stats\r\n'
         self.host = 'localhost'
         self.port = 11211
         self._keep_alive = True
         self.unix_socket = None
-        self.order = ORDER
-        self.definitions = CHARTS
 
     def _get_data(self):
         """

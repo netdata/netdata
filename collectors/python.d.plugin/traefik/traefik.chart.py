@@ -3,15 +3,13 @@
 # Author: Alexandre Menezes (@ale_menezes)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-from json import loads
 from collections import defaultdict
+
+from json import loads
+
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-update_every = 1
-priority = 60000
 
-# charts order (can be overridden if you want less charts, or different order)
 ORDER = [
     'response_statuses',
     'response_codes',
@@ -98,14 +96,22 @@ class Service(UrlService):
         self.url = self.configuration.get('url', 'http://localhost:8080/health')
         self.order = ORDER
         self.definitions = CHARTS
-        self.data = {
-            'successful_requests': 0, 'redirects': 0, 'bad_requests': 0,
-            'server_errors': 0, 'other_requests': 0, '1xx': 0, '2xx': 0,
-            '3xx': 0, '4xx': 0, '5xx': 0, 'other': 0,
-            'average_response_time_per_iteration_sec': 0
-        }
         self.last_total_response_time = 0
         self.last_total_count = 0
+        self.data = {
+            'successful_requests': 0,
+            'redirects': 0,
+            'bad_requests': 0,
+            'server_errors': 0,
+            'other_requests': 0,
+            '1xx': 0,
+            '2xx': 0,
+            '3xx': 0,
+            '4xx': 0,
+            '5xx': 0,
+            'other': 0,
+            'average_response_time_per_iteration_sec': 0,
+        }
 
     def _get_data(self):
         data = self._get_raw_data()

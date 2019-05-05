@@ -32,8 +32,8 @@ tomcat_priority=60000
 # will be in the proper units
 tomcat_decimal_detail=1000000
 
-# used by volume chart to convert bytes to KB
-tomcat_decimal_KB_detail=1000
+# used by volume chart to convert bytes to kB
+tomcat_decimal_kB_detail=1000
 
 tomcat_check() {
 
@@ -109,8 +109,8 @@ tomcat_create() {
 	cat <<EOF
 CHART tomcat.accesses '' "tomcat requests" "requests/s" statistics tomcat.accesses area $((tomcat_priority + 8)) $tomcat_update_every
 DIMENSION accesses '' incremental
-CHART tomcat.volume '' "tomcat volume" "KB/s" volume tomcat.volume area $((tomcat_priority + 5)) $tomcat_update_every
-DIMENSION volume '' incremental divisor ${tomcat_decimal_KB_detail}
+CHART tomcat.volume '' "tomcat volume" "kB/s" volume tomcat.volume area $((tomcat_priority + 5)) $tomcat_update_every
+DIMENSION volume '' incremental divisor ${tomcat_decimal_kB_detail}
 CHART tomcat.threads '' "tomcat threads" "current threads" statistics tomcat.threads line $((tomcat_priority + 6)) $tomcat_update_every
 DIMENSION current '' absolute 1
 DIMENSION busy '' absolute 1

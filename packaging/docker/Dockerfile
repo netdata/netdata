@@ -3,38 +3,16 @@
 
 # Cross-arch building is achieved by specifying ARCH as a build parameter with `--build-arg` option.
 # It is automated in `build.sh` script
-ARG ARCH=amd64-v3.8
-FROM multiarch/alpine:${ARCH} as builder
-
-# Install prerequisites
-RUN apk --no-cache add alpine-sdk \
-                       autoconf \
-                       automake \
-                       bash \
-                       build-base \
-                       curl \
-                       jq \
-                       libmnl-dev \
-                       libuuid \
-                       lm_sensors \
-                       netcat-openbsd \
-                       nodejs \
-                       pkgconfig \
-                       py-mysqldb \
-                       py-psycopg2 \
-                       py-yaml \
-                       python \
-                       util-linux-dev \
-                       zlib-dev
+ARG ARCH=amd64
+# This image contains preinstalled dependecies
+FROM netdata/builder:${ARCH} as builder 
 
 # Copy source
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 # Install from source
-RUN chmod +x netdata-installer.sh && \
-    sync && sleep 1 && \
-    ./netdata-installer.sh --dont-wait --dont-start-it
+RUN chmod +x netdata-installer.sh && ./netdata-installer.sh --dont-wait --dont-start-it
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -56,20 +34,19 @@ RUN mkdir -p /app/usr/sbin/ \
 
 #####################################################################
 ARG ARCH
-FROM multiarch/alpine:${ARCH}
+# This image contains preinstalled dependecies
+FROM netdata/base:${ARCH}
 
-# Reinstall some prerequisites
-RUN apk --no-cache add curl \
-                       fping \
-                       jq \
-                       libuuid \
-                       lm_sensors \
-                       netcat-openbsd \
-                       nodejs \
-                       py-mysqldb \
-                       py-psycopg2 \
-                       py-yaml \
-                       python
+# Conditional subscribiton to Polyverse's Polymorphic Linux repositories
+RUN if [ "$(uname -m)" == "x86_64" ]; then \
+        apk update && apk upgrade; \
+        curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io; \
+        if [ $? -eq 0 ]; then \
+                apk update && \
+                apk upgrade --available --no-cache && \
+                sed -in 's/^#//g' /etc/apk/repositories; \
+        fi \
+    fi
 
 # Copy files over
 COPY --from=builder /app /
@@ -90,7 +67,7 @@ RUN \
     chown -R root:netdata /etc/netdata && \
     chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
     chown -R root:netdata /usr/lib/netdata && \
-    chown -R root:netdata /usr/libexec/netdata/plugins.d/apps.plugin /usr/libexec/netdata/plugins.d/cgroup-network && \
+    chown -R root:netdata /usr/libexec/netdata/ && \
     chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
     chmod 0750 /var/lib/netdata /var/cache/netdata && \
     # Link log files to stdout

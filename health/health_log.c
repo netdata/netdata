@@ -396,7 +396,6 @@ inline void health_alarm_log(
     ae->duration = duration;
     ae->delay = delay;
     ae->delay_up_to_timestamp = when + delay;
-
     ae->flags |= flags;
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)

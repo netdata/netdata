@@ -1,0 +1,44 @@
+
+  ^
+  |.-.   .-.   .-.   .-.   .  netdata
+  |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
+
+  (C) Copyright 2017, Costa Tsaousis
+  All rights reserved
+  Released under GPL v3+
+
+  You are about to install netdata to this system.
+  netdata will be installed at:
+
+                    /opt/netdata
+
+  The following changes will be made to your system:
+
+  # USERS / GROUPS
+  User 'netdata' and group 'netdata' will be added, if not present.
+
+  # LOGROTATE
+  This file will be installed if logrotate is present.
+
+   - /etc/logrotate.d/netdata
+
+  # SYSTEM INIT
+  This file will be installed if this system runs with systemd:
+
+   - /lib/systemd/system/netdata.service
+
+   or, for older Centos, Debian/Ubuntu or OpenRC Gentoo:
+
+   - /etc/init.d/netdata         will be created
+
+
+  This package can also update a netdata installation that has been
+  created with another version of it.
+
+  Your netdata configuration will be retained.
+  After installation, netdata will be (re-)started.
+
+  netdata re-distributes a lot of open source software components.
+  Check its full license at:
+  https://github.com/netdata/netdata/blob/master/LICENSE.md

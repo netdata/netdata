@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Codacy declarations
+/* global NETDATA */
+
 var netdataDashboard = window.netdataDashboard || {};
 
 // Informational content for the various sections of the GUI (menus, sections, charts, etc.)
@@ -208,6 +211,12 @@ netdataDashboard.menu = {
         title: 'fping',
         icon: '<i class="fas fa-exchange-alt"></i>',
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
+    },
+
+    'ioping': {
+        title: 'ioping',
+        icon: '<i class="fas fa-exchange-alt"></i>',
+        info: 'Disk latency statistics, via <b>ioping</b>. <b>ioping</b> is a program to read/write data probes from/to a disk.'
     },
 
     'httpcheck': {
@@ -436,10 +445,22 @@ netdataDashboard.menu = {
         info: undefined
     },
 
-    'linux_power_supply': {
+    'powersupply': {
         title: 'Power Supply',
         icon: '<i class="fas fa-battery-half"></i>',
-        info: 'Statistics for the various system power supplies.'
+        info: 'Statistics for the various system power supplies. Data collected from <a href="https://www.kernel.org/doc/Documentation/power/power_supply_class.txt">Linux power supply class</a>.'
+    },
+
+    'xenstat': {
+        title: 'Xen Node',
+        icon: '<i class="fas fa-server"></i>',
+        info: 'General statistics for the Xen node. Data collected using <b>xenstat</b> library</a>.'
+    },
+
+    'xendomain': {
+        title: '',
+        icon: '<i class="fas fa-th-large"></i>',
+        info: 'Xen domain resource utilization metrics. Netdata reads this information using <b>xenstat</b> library which gives access to the resource usage information (CPU, memory, disk I/O, network) for a virtual machine.'
     }
 };
 
@@ -615,6 +636,10 @@ netdataDashboard.submenu = {
 // colors: the dimension colors of the chart (the default colors are appended)
 // height: the ratio of the chart height relative to the default
 //
+
+var cgroupCPULimitIsSet = 0;
+var cgroupMemLimitIsSet = 0;
+
 netdataDashboard.context = {
     'system.cpu': {
         info: function (os) {
@@ -647,7 +672,7 @@ netdataDashboard.context = {
     },
 
     'system.swapio': {
-        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of them is not shown in the chart, it is because it is zero - you can change the page settings to always render all the available dimensions on all charts).'
+        info: 'Total Swap I/O. (netdata measures both <code>in</code> and <code>out</code>. If either of the metrics <code>in</code> or <code>out</code> is not shown in the chart, the reason is that the metric is zero. - you can change the page settings to always render all the available dimensions on all charts).'
     },
 
     'system.pgfaults': {
@@ -1413,11 +1438,15 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // containers
 
-    'cgroup.cpu': {
+    'cgroup.cpu_limit': {
+        valueRange: "[0, null]",
         mainheads: [
             function (os, id) {
                 void(os);
+                cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="CPU"'
                     + ' data-units="%"'
@@ -1432,14 +1461,41 @@ netdataDashboard.context = {
         ]
     },
 
-    'cgroup.mem_usage': {
+    'cgroup.cpu': {
         mainheads: [
             function (os, id) {
                 void(os);
+                if (cgroupCPULimitIsSet === 0) {
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="CPU"'
+                        + ' data-units="%"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[4] + '"'
+                        + ' role="application"></div>';
+                }
+                else
+                    return '';
+            }
+        ]
+    },
+
+    'cgroup.mem_usage_limit': {
+        mainheads: [
+            function (os, id) {
+                void(os);
+                cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
+                    + ' data-dimensions="used"'
+                    + ' data-append-options="percentage"'
+                    + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
                     + ' data-title="Memory"'
-                    + ' data-units="MB"'
+                    + ' data-units="%"'
                     + ' data-gauge-adjust="width"'
                     + ' data-width="12%"'
                     + ' data-before="0"'
@@ -1447,6 +1503,29 @@ netdataDashboard.context = {
                     + ' data-points="CHART_DURATION"'
                     + ' data-colors="' + NETDATA.colors[1] + '"'
                     + ' role="application"></div>';
+            }
+        ]
+    },
+
+    'cgroup.mem_usage': {
+        mainheads: [
+            function (os, id) {
+                void(os);
+                if (cgroupMemLimitIsSet === 0) {
+                    return '<div data-netdata="' + id + '"'
+                        + ' data-chart-library="gauge"'
+                        + ' data-title="Memory"'
+                        + ' data-units="MB"'
+                        + ' data-gauge-adjust="width"'
+                        + ' data-width="12%"'
+                        + ' data-before="0"'
+                        + ' data-after="-CHART_DURATION"'
+                        + ' data-points="CHART_DURATION"'
+                        + ' data-colors="' + NETDATA.colors[1] + '"'
+                        + ' role="application"></div>';
+                }
+                else
+                    return '';
             }
         ]
     },
@@ -2315,6 +2394,25 @@ netdataDashboard.context = {
 
     'proxysql.commands_duration': {
         info: 'The total time spent executing commands of that type, in ms'
+    },
+
+    // ------------------------------------------------------------------------
+    // Power Supplies
+
+    'powersupply.capacity': {
+        info: undefined
+    },
+
+    'powersupply.charge': {
+        info: undefined
+    },
+
+    'powersupply.energy': {
+        info: undefined
+    },
+
+    'powersupply.voltage': {
+        info: undefined
     }
 
     // ------------------------------------------------------------------------

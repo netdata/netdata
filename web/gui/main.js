@@ -1,5 +1,8 @@
 // Main JavaScript file for the Netdata GUI.
 
+// Codacy declarations
+/* global NETDATA */
+
 // netdata snapshot data
 var netdataSnapshotData = null;
 
@@ -453,7 +456,7 @@ function saveObjectToClient(data, filename) {
     saveTextToClient(JSON.stringify(data), filename);
 }
 
-// --------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // registry call back to render my-netdata menu
 
 function toggleExpandIcon(svgEl) {
@@ -476,21 +479,8 @@ function toggleAgentItem(e, guid) {
     }
 }
 
-// TODO: consider renaming to `truncateString`
-
-/// Enforces a maximum string length while retaining the prefix and the postfix of
-/// the string.
-function clipString(str, maxLength) {
-    if (str.length <= maxLength) {
-        return str;
-    }
-
-    const spanLength = Math.floor((maxLength - 3) / 2);
-    return `${str.substring(0, spanLength)}...${str.substring(str.length - spanLength)}`;
-}
-
-// When you stream metrics from netdata to netdata, the recieving netdata now 
-// has multiple host databases. It's own, and multiple mirrored. Mirrored databases 
+// When you stream metrics from netdata to netdata, the recieving netdata now
+// has multiple host databases. It's own, and multiple mirrored. Mirrored databases
 // can be accessed with <http://localhost:19999/host/NAME/>
 function renderStreamedHosts(options) {
     let html = `<div class="info-item">Databases streamed to this agent</div>`;
@@ -505,19 +495,31 @@ function renderStreamedHosts(options) {
     }
 
     var master = options.hosts[0].hostname;
-    var sorted = options.hosts.sort(function (a, b) {
+    // We sort a clone of options.hosts, to keep the master as the first element
+    // for future calls.
+    var sorted = options.hosts.slice(0).sort(function (a, b) {
         if (a.hostname === master) {
             return -1;
         }
         return naturalSortCompare(a.hostname, b.hostname);
     });
 
+    let displayedDatabases = false;
+
     for (var s of sorted) {
         let url, icon;
         const hostname = s.hostname;
 
+        if (myNetdataMenuFilterValue !== "") {
+            if (!hostname.includes(myNetdataMenuFilterValue)) {
+                continue;
+            }
+        }
+
+        displayedDatabases = true;
+
         if (hostname === master) {
-            url = `base${'/'}`;
+            url = `${base}/`;
             icon = 'home';
         } else {
             url = `${base}/host/${hostname}/`;
@@ -528,7 +530,7 @@ function renderStreamedHosts(options) {
             `<div class="agent-item">
                 <a class="registry_link" href="${url}#" onClick="return gotoHostedModalHandler('${url}');">
                     <i class="fas fa-${icon}" style="color: #999;"></i>
-                </a>                    
+                </a>
                 <span class="__title" onClick="return gotoHostedModalHandler('${url}');">
                     <a class="registry_link" href="${url}#">${hostname}</a>
                 </span>
@@ -537,11 +539,20 @@ function renderStreamedHosts(options) {
         )
     }
 
+    if (!displayedDatabases) {
+        html += (
+            `<div class="info-item">
+                <i class="fas fa-filter"></i>
+                <span style="margin-left: 8px">no databases match the filter criteria.<span>
+            </div>`
+        )
+    }
+
     return html;
 }
 
 function renderMachines(machinesArray) {
-    let html = `<div class="info-item">My netdata agents</div>`;
+    let html = `<div class="info-item">My nodes</div>`;
 
     if (machinesArray === null) {
         let ret = loadLocalStorage("registryCallback");
@@ -552,6 +563,9 @@ function renderMachines(machinesArray) {
     }
 
     let found = false;
+    let displayedAgents = false;
+
+    const maskedURL = NETDATA.registry.MASKED_DATA;
 
     if (machinesArray) {
         saveLocalStorage("registryCallback", JSON.stringify(machinesArray));
@@ -563,18 +577,31 @@ function renderMachines(machinesArray) {
         for (var machine of machines) {
             found = true;
 
+            if (myNetdataMenuFilterValue !== "") {
+                if (!machine.name.includes(myNetdataMenuFilterValue)) {
+                    continue;
+                }
+            }
+
+            displayedAgents = true;
+
             const alternateUrlItems = (
                 `<div class="agent-alternate-urls agent-${machine.guid} collapsed">
-                ${machine.alternate_urls.reduce(
-                    (str, url) => str + (
-                        `<div class="agent-item agent-item--alternate">
-                            <div></div>
-                            <a href="${url}" title="${url}">${clipString(url, 64)}</a>
-                            <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
-                                <i class="fas fa-trash" style="color: #777;"></i>
-                            </a>
-                        </div>`
-                    ),
+                ${machine.alternate_urls.reduce((str, url) => {
+                        if (url === maskedURL) {
+                            return str
+                        }
+
+                        return str + (
+                            `<div class="agent-item agent-item--alternate">
+                                <div></div>
+                                <a href="${url}" title="${url}">${truncateString(url, 64)}</a>
+                                <a href="#" onclick="deleteRegistryModalHandler('${machine.guid}', '${machine.name}', '${url}'); return false;">
+                                    <i class="fas fa-trash" style="color: #777;"></i>
+                                </a>
+                            </div>`
+                        )
+                    },
                     ''
                 )}
                 </div>`
@@ -593,25 +620,34 @@ function renderMachines(machinesArray) {
                 ${alternateUrlItems}`
             )
         }
+
+        if (found && (!displayedAgents)) {
+            html += (
+                `<div class="info-item">
+                    <i class="fas fa-filter"></i>
+                    <span style="margin-left: 8px">zero nodes are matching the filter value.<span>
+                </div>`
+            )
+        }
     }
 
     if (!found) {
         if (machines) {
             html += (
                 `<div class="info-item">
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your netdata server list is empty</a> 
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Your nodes list is empty</a>
                 </div>`
             )
         } else {
             html += (
                 `<div class="info-item">
-                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry</a> 
+                    <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">Failed to contact the registry</a>
                 </div>`
             )
         }
 
         html += `<hr />`;
-        html += `<div class="info-item">Demo netdata agents</div>`;
+        html += `<div class="info-item">Demo netdata nodes</div>`;
 
         const demoServers = [
             {url: "//london.netdata.rocks/default.html", title: "UK - London (DigitalOcean.com)"},
@@ -628,7 +664,7 @@ function renderMachines(machinesArray) {
         for (var server of demoServers) {
             html += (
                 `<div class="agent-item">
-                    <i class="fas fa-chart-bar" color: #fff"></i>
+                    <i class="fas fa-chart-bar" style="color: #fff"></i>
                     <a href="${server.url}">${server.title}</a>
                     <div></div>
                 </div>
@@ -640,36 +676,125 @@ function renderMachines(machinesArray) {
     return html;
 }
 
-// Populates the my-netdata menu.
-function netdataRegistryCallback(machinesArray) {
-    let html = '';
+function setMyNetdataMenu(html) {
+    const el = document.getElementById('my-netdata-dropdown-content')
+    el.innerHTML = html;
+}
 
-    if (options.hosts.length > 1) {
-        html += renderStreamedHosts(options) + `<hr />`;
+function clearMyNetdataMenu() {
+    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
+        <i class="fas fa-hourglass-half"></i>
+        Loading, please wait...
+        <div></div>
+    </div>`);
+}
+
+function errorMyNetdataMenu() {
+    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
+        <i class="fas fa-exclamation-triangle" style="color: red"></i>
+        Cannot load known netdata agents from netdata.cloud!
+        <div></div>
+    </div>`);
+}
+
+function restrictMyNetdataMenu() {
+    setMyNetdataMenu(`<div class="info-item" style="white-space: nowrap">
+        <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in to netdata.cloud</a> to view your nodes!</span>
+        <div></div>
+    </div>`);
+}
+
+function renderMyNetdataMenu(machinesArray) {
+    const el = document.getElementById('my-netdata-dropdown-content');
+    el.classList.add(`theme-${netdataTheme}`);
+
+    if (machinesArray == registryAgents) {
+        console.log("Rendering my-netdata menu from registry");
+    } else {
+        console.log("Rendering my-netdata menu from netdata.cloud", machinesArray);
     }
 
-    html += renderMachines(machinesArray);
+    let html = '';
 
-    html += (
-        `<hr />
-        <div class="agent-item">
-            <i class="fas fa-cog""></i>
-            <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
-            <div></div>
-        </div>
-        <div class="agent-item">
-            <i class="fas fa-question-circle""></i>
-            <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">What is this?</a>
-            <div></div>
-        </div>`
-    )
+    if (!isSignedIn()) {
+        if (!NETDATA.registry.isRegistryEnabled()) {
+            html += (
+                `<div class="info-item" style="white-space: nowrap">
+                    <span>Please <a href="#" onclick="signInDidClick(event); return false">sign in to netdata.cloud</a> to view your nodes!</span>
+                    <div></div>
+                </div>
+                <hr />`
+            );
+        }
+    }
 
-    const el = document.getElementById('my-netdata-dropdown-content')
-    el.classList.add(`theme-${netdataTheme}`);
+    if (isSignedIn()) {
+        html += (
+            `<div class="filter-control">
+                <input 
+                    id="my-netdata-menu-filter-input"
+                    type="text" 
+                    placeholder="filter nodes..."
+                    autofocus
+                    autocomplete="off"
+                    value="${myNetdataMenuFilterValue}" 
+                    onkeydown="myNetdataFilterDidChange(event)"
+                />
+                <span class="filter-control__clear" onclick="myNetdataFilterClearDidClick(event)"><i class="fas fa-times"></i><span>
+            </div>
+            <hr />`
+        );
+    }
+
+    // options.hosts = [
+    //     {
+    //         hostname: "streamed1",
+    //     },
+    //     {
+    //         hostname: "streamed2",
+    //     },
+    // ]
+
+    if (options.hosts.length > 1) {
+        html += `<div id="my-netdata-menu-streamed">${renderStreamedHosts(options)}</div><hr />`;
+    }
+
+    if (isSignedIn() || NETDATA.registry.isRegistryEnabled()) {
+        html += `<div id="my-netdata-menu-machines">${renderMachines(machinesArray)}</div><hr />`;
+    }
+
+    if (!isSignedIn()) {
+        html += (
+            `<div class="agent-item">
+                <i class="fas fa-cog""></i>
+                <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
+                <div></div>
+            </div>
+            <div class="agent-item">
+                <i class="fas fa-question-circle""></i>
+                <a href="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" target="_blank">What is this?</a>
+                <div></div>
+            </div>`
+        )
+    } else {
+        html += (
+            `<div class="agent-item">
+                <i class="fas fa-sync"></i>
+                <a href="#" onclick="showSyncModal(); return false">Synchronize with netdata.cloud</a>
+                <div></div>
+            </div>
+            <div class="agent-item">
+                <i class="fas fa-question-circle""></i>
+                <a href="https://netdata.cloud/about" target="_blank">What is this?</a>
+                <div></div>
+            </div>`
+        )
+    }
+
     el.innerHTML = html;
 
     gotoServerInit();
-};
+}
 
 function isdemo() {
     if (this_is_demo !== null) {
@@ -764,6 +889,7 @@ function gotoServerValidateUrl(id, guid, url) {
                     } else {
                         document.getElementById('gotoServerResponse').innerHTML += 'found it! It is at:<br/><small>' + escapeUserInputHTML(url) + '</small>';
                         document.location = verifyURL(finalURL);
+                        $('#gotoServerModal').modal('hide');
                     }
                 }
             } else {
@@ -802,24 +928,29 @@ function gotoServerModalHandler(guid) {
         gotoServerValidateUrl(count++, guid, url);
     }
 
-    setTimeout(function () {
-        if (gotoServerStop === false) {
-            document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
-            NETDATA.registry.search(guid, function (data) {
-                // console.log(data);
-                len = data.urls.length;
-                while (len--) {
-                    var url = data.urls[len][1];
-                    // console.log(url);
-                    if (typeof checked[url] === 'undefined') {
-                        gotoServerValidateRemaining++;
-                        checked[url] = true;
-                        gotoServerValidateUrl(count++, guid, url);
+    if (!isSignedIn()) {
+        // When the registry is enabled, if the user's known URLs are not working
+        // we consult the registry to get additional URLs.  
+        setTimeout(function () {
+            if (gotoServerStop === false) {
+                document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
+                NETDATA.registry.search(guid, function (data) {
+                    // console.log(data);
+                    len = data.urls.length;
+                    while (len--) {
+                        var url = data.urls[len][1];
+                        // console.log(url);
+                        if (typeof checked[url] === 'undefined') {
+                            gotoServerValidateRemaining++;
+                            checked[url] = true;
+                            gotoServerValidateUrl(count++, guid, url);
+                        }
                     }
-                }
-            });
-        }
-    }, 2000);
+                });
+            }
+        }, 2000);
+    }
+
     return false;
 }
 
@@ -860,30 +991,55 @@ function notifyForSwitchRegistry() {
     }
 }
 
+var deleteRegistryGuid = null; 
 var deleteRegistryUrl = null;
 
 function deleteRegistryModalHandler(guid, name, url) {
-    void (guid);
+    // void (guid);
 
+    deleteRegistryGuid = guid;
     deleteRegistryUrl = url;
+
     document.getElementById('deleteRegistryServerName').innerHTML = name;
     document.getElementById('deleteRegistryServerName2').innerHTML = name;
     document.getElementById('deleteRegistryServerURL').innerHTML = url;
     document.getElementById('deleteRegistryResponse').innerHTML = '';
+ 
     $('#deleteRegistryModal').modal('show');
 }
 
 function notifyForDeleteRegistry() {
+    const responseEl = document.getElementById('deleteRegistryResponse');
+
     if (deleteRegistryUrl) {
-        NETDATA.registry.delete(deleteRegistryUrl, function (result) {
-            if (result !== null) {
-                deleteRegistryUrl = null;
-                $('#deleteRegistryModal').modal('hide');
-                NETDATA.registry.init();
-            } else {
-                document.getElementById('deleteRegistryResponse').innerHTML = "<b>Sorry! this command was rejected by the registry server.</b>";
-            }
-        });
+        if (isSignedIn()) {
+            deleteCloudAgentURL(deleteRegistryGuid, deleteRegistryUrl)
+                .then((count) => {
+                    if (!count) {
+                        responseEl.innerHTML = "<b>Sorry, this command was rejected by netdata.cloud!</b>";
+                        return;
+                    }
+                    NETDATA.registry.delete(deleteRegistryUrl, function (result) {
+                        if (result === null) {
+                            console.log("Received error from registry", result);
+                        }
+
+                        deleteRegistryUrl = null;
+                        $('#deleteRegistryModal').modal('hide');
+                        NETDATA.registry.init();
+                    });    
+                });
+        } else {
+            NETDATA.registry.delete(deleteRegistryUrl, function (result) {
+                if (result !== null) {
+                    deleteRegistryUrl = null;
+                    $('#deleteRegistryModal').modal('hide');
+                    NETDATA.registry.init();
+                } else {
+                    responseEl.innerHTML = "<b>Sorry, this command was rejected by the registry server!</b>";
+                }
+            });              
+        }
     }
 }
 
@@ -893,6 +1049,7 @@ var options = {
     data: null,
     hostname: 'netdata_server', // will be overwritten by the netdata server
     version: 'unknown',
+    release_channel: 'unknown',
     hosts: [],
 
     duration: 0, // the default duration of the charts
@@ -1167,6 +1324,7 @@ function enrichChartData(chart) {
         case 'ap':
         case 'net':
         case 'disk':
+        case 'powersupply':
         case 'statsd':
             chart.menu = tmp;
             break;
@@ -1614,7 +1772,7 @@ function renderPage(menus, data) {
 
     sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/blob/master/docs/Add-more-charts-to-netdata.md#add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
-    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, {space: '&nbsp;'}) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>v' + data.version.toString() + '</small></li>';
+    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, {space: '&nbsp;'}) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
     div.innerHTML = html;
     document.getElementById('sidebar').innerHTML = sidebar;
@@ -2555,6 +2713,7 @@ function initializeDynamicDashboardWithData(data) {
         options.hostname = data.hostname;
         options.data = data;
         options.version = data.version;
+        options.release_channel = data.release_channel;
         netdataDashboard.os = data.os;
 
         if (typeof data.hosts !== 'undefined') {
@@ -2562,7 +2721,7 @@ function initializeDynamicDashboardWithData(data) {
         }
 
         // update the dashboard hostname
-        document.getElementById('hostname').innerHTML = options.hostname + ((netdataSnapshotData !== null) ? ' (snap)' : '').toString();
+        document.getElementById('hostname').innerHTML = options.hostname + ((netdataSnapshotData !== null) ? ' (snap)' : '').toString() + '&nbsp;&nbsp;<strong class="caret">';
         document.getElementById('hostname').href = NETDATA.serverDefault;
         document.getElementById('netdataVersion').innerHTML = options.version;
 
@@ -2595,6 +2754,9 @@ function initializeDynamicDashboardWithData(data) {
 
         // render all charts
         renderChartsAndMenu(data);
+
+        // Ensure MyNetdata menu is rendered with latest host info #5370
+        renderMyNetdataMenu(isSignedIn() ? cloudAgents : registryAgents);
     }
 }
 
@@ -2678,91 +2840,101 @@ function versionLog(msg) {
     document.getElementById('versionCheckLog').innerHTML = msg;
 }
 
-function getNetdataCommitIdFromVersion() {
-    var s = options.version.split('-');
+// New way of checking for updates, based only on versions
 
-    if (s.length !== 3) {
-        return null;
+function versionsMatch(v1, v2) {
+    if (v1 == v2) {
+        return true;
+    } else {
+        let s1=v1.split('.');
+        let s2=v2.split('.');
+        // Check major version
+        let n1 = parseInt(s1[0].substring(1,2),10);
+        let n2 = parseInt(s2[0].substring(1,2), 10);
+        if ( n1 < n2 ) return false;
+        else if ( n1 > n2 ) return true;
+
+        // Check minor version
+        n1 = parseInt(s1[1],10);
+        n2 = parseInt(s2[1],10);
+        if ( n1 < n2 ) return false;
+        else if ( n1 > n2 ) return true;
+
+        // Split patch: format could be e.g. 0-22-nightly
+        s1=s1[2].split('-');
+        s2=s2[2].split('-');
+
+        n1 = parseInt(s1[0],10);
+        n2 = parseInt(s2[0],10);
+        if ( n1 < n2 ) return false;
+        else if ( n1 > n2 ) return true;
+
+        n1 = (s1.length > 1) ? parseInt(s1[1],10) : 0;
+        n2 = (s2.length > 1) ? parseInt(s2[1],10) : 0;
+        if ( n1 < n2 ) return false;
+        else return true;
     }
-    if (s[2][0] === 'g') {
-        var v = s[2].split('_')[0].substring(1, 8);
-        if (v.length === 7) {
-            versionLog('Installed git commit id of netdata is ' + v);
-            document.getElementById('netdataCommitId').innerHTML = v;
-            return v;
-        }
-    }
-    return null;
 }
 
-function getNetdataCommitId(force, callback) {
-    versionLog('Downloading installed git commit id from netdata...');
+function getGithubLatestVersion(callback) {
+    versionLog('Downloading latest version id from github...');
 
     $.ajax({
-        url: 'version.txt',
-        async: true,
-        cache: false,
-        xhrFields: {withCredentials: true} // required for the cookie
-    })
-        .done(function (data) {
-            data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
-
-            var c = getNetdataCommitIdFromVersion();
-            if (c !== null && data.length === 40 && data.substring(0, 7) !== c) {
-                versionLog('Installed files commit id and internal netdata git commit id do not match');
-                data = c;
-            }
-
-            if (data.length >= 7) {
-                versionLog('Installed git commit id of netdata is ' + data);
-                document.getElementById('netdataCommitId').innerHTML = data.substring(0, 7);
-                callback(data);
-            }
-        })
-        .fail(function () {
-            versionLog('Failed to download installed git commit id from netdata!');
-
-            if (force === true) {
-                var c = getNetdataCommitIdFromVersion();
-                if (c === null) {
-                    versionLog('Cannot find the git commit id of netdata.');
-                }
-                callback(c);
-            } else {
-                callback(null);
-            }
-        });
-}
-
-function getGithubLatestCommit(callback) {
-    versionLog('Downloading latest git commit id info from github...');
-
-    $.ajax({
-        url: 'https://api.github.com/repos/netdata/netdata/commits',
+        url: 'https://api.github.com/repos/netdata/netdata/releases/latest',
         async: true,
         cache: false
     })
         .done(function (data) {
-            versionLog('Latest git commit id from github is ' + data[0].sha);
-            callback(data[0].sha);
+            data = data.tag_name.replace(/(\r\n|\n|\r| |\t)/gm, "");
+            versionLog('Latest stable version from github is ' + data);
+            callback(data);
         })
         .fail(function () {
-            versionLog('Failed to download installed git commit id from github!');
+            versionLog('Failed to download the latest stable version id from github!');
             callback(null);
         });
 }
 
-function checkForUpdate(force, callback) {
-    getNetdataCommitId(force, function (sha1) {
-        if (sha1 === null) {
-            callback(null, null);
-        }
-
-        getGithubLatestCommit(function (sha2) {
-            callback(sha1, sha2);
+function getGCSLatestVersion(callback) {
+    versionLog('Downloading latest version id from GCS...');
+    $.ajax({
+        url: "https://www.googleapis.com/storage/v1/b/netdata-nightlies/o/latest-version.txt",
+        async: true,
+        cache: false
+    })
+        .done(function (response) {
+            $.ajax({
+                url: response.mediaLink,
+                async: true,
+                cache: false
+            })
+                .done(function (data) {
+                    data = data.replace(/(\r\n|\n|\r| |\t)/gm, "");
+                    versionLog('Latest nightly version from GCS is ' + data);
+                    callback(data);
+                })
+                .fail(function (xhr, textStatus, errorThrown) {
+                    versionLog('Failed to download the latest nightly version id from GCS!');
+                    callback(null);
+                });
+        })
+        .fail(function (xhr, textStatus, errorThrown) {
+            versionLog('Failed to download the latest nightly version from GCS!');
+            callback(null);
         });
-    });
+}
 
+
+function checkForUpdateByVersion(force, callback) {
+    if (options.release_channel === 'stable') {
+        getGithubLatestVersion(function (sha2) {
+            callback(options.version, sha2);
+        });
+    } else {
+        getGCSLatestVersion(function (sha2) {
+            callback(options.version, sha2);
+        });
+    }
     return null;
 }
 
@@ -2786,23 +2958,22 @@ function notifyForUpdate(force) {
         }
     }
 
-    checkForUpdate(force, function (sha1, sha2) {
+    checkForUpdateByVersion(force, function (sha1, sha2) {
         var save = false;
 
         if (sha1 === null) {
             save = false;
-            versionLog('<p><big>Failed to get your netdata git commit id!</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
+            versionLog('<p><big>Failed to get your netdata version!</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
         } else if (sha2 === null) {
             save = false;
-            versionLog('<p><big>Failed to get the latest git commit id from github.</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
-        } else if (sha1 === sha2) {
+            versionLog('<p><big>Failed to get the latest netdata version.</big></p><p>You can always get the latest netdata from <a href="https://github.com/netdata/netdata" target="_blank">its github page</a>.</p>');
+        } else if (versionsMatch(sha1, sha2)) {
             save = true;
-            versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>Probably, we need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
+            versionLog('<p><big>You already have the latest netdata!</big></p><p>No update yet?<br/>We probably need some motivation to keep going on!</p><p>If you haven\'t already, <a href="https://github.com/netdata/netdata" target="_blank">give netdata a <b><i class="fas fa-star"></i></b> at its github page</a>.</p>');
         } else {
             save = true;
-            var compare = 'https://github.com/netdata/netdata/compare/' + sha1.toString() + '...' + sha2.toString();
-
-            versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest commit: <b><code>' + sha2.substring(0, 7).toString() + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> since your installed version, and<br/><a href="https://github.com/netdata/netdata/tree/master/installer/UPDATE.md" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated, is generally a good idea.</p>');
+            var compare = 'https://docs.netdata.cloud/changelog/';
+            versionLog('<p><big><strong>New version of netdata available!</strong></big></p><p>Latest version: <b><code>' + sha2 + '</code></b></p><p><a href="' + compare + '" target="_blank">Click here for the changes log</a> and<br/><a href="https://github.com/netdata/netdata/tree/master/packaging/installer/UPDATE.md" target="_blank">click here for directions on updating</a> your netdata installation.</p><p>We suggest to review the changes log for new features you may be interested, or important bug fixes you may need.<br/>Keeping your netdata updated is generally a good idea.</p>');
 
             document.getElementById('update_badge').innerHTML = '!';
         }
@@ -3873,6 +4044,14 @@ function runOnceOnDashboardWithjQuery() {
     // ------------------------------------------------------------------------
     // sidebar / affix
 
+    if (shouldShowSignInBanner()) {
+        const el = document.getElementById("sign-in-banner");
+        if (el) {
+            el.style.display = "initial";
+            el.classList.add(`theme-${netdataTheme}`);
+        }
+    }
+
     $('#sidebar')
         .affix({
             offset: {
@@ -3970,6 +4149,7 @@ function runOnceOnDashboardWithjQuery() {
         })
         .on('shown.bs.dropdown', function () {
             Ps.update(document.getElementById('my-netdata-dropdown-content'));
+            myNetdataMenuDidShow();
         })
         .on('hidden.bs.dropdown', function () {
             NETDATA.unpause();
@@ -4108,7 +4288,7 @@ function runOnceOnDashboardWithjQuery() {
                                 }
                             }
                         }
-                        
+
                         if (inTag && content[i] === '>') {
                             inTag = false;
                         }
@@ -4189,12 +4369,6 @@ function finalizePage() {
         // do not to give errors on netdata demo servers for 60 seconds
         NETDATA.options.current.retries_on_data_failures = 60;
 
-        if (urlOptions.nowelcome !== true) {
-            setTimeout(function () {
-                $('#welcomeModal').modal();
-            }, 1000);
-        }
-
         // google analytics when this is used for the home page of the demo sites
         // this does not run on user's installations
         setTimeout(function () {
@@ -4232,6 +4406,12 @@ function finalizePage() {
     if (netdataSnapshotData !== null) {
         NETDATA.globalPanAndZoom.setMaster(NETDATA.options.targets[0], netdataSnapshotData.after_ms, netdataSnapshotData.before_ms);
     }
+
+    //if (urlOptions.nowelcome !== true) {
+    //    setTimeout(function () {
+    //        $('#welcomeModal').modal();
+    //    }, 2000);
+    //}
 
     // var netdataEnded = performance.now();
     // console.log('start up time: ' + (netdataEnded - netdataStarted).toString() + ' ms');
@@ -4343,3 +4523,544 @@ var selected_server_timezone = function (timezone, status) {
 // var netdataStarted = performance.now();
 
 var netdataCallback = initializeDynamicDashboard;
+
+// =================================================================================================
+// netdata.cloud
+
+let registryAgents = [];
+
+let cloudAgents = [];
+
+let myNetdataMenuFilterValue = "";
+
+let cloudAccountID = null;
+
+let cloudAccountName = null;
+
+let cloudToken = null;
+
+/// Enforces a maximum string length while retaining the prefix and the postfix of
+/// the string.
+function truncateString(str, maxLength) {
+    if (str.length <= maxLength) {
+        return str;
+    }
+
+    const spanLength = Math.floor((maxLength - 3) / 2);
+    return `${str.substring(0, spanLength)}...${str.substring(str.length - spanLength)}`;
+}
+
+// -------------------------------------------------------------------------------------------------
+// netdata.cloud API Client
+// -------------------------------------------------------------------------------------------------
+
+function isValidAgent(a) {
+    return a.urls != null && a.urls.length > 0;
+}
+
+// https://github.com/netdata/hub/issues/146
+function getCloudAccountAgents() {
+    if (!isSignedIn()) {
+        return [];
+    }
+    
+    return fetch(
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents`,
+        {
+            method: "GET",
+            mode: "cors",
+            headers: {
+                "Authorization": `Bearer ${cloudToken}`
+            }
+        }
+    ).then((response)  => {
+        if (!response.ok) {
+            throw Error("Cannot fetch known accounts");
+        }
+        return response.json();
+    }).then((payload) => {
+        const agents = payload.result ? payload.result.agents : null;
+
+        if (!agents) {
+            return [];
+        }
+
+        return agents.filter((a) => isValidAgent(a)).map((a) => {
+            return {
+                "guid": a.id,
+                "name": a.name,
+                "url": a.urls[0],
+                "alternate_urls": a.urls
+            }
+        })
+    }).catch(function (error) {
+        console.log(error);
+        return null;
+    });
+}
+
+// https://github.com/netdata/hub/issues/128
+function postCloudAccountAgents(agentsToSync) {
+    if (!isSignedIn()) {
+        return [];
+    }
+
+    const maskedURL = NETDATA.registry.MASKED_DATA;
+
+    const agents = agentsToSync.map((a) => {
+        const urls = a.alternate_urls.filter((url) => url != maskedURL);
+
+        return {
+            "id": a.guid,
+            "name": a.name,
+            "urls": urls
+        }
+    }).filter((a) => isValidAgent(a))
+
+    const payload = {
+        "accountID": cloudAccountID,
+        "agents": agents,
+        "merge": false,
+    };
+    
+    return fetch(
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents`,
+        {
+            method: "POST",
+            mode: "cors",
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": `Bearer ${cloudToken}`
+            },
+            body: JSON.stringify(payload)
+        }
+    ).then((response) => {
+        return response.json();
+    }).then((payload) => {
+        const agents = payload.result ? payload.result.agents : null;
+
+        if (!agents) {
+            return [];
+        }
+
+        return agents.filter((a) => isValidAgent(a)).map((a) => {
+            return {
+                "guid": a.id,
+                "name": a.name,
+                "url": a.urls[0],
+                "alternate_urls": a.urls
+            }
+        })        
+    });
+}
+
+function deleteCloudAgentURL(agentID, url) {
+    if (!isSignedIn()) {
+        return [];
+    }
+
+    return fetch(
+        `${NETDATA.registry.cloudBaseURL}/api/v1/accounts/${cloudAccountID}/agents/${agentID}/url?value=${encodeURIComponent(url)}`,
+        {
+            method: "DELETE",
+            mode: "cors",
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+                "Authorization": `Bearer ${cloudToken}`
+            },
+        }
+    ).then((response) => {
+        return response.json();
+    }).then((payload) => {
+        const count = payload.result ? payload.result.count : 0;
+        return count;
+    });
+}
+
+// -------------------------------------------------------------------------------------------------
+
+function signInDidClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!NETDATA.registry.isUsingGlobalRegistry()) {
+        // If user is using a private registry, request his consent for
+        // synchronizing with cloud.
+        showSignInModal();
+        return;
+    }
+
+    signIn();
+}
+
+function shouldShowSignInBanner() {
+    if (isSignedIn()) {
+        return false;
+    }
+
+    return localStorage.getItem("signInBannerClosed") != "true";
+}
+
+function closeSignInBanner() {
+    localStorage.setItem("signInBannerClosed", "true");
+    const el = document.getElementById("sign-in-banner");
+    if (el) {
+        el.style.display = "none";
+    }
+}
+
+function closeSignInBannerDidClick(e) {
+    closeSignInBanner();
+}
+
+function signOutDidClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    signOut();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+function updateMyNetdataAfterFilterChange() {
+    const machinesEl = document.getElementById("my-netdata-menu-machines")
+    machinesEl.innerHTML = renderMachines(cloudAgents);
+
+    if (options.hosts.length > 1) {
+        const streamedEl = document.getElementById("my-netdata-menu-streamed")
+        streamedEl.innerHTML = renderStreamedHosts(options);    
+    }
+}
+
+function myNetdataMenuDidShow() {
+    const filterEl = document.getElementById("my-netdata-menu-filter-input");
+    if (filterEl) {
+        filterEl.focus();
+    }
+}
+
+function myNetdataFilterDidChange(e) {
+    const inputEl = e.target;
+    setTimeout(() => {
+        myNetdataMenuFilterValue = inputEl.value;
+        updateMyNetdataAfterFilterChange();        
+    }, 1);
+}
+
+function myNetdataFilterClearDidClick(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const inputEl = document.getElementById("my-netdata-menu-filter-input");
+    inputEl.value = "";
+    myNetdataMenuFilterValue = "";
+    
+    updateMyNetdataAfterFilterChange();        
+    
+    inputEl.focus();
+}
+
+// -------------------------------------------------------------------------------------------------
+
+function clearCloudVariables() {
+    cloudAccountID = null;
+    cloudAccountName = null;
+    cloudToken = null;
+}
+
+function clearCloudLocalStorageItems() {
+    localStorage.removeItem("cloud.baseURL");
+    localStorage.removeItem("cloud.agentID");
+    localStorage.removeItem("cloud.sync");
+}
+
+function signIn() {
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`;
+    window.open(url);
+}
+
+function signOut() {
+    cloudSSOSignOut();
+}
+
+function renderAccountUI() {
+    if (!NETDATA.registry.isCloudEnabled) {
+        return
+    }
+
+    const container = document.getElementById("account-menu-container");
+    if (isSignedIn()) {
+        container.removeAttribute("title");
+        container.removeAttribute("data-original-title");
+        container.removeAttribute("data-placement");
+        container.innerHTML = (
+            `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
+            <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
+                    <li>
+                        <a href="#" class="btn" onclick="signOutDidClick(event); return false">
+                        <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Sign Out</span>
+                    </a>
+                </li>
+            </ul>`
+        )
+        document.getElementById("amc-account-name").textContent = cloudAccountName; // Anti-XSS
+    } else {
+        container.setAttribute("data-original-title", "sign in");
+        container.setAttribute("data-placement", "bottom");
+        container.innerHTML = (
+            `<a href="#" class="btn sign-in-btn theme-${netdataTheme}" onclick="signInDidClick(event); return false">
+                <i class="fas fa-sign-in-alt"></i>&nbsp;<span class="hidden-sm hidden-md">Sign In</span>
+            </a>`
+        )
+    }
+}
+
+function handleMessage(e) {
+    switch (e.data.type) {
+        case "sign-in":
+            handleSignInMessage(e);
+            break;
+
+        case "sign-out":
+            handleSignOutMessage(e);
+            break;
+
+        default:
+            return;
+    }
+}
+
+function handleSignInMessage(e) {
+    closeSignInBanner();
+    localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
+
+    cloudAccountID = e.data.accountID;
+    cloudAccountName = e.data.accountName;
+    cloudToken = e.data.token;
+
+    netdataRegistryCallback(registryAgents);
+}
+
+function handleSignOutMessage(e) {
+    clearCloudVariables();    
+    renderAccountUI();
+    renderMyNetdataMenu(registryAgents);
+}
+
+function isSignedIn() {
+    return cloudToken != null && cloudAccountID != null;
+}
+
+function sortedArraysEqual(a, b) {
+    if (a.length != b.length) return false;
+
+    for (var i = 0; i < a.length; ++i) {
+        if (a[i] !== b[i]) return false;
+    }
+
+    return true;
+}
+
+// If merging is needed returns the merged agents set, otherwise returns null.
+function mergeAgents(cloud, local) {
+    let dirty = false;
+
+    const union = new Map();
+
+    for (const cagent of cloud) {
+        union.set(cagent.guid, cagent);
+    }
+
+    for (const lagent of local) {
+        const cagent = union.get(lagent.guid);
+        if (cagent) {
+            for (const u of lagent.alternate_urls) {
+                if (u === NETDATA.registry.MASKED_DATA) { // TODO: temp until registry is updated.
+                    continue;
+                }
+
+                if (!cagent.alternate_urls.includes(u)) {
+                    dirty = true;
+                    cagent.alternate_urls.push(u);
+                }
+            }
+        } else {
+            dirty = true;
+            union.set(lagent.guid, lagent);
+        }
+    }
+
+    if (dirty) {
+        return Array.from(union.values());
+    }
+
+    return null;
+}
+
+function showSignInModal() {
+    document.getElementById("sim-registry").innerHTML = NETDATA.registry.server;
+    $("#signInModal").modal("show");
+}
+
+function explicitlySignIn() {
+    $("#signInModal").modal("hide");
+    signIn();
+}
+
+function showSyncModal() {
+    document.getElementById("sync-registry-modal-registry").innerHTML = NETDATA.registry.server;
+    $("#syncRegistryModal").modal("show");
+}
+
+function explicitlySyncAgents() {
+    $("#syncRegistryModal").modal("hide");
+
+    const json = localStorage.getItem("cloud.sync");
+    const sync = json ? JSON.parse(json): {};
+    delete sync[cloudAccountID];
+    localStorage.setItem("cloud.sync", JSON.stringify(sync));
+    
+    NETDATA.registry.init();
+}
+
+function syncAgents(callback) {
+    const json = localStorage.getItem("cloud.sync");
+    const sync = json ? JSON.parse(json): {};
+    
+    const currentAgent = {
+        guid: NETDATA.registry.machine_guid,
+        name: NETDATA.registry.hostname,
+        url: NETDATA.serverDefault,
+        alternate_urls: [NETDATA.serverDefault],
+    }
+
+    const localAgents = sync[cloudAccountID] 
+        ? [currentAgent] 
+        : registryAgents.concat([currentAgent]);
+    
+    console.log("Checking if sync is needed.", localAgents);
+
+    const agentsToSync = mergeAgents(cloudAgents, localAgents);
+
+    if ((!sync[cloudAccountID]) || agentsToSync)  {
+        sync[cloudAccountID] = new Date().getTime();
+        localStorage.setItem("cloud.sync", JSON.stringify(sync));
+    }
+
+    if (agentsToSync) {
+        console.log("Synchronizing with netdata.cloud.");
+        
+        postCloudAccountAgents(agentsToSync).then((agents) => {
+            // TODO: clear syncTime on error!
+            cloudAgents = agents;
+            callback(cloudAgents);
+        });
+
+        return        
+    } 
+
+    callback(cloudAgents);
+}
+
+let isCloudSSOInitialized = false;
+
+function cloudSSOInit() {
+    const iframeEl = document.getElementById("ssoifrm");
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sso-agent?id=${NETDATA.registry.machine_guid}`;
+    iframeEl.src = url;
+    isCloudSSOInitialized = true;
+}
+
+function cloudSSOSignOut() {
+    const iframe = document.getElementById("ssoifrm");
+    const url = `${NETDATA.registry.cloudBaseURL}/account/sign-out-agent`;
+    iframe.src = url;
+}
+
+function initCloud() {
+    if (!NETDATA.registry.isCloudEnabled) {
+        clearCloudVariables();
+        clearCloudLocalStorageItems();
+        return;
+    }
+
+    if (NETDATA.registry.cloudBaseURL != localStorage.getItem("cloud.baseURL")) {
+        clearCloudVariables();
+        clearCloudLocalStorageItems();
+        if (NETDATA.registry.cloudBaseURL) {
+            localStorage.setItem("cloud.baseURL", NETDATA.registry.cloudBaseURL);
+        }
+    }
+
+    if (!isCloudSSOInitialized) {
+        cloudSSOInit();
+    }
+
+    renderAccountUI();
+}
+
+// This callback is called after NETDATA.registry is initialized.
+function netdataRegistryCallback(machinesArray) {
+    localStorage.setItem("cloud.agentID", NETDATA.registry.machine_guid);
+
+    initCloud();
+
+    registryAgents = machinesArray;  
+
+    if (isSignedIn()) {
+        // We call getCloudAccountAgents() here because it requires that 
+        // NETDATA.registry is initialized.
+        clearMyNetdataMenu();
+        getCloudAccountAgents().then((agents) => {
+            if (!agents) {
+                errorMyNetdataMenu();
+                return;
+            }
+            cloudAgents = agents; 
+            syncAgents((agents) => {
+                const agentsMap = {}
+                for (const agent of agents) {
+                    agentsMap[agent.guid] = agent;
+                }
+    
+                NETDATA.registry.machines = agentsMap;
+                NETDATA.registry.machines_array = agents;
+    
+                renderMyNetdataMenu(agents);    
+            });
+        });
+    } else {
+        renderMyNetdataMenu(machinesArray)
+    }
+};
+
+// If we know the cloudBaseURL and agentID from local storage render (eagerly) 
+// the account ui before receiving the definitive response from the web server. 
+// This improves the perceived performance.
+function tryFastInitCloud() {
+    const baseURL = localStorage.getItem("cloud.baseURL");
+    const agentID = localStorage.getItem("cloud.agentID");
+
+    if (baseURL && agentID) {
+        NETDATA.registry.cloudBaseURL = baseURL;
+        NETDATA.registry.machine_guid = agentID;
+        NETDATA.registry.isCloudEnabled = true;
+    
+        initCloud();
+    }
+}
+
+function initializeApp() {
+    window.addEventListener("message", handleMessage, false);    
+
+//    tryFastInitCloud();
+}
+
+if (document.readyState === "complete") {
+    initializeApp();
+} else {
+    document.addEventListener("readystatechange", () => {
+        if (document.readyState === "complete") {
+            initializeApp();
+        }
+    })
+}

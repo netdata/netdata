@@ -6,12 +6,20 @@
 import xml.etree.ElementTree as ET
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
-# update_every = 2
-priority = 60000
 
 # see enum State_Type from monit.h (https://bitbucket.org/tildeslash/monit/src/master/src/monit.h)
-MONIT_SERVICE_NAMES = ['Filesystem', 'Directory', 'File', 'Process', 'Host', 'System', 'Fifo', 'Program', 'Net']
+MONIT_SERVICE_NAMES = [
+    'Filesystem',
+    'Directory',
+    'File',
+    'Process',
+    'Host',
+    'System',
+    'Fifo',
+    'Program',
+    'Net',
+]
+
 DEFAULT_SERVICES_IDS = [0, 1, 2, 3, 4, 6, 7, 8]
 
 # charts order (can be overridden if you want less charts, or different order)
@@ -89,10 +97,10 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        base_url = self.configuration.get('url', 'http://localhost:2812')
-        self.url = '{0}/_status?format=xml&level=full'.format(base_url)
         self.order = ORDER
         self.definitions = CHARTS
+        base_url = self.configuration.get('url', 'http://localhost:2812')
+        self.url = '{0}/_status?format=xml&level=full'.format(base_url)
 
     def parse(self, data):
         try:
@@ -104,15 +112,19 @@ class Service(UrlService):
 
     def check(self):
         self._manager = self._build_manager()
+
         raw_data = self._get_raw_data()
         if not raw_data:
             return None
+
         return bool(self.parse(raw_data))
 
     def _get_data(self):
         raw_data = self._get_raw_data()
+
         if not raw_data:
             return None
+
         xml = self.parse(raw_data)
         if not xml:
             return None
@@ -120,6 +132,7 @@ class Service(UrlService):
         data = {}
         for service_id in DEFAULT_SERVICES_IDS:
             service_category = MONIT_SERVICE_NAMES[service_id].lower()
+
             if service_category == 'system':
                 self.debug("Skipping service from 'System' category, because it's useless in graphs")
                 continue

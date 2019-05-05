@@ -12,7 +12,6 @@
 #include "idlejitter.plugin/plugin_idlejitter.h"
 #include "cgroups.plugin/sys_fs_cgroup.h"
 #include "diskspace.plugin/plugin_diskspace.h"
-#include "nfacct.plugin/plugin_nfacct.h"
 #include "proc.plugin/plugin_proc.h"
 #include "tc.plugin/plugin_tc.h"
 #include "macos.plugin/plugin_macos.h"
@@ -54,13 +53,13 @@
 #define NETDATA_CHART_PRIO_SYSTEM_SOFT_INTR           1100 // freebsd only
 #define NETDATA_CHART_PRIO_SYSTEM_ENTROPY             1000
 #define NETDATA_CHART_PRIO_SYSTEM_UPTIME              1000
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_QUEUES       990 // freebsd only
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES    1000 // freebsd only
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE        1100 // freebsd only
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES      1000
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS      1000
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SEGS 1000 // freebsd only
-#define NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SIZE 1000 // freebsd only
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_QUEUES      1200 // freebsd only
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_MESSAGES    1201
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_MSQ_SIZE        1202
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_SEMAPHORES      1203
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_SEM_ARRAYS      1204
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SEGS 1205
+#define NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SIZE 1206
 #define NETDATA_CHART_PRIO_SYSTEM_PACKETS             7001 // freebsd only
 
 
@@ -288,9 +287,6 @@
 #define NETDATA_CHART_PRIO_NETFILTER_ERRORS           8705
 #define NETDATA_CHART_PRIO_NETFILTER_SEARCH           8710
 
-#define NETDATA_CHART_PRIO_NETFILTER_PACKETS          8906
-#define NETDATA_CHART_PRIO_NETFILTER_BYTES            8907
-
 // SYNPROXY
 
 #define NETDATA_CHART_PRIO_SYNPROXY_SYN_RECEIVED      8751
@@ -301,11 +297,18 @@
 // MDSTAT
 
 #define NETDATA_CHART_PRIO_MDSTAT_HEALTH              9000
-#define NETDATA_CHART_PRIO_MDSTAT_DISKS               9001 // 5 charts per raid
-#define NETDATA_CHART_PRIO_MDSTAT_MISMATCH            9002
-#define NETDATA_CHART_PRIO_MDSTAT_OPERATION           9003
-#define NETDATA_CHART_PRIO_MDSTAT_FINISH              9004
-#define NETDATA_CHART_PRIO_MDSTAT_SPEED               9005
+#define NETDATA_CHART_PRIO_MDSTAT_NONREDUNDANT        9001
+#define NETDATA_CHART_PRIO_MDSTAT_DISKS               9002 // 5 charts per raid
+#define NETDATA_CHART_PRIO_MDSTAT_MISMATCH            9003
+#define NETDATA_CHART_PRIO_MDSTAT_OPERATION           9004
+#define NETDATA_CHART_PRIO_MDSTAT_FINISH              9005
+#define NETDATA_CHART_PRIO_MDSTAT_SPEED               9006
+
+// Linux Power Supply
+#define NETDATA_CHART_PRIO_POWER_SUPPLY_CAPACITY      9500 // 4 charts per power supply
+#define NETDATA_CHART_PRIO_POWER_SUPPLY_CHARGE        9501
+#define NETDATA_CHART_PRIO_POWER_SUPPLY_ENERGY        9502
+#define NETDATA_CHART_PRIO_POWER_SUPPLY_VOLTAGE       9503
 
 // CGROUPS
 

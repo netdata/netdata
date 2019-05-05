@@ -308,7 +308,11 @@ static inline int find_all_btrfs_pools(const char *path) {
             char label[FILENAME_MAX + 1] = "";
 
             snprintfz(filename, FILENAME_MAX, "%s/%s/label", path, de->d_name);
-            read_file(filename, label, FILENAME_MAX);
+            if(read_file(filename, label, FILENAME_MAX) != 0) {
+                error("BTRFS: failed to read '%s'", filename);
+                btrfs_free_node(node);
+                continue;
+            }
 
             char *s = label;
             if (s[0])
@@ -558,7 +562,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.disk"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_DISK
@@ -614,7 +618,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.data"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_DATA
@@ -655,7 +659,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.metadata"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_METADATA
@@ -698,7 +702,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                         , node->label
                         , "btrfs.system"
                         , title
-                        , "MB"
+                        , "MiB"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_BTRFS_NAME
                         , NETDATA_CHART_PRIO_BTRFS_SYSTEM

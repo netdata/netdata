@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: megacli netdata python.d module
-# Author: Ilya Mashchenko (l2isbad)
+# Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
@@ -66,7 +66,7 @@ def battery_charts(bats):
         charts.update(
             {
                 'bbu_{0}_relative_charge'.format(b.id): {
-                    'options': [None, 'Relative State of Charge', '%', 'battery',
+                    'options': [None, 'Relative State of Charge', 'percentage', 'battery',
                                 'megacli.bbu_relative_charge', 'line'],
                     'lines': [
                         ['bbu_{0}_relative_charge'.format(b.id), 'adapter {0}'.format(b.id)],
@@ -180,8 +180,8 @@ class Service(ExecutableService):
         ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
-        self.megacli = Megacli()
         self.do_battery = self.configuration.get('do_battery')
+        self.megacli = Megacli()
 
     def check_sudo(self):
         err = self._get_raw_data(command=self.megacli.sudo_check, stderr=True)

@@ -15,6 +15,12 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 
+void send_statistics( const char *action, const char *action_result, const char *action_data) {
+    (void) action;
+    (void) action_result;
+    (void) action_data;
+    return;
+}
 // callbacks required by popen()
 void signals_block(void) {};
 void signals_unblock(void) {};
@@ -99,6 +105,9 @@ static inline void debug_log_dummy(void) {}
 // etc.
 #define RATES_DETAIL 10000ULL
 
+// ----------------------------------------------------------------------------
+// factor for calculating correct CPU time values depending on units of raw data
+static unsigned int time_factor = 0;
 
 // ----------------------------------------------------------------------------
 // to avoid reallocating too frequently, we can increase the number of spare
@@ -106,7 +115,6 @@ static inline void debug_log_dummy(void) {}
 // IMPORTANT:
 // having a lot of spares, increases the CPU utilization of the plugin.
 #define MAX_SPARE_FDS 1
-
 
 // ----------------------------------------------------------------------------
 // command line options
@@ -166,12 +174,10 @@ static size_t
 // metric.
 
 // the total system time, as reported by /proc/stat
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static kernel_uint_t
         global_utime = 0,
         global_stime = 0,
         global_gtime = 0;
-#endif
 
 // the normalization ratios, as calculated by normalize_utilization()
 double  utime_fix_ratio = 1.0,
@@ -1038,8 +1044,8 @@ static inline int read_proc_pid_status(struct pid_stat *p, void *ptr) {
 
     p->uid                  = proc_info->ki_uid;
     p->gid                  = proc_info->ki_groups[0];
-    p->status_vmsize        = proc_info->ki_size / 1024; // in kB
-    p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in kB
+    p->status_vmsize        = proc_info->ki_size / 1024; // in KiB
+    p->status_vmrss         = proc_info->ki_rssize * pagesize / 1024; // in KiB
     // TODO: what about shared and swap memory on FreeBSD?
     return 1;
 #else
@@ -1327,8 +1333,8 @@ cleanup:
 #endif
 }
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
-static inline int read_proc_stat() {
+#ifndef __FreeBSD__
+static inline int read_global_time() {
     static char filename[FILENAME_MAX + 1] = "";
     static procfile *ff = NULL;
     static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, gntime_raw = 0, ntime_raw = 0;
@@ -1386,10 +1392,50 @@ cleanup:
     return 0;
 }
 #else
-static inline int read_proc_stat() {
+static inline int read_global_time() {
+    static kernel_uint_t utime_raw = 0, stime_raw = 0, gtime_raw = 0, ntime_raw = 0;
+    static usec_t collected_usec = 0, last_collected_usec = 0;
+    long cp_time[CPUSTATES];
+
+    if (unlikely(CPUSTATES != 5)) {
+        goto cleanup;
+    } else {
+        static int mib[2] = {0, 0};
+
+        if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
+            goto cleanup;
+        }
+    }
+
+    last_collected_usec = collected_usec;
+    collected_usec = now_monotonic_usec();
+
+    calls_counter++;
+
+    // temporary - it is added global_ntime;
+    kernel_uint_t global_ntime = 0;
+
+    incremental_rate(global_utime, utime_raw, cp_time[0] * 100LLU / system_hz, collected_usec, last_collected_usec);
+    incremental_rate(global_ntime, ntime_raw, cp_time[1] * 100LLU / system_hz, collected_usec, last_collected_usec);
+    incremental_rate(global_stime, stime_raw, cp_time[2] * 100LLU / system_hz, collected_usec, last_collected_usec);
+
+    global_utime += global_ntime;
+
+    if(unlikely(global_iterations_counter == 1)) {
+        global_utime = 0;
+        global_stime = 0;
+        global_gtime = 0;
+    }
+
+    return 1;
+
+cleanup:
+    global_utime = 0;
+    global_stime = 0;
+    global_gtime = 0;
     return 0;
 }
-#endif
+#endif /* !__FreeBSD__ */
 
 // ----------------------------------------------------------------------------
 
@@ -2289,7 +2335,7 @@ static int collect_data_for_all_processes(void) {
 
     size_t new_procbase_size;
 
-    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
+    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
     if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
         error("sysctl error: Can't get processes data size");
         return 0;
@@ -2396,7 +2442,7 @@ static int collect_data_for_all_processes(void) {
         return 0;
 
     // we need /proc/stat to normalize the cpu consumption of the exited childs
-    read_proc_stat();
+    read_global_time();
 
     // build the process tree
     link_all_processes_to_their_parents();
@@ -2884,7 +2930,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 , update_every
         );
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
         fprintf(stdout,
                 "CHART netdata.apps_fix '' 'Apps Plugin Normalization Ratios' 'percentage' apps.plugin netdata.apps_fix line 140002 %1$d\n"
                 "DIMENSION utime '' absolute 1 %2$llu\n"
@@ -2907,7 +2952,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
                     , update_every
                     , RATES_DETAIL
             );
-#endif
 
     }
 
@@ -2942,7 +2986,6 @@ void send_resource_usage_to_netdata(usec_t dt) {
         , targets_assignment_counter
         );
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
     fprintf(stdout,
             "BEGIN netdata.apps_fix %llu\n"
             "SET utime = %u\n"
@@ -2975,10 +3018,8 @@ void send_resource_usage_to_netdata(usec_t dt) {
             , (unsigned int)(cminflt_fix_ratio * 100 * RATES_DETAIL)
             , (unsigned int)(cmajflt_fix_ratio * 100 * RATES_DETAIL)
             );
-#endif
 }
 
-#if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
 static void normalize_utilization(struct target *root) {
     struct target *w;
 
@@ -2986,7 +3027,7 @@ static void normalize_utilization(struct target *root) {
     // here we try to eliminate them by disabling childs processing either for specific dimensions
     // or entirely. Of course, either way, we disable it just a single iteration.
 
-    kernel_uint_t max_time = processors * system_hz * RATES_DETAIL;
+    kernel_uint_t max_time = processors * time_factor * RATES_DETAIL;
     kernel_uint_t utime = 0, cutime = 0, stime = 0, cstime = 0, gtime = 0, cgtime = 0, minflt = 0, cminflt = 0, majflt = 0, cmajflt = 0;
 
     if(global_utime > max_time) global_utime = max_time;
@@ -3009,7 +3050,7 @@ static void normalize_utilization(struct target *root) {
         cmajflt += w->cmajflt;
     }
 
-    if((global_utime || global_stime || global_gtime) && (utime || stime || gtime)) {
+    if(global_utime || global_stime || global_gtime) {
         if(global_utime + global_stime + global_gtime > utime + cutime + stime + cstime + gtime + cgtime) {
             // everything we collected fits
             utime_fix_ratio  =
@@ -3019,7 +3060,7 @@ static void normalize_utilization(struct target *root) {
             cstime_fix_ratio =
             cgtime_fix_ratio = 1.0; //(double)(global_utime + global_stime) / (double)(utime + cutime + stime + cstime);
         }
-        else if(global_utime + global_stime > utime + stime) {
+        else if((global_utime + global_stime > utime + stime) && (cutime || cstime)) {
             // childrens resources are too high
             // lower only the children resources
             utime_fix_ratio  =
@@ -3029,13 +3070,21 @@ static void normalize_utilization(struct target *root) {
             cstime_fix_ratio =
             cgtime_fix_ratio = (double)((global_utime + global_stime) - (utime + stime)) / (double)(cutime + cstime);
         }
-        else {
+        else if(utime || stime) {
             // even running processes are unrealistic
             // zero the children resources
             // lower the running processes resources
             utime_fix_ratio  =
             stime_fix_ratio  =
             gtime_fix_ratio  = (double)(global_utime + global_stime) / (double)(utime + stime);
+            cutime_fix_ratio =
+            cstime_fix_ratio =
+            cgtime_fix_ratio = 0.0;
+        }
+        else {
+            utime_fix_ratio  =
+            stime_fix_ratio  =
+            gtime_fix_ratio  =
             cutime_fix_ratio =
             cstime_fix_ratio =
             cgtime_fix_ratio = 0.0;
@@ -3121,32 +3170,27 @@ static void normalize_utilization(struct target *root) {
             , (kernel_uint_t)(cgtime * cgtime_fix_ratio)
     );
 }
-#else // ALL_PIDS_ARE_READ_INSTANTLY == 1
-static void normalize_utilization(struct target *root) {
-    (void)root;
-}
-#endif // ALL_PIDS_ARE_READ_INSTANTLY
 
 static void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt) {
     struct target *w;
 
     send_BEGIN(type, "cpu", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_user", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_system", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
     }
     send_END();
@@ -3154,7 +3198,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     if(show_guest_time) {
         send_BEGIN(type, "cpu_guest", dt);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
+            if(unlikely(w->exposed && w->processes))
                 send_SET(w->name, (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
         }
         send_END();
@@ -3162,28 +3206,28 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->num_threads);
     }
     send_END();
 
     send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->processes);
     }
     send_END();
 
     send_BEGIN(type, "mem", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared):0ULL);
     }
     send_END();
 
     send_BEGIN(type, "vmem", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->status_vmsize);
     }
     send_END();
@@ -3191,22 +3235,22 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "swap", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->status_vmswap);
     }
     send_END();
 #endif
-    
+
     send_BEGIN(type, "minor_faults", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "major_faults", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
     }
     send_END();
@@ -3214,14 +3258,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "lreads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_logical_bytes_read);
     }
     send_END();
 
     send_BEGIN(type, "lwrites", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_logical_bytes_written);
     }
     send_END();
@@ -3229,14 +3273,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "preads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_storage_bytes_read);
     }
     send_END();
 
     send_BEGIN(type, "pwrites", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_storage_bytes_written);
     }
     send_END();
@@ -3244,21 +3288,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     if(enable_file_charts) {
         send_BEGIN(type, "files", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openfiles);
         }
         send_END();
 
         send_BEGIN(type, "sockets", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->opensockets);
         }
         send_END();
 
         send_BEGIN(type, "pipes", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openpipes);
         }
         send_END();
@@ -3290,19 +3334,19 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     // we have something new to show
     // update the charts
-    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu '' '%s CPU Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu stacked 20001 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, system_hz * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu %s\n", w->name, time_factor * RATES_DETAIL / 100, w->hidden ? "hidden" : "");
     }
 
-    fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.mem '' '%s Real Memory (w/o shared)' 'MiB' mem %s.mem stacked 20003 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
     }
 
-    fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MiB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
@@ -3320,28 +3364,28 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
 
-    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
+    fprintf(stdout, "CHART %s.cpu_system '' '%s CPU System Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20021 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
-            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
+            fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
     }
 
     if(show_guest_time) {
-        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'cpu time %%' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
+        fprintf(stdout, "CHART %s.cpu_guest '' '%s CPU Guest Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_system stacked 20022 %d\n", type, title, (processors * 100), processors, (processors > 1) ? "s" : "", type, update_every);
         for (w = root; w; w = w->next) {
             if(unlikely(w->exposed))
-                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, system_hz * RATES_DETAIL / 100LLU);
+                fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, time_factor * RATES_DETAIL / 100LLU);
         }
     }
 
 #ifndef __FreeBSD__
-    fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.swap '' '%s Swap Memory' 'MiB' swap %s.swap stacked 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
@@ -3373,25 +3417,25 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, RATES_DETAIL);
     }
 #else
-    fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'kilobytes/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.preads '' '%s Disk Reads' 'KiB/s' disk %s.preads stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
-    fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'kilobytes/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.pwrites '' '%s Disk Writes' 'KiB/s' disk %s.pwrites stacked 20002 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
-    fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'kilobytes/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.lreads '' '%s Disk Logical Reads' 'KiB/s' disk %s.lreads stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
     }
 
-    fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'kilobytes/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.lwrites '' '%s I/O Logical Writes' 'KiB/s' disk %s.lwrites stacked 20042 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 %llu\n", w->name, 1024LLU * RATES_DETAIL);
@@ -3710,7 +3754,14 @@ int main(int argc, char **argv) {
     procfile_adaptive_initial_allocation = 1;
 
     time_t started_t = now_monotonic_sec();
+
     get_system_HZ();
+#ifdef __FreeBSD__
+    time_factor = 1000000ULL / RATES_DETAIL; // FreeBSD uses usecs
+#else
+    time_factor = system_hz; // Linux uses clock ticks
+#endif
+
     get_system_pid_max();
     get_system_cpus();
 

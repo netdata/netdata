@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: icecast netdata python.d module
-# Author: Ilya Mashchenko (l2isbad)
+# Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
@@ -8,10 +8,9 @@ import json
 from bases.FrameworkServices.UrlService import UrlService
 
 
-priority = 60000
-
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['listeners']
+ORDER = [
+    'listeners',
+]
 
 CHARTS = {
     'listeners': {

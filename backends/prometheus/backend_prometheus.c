@@ -78,11 +78,50 @@ static inline size_t prometheus_label_copy(char *d, const char *s, size_t usable
     return n;
 }
 
-static inline char *prometheus_units_copy(char *d, const char *s, size_t usable) {
+static inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int showoldunits) {
     const char *sorig = s;
     char *ret = d;
     size_t n;
 
+    // Fix for issue 5227
+    if (unlikely(showoldunits)) {
+		static struct {
+			const char *newunit;
+			uint32_t hash;
+			const char *oldunit;
+		} units[] = {
+				  {"KiB/s", 0, "kilobytes/s"}
+				, {"MiB/s", 0, "MB/s"}
+				, {"GiB/s", 0, "GB/s"}
+				, {"KiB"  , 0, "KB"}
+				, {"MiB"  , 0, "MB"}
+				, {"GiB"  , 0, "GB"}
+				, {"inodes"       , 0, "Inodes"}
+				, {"percentage"   , 0, "percent"}
+				, {"faults/s"     , 0, "page faults/s"}
+				, {"KiB/operation", 0, "kilobytes per operation"}
+				, {"milliseconds/operation", 0, "ms per operation"}
+				, {NULL, 0, NULL}
+		};
+		static int initialized = 0;
+		int i;
+
+		if(unlikely(!initialized)) {
+			for (i = 0; units[i].newunit; i++)
+				units[i].hash = simple_hash(units[i].newunit);
+			initialized = 1;
+		}
+
+		uint32_t hash = simple_hash(s);
+		for(i = 0; units[i].newunit ; i++) {
+			if(unlikely(hash == units[i].hash && !strcmp(s, units[i].newunit))) {
+				// info("matched extension for filename '%s': '%s'", filename, last_dot);
+				s=units[i].oldunit;
+				sorig = s;
+				break;
+			}
+		}
+    }
     *d++ = '_';
     for(n = 1; *s && n < usable ; d++, s++, n++) {
         register char c = *s;
@@ -266,22 +305,22 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             rrdset_rdlock(st);
 
             int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
-            int homogeneus = 1;
+            int homogeneous = 1;
             if(as_collected) {
                 if(rrdset_flag_check(st, RRDSET_FLAG_HOMEGENEOUS_CHECK))
                     rrdset_update_heterogeneous_flag(st);
 
                 if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
-                    homogeneus = 0;
+                    homogeneous = 0;
             }
             else {
-                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
-                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX);
+                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE && !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
+                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, output_options & PROMETHEUS_OUTPUT_OLDUNITS);
             }
 
             if(unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
                 buffer_sprintf(wb, "\n# COMMENT %s chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n"
-                               , (homogeneus)?"homogeneus":"heterogeneous"
+                               , (homogeneous)?"homogeneous":"heterogeneous"
                                , (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id
                                , st->context
                                , st->family
@@ -291,12 +330,15 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->collections_counter) {
+                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     char *suffix = "";
 
                     if (as_collected) {
                         // we need as-collected / raw data
+
+                        if(unlikely(rd->last_collected_time.tv_sec < after))
+                            continue;
 
                         const char *t = "gauge", *h = "gives";
                         if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
@@ -306,7 +348,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             suffix = "_total";
                         }
 
-                        if(homogeneus) {
+                        if(homogeneous) {
                             // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                             // we add all dimensions as labels
 
@@ -512,12 +554,9 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
     }
 
     if(output_options & PROMETHEUS_OUTPUT_HELP) {
-        int show_range = 1;
         char *mode;
-        if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED) {
+        if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
             mode = "as collected";
-            show_range = 0;
-        }
         else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
             mode = "average";
         else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
@@ -525,19 +564,15 @@ static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_O
         else
             mode = "unknown";
 
-        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s"
+        buffer_sprintf(wb, "# COMMENT netdata \"%s\" to %sprometheus \"%s\", source \"%s\", last seen %lu %s, time range %lu to %lu\n\n"
                 , host->hostname
                 , (first_seen)?"FIRST SEEN ":""
                 , server
                 , mode
                 , (unsigned long)((first_seen)?0:(now - after))
                 , (first_seen)?"never":"seconds ago"
+                , (unsigned long)after, (unsigned long)now
         );
-
-        if(show_range)
-            buffer_sprintf(wb, ", time range %lu to %lu", (unsigned long)after, (unsigned long)now);
-
-        buffer_strcat(wb, "\n\n");
     }
 
     return after;

@@ -89,17 +89,17 @@ In Netdata v1.9+ there is also access list support, like this:
 
 #### Use an authenticating web server in proxy mode
 
-Use **one nginx** (or one apache) server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with URLs like `http://nginx.host/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Check [this wiki page for more information on configuring nginx for such a setup](Running-behind-nginx.md#netdata-via-nginx).
+Use one web server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Instructions are provided on how to set the proxy configuration to have Netdata run behind [nginx](Running-behind-nginx.md#netdata-via-nginx), [Apache](Running-behind-apache.md), [lighthttpd](Running-behind-lighttpd.md#netdata-via-lighttpd-v14x) and [Caddy](Running-behind-caddy.md#netdata-via-caddy).
 
-To use this method, you should firewall protect all your Netdata servers, so that only the nginx IP will allowed to directly access Netdata. To do this, run this on each of your servers (or use your firewall manager):
+To use this method, you should firewall protect all your Netdata servers, so that only the web server IP will allowed to directly access Netdata. To do this, run this on each of your servers (or use your firewall manager):
 
 ```sh
-NGINX_IP="1.2.3.4"
-iptables -t filter -I INPUT -p tcp --dport 19999 \! -s ${NGINX_IP} -m conntrack --ctstate NEW -j DROP
+PROXY_IP="1.2.3.4"
+iptables -t filter -I INPUT -p tcp --dport 19999 \! -s ${PROXY_IP} -m conntrack --ctstate NEW -j DROP
 ```
-_commands to allow direct access to Netdata from an nginx proxy_
+_commands to allow direct access to Netdata from a web server proxy_
 
-The above will prevent anyone except your nginx server to access a Netdata dashboard running on the host.
+The above will prevent anyone except your web server to access a Netdata dashboard running on the host.
 
 For Netdata v1.9+ you can also use `netdata.conf`:
 
@@ -149,13 +149,25 @@ Of course, there are many more methods you could use to protect Netdata:
 
 - install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a master Netdata server, which will be protected with authentication using an nginx server running locally at the master Netdata server. This requires more resources (you will need a bigger master Netdata server), but does not require any firewall changes, since all the slave Netdata servers will not be listening for incoming connections.
 
-## Registry or how to not send any information to a third party server
+## Anonymous Statistics
+
+### Registry or how to not send any information to a third party server
 
 The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit the following information to a third party server: 
 - The url where you open the web-ui in the browser (via http request referer)
 - The hostnames of the Netdata servers
 
 If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](../registry/#run-your-own-registry).
+
+### Opt out of anonymous statistics
+
+Starting with v1.12 Netdata also collects [anonymous statistics](anonymous-statistics.md) on certain events for: 
+
+1. **Quality assurance**, to help us understand if netdata behaves as expected and help us identify repeating issues for certain distributions or environments.
+
+2. **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extent our development decisions influence the community.
+
+To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). 
 
 ## Netdata directories
 

@@ -11,28 +11,31 @@
 #       and tls_cert_file options then.
 #
 
-from bases.FrameworkServices.UrlService import UrlService
-from json import loads
 import socket
 
+from json import loads
+
+from bases.FrameworkServices.UrlService import UrlService
+
 update_every = 5
-priority = 60000
 
 
-MB = 1048576
+MiB = 1 << 20
 CPU_SCALE = 1000
+
 ORDER = [
     'jvm_heap',
     'jvm_nonheap',
     'cpu',
     'fd_open',
 ]
+
 CHARTS = {
     'jvm_heap': {
-        'options': [None, 'JVM Heap', 'MB', 'resources', 'puppet.jvm', 'area'],
+        'options': [None, 'JVM Heap', 'MiB', 'resources', 'puppet.jvm', 'area'],
         'lines': [
-            ['jvm_heap_committed', 'committed', 'absolute', 1, MB],
-            ['jvm_heap_used', 'used', 'absolute', 1, MB],
+            ['jvm_heap_committed', 'committed', 'absolute', 1, MiB],
+            ['jvm_heap_used', 'used', 'absolute', 1, MiB],
         ],
         'variables': [
             ['jvm_heap_max'],
@@ -40,10 +43,10 @@ CHARTS = {
         ],
     },
     'jvm_nonheap': {
-        'options': [None, 'JVM Non-Heap', 'MB', 'resources', 'puppet.jvm', 'area'],
+        'options': [None, 'JVM Non-Heap', 'MiB', 'resources', 'puppet.jvm', 'area'],
         'lines': [
-            ['jvm_nonheap_committed', 'committed', 'absolute', 1, MB],
-            ['jvm_nonheap_used', 'used', 'absolute', 1, MB],
+            ['jvm_nonheap_committed', 'committed', 'absolute', 1, MiB],
+            ['jvm_nonheap_used', 'used', 'absolute', 1, MiB],
         ],
         'variables': [
             ['jvm_nonheap_max'],
@@ -72,9 +75,9 @@ CHARTS = {
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.url = 'https://{0}:8140'.format(socket.getfqdn())
         self.order = ORDER
         self.definitions = CHARTS
+        self.url = 'https://{0}:8140'.format(socket.getfqdn())
 
     def _get_data(self):
         # NOTE: there are several ways to retrieve data

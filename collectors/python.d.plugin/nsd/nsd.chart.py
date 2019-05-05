@@ -7,12 +7,20 @@ import re
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-# default module values (can be overridden per job in `config`)
-priority = 60000
+
 update_every = 30
 
-# charts order (can be overridden if you want less charts, or different order)
-ORDER = ['queries', 'zones', 'protocol', 'type', 'transfer', 'rcode']
+NSD_CONTROL_COMMAND = 'nsd-control stats_noreset'
+REGEX = re.compile(r'([A-Za-z0-9.]+)=(\d+)')
+
+ORDER = [
+    'queries',
+    'zones',
+    'protocol',
+    'type',
+    'transfer',
+    'rcode',
+]
 
 CHARTS = {
     'queries': {
@@ -78,22 +86,21 @@ CHARTS = {
 
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
-        ExecutableService.__init__(
-            self, configuration=configuration, name=name)
-        self.command = 'nsd-control stats_noreset'
+        ExecutableService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.regex = re.compile(r'([A-Za-z0-9.]+)=(\d+)')
+        self.command = NSD_CONTROL_COMMAND
 
     def _get_data(self):
         lines = self._get_raw_data()
         if not lines:
             return None
 
-        r = self.regex
-        stats = dict((k.replace('.', '_'), int(v))
-                     for k, v in r.findall(''.join(lines)))
+        stats = dict(
+            (k.replace('.', '_'), int(v)) for k, v in REGEX.findall(''.join(lines))
+        )
         stats.setdefault('num_opcode_NOTIFY', 0)
         stats.setdefault('num_type_TYPE252', 0)
         stats.setdefault('num_type_TYPE255', 0)
+
         return stats

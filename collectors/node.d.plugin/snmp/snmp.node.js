@@ -265,7 +265,7 @@ netdata.processors.snmp = {
                         if(__DEBUG === true)
                             netdata.debug(service.module.name + ': ' + service.name + ': failed ' + service.module.name + ' get for OIDs ' + varbinds[i].oid);
 
-                        service.error('OID ' + varbinds[i].oid + ' gave error: ' + snmp.varbindError(varbinds[i]));
+                        service.error('OID ' + varbinds[i].oid + ' gave error: ' + net_snmp.varbindError(varbinds[i]));
                         value = null;
                         failed++;
                     }
@@ -394,7 +394,7 @@ var snmp = {
                     var d = dim_keys[j];
 
                     if (dimensions[d].value !== null) {
-                        if(typeof dimensions[d].offset === 'number')
+                        if(typeof dimensions[d].offset === 'number' && typeof dimensions[d].value === 'number')
                             service.set(d, dimensions[d].value + dimensions[d].offset);
                         else
                             service.set(d, dimensions[d].value);

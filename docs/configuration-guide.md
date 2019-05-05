@@ -1,6 +1,6 @@
 # Configuration guide
 
-No configuration is required to run netdata, but you fill find plenty of options to tweak, so that you can adapt it to your particular needs.
+No configuration is required to run netdata, but you will find plenty of options to tweak, so that you can adapt it to your particular needs.
 
 <details markdown="1"><summary>Configuration files are placed in `/etc/netdata`.</summary>
 Depending on your installation method, Netdata will have been installed either directly under `/`, or under `/opt/netdata`. The paths mentioned here and in the documentation in general assume that your installation is under `/`. If it is not, you will find the exact same paths under `/opt/netdata` as well. (i.e. `/etc/netdata` will be `/opt/netdata/etc/netdata`).</details>
@@ -46,6 +46,10 @@ Entire plugins can be turned off from the [netdata.conf [plugins]](../daemon/con
 - `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
 
 ### Modify alarms and notifications
+
+##### Add a new alarm
+
+You can add a new alarm definition either by editing an existing stock alarm config file under `health.d` (e.g. `/etc/netdata/edit-config health.d/load.conf`), or by adding a new `.conf` file under `/etc/netdata/health.d`. The documentation on how to define an alarm is in [health monitoring](../health/#health-monitoring). It is suggested to look at some of the stock alarm definitions, so you can ensure you understand how the various options work.  
 
 ##### Turn off all alarms and notifications
 

@@ -36,7 +36,7 @@ void grouping_free_stddev(RRDR *r) {
 void grouping_add_stddev(RRDR *r, calculated_number value) {
     struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
 
-    if(isnormal(value)) {
+    if(calculated_number_isnumber(value)) {
         g->count++;
 
         // See Knuth TAOCP vol 2, 3rd edition, page 232
@@ -74,7 +74,7 @@ calculated_number grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_op
     if(likely(g->count > 1)) {
         value = stddev(g);
 
-        if(!isnormal(value)) {
+        if(!calculated_number_isnumber(value)) {
             value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
@@ -102,7 +102,7 @@ calculated_number grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FL
         calculated_number m = mean(g);
         value = 100.0 * stddev(g) / ((m < 0)? -m : m);
 
-        if(unlikely(!isnormal(value))) {
+        if(unlikely(!calculated_number_isnumber(value))) {
             value = 0.0;
             *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         }
