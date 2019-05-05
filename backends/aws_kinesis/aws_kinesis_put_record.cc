@@ -10,27 +10,29 @@
 
 using namespace Aws;
 
-kinesis_options *kinesis_init() {
-    SDKOptions *options = new SDKOptions;
+void kinesis_init(kinesis_options **options, kinesis_client **client,
+                  const char *region, const char *auth_key_id, const char *secure_key) {
+    *options = New<kinesis_options>("options");
 
-    InitAPI(*options);
-
-    return options;
-}
-
-void kinesis_shutdown(kinesis_options *options) {
-    ShutdownAPI(*options);
-}
-
-int kinesis_put_record(const char *region, const char *auth_key_id, const char *secure_key,
-               const char *stream_name, const char *partition_key,
-               const char *data, size_t data_len, char *error_message) {
+    InitAPI(**options);
 
     Client::ClientConfiguration config;
     config.region = region;
 
-    Kinesis::KinesisClient client(Auth::AWSCredentials(auth_key_id, secure_key), config);
+    *client = New<kinesis_client>("client", Auth::AWSCredentials(auth_key_id, secure_key), config);
+}
 
+void kinesis_shutdown(kinesis_options *options, kinesis_client *client) {
+    Delete(client);
+
+    ShutdownAPI(*options);
+
+    Delete(options);
+}
+
+int kinesis_put_record(const kinesis_client *client,
+                       const char *stream_name, const char *partition_key,
+                       const char *data, size_t data_len, char *error_message) {
     Kinesis::Model::PutRecordRequest request;
 
     request.SetStreamName(stream_name);
@@ -38,7 +40,7 @@ int kinesis_put_record(const char *region, const char *auth_key_id, const char *
 
     request.SetData(Utils::ByteBuffer((unsigned char*) data, data_len));
 
-    Kinesis::Model::PutRecordOutcome outcome = client.PutRecord(request);
+    Kinesis::Model::PutRecordOutcome outcome = client->PutRecord(request);
 
     if(!outcome.IsSuccess()) {
         outcome.GetError().GetMessage().copy(error_message, ERROR_LINE_MAX);
