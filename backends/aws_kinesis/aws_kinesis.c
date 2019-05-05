@@ -29,7 +29,7 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
     debug(D_BACKEND, "BACKEND: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
-    if(unlikely(!fp)) {
+    if(!fp) {
         return 1;
     }
 
