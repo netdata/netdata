@@ -124,6 +124,12 @@ AC_ARG_ENABLE(
     ,
     [enable_lto="detect"]
 )
+AC_ARG_ENABLE(
+    [https],
+    [AS_HELP_STRING([--enable-https], [Build with the HTTPS  @<:@default disabled@:>@])],
+    ,
+    [enable_https="no"]
+)
 
 
 # -----------------------------------------------------------------------------
@@ -283,6 +289,21 @@ AC_CHECK_LIB(
 
 OPTIONAL_SSL_CLFAGS="${SSL_CFLAGS}"
 OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+
+# -----------------------------------------------------------------------------
+# HTTPS
+test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
+	AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+
+AC_MSG_CHECKING([if netdata https should be used])
+if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
+	enable_https="yes"
+	AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+else
+	enable_https="no"
+fi
+AC_MSG_RESULT([${enable_https}])
+AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # compiler options

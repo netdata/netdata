@@ -49,6 +49,10 @@ void netdata_cleanup_and_exit(int ret) {
             error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
+#ifdef ENABLE_HTTPS
+	security_clean_openssl();
+#endif
+
     info("EXIT: all done - netdata is now exiting - bye bye...");
     exit(ret);
 }
@@ -344,9 +348,7 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
-<<<<<<< HEAD
-void log_init(void) {
-=======
+#ifdef ENABLE_HTTPS
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/key.pem",netdata_configured_user_config_dir);
@@ -357,9 +359,9 @@ static void security_init(){
 
     security_start_ssl();
 }
+#endif
 
 static void log_init(void) {
->>>>>>> c3990172... Start of SSL with Netdata
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
     stdout_filename    = config_get(CONFIG_SECTION_GLOBAL, "debug log",  filename);
@@ -1057,7 +1059,9 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
         // get the certificate and start security
+#ifdef ENABLE_HTTPS
         security_init();
+#endif
 
         // --------------------------------------------------------------------
         // setup process signals

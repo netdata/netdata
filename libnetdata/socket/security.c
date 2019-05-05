@@ -7,6 +7,7 @@ const char *security_cert=NULL;
 static SSL_CTX * security_initialize_openssl(){
     SSL_CTX *ctx;
     char error[512];
+	static int netdata_id_context = 1;
 
     //TO DO: Confirm the necessity to check return for other OPENSSL function
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -43,12 +44,17 @@ static SSL_CTX * security_initialize_openssl(){
     SSL_CTX_use_PrivateKey_file(ctx, security_key, SSL_FILETYPE_PEM);
     if ( !SSL_CTX_check_private_key(ctx) ){
         ERR_error_string_n(ERR_get_error(),error,sizeof(error));
-        fprintf(stderr,"Check private key: %s\n",security_key,security_cert,error);
+        fprintf(stderr,"Check private key: %s\n",error);
         SSL_CTX_free(ctx);
         return NULL;
     }
 
     SSL_CTX_set_session_cache_mode(ctx,SSL_SESS_CACHE_NO_AUTO_CLEAR|SSL_SESS_CACHE_SERVER);
+	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
+
+#if (OPENSSL_VERSION_NUMBER < 0x00905100L)
+	SSL_CTX_set_verify_depth(ctx,1);
+#endif
 
     return ctx;
 }
@@ -64,6 +70,11 @@ void security_start_ssl(){
 }
 
 void security_clean_openssl(){
+	if ( netdata_ctx )
+	{
+		SSL_CTX_free(netdata_ctx);
+	}
+
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     ERR_free_strings();
 #endif
