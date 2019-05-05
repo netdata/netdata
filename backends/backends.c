@@ -327,7 +327,7 @@ void *backends_main(void *ptr) {
 
         do_kinesis = 1;
 
-        if(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name)) {
+        if(unlikely(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name))) {
             error("BACKEND: kinesis backend type is set but cannot read its configuration from %s/aws_kinesis.conf", netdata_configured_user_config_dir);
             goto cleanup;
         }
@@ -549,12 +549,12 @@ void *backends_main(void *ptr) {
                     while(*(first_char + record_len) != '\n' && record_len) record_len--;
                 }
 
-                char error_message[ERROR_LINE_MAX + 1];
+                char error_message[ERROR_LINE_MAX + 1] = "";
 
                 debug(D_BACKEND, "BACKEND: kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \
                       buffer = %zu, record = %zu", destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name,
                       partition_key, buffer_len, record_len);
-                if(kinesis_put_record(kinesis_client, kinesis_stream_name, partition_key, first_char, record_len, error_message)) {
+                if(unlikely(kinesis_put_record(kinesis_client, kinesis_stream_name, partition_key, first_char, record_len, error_message))) {
                     // oops! we couldn't send (all or some of the) data
                     error("BACKEND: %s", error_message);
                     error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
@@ -743,7 +743,12 @@ void *backends_main(void *ptr) {
 
 cleanup:
 #if HAVE_KINESIS
-    kinesis_shutdown(kinesis_options, kinesis_client);
+    if(do_kinesis) {
+        kinesis_shutdown(kinesis_options, kinesis_client);
+        freez(kinesis_auth_key_id);
+        freez(kinesis_secure_key);
+        freez(kinesis_stream_name);
+    }
 #endif
 
     if(sock != -1)

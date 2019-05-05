@@ -15,9 +15,9 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
     char *secure_key = *secure_key_p;
     char *stream_name = *stream_name_p;
 
-    if(auth_key_id) freez(auth_key_id);
-    if(secure_key) freez(secure_key);
-    if(stream_name) freez(stream_name);
+    if(unlikely(auth_key_id)) freez(auth_key_id);
+    if(unlikely(secure_key)) freez(secure_key);
+    if(unlikely(stream_name)) freez(stream_name);
 
     int line = 0;
 
@@ -29,7 +29,7 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
     debug(D_BACKEND, "BACKEND: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
-    if(!fp) {
+    if(unlikely(!fp)) {
         return 1;
     }
 
@@ -45,7 +45,7 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
 
         char *name = s;
         char *value = strchr(s, '=');
-        if(!value) {
+        if(unlikely(!value)) {
             error("BACKEND: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
             continue;
         }
@@ -55,7 +55,7 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
         name = trim(name);
         value = trim(value);
 
-        if(!name || *name == '#') {
+        if(unlikely(!name || *name == '#')) {
             error("BACKEND: ignoring line %d of file '%s', name is empty.", line, filename);
             continue;
         }
@@ -86,7 +86,7 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
 
     fclose(fp);
 
-    if(!auth_key_id || !*auth_key_id || !secure_key || !*secure_key || !stream_name || !*stream_name) {
+    if(unlikely(!auth_key_id || !*auth_key_id || !secure_key || !*secure_key || !stream_name || !*stream_name)) {
         error("BACKEND: mandatory Kinesis parameters are not configured:%s%s%s",
               (auth_key_id && *auth_key_id) ? "" : " auth key id,",
               (secure_key && *secure_key) ? "" : " secure key,",
