@@ -43,6 +43,10 @@ stages:
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
+  # Experimental stage, run always on a specific branch to help experimentations
+- name: Binary release experimental stage
+  if: branch = package-cloud-deployer
+
 
 
 # Define stage implementation details
@@ -152,7 +156,11 @@ jobs:
   - name: Run labeler on github issues
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
 
-  - name: Prepare packages and publish to package cloud
+
+
+  - stage: Binary release experimental stage
+
+    name: Prepare packages and publish to package cloud
     script:
     - mkdir packages
     - touch packages/example-1.12.1-0.tar.gz
@@ -161,7 +169,8 @@ jobs:
       - provider: packagecloud
         repository: "netdata"
         username: "paulkatsoulakis"
-        token: "123"
+        token:
+          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
         dist: "centos/7"
         skip_cleanup: true
         local_dir: "packages"
