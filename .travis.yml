@@ -152,6 +152,25 @@ jobs:
   - name: Run labeler on github issues
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
 
+  - name: Prepare packages and publish to package cloud
+    script:
+    - mkdir packages
+    - touch packages/example-1.12.1-0.tar.gz
+    deploy:
+        # Beta packages deployment
+      - provider: packagecloud
+        repository: "netdata"
+        username: "paulkatsoulakis"
+        token: "123"
+        dist: "centos/7"
+        skip_cleanup: true
+        local_dir: "packages"
+        on:
+          # Only deploy on ${USER}/netdata, master branch, when packages directory is created
+          repo: ${TRAVIS_REPO_SLUG}
+          branch: master
+          condition: -d "packages" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
+
 
 
     # We only publish if a TAG has been set during packaging
