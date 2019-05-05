@@ -177,7 +177,7 @@ jobs:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: master
+          branch: package-cloud-deployer
           condition: -d "packages" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
 
 
