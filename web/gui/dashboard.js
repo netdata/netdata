@@ -4194,6 +4194,16 @@ NETDATA.peityChartCreate = function (state, data) {
     return true;
 };
 
+// ----------------------------------------------------------------------------------------------------------------
+// "Text-only" chart - Just renders the raw value to the DOM
+
+NETDATA.textOnlyCreate = function(state, data) {
+    // Round to one decimal place
+    state.element.innerHTML = Math.round(data.result[0] * 10) / 10;
+    return true;
+}
+
+NETDATA.textOnlyUpdate = NETDATA.textOnlyCreate;
 // Charts Libraries Registration
 
 NETDATA.chartLibraries = {
@@ -4631,6 +4641,48 @@ NETDATA.chartLibraries = {
             void(state);
             return 'netdata-container-gauge';
         }
+    },
+    "textonly": {
+        autoresize: function (state) {
+            void(state);
+            return false;
+        },
+        container_class: function (state) {
+            void(state);
+            return 'netdata-container';
+        },
+        create: NETDATA.textOnlyCreate,
+        enabled: true,
+        format: function (state) {
+            void(state);
+            return 'array';
+        },
+        initialized: true,
+        initialize: function (callback) {
+            callback();
+        },
+        legend: function (state) {
+            void(state);
+            return null;
+        },
+        max_updates_to_recreate: function (state) {
+            void(state);
+            return 5000;
+        },
+        options: function (state) {
+            void(state);
+            return 'absolute';
+        },
+        pixels_per_point: function (state) {
+            void(state);
+            return 3;
+        },
+        track_colors: function (state) {
+            void(state);
+            return false;
+        },
+        update: NETDATA.textOnlyUpdate,
+        xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
     }
 };
 

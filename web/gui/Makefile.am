@@ -29,6 +29,7 @@ DASHBOARD_JS_FILES = \
     src/dashboard.js/charting/d3pie.js \
     src/dashboard.js/charting/d3.js \
     src/dashboard.js/charting/peity.js \
+    src/dashboard.js/charting/textonly.js \
     src/dashboard.js/charting.js \
     src/dashboard.js/chart-registry.js \
     src/dashboard.js/common.js \
