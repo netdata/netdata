@@ -10,29 +10,31 @@
 
 using namespace Aws;
 
-void kinesis_init(kinesis_options **options, kinesis_client **client,
-                  const char *region, const char *auth_key_id, const char *secure_key) {
-    *options = New<kinesis_options>("options");
+SDKOptions options;
 
-    InitAPI(**options);
+Kinesis::KinesisClient *client;
+
+Vector<Kinesis::Model::PutRecordOutcomeCallable> future_outcomes;
+
+void kinesis_init(const char *region, const char *auth_key_id, const char *secure_key) {
+    InitAPI(options);
 
     Client::ClientConfiguration config;
     config.region = region;
+    config.requestTimeoutMs = 5000;
+    config.connectTimeoutMs = 5000;
 
-    *client = New<kinesis_client>("client", Auth::AWSCredentials(auth_key_id, secure_key), config);
+    client = New<Kinesis::KinesisClient>("client", Auth::AWSCredentials(auth_key_id, secure_key), config);
 }
 
-void kinesis_shutdown(kinesis_options *options, kinesis_client *client) {
+void kinesis_shutdown() {
     Delete(client);
 
-    ShutdownAPI(*options);
-
-    Delete(options);
+    ShutdownAPI(options);
 }
 
-int kinesis_put_record(const kinesis_client *client,
-                       const char *stream_name, const char *partition_key,
-                       const char *data, size_t data_len, char *error_message) {
+int kinesis_put_record(const char *stream_name, const char *partition_key,
+                       const char *data, size_t data_len) {
     Kinesis::Model::PutRecordRequest request;
 
     request.SetStreamName(stream_name);
@@ -40,7 +42,23 @@ int kinesis_put_record(const kinesis_client *client,
 
     request.SetData(Utils::ByteBuffer((unsigned char*) data, data_len));
 
-    Kinesis::Model::PutRecordOutcome outcome = client->PutRecord(request);
+    future_outcomes.push_back(client->PutRecordCallable(request));
+
+    return 0;
+}
+
+int kinesis_get_result(char *error_message) {
+    Kinesis::Model::PutRecordOutcome outcome;
+
+    for(auto future_outcome = future_outcomes.begin(); future_outcome != future_outcomes.end(); ) {
+        std::future_status status = future_outcome->wait_for(std::chrono::microseconds(100));
+        if(status == std::future_status::ready || status == std::future_status::deferred) {
+            outcome = future_outcome->get();
+            future_outcomes.erase(future_outcome);
+        } else {
+            ++future_outcome;
+        }
+    }
 
     if(!outcome.IsSuccess()) {
         outcome.GetError().GetMessage().copy(error_message, ERROR_LINE_MAX);

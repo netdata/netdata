@@ -241,8 +241,6 @@ void *backends_main(void *ptr) {
 #if HAVE_KINESIS
     int do_kinesis = 0;
     char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
-    kinesis_options *kinesis_options = NULL;
-    kinesis_client *kinesis_client = NULL;
 #endif
 
     // ------------------------------------------------------------------------
@@ -332,7 +330,7 @@ void *backends_main(void *ptr) {
             goto cleanup;
         }
 
-        kinesis_init(&kinesis_options, &kinesis_client, destination, kinesis_auth_key_id, kinesis_secure_key);
+        kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key);
 
         backend_response_checker = process_json_response;
         if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
@@ -554,7 +552,10 @@ void *backends_main(void *ptr) {
                 debug(D_BACKEND, "BACKEND: kinesis_put_record(): dest = %s, id = %s, key = %s, stream = %s, partition_key = %s, \
                       buffer = %zu, record = %zu", destination, kinesis_auth_key_id, kinesis_secure_key, kinesis_stream_name,
                       partition_key, buffer_len, record_len);
-                if(unlikely(kinesis_put_record(kinesis_client, kinesis_stream_name, partition_key, first_char, record_len, error_message))) {
+
+                kinesis_put_record(kinesis_stream_name, partition_key, first_char, record_len);
+
+                if(unlikely(kinesis_get_result(error_message))) {
                     // oops! we couldn't send (all or some of the) data
                     error("BACKEND: %s", error_message);
                     error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
@@ -744,7 +745,7 @@ void *backends_main(void *ptr) {
 cleanup:
 #if HAVE_KINESIS
     if(do_kinesis) {
-        kinesis_shutdown(kinesis_options, kinesis_client);
+        kinesis_shutdown();
         freez(kinesis_auth_key_id);
         freez(kinesis_secure_key);
         freez(kinesis_stream_name);
