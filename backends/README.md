@@ -33,6 +33,7 @@ X seconds (though, it can send them per second if you need it to).
    - **prometheus** is described at [prometheus page](prometheus/) since it pulls data from netdata.
 
    - **AWS Kinesis Data Streams**
+
      metrics are sent to the service in `JSON` format.
 
 2. Only one backend may be active at a time.
