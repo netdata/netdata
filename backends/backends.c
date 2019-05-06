@@ -330,7 +330,7 @@ void *backends_main(void *ptr) {
             goto cleanup;
         }
 
-        kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key);
+        kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
 
         backend_response_checker = process_json_response;
         if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)

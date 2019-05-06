@@ -16,13 +16,14 @@ Kinesis::KinesisClient *client;
 
 Vector<Kinesis::Model::PutRecordOutcomeCallable> future_outcomes;
 
-void kinesis_init(const char *region, const char *auth_key_id, const char *secure_key) {
+void kinesis_init(const char *region, const char *auth_key_id, const char *secure_key, const long timeout) {
     InitAPI(options);
 
     Client::ClientConfiguration config;
+
     config.region = region;
-    config.requestTimeoutMs = 5000;
-    config.connectTimeoutMs = 5000;
+    config.requestTimeoutMs = timeout;
+    config.connectTimeoutMs = timeout;
 
     client = New<Kinesis::KinesisClient>("client", Auth::AWSCredentials(auth_key_id, secure_key), config);
 }
@@ -39,7 +40,6 @@ int kinesis_put_record(const char *stream_name, const char *partition_key,
 
     request.SetStreamName(stream_name);
     request.SetPartitionKey(partition_key);
-
     request.SetData(Utils::ByteBuffer((unsigned char*) data, data_len));
 
     future_outcomes.push_back(client->PutRecordCallable(request));
