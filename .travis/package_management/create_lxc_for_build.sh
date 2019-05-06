@@ -20,8 +20,8 @@ if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
 fi
 
 # Check for presence of mandatory environment variables
-if [ -z "${BUILD_DISTRO}" ]; then
-	echo "No Distribution was defined. Make sure BUILD_DISTRO is set on the environment before running this script"
+if [ -z "${BUILD_STRING}" ]; then
+	echo "No Distribution was defined. Make sure BUILD_STRING is set on the environment before running this script"
 	exit 1
 fi
 
@@ -35,18 +35,12 @@ if [ -z "${BUILDER_NAME}" ]; then
 	exit 1
 fi
 
-# We got at this point, get the container set up
+if [ -z "${BUILD_DISTRO}" ]; then
+	echo "No build distro information defined. Make sure BUILD_DISTRO is set on the environment before running this script"
+	exit 1
+fi
 
-# Create the container
-echo "Creating the container.."
-lxc-create -n "${BUILDER_NAME}" -t download -d "${BUILD_DISTRO}" -- -r "${BUILD_RELEASE}" -a "${BUILD_ARCH}"
-
-# Start the container
-echo "Starting the container..."
-lxc-start --name "${BUILDER_NAME}"
-
-# Create the user account and establish RPM structure
-echo "Configuring the container...."
-.travis/package_management/configure_lxc_environment.py
+echo "Configuring LXC container ${BUILDER_NAME}/${BUILD_STRING}/${BUILD_ARCH}...."
+.travis/package_management/configure_lxc_environment.py "${BUILDER_NAME}"
 
 echo "..LXC creation complete!"

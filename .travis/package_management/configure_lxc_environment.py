@@ -2,8 +2,10 @@
 #
 # Prepare the build environment within the container
 # The script attaches to the running container and does the following:
-# 1) Create the builder user
-# 2) Prepare the environment for RPM build
+# 1) Create the container
+# 2) Start the container up
+# 3) Create the builder user
+# 4) Prepare the environment for RPM build
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -13,16 +15,25 @@ import os
 import sys
 import lxc
 
-if len(sys.argv) != 1:
+if len(sys.argv) != 2:
     print 'You need to provide a container name to get things started'
     sys.exit(1)
+container_name=sys.argv[1]
 
-container_name=sys.argv[0]
-container_list = lxc.list_containers(as_object=True)
-c = [i for i in container_list if i.name == container_name]
-if len(c) != 1:
-    raise Exception('Unexpected number of containers found with name %s (found %d, expected 1) ' % (container_name, len(c)))
-container = c[0]
+# Setup the container object
+container = lxc.Container(container_name)
+if container.defined:
+    raise Exception("Container %s already exists" % container_name)
+
+# Create the container rootfs
+if not container.create("download", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
+                                                   "release": os.environ["BUILD_RELEASE"],
+                                                   "arch": os.environ["BUILD_ARCH"]}):
+    raise Exception("Failed to create the container rootfs")
+
+# Start the container
+if not container.start():
+    raise Exception("Failed to start the container")
 
 if not container.running or not container.state == "RUNNING":
     raise Exception('Container %s is not running, configuration process aborted ' % container_name)

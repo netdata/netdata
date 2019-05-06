@@ -164,11 +164,11 @@ jobs:
     install:
     - sudo apt-get install -y wget lxc
     - source tests/installer/slack.sh
-    before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_DISTRO}.${BUILD_ARCH}"
+    before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
     script:
     - .travis/package_management/create_lxc_for_build.sh
     - .travis/package_management/build_package_in_container.sh
-    after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_DISTRO}.${BUILD_ARCH}"
+    after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
     deploy:
         # Beta packages deployment
       - provider: packagecloud
@@ -176,7 +176,7 @@ jobs:
         username: "paulkatsoulakis"
         token:
           secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
-        dist: "${BUILD_DISTRO}"
+        dist: "${BUILD_STRING}"
         skip_cleanup: true
         local_dir: "${PACKAGES_DIRECTORY}"
         on:
@@ -185,11 +185,14 @@ jobs:
           branch: package-cloud-deployer
           condition: -d "${PACKAGES_DIRECTORY}" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
     env:
-    - BUILD_DISTRO="el/7"
+    - BUILD_DISTRO="centos"
+    - BUILD_RELEASE="7"
+    - BUILD_STRING="el/7"
     - BUILDER_NAME="builder"
     - BUILD_ARCH="amd64"
     - LXC_CONTAINER_ROOT="/var/lib/lxc/${BUILDER_NAME}/rootfs"
     - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/rpmbuild"
+    - BUILD_VERSION="v1.14.0"
 
 
 
