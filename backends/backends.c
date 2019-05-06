@@ -555,22 +555,28 @@ void *backends_main(void *ptr) {
 
                 kinesis_put_record(kinesis_stream_name, partition_key, first_char, record_len);
 
-                if(unlikely(kinesis_get_result(error_message))) {
+                sent += record_len;
+                chart_transmission_successes++;
+
+                size_t sent_bytes = 0, lost_bytes = 0;
+
+                if(unlikely(kinesis_get_result(error_message, &sent_bytes, &lost_bytes))) {
                     // oops! we couldn't send (all or some of the) data
                     error("BACKEND: %s", error_message);
                     error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                          destination, buffer_len, sent);
+                          destination, sent_bytes, sent_bytes - lost_bytes);
 
                     chart_transmission_failures++;
                     chart_data_lost_events++;
-                    chart_lost_bytes += buffer_len - sent;
-                    chart_lost_metrics = chart_buffered_metrics;
+                    chart_lost_bytes += lost_bytes;
+
+                    // estimate the number of lost metrics
+                    chart_lost_metrics += (collected_number)(chart_buffered_metrics
+                                          * (buffer_len && (lost_bytes > buffer_len) ? (double)lost_bytes / buffer_len : 1));
+
                     break;
                 }
                 else {
-                    sent += record_len;
-
-                    chart_transmission_successes++;
                     chart_receptions++;
                 }
 

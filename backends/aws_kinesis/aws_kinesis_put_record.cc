@@ -14,7 +14,12 @@ SDKOptions options;
 
 Kinesis::KinesisClient *client;
 
-Vector<Kinesis::Model::PutRecordOutcomeCallable> future_outcomes;
+struct request_outcome {
+    Kinesis::Model::PutRecordOutcomeCallable future_outcome;
+    size_t data_len;
+};
+
+Vector<request_outcome> request_outcomes;
 
 void kinesis_init(const char *region, const char *auth_key_id, const char *secure_key, const long timeout) {
     InitAPI(options);
@@ -42,26 +47,35 @@ int kinesis_put_record(const char *stream_name, const char *partition_key,
     request.SetPartitionKey(partition_key);
     request.SetData(Utils::ByteBuffer((unsigned char*) data, data_len));
 
-    future_outcomes.push_back(client->PutRecordCallable(request));
+    request_outcomes.push_back({client->PutRecordCallable(request), data_len});
 
     return 0;
 }
 
-int kinesis_get_result(char *error_message) {
+int kinesis_get_result(char *error_message, size_t *sent_bytes, size_t *lost_bytes) {
     Kinesis::Model::PutRecordOutcome outcome;
+    *sent_bytes = 0;
+    *lost_bytes = 0;
 
-    for(auto future_outcome = future_outcomes.begin(); future_outcome != future_outcomes.end(); ) {
-        std::future_status status = future_outcome->wait_for(std::chrono::microseconds(100));
+    for(auto request_outcome = request_outcomes.begin(); request_outcome != request_outcomes.end(); ) {
+        std::future_status status = request_outcome->future_outcome.wait_for(std::chrono::microseconds(100));
+
         if(status == std::future_status::ready || status == std::future_status::deferred) {
-            outcome = future_outcome->get();
-            future_outcomes.erase(future_outcome);
+            outcome = request_outcome->future_outcome.get();
+            *sent_bytes += request_outcome->data_len;
+
+            if(!outcome.IsSuccess()) {
+                *lost_bytes += request_outcome->data_len;
+                outcome.GetError().GetMessage().copy(error_message, ERROR_LINE_MAX);
+            }
+
+            request_outcomes.erase(request_outcome);
         } else {
-            ++future_outcome;
+            ++request_outcome;
         }
     }
 
-    if(!outcome.IsSuccess()) {
-        outcome.GetError().GetMessage().copy(error_message, ERROR_LINE_MAX);
+    if(*lost_bytes) {
         return 1;
     }
 
