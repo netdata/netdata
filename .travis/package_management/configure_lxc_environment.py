@@ -15,8 +15,9 @@ import os
 import sys
 import lxc
 
+print (sys.argv)
 if len(sys.argv) != 2:
-    print 'You need to provide a container name to get things started'
+    print ('You need to provide a container name to get things started')
     sys.exit(1)
 container_name=sys.argv[1]
 
@@ -40,15 +41,13 @@ if not container.running or not container.state == "RUNNING":
 
 # Wait for connectivity
 if not container.get_ips(timeout=30):
-    continue
+    raise Exception("Timeout while waiting for container")
 
 # Run the required activities now
 # 1. Create the builder user
-container.attach_wait(lxc.attach_run_command,
-                      ["useradd", os.environ['BUILDER_NAME'])
+container.attach_wait(lxc.attach_run_command, ["useradd", os.environ['BUILDER_NAME']])
 
-container.attach_wait(lxc.attach_run_command,
-                      ["echo", "'%_topdir %(echo /home/%s)/rpmbuild' > /home/%s/.rpmmacros" % (os.environ['BUILDER_NAME'], os.environ['BUILDER_NAME'])])
+container.attach_wait(lxc.attach_run_command, ["echo", "'%_topdir %(echo /home/%s)/rpmbuild' > /home/%s/.rpmmacros" % (os.environ['BUILDER_NAME'], os.environ['BUILDER_NAME'])])
 
 # Download the source
 dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
@@ -61,4 +60,4 @@ spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 container.attach_wait(lxc.attach_run_command,
                       ["tar", "-Oxvf", dest_archive, "netdata-%s/netdata.spec > %s" % (os.environ['BUILD_VERSION'], spec_file)])
 
-print 'Done!'
+print ('Done!')
