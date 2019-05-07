@@ -55,7 +55,7 @@ if command_result != 0:
 
 print ("2. Setting up macros")
 command_result = container.attach_wait(lxc.attach_run_command,
-                      ["echo", "'%\_topdir %(echo /home/%s)/rpmbuild' > /home/%s/.rpmmacros" % (os.environ['BUILDER_NAME'], os.environ['BUILDER_NAME'])])
+                      ["echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
 if command_result != 0:
     raise Exception("Command failed with exit code %d" % command_result)
 
