@@ -78,10 +78,7 @@ void read_extent_cb(uv_fs_t* req)
     }
 
     for (i = 0 ; i < xt_io_descr->descr_count; ++i) {
-        ret = posix_memalign(&page, RRDFILE_ALIGNMENT, RRDENG_BLOCK_SIZE);
-        if (unlikely(ret)) {
-            fatal("posix_memalign:%s", strerror(ret));
-        }
+        page = mallocz(RRDENG_BLOCK_SIZE);
         descr = xt_io_descr->descr_array[i];
         for (j = 0, page_offset = 0; j < count; ++j) {
             /* care, we don't hold the descriptor mutex */

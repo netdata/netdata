@@ -291,12 +291,7 @@ void *rrdeng_create_page(uuid_t *id, struct rrdeng_page_cache_descr **ret_descr)
 
     /* TODO: check maximum number of pages in page cache limit */
 
-    ret = posix_memalign(&page, RRDFILE_ALIGNMENT, RRDENG_BLOCK_SIZE); /*TODO: add page size */
-    if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
-        /* *ret_descr = NULL;
-        return NULL;*/
-    }
+    page = mallocz(RRDENG_BLOCK_SIZE); /*TODO: add page size */
     descr = pg_cache_create_descr();
     descr->page = page;
     descr->id = id; /* TODO: add page type: metric, log, something? */
