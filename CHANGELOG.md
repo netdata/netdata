@@ -13,6 +13,7 @@
 - v1.14.0 is released but status is draft [\#5921](https://github.com/netdata/netdata/issues/5921)
 - Weird WD values [\#5919](https://github.com/netdata/netdata/issues/5919)
 - Alert badge not showing after reverse proxy [\#5900](https://github.com/netdata/netdata/issues/5900)
+- Fatal errors sometimes fail to halt the netdata daemon [\#5896](https://github.com/netdata/netdata/issues/5896)
 - Docker image has plugins not executable for netdata user [\#5890](https://github.com/netdata/netdata/issues/5890)
 - cgroup-network-helper.sh issues in our Docker images [\#5880](https://github.com/netdata/netdata/issues/5880)
 - Fix dependency installation for Fedora 30 [\#5831](https://github.com/netdata/netdata/issues/5831)
@@ -27,7 +28,9 @@
 - netdata/packaging: \[SPIKE\] Investigate CPack/CMake status, clarify and estimate the available approaches [\#5775](https://github.com/netdata/netdata/issues/5775)
 - "Healthy" entrypoint for HTTP-interface [\#5764](https://github.com/netdata/netdata/issues/5764)
 - netdata/packaging/ci: Create and document a manual nightly deployment procedure [\#5762](https://github.com/netdata/netdata/issues/5762)
+- snmp-trap receiver [\#5597](https://github.com/netdata/netdata/issues/5597)
 - Tengine monitoring [\#4886](https://github.com/netdata/netdata/issues/4886)
+- Scaleio monitoring [\#4825](https://github.com/netdata/netdata/issues/4825)
 - Monitor disk access latency \(e.g. ioping\) [\#4660](https://github.com/netdata/netdata/issues/4660)
 - provide binary repos for main distros [\#2728](https://github.com/netdata/netdata/issues/2728)
 - RPM Packaging Discussion [\#1306](https://github.com/netdata/netdata/issues/1306)
@@ -36,6 +39,7 @@
 
 **Merged pull requests:**
 
+- Change HTTP version to HTTP method [\#5974](https://github.com/netdata/netdata/pull/5974) ([SahAssar](https://github.com/SahAssar))
 - Update Node app\_group [\#5962](https://github.com/netdata/netdata/pull/5962) ([jonfairbanks](https://github.com/jonfairbanks))
 - Fix coverity warnings [\#5952](https://github.com/netdata/netdata/pull/5952) ([cakrit](https://github.com/cakrit))
 - Add support for Mac OS X Name and Version [\#5949](https://github.com/netdata/netdata/pull/5949) ([cakrit](https://github.com/cakrit))
