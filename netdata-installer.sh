@@ -380,6 +380,7 @@ run ./configure \
 	--localstatedir="${NETDATA_PREFIX}/var" \
 	--with-zlib \
 	--with-math \
+	--enable-https \
 	--with-user=netdata \
 	${NETDATA_CONFIGURE_OPTIONS} \
 	CFLAGS="${CFLAGS}" || exit 1

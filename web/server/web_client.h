@@ -153,6 +153,10 @@ struct web_client {
     // STATIC-THREADED WEB SERVER MEMBERS
     size_t pollinfo_slot;           // POLLINFO slot of the web client
     size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
+#ifdef ENABLE_HTTPS
+	BIO *sbio; //Socket BIO
+	SSL *ssl; //SSL connection 
+#endif
 };
 
 extern uid_t web_files_uid(void);
