@@ -40,6 +40,8 @@ if not container.get_ips(timeout=30):
 
 # Run the build process on the container
 print ("Starting RPM build process")
-container.attach_wait(lxc.attach_run_command, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "rpmbuild/SPECS/netdata.spec"])
+command_result = container.attach_wait(lxc.attach_run_command, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "rpmbuild/SPECS/netdata.spec"])
+if command_result != 0:
+    raise Exception("Failed to run RPM build command in container")
 
 print ('Done!')
