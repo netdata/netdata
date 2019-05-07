@@ -166,8 +166,8 @@ jobs:
     - source tests/installer/slack.sh
     before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
     script:
-    - .travis/package_management/create_lxc_for_build.sh
-    - .travis/package_management/build_package_in_container.sh
+    - sudo .travis/package_management/create_lxc_for_build.sh
+    - sudo .travis/package_management/build_package_in_container.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
     deploy:
         # Beta packages deployment
@@ -185,6 +185,7 @@ jobs:
           branch: package-cloud-deployer
           condition: -d "${PACKAGES_DIRECTORY}" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
     env:
+    # These are added to help emulating a release environment, so that we can prepare the end to end workflow of a package publish process for RPM
     - BUILD_DISTRO="centos"
     - BUILD_RELEASE="7"
     - BUILD_STRING="el/7"

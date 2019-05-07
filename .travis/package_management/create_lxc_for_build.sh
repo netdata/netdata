@@ -40,7 +40,12 @@ if [ -z "${BUILD_DISTRO}" ]; then
 	exit 1
 fi
 
+if [ -z "${BUILD_RELEASE}" ]; then
+	echo "No build release information defined. Make sure BUILD_RELEASE is set on the environment before running this script"
+	exit 1
+fi
+
 echo "Configuring LXC container ${BUILDER_NAME}/${BUILD_STRING}/${BUILD_ARCH}...."
-.travis/package_management/configure_lxc_environment.py "${BUILDER_NAME}"
+.travis/package_management/configure_lxc_environment.py "${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
 
 echo "..LXC creation complete!"

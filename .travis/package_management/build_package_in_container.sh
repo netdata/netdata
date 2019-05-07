@@ -16,4 +16,6 @@ if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     exit 1
 fi
 
-echo "WIP - Nothing to be done for the moment"
+.travis/package_management/trigger_lxc_rpm_build.py "${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+
+echo "Build process completed!"
