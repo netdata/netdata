@@ -9,6 +9,7 @@
 - Coverity Scan issues on get\_system\_info [\#5937](https://github.com/netdata/netdata/issues/5937)
 - `timeout` requires flag [\#5935](https://github.com/netdata/netdata/issues/5935)
 - docker image is missing nut package [\#5934](https://github.com/netdata/netdata/issues/5934)
+- mongodb error exception on check : ‘locks’ [\#5929](https://github.com/netdata/netdata/issues/5929)
 - v1.14.0 is released but status is draft [\#5921](https://github.com/netdata/netdata/issues/5921)
 - Weird WD values [\#5919](https://github.com/netdata/netdata/issues/5919)
 - Alert badge not showing after reverse proxy [\#5900](https://github.com/netdata/netdata/issues/5900)
@@ -23,18 +24,25 @@
 **Closed issues:**
 
 - Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
+- netdata/packaging: \[SPIKE\] Investigate CPack/CMake status, clarify and estimate the available approaches [\#5775](https://github.com/netdata/netdata/issues/5775)
 - "Healthy" entrypoint for HTTP-interface [\#5764](https://github.com/netdata/netdata/issues/5764)
 - netdata/packaging/ci: Create and document a manual nightly deployment procedure [\#5762](https://github.com/netdata/netdata/issues/5762)
 - Tengine monitoring [\#4886](https://github.com/netdata/netdata/issues/4886)
 - Monitor disk access latency \(e.g. ioping\) [\#4660](https://github.com/netdata/netdata/issues/4660)
+- provide binary repos for main distros [\#2728](https://github.com/netdata/netdata/issues/2728)
+- RPM Packaging Discussion [\#1306](https://github.com/netdata/netdata/issues/1306)
+- Binary release [\#87](https://github.com/netdata/netdata/issues/87)
+- Build packaging for debian [\#42](https://github.com/netdata/netdata/issues/42)
 
 **Merged pull requests:**
 
+- Update Node app\_group [\#5962](https://github.com/netdata/netdata/pull/5962) ([jonfairbanks](https://github.com/jonfairbanks))
 - Fix coverity warnings [\#5952](https://github.com/netdata/netdata/pull/5952) ([cakrit](https://github.com/cakrit))
 - Add support for Mac OS X Name and Version [\#5949](https://github.com/netdata/netdata/pull/5949) ([cakrit](https://github.com/cakrit))
 - nvidia\_smi: power chart algorithm,mul,div fix [\#5940](https://github.com/netdata/netdata/pull/5940) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging/ci:  Make timeout usage more cross-distro compliant [\#5938](https://github.com/netdata/netdata/pull/5938) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fixing a typo in documentation [\#5936](https://github.com/netdata/netdata/pull/5936) ([smonff](https://github.com/smonff))
+- mongodb: various KeyError  fixes [\#5931](https://github.com/netdata/netdata/pull/5931) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging/ci: minor improvements [\#5928](https://github.com/netdata/netdata/pull/5928) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - smartd\_log: attrs 3, 194 fix [\#5923](https://github.com/netdata/netdata/pull/5923) ([ilyam8](https://github.com/ilyam8))
 - Fix lifecycle script [\#5918](https://github.com/netdata/netdata/pull/5918) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
