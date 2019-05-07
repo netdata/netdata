@@ -83,6 +83,6 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "--output-documen
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "-Oxvf", dest_archive, "netdata-%s/netdata.spec > %s" % (os.environ['BUILD_VERSION'], spec_file)])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-%s/netdata.spec" % os.environ['BUILD_VERSION']])
 
 print ('Done!')
