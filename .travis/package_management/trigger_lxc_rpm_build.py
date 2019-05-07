@@ -18,8 +18,9 @@ if len(sys.argv) != 2:
 container_name=sys.argv[1]
 
 # Load the container, break if its not there
+print ("Starting up container %s" % container_name)
 container = lxc.Container(container_name)
-if not c.defined:
+if not container.defined:
     raise Exception("Container %s does not exist!" % container_name)
 
 # Check if the container is running, attempt to start it up in case its not running
@@ -38,6 +39,7 @@ if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
 # Run the build process on the container
+print ("Starting RPM build process")
 container.attach_wait(lxc.attach_run_command, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "rpmbuild/SPECS/netdata.spec"])
 
 print ('Done!')
