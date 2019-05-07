@@ -63,6 +63,7 @@ if command_result != 0:
 print ("3. Fetch netdata source into the repo structure")
 dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
 release_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
+print ("3. Fetch netdata source into the repo structure(%s -> %s)" % (release_url, dest_archive))
 command_result = container.attach_wait(lxc.attach_run_command,
                       ["wget", "-O", dest_archive, release_url])
 if command_result != 0:
