@@ -22,8 +22,7 @@ def run_command(command):
     if command_result != 0:
         raise Exception("Command failed with exit code %d" % command_result)
 
-print (sys.argv)
-printen(sys.argv) != 2:
+if len(sys.argv) != 2:
     print ('You need to provide a container name to get things started')
     sys.exit(1)
 container_name=sys.argv[1]
