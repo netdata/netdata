@@ -57,12 +57,15 @@ if not container.get_ips(timeout=30):
 print ("1. Adding user %s" % os.environ['BUILDER_NAME'])
 run_command(["useradd", os.environ['BUILDER_NAME']])
 
-print ("2. Setting up macros")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "echo '%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
-
 # Fetch wget to retrieve the source
-print ("3. Installing wget")
-run_command(["yum", "install", "-y", "wget sudo"])
+print ("2. Installing package dependencies within LXC container")
+run_command(["yum", "install", "-y", "wget"])
+run_command(["yum", "install", "-y", "sudo"])
+run_command(["yum", "install", "-y", "rpm-build"])
+run_command(["yum", "install", "-y", "redhat-rpm-config"])
+
+print ("3. Setting up macros")
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "/bin/echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
 
 # Download the source
 dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
