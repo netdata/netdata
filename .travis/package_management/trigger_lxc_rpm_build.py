@@ -38,6 +38,11 @@ if not container.running or not container.state == "RUNNING":
 if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
+# Get sudo onboard
+command_result = container.attach_wait(lxc.attach_run_command, ["yum", "install", "sudo", "-y"])
+if command_result != 0:
+    raise Exception("Failed to install sudo on container")
+
 # Run the build process on the container
 print ("Starting RPM build process")
 command_result = container.attach_wait(lxc.attach_run_command, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "rpmbuild/SPECS/netdata.spec"])
