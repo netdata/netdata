@@ -191,7 +191,7 @@ jobs:
     - BUILD_STRING="el/7"
     - BUILDER_NAME="builder"
     - BUILD_ARCH="amd64"
-    - LXC_CONTAINER_ROOT="/var/lib/lxc/${BUILDER_NAME}/rootfs"
+    - LXC_CONTAINER_ROOT="/var/lib/lxc/${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}/rootfs"
     - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/rpmbuild"
     - BUILD_VERSION="v1.14.0"
 
