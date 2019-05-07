@@ -168,7 +168,9 @@ jobs:
     script:
     - sudo .travis/package_management/create_lxc_for_build.sh
     - sudo .travis/package_management/build_package_in_container.sh
-    - sudo cp -r "${PACKAGES_DIRECTORY}/RPMS" "${PACKAGES_DIRECTORY}/SRPMS" packages/ && sudo chown -R 777 packages/
+    - sudo cp -r "${PACKAGES_DIRECTORY}/RPMS" packages/
+    - sudo cp -r "${PACKAGES_DIRECTORY}/SRPMS" packages/
+    - sudo chmod -R 777 packages/
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
     deploy:
         # Beta packages deployment
