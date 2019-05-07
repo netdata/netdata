@@ -168,6 +168,7 @@ jobs:
     script:
     - sudo .travis/package_management/create_lxc_for_build.sh
     - sudo .travis/package_management/build_package_in_container.sh
+    - ls -ltrR ${PACKAGES_DIRECTORY}
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
     deploy:
         # Beta packages deployment
