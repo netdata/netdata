@@ -27,9 +27,12 @@ if container.defined:
     raise Exception("Container %s already exists" % container_name)
 
 # Create the container rootfs
-if not container.create("download", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
-                                                   "release": os.environ["BUILD_RELEASE"],
-                                                   "arch": os.environ["BUILD_ARCH"]}):
+try:
+    container.create("download", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
+                                                "release": os.environ["BUILD_RELEASE"],
+                                                "arch": os.environ["BUILD_ARCH"]})
+except Exception as ex:
+    print("Failed to create container rootfs: {0}".format(ex))
     raise Exception("Failed to create the container rootfs")
 
 # Start the container
