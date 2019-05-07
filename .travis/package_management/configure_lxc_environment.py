@@ -62,19 +62,26 @@ print ("2. Installing package dependencies within LXC container")
 run_command(["yum", "install", "-y", "wget"])
 run_command(["yum", "install", "-y", "sudo"])
 run_command(["yum", "install", "-y", "rpm-build"])
-run_command(["yum", "install", "-y", "redhat-rpm-config"])
 
 print ("3. Setting up macros")
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "/bin/echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
 
+print ("4. Create rpmbuild directory")
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/BUILD"])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/RPMS"])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/SOURCES"])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/SPECS"])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/SRPMS"])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild"])
+
 # Download the source
 dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
 release_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
-print ("4. Fetch netdata source into the repo structure(%s -> %s)" % (release_url, dest_archive))
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-O", dest_archive, release_url])
+print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (release_url, dest_archive))
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "--output-document=" + dest_archive, release_url])
 
 # Extract the spec file in place
-print ("5. Extract spec file from the source")
+print ("6. Extract spec file from the source")
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "-Oxvf", dest_archive, "netdata-%s/netdata.spec > %s" % (os.environ['BUILD_VERSION'], spec_file)])
 
