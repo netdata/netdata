@@ -184,7 +184,7 @@ jobs:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
           branch: package-cloud-deployer
-          condition: -d "${PACKAGES_DIRECTORY}" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
+          #condition: -d "${PACKAGES_DIRECTORY}" && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
     env:
     # These are added to help emulating a release environment, so that we can prepare the end to end workflow of a package publish process for RPM
     - BUILD_DISTRO="centos"
