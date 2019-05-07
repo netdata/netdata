@@ -15,8 +15,15 @@ import os
 import sys
 import lxc
 
+def run_command(command):
+    print ("Running command: %s" % command)
+    command_result = container.attach_wait(lxc.attach_run_command, command)
+
+    if command_result != 0:
+        raise Exception("Command failed with exit code %d" % command_result)
+
 print (sys.argv)
-if len(sys.argv) != 2:
+printen(sys.argv) != 2:
     print ('You need to provide a container name to get things started')
     sys.exit(1)
 container_name=sys.argv[1]
@@ -49,32 +56,24 @@ if not container.get_ips(timeout=30):
 # Run the required activities now
 # 1. Create the builder user
 print ("1. Adding user %s" % os.environ['BUILDER_NAME'])
-command_result = container.attach_wait(lxc.attach_run_command, ["useradd", os.environ['BUILDER_NAME']])
-if command_result != 0:
-    raise Exception("Command failed with exit code %d" % command_result)
+run_command(["useradd", os.environ['BUILDER_NAME']])
 
 print ("2. Setting up macros")
-command_result = container.attach_wait(lxc.attach_run_command,
-                      ["echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
-if command_result != 0:
-    raise Exception("Command failed with exit code %d" % command_result)
+run_command(["echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
+
+# Fetch wget to retrieve the source
+print ("3. Installing wget")
+run_command(["yum", "install", "-y", "wget"])
 
 # Download the source
-print ("3. Fetch netdata source into the repo structure")
 dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
 release_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
-print ("3. Fetch netdata source into the repo structure(%s -> %s)" % (release_url, dest_archive))
-command_result = container.attach_wait(lxc.attach_run_command,
-                      ["wget", "-O", dest_archive, release_url])
-if command_result != 0:
-    raise Exception("Command failed with exit code %d" % command_result)
+print ("4. Fetch netdata source into the repo structure(%s -> %s)" % (release_url, dest_archive))
+run_command(["wget", "-O", dest_archive, release_url])
 
 # Extract the spec file in place
-print ("4. Extract spec file from the source")
+print ("5. Extract spec file from the source")
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-command_result = container.attach_wait(lxc.attach_run_command,
-                      ["tar", "-Oxvf", dest_archive, "netdata-%s/netdata.spec > %s" % (os.environ['BUILD_VERSION'], spec_file)])
-if command_result != 0:
-    raise Exception("Command failed with exit code %d" % command_result)
+run_command(["tar", "-Oxvf", dest_archive, "netdata-%s/netdata.spec > %s" % (os.environ['BUILD_VERSION'], spec_file)])
 
 print ('Done!')
