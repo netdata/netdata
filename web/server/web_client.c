@@ -1668,11 +1668,14 @@ ssize_t web_client_receive(struct web_client *w)
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
     ssize_t left = w->response.data->size - w->response.data->len;
-    ssize_t bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
-	/*
+    ssize_t bytes;
 #ifdef ENABLE_HTTPS
+    bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+	/*
+	 */
+#else
+    bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
 #endif
-*/
 
     if(likely(bytes > 0)) {
         w->stats_received_bytes += bytes;

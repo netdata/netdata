@@ -161,11 +161,43 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         web_clients_cache.avail_count--;
         web_client_zero(w);
         web_clients_cache.reused++;
+#ifdef ENABLE_HTTPS
+	int test;
+	SSL *ssl;
+	if ( netdata_ctx )
+	{
+		ssl = w->ssl;
+		if ( ssl )
+		{
+			if ( !(test = SSL_shutdown(ssl) ) )
+			{
+   				debug(D_WEB_CLIENT_ACCESS, "%llu: Closing SSL not possible from %s,trying again.", w->id, w->client_ip);
+				if ( w->ifd != -1 )
+				{
+					shutdown(w->ifd,1);
+					test = SSL_shutdown(ssl);
+				}
+			}
+
+			SSL_free(ssl);
+			w->ssl = NULL;
+		}
+		if ( w->sbio )
+		{
+			BIO_free(w->sbio);
+			w->sbio = NULL;
+		}
+	}
+#endif
     }
     else {
         // allocate it
         w = web_client_alloc();
         web_clients_cache.allocated++;
+#ifdef ENABLE_HTTPS
+		w->ssl = NULL;
+		w->sbio = NULL;
+#endif
     }
 
     // link it to used web clients
@@ -200,38 +232,6 @@ void web_client_release(struct web_client *w) {
     web_client_disconnected();
 
     netdata_thread_disable_cancelability();
-
-#ifdef ENABLE_HTTPS
-	/*
-	int test;
-	SSL *ssl;
-	if ( netdata_ctx )
-	{
-		ssl = w->ssl;
-		if ( ssl )
-		{
-			///KILLING THE SERVER
-			if ( !(test = SSL_shutdown(ssl) ) )
-			{
-   				debug(D_WEB_CLIENT_ACCESS, "%llu: Closing SSL not possible from %s,trying again.", w->id, w->client_ip);
-				if ( w->ifd != -1 )
-				{
-					shutdown(w->ifd,1);
-				test = SSL_shutdown(ssl);
-				}
-			}
-
-			SSL_free(ssl);
-			w->ssl = NULL;
-		}
-		if ( w->sbio )
-		{
-			BIO_free(w->sbio);
-			w->sbio = NULL;
-		}
-	}
-	*/
-#endif
 
     if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
         if (w->ifd != -1) close(w->ifd);

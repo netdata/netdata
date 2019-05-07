@@ -138,11 +138,12 @@ void web_client_initialize_connection(struct web_client *w) {
 
     web_client_cache_verify(0);
 #ifdef ENABLE_HTTPS
-	/*
 	if ( netdata_ctx )
 	{
 		if ( (w->ssl = SSL_new(netdata_ctx) ) )
 		{
+			SSL_set_accept_state(w->ssl);//NEW
+			SSL_set_fd(w->ssl, w->ifd);//NEW
 			if ( (w->sbio = BIO_new_socket(w->ifd,BIO_NOCLOSE) ) )
 			{
 				SSL_set_bio(w->ssl,w->sbio,w->sbio);
@@ -154,11 +155,9 @@ void web_client_initialize_connection(struct web_client *w) {
 		}
 		else
 		{
-			w->sbio = NULL;
 	        debug(D_WEB_CLIENT, "%llu: failed to create SSL context on socket fd %d.", w->id, w->ifd);
 		}
 	}
-	*/
 #endif
 }
 
