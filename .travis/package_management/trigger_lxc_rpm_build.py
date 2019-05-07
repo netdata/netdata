@@ -11,6 +11,13 @@ import os
 import sys
 import lxc
 
+def run_command(command):
+    print ("Running command: %s" % command)
+    command_result = container.attach_wait(lxc.attach_run_command, command)
+
+    if command_result != 0:
+        raise Exception("Command failed with exit code %d" % command_result)
+
 print (sys.argv)
 if len(sys.argv) != 2:
     print ('You need to provide a container name to get things started')
@@ -39,14 +46,16 @@ if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
 # Get sudo onboard
-command_result = container.attach_wait(lxc.attach_run_command, ["yum", "install", "sudo", "-y"])
-if command_result != 0:
-    raise Exception("Failed to install sudo on container")
+print ("Installing dependencies for the builder")
+run_command(["yum", "install", "zlib-devel", "-y"])
+run_command(["yum", "install", "libuuid-devel", "-y"])
+run_command(["yum", "install", "autoconf", "-y"])
+run_command(["yum", "install", "automake", "-y"])
+run_command(["yum", "install", "gcc", "-y"])
+run_command(["yum", "install", "make", "-y"])
 
 # Run the build process on the container
 print ("Starting RPM build process")
-command_result = container.attach_wait(lxc.attach_run_command, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
-if command_result != 0:
-    raise Exception("Failed to run RPM build command in container")
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
 
 print ('Done!')
