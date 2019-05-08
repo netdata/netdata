@@ -73,7 +73,7 @@ These are options that affect the operation of netdata in this area:
 
 ```
 [global]
-    memory mode = none | ram | save | map
+    memory mode = none | ram | save | map | dbengine
 ```
 
 `[global].memory mode = none` disables the database at this host. This also disables health
@@ -169,6 +169,10 @@ The above is the receiver configuration of a single host, at the receiver end. `
 the unique id the netdata generating the metrics (i.e. the netdata that originally collects
 them `/var/lib/netdata/registry/netdata.unique.id`). So, metrics for netdata `A` that pass through
 any number of other netdata, will have the same `MACHINE_GUID`.
+
+You can also use `default memory mode = dbengine` for an API key or `memory mode = dbengine` for
+ a single host. The additional `page cache size` and `dbengine disk space` configuration options
+ are inherited from the global netdata configuration.
 
 ##### allow from
 
