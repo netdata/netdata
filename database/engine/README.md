@@ -9,6 +9,7 @@ but depends on the configured disk space and the effective compression ratio of 
 
 With the DB engine memory mode the metric data are stored in database files. These files are
 organized in pairs, the datafiles and their corresponding journalfiles, e.g.:
+
 ```
 datafile-1-0000000001.ndf
 journalfile-1-0000000001.njf
@@ -18,6 +19,7 @@ datafile-1-0000000003.ndf
 journalfile-1-0000000003.njf
 ...
 ``` 
+
 They are located under their host's cache directory in the directory `./dbengine`
 (e.g. for localhost the default location is `/var/cache/netdata/dbengine/*`). The higher
 numbered filenames contain more recent metric data. The user can safely delete some pairs
@@ -34,6 +36,7 @@ netdata.conf and setting:
 [global]
     memory mode = dbengine
 ```
+
 For setting the memory mode for the rest of the nodes you should look at
 [streaming](../../streaming/).
 
@@ -42,11 +45,13 @@ for any metrics being stored in the DB engine.
 
 All DB engine instances, for localhost and all other streaming recipient nodes inherit their
 configuration from `netdata.conf`:
+
 ```
 [global]
     page cache size = 32
     dbengine disk space = 256
 ```
+
 The above values are the default and minimum values for Page Cache size and DB engine disk space
 quota. Both numbers are in **MiB**. All DB engine instances will allocate the configured resources
 separately.
@@ -88,10 +93,13 @@ There are explicit memory requirements **per** DB engine **instance**, meaning *
 **node** (e.g. localhost and streaming recipient nodes):
 
 - `page cache size` must be at least `#dimensions-being-collected x 4096 x 2` bytes.
+
 - an additional `#pages-on-disk x 4096 x 0.06` bytes of RAM are allocated for metadata.
-  - roughly speaking this is 6% of the uncompressed disk space taken by the DB files.
-  - for very highly compressible data (compression ratio > 90%) this RAM overhead
-  is comparable to the disk space footprint.
+
+    - roughly speaking this is 6% of the uncompressed disk space taken by the DB files.
+
+    - for very highly compressible data (compression ratio > 90%) this RAM overhead
+      is comparable to the disk space footprint.
 
 An important observation is that RAM usage depends on both the `page cache size` and the 
 `dbengine disk space` options. 

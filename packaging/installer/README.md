@@ -234,14 +234,16 @@ package|description
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
-package|description
-:-----:|-----------
-`libuv`|multi-platform support library with a focus on asynchronous I/O
-`liblz4`|Extremely Fast Compression algorithm
-`Judy`|General purpose dynamic array
-`openssl`|Cryptography and SSL/TLS Toolkit
+Netdata DB engine can be enabled when these are installed (they are optional):
 
-Netdata DB engine can be enabled when these are installed.
+|package|description|
+|:-----:|-----------|
+|`libuv`|multi-platform support library with a focus on asynchronous I/O|
+|`liblz4`|Extremely Fast Compression algorithm|
+|`Judy`|General purpose dynamic array|
+|`openssl`|Cryptography and SSL/TLS Toolkit|
+
+*Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
 ---
 
