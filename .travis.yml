@@ -21,7 +21,6 @@ env:
   - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
   - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
 
-
   # Debian distros build
   - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
   - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
@@ -77,6 +76,15 @@ stages:
   # Experimental stage, run always on a specific branch to help experimentations
 - name: "Binary releases - AMD64"
   if: branch = package-cloud-deployer
+  env:
+  # Fedora distros build
+  - BUILD_ARCH="amd64" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
+
+  # Opensuse distros build
+  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
 
 
 
