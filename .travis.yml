@@ -3,6 +3,37 @@ language: c
 services:
 - docker
 
+env:
+  # References:
+  # https://us.images.linuxcontainers.org
+  # https://packagecloud.io/docs#install_repo
+  # Enterprise linux builds (Centos, Redhat, Amazon linux (el/6)
+  - BUILD_ARCH="amd64" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="centos" BUILD_RELEASE="5" BUILD_STRING="el/5"
+
+  # Fedora distros build
+  - BUILD_ARCH="amd64" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
+
+  # Opensuse distros build
+  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
+
+
+  # Debian distros build
+  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
+
+  # Ubuntu distros build
+  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="disco" BUILD_STRING="ubuntu/disco"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="cosmic" BUILD_STRING="ubuntu/cosmic"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="bionic" BUILD_STRING="ubuntu/bionic"
+  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
+
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
   allow_failures:
@@ -168,6 +199,7 @@ jobs:
     script:
     - sudo .travis/package_management/rpm/create_lxc_for_build.sh
     - sudo .travis/package_management/rpm/build_package_in_container.sh
+    - mkdir packages
     - sudo cp -r "${PACKAGES_DIRECTORY}/RPMS" packages/
     - sudo cp -r "${PACKAGES_DIRECTORY}/SRPMS" packages/
     - sudo chmod -R 777 packages/
@@ -189,12 +221,7 @@ jobs:
           condition: -d packages && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
     after_deploy: rm -rf packages
     env:
-    # These are added to help emulating a release environment, so that we can prepare the end to end workflow of a package publish process for RPM
-    - BUILD_DISTRO="centos"
-    - BUILD_RELEASE="7"
-    - BUILD_STRING="el/7"
     - BUILDER_NAME="builder"
-    - BUILD_ARCH="amd64"
     - LXC_CONTAINER_ROOT="/var/lib/lxc/${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}/rootfs"
     - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/rpmbuild"
     - BUILD_VERSION="v1.14.0" # This will be exctracted from the repository
