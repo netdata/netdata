@@ -46,6 +46,6 @@ if [ -z "${BUILD_RELEASE}" ]; then
 fi
 
 echo "Configuring LXC container ${BUILDER_NAME}/${BUILD_STRING}/${BUILD_ARCH}...."
-.travis/package_management/configure_lxc_environment.py "${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+.travis/package_management/rpm/configure_lxc_environment.py "${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
 
 echo "..LXC creation complete!"

@@ -16,6 +16,6 @@ if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     exit 1
 fi
 
-.travis/package_management/trigger_lxc_rpm_build.py "${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+.travis/package_management/rpm/trigger_lxc_rpm_build.py "${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
 
 echo "Build process completed!"

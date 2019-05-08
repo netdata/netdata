@@ -166,8 +166,8 @@ jobs:
     - source tests/installer/slack.sh
     before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
     script:
-    - sudo .travis/package_management/create_lxc_for_build.sh
-    - sudo .travis/package_management/build_package_in_container.sh
+    - sudo .travis/package_management/rpm/create_lxc_for_build.sh
+    - sudo .travis/package_management/rpm/build_package_in_container.sh
     - sudo cp -r "${PACKAGES_DIRECTORY}/RPMS" packages/
     - sudo cp -r "${PACKAGES_DIRECTORY}/SRPMS" packages/
     - sudo chmod -R 777 packages/
@@ -197,7 +197,7 @@ jobs:
     - BUILD_ARCH="amd64"
     - LXC_CONTAINER_ROOT="/var/lib/lxc/${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}/rootfs"
     - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/rpmbuild"
-    - BUILD_VERSION="v1.14.0"
+    - BUILD_VERSION="v1.14.0" # This will be exctracted from the repository
 
 
 
