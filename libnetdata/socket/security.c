@@ -20,7 +20,9 @@ static SSL_CTX * security_initialize_openssl(){
     SSL_load_error_strings();
 # endif
 
-    if ( !(ctx = SSL_CTX_new(SSLv23_server_method()) ) ){
+	ctx = SSL_CTX_new(SSLv23_server_method());
+    if ( !ctx ) {
+		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
 
@@ -29,14 +31,16 @@ static SSL_CTX * security_initialize_openssl(){
     SSL_CTX_use_certificate_file(ctx, security_cert, SSL_FILETYPE_PEM);
 #else
     OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL);
-    if ( !(ctx = SSL_CTX_new(TLS_server_method()) ) ){
+    ctx = SSL_CTX_new(TLS_server_method());
+    if ( !ctx ){
+		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
 
-    /* What is the minimum version?
     SSL_CTX_set_min_proto_version(ctx,TLS1_1_VERSION);
-     */
     SSL_CTX_set_min_proto_version(ctx,SSL3_VERSION);
+    /* What is the minimum version?
+     */
 
     SSL_CTX_use_certificate_chain_file(ctx, security_cert );
 #endif
@@ -44,7 +48,7 @@ static SSL_CTX * security_initialize_openssl(){
     SSL_CTX_use_PrivateKey_file(ctx, security_key, SSL_FILETYPE_PEM);
     if ( !SSL_CTX_check_private_key(ctx) ){
         ERR_error_string_n(ERR_get_error(),error,sizeof(error));
-        fprintf(stderr,"Check private key: %s\n",error);
+		error("Private key check error: %s",error);
         SSL_CTX_free(ctx);
         return NULL;
     }
@@ -62,7 +66,7 @@ static SSL_CTX * security_initialize_openssl(){
 void security_start_ssl(){
     struct stat statbuf;
     if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ){
-        fprintf(stdout,"To use SSL it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
+        info("To use encryptation it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
         return;
     }
 
@@ -78,4 +82,36 @@ void security_clean_openssl(){
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     ERR_free_strings();
 #endif
+}
+
+int security_process_accept(SSL *ssl,int sock) {
+	ERR_clear_error();
+	int test = SSL_accept(ssl);
+	int sslerrno = SSL_get_error(ssl, test);
+	if ( test != 1 ){
+		switch(sslerrno)
+		{
+			case SSL_ERROR_WANT_READ:
+				{
+					error("SSL Handshake wanna read on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+					return 1;
+				}
+			case SSL_ERROR_WANT_WRITE:
+				{
+					error("SSL Handshake wanna write on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+					return 2;
+				}
+			default:
+				{
+					error("SSL Handshake failed %s on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
+					return -1;
+				}
+		}
+	}
+	else
+	{
+		info("SSL Handshake finished %s on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
+	}
+
+	return 0;
 }

@@ -1589,12 +1589,65 @@ ssize_t web_client_send(struct web_client *w) {
         return 0;
     }
 
+#ifdef ENABLE_HTTPS
+	int err;
+	if ( netdata_ctx)
+	{
+		ERR_clear_error();
+		bytes = SSL_write(w->ssl, &w->response.data->buffer[w->response.sent],w->response.data->len - w->response.sent );
+		err = SSL_get_error(w->ssl, bytes);
+	}
+	else
+	{
+    	bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
+	}
+#else
     bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
+#endif
     if(likely(bytes > 0)) {
         w->stats_sent_bytes += bytes;
         w->response.sent += bytes;
         debug(D_WEB_CLIENT, "%llu: Sent %zd bytes.", w->id, bytes);
     }
+#ifdef ENABLE_HTTPS
+	else
+	{
+		if ( netdata_ctx)
+		{
+			switch(err)
+			{
+				case SSL_ERROR_WANT_READ:
+				case SSL_ERROR_WANT_WRITE:
+					{
+						bytes ^= bytes;
+						break;
+					}
+				case SSL_ERROR_SYSCALL:
+				case SSL_ERROR_NONE:
+				case SSL_ERROR_ZERO_RETURN:
+					{
+						if (bytes < 0)
+						{
+							error("SSL failed while writing.");
+        					WEB_CLIENT_IS_DEAD(w);
+						}
+						else
+						{
+							bytes = -1;
+						}
+						break;
+					}
+				case SSL_ERROR_SSL:
+					{
+						error("SSL error: %d",err);
+        				WEB_CLIENT_IS_DEAD(w);
+						bytes = -1;
+						break;
+					}
+			}
+		}
+	}
+#else
     else if(likely(bytes == 0)) {
         debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
         WEB_CLIENT_IS_DEAD(w);
@@ -1603,6 +1656,7 @@ ssize_t web_client_send(struct web_client *w) {
         debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
         WEB_CLIENT_IS_DEAD(w);
     }
+#endif
 
     return(bytes);
 }
@@ -1670,9 +1724,18 @@ ssize_t web_client_receive(struct web_client *w)
     ssize_t left = w->response.data->size - w->response.data->len;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
-	/*
-	 */
+	int err;
+readmeagain:
+	if ( netdata_ctx)
+	{
+		ERR_clear_error();
+		bytes = SSL_read(w->ssl, &w->response.data->buffer[w->response.data->len],(size_t) (left - 1) );
+		err = SSL_get_error(w->ssl, bytes);
+	}
+	else
+	{
+    	bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+	}
 #else
     bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
 #endif
@@ -1690,6 +1753,43 @@ ssize_t web_client_receive(struct web_client *w)
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
     }
     else {
+#ifdef ENABLE_HTTPS
+		if ( netdata_ctx)
+		{
+			switch(err)
+			{
+				case SSL_ERROR_WANT_READ:
+					{
+						bytes ^= bytes;
+						break;
+					}
+				case SSL_ERROR_WANT_WRITE:
+					{
+						goto readmeagain;
+					}
+				case SSL_ERROR_SYSCALL:
+				case SSL_ERROR_NONE:
+				case SSL_ERROR_ZERO_RETURN:
+					{
+						if (bytes < 0)
+						{
+							error("SSL failed while read.");
+						}
+						else
+						{
+							bytes = -1;
+						}
+						break;
+					}
+				case SSL_ERROR_SSL:
+					{
+						error("SSL error: %d",err);
+						bytes = -1;
+						break;
+					}
+			}
+		}
+#endif
         debug(D_WEB_CLIENT, "%llu: receive data failed.", w->id);
         WEB_CLIENT_IS_DEAD(w);
     }

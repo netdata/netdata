@@ -14,5 +14,6 @@ extern const char *security_cert;
 
 void security_clean_openssl();
 void security_start_ssl();
+int security_process_accept(SSL *ssl,int sock);
 
 #endif //NETDATA_SECURITY_H

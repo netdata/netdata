@@ -182,11 +182,13 @@ struct web_client *web_client_get_from_cache_or_allocate() {
 			SSL_free(ssl);
 			w->ssl = NULL;
 		}
+		/*
 		if ( w->sbio )
 		{
 			BIO_free(w->sbio);
 			w->sbio = NULL;
 		}
+		*/
 	}
 #endif
     }
@@ -196,7 +198,7 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         web_clients_cache.allocated++;
 #ifdef ENABLE_HTTPS
 		w->ssl = NULL;
-		w->sbio = NULL;
+	//	w->sbio = NULL;
 #endif
     }
 

@@ -8,6 +8,23 @@ int web_client_first_request_timeout = DEFAULT_TIMEOUT_TO_RECEIVE_FIRST_WEB_REQU
 long web_client_streaming_rate_t = 0L;
 
 // ----------------------------------------------------------------------------
+// high level SSL accept management
+#ifdef ENABLE_HTTPS
+static void web_server_ssl_accept(POLLJOB *p,struct web_client *w,int prev){
+	POLLINFO *wpi = pollinfo_from_slot(p, w->pollinfo_slot);
+	if ( w->accepted > 0 )
+	{
+		p->fds[wpi->slot].events &= ( prev == 1 )?~POLLIN:~POLLOUT;
+		p->fds[wpi->slot].events |= ( w->accepted == 1 )?POLLIN:POLLOUT;
+	}
+	else
+	{
+		p->fds[wpi->slot].events &= ( prev == 1 )?~POLLIN:~POLLOUT;
+	}
+}
+#endif
+
+// ----------------------------------------------------------------------------
 // high level web clients connection management
 
 static struct web_client *web_client_create_on_fd(int fd, const char *client_ip, const char *client_port, int port_acl) {
@@ -157,6 +174,13 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     else
         web_client_set_tcp(w);
 
+#ifdef ENABLE_HTTPS
+	if ( netdata_ctx )
+	{
+		web_server_ssl_accept(pi->p,w,0);
+	}
+#endif
+
     debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
     return w;
 }
@@ -188,6 +212,32 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
+#ifdef ENABLE_HTTPS
+	if ( netdata_ctx )
+	{
+		error("SSL accept %d on fd %d\n",w->accepted,w->ifd);
+		if ( w->accepted == 1 )
+		{
+			int previous = w->accepted;
+			w->accepted = security_process_accept(w->ssl,fd);
+			if ( w->accepted == -1 )
+			{
+			    WEB_CLIENT_IS_DEAD(w);
+			}
+			else
+			{
+				web_server_ssl_accept(pi->p,w,previous);
+			}
+
+		error("SSL accept RET %d on fd %d\n",w->accepted,w->ifd);
+			return 0;
+		}
+		else if ( w->accepted == 2)
+		{
+			return 0;
+		}
+	}
+#endif
 
     if(unlikely(web_client_receive(w) < 0))
         return -1;
@@ -243,6 +293,32 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
+#ifdef ENABLE_HTTPS
+	if ( netdata_ctx )
+	{
+		error("SSL accept %d on fd %d\n",w->accepted,w->ifd);
+		if ( w->accepted == 2 )
+		{
+			int previous = w->accepted;
+			w->accepted = security_process_accept(w->ssl,fd);
+			if ( w->accepted == -1 )
+			{
+			    WEB_CLIENT_IS_DEAD(w);
+			}
+			else
+			{
+				web_server_ssl_accept(pi->p,w,previous);
+			}
+
+		error("SSL accept RET %d on fd %d\n",w->accepted,w->ifd);
+			return 0;
+		}
+		else if ( w->accepted == 1)
+		{
+			return 0;
+		}
+	}
+#endif
 
     debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
