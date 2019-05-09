@@ -2615,8 +2615,6 @@ static inline void update_cpu_limits(char **filename, unsigned long long *value,
 
 static inline void update_cpu_limits2(struct cgroup *cg) {
     if(cg->filename_cpu_cfs_quota){
-        int ret = -1;
-
         static procfile *ff = NULL;
 
         ff = procfile_reopen(ff, cg->filename_cpu_cfs_quota, NULL, PROCFILE_FLAG_DEFAULT);
@@ -2635,10 +2633,9 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
             error("CGROUP: file '%s' should have 1 lines.", cg->filename_cpu_cfs_quota);
             return;
         }
-        procfile_print(ff);///
 
         cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1));
-        cg->cpuset_cpus = get_system_cpus(); //todo: is this correct logic in unifed cgroups?
+        cg->cpuset_cpus = get_system_cpus();
 
         char *s = "max\n\0";
         if(strsame(s, procfile_lineword(ff, 0, 0)) == 0){
@@ -2646,7 +2643,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         } else {
             cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0));
         }
-        debug(D_CGROUP, "CPU limits vals: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
+        debug(D_CGROUP, "CPU limits values: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
         return;
 
 cpu_limits2_err:
@@ -2792,11 +2789,11 @@ void update_cgroup_charts(int update_every) {
                     cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_create(cg->st_cpu, "cpu_limit");
                     if(!cg->chart_var_cpu_limit) {
                         error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
-                        if(cg->filename_cpuset_cpus)freez(cg->filename_cpuset_cpus);
+                        if(cg->filename_cpuset_cpus) freez(cg->filename_cpuset_cpus);
                         cg->filename_cpuset_cpus = NULL;
-                        if(cg->filename_cpu_cfs_period)freez(cg->filename_cpu_cfs_period);
+                        if(cg->filename_cpu_cfs_period) freez(cg->filename_cpu_cfs_period);
                         cg->filename_cpu_cfs_period = NULL;
-                        if(cg->filename_cpu_cfs_quota)freez(cg->filename_cpu_cfs_quota);
+                        if(cg->filename_cpu_cfs_quota) freez(cg->filename_cpu_cfs_quota);
                         cg->filename_cpu_cfs_quota = NULL;
                     }
                 }
