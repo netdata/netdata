@@ -215,7 +215,7 @@ jobs:
           repo: ${TRAVIS_REPO_SLUG}
           branch: package-cloud-deployer
           condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
-    after_deploy: rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory"
+    after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi
     env:
     - PACKAGE_TYPE="deb"
     - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
@@ -255,7 +255,7 @@ jobs:
           repo: ${TRAVIS_REPO_SLUG}
           branch: package-cloud-deployer
           condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
-    after_deploy: rm -rf "${PACKAGES_DIRECTORY}"
+    after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
     env:
     - PACKAGE_TYPE="rpm"
     - LXC_CONTAINER_ROOT="/var/lib/lxc/${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}/rootfs"
