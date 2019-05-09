@@ -137,43 +137,5 @@ void web_client_initialize_connection(struct web_client *w) {
     web_server_log_connection(w, "CONNECTED");
 
     web_client_cache_verify(0);
-#ifdef ENABLE_HTTPS
-	int sslerrno;
-	w->accepted = 0;
-	if ( netdata_ctx )
-	{
-		if ( (w->ssl = SSL_new(netdata_ctx) ) )
-		{
-			SSL_set_accept_state(w->ssl);
-			if ( SSL_set_fd(w->ssl, w->ifd) == 1 )
-			{
-				/*
-				if ( (w->sbio = BIO_new_socket(w->ifd,BIO_NOCLOSE) ) )
-				{
-					SSL_set_bio(w->ssl,w->sbio,w->sbio);
-				}
-				else
-				{
-			        error("Failed to set BIO new socket on socket fd %d.", w->ifd);
-				}
-				*/
-				w->accepted = security_process_accept(w->ssl,w->ifd);
-				if ( w->accepted == -1 )
-				{
-				    WEB_CLIENT_IS_DEAD(w);
-				}
-			}
-			else
-			{
-	        	error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
-        		WEB_CLIENT_IS_DEAD(w);
-			}
-		}
-		else
-		{
-	        error("Failed to create SSL context on socket fd %d.", w->ifd);
-        	WEB_CLIENT_IS_DEAD(w);
-		}
-	}
-#endif
+
 }

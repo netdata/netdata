@@ -4,6 +4,13 @@ SSL_CTX *netdata_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
 
+static void security_info_callback(const SSL *ssl, int where, int ret) {
+    (void)ssl;
+    if ( where & SSL_CB_ALERT ) {
+        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s",SSL_alert_type_string( ret ),SSL_alert_desc_string_long(ret));
+    }
+}
+
 static SSL_CTX * security_initialize_openssl(){
     SSL_CTX *ctx;
     char error[512];
@@ -37,10 +44,7 @@ static SSL_CTX * security_initialize_openssl(){
         return NULL;
     }
 
-    SSL_CTX_set_min_proto_version(ctx,TLS1_1_VERSION);
-    SSL_CTX_set_min_proto_version(ctx,SSL3_VERSION);
-    /* What is the minimum version?
-     */
+    SSL_CTX_set_min_proto_version(ctx,TLS1_VERSION);
 
     SSL_CTX_use_certificate_chain_file(ctx, security_cert );
 #endif
@@ -55,10 +59,12 @@ static SSL_CTX * security_initialize_openssl(){
 
     SSL_CTX_set_session_cache_mode(ctx,SSL_SESS_CACHE_NO_AUTO_CLEAR|SSL_SESS_CACHE_SERVER);
 	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
+    SSL_CTX_set_info_callback(ctx,security_info_callback);
 
 #if (OPENSSL_VERSION_NUMBER < 0x00905100L)
 	SSL_CTX_set_verify_depth(ctx,1);
 #endif
+    debug(D_WEB_CLIENT,"SSL GLOBAL CONTEXT STARTED\n");
 
     return ctx;
 }
@@ -93,12 +99,12 @@ int security_process_accept(SSL *ssl,int sock) {
 		{
 			case SSL_ERROR_WANT_READ:
 				{
-					error("SSL Handshake wanna read on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+					debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna read on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
 					return 1;
 				}
 			case SSL_ERROR_WANT_WRITE:
 				{
-					error("SSL Handshake wanna write on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+					debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna write on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
 					return 2;
 				}
 			default:
@@ -108,10 +114,8 @@ int security_process_accept(SSL *ssl,int sock) {
 				}
 		}
 	}
-	else
-	{
-		info("SSL Handshake finished %s on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
-	}
+
+	debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
 
 	return 0;
 }

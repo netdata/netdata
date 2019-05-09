@@ -180,15 +180,7 @@ struct web_client *web_client_get_from_cache_or_allocate() {
 			}
 
 			SSL_free(ssl);
-			w->ssl = NULL;
 		}
-		/*
-		if ( w->sbio )
-		{
-			BIO_free(w->sbio);
-			w->sbio = NULL;
-		}
-		*/
 	}
 #endif
     }
@@ -196,11 +188,13 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         // allocate it
         w = web_client_alloc();
         web_clients_cache.allocated++;
-#ifdef ENABLE_HTTPS
-		w->ssl = NULL;
-	//	w->sbio = NULL;
-#endif
     }
+
+#ifdef ENABLE_HTTPS
+    w->ssl = NULL;
+    w->accepted = 1;
+    debug(D_WEB_CLIENT_ACCESS,"(Re)starting SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->accepted,w->ifd);
+#endif
 
     // link it to used web clients
     if (web_clients_cache.used) web_clients_cache.used->prev = w;
