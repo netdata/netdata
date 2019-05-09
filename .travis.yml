@@ -8,31 +8,30 @@ env:
   # https://us.images.linuxcontainers.org
   # https://packagecloud.io/docs#install_repo
   # Enterprise linux builds (Centos, Redhat, Amazon linux (el/6)
-  - BUILD_ARCH="amd64" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="centos" BUILD_RELEASE="5" BUILD_STRING="el/5"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="5" BUILD_STRING="el/5"
 
   # Fedora distros build
-  - BUILD_ARCH="amd64" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
 
   # Opensuse distros build
-  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
-
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
 
   # Debian distros build
-  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
 
   # Ubuntu distros build
-  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="disco" BUILD_STRING="ubuntu/disco"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="cosmic" BUILD_STRING="ubuntu/cosmic"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="bionic" BUILD_STRING="ubuntu/bionic"
-  - BUILD_ARCH="amd64" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="disco" BUILD_STRING="ubuntu/disco"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="cosmic" BUILD_STRING="ubuntu/cosmic"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="bionic" BUILD_STRING="ubuntu/bionic"
+  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
 
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
@@ -75,10 +74,10 @@ stages:
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
   # Experimental stage, run always on a specific branch to help experimentations
-- name: "Binary releases - AMD64"
+- name: "Binary releases - RPM/AMD64"
   if: branch = package-cloud-deployer
-
-
+- name: "Binary releases - DEB/AMD64"
+  if: branch = package-cloud-deployer
 
 # Define stage implementation details
 #
@@ -189,7 +188,43 @@ jobs:
 
 
 
-  - stage: "Binary releases - AMD64"
+  - stage: "Binary releases - DEB/AMD64"
+
+    name: "Build & Publish for: Debian (amd64)"
+    install:
+    - sudo apt-get install -y wget lxc
+    - source tests./installer/slack.sh
+    before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
+    script:
+    - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
+    - sudo .travis/package_management/create_lxc_for_build.sh
+    - sudo .travis/package_management/build_package_in_container.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
+    deploy:
+        # Beta packages deployment
+      - provider: packagecloud
+        repository: "netdata"
+        username: "paulkatsoulakis"
+        token:
+          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
+        dist: "${BUILD_STRING}"
+        local_dir: "${PACKAGES_DIRECTORY}"
+        skip_cleanup: true
+        on:
+          # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
+          repo: ${TRAVIS_REPO_SLUG}
+          branch: package-cloud-deployer
+          condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
+    after_deploy: rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory"
+    env:
+    - PACKAGE_TYPE="deb"
+    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
+    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
+
+
+
+  - stage: "Binary releases - RPM/AMD64"
 
     name: "Build & Publish for: Enterprise Linux 7.0 (amd64)"
     install:
@@ -197,12 +232,13 @@ jobs:
     - source tests/installer/slack.sh
     before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
     script:
-    - sudo .travis/package_management/rpm/create_lxc_for_build.sh
-    - sudo .travis/package_management/rpm/build_package_in_container.sh
-    - mkdir packages
-    - sudo cp -r "${PACKAGES_DIRECTORY}/RPMS" packages/
-    - sudo cp -r "${PACKAGES_DIRECTORY}/SRPMS" packages/
-    - sudo chmod -R 777 packages/
+    - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
+    - sudo .travis/package_management/create_lxc_for_build.sh
+    - sudo .travis/package_management/build_package_in_container.sh
+    - mkdir "${PACKAGES_DIRECTORY}"
+    - if [ -d "${BUILD_DIRECTORY}/RPMS" ]; then sudo cp -r "${BUILD_DIRECTORY}/RPMS" "${PACKAGES_DIRECTORY}"; fi;
+    - if [ -d "${BUILD_DIRECTORY}/SRPMS" ]; then sudo cp -r "${BUILD_DIRECTORY}/SRPMS" "${PACKAGES_DIRECTORY}"; fi;
+    - sudo chmod -R 777 "${PACKAGES_DIRECTORY}"
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
     deploy:
         # Beta packages deployment
@@ -212,19 +248,19 @@ jobs:
         token:
           secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
         dist: "${BUILD_STRING}"
-        local_dir: packages
+        local_dir: ${PACKAGES_DIRECTORY}
         skip_cleanup: true
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
           branch: package-cloud-deployer
-          condition: -d packages && ${TRAVIS_REPO_SLUG} != "netdata/netdata"
-    after_deploy: rm -rf packages
+          condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
+    after_deploy: rm -rf "${PACKAGES_DIRECTORY}"
     env:
-    - BUILDER_NAME="builder"
+    - PACKAGE_TYPE="rpm"
     - LXC_CONTAINER_ROOT="/var/lib/lxc/${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}/rootfs"
-    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/rpmbuild"
-    - BUILD_VERSION="v1.14.0" # This will be exctracted from the repository
+    - BUILD_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/rpmbuild"
+    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/packages"
 
 
 

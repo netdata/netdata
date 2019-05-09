@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 #
-# This script generates an LXC container and starts it up
-# Once the script completes successfully, a container has become available for usage
-# The container image to be used and the container name to be set, are part of variables 
-# that must be present for the script to work
+# TBD
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -45,7 +42,11 @@ if [ -z "${BUILD_RELEASE}" ]; then
 	exit 1
 fi
 
-echo "Configuring LXC container ${BUILDER_NAME}/${BUILD_STRING}/${BUILD_ARCH}...."
-.travis/package_management/rpm/configure_lxc_environment.py "${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+if [ -z "${PACKAGE_TYPE}" ]; then
+	echo "No build release information defined. Make sure PACKAGE_TYPE is set on the environment before running this script"
+	exit 1
+fi
 
-echo "..LXC creation complete!"
+.travis/package_management/${PACKAGE_TYPE}/trigger_lxc_rpm_build.py "${CONTAINER_NAME}"
+
+echo "Build process completed!"
