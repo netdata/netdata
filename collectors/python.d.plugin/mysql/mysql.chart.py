@@ -313,7 +313,7 @@ CHARTS = {
         ]
     },
     'threads_creation_rate': {
-        'options': [None, 'Threads Creation Rate', 'threads', 'threads/s', 'mysql.threads', 'line'],
+        'options': [None, 'Threads Creation Rate', 'threads/s', 'threads', 'mysql.threads', 'line'],
         'lines': [
             ['Threads_created', 'created', 'incremental'],
         ]
