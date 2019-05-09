@@ -153,15 +153,18 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     w->pollinfo_slot = pi->slot;
 
     if(unlikely(pi->socktype == AF_UNIX)) {
+        debug(D_WEB_CLIENT, "%llu: KILLME SSL this is a UNIX socket %d", w->id, pi->fd);
         web_client_set_unix(w);
     }
     else {
+        debug(D_WEB_CLIENT, "%llu: KILLME SSL this is a TCP socket %d", w->id, pi->fd);
         web_client_set_tcp(w);
     }
+
 #ifdef ENABLE_HTTPS
     if ( netdata_ctx ) {
-        debug(D_WEB_CLIENT, "%llu: SSL allocating SSL to %d", w->id, pi->fd);
         if ((w->ssl = SSL_new(netdata_ctx))) {
+            debug(D_WEB_CLIENT, "%llu: SSL started on socket %d", w->id, pi->fd);
             SSL_set_accept_state(w->ssl);
             if ( SSL_set_fd(w->ssl, w->ifd) != 1 )
             {
@@ -170,16 +173,6 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
             } else{
                 web_client_set_ssl_flag(w,security_process_accept(w->ssl,w->ifd));
             }
-            /*
-                        if ( w->accepted == -1 )
-                        {
-                            error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
-                            WEB_CLIENT_IS_DEAD(w);
-                        } else {
-                            web_server_ssl_accept(pi->p, w, 0);
-                        }
-                }
-            */
         } else {
             error("Failed to create SSL context on socket fd %d.", w->ifd);
             WEB_CLIENT_IS_DEAD(w);
@@ -219,8 +212,6 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
-#ifdef ENABLE_HTTPS
-#endif
 
     if(unlikely(web_client_receive(w) < 0))
         return -1;
@@ -276,8 +267,6 @@ static int web_server_snd_callback(POLLINFO *pi, short int *events) {
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
-#ifdef ENABLE_HTTPS
-#endif
 
     debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 

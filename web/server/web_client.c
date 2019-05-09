@@ -1046,6 +1046,30 @@ static inline void web_client_send_http_header(struct web_client *w) {
 
     size_t count = 0;
     ssize_t bytes;
+#ifdef ENABLE_HTTPS
+    if (netdata_ctx){
+        if ( w->ssl ) {
+            while((bytes = SSL_write(w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
+                count++;
+                if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                    error("Cannot send HTTP headers to web client.");
+                    break;
+                }
+            }
+        } else {
+            return 0;
+        }
+    } else {
+        while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+            count++;
+
+            if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                error("Cannot send HTTP headers to web client.");
+                break;
+            }
+        }
+    }
+#else
     while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
         count++;
 
@@ -1054,6 +1078,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
             break;
         }
     }
+#endif
 
     if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
         if(bytes > 0)
@@ -1374,8 +1399,21 @@ ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
     debug(D_DEFLATE, "%llu: OPEN CHUNK of %zu bytes (hex: %zx).", w->id, len, len);
     char buf[24];
     sprintf(buf, "%zX\r\n", len);
-    
-    ssize_t bytes = send(w->ofd, buf, strlen(buf), 0);
+
+    ssize_t bytes;
+#ifdef ENABLE_HTTPS
+    if (netdata_ctx){
+        if ( w->ssl ) {
+            bytes = SSL_write(w->ssl,buf, strlen(buf)) ;
+        } else {
+            return 0;
+        }
+    } else {
+        bytes = send(w->ofd,buf, strlen(buf) , 0);
+    }
+#else
+    bytes = send(w->ofd, buf, strlen(buf), 0);
+#endif
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk header %zd bytes.", w->id, bytes);
         w->stats_sent_bytes += bytes;
@@ -1397,7 +1435,20 @@ ssize_t web_client_send_chunk_close(struct web_client *w)
 {
     //debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
-    ssize_t bytes = send(w->ofd, "\r\n", 2, 0);
+    ssize_t bytes;
+#ifdef ENABLE_HTTPS
+    if (netdata_ctx){
+        if ( w->ssl ) {
+            bytes = SSL_write(w->ssl,"\r\n" , 2) ;
+        } else {
+            return 0;
+        }
+    } else {
+        bytes = send(w->ofd, "\r\n", 2, 0);
+    }
+#else
+    bytes = send(w->ofd, "\r\n", 2, 0);
+#endif
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
         w->stats_sent_bytes += bytes;
@@ -1419,7 +1470,20 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
 {
     //debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
-    ssize_t bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, 0);
+    ssize_t bytes;
+#ifdef ENABLE_HTTPS
+    if (netdata_ctx){
+        if ( w->ssl ) {
+            bytes = SSL_write(w->ssl,"\r\n0\r\n\r\n", 7) ;
+        } else {
+            return 0;
+        }
+    } else {
+        bytes = send(w->ofd,"\r\n0\r\n\r\n", 7 , 0);
+    }
+#else
+    bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, 0);
+#endif
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
         w->stats_sent_bytes += bytes;
@@ -1533,7 +1597,19 @@ ssize_t web_client_send_deflate(struct web_client *w)
     
     debug(D_WEB_CLIENT, "%llu: Sending %zu bytes of data (+%zd of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
 
+#ifdef ENABLE_HTTPS
+    if (netdata_ctx){
+        if ( w->ssl ) {
+            len = SSL_write(w->ssl,&w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent)) ;
+        } else {
+            return 0;
+        }
+    } else {
+        len = send(w->ofd, &w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
+    }
+#else
     len = send(w->ofd, &w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
+#endif
     if(len > 0) {
         w->stats_sent_bytes += len;
         w->response.zsent += len;
@@ -1574,6 +1650,7 @@ ssize_t web_client_send(struct web_client *w) {
 #ifdef ENABLE_HTTPS
     if ( netdata_ctx )
     {
+        debug(D_WEB_CLIENT, "%d Starting SSL send process on socket %d .",w->accepted, w->ifd);
         if ( w->accepted != 0)
         {
             return web_client_ssl_accept(w);
@@ -1614,7 +1691,19 @@ ssize_t web_client_send(struct web_client *w) {
         return 0;
     }
 
+#ifdef ENABLE_HTTPS
+    if (netdata_ctx){
+        if ( w->ssl ) {
+            bytes = SSL_write(w->ssl,&w->response.data->buffer[w->response.data->len] , (size_t)(w->response.data->len - w->response.sent)) ;
+        } else {
+            return 0;
+        }
+    } else {
+        bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
+    }
+#else
     bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
+#endif
     if(likely(bytes > 0)) {
         w->stats_sent_bytes += bytes;
         w->response.sent += bytes;
@@ -1703,7 +1792,20 @@ ssize_t web_client_receive(struct web_client *w)
 
     ssize_t left = w->response.data->size - w->response.data->len;
     ssize_t bytes;
+#ifdef ENABLE_HTTPS
+    if (netdata_ctx) {
+        if ( w->ssl ) {
+            bytes = SSL_read(w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+        }else {
+            return 0;
+        }
+    }
+    else{
+        bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+    }
+#else
     bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+#endif
 
     if(likely(bytes > 0)) {
         w->stats_received_bytes += bytes;
@@ -1714,6 +1816,9 @@ ssize_t web_client_receive(struct web_client *w)
         w->response.data->len += bytes;
         w->response.data->buffer[w->response.data->len] = '\0';
 
+#ifdef ENABLE_HTTPS
+        debug(D_WEB_DATA, "%llu: SSL KILLME data: '%s'.", w->id, &w->response.data->buffer[old]);
+#endif
         debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
     }

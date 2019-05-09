@@ -91,31 +91,55 @@ void security_clean_openssl(){
 }
 
 int security_process_accept(SSL *ssl,int sock) {
-	ERR_clear_error();
-	int test = SSL_accept(ssl);
-	int sslerrno = SSL_get_error(ssl, test);
-	if ( test != 1 ){
-		switch(sslerrno)
-		{
-			case SSL_ERROR_WANT_READ:
-				{
-					debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna read on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-					return 1;
-				}
-			case SSL_ERROR_WANT_WRITE:
-				{
-					debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna write on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-					return 2;
-				}
-			default:
-				{
-					error("SSL Handshake failed %s on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
-					return -1;
-				}
-		}
-	}
+    sock_delnonblock(sock);
+    usec_t end = now_realtime_usec() + 600000;
+    usec_t curr;
+    int test;
+    while (!SSL_is_init_finished(ssl)) {
+        ERR_clear_error();
+        if ((test = SSL_do_handshake(ssl)) <= 0) {
+            int sslerrno = SSL_get_error(ssl, test);
+            curr = now_realtime_sec();
+            switch(sslerrno) {
+                case SSL_ERROR_WANT_READ:
+                {
+                    if ( curr >=  end)
+                    {
+                        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna read on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                        return 1;
+                    }
+                    break;
+                }
+                case SSL_ERROR_WANT_WRITE:
+                {
+                    if ( curr >=  end)
+                    {
+                        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna write on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                        return 2;
+                    }
+                    break;
+                }
+                case SSL_ERROR_NONE:
+                {
+                    debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_NONE on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                    break;
+                }
+                case SSL_ERROR_SYSCALL:
+                default:
+                {
+                    debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_SYSCALL on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                    break;
+                }
+            }
+        }
+    }
 
-	debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
+    sock_setnonblock(sock);
 
-	return 0;
+    if ( SSL_is_init_finished(ssl) )
+    {
+        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
+    }
+
+    return 0;
 }
