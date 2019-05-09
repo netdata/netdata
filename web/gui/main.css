@@ -713,3 +713,7 @@ body.modal-open {
     margin-left: 5px;
     color: #17CE8A;
 }
+
+.beta {
+    color:#FFCC00;    
+}

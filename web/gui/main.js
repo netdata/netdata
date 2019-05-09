@@ -775,7 +775,7 @@ function renderMyNetdataMenu(machinesArray) {
         html += (
             `<div class="agent-item">
                 <i class="fas fa-tv"></i>
-                <a onClick="openAuthenticatedUrl('console/index.html');" target="_blank">Nodes<sup> beta</sup></a>
+                <a onClick="openAuthenticatedUrl('console/index.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -793,7 +793,7 @@ function renderMyNetdataMenu(machinesArray) {
         html += (
             `<div class="agent-item">
                 <i class="fas fa-tv"></i>
-                <a href"console/index.html" target="_blank">Nodes<sup> beta</sup></a>
+                <a href"console/index.html" target="_blank">Nodes<sup class="beta"> beta</sup></a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -4846,7 +4846,7 @@ function renderAccountUI() {
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">   
                 <li>
                     <a href="console/index.html" target="_blank" class="btn">
-                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes<sup> beta</sup></span>
+                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes<sup class="beta"> beta</sup></span>
                     </a>
                 </li>
                 <li>
