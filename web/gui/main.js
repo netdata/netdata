@@ -704,6 +704,14 @@ function restrictMyNetdataMenu() {
     </div>`);
 }
 
+function openAuthenticatedUrl(url) {  
+    if (isSignedIn()) {
+        window.open(url);
+    } else {
+        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`);
+    }
+}
+
 function renderMyNetdataMenu(machinesArray) {
     const el = document.getElementById('my-netdata-dropdown-content');
     el.classList.add(`theme-${netdataTheme}`);
@@ -766,6 +774,11 @@ function renderMyNetdataMenu(machinesArray) {
     if (!isSignedIn()) {
         html += (
             `<div class="agent-item">
+                <i class="fas fa-tv"></i>
+                <a onClick="openAuthenticatedUrl('console/index.html');" target="_blank">Nodes<sup> beta</sup></a>
+                <div></div>
+            </div>
+            <div class="agent-item">
                 <i class="fas fa-cog""></i>
                 <a href="#" onclick="switchRegistryModalHandler(); return false;">Switch Identity</a>
                 <div></div>
@@ -780,7 +793,7 @@ function renderMyNetdataMenu(machinesArray) {
         html += (
             `<div class="agent-item">
                 <i class="fas fa-tv"></i>
-                <a href="console/index.html" target="_blank">Nodes view</a>
+                <a href"console/index.html" target="_blank">Nodes<sup> beta</sup></a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -4832,8 +4845,8 @@ function renderAccountUI() {
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">   
                 <li>
-                    <a href="console/index.html#/" target="_blank" class="btn">
-                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes view</span>
+                    <a href="console/index.html" target="_blank" class="btn">
+                    <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes<sup> beta</sup></span>
                     </a>
                 </li>
                 <li>
