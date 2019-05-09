@@ -13,7 +13,6 @@
 - v1.14.0 is released but status is draft [\#5921](https://github.com/netdata/netdata/issues/5921)
 - Weird WD values [\#5919](https://github.com/netdata/netdata/issues/5919)
 - Alert badge not showing after reverse proxy [\#5900](https://github.com/netdata/netdata/issues/5900)
-- Fatal errors sometimes fail to halt the netdata daemon [\#5896](https://github.com/netdata/netdata/issues/5896)
 - Docker image has plugins not executable for netdata user [\#5890](https://github.com/netdata/netdata/issues/5890)
 - cgroup-network-helper.sh issues in our Docker images [\#5880](https://github.com/netdata/netdata/issues/5880)
 - Fix dependency installation for Fedora 30 [\#5831](https://github.com/netdata/netdata/issues/5831)
@@ -25,9 +24,11 @@
 **Closed issues:**
 
 - Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
+- research: docker swarm [\#5877](https://github.com/netdata/netdata/issues/5877)
 - netdata/packaging: \[SPIKE\] Investigate CPack/CMake status, clarify and estimate the available approaches [\#5775](https://github.com/netdata/netdata/issues/5775)
 - "Healthy" entrypoint for HTTP-interface [\#5764](https://github.com/netdata/netdata/issues/5764)
 - netdata/packaging/ci: Create and document a manual nightly deployment procedure [\#5762](https://github.com/netdata/netdata/issues/5762)
+- feature: collect docker swarm metrics [\#5710](https://github.com/netdata/netdata/issues/5710)
 - snmp-trap receiver [\#5597](https://github.com/netdata/netdata/issues/5597)
 - Tengine monitoring [\#4886](https://github.com/netdata/netdata/issues/4886)
 - Scaleio monitoring [\#4825](https://github.com/netdata/netdata/issues/4825)
@@ -39,6 +40,7 @@
 
 **Merged pull requests:**
 
+- fix typo in the mysql graph [\#5980](https://github.com/netdata/netdata/pull/5980) ([kam1kaze](https://github.com/kam1kaze))
 - Change HTTP version to HTTP method [\#5974](https://github.com/netdata/netdata/pull/5974) ([SahAssar](https://github.com/SahAssar))
 - Update Node app\_group [\#5962](https://github.com/netdata/netdata/pull/5962) ([jonfairbanks](https://github.com/jonfairbanks))
 - Fix coverity warnings [\#5952](https://github.com/netdata/netdata/pull/5952) ([cakrit](https://github.com/cakrit))
