@@ -772,7 +772,7 @@ function renderMyNetdataMenu(machinesArray) {
     }
 
     if (!isSignedIn()) {
-        html += (//http://netdata-deb-health01.netdata.rocks:19999/#
+        html += (
             `<div class="agent-item">
                 <i class="fas fa-tv"></i>
                 <a onClick="openAuthenticatedUrl('console/index.html');" target="_blank">Nodes<sup> beta</sup></a>
