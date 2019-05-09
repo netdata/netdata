@@ -1048,27 +1048,27 @@ static inline void web_client_send_http_header(struct web_client *w) {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if (netdata_ctx){
-        if ( w->ssl ) {
-            while((bytes = SSL_write(w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
+            if ( w->ssl ) {
+                while((bytes = SSL_write(w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
+                    count++;
+                    if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                        error("Cannot send HTTP headers to web client.");
+                        break;
+                    }
+                }
+            } else {
+                return;
+            }
+        } else {
+            while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
                 count++;
+
                 if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
                     error("Cannot send HTTP headers to web client.");
                     break;
                 }
             }
-        } else {
-            return 0;
         }
-    } else {
-        while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
-            count++;
-
-            if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                error("Cannot send HTTP headers to web client.");
-                break;
-            }
-        }
-    }
 #else
     while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
         count++;
