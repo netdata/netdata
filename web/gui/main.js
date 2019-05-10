@@ -706,7 +706,7 @@ function restrictMyNetdataMenu() {
 
 function openAuthenticatedUrl(url) {  
     if (isSignedIn()) {
-        window.open(url);
+        window.open(`${NETDATA.registry.cloudBaseURL}/${url}`);
     } else {
         window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`);
     }
@@ -793,7 +793,7 @@ function renderMyNetdataMenu(machinesArray) {
         html += (
             `<div class="agent-item">
                 <i class="fas fa-tv"></i>
-                <a href"console/index.html" target="_blank">Nodes<sup class="beta"> beta</sup></a>
+                <a onclick="openAuthenticatedUrl('console/index.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -4845,7 +4845,7 @@ function renderAccountUI() {
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">   
                 <li>
-                    <a href="console/index.html" target="_blank" class="btn">
+                    <a onclick="openAuthenticatedUrl('console/index.html');" target="_blank" class="btn">
                     <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes<sup class="beta"> beta</sup></span>
                     </a>
                 </li>
