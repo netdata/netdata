@@ -153,18 +153,15 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     w->pollinfo_slot = pi->slot;
 
     if(unlikely(pi->socktype == AF_UNIX)) {
-        debug(D_WEB_CLIENT, "%llu: KILLME SSL this is a UNIX socket %d", w->id, pi->fd);
         web_client_set_unix(w);
     }
     else {
-        debug(D_WEB_CLIENT, "%llu: KILLME SSL this is a TCP socket %d", w->id, pi->fd);
         web_client_set_tcp(w);
     }
 
 #ifdef ENABLE_HTTPS
     if ( netdata_ctx ) {
         if ((w->ssl = SSL_new(netdata_ctx))) {
-            debug(D_WEB_CLIENT, "%llu: SSL started on socket %d", w->id, pi->fd);
             SSL_set_accept_state(w->ssl);
             if ( SSL_set_fd(w->ssl, w->ifd) != 1 )
             {

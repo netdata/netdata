@@ -91,6 +91,23 @@ Netdata supports access lists in `netdata.conf`:
 
 - `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](../api/health/#health-management-api)
 
+### Enabling TLS/SSL support
+
+Netdata since version 1.14 supports encrypted connections. To enable this option it is necessary to genereate a certificate and a key, case you do not have one it is possible to generate them  with the following command
+
+openssl req -newkey rsa:4096 -nodes -sha512 -x509 -days 365 -nodes -keyout key.pem -out cert.pem
+
+, it is important to say that the previous command will create a self signed certificate and the browsers will show warnings about it.
+
+To start using HTTPS with Netdata it is only necessary to write the path for your certificate (`ssl certificate`) and key(`ssl key`) inside the `web section`
+
+```
+[web]
+	ssl key = /etc/netdata/key.pem
+	ssl certificate = /etc/netdata/cert.pem
+```
+
+
 ### Other netdata.conf [web] section options
 setting | default | info
 :------:|:-------:|:----

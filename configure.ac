@@ -125,10 +125,10 @@ AC_ARG_ENABLE(
     [enable_lto="detect"]
 )
 AC_ARG_ENABLE(
-    [https],
-    [AS_HELP_STRING([--enable-https], [Build with the HTTPS  @<:@default disabled@:>@])],
+    [openssl],
+    [AS_HELP_STRING([--enable-https], [Build with the support to SSL/TLS  @<:@default autodetect@:>@])],
     ,
-    [enable_https="no"]
+    [enable_https="yes"]
 )
 
 

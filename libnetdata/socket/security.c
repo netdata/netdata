@@ -45,6 +45,7 @@ static SSL_CTX * security_initialize_openssl(){
     }
 
     SSL_CTX_set_min_proto_version(ctx,TLS1_VERSION);
+    //SET OTHER PROTOCOL VERSIONS(TLS1_2_VERSION)
 
     SSL_CTX_use_certificate_chain_file(ctx, security_cert );
 #endif
@@ -140,6 +141,9 @@ int security_process_accept(SSL *ssl,int sock) {
     {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
     }
+    else
+
+    {}
 
     return 0;
 }
