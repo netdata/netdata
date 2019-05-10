@@ -141,9 +141,6 @@ int security_process_accept(SSL *ssl,int sock) {
     {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
     }
-    else
-
-    {}
 
     return 0;
 }
