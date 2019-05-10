@@ -25,6 +25,7 @@
 
 - Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
 - research: docker swarm [\#5877](https://github.com/netdata/netdata/issues/5877)
+- Implement CPU limits for cgroup v2 [\#5850](https://github.com/netdata/netdata/issues/5850)
 - netdata/packaging: \[SPIKE\] Investigate CPack/CMake status, clarify and estimate the available approaches [\#5775](https://github.com/netdata/netdata/issues/5775)
 - "Healthy" entrypoint for HTTP-interface [\#5764](https://github.com/netdata/netdata/issues/5764)
 - netdata/packaging/ci: Create and document a manual nightly deployment procedure [\#5762](https://github.com/netdata/netdata/issues/5762)
@@ -55,6 +56,7 @@
 - netdata/packaging/docker: fix docker permissions and other things [\#5917](https://github.com/netdata/netdata/pull/5917) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - SocketService: set socket operation timeout before connecting [\#5911](https://github.com/netdata/netdata/pull/5911) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging/ci: Create manual nightly deployment tool [\#5899](https://github.com/netdata/netdata/pull/5899) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Implement unified cgroup cpu limit [\#5895](https://github.com/netdata/netdata/pull/5895) ([skrzyp1](https://github.com/skrzyp1))
 - NEW: Energi Core daemon monitoring, suits other Bitcoin forks [\#5894](https://github.com/netdata/netdata/pull/5894) ([andvgal](https://github.com/andvgal))
 - NEW: allow additional name argument passing to urllib3 request in UrlService [\#5893](https://github.com/netdata/netdata/pull/5893) ([andvgal](https://github.com/andvgal))
 - info API minor enhancements [\#5891](https://github.com/netdata/netdata/pull/5891) ([cakrit](https://github.com/cakrit))
