@@ -5,11 +5,11 @@
 # 1) Create the container
 # 2) Start the container up
 # 3) Create the builder user
-# 4) Prepare the environment for RPM build
+# 4) Prepare the environment for DEB build
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
+# Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 
 import os
 import sys
@@ -59,30 +59,32 @@ run_command(["useradd", os.environ['BUILDER_NAME']])
 
 # Fetch wget to retrieve the source
 print ("2. Installing package dependencies within LXC container")
-run_command(["yum", "install", "-y", "wget"])
-run_command(["yum", "install", "-y", "sudo"])
-run_command(["yum", "install", "-y", "rpm-build"])
-
-print ("3. Setting up macros")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "/bin/echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
-
-print ("4. Create rpmbuild directory")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/BUILD"])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/RPMS"])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/SOURCES"])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/SPECS"])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild/SRPMS"])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild"])
+run_command(["apt-get", "install", "-y", "wget"])
+run_command(["apt-get", "install", "-y", "sudo"])
+run_command(["apt-get", "install", "-y", "dh-make"])
+run_command(["apt-get", "install", "-y", "dh-systemd"])
+run_command(["apt-get", "install", "-y", "bzr-builddeb"])
+run_command(["apt-get", "install", "-y", "zlib1g-dev"])
+run_command(["apt-get", "install", "-y", "uuid-dev"])
+run_command(["apt-get", "install", "-y", "libmnl-dev"])
+run_command(["apt-get", "install", "-y", "gcc"])
+run_command(["apt-get", "install", "-y", "make"])
+run_command(["apt-get", "install", "-y", "git"])
+run_command(["apt-get", "install", "-y", "autoconf"])
+run_command(["apt-get", "install", "-y", "autoconf-archive"])
+run_command(["apt-get", "install", "-y", "autogen"])
+run_command(["apt-get", "install", "-y", "automake"])
+run_command(["apt-get", "install", "-y", "pkg-config"])
+run_command(["apt-get", "install", "-y", "curl"])
 
 # Download the source
-dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
+dest_archive="/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
 release_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
-print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (release_url, dest_archive))
+
+print ("3. Fetch netdata source (%s -> %s)" % (release_url, dest_archive))
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "--output-document=" + dest_archive, release_url])
 
-# Extract the spec file in place
-print ("6. Extract spec file from the source")
-spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-%s/netdata.spec" % os.environ['BUILD_VERSION']])
+print ("4. Extracting directory contents to /home " + os.environ['BUILDER_NAME'])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive, "-C", "/home/" + os.environ['BUILDER_NAME']])
 
 print ('Done!')

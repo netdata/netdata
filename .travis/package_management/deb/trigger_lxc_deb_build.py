@@ -2,7 +2,6 @@
 #
 # This script is responsible for running the RPM build on the running container
 #
-#
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
@@ -45,17 +44,18 @@ if not container.running or not container.state == "RUNNING":
 if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
-# Get sudo onboard
-print ("Installing dependencies for the builder")
-run_command(["yum", "install", "zlib-devel", "-y"])
-run_command(["yum", "install", "libuuid-devel", "-y"])
-run_command(["yum", "install", "autoconf", "-y"])
-run_command(["yum", "install", "automake", "-y"])
-run_command(["yum", "install", "gcc", "-y"])
-run_command(["yum", "install", "make", "-y"])
+print ("Setting up EMAIL and DEBFULLNAME variables required by the build tools")
+os.environ["EMAIL"] = "bot@netdata.cloud"
+os.environ["DEBFULLNAME"] = "Netdata builder"
 
 # Run the build process on the container
-print ("Starting RPM build process")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
+print ("Starting DEB build process, running dh-make")
+new_version = os.environ["BUILD_VERSION"].replace('v', '')
+
+print ("Entering builder home directory")
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "-", "builder"])
+
+print ("Building the package")
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "dpkg-buildpackage", "--host-arch", "amd64", "--target-arch", "amd64", "--post-clean", "--pre-clean", "--build=binary", "--release-by=\"Netdata Builder\"", "--build-by=\"Netdata Builder\""])
 
 print ('Done!')
