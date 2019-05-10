@@ -706,7 +706,7 @@ function restrictMyNetdataMenu() {
 
 function openAuthenticatedUrl(url) {  
     if (isSignedIn()) {
-        window.open(`${NETDATA.registry.cloudBaseURL}/${url}`);
+        window.open(url);
     } else {
         window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`);
     }
