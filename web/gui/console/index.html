@@ -12,9 +12,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" href="/favicon.ico" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
-    <script crossorigin src="https://unpkg.com/react@16/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
-    <script crossorigin type="text/javascript" src="https://my-netdata.io/dashboard.js?v=3"></script>
     <script>
         function loadJSFile(filename) {
             const s = document.createElement("script")
@@ -31,20 +28,27 @@
             document.getElementsByTagName("head")[0].appendChild(l)
         }
 
-        const cloudBaseURL = localStorage.getItem("cloud.baseURL") || "https://netdata.cloud"
+        var cloudBaseURL = localStorage.getItem("cloud.baseURL") || "https://netdata.cloud"
 
-        const main = document.getElementById("app")
-        main.setAttribute("data-static-base-url", cloudBaseURL)
-        main.setAttribute("data-api-base-url", cloudBaseURL)
-        main.setAttribute("data-api-base-url-v2", cloudBaseURL)
-
-        loadCSSFile(`${cloudBaseURL}/static/console/main.css?v=1`)
-        loadJSFile(`${cloudBaseURL}/static/console/main.bundle.js?v=1`)
+        loadCSSFile(`${cloudBaseURL}/static/console/main.css?v=4`)
     </script>
 </head>
 
 <body class="mdc-theme--background mdc-typography">
     <main id="app" class="console-app" data-host="agent"></main>
+    <script>
+        const main = document.getElementById("app")
+        main.setAttribute("data-static-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url-v2", cloudBaseURL)
+
+        loadJSFile(`${cloudBaseURL}/static/console/main.js?v=4`)
+    </script>
+    <script>
+        var netdataTheme = "white"
+        var netdataNoBootstrap = true
+    </script>
+    <script crossorigin type="text/javascript" src="https://my-netdata.io/dashboard.js?v=4"></script>
 </body>
 
 </html>
