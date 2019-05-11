@@ -44,6 +44,41 @@ stages:
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
 
+- stage: &_DEB_TEMPLATE
+    name: "Build & Publish for: Debian (amd64)"
+    install:
+    - sudo apt-get install -y wget lxc
+    - source tests./installer/slack.sh
+    before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
+    script:
+    - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
+    - sudo .travis/package_management/create_lxc_for_build.sh
+    - sudo .travis/package_management/build_package_in_container.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
+    deploy:
+        # Beta packages deployment
+      - provider: packagecloud
+        repository: "netdata"
+        username: "paulkatsoulakis"
+        token:
+          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
+        dist: "${BUILD_STRING}"
+        local_dir: "${PACKAGES_DIRECTORY}"
+        skip_cleanup: true
+        on:
+          # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
+          repo: ${TRAVIS_REPO_SLUG}
+          branch: package-cloud-deployer
+          condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
+    after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi
+    env:
+    - PACKAGE_TYPE="deb"
+    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
+    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
+
+
+
 # Define stage implementation details
 #
 jobs:
@@ -150,41 +185,6 @@ jobs:
 
   - name: Run labeler on github issues
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
-
-
-  - stage: &_DEB_TEMPLATE
-
-    name: "Build & Publish for: Debian (amd64)"
-    install:
-    - sudo apt-get install -y wget lxc
-    - source tests./installer/slack.sh
-    before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
-    script:
-    - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
-    - sudo .travis/package_management/create_lxc_for_build.sh
-    - sudo .travis/package_management/build_package_in_container.sh
-    after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
-    deploy:
-        # Beta packages deployment
-      - provider: packagecloud
-        repository: "netdata"
-        username: "paulkatsoulakis"
-        token:
-          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
-        dist: "${BUILD_STRING}"
-        local_dir: "${PACKAGES_DIRECTORY}"
-        skip_cleanup: true
-        on:
-          # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
-          repo: ${TRAVIS_REPO_SLUG}
-          branch: package-cloud-deployer
-          condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
-    after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi
-    env:
-    - PACKAGE_TYPE="deb"
-    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
-    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
-    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
 
   # Debian distros build
   - stage:
