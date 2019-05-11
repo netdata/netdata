@@ -227,7 +227,7 @@ jobs:
   #
   - stage:
     <<: *_DEB_TEMPLATE
-    stage: "Build ubuntu/disco - amd64"
+    stage: "Package ubuntu/disco - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="disco" BUILD_STRING="ubuntu/disco"
     - PACKAGE_TYPE="deb"
@@ -240,7 +240,7 @@ jobs:
 
   - stage:
     <<: *_DEB_TEMPLATE
-    stage: "Build ubuntu/cosmic - amd64"
+    stage: "Package ubuntu/cosmic - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="cosmic" BUILD_STRING="ubuntu/cosmic"
     - PACKAGE_TYPE="deb"
@@ -253,7 +253,7 @@ jobs:
 
   - stage:
     <<: *_DEB_TEMPLATE
-    stage: "Build ubuntu/bionic - amd64"
+    stage: "Package ubuntu/bionic - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="bionic" BUILD_STRING="ubuntu/bionic"
     - PACKAGE_TYPE="deb"
@@ -266,7 +266,7 @@ jobs:
 
   - stage:
     <<: *_DEB_TEMPLATE
-    stage: "Build ubuntu/artful - amd64"
+    stage: "Package ubuntu/artful - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
     - PACKAGE_TYPE="deb"
@@ -280,7 +280,7 @@ jobs:
   # Debian distros build
   - stage:
     <<: *_DEB_TEMPLATE
-    stage: "Build debian/buster - amd64"
+    stage: "Package debian/buster - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
     - PACKAGE_TYPE="deb"
@@ -293,7 +293,7 @@ jobs:
 
   - stage: 
     <<: *_DEB_TEMPLATE
-    stage: "Build debian/stretch - amd64"
+    stage: "Package debian/stretch - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
     - PACKAGE_TYPE="deb"
@@ -306,7 +306,7 @@ jobs:
 
   - stage:
     <<: *_DEB_TEMPLATE
-    stage: "Build debian/jessie - amd64"
+    stage: "Package debian/jessie - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
     - PACKAGE_TYPE="deb"
@@ -319,7 +319,7 @@ jobs:
 
   - stage:
     <<: *_DEB_TEMPLATE
-    stage: "Build debian/wheezy - amd64"
+    stage: "Package debian/wheezy - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
     - PACKAGE_TYPE="deb"
@@ -333,7 +333,7 @@ jobs:
   # Enterprise linux builds (Centos, Redhat, Amazon linux (el/6)
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build Enterprise Linux 7 - amd64"
+    stage: "Package Enterprise Linux 7 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
     - PACKAGE_TYPE="rpm"
@@ -346,7 +346,7 @@ jobs:
 
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build Enterprise linux 6 - amd64"
+    stage: "Package Enterprise linux 6 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
     - PACKAGE_TYPE="rpm"
@@ -359,7 +359,7 @@ jobs:
 
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build Enterprise Linux 5 - amd64"
+    stage: "Package Enterprise Linux 5 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="5" BUILD_STRING="el/5"
     - PACKAGE_TYPE="rpm"
@@ -373,7 +373,7 @@ jobs:
   # Fedora distros build
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build Fedora 29 - amd64"
+    stage: "Package Fedora 29 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
     - PACKAGE_TYPE="rpm"
@@ -386,7 +386,7 @@ jobs:
 
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build Fedora 28 - amd64"
+    stage: "Package Fedora 28 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
     - PACKAGE_TYPE="rpm"
@@ -400,7 +400,7 @@ jobs:
   # Opensuse distros build
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build OpenSuSE 15.1 - amd64"
+    stage: "Package OpenSuSE 15.1 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
     - PACKAGE_TYPE="rpm"
@@ -413,7 +413,7 @@ jobs:
 
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build OpenSuSE 15.0 - amd64"
+    stage: "Package OpenSuSE 15.0 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
     - PACKAGE_TYPE="rpm"
@@ -426,7 +426,7 @@ jobs:
 
   - stage:
     <<: *_RPM_TEMPLATE
-    stage: "Build OpenSuSE 42.3 - amd64"
+    stage: "Package OpenSuSE 42.3 - amd64"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
     - PACKAGE_TYPE="rpm"
