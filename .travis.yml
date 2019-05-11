@@ -55,10 +55,10 @@ stages:
     - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
     - sudo .travis/package_management/create_lxc_for_build.sh
     - sudo .travis/package_management/build_package_in_container.sh
-    - sudo mkdir "${PACKAGES_DIRECTORY}"
+    - if [ -d "${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}" ]; then sudo mkdir "${PACKAGES_DIRECTORY}"; fi;
     - if [ -d "${BUILD_DIRECTORY}/RPMS" ]; then sudo cp -r "${BUILD_DIRECTORY}/RPMS" "${PACKAGES_DIRECTORY}"; fi;
     - if [ -d "${BUILD_DIRECTORY}/SRPMS" ]; then sudo cp -r "${BUILD_DIRECTORY}/SRPMS" "${PACKAGES_DIRECTORY}"; fi;
-    - sudo chmod -R 777 "${PACKAGES_DIRECTORY}"
+    - if [ -d "${PACKAGES_DIRECTORY}" ] ; then sudo chmod -R 777 "${PACKAGES_DIRECTORY}"; fi;
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
     deploy:
         # Beta packages deployment
