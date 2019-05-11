@@ -3,36 +3,6 @@ language: c
 services:
 - docker
 
-env:
-  # References:
-  # https://us.images.linuxcontainers.org
-  # https://packagecloud.io/docs#install_repo
-  # Enterprise linux builds (Centos, Redhat, Amazon linux (el/6)
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="5" BUILD_STRING="el/5"
-
-  # Fedora distros build
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
-
-  # Opensuse distros build
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
-
-  # Debian distros build
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
-
-  # Ubuntu distros build
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="disco" BUILD_STRING="ubuntu/disco"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="cosmic" BUILD_STRING="ubuntu/cosmic"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="bionic" BUILD_STRING="ubuntu/bionic"
-  - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
-
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
   allow_failures:
@@ -72,24 +42,6 @@ stages:
 
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
-
-  # Experimental stage, run always on a specific branch to help experimentations
-- name: "Binary releases - RPM/AMD64"
-  if: branch = package-cloud-deployer
-
-  # Debian distros build
-- name: "Build buster"
-  if: branch = package-cloud-deployer
-
-- name: "Build stretch"
-  if: branch = package-cloud-deployer
-
-- name: "Build jessie"
-  if: branch = package-cloud-deployer
-
-- name: "Build wheezy"
-  if: branch = package-cloud-deployer
-
 
 
 # Define stage implementation details
@@ -235,22 +187,26 @@ jobs:
     - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
 
   # Debian distros build
-  - stage: *_DEB_TEMPLATE
+  - stage:
+    <<: *_DEB_TEMPLATE
     name: "Build buster"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
 
-  - stage: *_DEB_TEMPLATE
+  - stage: 
+    <<: *_DEB_TEMPLATE
     name: "Build stretch"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
 
-  - stage: *_DEB_TEMPLATE
+  - stage:
+    <<: *_DEB_TEMPLATE
     name: "Build jessie"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
 
-  - stage: *_DEB_TEMPLATE
+  - stage:
+    <<: *_DEB_TEMPLATE
     name: "Build wheezy"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
