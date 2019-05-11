@@ -33,6 +33,7 @@ container = lxc.Container(container_name)
 if container.defined:
     raise Exception("Container %s already exists" % container_name)
 
+print ("Creating container with parameters: %s, %s, %s " % (os.environ["BUILD_DISTRO"], os.environ["BUILD_RELEASE"], os.environ["BUILD_ARCH"]))
 # Create the container rootfs
 if not container.create("download", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
                                                    "release": os.environ["BUILD_RELEASE"],
