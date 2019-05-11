@@ -76,8 +76,21 @@ stages:
   # Experimental stage, run always on a specific branch to help experimentations
 - name: "Binary releases - RPM/AMD64"
   if: branch = package-cloud-deployer
-- name: "Binary releases - DEB/AMD64"
+
+  # Debian distros build
+- name: "Build buster"
   if: branch = package-cloud-deployer
+
+- name: "Build stretch"
+  if: branch = package-cloud-deployer
+
+- name: "Build jessie"
+  if: branch = package-cloud-deployer
+
+- name: "Build wheezy"
+  if: branch = package-cloud-deployer
+
+
 
 # Define stage implementation details
 #
@@ -187,8 +200,7 @@ jobs:
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
 
 
-_deb_template_stage: &_deb_stage_template
-  - stage: "Binary releases - DEB/AMD64"
+  - stage: &_DEB_TEMPLATE
 
     name: "Build & Publish for: Debian (amd64)"
     install:
@@ -223,20 +235,23 @@ _deb_template_stage: &_deb_stage_template
     - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
 
   # Debian distros build
-  - <<: *_deb_stage_template
-  - stage: "Binary releases - DEB/AMD64 (buster)"
+  - stage: *_DEB_TEMPLATE
+    name: "Build buster"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
-  - <<: *_deb_stage_template
-  - stage: "Binary releases - DEB/AMD64 (buster)"
+
+  - stage: *_DEB_TEMPLATE
+    name: "Build stretch"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
-  - <<: *_deb_stage_template
-  - stage: "Binary releases - DEB/AMD64 (buster)"
+
+  - stage: *_DEB_TEMPLATE
+    name: "Build jessie"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
-  - <<: *_deb_stage_template
-  - stage: "Binary releases - DEB/AMD64 (buster)"
+
+  - stage: *_DEB_TEMPLATE
+    name: "Build wheezy"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
 
