@@ -281,6 +281,7 @@ jobs:
   - stage:
     <<: *_DEB_TEMPLATE
     stage: "Build debian/buster"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
     - PACKAGE_TYPE="deb"
@@ -294,6 +295,7 @@ jobs:
   - stage: 
     <<: *_DEB_TEMPLATE
     stage: "Build debian/stretch"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
     - PACKAGE_TYPE="deb"
@@ -307,6 +309,7 @@ jobs:
   - stage:
     <<: *_DEB_TEMPLATE
     stage: "Build debian/jessie"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
     - PACKAGE_TYPE="deb"
@@ -320,6 +323,7 @@ jobs:
   - stage:
     <<: *_DEB_TEMPLATE
     stage: "Build debian/wheezy"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
     - PACKAGE_TYPE="deb"
@@ -334,6 +338,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build Enterprise Linux 7"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
     - PACKAGE_TYPE="rpm"
@@ -347,6 +352,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build Enterprise linux 6"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
     - PACKAGE_TYPE="rpm"
@@ -360,6 +366,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build Enterprise Linux 5"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="centos" BUILD_RELEASE="5" BUILD_STRING="el/5"
     - PACKAGE_TYPE="rpm"
@@ -374,6 +381,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build Fedora 29"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
     - PACKAGE_TYPE="rpm"
@@ -387,6 +395,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build Fedora 28"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
     - PACKAGE_TYPE="rpm"
@@ -401,6 +410,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build OpenSuSE 15.1"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
     - PACKAGE_TYPE="rpm"
@@ -414,6 +424,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build OpenSuSE 15.0"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
     - PACKAGE_TYPE="rpm"
@@ -427,6 +438,7 @@ jobs:
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Build OpenSuSE 42.3"
+    name: "Build & Publish RPM package for: ${BUILD_DISTRO}/${BUILD_ARCH}"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="rpm" BUILD_DISTRO="opensuse" BUILD_RELEASE="42.3" BUILD_STRING="opensuse/42.3"
     - PACKAGE_TYPE="rpm"
