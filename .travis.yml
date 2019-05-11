@@ -187,7 +187,7 @@ jobs:
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
 
 
-
+_deb_template_stage: &_deb_stage_template
   - stage: "Binary releases - DEB/AMD64"
 
     name: "Build & Publish for: Debian (amd64)"
@@ -221,6 +221,24 @@ jobs:
     - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
     - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
     - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
+
+  # Debian distros build
+  - <<: *_deb_stage_template
+  - stage: "Binary releases - DEB/AMD64 (buster)"
+    env:
+    - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
+  - <<: *_deb_stage_template
+  - stage: "Binary releases - DEB/AMD64 (buster)"
+    env:
+    - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
+  - <<: *_deb_stage_template
+  - stage: "Binary releases - DEB/AMD64 (buster)"
+    env:
+    - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
+  - <<: *_deb_stage_template
+  - stage: "Binary releases - DEB/AMD64 (buster)"
+    env:
+    - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
 
 
 
