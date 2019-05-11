@@ -43,6 +43,13 @@ stages:
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
+- name: "Build buster"
+  if: branch = package-cloud-deployer
+- name: "Build wheezy"
+  if: branch = package-cloud-deployer
+- name: "Build stretch"
+  if: branch = package-cloud-deployer
+
 
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish for: Debian (amd64)"
