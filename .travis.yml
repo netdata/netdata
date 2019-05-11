@@ -43,14 +43,6 @@ stages:
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
-- name: "Build buster"
-  if: branch = package-cloud-deployer
-- name: "Build wheezy"
-  if: branch = package-cloud-deployer
-- name: "Build stretch"
-  if: branch = package-cloud-deployer
-
-
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish for: Debian (amd64)"
     install:
@@ -78,12 +70,6 @@ stages:
           branch: package-cloud-deployer
           condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
     after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi
-    env:
-    - PACKAGE_TYPE="deb"
-    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
-    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
-    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
-
 
 
 # Define stage implementation details
@@ -196,27 +182,49 @@ jobs:
   # Debian distros build
   - stage:
     <<: *_DEB_TEMPLATE
-    name: "Build buster"
+    stage: "Build buster"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
+    - PACKAGE_TYPE="deb"
+    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
+    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
+
+
 
   - stage: 
     <<: *_DEB_TEMPLATE
-    name: "Build stretch"
+    stage: "Build stretch"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
+    - PACKAGE_TYPE="deb"
+    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
+    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
+
+
 
   - stage:
     <<: *_DEB_TEMPLATE
-    name: "Build jessie"
+    stage: "Build jessie"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
+    - PACKAGE_TYPE="deb"
+    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
+    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
+
+
 
   - stage:
     <<: *_DEB_TEMPLATE
-    name: "Build wheezy"
+    stage: "Build wheezy"
     env:
     - BUILDER_NAME="builder" BUILD_ARCH="amd64" PACKAGE_TYPE="deb" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
+    - PACKAGE_TYPE="deb"
+    - CONTAINER_NAME="${BUILDER_NAME}.${BUILD_DISTRO}${BUILD_RELEASE}.${BUILD_ARCH}"
+    - LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
+    - PACKAGES_DIRECTORY="${LXC_CONTAINER_ROOT}/home/${BUILDER_NAME}/build-area"
 
 
 
