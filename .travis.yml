@@ -47,13 +47,8 @@ stages:
 # DEB and RPM template flows
 - stage: &_RPM_TEMPLATE
     name: "Build & Publish RPM package"
-    apt:
-      name: lxd
-      state: latest
-      default_release: xenial-backports
-
     install:
-    - sudo apt-get install -y wget
+    - sudo apt-get install -y wget lxd lxc
     - source tests/installer/slack.sh
     before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
     script:
@@ -86,7 +81,7 @@ stages:
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish DEB package"
     install:
-    - sudo apt-get install -y wget lxc
+    - sudo apt-get install -y wget lxc lxd
     - source tests/installer/slack.sh
     before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
     script:
@@ -336,7 +331,7 @@ jobs:
 
 
 
-  # Enterprise linux builds (Centos, Redhat, Amazon linux (el/6)
+  # Enterprise linux builds (Centos, Redhat, Amazon linux (el/6))
   - stage:
     <<: *_RPM_TEMPLATE
     stage: "Package Enterprise Linux 7 - amd64"
