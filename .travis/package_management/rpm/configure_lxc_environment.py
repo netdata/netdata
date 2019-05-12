@@ -35,7 +35,7 @@ if container.defined:
 
 # Create the container rootfs
 print ("Creating container with parameters: %s, %s, %s " % (os.environ["BUILD_DISTRO"], os.environ["BUILD_RELEASE"], os.environ["BUILD_ARCH"]))
-if not container.create("download", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
+if not container.create("ubuntu", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
                                                            "release": os.environ["BUILD_RELEASE"],
                                                            "arch": os.environ["BUILD_ARCH"]}):
     raise Exception("Failed to create the container rootfs")
