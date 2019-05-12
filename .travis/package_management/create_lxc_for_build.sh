@@ -51,7 +51,7 @@ if [ -z "${PACKAGE_TYPE}" ]; then
 fi
 
 echo "Creating container from command line"
-lxc-create -n "${CONTAINER_NAME}" --logfile="/tmp/container_debug" -logpriority="DEBUG" -t "download" -- -d "${BUILD_DISTRO}" -r "${BUILD_RELEASE}" --no-validate
+lxc-create -n "${CONTAINER_NAME}" --logfile="/tmp/container_debug" -logpriority="DEBUG" -t "/usr/share/lxc/templates/lxc-download" -- -d "${BUILD_DISTRO}" -r "${BUILD_RELEASE}" --no-validate
 echo "log result:"
 cat /tmp/container_debug
 
