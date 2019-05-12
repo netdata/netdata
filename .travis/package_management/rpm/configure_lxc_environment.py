@@ -33,13 +33,13 @@ container = lxc.Container(container_name)
 if container.defined:
     raise Exception("Container %s already exists" % container_name)
 
-# print ("Creating container with parameters: %s, %s, %s " % (os.environ["BUILD_DISTRO"], os.environ["BUILD_RELEASE"], os.environ["BUILD_ARCH"]))
-# # Create the container rootfs
-# if not container.create("download", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
-#                                                   "release": os.environ["BUILD_RELEASE"],
-#                                                   "arch": os.environ["BUILD_ARCH"]}):
-#    raise Exception("Failed to create the container rootfs")
-# print ("Container %s was successfully created, starting it up" % container_name)
+# Create the container rootfs
+print ("Creating container with parameters: %s, %s, %s " % (os.environ["BUILD_DISTRO"], os.environ["BUILD_RELEASE"], os.environ["BUILD_ARCH"]))
+if not container.create("download", lxc.LXC_CREATE_QUIET, {"dist": os.environ["BUILD_DISTRO"],
+                                                           "release": os.environ["BUILD_RELEASE"],
+                                                           "arch": os.environ["BUILD_ARCH"]}):
+    raise Exception("Failed to create the container rootfs")
+print ("Container %s was successfully created, starting it up" % container_name)
 
 # Start the container
 if not container.start():
@@ -54,11 +54,11 @@ if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
 # Run the required activities now
-# 1. Create the builder user
+# Create the builder user
 print ("1. Adding user %s" % os.environ['BUILDER_NAME'])
 run_command(["useradd", os.environ['BUILDER_NAME']])
 
-# Fetch wget to retrieve the source
+# Fetch wget, sudo and rpm-build within the container
 print ("2. Installing package dependencies within LXC container")
 run_command(["yum", "install", "-y", "wget"])
 run_command(["yum", "install", "-y", "sudo"])
