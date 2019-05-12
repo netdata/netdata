@@ -47,7 +47,7 @@ stages:
 # DEB and RPM template flows
 - stage: &_RPM_TEMPLATE
     name: "Build & Publish RPM package"
-    install:
+    before_install:
     - sudo apt-get install -y wget lxc lxc-templates
     - source tests/installer/slack.sh
     before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
@@ -79,7 +79,7 @@ stages:
 
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish DEB package"
-    install:
+    before_install:
     - sudo apt-get install -y wget lxc lxc-templates
     - source tests/installer/slack.sh
     before_script: post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
