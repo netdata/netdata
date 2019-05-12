@@ -95,7 +95,7 @@ class UrlService(SimpleService):
         """
         try:
             status, data = self._get_raw_data_with_status(url, manager, **kwargs)
-        except (urllib3.exceptions.HTTPError, TypeError, AttributeError) as error:
+        except Exception as error:
             self.error('Url: {url}. Error: {error}'.format(url=url or self.url, error=error))
             return None
 
