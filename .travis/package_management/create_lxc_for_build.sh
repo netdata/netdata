@@ -50,6 +50,7 @@ if [ -z "${PACKAGE_TYPE}" ]; then
 	exit 1
 fi
 
+ls -ltrR /usr/share/lxc || ls -ltrR /var/lib/lxc
 echo "Creating container from command line"
 lxc-create -n "${CONTAINER_NAME}" --logfile="/tmp/container_debug" -logpriority="DEBUG" -- -d "${BUILD_DISTRO}" -r "${BUILD_RELEASE}" --no-validate
 echo "log result:"
