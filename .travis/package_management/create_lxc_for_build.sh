@@ -50,6 +50,9 @@ if [ -z "${PACKAGE_TYPE}" ]; then
 	exit 1
 fi
 
+echo "Creating container from command line"
+lxc-create -n "${CONTAINER_NAME}" -t "download" -- -d "${BUILD_DISTRO}" -r "${BUILD_RELEASE}" --no-validate
+
 echo "Configuring LXC container ${BUILDER_NAME}/${BUILD_STRING}/${BUILD_ARCH}...."
 .travis/package_management/${PACKAGE_TYPE}/configure_lxc_environment.py "${CONTAINER_NAME}"
 
