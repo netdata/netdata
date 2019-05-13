@@ -3,8 +3,8 @@
 # This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 
-cmake_minimum_required(VERSION 3.0.2)
-project(netdata C)
+cmake_minimum_required(VERSION 3.1.0)
+project(netdata C CXX)
 
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
@@ -156,6 +156,50 @@ IF(MACOS)
     # ${IOKIT}
 ENDIF(MACOS)
 
+
+# -----------------------------------------------------------------------------
+# Detect libcrypto
+
+pkg_check_modules(CRYPTO libcrypto)
+# later we use:
+# ${CRYPTO_LIBRARIES}
+# ${CRYPTO_CFLAGS_OTHER}
+# ${CRYPTO_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libssl
+
+pkg_check_modules(SSL libssl)
+# later we use:
+# ${SSL_LIBRARIES}
+# ${SSL_CFLAGS_OTHER}
+# ${SSL_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libcurl
+
+pkg_check_modules(CURL libcurl)
+# later we use:
+# ${CURL_LIBRARIES}
+# ${CURL_CFLAGS_OTHER}
+# ${CURL_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libaws-cpp-sdk-core
+
+find_library(HAVE_AWS aws-cpp-sdk-core)
+# later we use:
+# ${HAVE_AWS}
+
+# -----------------------------------------------------------------------------
+# Detect libaws-cpp-sdk-kinesis
+
+find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
+# later we use:
+# ${HAVE_KINESIS}
 
 # -----------------------------------------------------------------------------
 # netdata files
@@ -440,6 +484,13 @@ set(BACKENDS_PLUGIN_FILES
         backends/prometheus/backend_prometheus.h
         )
 
+set(KINESIS_BACKEND_FILES
+        backends/aws_kinesis/aws_kinesis.c
+        backends/aws_kinesis/aws_kinesis.h
+        backends/aws_kinesis/aws_kinesis_put_record.cc
+        backends/aws_kinesis/aws_kinesis_put_record.h
+        )
+
 set(DAEMON_FILES
         daemon/common.c
         daemon/common.h
@@ -486,6 +537,25 @@ add_definitions(
 )
 
 # -----------------------------------------------------------------------------
+# kinesis backend
+
+IF(HAVE_KINESIS AND HAVE_AWS AND CRYPTO_LIBRARIES AND SSL_LIBRARIES AND CURL_LIBRARIES)
+    SET(ENABLE_BACKEND_KINESIS True)
+ELSE()
+    SET(ENABLE_BACKEND_KINESIS False)
+ENDIF()
+
+IF(ENABLE_BACKEND_KINESIS)
+    message(STATUS "kinesis backend: enabled")
+    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES})
+    list(APPEND NETDATA_COMMON_LIBRARIES aws-cpp-sdk-kinesis aws-cpp-sdk-core ${CRYPTO_LIBRARIES} ${SSL_LIBRARIES} ${CURL_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CRYPTO_INCLUDE_DIRS} ${SSL_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${CRYPTO_CFLAGS_OTHER} ${SSL_CFLAGS_OTHER} ${CURL_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "kinesis backend: disabled (requires AWS SDK for C++)")
+ENDIF()
+
+# -----------------------------------------------------------------------------
 # netdata
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
@@ -520,6 +590,11 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
 
+ENDIF()
+
+IF(ENABLE_BACKEND_KINESIS)
+    set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
+    set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
 
 IF(IPMI_LIBRARIES)
