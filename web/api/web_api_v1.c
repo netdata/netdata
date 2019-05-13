@@ -208,6 +208,7 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     health_alarms2json(host, w->response.data, all);
+    buffer_no_cacheable(w->response.data);
     return 200;
 }
 
@@ -754,6 +755,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_strcat(wb, "\n\t]\n");
 
     buffer_strcat(wb, "}");
+    buffer_no_cacheable(wb);
     return 200;
 }
 

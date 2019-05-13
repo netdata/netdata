@@ -1006,7 +1006,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         buffer_sprintf(w->response.header_output,
                 "Cache-Control: %s\r\n"
                         "Expires: %s\r\n",
-                (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache":"public",
+                (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache, no-store, must-revalidate\r\nPragma: no-cache":"public",
                 edate);
     }
 
