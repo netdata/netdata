@@ -1699,7 +1699,8 @@ static inline void find_all_cgroups() {
                     cg->cpuacct_stat.enabled = cgroup_enable_cpuacct_stat;
                     cg->filename_cpuset_cpus = NULL;
                     cg->filename_cpu_cfs_period = NULL;
-                    cg->filename_cpu_cfs_quota = NULL;
+                    snprintfz(filename, FILENAME_MAX, "%s%s/cpu.max", cgroup_unified_base, cg->id);
+                    cg->filename_cpu_cfs_quota = strdupz(filename);
                     debug(D_CGROUP, "cpu.stat filename for unified cgroup '%s': '%s'", cg->id, cg->cpuacct_stat.filename);
                 }
                 else
@@ -2612,6 +2613,47 @@ static inline void update_cpu_limits(char **filename, unsigned long long *value,
     }
 }
 
+static inline void update_cpu_limits2(struct cgroup *cg) {
+    if(cg->filename_cpu_cfs_quota){
+        static procfile *ff = NULL;
+
+        ff = procfile_reopen(ff, cg->filename_cpu_cfs_quota, NULL, PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) {
+            goto cpu_limits2_err;
+        }
+
+        ff = procfile_readall(ff);
+        if(unlikely(!ff)) {
+            goto cpu_limits2_err;
+        }
+
+        unsigned long lines = procfile_lines(ff);
+
+        if (unlikely(lines < 1)) {
+            error("CGROUP: file '%s' should have 1 lines.", cg->filename_cpu_cfs_quota);
+            return;
+        }
+
+        cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1));
+        cg->cpuset_cpus = get_system_cpus();
+
+        char *s = "max\n\0";
+        if(strsame(s, procfile_lineword(ff, 0, 0)) == 0){
+            cg->cpu_cfs_quota = cg->cpu_cfs_period * cg->cpuset_cpus;
+        } else {
+            cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0));
+        }
+        debug(D_CGROUP, "CPU limits values: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
+        return;
+
+cpu_limits2_err:
+        error("Cannot refresh cgroup %s cpu limit by reading '%s'. Will not update its limit anymore.", cg->id, cg->filename_cpu_cfs_quota);
+        freez(cg->filename_cpu_cfs_quota);
+        cg->filename_cpu_cfs_quota = NULL;
+
+    }
+}
+
 static inline int update_memory_limits(char **filename, RRDSETVAR **chart_var, unsigned long long *value, const char *chart_var_name, struct cgroup *cg) {
     if(*filename) {
         if(unlikely(!*chart_var)) {
@@ -2735,26 +2777,31 @@ void update_cgroup_charts(int update_every) {
             rrdset_done(cg->st_cpu);
 
             if(likely(cg->filename_cpuset_cpus || cg->filename_cpu_cfs_period || cg->filename_cpu_cfs_quota)) {
-                update_cpu_limits(&cg->filename_cpuset_cpus, &cg->cpuset_cpus, cg);
-                update_cpu_limits(&cg->filename_cpu_cfs_period, &cg->cpu_cfs_period, cg);
-                update_cpu_limits(&cg->filename_cpu_cfs_quota, &cg->cpu_cfs_quota, cg);
+                if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
+                    update_cpu_limits(&cg->filename_cpuset_cpus, &cg->cpuset_cpus, cg);
+                    update_cpu_limits(&cg->filename_cpu_cfs_period, &cg->cpu_cfs_period, cg);
+                    update_cpu_limits(&cg->filename_cpu_cfs_quota, &cg->cpu_cfs_quota, cg);
+                } else {
+                    update_cpu_limits2(cg);
+                }
 
                 if(unlikely(!cg->chart_var_cpu_limit)) {
                     cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_create(cg->st_cpu, "cpu_limit");
                     if(!cg->chart_var_cpu_limit) {
                         error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
-                        freez(cg->filename_cpuset_cpus);
+                        if(cg->filename_cpuset_cpus) freez(cg->filename_cpuset_cpus);
                         cg->filename_cpuset_cpus = NULL;
-                        freez(cg->filename_cpu_cfs_period);
+                        if(cg->filename_cpu_cfs_period) freez(cg->filename_cpu_cfs_period);
                         cg->filename_cpu_cfs_period = NULL;
-                        freez(cg->filename_cpu_cfs_quota);
+                        if(cg->filename_cpu_cfs_quota) freez(cg->filename_cpu_cfs_quota);
                         cg->filename_cpu_cfs_quota = NULL;
                     }
                 }
                 else {
                     calculated_number value = 0, quota = 0;
 
-                    if(likely(cg->filename_cpuset_cpus || (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota))) {
+                    if(likely( ((!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) && (cg->filename_cpuset_cpus || (cg->filename_cpu_cfs_period && cg->filename_cpu_cfs_quota)))
+                            || ((cg->options & CGROUP_OPTIONS_IS_UNIFIED) && cg->filename_cpu_cfs_quota))) {
                         if(unlikely(cg->cpu_cfs_quota > 0))
                             quota = (calculated_number)cg->cpu_cfs_quota / (calculated_number)cg->cpu_cfs_period;
 
@@ -2789,7 +2836,12 @@ void update_cgroup_charts(int update_every) {
                         else
                             rrdset_next(cg->st_cpu_limit);
 
-                        calculated_number cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / system_hz;
+                        calculated_number cpu_usage = 0;
+                        if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED))
+                            cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / system_hz;
+                        else
+                            cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / 1000000;
+
                         calculated_number cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
 
                         rrdset_isnot_obsolete(cg->st_cpu_limit);

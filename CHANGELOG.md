@@ -4,7 +4,13 @@
 
 **Fixed bugs:**
 
+- elasticsearch throws exception and kills whole python.d [\#5978](https://github.com/netdata/netdata/issues/5978)
+- System info doesn't show OS name and version in Mac OS X [\#5950](https://github.com/netdata/netdata/issues/5950)
 - nvidia\_smi wrong power draw numbers [\#5939](https://github.com/netdata/netdata/issues/5939)
+- Coverity Scan issues on get\_system\_info [\#5937](https://github.com/netdata/netdata/issues/5937)
+- `timeout` requires flag [\#5935](https://github.com/netdata/netdata/issues/5935)
+- docker image is missing nut package [\#5934](https://github.com/netdata/netdata/issues/5934)
+- mongodb error exception on check : ‘locks’ [\#5929](https://github.com/netdata/netdata/issues/5929)
 - v1.14.0 is released but status is draft [\#5921](https://github.com/netdata/netdata/issues/5921)
 - Weird WD values [\#5919](https://github.com/netdata/netdata/issues/5919)
 - Alert badge not showing after reverse proxy [\#5900](https://github.com/netdata/netdata/issues/5900)
@@ -15,24 +21,49 @@
 - netdata/packaging/ci: Investigate pipeline failure [\#5733](https://github.com/netdata/netdata/issues/5733)
 - \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
 - python SocketService: lack of connect timeout, python.d.plugin hangs [\#5541](https://github.com/netdata/netdata/issues/5541)
+- netdata service fails to start - pfsense [\#3469](https://github.com/netdata/netdata/issues/3469)
 
 **Closed issues:**
 
 - Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
+- research: docker swarm [\#5877](https://github.com/netdata/netdata/issues/5877)
+- Implement CPU limits for cgroup v2 [\#5850](https://github.com/netdata/netdata/issues/5850)
+- netdata/packaging: \[SPIKE\] Investigate CPack/CMake status, clarify and estimate the available approaches [\#5775](https://github.com/netdata/netdata/issues/5775)
 - "Healthy" entrypoint for HTTP-interface [\#5764](https://github.com/netdata/netdata/issues/5764)
+- netdata/packaging/ci: Create and document a manual nightly deployment procedure [\#5762](https://github.com/netdata/netdata/issues/5762)
+- feature: collect docker swarm metrics [\#5710](https://github.com/netdata/netdata/issues/5710)
+- snmp-trap receiver [\#5597](https://github.com/netdata/netdata/issues/5597)
 - Tengine monitoring [\#4886](https://github.com/netdata/netdata/issues/4886)
+- Scaleio monitoring [\#4825](https://github.com/netdata/netdata/issues/4825)
 - Monitor disk access latency \(e.g. ioping\) [\#4660](https://github.com/netdata/netdata/issues/4660)
+- provide binary repos for main distros [\#2728](https://github.com/netdata/netdata/issues/2728)
+- RPM Packaging Discussion [\#1306](https://github.com/netdata/netdata/issues/1306)
+- Binary release [\#87](https://github.com/netdata/netdata/issues/87)
+- Build packaging for debian [\#42](https://github.com/netdata/netdata/issues/42)
 
 **Merged pull requests:**
 
+- UserService self.\_get\_raw\_data except fix [\#5997](https://github.com/netdata/netdata/pull/5997) ([ilyam8](https://github.com/ilyam8))
+- \(Docs\) fix pfsense instructions [\#5982](https://github.com/netdata/netdata/pull/5982) ([Fohdeesha](https://github.com/Fohdeesha))
+- fix typo in the mysql graph [\#5980](https://github.com/netdata/netdata/pull/5980) ([kam1kaze](https://github.com/kam1kaze))
+- Change HTTP version to HTTP method [\#5974](https://github.com/netdata/netdata/pull/5974) ([SahAssar](https://github.com/SahAssar))
+- Update Node app\_group [\#5962](https://github.com/netdata/netdata/pull/5962) ([jonfairbanks](https://github.com/jonfairbanks))
+- Fix coverity warnings [\#5952](https://github.com/netdata/netdata/pull/5952) ([cakrit](https://github.com/cakrit))
+- Add support for Mac OS X Name and Version [\#5949](https://github.com/netdata/netdata/pull/5949) ([cakrit](https://github.com/cakrit))
 - nvidia\_smi: power chart algorithm,mul,div fix [\#5940](https://github.com/netdata/netdata/pull/5940) ([ilyam8](https://github.com/ilyam8))
+- netdata/packaging/ci:  Make timeout usage more cross-distro compliant [\#5938](https://github.com/netdata/netdata/pull/5938) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fixing a typo in documentation [\#5936](https://github.com/netdata/netdata/pull/5936) ([smonff](https://github.com/smonff))
+- mongodb: various KeyError  fixes [\#5931](https://github.com/netdata/netdata/pull/5931) ([ilyam8](https://github.com/ilyam8))
+- netdata/packaging/ci: minor improvements [\#5928](https://github.com/netdata/netdata/pull/5928) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - smartd\_log: attrs 3, 194 fix [\#5923](https://github.com/netdata/netdata/pull/5923) ([ilyam8](https://github.com/ilyam8))
 - Fix lifecycle script [\#5918](https://github.com/netdata/netdata/pull/5918) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/docker: fix docker permissions and other things [\#5917](https://github.com/netdata/netdata/pull/5917) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - SocketService: set socket operation timeout before connecting [\#5911](https://github.com/netdata/netdata/pull/5911) ([ilyam8](https://github.com/ilyam8))
+- netdata/packaging/ci: Create manual nightly deployment tool [\#5899](https://github.com/netdata/netdata/pull/5899) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Implement unified cgroup cpu limit [\#5895](https://github.com/netdata/netdata/pull/5895) ([skrzyp1](https://github.com/skrzyp1))
 - NEW: Energi Core daemon monitoring, suits other Bitcoin forks [\#5894](https://github.com/netdata/netdata/pull/5894) ([andvgal](https://github.com/andvgal))
 - NEW: allow additional name argument passing to urllib3 request in UrlService [\#5893](https://github.com/netdata/netdata/pull/5893) ([andvgal](https://github.com/andvgal))
+- info API minor enhancements [\#5891](https://github.com/netdata/netdata/pull/5891) ([cakrit](https://github.com/cakrit))
 - Extend netdata info API call [\#5889](https://github.com/netdata/netdata/pull/5889) ([cakrit](https://github.com/cakrit))
 - Add ioping plugin [\#5725](https://github.com/netdata/netdata/pull/5725) ([vlvkobal](https://github.com/vlvkobal))
 

@@ -674,12 +674,15 @@ int get_system_info () {
             if (*value=='=') {
                 *value='\0';
                 value++;
-                char *newline = value + strlen(value) - 1;
-                (*newline)='\0';
-            }
-            if (name && value && *name && *value) {
-                info("%s=%s", name, value);
-                setenv(name, value, 1);
+                if (strlen(value)>1) {
+                    char *newline = value + strlen(value) - 1;
+                    (*newline) = '\0';
+                }
+                char n[51], v[101];
+                snprintfz(n,50,"%s",name);
+                snprintfz(v,101,"%s",value);
+                info("%s=%s", n, v);
+                setenv(n, v, 1);
             }
         }
         mypclose(fp, command_pid);

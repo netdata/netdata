@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cross-arch docker build helper script
+#
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #

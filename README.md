@@ -147,6 +147,16 @@ not just visualize metrics.
 
 ## News
 
+`Apr 26th, 2019` - **[netdata v1.14.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release 1.14 contains 14 bug fixes and 24 improvements.
+
+The release introduces major additions to Kubernetes monitoring, with tens of new charts for [Kubelet](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubelet/), [kube-proxy](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubeproxy/) and [coredns](https://github.com/netdata/go.d.plugin/tree/master/modules/coredns) metrics, as well as significant improvements to the netdata [helm chart](https://github.com/netdata/helmchart/). 
+ 
+Two new collectors were added, to monitor [Docker hub](https://docs.netdata.cloud/collectors/go.d.plugin/modules/dockerhub/) and [Docker engine](https://docs.netdata.cloud/collectors/go.d.plugin/modules/docker_engine/) metrics. 
+
+Finally, v1.14  adds support for [version 2 cgroups](https://github.com/netdata/netdata/pull/5407), [OpenLDAP over TLS](https://github.com/netdata/netdata/pull/5859), [NVIDIA SMI free and per process memory](https://github.com/netdata/netdata/pull/5796/files) and [configurable syslog facilities](https://github.com/netdata/netdata/pull/5792). 
+
 `Mar 14th, 2019` - **[netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release 1.13.0 contains 14 bug fixes and 8 improvements.
