@@ -1776,9 +1776,6 @@ ssize_t web_client_receive(struct web_client *w)
         w->response.data->len += bytes;
         w->response.data->buffer[w->response.data->len] = '\0';
 
-#ifdef ENABLE_HTTPS
-        debug(D_WEB_DATA, "%llu: SSL KILLME data: '%s'.", w->id, &w->response.data->buffer[old]);
-#endif
         debug(D_WEB_CLIENT, "%llu: Received %zd bytes.", w->id, bytes);
         debug(D_WEB_DATA, "%llu: Received data: '%s'.", w->id, &w->response.data->buffer[old]);
     }

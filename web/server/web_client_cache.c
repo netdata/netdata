@@ -6,6 +6,20 @@
 // ----------------------------------------------------------------------------
 // allocate and free web_clients
 
+#ifdef ENABLE_HTTPS
+static void web_client_release_ssl(struct web_client *w){
+    if ( netdata_ctx )
+    {
+        if ( w->ssl )
+        {
+            SSL_shutdown(w->ssl);
+            SSL_free(w->ssl);
+            w->ssl = NULL;
+        }
+    }
+}
+#endif
+
 static void web_client_zero(struct web_client *w) {
     // zero everything about it - but keep the buffers
 
@@ -159,42 +173,25 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         if(w->prev) w->prev->next = w->next;
         if(w->next) w->next->prev = w->prev;
         web_clients_cache.avail_count--;
+#ifdef ENABLE_HTTPS
+        web_client_release_ssl(w);
+#endif
         web_client_zero(w);
         web_clients_cache.reused++;
 #ifdef ENABLE_HTTPS
-	if ( netdata_ctx )
-	{
-		SSL *ssl;
-		ssl = w->ssl;
-		if ( ssl )
-		{
-			int test;
-			if ( !(test = SSL_shutdown(ssl) ) )
-			{
-   				debug(D_WEB_CLIENT_ACCESS, "%llu: Closing SSL not possible from %s,trying again.", w->id, w->client_ip);
-				if ( w->ifd != -1 )
-				{
-					shutdown(w->ifd,1);
-					SSL_shutdown(ssl);
-				}
-			}
-
-			SSL_free(ssl);
-		}
-	}
+        w->accepted = 1;
+        debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->accepted,w->ifd);
 #endif
     }
     else {
         // allocate it
         w = web_client_alloc();
+#ifdef ENABLE_HTTPS
+        w->accepted = 1;
+        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->accepted,w->ifd);
+#endif
         web_clients_cache.allocated++;
     }
-
-#ifdef ENABLE_HTTPS
-    w->ssl = NULL;
-    w->accepted = 1;
-    debug(D_WEB_CLIENT_ACCESS,"(Re)starting SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->accepted,w->ifd);
-#endif
 
     // link it to used web clients
     if (web_clients_cache.used) web_clients_cache.used->prev = w;
@@ -233,6 +230,11 @@ void web_client_release(struct web_client *w) {
         if (w->ifd != -1) close(w->ifd);
         if (w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
         w->ifd = w->ofd = -1;
+#ifdef ENABLE_HTTPS
+        web_client_release_ssl(w);
+        w->accepted = 1;
+#endif
+
     }
 
     // unlink it from the used

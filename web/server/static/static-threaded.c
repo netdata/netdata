@@ -152,6 +152,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port, pi->port_acl);
     w->pollinfo_slot = pi->slot;
 
+    //if(unlikely(pi->socktype == AF_UNIX)) {
     if(unlikely(pi->socktype == AF_UNIX)) {
         web_client_set_unix(w);
     }

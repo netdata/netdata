@@ -125,12 +125,11 @@ AC_ARG_ENABLE(
     [enable_lto="detect"]
 )
 AC_ARG_ENABLE(
-    [openssl],
-    [AS_HELP_STRING([--enable-https], [Build with the support to SSL/TLS  @<:@default autodetect@:>@])],
+    [https],
+    [AS_HELP_STRING([--enable-https], [Enable SSL support @<:@default autodetect@:>@])],
     ,
-    [enable_https="yes"]
+    [enable_https="detect"]
 )
-
 
 # -----------------------------------------------------------------------------
 # netdata required checks
