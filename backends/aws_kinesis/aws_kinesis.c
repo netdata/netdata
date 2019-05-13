@@ -18,6 +18,9 @@ int read_kinesis_conf(const char *path, char **access_key_id_p, char **secret_ac
     if(unlikely(access_key_id)) freez(access_key_id);
     if(unlikely(secret_access_key)) freez(secret_access_key);
     if(unlikely(stream_name)) freez(stream_name);
+    access_key_id = NULL;
+    secret_access_key = NULL;
+    stream_name = NULL;
 
     int line = 0;
 
@@ -85,11 +88,8 @@ int read_kinesis_conf(const char *path, char **access_key_id_p, char **secret_ac
 
     fclose(fp);
 
-    if(unlikely(!access_key_id || !*access_key_id || !secret_access_key || !*secret_access_key || !stream_name || !*stream_name)) {
-        error("BACKEND: mandatory Kinesis parameters are not configured:%s%s%s",
-              (access_key_id && *access_key_id) ? "" : " aws_access_key_id,",
-              (secret_access_key && *secret_access_key) ? "" : " aws_secret_access_key,",
-              (stream_name && *stream_name) ? "" : " stream name");
+    if(unlikely(!stream_name || !*stream_name)) {
+        error("BACKEND: stream name is a mandatory Kinesis parameter but it is not configured");
         return 1;
     }
 
