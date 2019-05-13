@@ -9,14 +9,14 @@
 // kinesis backend
 
 // read the aws_kinesis.conf file
-int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_p, char **stream_name_p)
+int read_kinesis_conf(const char *path, char **access_key_id_p, char **secret_access_key_p, char **stream_name_p)
 {
-    char *auth_key_id = *auth_key_id_p;
-    char *secure_key = *secure_key_p;
+    char *access_key_id = *access_key_id_p;
+    char *secret_access_key = *secret_access_key_p;
     char *stream_name = *stream_name_p;
 
-    if(unlikely(auth_key_id)) freez(auth_key_id);
-    if(unlikely(secure_key)) freez(secure_key);
+    if(unlikely(access_key_id)) freez(access_key_id);
+    if(unlikely(secret_access_key)) freez(secret_access_key);
     if(unlikely(stream_name)) freez(stream_name);
 
     int line = 0;
@@ -72,30 +72,29 @@ int read_kinesis_conf(const char *path, char **auth_key_id_p, char **secure_key_
 
             if(*s == '"' || *s == '\'') *s = '\0';
         }
-
-        if(name[0] == 'a' && !strcmp(name, "auth key id")) {
-            auth_key_id = strdupz(value);
+        if(name[0] == 'a' && name[4] == 'a' && !strcmp(name, "aws_access_key_id")) {
+            access_key_id = strdupz(value);
         }
-        else if(name[0] == 's' && name[1] == 'e' && !strcmp(name, "secure key")) {
-            secure_key = strdupz(value);
+        else if(name[0] == 'a' && name[4] == 's' && !strcmp(name, "aws_secret_access_key")) {
+            secret_access_key = strdupz(value);
         }
-        else if(name[0] == 's' && name[1] == 't' && !strcmp(name, "stream name")) {
+        else if(name[0] == 's' && !strcmp(name, "stream name")) {
             stream_name = strdupz(value);
         }
     }
 
     fclose(fp);
 
-    if(unlikely(!auth_key_id || !*auth_key_id || !secure_key || !*secure_key || !stream_name || !*stream_name)) {
+    if(unlikely(!access_key_id || !*access_key_id || !secret_access_key || !*secret_access_key || !stream_name || !*stream_name)) {
         error("BACKEND: mandatory Kinesis parameters are not configured:%s%s%s",
-              (auth_key_id && *auth_key_id) ? "" : " auth key id,",
-              (secure_key && *secure_key) ? "" : " secure key,",
+              (access_key_id && *access_key_id) ? "" : " aws_access_key_id,",
+              (secret_access_key && *secret_access_key) ? "" : " aws_secret_access_key,",
               (stream_name && *stream_name) ? "" : " stream name");
         return 1;
     }
 
-    *auth_key_id_p = auth_key_id;
-    *secure_key_p = secure_key;
+    *access_key_id_p = access_key_id;
+    *secret_access_key_p = secret_access_key;
     *stream_name_p = stream_name;
 
     return 0;

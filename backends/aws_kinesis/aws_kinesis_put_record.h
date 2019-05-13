@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-void kinesis_init(const char *region, const char *auth_key_id, const char *secure_key, const long timeout);
+void kinesis_init(const char *region, const char *access_key_id, const char *secret_key, const long timeout);
 
 void kinesis_shutdown();
 

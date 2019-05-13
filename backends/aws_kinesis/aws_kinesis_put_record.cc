@@ -21,7 +21,7 @@ struct request_outcome {
 
 Vector<request_outcome> request_outcomes;
 
-void kinesis_init(const char *region, const char *auth_key_id, const char *secure_key, const long timeout) {
+void kinesis_init(const char *region, const char *access_key_id, const char *secret_key, const long timeout) {
     InitAPI(options);
 
     Client::ClientConfiguration config;
@@ -30,7 +30,7 @@ void kinesis_init(const char *region, const char *auth_key_id, const char *secur
     config.requestTimeoutMs = timeout;
     config.connectTimeoutMs = timeout;
 
-    client = New<Kinesis::KinesisClient>("client", Auth::AWSCredentials(auth_key_id, secure_key), config);
+    client = New<Kinesis::KinesisClient>("client", Auth::AWSCredentials(access_key_id, secret_key), config);
 }
 
 void kinesis_shutdown() {

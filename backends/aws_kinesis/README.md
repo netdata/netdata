@@ -20,12 +20,13 @@ set the `destination` option to an AWS region.
 In the netdata configuration directory run `./edit-config aws_kinesis.conf` and set AWS credentials and stream name:
 ```
 # AWS credentials
-auth key id = your_access_key_id
-secure key = your_secret_access_key
+aws_access_key_id = your_access_key_id
+aws_secret_access_key = your_secret_access_key
 
 # destination stream
 stream name = your_stream_name
 ```
+Alternatively, AWS credentials can be set for the *netdata* user using AWS SDK for C++ [standard methods](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html).
 
 A partition key for every record is computed automatically by the netdata with the purpose to distribute records across available shards evenly.
 
