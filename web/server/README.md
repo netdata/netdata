@@ -107,11 +107,11 @@ To start using HTTPS with Netdata it is only necessary to write the path for you
 	ssl certificate = /etc/netdata/cert.pem
 ```
 
-TIP: The openssl when work with 4096 bytes key will forceh high CPU usage due the math with large numbers, according with our tests using the command
+TIP: The openssl when work with 4096 bits key will forceh high CPU usage due the math with large numbers, according with our tests using the command
 
 $ openssl speed rsa2048 rsa4096
 
-, the rsa4096 can be until 4 times slower than rsa2048,  so we recommend to use 2048 bytes.
+, the rsa4096 can be until 4 times slower than rsa2048,  so we recommend to use 2048 bits.
 
 ### Other netdata.conf [web] section options
 setting | default | info

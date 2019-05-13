@@ -12,13 +12,28 @@ static void web_client_release_ssl(struct web_client *w){
     {
         if ( w->ssl )
         {
-            SSL_shutdown(w->ssl);
+            int test;
+            debug(D_WEB_CLIENT_ACCESS,"RELEASING SSL %d",w->ifd);
+            test = SSL_shutdown(w->ssl);
+            if (  !test )
+            {
+                test = SSL_shutdown(w->ssl);
+            }
             SSL_free(w->ssl);
             w->ssl = NULL;
         }
     }
 }
+
+static void web_client_reuse_ssl(struct web_client *w) {
+    if (netdata_ctx) {
+        if (w->ssl) {
+            SSL_clear(w->ssl);
+        }
+    }
+}
 #endif
+
 
 static void web_client_zero(struct web_client *w) {
     // zero everything about it - but keep the buffers
@@ -174,11 +189,14 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         if(w->next) w->next->prev = w->prev;
         web_clients_cache.avail_count--;
 #ifdef ENABLE_HTTPS
-        web_client_release_ssl(w);
+        SSL *ssl = w->ssl;
+        web_client_reuse_ssl(w);
+ //       web_client_release_ssl(w);
 #endif
         web_client_zero(w);
         web_clients_cache.reused++;
 #ifdef ENABLE_HTTPS
+        w->ssl = ssl;
         w->accepted = 1;
         debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->accepted,w->ifd);
 #endif
