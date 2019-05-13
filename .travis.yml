@@ -106,6 +106,8 @@ stages:
     - if [ -d "${BUILD_DIRECTORY}/SRPMS" ]; then sudo cp -r "${BUILD_DIRECTORY}/SRPMS" "${PACKAGES_DIRECTORY}"; fi;
     - if [ -d "${PACKAGES_DIRECTORY}" ] ; then sudo chmod -R 777 "${PACKAGES_DIRECTORY}"; fi;
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
+    before_deploy:
+    - .travis/package_management/yank_stale_rpm.sh
     deploy:
       # Beta packages deployment
       - provider: packagecloud
@@ -148,6 +150,8 @@ stages:
     - sudo .travis/package_management/create_lxc_for_build.sh
     - sudo .travis/package_management/build_package_in_container.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
+    before_deploy:
+    - .travis/package_management/yank_stale_rpm.sh
     deploy:
       # Beta packages deployment
       - provider: packagecloud

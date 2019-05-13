@@ -95,3 +95,40 @@ During packaging we are preparing the release changelog information and run the 
 ## Publish for release
 The publishing stage is the most complex part in publishing. This is the stage were we generate and publish docker images,
 prepare the release artifacts and get ready with the release draft.
+
+### Package Management workflows
+As part of our goal to provide the best support to our customers, we have created a set of CI workflows to automatically produce
+DEB and RPM for multiple distributions. These workflows are implemented under the templated stages '_DEB_TEMPLATE' and '_RPM_TEMPLATE'.
+We currently plan to actively support the following Operating Systems, with a plan to further expand this list following our users needs.
+
+Operating systems supported:
+- Debian versions
+  - Buster
+  - Stretch
+  - Jessie
+  - Wheezy
+
+- Ubuntu versions
+  - Disco
+  - Cosmic
+  - Bionic
+  - artful
+
+- Enterprise Linux versions (Covers Redhat, CentOS, and Amazon Linux with version 6)
+  - Version 7
+  - Version 6
+  - Version 5
+
+- Fedora versions
+  - Version 28
+  - Version 29
+
+- OpenSuSE versions
+  - 15.1
+  - 15.0
+  - 42.3
+
+The Package deployment can be triggered manually by executing an empty commit with the following keywords on the commit message:
+- '[Package PRM amd64]': To trigger build and publish of all supported RPM versions
+- '[Package DEB amd64]': To trigger build and publish of all supported DEB versions
+- '[Package ALL]': To trigger build and publish of all binary packages
