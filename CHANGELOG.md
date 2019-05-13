@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- elasticsearch throws exception and kills whole python.d [\#5978](https://github.com/netdata/netdata/issues/5978)
 - System info doesn't show OS name and version in Mac OS X [\#5950](https://github.com/netdata/netdata/issues/5950)
 - nvidia\_smi wrong power draw numbers [\#5939](https://github.com/netdata/netdata/issues/5939)
 - Coverity Scan issues on get\_system\_info [\#5937](https://github.com/netdata/netdata/issues/5937)
@@ -20,6 +21,7 @@
 - netdata/packaging/ci: Investigate pipeline failure [\#5733](https://github.com/netdata/netdata/issues/5733)
 - \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
 - python SocketService: lack of connect timeout, python.d.plugin hangs [\#5541](https://github.com/netdata/netdata/issues/5541)
+- netdata service fails to start - pfsense [\#3469](https://github.com/netdata/netdata/issues/3469)
 
 **Closed issues:**
 
@@ -41,6 +43,8 @@
 
 **Merged pull requests:**
 
+- UserService self.\_get\_raw\_data except fix [\#5997](https://github.com/netdata/netdata/pull/5997) ([ilyam8](https://github.com/ilyam8))
+- \(Docs\) fix pfsense instructions [\#5982](https://github.com/netdata/netdata/pull/5982) ([Fohdeesha](https://github.com/Fohdeesha))
 - fix typo in the mysql graph [\#5980](https://github.com/netdata/netdata/pull/5980) ([kam1kaze](https://github.com/kam1kaze))
 - Change HTTP version to HTTP method [\#5974](https://github.com/netdata/netdata/pull/5974) ([SahAssar](https://github.com/SahAssar))
 - Update Node app\_group [\#5962](https://github.com/netdata/netdata/pull/5962) ([jonfairbanks](https://github.com/jonfairbanks))

@@ -299,16 +299,19 @@ Note first three packages are downloaded from the pfSense repository for maintai
 pkg install pkgconf
 pkg install bash
 pkg install e2fsprogs-libuuid
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.11.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.8_2.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.13.0.txz
 ```
 To start Netdata manually run `service netdata onestart`
 
-To start Netdata automatically at each boot add `service netdata start` as a Shellcmd within the pfSense web interface (under **Services/Shellcmd**, which you need to install beforehand under **System/Package Manager/Available Packages**).
+To start Netdata automatically at each boot add `service netdata onestart` as a Shellcmd within the pfSense web interface (under **Services/Shellcmd**, which you need to install beforehand under **System/Package Manager/Available Packages**).
 Shellcmd Type should be set to `Shellcmd`.
-![](https://user-images.githubusercontent.com/36808164/36930790-4db3aa84-1f0d-11e8-8752-cdc08bb7207c.png)
+![](https://i.imgur.com/wcKiPe1.png)
 Alternatively more information can be found in https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages, for achieving the same via the command line and scripts.
 
-If you experience an issue with `/usr/bin/install` absense on pfSense 2.3 or earlier, update pfSense or use workaround from [https://redmine.pfsense.org/issues/6643](https://redmine.pfsense.org/issues/6643)
+If you experience an issue with `/usr/bin/install` absense on pfSense 2.3 or earlier, update pfSense or use workaround from [https://redmine.pfsense.org/issues/6643](https://redmine.pfsense.org/issues/6643)  
+
+**Note:** In pfSense, the Netdata configuration files are located under `/usr/local/etc/netdata`
 
 ##### FreeNAS
 On FreeNAS-Corral-RELEASE (>=10.0.3), Netdata is pre-installed.
