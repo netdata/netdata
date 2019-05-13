@@ -44,6 +44,10 @@ stages:
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
+- name: "Package OpenSuSE 15.1 - amd64"
+  if: branch = package-cloud-deployer
+
+
 # DEB and RPM template flows
 - stage: &_RPM_TEMPLATE
     name: "Build & Publish RPM package"
