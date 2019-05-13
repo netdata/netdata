@@ -810,7 +810,12 @@ install_go
 progress "Install netdata at system init"
 
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
-install_netdata_service || run_failed "Cannot install netdata init service."
+
+if grep -q docker /proc/1/cgroup >/dev/null 2>&1; then
+	echo >&2 "We are running within a docker container, will not be installing netdata service"
+else
+	install_netdata_service || run_failed "Cannot install netdata init service."
+fi
 
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata
