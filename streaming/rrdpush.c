@@ -445,7 +445,21 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s HTTP/1.1\r\n"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
+                    "&NETDATA_SYSTEM_OS_NAME=%s"
+                    "&NETDATA_SYSTEM_OS_ID=%s"
+                    "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
+                    "&NETDATA_SYSTEM_OS_VERSION=%s"
+                    "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
+                    "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                    "&NETDATA_SYSTEM_KERNEL_NAME=%s"
+                    "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
+                    "&NETDATA_SYSTEM_ARCHITECTURE=%s"
+                    "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
+                    "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
+                    "&NETDATA_SYSTEM_CONTAINER=%s"
+                    "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
+                    " HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
               , host->rrdpush_send_api_key
@@ -456,6 +470,19 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->os
               , host->timezone
               , (host->tags)?host->tags:""
+              , host->system_info->os_name
+              , host->system_info->os_id
+              , host->system_info->os_id_like
+              , host->system_info->os_version
+              , host->system_info->os_version_id
+              , host->system_info->os_detection
+              , host->system_info->kernel_name
+              , host->system_info->kernel_version
+              , host->system_info->architecture
+              , host->system_info->virtualization
+              , host->system_info->virt_detection
+              , host->system_info->container
+              , host->system_info->container_detection
               , host->program_name
               , host->program_version
     );
@@ -821,6 +848,7 @@ static int rrdpush_receive(int fd
                            , const char *tags
                            , const char *program_name
                            , const char *program_version
+                           , struct rrdhost_system_info *system_info
                            , int update_every
                            , char *client_ip
                            , char *client_port
@@ -894,6 +922,7 @@ static int rrdpush_receive(int fd
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , system_info
         );
 
     if(!host) {
@@ -1027,6 +1056,7 @@ struct rrdpush_thread {
     char *client_port;
     char *program_name;
     char *program_version;
+    struct rrdhost_system_info *system_info;
     int update_every;
 };
 
@@ -1049,6 +1079,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         freez(rpt->client_port);
         freez(rpt->program_name);
         freez(rpt->program_version);
+        rrdhost_system_info_free(rpt->system_info);
         freez(rpt);
     }
 }
@@ -1070,6 +1101,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->tags
 	    , rpt->program_name
 	    , rpt->program_version
+        , rpt->system_info
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
@@ -1120,6 +1152,8 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     int update_every = default_rrd_update_every;
     char buf[GUID_LEN + 1];
 
+    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+
     while(url) {
         char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
@@ -1145,7 +1179,9 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else if(!strcmp(name, "tags"))
             tags = value;
         else
-            info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
+            if(unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
+                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
+            }
     }
 
     if(!key || !*key) {
@@ -1248,6 +1284,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
+    rpt->system_info       = system_info;
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');
@@ -1259,6 +1296,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         rpt->program_name = strdupz(w->user_agent);
         if(t && *t) rpt->program_version = strdupz(t);
     }
+
 
     netdata_thread_t thread;
 
