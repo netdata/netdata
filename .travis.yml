@@ -4,10 +4,14 @@ language: c
 services:
 - docker
 
+
+
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
   allow_failures:
     - env: ALLOW_SOFT_FAILURE_HERE=true
+
+
 
 # Install dependencies for all, once
 #
@@ -18,10 +22,14 @@ install:
 - docker info
 - source tests/installer/slack.sh
 
+
+
 # Setup notification system
 #
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
+
+
 
 # Define the stage sequence and conditionals
 #
@@ -44,39 +52,42 @@ stages:
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
-  # Build packages when special conditions are met
+  # Build DEB packages under special conditions
 - name: "Package ubuntu/disco - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
 - name: "Package ubuntu/cosmic - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
 - name: "Package ubuntu/bionic - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
 - name: "Package ubuntu/artful - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
 - name: "Package debian/buster - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
 - name: "Package debian/stretch - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
 - name: "Package debian/jessie - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
 - name: "Package debian/wheezy - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 DEB\]|\[Package ALL\])/
+
+  # Build RPM packages under special conditions
 - name: "Package Enterprise Linux 7 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
 - name: "Package Enterprise linux 6 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
 - name: "Package Enterprise Linux 5 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
 - name: "Package Fedora 29 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
 - name: "Package Fedora 28 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
 - name: "Package OpenSuSE 15.1 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
 - name: "Package OpenSuSE 15.0 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
 - name: "Package OpenSuSE 42.3 - amd64"
-  if: branch = package-cloud-deployer
+  if: type != cron AND branch = package-cloud-deployer AND commit_message =~ /(\[Package AMD64 RPM\]|\[Package ALL\])/
+
 
 
 # DEB and RPM template flows
@@ -139,7 +150,6 @@ stages:
           branch: package-cloud-deployer
           condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" != "netdata/netdata"
     after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi
-
 
 
 
@@ -249,7 +259,6 @@ jobs:
 
   - name: Run labeler on github issues
     script: .travis/labeler.sh # labeler should be replaced with GitHub Actions when they hit GA
-
 
 
 
@@ -474,7 +483,8 @@ jobs:
   # ############################################### #
 
 
-    # We only publish if a TAG has been set during packaging
+
+  # We only publish if a TAG has been set during packaging
   - stage: Publish for release
 
     name: Build & Publish docker images
@@ -511,7 +521,7 @@ jobs:
 
 
 
-    # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
+  # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
   - stage: Nightly operations
 
     name: Run coverity scan
@@ -535,8 +545,8 @@ jobs:
 
 
 
-    # This is the nightly execution step
-    #
+  # This is the nightly execution step
+  #
   - stage: Nightly release
 
     name: Build & Publish docker images
