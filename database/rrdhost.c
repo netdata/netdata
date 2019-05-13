@@ -824,19 +824,21 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info) {
     struct rrdhost_system_info *ret = callocz(1, sizeof(struct rrdhost_system_info));
 
-    ret->os_name = strdupz(system_info->os_name);
-    ret->os_id = strdupz(system_info->os_id);
-    ret->os_id_like = strdupz(system_info->os_id_like);
-    ret->os_version = strdupz(system_info->os_version);
-    ret->os_version_id = strdupz(system_info->os_version_id);
-    ret->os_detection = strdupz(system_info->os_detection);
-    ret->kernel_name = strdupz(system_info->kernel_name);
-    ret->kernel_version = strdupz(system_info->kernel_version);
-    ret->architecture = strdupz(system_info->architecture);
-    ret->virtualization = strdupz(system_info->virtualization);
-    ret->virt_detection = strdupz(system_info->virt_detection);
-    ret->container = strdupz(system_info->container);
-    ret->container_detection = strdupz(system_info->container_detection);
+    if(likely(system_info)) {
+        ret->os_name = strdupz(system_info->os_name);
+        ret->os_id = strdupz(system_info->os_id);
+        ret->os_id_like = strdupz(system_info->os_id_like);
+        ret->os_version = strdupz(system_info->os_version);
+        ret->os_version_id = strdupz(system_info->os_version_id);
+        ret->os_detection = strdupz(system_info->os_detection);
+        ret->kernel_name = strdupz(system_info->kernel_name);
+        ret->kernel_version = strdupz(system_info->kernel_version);
+        ret->architecture = strdupz(system_info->architecture);
+        ret->virtualization = strdupz(system_info->virtualization);
+        ret->virt_detection = strdupz(system_info->virt_detection);
+        ret->container = strdupz(system_info->container);
+        ret->container_detection = strdupz(system_info->container_detection);
+    }
 
     return ret;
 }
