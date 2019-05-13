@@ -44,7 +44,38 @@ stages:
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
 
+  # Build packages when special conditions are met
+- name: "Package ubuntu/disco - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package ubuntu/cosmic - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package ubuntu/bionic - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package ubuntu/artful - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package debian/buster - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package debian/stretch - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package debian/jessie - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package debian/wheezy - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package Enterprise Linux 7 - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package Enterprise linux 6 - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package Enterprise Linux 5 - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package Fedora 29 - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package Fedora 28 - amd64"
+  if: branch = package-cloud-deployer
 - name: "Package OpenSuSE 15.1 - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package OpenSuSE 15.0 - amd64"
+  if: branch = package-cloud-deployer
+- name: "Package OpenSuSE 42.3 - amd64"
   if: branch = package-cloud-deployer
 
 
