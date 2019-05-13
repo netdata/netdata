@@ -7,7 +7,7 @@
 # 1) package cloud gem (detects absence and installs it)
 #
 # Requires:
-# 1) PACKAGE_CLOUD_TOKEN variable exported
+# 1) PKG_CLOUD_TOKEN variable exported
 # 2) To properly install package_cloud when not found, it requires: ruby gcc gcc-c++ ruby-devel
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
@@ -34,11 +34,11 @@ else
 fi
 
 # Check for required token and prepare config
-if [ -z "${PACKAGE_CLOUD_TOKEN}" ]; then
-	echo "Please set PACKAGE_CLOUD_TOKEN to be able to use ${0}"
+if [ -z "${PKG_CLOUD_TOKEN}" ]; then
+	echo "Please set PKG_CLOUD_TOKEN to be able to use ${0}"
 	exit 1
 fi
-echo "{\"url\":\"https://packagecloud.io\",\"token\":\"${PACKAGE_CLOUD_TOKEN}\"}" > "${PKG_CLOUD_CONFIG}"
+echo "{\"url\":\"https://packagecloud.io\",\"token\":\"${PKG_CLOUD_TOKEN}\"}" > "${PKG_CLOUD_CONFIG}"
 
 echo "Executing package_cloud with config ${PKG_CLOUD_CONFIG} and parameters $@"
 package_cloud $@ --config=${PKG_CLOUD_CONFIG}

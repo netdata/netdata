@@ -111,10 +111,9 @@ stages:
       - provider: packagecloud
         repository: "netdata"
         username: "$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
-        token:
-          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
+        token: "${PKG_CLOUD_TOKEN}"
         dist: "${BUILD_STRING}"
-        local_dir: ${PACKAGES_DIRECTORY}
+        local_dir: "${PACKAGES_DIRECTORY}"
         skip_cleanup: true
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
@@ -125,14 +124,13 @@ stages:
       - provider: packagecloud
         repository: "netdata"
         username: "netdata"
-        token:
-          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
+        token: "${PKG_CLOUD_TOKEN}"
         dist: "${BUILD_STRING}"
-        local_dir: ${PACKAGES_DIRECTORY}
+        local_dir: "${PACKAGES_DIRECTORY}"
         skip_cleanup: true
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
-          repo: ${TRAVIS_REPO_SLUG}
+          repo: "${TRAVIS_REPO_SLUG}"
           branch: master
           condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" = "netdata/netdata"
     after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
@@ -155,8 +153,7 @@ stages:
       - provider: packagecloud
         repository: "netdata"
         username: "$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
-        token:
-          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
+        token: "${PKG_CLOUD_TOKEN}"
         dist: "${BUILD_STRING}"
         local_dir: "${PACKAGES_DIRECTORY}"
         skip_cleanup: true
@@ -169,14 +166,13 @@ stages:
       - provider: packagecloud
         repository: "netdata"
         username: "netdata"
-        token:
-          secure: hQ8D5GWBnu+6B//9GPIjfdlQHFtvNNuf23v2BahgWCiKE4NbW1FLmCKb33blXMEL00B4TRimJlGtyUO/A+8tuG/CcSAY0cmc85mkLCr6z3086trTymTApsk+wNBCiwrxOivcfASjXlqybPCILiGQSb2ONDt/ovKG3Ipud2oMJ1l4VOx2fpRN2sbA9RGRvgkzKzrRaMiCLCBpbwnSeDBS9qIZhddum3/tVTgYyp8QQGwT4/KczTW0ND/lE3rkqEJD2fASIo08G3G2mpLI3ytKfk161fKM2jUUdIcEFoBCDEf/hmJ8IgbEsTLNbWka8tRfvPZHusihbKzZf0gDAfbjLNsUCG+EGnutBKJEgRXyb8mVVrYxnjCWa0bjvtQoaqw1ZlEuf9vxiaIAwHTYlqJxEVyMbFarBA0cLjYXbhLusrtHn4XDinmRRwtMch8dj4zgo3/nNclIvooi18nGZs1nl3MI7MTIyZ9j62YyPvrdcNVIh3tBhgq//Ir9w05+1p8b6zc3UxLZaBvBgRhYPyxm0GLxnuFbJ3RmIx28oH7F6FykiEXMDARwM1TXn7mgYcLYqMQlpEj+JM6Mke486muTwHhfUHOWtg0+AYeoOgXZnCxQe2klxIuGTBv+Vl5dRb/DgOuilJ2ZeAV+iDS81JeFb0TdXJFq6/C2AfzpqNDENWU=
+        token: "${PKG_CLOUD_TOKEN}"
         dist: "${BUILD_STRING}"
         local_dir: "${PACKAGES_DIRECTORY}"
         skip_cleanup: true
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
-          repo: ${TRAVIS_REPO_SLUG}
+          repo: "${TRAVIS_REPO_SLUG}"
           branch: master
           condition: -d "${PACKAGES_DIRECTORY}" && "${TRAVIS_REPO_SLUG}" = "netdata/netdata"
     after_deploy: if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi
