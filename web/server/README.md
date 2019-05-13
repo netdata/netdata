@@ -95,7 +95,7 @@ Netdata supports access lists in `netdata.conf`:
 
 Netdata since version 1.14 supports encrypted connections. To enable this option it is necessary to genereate a certificate and a key, case you do not have one it is possible to generate them  with the following command
 
-openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -nodes -keyout key.pem -out cert.pem
+$ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -nodes -keyout key.pem -out cert.pem
 
 , it is important to say that the previous command will create a self signed certificate and the browsers will show warnings about it.
 
@@ -107,7 +107,11 @@ To start using HTTPS with Netdata it is only necessary to write the path for you
 	ssl certificate = /etc/netdata/cert.pem
 ```
 
-TIP: we have notice that when we use a 4096 bytes key the netdata can reach high CPU usage due the account made with large numbers, so we recommend to use 2048 bytes.
+TIP: The openssl when work with 4096 bytes key will forceh high CPU usage due the math with large numbers, according with our tests using the command
+
+$ openssl speed rsa2048 rsa4096
+
+, the rsa4096 can be until 4 times slower than rsa2048,  so we recommend to use 2048 bytes.
 
 ### Other netdata.conf [web] section options
 setting | default | info
