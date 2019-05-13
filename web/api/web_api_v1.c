@@ -736,20 +736,20 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
     buffer_strcat(wb, "\t},\n");
 
-    buffer_sprintf(wb, "\t\"os_name\": %s,\n", getenv("NETDATA_SYSTEM_OS_NAME"));
-    buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", getenv("NETDATA_SYSTEM_OS_ID"));
-    buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", getenv("NETDATA_SYSTEM_OS_ID_LIKE"));
-    buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", getenv("NETDATA_SYSTEM_OS_VERSION"));
-    buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", getenv("NETDATA_SYSTEM_OS_VERSION_ID"));
-    buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", getenv("NETDATA_SYSTEM_OS_DETECTION"));
-    buffer_sprintf(wb, "\t\"kernel_name\": \"%s\",\n", getenv("NETDATA_SYSTEM_KERNEL_NAME"));
-    buffer_sprintf(wb, "\t\"kernel_version\": \"%s\",\n", getenv("NETDATA_SYSTEM_KERNEL_VERSION"));
-    buffer_sprintf(wb, "\t\"architecture\": \"%s\",\n", getenv("NETDATA_SYSTEM_ARCHITECTURE"));
-    buffer_sprintf(wb, "\t\"virtualization\": \"%s\",\n", getenv("NETDATA_SYSTEM_VIRTUALIZATION"));
-    buffer_sprintf(wb, "\t\"virt_detection\": \"%s\",\n", getenv("NETDATA_SYSTEM_VIRT_DETECTION"));
-    buffer_sprintf(wb, "\t\"container\": \"%s\",\n", getenv("NETDATA_SYSTEM_CONTAINER"));
-    buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", getenv("NETDATA_SYSTEM_CONTAINER_DETECTION"));
-    
+    buffer_sprintf(wb, "\t\"os_name\": %s,\n", host->system_info->os_name);
+    buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", host->system_info->os_id);
+    buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", host->system_info->os_id_like);
+    buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", host->system_info->os_version);
+    buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", host->system_info->os_version_id);
+    buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", host->system_info->os_detection);
+    buffer_sprintf(wb, "\t\"kernel_name\": \"%s\",\n", host->system_info->kernel_name);
+    buffer_sprintf(wb, "\t\"kernel_version\": \"%s\",\n", host->system_info->kernel_version);
+    buffer_sprintf(wb, "\t\"architecture\": \"%s\",\n", host->system_info->architecture);
+    buffer_sprintf(wb, "\t\"virtualization\": \"%s\",\n", host->system_info->virtualization);
+    buffer_sprintf(wb, "\t\"virt_detection\": \"%s\",\n", host->system_info->virt_detection);
+    buffer_sprintf(wb, "\t\"container\": \"%s\",\n", host->system_info->container);
+    buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", host->system_info->container_detection);
+
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);
     buffer_strcat(wb, "\n\t]\n");

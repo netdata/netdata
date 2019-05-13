@@ -650,7 +650,7 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
-int get_system_info () {
+int get_system_info(struct rrdhost_system_info *system_info) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
@@ -679,10 +679,15 @@ int get_system_info () {
                     (*newline) = '\0';
                 }
                 char n[51], v[101];
-                snprintfz(n,50,"%s",name);
-                snprintfz(v,101,"%s",value);
-                info("%s=%s", n, v);
-                setenv(n, v, 1);
+                snprintfz(n, 50,"%s",name);
+                snprintfz(v, 101,"%s",value);
+                if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
+                    info("Unexpected environment variable %s=%s", n, v);
+                }
+                else {
+                    info("%s=%s", n, v);
+                    setenv(n, v, 1);
+                }
             }
         }
         mypclose(fp, command_pid);
@@ -844,7 +849,7 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
-                            rrd_init("unittest");
+                            rrd_init("unittest", NULL);
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
@@ -1093,8 +1098,10 @@ int main(int argc, char **argv) {
 
     // initialize the log files
     open_all_log_files();
+
 	netdata_anonymous_statistics_enabled=-1;
-    if (get_system_info() == 0) send_statistics("START","-", "-");
+    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
+    if (get_system_info(system_info) == 0) send_statistics("START","-", "-");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1129,13 +1136,13 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
-    rrd_init(netdata_configured_hostname);
+    rrd_init(netdata_configured_hostname, system_info);
+    rrdhost_system_info_free(system_info);
 
     // ------------------------------------------------------------------------
     // enable log flood protection
 
     error_log_limit_reset();
-
 
     // ------------------------------------------------------------------------
     // spawn the threads
