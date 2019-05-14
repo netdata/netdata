@@ -25,6 +25,8 @@ They are located under their host's cache directory in the directory `./dbengine
 numbered filenames contain more recent metric data. The user can safely delete some pairs
 of files when netdata is stopped to manually free up some space.
 
+*Users should* **back up** *their `./dbengine` folders if they consider this data to be important.*
+
 ## Configuration
 
 There is one DB engine instance per netdata host/node. That is, there is one `./dbengine` folder
