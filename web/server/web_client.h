@@ -175,8 +175,6 @@ extern void buffer_data_options2string(BUFFER *wb, uint32_t options);
 
 extern int mysendfile(struct web_client *w, char *filename);
 
-extern void web_client_set_ssl_flag(struct web_client *w,int flag);
-
 #include "daemon/common.h"
 
 #endif

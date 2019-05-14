@@ -162,18 +162,25 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
 #ifdef ENABLE_HTTPS
     if ( netdata_ctx ) {
-        if ((w->ssl = SSL_new(netdata_ctx))) {
-            SSL_set_accept_state(w->ssl);
-            if ( SSL_set_fd(w->ssl, w->ifd) != 1 )
-            {
+        //the next two ifs are not together because I am reusing SSL structure
+        if (!w->ssl)
+        {
+            if ((w->ssl = SSL_new(netdata_ctx))) {
+                SSL_set_accept_state(w->ssl);
+            } else {
+                error("Failed to create SSL context on socket fd %d.", w->ifd);
+                WEB_CLIENT_IS_DEAD(w);
+            }
+        }
+
+        if (w->ssl) {
+            if (SSL_set_fd(w->ssl, w->ifd) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
                 WEB_CLIENT_IS_DEAD(w);
-            } else{
-                web_client_set_ssl_flag(w,security_process_accept(w->ssl,w->ifd));
             }
-        } else {
-            error("Failed to create SSL context on socket fd %d.", w->ifd);
-            WEB_CLIENT_IS_DEAD(w);
+            else{
+                w->accepted = security_process_accept(w->ssl, w->ifd);
+            }
         }
     }
 #endif

@@ -120,6 +120,11 @@ int security_process_accept(SSL *ssl,int sock) {
                     }
                     break;
                 }
+				case SSL_ERROR_SSL:
+				{
+					debug(D_WEB_CLIENT_ACCESS,"There is not a SSL request on socket %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                	return 3;
+				}
                 case SSL_ERROR_NONE:
                 {
                     debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_NONE on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));

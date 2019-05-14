@@ -923,10 +923,10 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if (netdata_ctx){
-        if ( w->ssl ) {
+        if ( ( w->ssl ) && ( !w->accepted ) ){
             bytes = SSL_write(w->ssl,buf, len) ;
         } else {
-            bytes = 0;
+            bytes = send(w->ofd,buf, len , flags);
         }
     } else {
         bytes = send(w->ofd,buf, len , flags);
@@ -1068,7 +1068,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if (netdata_ctx){
-            if ( w->ssl ) {
+           if ( ( w->ssl ) && ( !w->accepted ) ){
                 while((bytes = SSL_write(w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
                     if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
@@ -1077,7 +1077,14 @@ static inline void web_client_send_http_header(struct web_client *w) {
                     }
                 }
             } else {
-                return;
+                while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+                    count++;
+
+                    if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                        error("Cannot send HTTP headers to web client.");
+                        break;
+                    }
+                }
             }
         } else {
             while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
@@ -1353,8 +1360,22 @@ void web_client_process_request(struct web_client *w) {
             debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
             buffer_flush(w->response.data);
+#ifdef ENABLE_HTTPS
+            if (netdata_ctx) {
+                if ((w->ssl) && (w->accepted == 3)) {
+                    w->response.data->contenttype = CT_TEXT_HTML;
+                    buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection...</body></html>");
+                    w->response.code = 301;
+                } else{
+                    w->response.code = 400;
+                }
+            } else{
+                w->response.code = 400;
+            }
+#else
             buffer_strcat(w->response.data, "I don't understand you...\r\n");
             w->response.code = 400;
+#endif
             break;
     }
 
@@ -1603,33 +1624,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
 }
 #endif // NETDATA_WITH_ZLIB
 
-#ifdef ENABLE_HTTPS
-static inline int web_client_ssl_accept(struct web_client *w)
-{
-    if ( w->ssl) {
-        if ( !SSL_is_init_finished(w->ssl) ) {
-            web_client_set_ssl_flag(w,security_process_accept(w->ssl, w->ifd));
-        } else{
-            web_client_set_ssl_flag(w,0);
-        }
-    }
-
-    return (w->accepted >= 0)?1:-1;
-}
-#endif
-
 ssize_t web_client_send(struct web_client *w) {
-#ifdef ENABLE_HTTPS
-    if ( netdata_ctx )
-    {
-        debug(D_WEB_CLIENT, "%d Starting SSL send process on socket %d .",w->accepted, w->ifd);
-        if ( w->accepted != 0)
-        {
-            return web_client_ssl_accept(w);
-        }
-    }
-#endif
-
 #ifdef NETDATA_WITH_ZLIB
     if(likely(w->response.zoutput)) return web_client_send_deflate(w);
 #endif // NETDATA_WITH_ZLIB
@@ -1735,15 +1730,6 @@ ssize_t web_client_read_file(struct web_client *w)
 
 ssize_t web_client_receive(struct web_client *w)
 {
-#ifdef ENABLE_HTTPS
-    if ( netdata_ctx )
-    {
-        if ( w->accepted != 0)
-        {
-            return web_client_ssl_accept(w);
-        }
-    }
-#endif
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
         return web_client_read_file(w);
 
@@ -1754,10 +1740,10 @@ ssize_t web_client_receive(struct web_client *w)
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if (netdata_ctx) {
-        if ( w->ssl ) {
+        if ( ( w->ssl ) && (!w->accepted)) {
             bytes = SSL_read(w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
         }else {
-            return 0;
+            bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }
     }
     else{
@@ -1785,27 +1771,4 @@ ssize_t web_client_receive(struct web_client *w)
     }
 
     return(bytes);
-}
-
-void web_client_set_ssl_flag(struct web_client *w,int flag){
-    w->accepted = flag;
-    if ( flag > 0){
-        if (flag == 2){
-            web_client_disable_wait_receive(w);
-            web_client_enable_wait_send(w);
-        } else{
-            web_client_disable_wait_send(w);
-            web_client_enable_wait_receive(w);
-        }
-    }
-    else
-    {
-        if ( !flag)
-        {
-            web_client_disable_wait_send(w);
-            web_client_enable_wait_receive(w);
-        } else{
-            WEB_CLIENT_IS_DEAD(w);
-        }
-    }
 }
