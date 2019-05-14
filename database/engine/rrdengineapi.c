@@ -430,7 +430,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->max_disk_space = disk_space_mb * 1048576LLU;
-    strncpy(ctx->dbfiles_path, dbfiles_path, sizeof(ctx->dbfiles_path) - 1);
+    strncpyz(ctx->dbfiles_path, dbfiles_path, sizeof(ctx->dbfiles_path) - 1);
     ctx->dbfiles_path[sizeof(ctx->dbfiles_path) - 1] = '\0';
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
