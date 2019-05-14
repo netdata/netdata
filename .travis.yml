@@ -231,6 +231,8 @@ jobs:
     - packaging/docker/build.sh
     - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
+    git:
+      depth: false
     env: ALLOW_SOFT_FAILURE_HERE=true
 
   - name: Create nightly release artifacts, publish to GCS
@@ -242,6 +244,8 @@ jobs:
     - echo "packaging/version:" && cat packaging/version
     - .travis/create_artifacts.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly artifacts generation failed"
+    git:
+      depth: false
     before_deploy:
       echo "Preparing creds under ${TRAVIS_REPO_SLUG}";
       if [ "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
