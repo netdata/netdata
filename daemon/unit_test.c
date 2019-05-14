@@ -1622,6 +1622,7 @@ int test_dbengine(void)
             , default_rrdpush_destination
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
+            , NULL
     );
     if (NULL == host)
         return 1;
@@ -1738,6 +1739,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
             , default_rrdpush_destination
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
+            , NULL
     );
     if (NULL == host)
         return;
