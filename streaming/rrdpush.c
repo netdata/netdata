@@ -469,20 +469,20 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , default_rrd_update_every
               , host->os
               , host->timezone
-              , (host->tags)?host->tags:""
-              , host->system_info->os_name
-              , host->system_info->os_id
-              , host->system_info->os_id_like
-              , host->system_info->os_version
-              , host->system_info->os_version_id
-              , host->system_info->os_detection
-              , host->system_info->kernel_name
-              , host->system_info->kernel_version
-              , host->system_info->architecture
-              , host->system_info->virtualization
-              , host->system_info->virt_detection
-              , host->system_info->container
-              , host->system_info->container_detection
+              , (host->tags) ? host->tags : ""
+              , (host->system_info->os_name) ? host->system_info->os_name : ""
+              , (host->system_info->os_id) ? host->system_info->os_id : ""
+              , (host->system_info->os_id_like) ? host->system_info->os_id_like : ""
+              , (host->system_info->os_version) ? host->system_info->os_version : ""
+              , (host->system_info->os_version_id) ? host->system_info->os_version_id : ""
+              , (host->system_info->os_detection) ? host->system_info->os_detection : ""
+              , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
+              , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
+              , (host->system_info->architecture) ? host->system_info->architecture : ""
+              , (host->system_info->virtualization) ? host->system_info->virtualization : ""
+              , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
+              , (host->system_info->container) ? host->system_info->container : ""
+              , (host->system_info->container_detection) ? host->system_info->container_detection : ""
               , host->program_name
               , host->program_version
     );
