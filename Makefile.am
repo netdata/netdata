@@ -412,6 +412,13 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
+KINESIS_BACKEND_FILES = \
+    backends/aws_kinesis/aws_kinesis.c \
+    backends/aws_kinesis/aws_kinesis.h \
+    backends/aws_kinesis/aws_kinesis_put_record.cc \
+    backends/aws_kinesis/aws_kinesis_put_record.h \
+    $(NULL)
+
 DAEMON_FILES = \
 	daemon/common.c \
 	daemon/common.h \
@@ -471,13 +478,18 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
 	$(NULL)
-
+# TODO: Find more graceful way to add libs for AWS Kinesis
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(NULL)
+if ENABLE_BACKEND_KINESIS
+    netdata_LINK = $(CXXLD) $(CXXFLAGS) -o $@
+else
+    netdata_LINK = $(CCLD) $(CFLAGS) -o $@
+endif
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
@@ -530,4 +542,9 @@ if ENABLE_PLUGIN_XENSTAT
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_XENSTAT_LIBS) \
         $(NULL)
+endif
+
+if ENABLE_BACKEND_KINESIS
+    netdata_SOURCES += $(KINESIS_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
 endif
