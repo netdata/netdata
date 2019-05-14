@@ -122,6 +122,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                         char *rrdpush_destination,
                         char *rrdpush_api_key,
                         char *rrdpush_send_charts_matching,
+                        struct rrdhost_system_info *system_info,
                         int is_localhost
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
@@ -156,6 +157,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->program_name = strdupz((program_name && *program_name)?program_name:"unknown");
     host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
+
+    host->system_info = rrdhost_system_info_dup(system_info);
 
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
@@ -332,6 +335,7 @@ RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_destination
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
+        , struct rrdhost_system_info *system_info
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
@@ -355,6 +359,7 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , system_info
                 , 0
         );
     }
@@ -439,7 +444,7 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-void rrd_init(char *hostname) {
+void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1)
@@ -468,6 +473,7 @@ void rrd_init(char *hostname) {
             , default_rrdpush_destination
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
+            , system_info
             , 1
     );
     rrd_unlock();
@@ -512,6 +518,27 @@ void __rrd_check_wrlock(const char *file, const char *function, const unsigned l
 
 // ----------------------------------------------------------------------------
 // RRDHOST - free
+
+void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
+    info("SYSTEM_INFO: free %p", system_info);
+
+    if(likely(system_info)) {
+        freez(system_info->os_name);
+        freez(system_info->os_id);
+        freez(system_info->os_id_like);
+        freez(system_info->os_version);
+        freez(system_info->os_version_id);
+        freez(system_info->os_detection);
+        freez(system_info->kernel_name);
+        freez(system_info->kernel_version);
+        freez(system_info->architecture);
+        freez(system_info->virtualization);
+        freez(system_info->virt_detection);
+        freez(system_info->container);
+        freez(system_info->container_detection);
+        freez(system_info);
+    }
+}
 
 void rrdhost_free(RRDHOST *host) {
     if(!host) return;
@@ -573,6 +600,7 @@ void rrdhost_free(RRDHOST *host) {
     freez((void *)host->timezone);
     freez(host->program_version);
     freez(host->program_name);
+    rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
     freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
@@ -743,4 +771,74 @@ restart_after_removal:
             goto restart_after_removal;
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// RRDHOST - set system info from environment variables
+
+int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
+    if(!strcmp(name, "NETDATA_SYSTEM_OS_NAME")){
+        system_info->os_name = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID")){
+        system_info->os_id = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE")){
+        system_info->os_id_like = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION")){
+        system_info->os_version = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID")){
+        system_info->os_version_id = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION")){
+        system_info->os_detection = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
+        system_info->kernel_name = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_VERSION")){
+        system_info->kernel_version = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_ARCHITECTURE")){
+        system_info->architecture = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_VIRTUALIZATION")){
+        system_info->virtualization = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_VIRT_DETECTION")){
+        system_info->virt_detection = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER")){
+        system_info->container = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER_DETECTION")){
+        system_info->container_detection = strdupz(value);
+    }
+    else return 1;
+
+    return 0;
+}
+
+struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info) {
+    struct rrdhost_system_info *ret = callocz(1, sizeof(struct rrdhost_system_info));
+
+    if(likely(system_info)) {
+        ret->os_name = strdupz(system_info->os_name);
+        ret->os_id = strdupz(system_info->os_id);
+        ret->os_id_like = strdupz(system_info->os_id_like);
+        ret->os_version = strdupz(system_info->os_version);
+        ret->os_version_id = strdupz(system_info->os_version_id);
+        ret->os_detection = strdupz(system_info->os_detection);
+        ret->kernel_name = strdupz(system_info->kernel_name);
+        ret->kernel_version = strdupz(system_info->kernel_version);
+        ret->architecture = strdupz(system_info->architecture);
+        ret->virtualization = strdupz(system_info->virtualization);
+        ret->virt_detection = strdupz(system_info->virt_detection);
+        ret->container = strdupz(system_info->container);
+        ret->container_detection = strdupz(system_info->container_detection);
+    }
+
+    return ret;
 }

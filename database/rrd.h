@@ -490,6 +490,22 @@ typedef struct alarm_log {
 // ----------------------------------------------------------------------------
 // RRD HOST
 
+struct rrdhost_system_info {
+    char *os_name;
+    char *os_id;
+    char *os_id_like;
+    char *os_version;
+    char *os_version_id;
+    char *os_detection;
+    char *kernel_name;
+    char *kernel_version;
+    char *architecture;
+    char *virtualization;
+    char *virt_detection;
+    char *container;
+    char *container_detection;
+};
+
 struct rrdhost {
     avl avl;                                        // the index of hosts
 
@@ -519,6 +535,8 @@ struct rrdhost {
 
     char *program_name;                             // the program name that collects metrics for this host
     char *program_version;                          // the program version that collects metrics for this host
+
+    struct rrdhost_system_info *system_info;        // information collected from the host environment
 
     // ------------------------------------------------------------------------
     // streaming of data to remote hosts - rrdpush
@@ -634,7 +652,7 @@ extern netdata_rwlock_t rrd_rwlock;
 extern size_t rrd_hosts_available;
 extern time_t rrdhost_free_orphan_time;
 
-extern void rrd_init(char *hostname);
+extern void rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
 extern RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash);
 extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);
@@ -656,7 +674,11 @@ extern RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_destination
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
+        , struct rrdhost_system_info *system_info
 );
+
+extern int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
+extern struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info);
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
 extern void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
@@ -714,6 +736,7 @@ extern void rrdhost_save_all(void);
 extern void rrdhost_cleanup_all(void);
 
 extern void rrdhost_cleanup_orphan_hosts_nolock(RRDHOST *protected);
+extern void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 extern void rrdhost_free(RRDHOST *host);
 extern void rrdhost_save_charts(RRDHOST *host);
 extern void rrdhost_delete_charts(RRDHOST *host);

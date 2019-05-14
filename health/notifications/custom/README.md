@@ -5,6 +5,36 @@ To configure custom notifications, you will need to define the `custom_sender()`
 You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples.
 As with other notifications, you will also need to define the recipient list in `DEFAULT_RECIPIENT_CUSTOM` and/or the `role_recipients_custom` array.
 
+The following is a sample `custom_sender` function to send an SMS via an imaginary HTTPS endpoint to the SMS gateway:
+```
+ custom_sender() {
+    # example human readable SMS
+    local msg="${host} ${status_message}: ${alarm} ${raised_for}"
+
+    # limit it to 160 characters and encode it for use in a URL
+    urlencode "${msg:0:160}" >/dev/null; msg="${REPLY}"
+
+    # a space separated list of the recipients to send alarms to
+    to="${1}"
+
+    for phone in ${to}; do
+      httpcode=$(docurl -X POST \
+				    --data-urlencode "From=XXX" \
+				    --data-urlencode "To=${phone}" \
+				    --data-urlencode "Body=${msg}" \
+				    -u "${accountsid}:${accounttoken}" \
+        https://domain.website.com/)
+
+       if [ "${httpcode}" = "200" ]; then
+         info "sent custom notification ${msg} to ${phone}"
+         sent=$((sent + 1))
+       else
+         error "failed to send custom notification ${msg} to ${phone} with HTTP error code ${httpcode}."
+       fi
+    done
+}
+```
+
 Variables available to the custom_sender:
 
  - ${to_custom}          the list of recipients for the alarm
