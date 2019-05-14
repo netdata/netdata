@@ -49,12 +49,17 @@ RUN if [ "$(uname -m)" == "x86_64" ]; then \
     fi
 
 # Copy files over
+RUN mkdir -p /opt/src
 COPY --from=builder /app /
+COPY --from=builder /opt/src /opt/src
 
 # Configure system
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
 RUN \
+    # provide judy installation to base image
+    apk add make alpine-sdk && \
+    cd /opt/src/judy-1.0.5 && make install && cd - && \
     # fping from alpine apk is on a different location. Moving it.
     mv /usr/sbin/fping /usr/local/bin/fping && \
     chmod 4755 /usr/local/bin/fping && \
