@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Netdata Console</title>
+    <meta name="application-name" content="netdata" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+    <!-- Google Tag Manager -->
+    <script>(function (w, d, s, l, i) {
+            w[l] = w[l] || []; w[l].push({
+                'gtm.start':
+                    new Date().getTime(), event: 'gtm.js'
+            }); var f = d.getElementsByTagName(s)[0],
+                j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+                    'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+        })(window, document, 'script', 'dataLayer', 'GTM-N6CBMJD');
+        googleTagManager = window.dataLayer || [];
+    </script>
+    <!-- End Google Tag Manager -->
+    <script>
+        function loadJSFile(filename) {
+            const s = document.createElement("script")
+            s.setAttribute("type", "text/javascript")
+            s.setAttribute("src", filename)
+            document.getElementsByTagName("head")[0].appendChild(s)
+        }
+
+        function loadCSSFile(filename) {
+            const l = document.createElement("link")
+            l.setAttribute("rel", "stylesheet")
+            l.setAttribute("type", "text/css")
+            l.setAttribute("href", filename)
+            document.getElementsByTagName("head")[0].appendChild(l)
+        }
+
+        var cloudBaseURL = localStorage.getItem("cloud.baseURL") || "https://netdata.cloud"
+
+        loadCSSFile(`${cloudBaseURL}/static/console/main.css?v=4`)
+    </script>
+</head>
+
+<body class="mdc-theme--background mdc-typography">
+    <!-- Google Tag Manager (noscript) -->
+    <noscript>
+        <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-N6CBMJD" height="0" width="0"
+            style="display:none;visibility:hidden"></iframe>
+    </noscript>
+    <!-- End Google Tag Manager (noscript) -->
+    <main id="app" class="console-app" data-host="agent"></main>
+    <script>
+        const main = document.getElementById("app")
+        main.setAttribute("data-static-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url", cloudBaseURL)
+        main.setAttribute("data-api-base-url-v2", cloudBaseURL)
+
+        loadJSFile(`${cloudBaseURL}/static/console/main.js?v=4`)
+    </script>
+    <script>
+        var netdataTheme = "white"
+        var netdataNoBootstrap = true
+    </script>
+    <script type="text/javascript" src="/dashboard.js?v20190515"></script>
+</body>
+
+</html>
