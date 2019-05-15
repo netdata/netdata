@@ -181,8 +181,6 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
             }
             else{
                 static uint32_t hash_stream = 0;
-                uint32_t cmp;
-
                 if(unlikely(!hash_stream)) {
                     hash_stream = simple_uhash("STREAM");
                 }
@@ -191,7 +189,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
                 if ( recv(w->ifd,test, 6,MSG_PEEK) == 6 )
                 {
                     test[6] = 0x00;
-                    cmp = simple_uhash(test);
+                    uint32_t cmp = simple_uhash(test);
                     if ( cmp != hash_stream){
                         error("KILLME %s\n",test);
                         w->accepted = security_process_accept(w->ssl, w->ifd);

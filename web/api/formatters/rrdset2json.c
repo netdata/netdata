@@ -7,6 +7,9 @@
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used) {
     rrdset_rdlock(st);
 
+    time_t first_entry_t = rrdset_first_entry_t(st);
+    time_t last_entry_t  = rrdset_last_entry_t(st);
+
     buffer_sprintf(wb,
             "\t\t{\n"
             "\t\t\t\"id\": \"%s\",\n"
@@ -40,9 +43,9 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                    , st->units
                    , st->name
                    , rrdset_type_name(st->chart_type)
-                   , st->entries * st->update_every
-                   , rrdset_first_entry_t(st)
-                   , rrdset_last_entry_t(st)
+                   , last_entry_t - first_entry_t + st->update_every//st->entries * st->update_every
+                   , first_entry_t//rrdset_first_entry_t(st)
+                   , last_entry_t//rrdset_last_entry_t(st)
                    , st->update_every
     );
 

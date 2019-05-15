@@ -17,12 +17,13 @@ to 1 second. You will have just one hour of data.
 For a day of data and 1.000 dimensions, you will need: 86.400 seconds * 4 bytes * 1.000
 dimensions = 345MB of RAM.
 
-Currently the only option you have to lower this number is to use
-**[Memory Deduplication - Kernel Same Page Merging - KSM](#ksm)**.
+One option you have to lower this number is to use
+**[Memory Deduplication - Kernel Same Page Merging - KSM](#ksm)**. Another possibility is to 
+use the **[Database Engine](engine/)**.
 
 ## Memory modes
 
-Currently netdata supports 5 memory modes:
+Currently netdata supports 6 memory modes:
 
 1. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and
    supports [KSM](#ksm).
@@ -41,6 +42,12 @@ Currently netdata supports 5 memory modes:
 
 5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the
    fallback for all others except `none`.
+
+6. `dbengine`, data are in database files. The [Database Engine](engine/) works like a traditional
+   database. There is some amount of RAM dedicated to data caching and indexing and the rest of
+   the data reside compressed on disk. The number of history entries is not fixed in this case,
+   but depends on the configured disk space and the effective compression ratio of the data stored.
+   For more details see [here](engine/).
 
 You can select the memory mode by editing netdata.conf and setting:
 
@@ -80,7 +87,7 @@ server that will maintain the entire database for all nodes, and will also run h
 for all nodes.
 
 For this central netdata, memory size can be a problem. Fortunately, netdata supports several
-memory modes. What is interesting for this setup is `memory mode = map`.
+memory modes. One interesting option for this setup is `memory mode = map`.
 
 In this mode, the database of netdata is stored in memory mapped files. netdata continues to read
 and write the database in memory, but the kernel automatically loads and saves memory pages from/to
@@ -88,7 +95,7 @@ disk.
 
 **We suggest _not_ to use this mode on nodes that run other applications.** There will always be
 dirty memory to be synced and this syncing process may influence the way other applications work.
-This mode however is ideal when we need a central netdata server that would normally need huge
+This mode however is useful when we need a central netdata server that would normally need huge
 amounts of memory. Using memory mode `map` we can overcome all memory restrictions.
 
 There are a few kernel options that provide finer control on the way this syncing works. But before
@@ -155,9 +162,24 @@ vm.dirty_ratio = 90
 vm.dirty_writeback_centisecs = 0
 ```
 
+There is another memory mode to help overcome the memory size problem. What is most interesting
+for this setup is `memory mode = dbengine`.
+
+In this mode, the database of netdata is stored in database files. The [Database Engine](engine/)
+works like a traditional database. There is some amount of RAM dedicated to data caching and
+indexing and the rest of the data reside compressed on disk. The number of history entries is not 
+fixed in this case, but depends on the configured disk space and the effective compression ratio
+of the data stored.
+
+We suggest to use **this** mode on nodes that also run other applications. The Database Engine uses
+direct I/O to avoid polluting the OS filesystem caches and does not generate excessive I/O traffic 
+so as to create the minimum possible interference with other applications. Using memory mode
+`dbengine` we can overcome most memory restrictions. For more details see [here](engine/).
+
 ## KSM
 
-Netdata offers all its round robin database to kernel for deduplication.
+Netdata offers all its round robin database to kernel for deduplication
+(except for `memory mode = dbengine`).
 
 In the past KSM has been criticized for consuming a lot of CPU resources.
 Although this is true when KSM is used for deduplicating certain applications, it is not true with

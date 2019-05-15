@@ -90,6 +90,69 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 }
 
 // ----------------------------------------------------------------------------
+// RRDDIM legacy data collection functions
+
+static void rrddim_collect_init(RRDDIM *rd) {
+    rd->values[rd->rrdset->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+}
+static void rrddim_collect_store_metric(RRDDIM *rd, usec_t point_in_time, storage_number number) {
+    (void)point_in_time;
+
+    rd->values[rd->rrdset->current_entry] = number;
+}
+static void rrddim_collect_finalize(RRDDIM *rd) {
+    (void)rd;
+
+    return;
+}
+
+// ----------------------------------------------------------------------------
+// RRDDIM legacy database query functions
+
+static void rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time) {
+    handle->rd = rd;
+    handle->start_time = start_time;
+    handle->end_time = end_time;
+    handle->slotted.slot = rrdset_time2slot(rd->rrdset, start_time);
+    handle->slotted.last_slot = rrdset_time2slot(rd->rrdset, end_time);
+    handle->slotted.finished = 0;
+}
+
+static storage_number rrddim_query_next_metric(struct rrddim_query_handle *handle) {
+    RRDDIM *rd = handle->rd;
+    long entries = rd->rrdset->entries;
+    long slot = handle->slotted.slot;
+
+    if (unlikely(handle->slotted.slot == handle->slotted.last_slot))
+        handle->slotted.finished = 1;
+    storage_number n = rd->values[slot++];
+
+    if(unlikely(slot >= entries)) slot = 0;
+    handle->slotted.slot = slot;
+
+    return n;
+}
+
+static int rrddim_query_is_finished(struct rrddim_query_handle *handle) {
+    return handle->slotted.finished;
+}
+
+static void rrddim_query_finalize(struct rrddim_query_handle *handle) {
+    (void)handle;
+
+    return;
+}
+
+static time_t rrddim_query_latest_time(RRDDIM *rd) {
+    return rrdset_last_entry_t(rd->rrdset);
+}
+
+static time_t rrddim_query_oldest_time(RRDDIM *rd) {
+    return rrdset_first_entry_t(rd->rrdset);
+}
+
+
+// ----------------------------------------------------------------------------
 // RRDDIM create a dimension
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
@@ -123,9 +186,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rrdset_strncpyz_name(filename, id, FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP || memory_mode == RRD_MEMORY_MODE_RAM) {
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
+       memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         rd = (RRDDIM *)mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM)?NULL:fullfilename
+                  (memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE)?NULL:fullfilename
                 , size
                 , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
                 , 1
@@ -146,7 +210,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             struct timeval now;
             now_realtime_timeval(&now);
 
-            if(memory_mode == RRD_MEMORY_MODE_RAM) {
+            if(memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 memset(rd, 0, size);
             }
             else {
@@ -243,11 +307,34 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     rd->collected_volume = 0;
     rd->stored_volume = 0;
     rd->last_stored_value = 0;
-    rd->values[st->current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
     rd->last_collected_time.tv_sec = 0;
     rd->last_collected_time.tv_usec = 0;
     rd->rrdset = st;
-
+    rd->state = mallocz(sizeof(*rd->state));
+    if(memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+        rd->state->collect_ops.init         = rrdeng_store_metric_init;
+        rd->state->collect_ops.store_metric = rrdeng_store_metric_next;
+        rd->state->collect_ops.finalize     = rrdeng_store_metric_finalize;
+        rd->state->query_ops.init           = rrdeng_load_metric_init;
+        rd->state->query_ops.next_metric    = rrdeng_load_metric_next;
+        rd->state->query_ops.is_finished    = rrdeng_load_metric_is_finished;
+        rd->state->query_ops.finalize       = rrdeng_load_metric_finalize;
+        rd->state->query_ops.latest_time    = rrdeng_metric_latest_time;
+        rd->state->query_ops.oldest_time    = rrdeng_metric_oldest_time;
+#endif
+    } else {
+        rd->state->collect_ops.init         = rrddim_collect_init;
+        rd->state->collect_ops.store_metric = rrddim_collect_store_metric;
+        rd->state->collect_ops.finalize     = rrddim_collect_finalize;
+        rd->state->query_ops.init           = rrddim_query_init;
+        rd->state->query_ops.next_metric    = rrddim_query_next_metric;
+        rd->state->query_ops.is_finished    = rrddim_query_is_finished;
+        rd->state->query_ops.finalize       = rrddim_query_finalize;
+        rd->state->query_ops.latest_time    = rrddim_query_latest_time;
+        rd->state->query_ops.oldest_time    = rrddim_query_oldest_time;
+    }
+    rd->state->collect_ops.init(rd);
     // append this dimension
     if(!st->dimensions)
         st->dimensions = rd;
@@ -294,6 +381,9 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 {
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", st->name, rd->name);
 
+    rd->state->collect_ops.finalize(rd);
+    freez(rd->state);
+
     if(rd == st->dimensions)
         st->dimensions = rd->next;
     else {
@@ -319,6 +409,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_RAM:
+        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
