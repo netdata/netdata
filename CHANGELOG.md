@@ -22,7 +22,10 @@
 - \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
 - python SocketService: lack of connect timeout, python.d.plugin hangs [\#5541](https://github.com/netdata/netdata/issues/5541)
 - installer wrong message on centos [\#5474](https://github.com/netdata/netdata/issues/5474)
+- File not found by glob when building an rpm \(latest code - 20181218\) [\#5033](https://github.com/netdata/netdata/issues/5033)
+- Issue creating deb package from v1.11.1 [\#4979](https://github.com/netdata/netdata/issues/4979)
 - netdata service fails to start - pfsense [\#3469](https://github.com/netdata/netdata/issues/3469)
+- Fix segmentation fault [\#6011](https://github.com/netdata/netdata/pull/6011) ([vlvkobal](https://github.com/vlvkobal))
 
 **Closed issues:**
 
@@ -48,11 +51,15 @@
 - Monitor disk access latency \(e.g. ioping\) [\#4660](https://github.com/netdata/netdata/issues/4660)
 - provide binary repos for main distros [\#2728](https://github.com/netdata/netdata/issues/2728)
 - RPM Packaging Discussion [\#1306](https://github.com/netdata/netdata/issues/1306)
+- Setup PPA for Debian systems [\#1302](https://github.com/netdata/netdata/issues/1302)
 - Binary release [\#87](https://github.com/netdata/netdata/issues/87)
+- Provide Ubuntu PPA [\#69](https://github.com/netdata/netdata/issues/69)
 - Build packaging for debian [\#42](https://github.com/netdata/netdata/issues/42)
 
 **Merged pull requests:**
 
+- netdata/packaging: Make docker image bring onboard the required packages for the new DB [\#6014](https://github.com/netdata/netdata/pull/6014) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Fix Coverity defects [\#6008](https://github.com/netdata/netdata/pull/6008) ([vlvkobal](https://github.com/vlvkobal))
 - Do not cache alarms and info api calls. Extend no-cache headers. [\#5999](https://github.com/netdata/netdata/pull/5999) ([cakrit](https://github.com/cakrit))
 - UserService self.\_get\_raw\_data except fix [\#5997](https://github.com/netdata/netdata/pull/5997) ([ilyam8](https://github.com/ilyam8))
 - Add system info streaming [\#5996](https://github.com/netdata/netdata/pull/5996) ([vlvkobal](https://github.com/vlvkobal))
@@ -82,6 +89,7 @@
 - info API minor enhancements [\#5891](https://github.com/netdata/netdata/pull/5891) ([cakrit](https://github.com/cakrit))
 - Extend netdata info API call [\#5889](https://github.com/netdata/netdata/pull/5889) ([cakrit](https://github.com/cakrit))
 - Add ioping plugin [\#5725](https://github.com/netdata/netdata/pull/5725) ([vlvkobal](https://github.com/vlvkobal))
+- Database engine [\#5282](https://github.com/netdata/netdata/pull/5282) ([mfundul](https://github.com/mfundul))
 
 ## [v1.14.0](https://github.com/netdata/netdata/tree/v1.14.0) (2019-04-18)
 
