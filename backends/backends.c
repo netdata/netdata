@@ -62,9 +62,11 @@ calculated_number backend_calculate_value_from_stored_data(
     (void)host;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rrdset_first_entry_t(st);
-    time_t last_t  = rrdset_last_entry_t(st);
+    time_t first_t = rd->state->query_ops.oldest_time(rd);
+    time_t last_t  = rd->state->query_ops.latest_time(rd);
     time_t update_every = st->update_every;
+    struct rrddim_query_handle handle;
+    storage_number n;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics
@@ -105,6 +107,7 @@ calculated_number backend_calculate_value_from_stored_data(
     size_t counter = 0;
     calculated_number sum = 0;
 
+/*
     long    start_at_slot = rrdset_time2slot(st, before),
             stop_at_slot  = rrdset_time2slot(st, after),
             slot, stop_now = 0;
@@ -126,7 +129,21 @@ calculated_number backend_calculate_value_from_stored_data(
 
         counter++;
     }
+*/
+    for(rd->state->query_ops.init(rd, &handle, before, after) ; !rd->state->query_ops.is_finished(&handle) ; ) {
+        n = rd->state->query_ops.next_metric(&handle);
 
+        if(unlikely(!does_storage_number_exist(n))) {
+            // not collected
+            continue;
+        }
+
+        calculated_number value = unpack_storage_number(n);
+        sum += value;
+
+        counter++;
+    }
+    rd->state->query_ops.finalize(&handle);
     if(unlikely(!counter)) {
         debug(D_BACKEND, "BACKEND: %s.%s.%s: no values stored in database for range %lu to %lu",
               host->hostname, st->id, rd->id,

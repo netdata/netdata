@@ -89,6 +89,46 @@ set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${ZLIB_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${ZLIB_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
 
+# -----------------------------------------------------------------------------
+# libuv multi-platform support library with a focus on asynchronous I/O
+
+pkg_check_modules(LIBUV REQUIRED libuv)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${LIBUV_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${LIBUV_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBUV_INCLUDE_DIRS})
+
+# -----------------------------------------------------------------------------
+# lz4 Extremely Fast Compression algorithm
+
+pkg_check_modules(LIBLZ4 REQUIRED liblz4)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${LIBLZ4_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${LIBLZ4_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_DIRS})
+
+# -----------------------------------------------------------------------------
+# Judy General purpose dynamic array
+
+# pkgconfig not working in Ubuntu, why? upstream package broken?
+#pkg_check_modules(JUDY REQUIRED Judy)
+#set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${JUDY_CFLAGS_OTHER})
+#set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${JUDY_LIBRARIES})
+#set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${JUDY_INCLUDE_DIRS})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} "-lJudy")
+set(CMAKE_REQUIRED_LIBRARIES "Judy")
+check_symbol_exists("JudyLLast" "Judy.h" HAVE_JUDY)
+IF(HAVE_JUDY)
+    message(STATUS "Judy library found")
+ELSE()
+    message( FATAL_ERROR "libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'." )
+ENDIF()
+
+# -----------------------------------------------------------------------------
+# OpenSSL Cryptography and SSL/TLS Toolkit
+
+pkg_check_modules(OPENSSL REQUIRED openssl)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${OPENSSL_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${OPENSSL_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
 
 # -----------------------------------------------------------------------------
 # Detect libcap
@@ -403,6 +443,19 @@ set(RRD_PLUGIN_FILES
         database/rrdsetvar.h
         database/rrdvar.c
         database/rrdvar.h
+        database/engine/rrdengine.c
+        database/engine/rrdengine.h
+        database/engine/rrddiskprotocol.h
+        database/engine/datafile.c
+        database/engine/datafile.h
+        database/engine/journalfile.c
+        database/engine/journalfile.h
+        database/engine/rrdenginelib.c
+        database/engine/rrdenginelib.h
+        database/engine/rrdengineapi.c
+        database/engine/rrdengineapi.h
+        database/engine/pagecache.c
+        database/engine/pagecache.h
         )
 
 set(WEB_PLUGIN_FILES

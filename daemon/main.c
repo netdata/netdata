@@ -301,6 +301,7 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
@@ -471,6 +472,25 @@ static void get_netdata_configured_variables() {
 
     default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
 
+#ifdef ENABLE_DBENGINE
+    // ------------------------------------------------------------------------
+    // get default Database Engine page cache size in MiB
+
+    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
+    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+    }
+
+    // ------------------------------------------------------------------------
+    // get default Database Engine disk space quota in MiB
+
+    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine disk space", default_rrdeng_disk_quota_mb);
+    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+    }
+#endif
     // ------------------------------------------------------------------------
 
     netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
@@ -841,6 +861,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+                        char* createdataset_string = "createdataset=";
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -853,7 +874,21 @@ int main(int argc, char **argv) {
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if(test_dbengine()) return 1;
+#endif
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
+                            return 0;
+                        }
+                        else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
+                            unsigned history_seconds;
+
+                            optarg += strlen(createdataset_string);
+                            history_seconds = (unsigned )strtoull(optarg, NULL, 0);
+
+#ifdef ENABLE_DBENGINE
+                            generate_dbengine_dataset(history_seconds);
+#endif
                             return 0;
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
@@ -1138,7 +1173,6 @@ int main(int argc, char **argv) {
 
     rrd_init(netdata_configured_hostname, system_info);
     rrdhost_system_info_free(system_info);
-
     // ------------------------------------------------------------------------
     // enable log flood protection
 
