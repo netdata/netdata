@@ -131,6 +131,12 @@ AC_ARG_ENABLE(
     ,
     [enable_lto="detect"]
 )
+AC_ARG_ENABLE(
+    [dbengine],
+    [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
+    ,
+    [enable_dbengine="detect"]
+)
 
 
 # -----------------------------------------------------------------------------
@@ -188,7 +194,7 @@ case "$host_os" in
 freebsd*)
     build_target=freebsd
     build_target_id=2
-    CFLAGS="${CFLAGS} -I/usr/local/include"
+    CFLAGS="${CFLAGS} -I/usr/local/include -L/usr/local/lib"
     ;;
 darwin*)
     build_target=macos
@@ -243,6 +249,46 @@ AC_MSG_RESULT([${with_math}])
 
 
 # -----------------------------------------------------------------------------
+# libuv multi-platform support library with a focus on asynchronous I/O
+# TODO: check version, uv_fs_scandir_next only available in version >= 1.0
+
+AC_CHECK_LIB(
+    [uv],
+    [uv_fs_scandir_next],
+    [UV_LIBS="-luv"]
+)
+
+OPTIONAL_UV_CLFAGS="${UV_CFLAGS}"
+OPTIONAL_UV_LIBS="${UV_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# lz4 Extremely Fast Compression algorithm
+
+AC_CHECK_LIB(
+    [lz4],
+    [LZ4_decompress_safe],
+    [LZ4_LIBS="-llz4"]
+)
+
+OPTIONAL_LZ4_CLFAGS="${LZ4_CFLAGS}"
+OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# Judy General purpose dynamic array
+
+AC_CHECK_LIB(
+    [Judy],
+    [JudyLIns],
+    [JUDY_LIBS="-lJudy"]
+)
+
+OPTIONAL_JUDY_CLFAGS="${JUDY_CFLAGS}"
+OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
+
+
+# -----------------------------------------------------------------------------
 # zlib
 
 PKG_CHECK_MODULES(
@@ -277,6 +323,43 @@ PKG_CHECK_MODULES(
 AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# OpenSSL Cryptography and SSL/TLS Toolkit
+
+AC_CHECK_LIB(
+    [crypto],
+    [SHA256_Init],
+    [SSL_LIBS="-lcrypto -lssl"]
+)
+
+OPTIONAL_SSL_CLFAGS="${SSL_CFLAGS}"
+OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+
+# -----------------------------------------------------------------------------
+# DB engine
+test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
+    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
+    AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
+    AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+
+AC_MSG_CHECKING([if netdata dbengine should be used])
+if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
+    enable_dbengine="yes"
+    AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
+else
+    enable_dbengine="no"
+fi
+AC_MSG_RESULT([${enable_dbengine}])
+AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -781,7 +864,12 @@ CPPFLAGS="\
 
 AC_SUBST([OPTIONAL_MATH_CFLAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
-AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
+AC_SUBST([OPTIONAL_RT_CLFAGS])
+AC_SUBST([OPTIONAL_UV_LIBS])
+AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_JUDY_LIBS])
+AC_SUBST([OPTIONAL_SSL_LIBS])
+AC_SUBST([OPTIONAL_NFACCT_CLFAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
@@ -831,6 +919,7 @@ AC_CONFIG_FILES([
     collectors/xenstat.plugin/Makefile
     daemon/Makefile
     database/Makefile
+    database/engine/Makefile
     diagrams/Makefile
     health/Makefile
     health/notifications/Makefile

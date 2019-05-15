@@ -14,6 +14,14 @@ typedef struct rrdcalc RRDCALC;
 typedef struct rrdcalctemplate RRDCALCTEMPLATE;
 typedef struct alarm_entry ALARM_ENTRY;
 
+// forward declarations
+struct rrddim_volatile;
+#ifdef ENABLE_DBENGINE
+struct rrdeng_page_cache_descr;
+struct rrdengine_instance;
+struct pg_cache_page_index;
+#endif
+
 #include "../daemon/common.h"
 #include "web/api/queries/query.h"
 #include "rrdvar.h"
@@ -66,7 +74,8 @@ typedef enum rrd_memory_mode {
     RRD_MEMORY_MODE_RAM  = 1,
     RRD_MEMORY_MODE_MAP  = 2,
     RRD_MEMORY_MODE_SAVE = 3,
-    RRD_MEMORY_MODE_ALLOC = 4
+    RRD_MEMORY_MODE_ALLOC = 4,
+    RRD_MEMORY_MODE_DBENGINE = 5
 } RRD_MEMORY_MODE;
 
 #define RRD_MEMORY_MODE_NONE_NAME "none"
@@ -74,6 +83,7 @@ typedef enum rrd_memory_mode {
 #define RRD_MEMORY_MODE_MAP_NAME "map"
 #define RRD_MEMORY_MODE_SAVE_NAME "save"
 #define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
+#define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
 
 extern RRD_MEMORY_MODE default_rrd_memory_mode;
 
@@ -178,7 +188,8 @@ struct rrddim {
     char *cache_filename;                           // the filename we load/save from/to this set
 
     size_t collections_counter;                     // the number of times we added values to this rrdim
-    size_t unused[9];
+    struct rrddim_volatile *state;                  // volatile state that is not persistently stored
+    size_t unused[8];
 
     collected_number collected_value_max;           // the absolute maximum of the collected value
 
@@ -224,6 +235,90 @@ struct rrddim {
     // the values stored in this dimension, using our floating point numbers
 
     storage_number values[];                        // the array of values - THIS HAS TO BE THE LAST MEMBER
+};
+
+// ----------------------------------------------------------------------------
+// iterator state for RRD dimension data collection
+union rrddim_collect_handle {
+    struct {
+        long slot;
+        long entries;
+    } slotted;                           // state the legacy code uses
+#ifdef ENABLE_DBENGINE
+    struct rrdeng_collect_handle {
+        struct rrdeng_page_cache_descr *descr, *prev_descr;
+        unsigned long page_correlation_id;
+        struct rrdengine_instance *ctx;
+        struct pg_cache_page_index *page_index;
+    } rrdeng; // state the database engine uses
+#endif
+};
+
+// ----------------------------------------------------------------------------
+// iterator state for RRD dimension data queries
+struct rrddim_query_handle {
+    RRDDIM *rd;
+    time_t start_time;
+    time_t end_time;
+    union {
+        struct {
+            long slot;
+            long last_slot;
+            uint8_t finished;
+        } slotted;                         // state the legacy code uses
+#ifdef ENABLE_DBENGINE
+        struct rrdeng_query_handle {
+            struct rrdeng_page_cache_descr *descr;
+            struct rrdengine_instance *ctx;
+            struct pg_cache_page_index *page_index;
+            time_t now; //TODO: remove now to implement next point iteration
+            time_t dt; //TODO: remove dt to implement next point iteration
+        } rrdeng; // state the database engine uses
+#endif
+    };
+};
+
+
+// ----------------------------------------------------------------------------
+// volatile state per RRD dimension
+struct rrddim_volatile {
+#ifdef ENABLE_DBENGINE
+    uuid_t *rrdeng_uuid;                 // database engine metric UUID
+#endif
+    union rrddim_collect_handle handle;
+    // ------------------------------------------------------------------------
+    // function pointers that handle data collection
+    struct rrddim_collect_ops {
+        // an initialization function to run before starting collection
+        void (*init)(RRDDIM *rd);
+
+        // run this to store each metric into the database
+        void (*store_metric)(RRDDIM *rd, usec_t point_in_time, storage_number number);
+
+        // an finalization function to run after collection is over
+        void (*finalize)(RRDDIM *rd);
+    } collect_ops;
+
+    // function pointers that handle database queries
+    struct rrddim_query_ops {
+        // run this before starting a series of next_metric() database queries
+        void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
+
+        // run this to load each metric number from the database
+        storage_number (*next_metric)(struct rrddim_query_handle *handle);
+
+        // run this to test if the series of next_metric() database queries is finished
+        int (*is_finished)(struct rrddim_query_handle *handle);
+
+        // run this after finishing a series of load_metric() database queries
+        void (*finalize)(struct rrddim_query_handle *handle);
+
+        // get the timestamp of the last entry of this metric
+        time_t (*latest_time)(RRDDIM *rd);
+
+        // get the timestamp of the first entry of this metric
+        time_t (*oldest_time)(RRDDIM *rd);
+    } query_ops;
 };
 
 // ----------------------------------------------------------------------------
@@ -528,6 +623,10 @@ struct rrdhost {
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
+#ifdef ENABLE_DBENGINE
+    unsigned page_cache_mb;                         // Database Engine page cache size in MiB
+    unsigned disk_space_mb;                         // Database Engine disk space quota in MiB
+#endif
     RRD_MEMORY_MODE rrd_memory_mode;                // the memory more for the charts of this host
 
     char *cache_dir;                                // the directory to save RRD cache files
@@ -619,6 +718,10 @@ struct rrdhost {
 
     avl_tree_lock rrdfamily_root_index;             // the host's chart families index
     avl_tree_lock rrdvar_root_index;                // the host's chart variables index
+
+#ifdef ENABLE_DBENGINE
+    struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
+#endif
 
     struct rrdhost *next;
 };
@@ -771,10 +874,41 @@ extern void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_duration(st) ((time_t)( (((st)->counter >= ((unsigned long)(st)->entries))?(unsigned long)(st)->entries:(st)->counter) * (st)->update_every ))
 
 // get the timestamp of the last entry in the round robin database
-#define rrdset_last_entry_t(st) ((time_t)(((st)->last_updated.tv_sec)))
+static inline time_t rrdset_last_entry_t(RRDSET *st) {
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        RRDDIM *rd;
+        time_t last_entry_t  = 0;
+
+        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
+        rrddim_foreach_read(rd, st) {
+            last_entry_t = MAX(last_entry_t, rd->state->query_ops.latest_time(rd));
+        }
+        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+        return last_entry_t;
+    } else {
+        return (time_t)st->last_updated.tv_sec;
+    }
+}
 
 // get the timestamp of first entry in the round robin database
-#define rrdset_first_entry_t(st) ((time_t)(rrdset_last_entry_t(st) - rrdset_duration(st)))
+static inline time_t rrdset_first_entry_t(RRDSET *st) {
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+        RRDDIM *rd;
+        time_t first_entry_t = LONG_MAX;
+
+        int ret = netdata_rwlock_tryrdlock(&st->rrdset_rwlock);
+        rrddim_foreach_read(rd, st) {
+            first_entry_t = MIN(first_entry_t, rd->state->query_ops.oldest_time(rd));
+        }
+        if(0 == ret) netdata_rwlock_unlock(&st->rrdset_rwlock);
+
+        if (unlikely(LONG_MAX == first_entry_t)) return 0;
+        return first_entry_t;
+    } else {
+        return (time_t)(rrdset_last_entry_t(st) - rrdset_duration(st));
+    }
+}
 
 // get the last slot updated in the round robin database
 #define rrdset_last_slot(st) ((size_t)(((st)->current_entry == 0) ? (st)->entries - 1 : (st)->current_entry - 1))
@@ -914,5 +1048,11 @@ extern void rrdhost_cleanup_obsolete_charts(RRDHOST *host);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
+// ----------------------------------------------------------------------------
+// RRD DB engine declarations
+
+#ifdef ENABLE_DBENGINE
+#include "database/engine/rrdengineapi.h"
+#endif
 
 #endif /* NETDATA_RRD_H */

@@ -134,6 +134,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_update_every    = (update_every > 0)?update_every:1;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
+#ifdef ENABLE_DBENGINE
+    host->page_cache_mb       = default_rrdeng_page_cache_mb;
+    host->disk_space_mb       = default_rrdeng_disk_quota_mb;
+#endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
@@ -205,7 +209,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
         host->cache_dir = strdupz(filename);
 
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+        if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
+           host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->cache_dir);
@@ -220,6 +225,30 @@ RRDHOST *rrdhost_create(const char *hostname,
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->varlib_dir);
        }
 
+    }
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+        char dbenginepath[FILENAME_MAX + 1];
+        int ret;
+
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+        ret = mkdir(dbenginepath, 0775);
+        if(ret != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
+        else
+            ret = rrdeng_init(&host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+        if(ret) {
+            error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
+                  host->hostname, host->machine_guid, host->cache_dir);
+            rrdhost_free(host);
+            host = NULL;
+            //rrd_hosts_available++; //TODO: maybe we want this?
+
+            return host;
+        }
+#else
+        fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
+#endif
     }
 
     if(host->health_enabled) {
@@ -568,6 +597,12 @@ void rrdhost_free(RRDHOST *host) {
     rrdvar_free_remaining_variables(host, &host->rrdvar_root_index);
 
     health_alarm_log_free(host);
+
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+        rrdeng_exit(host->rrdeng_ctx);
+#endif
+    }
 
     // ------------------------------------------------------------------------
     // remove it from the indexes

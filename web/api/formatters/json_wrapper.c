@@ -96,12 +96,19 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if(i) buffer_strcat(wb, ", ");
         i++;
 
+        calculated_number value = rd->last_stored_value;
+        if (NAN == value)
+            buffer_strcat(wb, "null");
+        else
+            buffer_rrd_value(wb, value);
+        /*
         storage_number n = rd->values[rrdset_last_slot(r->st)];
 
         if(!does_storage_number_exist(n))
             buffer_strcat(wb, "null");
         else
             buffer_rrd_value(wb, unpack_storage_number(n));
+        */
     }
     if(!i) {
         rows = 0;

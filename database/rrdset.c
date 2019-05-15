@@ -363,6 +363,7 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_RAM:
+        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
             munmap(st, st->memsize);
             break;
@@ -541,6 +542,9 @@ RRDSET *rrdset_create_custom(
     int enabled = config_get_boolean(config_section, "enabled", 1);
     if(!enabled) entries = 5;
 
+    if(memory_mode == RRD_MEMORY_MODE_DBENGINE)
+        entries = config_set_number(config_section, "history", 5);
+
     unsigned long size = sizeof(RRDSET);
     char *cache_dir = rrdset_cache_dir(host, fullid, config_section);
 
@@ -552,9 +556,10 @@ RRDSET *rrdset_create_custom(
     debug(D_RRD_CALLS, "Creating RRD_STATS for '%s.%s'.", type, id);
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
-    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP || memory_mode == RRD_MEMORY_MODE_RAM) {
+    if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
+       memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         st = (RRDSET *) mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM)?NULL:fullfilename
+                  (memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE)?NULL:fullfilename
                 , size
                 , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
                 , 0
@@ -585,7 +590,7 @@ RRDSET *rrdset_create_custom(
             st->alarms = NULL;
             st->flags = 0x00000000;
 
-            if(memory_mode == RRD_MEMORY_MODE_RAM) {
+            if(memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
                 memset(st, 0, size);
             }
             else {
@@ -631,7 +636,10 @@ RRDSET *rrdset_create_custom(
 
     if(unlikely(!st)) {
         st = callocz(1, size);
-        st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
+        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            st->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        else
+            st->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
     st->plugin_name = plugin?strdupz(plugin):NULL;
@@ -1052,12 +1060,14 @@ static inline size_t rrdset_done_interpolate(
             }
 
             if(unlikely(!store_this_entry)) {
-                rd->values[current_entry] = SN_EMPTY_SLOT; //pack_storage_number(0, SN_NOT_EXISTS);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)
+//                rd->values[current_entry] = SN_EMPTY_SLOT; //pack_storage_number(0, SN_NOT_EXISTS);
                 continue;
             }
 
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
-                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
+                rd->state->collect_ops.store_metric(rd, next_store_ut, pack_storage_number(new_value, storage_flags));
+//                rd->values[current_entry] = pack_storage_number(new_value, storage_flags );
                 rd->last_stored_value = new_value;
 
                 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1079,7 +1089,8 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
-                rd->values[current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+//                rd->values[current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
+                rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)
                 rd->last_stored_value = NAN;
             }
 
@@ -1119,11 +1130,16 @@ static inline size_t rrdset_done_interpolate(
         // reset the storage flags for the next point, if any;
         storage_flags = SN_EXISTS;
 
-        counter++;
-        current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
+        st->counter = ++counter;
+        st->current_entry = current_entry = ((current_entry + 1) >= st->entries) ? 0 : current_entry + 1;
+
+        st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
+        st->last_updated.tv_usec = 0;
+
         last_stored_ut = next_store_ut;
     }
 
+/*
     st->counter = counter;
     st->current_entry = current_entry;
 
@@ -1131,6 +1147,7 @@ static inline size_t rrdset_done_interpolate(
         st->last_updated.tv_sec = (time_t) (last_ut / USEC_PER_SEC);
         st->last_updated.tv_usec = 0;
     }
+*/
 
     return stored_entries;
 }
@@ -1201,7 +1218,8 @@ void rrdset_done(RRDSET *st) {
     }
 
     // check if the chart has a long time to be updated
-    if(unlikely(st->usec_since_last_update > st->entries * update_every_ut)) {
+    if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
+                st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
         info("host '%s', chart %s: took too long to be updated (counter #%zu, update #%zu, %0.3" LONG_DOUBLE_MODIFIER " secs). Resetting it.", st->rrdhost->hostname, st->name, st->counter, st->counter_done, (LONG_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
         st->usec_since_last_update = update_every_ut;
@@ -1242,7 +1260,8 @@ void rrdset_done(RRDSET *st) {
     }
 
     // check if we will re-write the entire data set
-    if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->entries * update_every_ut)) {
+    if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->entries * update_every_ut &&
+                st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)) {
         info("%s: too old data (last updated at %ld.%ld, last collected at %ld.%ld). Resetting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
         rrdset_reset(st);
         rrdset_init_last_updated_time(st);
@@ -1266,8 +1285,14 @@ void rrdset_done(RRDSET *st) {
         // if we have not collected metrics this session (st->counter_done == 0)
         // and we have collected metrics for this chart in the past (st->counter != 0)
         // fill the gap (the chart has been just loaded from disk)
-        if(unlikely(st->counter)) {
+        if(unlikely(st->counter) && st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
             rrdset_done_fill_the_gap(st);
+            last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
+            next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
+        }
+        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            // set a fake last_updated to jump to current time
+            rrdset_init_last_updated_time(st);
             last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
             next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
         }
