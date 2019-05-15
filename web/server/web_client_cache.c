@@ -68,8 +68,10 @@ static void web_client_free(struct web_client *w) {
     freez(w->user_agent);
     freez(w);
 #ifdef ENABLE_HTTPS
-    SSL_free(w->ssl);
-    w->ssl = NULL;
+    if ( w->ssl){
+        SSL_free(w->ssl);
+        w->ssl = NULL;
+    }
 #endif
 }
 

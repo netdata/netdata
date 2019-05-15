@@ -92,7 +92,7 @@ void security_clean_openssl(){
 }
 
 int security_process_accept(SSL *ssl,int sock) {
-    sock_delnonblock(sock);
+ //   sock_delnonblock(sock);
     usec_t end = now_realtime_usec() + 600000;
     usec_t curr;
     int test;
@@ -140,12 +140,11 @@ int security_process_accept(SSL *ssl,int sock) {
         }
     }
 
-    sock_setnonblock(sock);
-
     if ( SSL_is_init_finished(ssl) )
     {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
     }
+//    sock_setnonblock(sock);
 
     return 0;
 }

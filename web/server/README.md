@@ -93,7 +93,7 @@ Netdata supports access lists in `netdata.conf`:
 
 ### Enabling TLS/SSL support
 
-Netdata since version 1.14 supports encrypted connections. To enable this option it is necessary to genereate a certificate and a key, case you do not have one it is possible to generate them  with the following command
+Netdata since version 1.15 ports encrypted connections. To enable this option it is necessary to genereate a certificate and a key, case you do not have one it is possible to generate them  with the following command
 
 $ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -nodes -keyout key.pem -out cert.pem
 

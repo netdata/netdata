@@ -1733,12 +1733,14 @@ ssize_t web_client_receive(struct web_client *w)
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
         return web_client_read_file(w);
 
+    ssize_t bytes;
+    ssize_t left = w->response.data->size - w->response.data->len;
+
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
-    ssize_t left = w->response.data->size - w->response.data->len;
-    ssize_t bytes;
 #ifdef ENABLE_HTTPS
+
     if (netdata_ctx) {
         if ( ( w->ssl ) && (!w->accepted)) {
             bytes = SSL_read(w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
@@ -1769,6 +1771,8 @@ ssize_t web_client_receive(struct web_client *w)
         debug(D_WEB_CLIENT, "%llu: receive data failed.", w->id);
         WEB_CLIENT_IS_DEAD(w);
     }
+
+    return(bytes);
 
     return(bytes);
 }

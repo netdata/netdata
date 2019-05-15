@@ -1,7 +1,6 @@
 #ifndef NETDATA_SECURITY_H
 # define NETDATA_SECURITY_H
 
-
 # include <openssl/ssl.h>
 # include <openssl/err.h>
 # if (SSLEAY_VERSION_NUMBER >= 0x0907000L) && (OPENSSL_VERSION_NUMBER < 0x10100000L)
