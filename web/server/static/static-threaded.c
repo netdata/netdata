@@ -174,7 +174,6 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         }
 
         if (w->ssl) {
-            error("KILLME REQUEST\n");
             if (SSL_set_fd(w->ssl, w->ifd) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
                 WEB_CLIENT_IS_DEAD(w);
@@ -191,7 +190,6 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
                     test[6] = 0x00;
                     uint32_t cmp = simple_uhash(test);
                     if ( cmp != hash_stream){
-                        error("KILLME %s\n",test);
                         w->accepted = security_process_accept(w->ssl, w->ifd);
                     }
                 }

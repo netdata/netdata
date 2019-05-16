@@ -824,7 +824,11 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
+#ifdef ENABLE_HTTPS
+ssize_t recv_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+#else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+#endif
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -852,10 +856,17 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         if(fd.events & POLLIN) break;
     }
 
+#ifdef ENABLE_HTTPS
     return recv(sockfd, buf, len, flags);
+#else
+#endif
 }
 
+#ifdef ENABLE_HTTPS
+ssize_t send_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+#else
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+#endif
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -883,7 +894,11 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         if(fd.events & POLLOUT) break;
     }
 
+#ifdef ENABLE_HTTPS
     return send(sockfd, buf, len, flags);
+#else
+    return send(sockfd, buf, len, flags);
+#endif
 }
 
 

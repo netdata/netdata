@@ -12,7 +12,7 @@ extern const char *security_key;
 extern const char *security_cert;
 
 void security_clean_openssl();
-void security_start_ssl();
+void security_start_ssl(int type);
 int security_process_accept(SSL *ssl,int sock);
 
 #endif //NETDATA_SECURITY_H

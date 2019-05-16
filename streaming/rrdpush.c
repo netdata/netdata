@@ -487,7 +487,11 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->program_version
     );
 
+#ifdef ENABLE_HTTPS
+    if(send_timeout(NULL,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
+#else
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
+#endif
         error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -495,7 +499,11 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
+#ifdef ENABLE_HTTPS
+    if(recv_timeout(NULL,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+#else
     if(recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+#endif
         error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -852,6 +860,9 @@ static int rrdpush_receive(int fd
                            , int update_every
                            , char *client_ip
                            , char *client_port
+#ifdef ENABLE_HTTPS
+                           , SSL *ssl
+#endif
 ) {
     RRDHOST *host;
     int history = default_rrd_history_entries;
@@ -965,7 +976,11 @@ static int rrdpush_receive(int fd
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", client_ip, client_port);
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
+#ifdef ENABLE_HTTPS
+    if(send_timeout(NULL,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+#else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+#endif
         log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "FAILED - CANNOT REPLY");
         error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", host->hostname, client_ip, client_port);
         close(fd);
@@ -1058,6 +1073,9 @@ struct rrdpush_thread {
     char *program_version;
     struct rrdhost_system_info *system_info;
     int update_every;
+#ifdef ENABLE_HTTPS
+    SSL *ssl;
+#endif
 };
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
@@ -1105,6 +1123,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
+	    , rpt->ssl
     );
 
     netdata_thread_cleanup_pop(1);
@@ -1295,6 +1314,9 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
+#ifdef ENABLE_HTTPS
+    rpt->ssl                = w->ssl;
+#endif
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');

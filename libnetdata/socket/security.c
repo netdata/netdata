@@ -11,54 +11,77 @@ static void security_info_callback(const SSL *ssl, int where, int ret) {
     }
 }
 
-static SSL_CTX * security_initialize_openssl(){
-    SSL_CTX *ctx;
-    char error[512];
-	static int netdata_id_context = 1;
-
-    //TO DO: Confirm the necessity to check return for other OPENSSL function
+void security_openssl_library()
+{
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-# if (SSLEAY_VERSION_NUMBER >= 0x0907000L)
-    OPENSSL_config(NULL);
+    # if (SSLEAY_VERSION_NUMBER >= 0x0907000L)
+        OPENSSL_config(NULL);
 # endif
-    SSL_library_init();
+        SSL_library_init();
 
 # if OPENSSL_API_COMPAT < 0x10100000L
-    SSL_load_error_strings();
+        SSL_load_error_strings();
 # endif
+#else
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL);
+#endif
+}
 
+void security_openssl_common_options(SSL_CTX *ctx){
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
+#else
+    SSL_CTX_set_min_proto_version(ctx,TLS1_VERSION);
+#endif
+    SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+}
+
+static SSL_CTX * security_initialize_openssl_client() {
+    SSL_CTX *ctx;
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    ctx = SSL_CTX_new(SSLv23_client_method());
+#else
+    ctx = SSL_CTX_new(TLS_client_method());
+#endif
+    security_openssl_common_options(ctx);
+
+    return ctx;
+}
+
+static SSL_CTX * security_initialize_openssl_server(){
+    SSL_CTX *ctx;
+    char lerror[512];
+	static int netdata_id_context = 1;
+
+    security_openssl_library();
+    //TO DO: Confirm the necessity to check return for other OPENSSL function
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	ctx = SSL_CTX_new(SSLv23_server_method());
     if ( !ctx ) {
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
 
-    SSL_CTX_set_options(ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
-
     SSL_CTX_use_certificate_file(ctx, security_cert, SSL_FILETYPE_PEM);
 #else
-    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL);
     ctx = SSL_CTX_new(TLS_server_method());
     if ( !ctx ){
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
 
-    SSL_CTX_set_min_proto_version(ctx,TLS1_VERSION);
-    //SET OTHER PROTOCOL VERSIONS(TLS1_2_VERSION)
-
     SSL_CTX_use_certificate_chain_file(ctx, security_cert );
 #endif
+    security_openssl_common_options(ctx);
 
     SSL_CTX_use_PrivateKey_file(ctx, security_key, SSL_FILETYPE_PEM);
     if ( !SSL_CTX_check_private_key(ctx) ){
-        ERR_error_string_n(ERR_get_error(),error,sizeof(error));
-		error("Private key check error: %s",error);
+        ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
+		error("Private key check error: %s",lerror);
         SSL_CTX_free(ctx);
         return NULL;
     }
 
-    SSL_CTX_set_session_cache_mode(ctx,SSL_SESS_CACHE_NO_AUTO_CLEAR|SSL_SESS_CACHE_SERVER);
 	SSL_CTX_set_session_id_context(ctx,(void*)&netdata_id_context,(unsigned int)sizeof(netdata_id_context));
     SSL_CTX_set_info_callback(ctx,security_info_callback);
 
@@ -70,14 +93,14 @@ static SSL_CTX * security_initialize_openssl(){
     return ctx;
 }
 
-void security_start_ssl(){
+void security_start_ssl(int type){
     struct stat statbuf;
     if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ){
         info("To use encryptation it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
         return;
     }
 
-    netdata_ctx =  security_initialize_openssl();
+    netdata_ctx =  (!type)?security_initialize_openssl_server():security_initialize_openssl_client();
 }
 
 void security_clean_openssl(){
