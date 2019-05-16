@@ -38,6 +38,7 @@ function rnd(min, max) {
 
 // Main function
 export default function () {
+    // Control what the data request asks for
     let charts = [ "example.random" ]
     let chartmin = 0;
     let chartmax = charts.length - 1; 
@@ -49,7 +50,7 @@ export default function () {
     let pointsmax = 3600;
 
     group("Requests", function () {
-        // Execute multiple requests in parallel like a browser, to fetch data for the charts
+        // Execute multiple requests in parallel like a browser, to fetch data for the charts. The one taking the longes is the data request.
         let resps = http.batch([
             ["GET", "http://localhost:19999/api/v1/info", { tags: { fast: "yes" } }],
             ["GET", "http://localhost:19999/api/v1/charts", { tags: { fast: "yes" } }],
