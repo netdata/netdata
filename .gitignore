@@ -130,6 +130,7 @@ cmake_install.cmake
 .jetbrains*
 
 .DS_Store
+webcopylocal*
 
 contrib/debian/changelog
 
