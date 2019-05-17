@@ -87,7 +87,6 @@ markdown_extensions:
  - admonition
  - codehilite
  - meta
- - nl2br
  - sane_lists
  - smarty
  - toc:
@@ -156,6 +155,7 @@ echo -ne "        - Running behind another web server:
 "
 #navpart 2 system
 navpart 2 database
+navpart 2 database/engine
 navpart 2 registry
 
 echo -ne "    - 'docs/Performance.md'
