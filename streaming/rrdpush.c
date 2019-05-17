@@ -435,6 +435,21 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
             , connected_to_size
     );
 
+#ifdef ENABLE_HTTPS
+    if(netdata_cli_ctx){
+        if (!host->ssl.conn){
+            host->ssl.conn = SSL_new(netdata_cli_ctx);
+            if (host->ssl.conn)
+            {
+                if (SSL_set_fd(host->ssl.conn, host->rrdpush_sender_socket) != 1) {
+                    error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
+                    host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                }
+            }
+        }
+    }
+#endif
+
     if(unlikely(host->rrdpush_sender_socket == -1)) {
         error("STREAM %s [send to %s]: failed to connect", host->hostname, host->rrdpush_send_destination);
         return 0;
@@ -442,6 +457,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
 
+    //CREATE SAFETY STREAM HEADER
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
@@ -572,6 +588,10 @@ void *rrdpush_sender_thread(void *ptr) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.", host->hostname, gettid());
         return NULL;
     }
+
+#ifdef ENABLE_HTTPS
+    security_start_ssl(1);
+#endif
 
     info("STREAM %s [send]: thread created (task id %d)", host->hostname, gettid());
 
@@ -861,9 +881,13 @@ static int rrdpush_receive(int fd
                            , char *client_ip
                            , char *client_port
 #ifdef ENABLE_HTTPS
-                           , SSL *ssl
+                           , struct netdata_ssl *ssl
 #endif
 ) {
+
+#ifdef ENABLE_HTTPS
+    (void)ssl;
+#endif
     RRDHOST *host;
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
@@ -1074,7 +1098,7 @@ struct rrdpush_thread {
     struct rrdhost_system_info *system_info;
     int update_every;
 #ifdef ENABLE_HTTPS
-    SSL *ssl;
+    struct netdata_ssl *ssl;
 #endif
 };
 
@@ -1315,7 +1339,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
 #ifdef ENABLE_HTTPS
-    rpt->ssl                = w->ssl;
+    rpt->ssl                = &w->ssl;
 #endif
 
     if(w->user_agent && w->user_agent[0]) {

@@ -28,9 +28,9 @@ static void web_client_release_ssl(struct web_client *w){
  */
 
 static void web_client_reuse_ssl(struct web_client *w) {
-    if (netdata_ctx) {
-        if (w->ssl) {
-            SSL_clear(w->ssl);
+    if (netdata_srv_ctx) {
+        if (w->ssl.conn) {
+            SSL_clear(w->ssl.conn);
         }
     }
 }
@@ -68,9 +68,9 @@ static void web_client_free(struct web_client *w) {
     freez(w->user_agent);
     freez(w);
 #ifdef ENABLE_HTTPS
-    if ( w->ssl){
-        SSL_free(w->ssl);
-        w->ssl = NULL;
+    if ( w->ssl.conn){
+        SSL_free(w->ssl.conn);
+        w->ssl.conn = NULL;
     }
 #endif
 }
@@ -197,23 +197,23 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         if(w->next) w->next->prev = w->prev;
         web_clients_cache.avail_count--;
 #ifdef ENABLE_HTTPS
-        SSL *ssl = w->ssl;
+        SSL *ssl = w->ssl.conn;
         web_client_reuse_ssl(w);
 #endif
         web_client_zero(w);
         web_clients_cache.reused++;
 #ifdef ENABLE_HTTPS
-        w->ssl = ssl;
-        w->accepted = 1;
-        debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->accepted,w->ifd);
+        w->ssl.conn = ssl;
+        w->ssl.flags = NETDATA_SSL_START;
+        debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->ssl.flags,w->ifd);
 #endif
     }
     else {
         // allocate it
         w = web_client_alloc();
 #ifdef ENABLE_HTTPS
-        w->accepted = 1;
-        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->accepted,w->ifd);
+        w->ssl.flags = NETDATA_SSL_START;
+        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %d) to %d",w->ssl.flags,w->ifd);
 #endif
         web_clients_cache.allocated++;
     }
@@ -257,7 +257,7 @@ void web_client_release(struct web_client *w) {
         w->ifd = w->ofd = -1;
 #ifdef ENABLE_HTTPS
         web_client_reuse_ssl(w);
-        w->accepted = 1;
+        w->ssl.flags = 1;
 #endif
 
     }

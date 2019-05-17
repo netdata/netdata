@@ -922,9 +922,9 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if (netdata_ctx){
-        if ( ( w->ssl ) && ( !w->accepted ) ){
-            bytes = SSL_write(w->ssl,buf, len) ;
+    if (netdata_srv_ctx){
+        if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
+            bytes = SSL_write(w->ssl.conn,buf, len) ;
         } else {
             bytes = send(w->ofd,buf, len , flags);
         }
@@ -1067,9 +1067,9 @@ static inline void web_client_send_http_header(struct web_client *w) {
     size_t count = 0;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if (netdata_ctx){
-           if ( ( w->ssl ) && ( !w->accepted ) ){
-                while((bytes = SSL_write(w->ssl, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
+    if (netdata_srv_ctx){
+           if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
+                while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
                     if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
                         error("Cannot send HTTP headers to web client.");
@@ -1361,8 +1361,8 @@ void web_client_process_request(struct web_client *w) {
 
             buffer_flush(w->response.data);
 #ifdef ENABLE_HTTPS
-            if (netdata_ctx) {
-                if ((w->ssl) && (w->accepted == 3)) {
+            if (netdata_srv_ctx) {
+                if ((w->ssl.conn) && (w->ssl.flags == NETDATA_SSL_NO_HANDSHAKE)) {
                     w->response.data->contenttype = CT_TEXT_HTML;
                     buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection...</body></html>");
                     w->response.code = 301;
@@ -1741,9 +1741,9 @@ ssize_t web_client_receive(struct web_client *w)
 
 #ifdef ENABLE_HTTPS
 
-    if (netdata_ctx) {
-        if ( ( w->ssl ) && (!w->accepted)) {
-            bytes = SSL_read(w->ssl, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+    if (netdata_srv_ctx) {
+        if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
+            bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
         }else {
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }

@@ -1,6 +1,7 @@
 #include "../libnetdata.h"
 
-SSL_CTX *netdata_ctx=NULL;
+SSL_CTX *netdata_cli_ctx=NULL;
+SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
 
@@ -53,7 +54,6 @@ static SSL_CTX * security_initialize_openssl_server(){
     char lerror[512];
 	static int netdata_id_context = 1;
 
-    security_openssl_library();
     //TO DO: Confirm the necessity to check return for other OPENSSL function
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	ctx = SSL_CTX_new(SSLv23_server_method());
@@ -94,20 +94,30 @@ static SSL_CTX * security_initialize_openssl_server(){
 }
 
 void security_start_ssl(int type){
-    struct stat statbuf;
-    if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ){
-        info("To use encryptation it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
-        return;
-    }
+    if ( !type){
+        struct stat statbuf;
+        if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ){
+            info("To use encryptation it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
+            return;
+        }
 
-    netdata_ctx =  (!type)?security_initialize_openssl_server():security_initialize_openssl_client();
+        netdata_srv_ctx =  security_initialize_openssl_server();
+    }
+    else {
+        netdata_cli_ctx =  security_initialize_openssl_client();
+    }
 }
 
 void security_clean_openssl(){
-	if ( netdata_ctx )
+	if ( netdata_srv_ctx )
 	{
-		SSL_CTX_free(netdata_ctx);
+		SSL_CTX_free(netdata_srv_ctx);
 	}
+
+    if ( netdata_cli_ctx )
+    {
+        SSL_CTX_free(netdata_cli_ctx);
+    }
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     ERR_free_strings();
@@ -115,7 +125,6 @@ void security_clean_openssl(){
 }
 
 int security_process_accept(SSL *ssl,int sock) {
- //   sock_delnonblock(sock);
     usec_t end = now_realtime_usec() + 600000;
     usec_t curr;
     int test;
@@ -130,7 +139,7 @@ int security_process_accept(SSL *ssl,int sock) {
                     if ( curr >=  end)
                     {
                         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna read on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                        return 1;
+                        return NETDATA_SSL_WANT_READ;
                     }
                     break;
                 }
@@ -139,14 +148,14 @@ int security_process_accept(SSL *ssl,int sock) {
                     if ( curr >=  end)
                     {
                         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna write on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                        return 2;
+                        return NETDATA_SSL_WANT_WRITE;
                     }
                     break;
                 }
 				case SSL_ERROR_SSL:
 				{
 					debug(D_WEB_CLIENT_ACCESS,"There is not a SSL request on socket %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                	return 3;
+                	return NETDATA_SSL_NO_HANDSHAKE;
 				}
                 case SSL_ERROR_NONE:
                 {
@@ -167,7 +176,6 @@ int security_process_accept(SSL *ssl,int sock) {
     {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
     }
-//    sock_setnonblock(sock);
 
     return 0;
 }

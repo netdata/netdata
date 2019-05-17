@@ -829,6 +829,10 @@ ssize_t recv_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int 
 #else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
 #endif
+
+#ifdef ENABLE_HTTPS
+    (void)ssl;
+#endif
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -866,6 +870,10 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 ssize_t send_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
 #else
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+#endif
+
+#ifdef ENABLE_HTTPS
+    (void)ssl;
 #endif
     for(;;) {
         struct pollfd fd = {

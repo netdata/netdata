@@ -723,6 +723,10 @@ struct rrdhost {
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
 #endif
 
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl ssl;                         //Structure used to encrypt the connection
+#endif
+
     struct rrdhost *next;
 };
 extern RRDHOST *localhost;

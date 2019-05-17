@@ -161,20 +161,21 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     }
 
 #ifdef ENABLE_HTTPS
-    if ( netdata_ctx ) {
+    if ( netdata_srv_ctx ) {
         //the next two ifs are not together because I am reusing SSL structure
-        if (!w->ssl)
+        if (!w->ssl.conn)
         {
-            if ((w->ssl = SSL_new(netdata_ctx))) {
-                SSL_set_accept_state(w->ssl);
+            w->ssl.conn = SSL_new(netdata_srv_ctx);
+            if ( w->ssl.conn ) {
+                SSL_set_accept_state(w->ssl.conn);
             } else {
                 error("Failed to create SSL context on socket fd %d.", w->ifd);
                 WEB_CLIENT_IS_DEAD(w);
             }
         }
 
-        if (w->ssl) {
-            if (SSL_set_fd(w->ssl, w->ifd) != 1) {
+        if (w->ssl.conn) {
+            if (SSL_set_fd(w->ssl.conn, w->ifd) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
                 WEB_CLIENT_IS_DEAD(w);
             }
@@ -190,7 +191,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
                     test[6] = 0x00;
                     uint32_t cmp = simple_uhash(test);
                     if ( cmp != hash_stream){
-                        w->accepted = security_process_accept(w->ssl, w->ifd);
+                        w->ssl.flags = security_process_accept(w->ssl.conn, w->ifd);
                     }
                 }
                 sock_setnonblock(w->ifd);
@@ -440,6 +441,9 @@ void *socket_listen_main_static_threaded(void *ptr) {
             if(!api_sockets.opened)
                 fatal("LISTENER: no listen sockets available.");
 
+#ifdef ENABLE_HTTPS
+            security_start_ssl(0);
+#endif
             // 6 threads is the optimal value
             // since 6 are the parallel connections browsers will do
             // so, if the machine has more CPUs, avoid using resources unnecessarily

@@ -154,8 +154,7 @@ struct web_client {
     size_t pollinfo_slot;           // POLLINFO slot of the web client
     size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
 #ifdef ENABLE_HTTPS
-	SSL *ssl; //SSL connection
-	int accepted;
+    struct netdata_ssl ssl;
 #endif
 };
 

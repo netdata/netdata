@@ -358,7 +358,7 @@ static void security_init(){
     snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
     security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
 
-    security_start_ssl(0);
+    security_openssl_library();
 }
 #endif
 
