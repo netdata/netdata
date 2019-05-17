@@ -130,7 +130,7 @@ calculated_number backend_calculate_value_from_stored_data(
         counter++;
     }
 */
-    for(rd->state->query_ops.init(rd, &handle, before, after) ; !rd->state->query_ops.is_finished(&handle) ; ) {
+    for(rd->state->query_ops.init(rd, &handle, after, before) ; !rd->state->query_ops.is_finished(&handle) ; ) {
         n = rd->state->query_ops.next_metric(&handle);
 
         if(unlikely(!does_storage_number_exist(n))) {
