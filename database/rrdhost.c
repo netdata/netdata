@@ -147,6 +147,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_sender_pipe[0] = -1;
     host->rrdpush_sender_pipe[1] = -1;
     host->rrdpush_sender_socket  = -1;
+#ifdef ENABLE_HTTPS
+    host->ssl.conn = NULL;
+    host->ssl.flags = NETDATA_SSL_START;
+#endif
 
     netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);

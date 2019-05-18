@@ -182,13 +182,14 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
             else{
                 static uint32_t hash_stream = 0;
                 if(unlikely(!hash_stream)) {
-                    hash_stream = simple_uhash("STREAM");
+                    hash_stream = simple_uhash("STREAM ");
                 }
                 sock_delnonblock(w->ifd);
                 char test[8];
-                if ( recv(w->ifd,test, 6,MSG_PEEK) == 6 )
+                if ( recv(w->ifd,test, 7,MSG_PEEK) == 7 )
                 {
-                    test[6] = 0x00;
+                    test[7] = 0x00;
+ //                   error("KILLME HEADER: %s",test);
                     uint32_t cmp = simple_uhash(test);
                     if ( cmp != hash_stream){
                         w->ssl.flags = security_process_accept(w->ssl.conn, w->ifd);

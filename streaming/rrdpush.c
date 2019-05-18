@@ -414,6 +414,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     }
 }
 
+//called from client side
 static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     struct timeval tv = {
             .tv_sec = timeout,
@@ -435,21 +436,6 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
             , connected_to_size
     );
 
-#ifdef ENABLE_HTTPS
-    if(netdata_cli_ctx){
-        if (!host->ssl.conn){
-            host->ssl.conn = SSL_new(netdata_cli_ctx);
-            if (host->ssl.conn)
-            {
-                if (SSL_set_fd(host->ssl.conn, host->rrdpush_sender_socket) != 1) {
-                    error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
-                    host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-                }
-            }
-        }
-    }
-#endif
-
     if(unlikely(host->rrdpush_sender_socket == -1)) {
         error("STREAM %s [send to %s]: failed to connect", host->hostname, host->rrdpush_send_destination);
         return 0;
@@ -457,11 +443,39 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
 
-    //CREATE SAFETY STREAM HEADER
+#ifdef ENABLE_HTTPS
+    if(netdata_cli_ctx){
+        if (!host->ssl.conn){
+            host->ssl.conn = SSL_new(netdata_cli_ctx);
+            if(host->ssl.conn){
+                error("Failed to allocate SSL structure.");
+            }
+        }
+        else{
+            SSL_clear(host->ssl.conn);
+        }
+
+        if (host->ssl.conn)
+        {
+            if (SSL_set_fd(host->ssl.conn, host->rrdpush_sender_socket) != 1) {
+                error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            } else{
+  //              host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+            }
+        }
+    }
+#endif
+
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
+#ifdef ENABLE_HTTPS
+            "STREAM%skey=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
+#else
             "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
+#endif
                     "&NETDATA_SYSTEM_OS_NAME=%s"
                     "&NETDATA_SYSTEM_OS_ID=%s"
                     "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -478,6 +492,9 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                     " HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
+#ifdef ENABLE_HTTPS
+              ,(!host->ssl.flags )?"S ":" "
+#endif
               , host->rrdpush_send_api_key
               , host->hostname
               , host->registry_hostname
@@ -504,7 +521,15 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     );
 
 #ifdef ENABLE_HTTPS
-    if(send_timeout(NULL,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
+    if (!host->ssl.flags) {
+        ERR_clear_error();
+        int err = SSL_connect(host->ssl.conn);
+        if (err != 1){
+            err = SSL_get_error(host->ssl.conn, err);
+            error("SSL cannot connect ith the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
+        }
+    }
+    if(send_timeout((!host->ssl.flags)?host->ssl.conn:NULL,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #else
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #endif
@@ -516,7 +541,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
 #ifdef ENABLE_HTTPS
-    if(recv_timeout(NULL,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    if(recv_timeout((!host->ssl.flags)?host->ssl.conn:NULL,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
 #else
     if(recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
 #endif
@@ -1001,7 +1026,7 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
 #ifdef ENABLE_HTTPS
-    if(send_timeout(NULL,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+    if(send_timeout((!ssl->flags)?ssl->conn:NULL,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #endif

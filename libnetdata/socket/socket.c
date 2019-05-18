@@ -830,9 +830,6 @@ ssize_t recv_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int 
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
 #endif
 
-#ifdef ENABLE_HTTPS
-    (void)ssl;
-#endif
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -861,9 +858,13 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 
 #ifdef ENABLE_HTTPS
-    return recv(sockfd, buf, len, flags);
-#else
+    (void)flags;
+    if (ssl)
+    {
+        return SSL_read(ssl,buf,len);
+    }
 #endif
+    return recv(sockfd, buf, len, flags);
 }
 
 #ifdef ENABLE_HTTPS
@@ -872,9 +873,6 @@ ssize_t send_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int 
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
 #endif
 
-#ifdef ENABLE_HTTPS
-    (void)ssl;
-#endif
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -903,10 +901,12 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 
 #ifdef ENABLE_HTTPS
-    return send(sockfd, buf, len, flags);
-#else
-    return send(sockfd, buf, len, flags);
+    (void)flags;
+    if(ssl){
+        return SSL_write(ssl, buf, len);
+    }
 #endif
+    return send(sockfd, buf, len, flags);
 }
 
 

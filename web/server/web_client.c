@@ -846,8 +846,14 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         encoded_url = s = &s[8];
         w->mode = WEB_CLIENT_MODE_OPTIONS;
     }
-    else if(!strncmp(s, "STREAM ", 7)) {
+   // else if(!strncmp(s, "STREAM ", 7)) {
+    else if(!strncmp(s, "STREAM", 6)) {
+
         encoded_url = s = &s[7];
+        if(*encoded_url != 'k')
+        {
+            encoded_url++;
+        }
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
