@@ -32,13 +32,27 @@ setup_terminal() {
 
 	return 0
 }
+setup_terminal || echo >/dev/null
 
-progress() {
-	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+# -----------------------------------------------------------------------------
+fatal() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+	exit 1
 }
 
+run_ok() {
+	printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+}
+
+run_failed() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+}
+
+ESCAPED_PRINT_METHOD=
+printf "%q " test >/dev/null 2>&1
+[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
-	if printf "%q " test >/dev/null 2>&1; then
+	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
 		printf "%q " "${@}"
 	else
 		printf "%s" "${*}"
@@ -46,24 +60,39 @@ escaped_print() {
 	return 0
 }
 
+progress() {
+	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+}
+
+run_logfile="/dev/null"
 run() {
-	local dir="${PWD}" info_console
+	local user="${USER--}" dir="${PWD}" info info_console
 
 	if [ "${UID}" = "0" ]; then
+		info="[root ${dir}]# "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
 	else
+		info="[${user} ${dir}]$ "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	escaped_print "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" "${@}" "${TPUT_RESET}\n" >&2
+	printf >>"${run_logfile}" "${info}"
+	escaped_print >>"${run_logfile}" "${@}"
+	printf >>"${run_logfile}" " ... "
+
+	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+	escaped_print >&2 "${@}"
+	printf >&2 "${TPUT_RESET}\n"
 
 	"${@}"
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+		run_failed
+		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
 	else
-		printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+		run_ok
+		printf >>"${run_logfile}" "OK\n"
 	fi
 
 	return ${ret}
@@ -129,8 +158,6 @@ umask 022
 sudo=""
 [ -z "${UID}" ] && UID="$(id -u)"
 [ "${UID}" -ne "0" ] && sudo="sudo"
-
-setup_terminal || echo >/dev/null
 
 # ---------------------------------------------------------------------------------------------------------------------
 if [ "$(uname -m)" != "x86_64" ]; then
