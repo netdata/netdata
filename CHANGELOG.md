@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- BUG when compiling code in mac OS [\#6043](https://github.com/netdata/netdata/issues/6043)
 - Unexpected change to metrics sent to backends with new dbengine [\#6039](https://github.com/netdata/netdata/issues/6039)
 - netdata/packaging: Fix installer failure on missing packages [\#6026](https://github.com/netdata/netdata/issues/6026)
 - Prowl notifications ignored by alarm-notify.sh [\#6021](https://github.com/netdata/netdata/issues/6021)
@@ -32,6 +33,7 @@
 - File not found by glob when building an rpm \(latest code - 20181218\) [\#5033](https://github.com/netdata/netdata/issues/5033)
 - Issue creating deb package from v1.11.1 [\#4979](https://github.com/netdata/netdata/issues/4979)
 - netdata service fails to start - pfsense [\#3469](https://github.com/netdata/netdata/issues/3469)
+- netdata/packaging: Fix kickstart/kickstart-static64 formatting bugs [\#6048](https://github.com/netdata/netdata/pull/6048) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Adjust auto-updater installation logic [\#6035](https://github.com/netdata/netdata/pull/6035) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Fix broken netdata docker image for dbengine-enabled code [\#6020](https://github.com/netdata/netdata/pull/6020) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix segmentation fault [\#6011](https://github.com/netdata/netdata/pull/6011) ([vlvkobal](https://github.com/vlvkobal))
@@ -70,6 +72,7 @@
 
 **Merged pull requests:**
 
+- netdata/daemon/backends: Fix AWS Kinesis link error [\#6047](https://github.com/netdata/netdata/pull/6047) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Fix makeself packaging [\#6041](https://github.com/netdata/netdata/pull/6041) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix timestamps being reversed for backends [\#6040](https://github.com/netdata/netdata/pull/6040) ([mfundul](https://github.com/mfundul))
 - Improve paragraphs in HTML docs [\#6032](https://github.com/netdata/netdata/pull/6032) ([cakrit](https://github.com/cakrit))
