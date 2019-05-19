@@ -72,7 +72,7 @@ AC_ARG_ENABLE(
 )
 AC_ARG_ENABLE(
     [backend-kinesis],
-    [AS_HELP_STRING([--enable-backend-xenstat], [enable kinesis backend @<:@default autodetect@:>@])],
+    [AS_HELP_STRING([--enable-backend-kinesis], [enable kinesis backend @<:@default autodetect@:>@])],
     ,
     [enable_backend_kinesis="detect"]
 )

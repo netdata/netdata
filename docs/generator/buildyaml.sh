@@ -87,7 +87,6 @@ markdown_extensions:
  - admonition
  - codehilite
  - meta
- - nl2br
  - sane_lists
  - smarty
  - toc:

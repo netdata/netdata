@@ -1,11 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#
+# Artifacts creation script.
+# This script generates two things:
+#   1) The static binary that can run on all linux distros (built-in dependencies etc)
+#   2) The distribution source tarbal
+#
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
+#
 # shellcheck disable=SC2230
 
 set -e
 
-if [ ! -f .gitignore ]; then
-	echo "Run as ./travis/$(basename "$0") from top level directory of git repository"
-	exit 1
+# If we are not in netdata git repo, at the top level directory, fail
+TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
+CWD=$(git rev-parse --show-cdup || echo "")
+if [ -n "${CWD}" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
+    echo "Run as .travis/$(basename "$0") from top level directory of netdata git repository"
+    exit 1
 fi
 
 if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
@@ -13,8 +26,9 @@ if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
 	exit 0
 fi;
 
+
 echo "--- Initialize git configuration ---"
-git checkout master
+git checkout "${1-master}"
 git pull
 
 # Everything from this directory will be uploaded to GCS
