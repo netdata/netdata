@@ -606,6 +606,11 @@ portable_add_user() {
 		run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
 	fi
 
+	# mac OS
+	if command -v sysadminctl 1> /dev/null 2>&1; then
+		run sysadminctl -addUser  ${username} && return 0
+	fi
+
 	echo >&2 "Failed to add ${username} user account !"
 
 	return 1
@@ -635,6 +640,11 @@ portable_add_group() {
 	# BusyBox
 	if command -v addgroup 1>/dev/null 2>&1; then
 		run addgroup "${groupname}" && return 0
+	fi
+
+	# mac OS
+	if command -v dseditgroup 1> /dev/null 2>&1; then
+		dseditgroup -o create "${groupname}" && return 0
 	fi
 
 	echo >&2 "Failed to add ${groupname} user group !"
@@ -674,6 +684,10 @@ portable_add_user_to_group() {
 			run addgroup "${username}" "${groupname}" && return 0
 		fi
 
+		# mac OS
+		if command -v dseditgroup 1> /dev/null 2>&1; then
+			dseditgroup -u "${username}" "${groupname}" && return 0
+		fi
 		echo >&2 "Failed to add user ${username} to group ${groupname} !"
 		return 1
 	fi
