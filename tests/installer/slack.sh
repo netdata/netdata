@@ -50,5 +50,9 @@ post_message() {
 			echo "Sending ${POST_MESSAGE}"
 			curl -X POST --data-urlencode "payload=${POST_MESSAGE}" "${SLACK_NOTIFY_WEBHOOK_URL}"
 			;;
+		*)
+			echo "Unrecognized message type \"$TYPE\" was given"
+			return 1
+			;;
 	esac
 }
