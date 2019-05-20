@@ -307,7 +307,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             if(as_collected) {
-                if(rrdset_flag_check(st, RRDSET_FLAG_HOMEGENEOUS_CHECK))
+                if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
                     rrdset_update_heterogeneous_flag(st);
 
                 if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
@@ -537,6 +537,149 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
     rrdhost_unlock(host);
 }
 
+static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, BACKEND_OPTIONS backend_options, time_t after, time_t before) {
+    rrdhost_rdlock(host);
+
+    char hostname[PROMETHEUS_ELEMENT_MAX + 1];
+    prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
+
+    char labels[PROMETHEUS_LABELS_MAX + 1] = "";
+    buffer_sprintf(wb, "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
+
+    if(host->tags && *(host->tags)) {
+        buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
+    }
+
+    snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
+
+    // for each chart
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        char chart[PROMETHEUS_ELEMENT_MAX + 1];
+        char context[PROMETHEUS_ELEMENT_MAX + 1];
+        char family[PROMETHEUS_ELEMENT_MAX + 1];
+        char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
+
+        prometheus_label_copy(chart, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
+        prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
+        prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
+
+        if(likely(backends_can_send_rrdset(backend_options, st))) {
+            rrdset_rdlock(st);
+
+            int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
+            int homogeneous = 1;
+            if(as_collected) {
+                if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
+                    rrdset_update_heterogeneous_flag(st);
+
+                if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
+                    homogeneous = 0;
+            }
+            else {
+                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
+            }
+
+            // for each dimension
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+                    char dimension[PROMETHEUS_ELEMENT_MAX + 1];
+                    char *suffix = "";
+
+                    if (as_collected) {
+                        // we need as-collected / raw data
+
+                        if(unlikely(rd->last_collected_time.tv_sec < after))
+                            continue;
+
+                        const char *t = "gauge", *h = "gives";
+                        if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
+                           rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
+                            t = "counter";
+                            h = "delta gives";
+                            suffix = "_total";
+                        }
+
+                        if(homogeneous) {
+                            // all the dimensions of the chart, has the same algorithm, multiplier and divisor
+                            // we add all dimensions as labels
+
+                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                            buffer_sprintf(wb
+                                           , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                                           , prefix
+                                           , context
+                                           , suffix
+                                           , chart
+                                           , family
+                                           , dimension
+                                           , labels
+                                           , rd->last_collected_value
+                                           , timeval_msec(&rd->last_collected_time)
+                            );
+                        }
+                        else {
+                            // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
+                            // we create a metric per dimension
+
+                            prometheus_name_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                            buffer_sprintf(wb
+                                           , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                                           , prefix
+                                           , context
+                                           , dimension
+                                           , suffix
+                                           , chart
+                                           , family
+                                           , labels
+                                           , rd->last_collected_value
+                                           , timeval_msec(&rd->last_collected_time)
+                            );
+                        }
+                    }
+                    else {
+                        // we need average or sum of the data
+
+                        time_t first_t = after, last_t = before;
+                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
+
+                        if(!isnan(value) && !isinf(value)) {
+
+                            if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+                                suffix = "_average";
+                            else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
+                                suffix = "_sum";
+
+                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+
+                            buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
+                                           , prefix
+                                           , context
+                                           , units
+                                           , suffix
+                                           , chart
+                                           , family
+                                           , dimension
+                                           , labels
+                                           , value
+                                           , last_t * MSEC_PER_SEC
+                            );
+                        }
+                    }
+                }
+            }
+
+            rrdset_unlock(st);
+        }
+    }
+
+    rrdhost_unlock(host);
+}
+
 static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_OPTIONS backend_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";
 
@@ -596,6 +739,19 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
     rrd_rdlock();
     rrdhost_foreach_read(host) {
         rrd_stats_api_v1_charts_allmetrics_prometheus(host, wb, prefix, backend_options, after, before, 1, output_options);
+    }
+    rrd_unlock();
+}
+
+void rrd_stats_remote_write_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options) {
+    time_t before = now_realtime_sec();
+
+    // we start at the point we had stopped before
+    time_t after = prometheus_preparation(host, wb, backend_options, server, before, 0);
+
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        rrd_stats_remote_write_allmetrics_prometheus(host, wb, prefix, backend_options, after, before);
     }
     rrd_unlock();
 }

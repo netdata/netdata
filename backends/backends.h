@@ -53,4 +53,8 @@ extern int discard_response(BUFFER *b, const char *backend);
 #include "backends/aws_kinesis/aws_kinesis.h"
 #endif
 
+#if HAVE_PROTOBUF
+#include "backends/prometheus/remote_write/remote_write.h"
+#endif
+
 #endif /* NETDATA_BACKENDS_H */

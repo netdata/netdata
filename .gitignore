@@ -59,6 +59,10 @@ xenstat.plugin
 cgroup-network
 !cgroup-network/
 
+# protoc generated files
+backends/prometheus/remote_write/remote_write.pb.cc
+backends/prometheus/remote_write/remote_write.pb.h
+
 # installation artifacts
 packaging/installer/.environment.sh
 *.tar.*

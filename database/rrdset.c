@@ -210,7 +210,7 @@ inline void rrdset_update_heterogeneous_flag(RRDSET *st) {
 
     RRDDIM *rd;
 
-    rrdset_flag_clear(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    rrdset_flag_clear(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
 
     RRD_ALGORITHM algorithm = st->dimensions->algorithm;
     collected_number multiplier = abs(st->dimensions->multiplier);

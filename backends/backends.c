@@ -254,9 +254,9 @@ void *backends_main(void *ptr) {
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
+    int do_kinesis = 0, do_prometheus_remote_write = 0;
 
 #if HAVE_KINESIS
-    int do_kinesis = 0;
     char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
 #endif
 
@@ -337,9 +337,8 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_stored_json_plaintext;
 
     }
-#if HAVE_KINESIS
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
-
+#if HAVE_KINESIS
         do_kinesis = 1;
 
         if(unlikely(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name))) {
@@ -354,9 +353,19 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_collected_json_plaintext;
         else
             backend_request_formatter = format_dimension_stored_json_plaintext;
-
-    }
+#else
+        error("AWS Kinesis support isn't compiled");
 #endif /* HAVE_KINESIS */
+    }
+    else if (!strcmp(type, "prometheus remote write")) {
+#if HAVE_PROTOBUF
+        do_prometheus_remote_write = 1;
+
+        init_write_request();
+#else
+        error("Prometheus remote write support isn't compiled");
+#endif /* HAVE_PROTOBUF */
+    }
     else {
         error("BACKEND: Unknown backend type '%s'", type);
         goto cleanup;
@@ -451,6 +460,10 @@ void *backends_main(void *ptr) {
         size_t count_charts_total = 0;
         size_t count_dims_total = 0;
 
+#if HAVE_PROTOBUF
+        RRDHOST *host = localhost;
+        rrd_stats_remote_write_allmetrics_prometheus_all_hosts(host, b, NULL, global_backend_prefix, global_backend_options);
+#else
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
@@ -508,6 +521,7 @@ void *backends_main(void *ptr) {
             rrdhost_unlock(host);
         }
         rrd_unlock();
+#endif /* HAVE_PROTOBUF */
 
         netdata_thread_enable_cancelability();
 
@@ -772,6 +786,12 @@ cleanup:
         freez(kinesis_auth_key_id);
         freez(kinesis_secure_key);
         freez(kinesis_stream_name);
+    }
+#endif
+
+#if HAVE_PROTOBUF
+    if(do_prometheus_remote_write) {
+        protocol_buffers_shutdown();
     }
 #endif
 
