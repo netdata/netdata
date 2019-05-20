@@ -350,8 +350,13 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
 
     uv_rwlock_wrlock(&page_index->lock);
     ret = JudyLDel(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
-    assert(1 == ret);
     uv_rwlock_wrunlock(&page_index->lock);
+//    assert(1 == ret);
+    if (unlikely(1 != ret)) {
+        error("%s: JudyLDel failed with %d", __func__, ret);
+        print_page_cache_descr(descr);
+        return;
+    }
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     ++ctx->stats.pg_cache_deletions;
