@@ -4,8 +4,10 @@
 
 **Fixed bugs:**
 
+- netdata/dbengine: constant restarts on octopuscs [\#6053](https://github.com/netdata/netdata/issues/6053)
 - BUG when compiling code in mac OS [\#6043](https://github.com/netdata/netdata/issues/6043)
 - Unexpected change to metrics sent to backends with new dbengine [\#6039](https://github.com/netdata/netdata/issues/6039)
+- packages installer failed [\#6027](https://github.com/netdata/netdata/issues/6027)
 - netdata/packaging: Fix installer failure on missing packages [\#6026](https://github.com/netdata/netdata/issues/6026)
 - Prowl notifications ignored by alarm-notify.sh [\#6021](https://github.com/netdata/netdata/issues/6021)
 - using with docker. got error after update. [\#6018](https://github.com/netdata/netdata/issues/6018)
@@ -43,6 +45,7 @@
 
 **Closed issues:**
 
+- \[feature\] collects windows metrics from wmi\_exporter [\#6001](https://github.com/netdata/netdata/issues/6001)
 - \[Binary releases\] Establish RPM repository servers and software [\#5966](https://github.com/netdata/netdata/issues/5966)
 - \[Binary releases\] Establish Debian/Ubuntu repository servers and software [\#5965](https://github.com/netdata/netdata/issues/5965)
 - Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
@@ -74,6 +77,8 @@
 
 **Merged pull requests:**
 
+- Fix delete datafile error [\#6057](https://github.com/netdata/netdata/pull/6057) ([mfundul](https://github.com/mfundul))
+- Reiterate the proper way to persist configurations in the Configuration guid [\#6052](https://github.com/netdata/netdata/pull/6052) ([cakrit](https://github.com/cakrit))
 - netdata/daemon/backends: Fix AWS Kinesis link error [\#6047](https://github.com/netdata/netdata/pull/6047) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Fix makeself packaging [\#6041](https://github.com/netdata/netdata/pull/6041) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix timestamps being reversed for backends [\#6040](https://github.com/netdata/netdata/pull/6040) ([mfundul](https://github.com/mfundul))
