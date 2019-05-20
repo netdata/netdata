@@ -22,7 +22,19 @@ Under that directory you will see the following:
 
 So there are many configuration files to control every aspect of Netdata's behavior. It can be overwhelming at first, but you won't have to deal with any of them, unless you have specific things you need to change. The following HOWTO will guide you on how to customize your netdata, based on what you want to do. 
 
+
 ## How to
+
+### Persist my configuration
+
+In http://localhost:19999/netdata.conf, you will see the following two parameters:
+
+```bash
+	# config directory = /etc/netdata
+	# stock config directory = /usr/lib/netdata/conf.d
+```
+
+To persist your configurations, don't edit the files under the `stock config directory` directly. Use the `sudo [config directory]/edit-config` command, or copy the stock config file to its proper place under the `config directory` and edit it there. 
 
 ### Change what I see
 
