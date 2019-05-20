@@ -351,12 +351,13 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
     uv_rwlock_wrlock(&page_index->lock);
     ret = JudyLDel(&page_index->JudyL_array, (Word_t)(descr->start_time / USEC_PER_SEC), PJE0);
     uv_rwlock_wrunlock(&page_index->lock);
-//    assert(1 == ret);
-    if (unlikely(1 != ret)) {
-        error("%s: JudyLDel failed with %d", __func__, ret);
-        print_page_cache_descr(descr);
-        return;
+    if (unlikely(0 == ret)) {
+        error("Page under deletion was not in index.");
+        if (unlikely(debug_flags & D_RRDENGINE))
+            print_page_cache_descr(descr);
+        goto destroy;
     }
+    assert(1 == ret);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     ++ctx->stats.pg_cache_deletions;
@@ -373,7 +374,7 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
     /* even a locked page could be dirty */
     while (unlikely(descr->flags & RRD_PAGE_DIRTY)) {
         debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
-        if(unlikely(debug_flags & D_RRDENGINE))
+        if (unlikely(debug_flags & D_RRDENGINE))
             print_page_cache_descr(descr);
         pg_cache_wait_event_unsafe(descr);
     }
@@ -388,6 +389,7 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_cach
         uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
     }
     pg_cache_put(descr);
+destroy:
     pg_cache_destroy_descr(descr);
     pg_cache_update_metric_times(page_index);
 }
