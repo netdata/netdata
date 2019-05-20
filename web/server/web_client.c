@@ -807,11 +807,20 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
-    HTTP_VALIDATION_INCOMPLETE
+    HTTP_VALIDATION_INCOMPLETE,
+    HTTP_VALIDATION_REDIRECT
 } HTTP_VALIDATION;
 
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+
+#ifdef ENABLE_HTTPS
+    if (netdata_srv_ctx) {
+        if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (s[0] != 'S'))  ) {
+            return HTTP_VALIDATION_REDIRECT;
+        }
+    }
+#endif
 
     size_t last_pos = w->header_parse_last_size;
     if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
@@ -846,14 +855,16 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         encoded_url = s = &s[8];
         w->mode = WEB_CLIENT_MODE_OPTIONS;
     }
-   // else if(!strncmp(s, "STREAM ", 7)) {
-    else if(!strncmp(s, "STREAM", 6)) {
+    else if(!strncmp(s, "STREAM ", 7)) {
+   // else if(!strncmp(s, "STREAM", 6)) {
 
         encoded_url = s = &s[7];
+        /*
         if(*encoded_url != 'k')
         {
             encoded_url++;
         }
+         */
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
@@ -1361,27 +1372,22 @@ void web_client_process_request(struct web_client *w) {
                 return;
             }
             break;
-
+#ifdef ENABLE_HTTPS
+        case HTTP_VALIDATION_REDIRECT:
+        {
+            buffer_flush(w->response.data);
+            w->response.data->contenttype = CT_TEXT_HTML;
+            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection...</body></html>");
+            w->response.code = 301;
+            break;
+        }
+#endif
         case HTTP_VALIDATION_NOT_SUPPORTED:
             debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
             buffer_flush(w->response.data);
-#ifdef ENABLE_HTTPS
-            if (netdata_srv_ctx) {
-                if ((w->ssl.conn) && (w->ssl.flags == NETDATA_SSL_NO_HANDSHAKE)) {
-                    w->response.data->contenttype = CT_TEXT_HTML;
-                    buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection...</body></html>");
-                    w->response.code = 301;
-                } else{
-                    w->response.code = 400;
-                }
-            } else{
-                w->response.code = 400;
-            }
-#else
             buffer_strcat(w->response.data, "I don't understand you...\r\n");
             w->response.code = 400;
-#endif
             break;
     }
 
@@ -1746,7 +1752,6 @@ ssize_t web_client_receive(struct web_client *w)
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
 #ifdef ENABLE_HTTPS
-
     if (netdata_srv_ctx) {
         if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
             bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));

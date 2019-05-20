@@ -4,6 +4,8 @@ SSL_CTX *netdata_cli_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
+int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
+int netdata_use_ssl_on_http = NETDATA_SSL_FORCE; //We force SSL due safety reasons
 
 static void security_info_callback(const SSL *ssl, int where, int ret) {
     (void)ssl;
@@ -124,10 +126,16 @@ void security_clean_openssl(){
 #endif
 }
 
-int security_process_accept(SSL *ssl,int sock) {
-    usec_t end = now_realtime_usec() + 600000;
+int security_process_accept(SSL *ssl,int msg) {
+    usec_t end = now_realtime_usec() + 60000000;
     usec_t curr;
+    int sock = SSL_get_fd(ssl);
     int test;
+    if (msg > 0x17)
+    {
+        return NETDATA_SSL_NO_HANDSHAKE;
+    }
+
     while (!SSL_is_init_finished(ssl)) {
         ERR_clear_error();
         if ((test = SSL_do_handshake(ssl)) <= 0) {
@@ -138,7 +146,7 @@ int security_process_accept(SSL *ssl,int sock) {
                 {
                     if ( curr >=  end)
                     {
-                        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna read on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                        error("Handshake did not finish due timeout %d!",sock);
                         return NETDATA_SSL_WANT_READ;
                     }
                     break;
@@ -147,7 +155,7 @@ int security_process_accept(SSL *ssl,int sock) {
                 {
                     if ( curr >=  end)
                     {
-                        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake wanna write on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                        error("Handshake did not finish due timeout %d!",sock);
                         return NETDATA_SSL_WANT_WRITE;
                     }
                     break;

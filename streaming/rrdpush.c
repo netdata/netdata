@@ -444,11 +444,13 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
 
 #ifdef ENABLE_HTTPS
-    if(netdata_cli_ctx){
+    if( netdata_cli_ctx ){
+        host->ssl.flags = NETDATA_SSL_START;
         if (!host->ssl.conn){
             host->ssl.conn = SSL_new(netdata_cli_ctx);
             if(host->ssl.conn){
                 error("Failed to allocate SSL structure.");
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
         }
         else{
@@ -461,21 +463,19 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                 error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             } else{
-  //              host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
                 host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
             }
         }
+    }
+    else {
+        host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
 
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
-#ifdef ENABLE_HTTPS
-            "STREAM%skey=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
-#else
             "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
-#endif
                     "&NETDATA_SYSTEM_OS_NAME=%s"
                     "&NETDATA_SYSTEM_OS_ID=%s"
                     "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -492,9 +492,11 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                     " HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
+                    /*
 #ifdef ENABLE_HTTPS
-              ,(!host->ssl.flags )?"S ":" "
+              ,((!host->ssl.flags ) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE) )?"S ":" "
 #endif
+                     */
               , host->rrdpush_send_api_key
               , host->hostname
               , host->registry_hostname
@@ -615,7 +617,9 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 
 #ifdef ENABLE_HTTPS
-    security_start_ssl(1);
+    if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
+        security_start_ssl(1);
+    }
 #endif
 
     info("STREAM %s [send]: thread created (task id %d)", host->hostname, gettid());

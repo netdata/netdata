@@ -152,7 +152,6 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port, pi->port_acl);
     w->pollinfo_slot = pi->slot;
 
-    //if(unlikely(pi->socktype == AF_UNIX)) {
     if(unlikely(pi->socktype == AF_UNIX)) {
         web_client_set_unix(w);
     }
@@ -162,7 +161,25 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
 
 #ifdef ENABLE_HTTPS
     if ( netdata_srv_ctx ) {
-        //the next two ifs are not together because I am reusing SSL structure
+        if( sock_delnonblock(w->ifd) < 0 ){
+            error("Web server cannot remove the non-blocking flag from socket %d",w->ifd);
+        }
+
+        //Read the first 7 bytes from the message, but the message
+        //is not removed from the queue, because we are using MSG_PEEK
+        char test[8];
+        if ( recv(w->ifd,test, 7,MSG_PEEK) == 7 ) {
+            test[7] = 0x00;
+        }
+        else {
+            //Case I do not have success to read 7 bytes,
+            //this means that the mensage was not completely read, so
+            //I cannot identify it yet.
+            sock_setnonblock(w->ifd);
+            return w;
+        }
+
+        //The next two ifs are not together because I am reusing SSL structure
         if (!w->ssl.conn)
         {
             w->ssl.conn = SSL_new(netdata_srv_ctx);
@@ -170,34 +187,32 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
                 SSL_set_accept_state(w->ssl.conn);
             } else {
                 error("Failed to create SSL context on socket fd %d.", w->ifd);
-                WEB_CLIENT_IS_DEAD(w);
+                if (test[0] < 0x18){
+                    WEB_CLIENT_IS_DEAD(w);
+                    sock_setnonblock(w->ifd);
+                    return w;
+                }
             }
         }
+
 
         if (w->ssl.conn) {
             if (SSL_set_fd(w->ssl.conn, w->ifd) != 1) {
                 error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
-                WEB_CLIENT_IS_DEAD(w);
+                //The client is not set dead, because I received a normal HTTP request
+                //instead a Client Hello(HTTPS).
+                if ( test[0] < 0x18 ){
+                    WEB_CLIENT_IS_DEAD(w);
+                }
             }
             else{
-                static uint32_t hash_stream = 0;
-                if(unlikely(!hash_stream)) {
-                    hash_stream = simple_uhash("STREAM ");
-                }
-                sock_delnonblock(w->ifd);
-                char test[8];
-                if ( recv(w->ifd,test, 7,MSG_PEEK) == 7 )
-                {
-                    test[7] = 0x00;
- //                   error("KILLME HEADER: %s",test);
-                    uint32_t cmp = simple_uhash(test);
-                    if ( cmp != hash_stream){
-                        w->ssl.flags = security_process_accept(w->ssl.conn, w->ifd);
-                    }
-                }
-                sock_setnonblock(w->ifd);
+                w->ssl.flags = security_process_accept(w->ssl.conn, (int)test[0]);
             }
         }
+
+        error("KILLME %s %d",test,w->ssl.flags);
+
+        sock_setnonblock(w->ifd);
     }
 #endif
 
