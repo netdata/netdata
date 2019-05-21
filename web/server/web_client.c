@@ -565,11 +565,11 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
 }
 
 static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "This host does not maintain a database");
-        return 400;
-    }
+    //if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
+    //    buffer_flush(w->response.data);
+    //    buffer_strcat(w->response.data, "This host does not maintain a database");
+    //    return 400;
+    //}
 
     return func(host, w, url);
 }
@@ -951,7 +951,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     buffer_sprintf(w->response.header_output,
             "HTTP/1.1 %d %s\r\n"
                     "Connection: %s\r\n"
-                    "Server: NetData Embedded HTTP Server v%s\r\n"
+                    "Server: NetData Embedded HTTP Server %s\r\n"
                     "Access-Control-Allow-Origin: %s\r\n"
                     "Access-Control-Allow-Credentials: true\r\n"
                     "Content-Type: %s\r\n"
@@ -1006,7 +1006,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         buffer_sprintf(w->response.header_output,
                 "Cache-Control: %s\r\n"
                         "Expires: %s\r\n",
-                (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache":"public",
+                (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache, no-store, must-revalidate\r\nPragma: no-cache":"public",
                 edate);
     }
 

@@ -1,5 +1,5 @@
 # netdata [![Build Status](https://travis-ci.com/netdata/netdata.svg?branch=master)](https://travis-ci.com/netdata/netdata) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2231/badge)](https://bestpractices.coreinfrastructure.org/projects/2231) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
-  
+
 [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade) [![LGTM C](https://img.shields.io/lgtm/grade/cpp/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:cpp) [![LGTM JS](https://img.shields.io/lgtm/grade/javascript/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:javascript) [![LGTM PYTHON](https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:python)
 
 ---
@@ -10,12 +10,12 @@ Netdata provides **unparalleled insights**, **in real-time**, of everything happ
 
 _Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function._
 
-Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**.  
+Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
-![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)  
+![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)
 
 Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars) and it is the 3rd most starred open-source project.
-Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).  
+Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).
 
 ---
 
@@ -53,13 +53,13 @@ The following animated image, shows the top part of a typical netdata dashboard.
 
 *A typical netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
 
-> *We have a few online demos to experience it live: [https://my-netdata.io](https://my-netdata.io)*  
+> *We have a few online demos to experience it live: [https://my-netdata.io](https://my-netdata.io)*
 
 ## User base
 
 Netdata is used by hundreds of thousands of users all over the world.
 Check our [GitHub watchers list](https://github.com/netdata/netdata/watchers).
-You will find people working for **Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**, 
+You will find people working for **Amazon**, **Atos**, **Baidu**, **Cisco Systems**, **Citrix**, **Deutsche Telekom**, **DigitalOcean**,
 **Elastic**, **EPAM Systems**, **Ericsson**, **Google**, **Groupon**, **Hortonworks**, **HP**, **Huawei**,
 **IBM**, **Microsoft**, **NewRelic**, **Nvidia**, **Red Hat**, **SAP**, **Selectel**, **TicketMaster**,
 **Vimeo**, and many more!
@@ -72,9 +72,9 @@ We provide docker images for the most common architectures. These are statistics
 ### Registry
 When you install multiple netdata, they are integrated into **one distributed application**, via a [netdata registry](registry/#registry). This is a web browser feature and it allows us to count the number of unique users and unique netdata servers installed. The following information comes from the global public netdata registry we run:
 
-[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
-  
-*in the last 24 hours:*<br/> [![New Users Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)  
+[![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
+
+*in the last 24 hours:*<br/> [![New Users Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
 ## Quick Start
 
@@ -145,24 +145,105 @@ Netdata is **open-source**, **free**, super **fast**, very **easy**, completely 
 It has been designed by **SysAdmins**, **DevOps** and **Developers** for troubleshooting performance problems,
 not just visualize metrics.
 
-## News  
-  
-`Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**  
+## News
+
+`May 21st, 2019` - **[netdata v1.15.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.15.0 contains 11 bug fixes and 30 improvements.
+
+We are very happy and proud to be able to include two major improvements in this release: The aggregated node view and the [new database engine](https://docs.netdata.cloud/database/engine/). 
+
+*Aggregated node view*
+
+The No. 1 request from our community has been a better way to view and manage their Netdata installations, via an aggregated view. The node menu with the simple list of hosts on the agent UI just didn't do it for people with hundreds, or thousands of instances. This release introduces the node view, which uses the power of [Netdata Cloud](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to deliver powerful views of a Netdata-based monitoring infrastructure. You can read more about Netdata Cloud and the future of netdata [here](https://blog.netdata.cloud/posts/netdata-cloud-announcement/).
+
+*New database engine*
+
+Historically, Netdata has required a lot of memory for long-term metrics storage. To mitigate this we've been building a new DB engine for several months and will continue improving until it can become the default `memory mode` for new Netdata installations. The version included in release v1.15.0 already permits longer-term storage of compressed data and we'll continue reducing the required memory in following releases.
+
+*Other major additions*
+
+We have added support for the [AWS Kinesis backend](https://docs.netdata.cloud/backends/aws_kinesis/) and new collectors for [OpenVPN](https://docs.netdata.cloud/collectors/go.d.plugin/modules/openvpn/), the [Tengine web server](https://docs.netdata.cloud/collectors/go.d.plugin/modules/tengine/), [ScaleIO (VxFlex OS)](https://docs.netdata.cloud/collectors/go.d.plugin/modules/scaleio/), [ioping-like latency metrics](https://docs.netdata.cloud/collectors/ioping.plugin/) and [Energi Core node instances](https://docs.netdata.cloud/collectors/python.d.plugin/energid/).
+
+We now have a new, ["text-only" chart type](https://github.com/netdata/netdata/issues/5578), [cpu limits for v2 cgroups](https://github.com/netdata/netdata/issues/5850), [docker swarm metrics](https://docs.netdata.cloud/collectors/go.d.plugin/modules/docker_engine/) and improved [documentation](https://docs.netdata.cloud/).
+
+We continued improving the [Kubernetes helmchart](https://github.com/netdata/helmchart) with liveness probes for slaves, persistence options, a fix for a `Cannot allocate memory` issue and easy configuration for the kubelet, kube-proxy and coredns collectors. 
+
+Finally, we built a process to quickly replace any problematic nightly builds and added more automated CI tests to prevent such builds from being published in the first place.
+
+---
+
+`Apr 26th, 2019` - **[netdata v1.14.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release 1.14 contains 14 bug fixes and 24 improvements.
+
+The release introduces major additions to Kubernetes monitoring, with tens of new charts for [Kubelet](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubelet/), [kube-proxy](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubeproxy/) and [coredns](https://github.com/netdata/go.d.plugin/tree/master/modules/coredns) metrics, as well as significant improvements to the netdata [helm chart](https://github.com/netdata/helmchart/). 
+ 
+Two new collectors were added, to monitor [Docker hub](https://docs.netdata.cloud/collectors/go.d.plugin/modules/dockerhub/) and [Docker engine](https://docs.netdata.cloud/collectors/go.d.plugin/modules/docker_engine/) metrics. 
+
+Finally, v1.14  adds support for [version 2 cgroups](https://github.com/netdata/netdata/pull/5407), [OpenLDAP over TLS](https://github.com/netdata/netdata/pull/5859), [NVIDIA SMI free and per process memory](https://github.com/netdata/netdata/pull/5796/files) and [configurable syslog facilities](https://github.com/netdata/netdata/pull/5792). 
+
+---
+
+`Mar 14th, 2019` - **[netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release 1.13.0 contains 14 bug fixes and 8 improvements.
+
+netdata has taken the first step into the world of Kubernetes, with a beta version of a [Helm chart](https://github.com/netdata/helmchart) for deployment to a k8s cluster and [proper naming](https://github.com/netdata/netdata/pull/5576) of the cgroup containers. We have [big plans](https://github.com/netdata/netdata/issues/5392) for Kubernetes, so stay tuned!
+
+A [major refactoring of the python.d plugin](https://github.com/netdata/netdata/pull/5552) has resulted in a dramatic decrease of the required memory, making netdata even more resource efficient.
+
+We also added charts for IPC shared memory segments and total memory used.
+
+---
+
+`Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)**
+
+Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
+
+The main motivation behind a new patch release is the introduction of a **stable release channel**.
+A "stable" installation and update channel was always on our roadmap, but it became a necessity when we realized that our users in China could not use the nightly releases published on Google Cloud. The "stable" channel is based on our official GitHub releases and uses assets hosted on GitHub.
+
+We are also introducing a new **Oracle DB collector** module, implemented in Python.
+
+---
+
+`Feb 21st, 2019` - **[netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)**
+
+Patch release 1.12.1 contains 22 bug fixes and 8 improvements.
+
+---
+
+`Feb 14th, 2019` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release 1.12 is made out of 211 pull requests and 22 bug fixes.
+The key improvements are:
+
+- Introducing `netdata.cloud`, the free netdata service for all netdata users
+- High performance plugins with go.d.plugin (data collection orchestrator written in Go)
+- 7 new data collectors and 11 rewrites of existing data collectors for improved performance
+- A new management API for all netdata servers
+- Bind different functions of the netdata APIs to different ports
+- Improved installation and updates
+
+---
+
+`Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**
 
 - Improved internal database to support values above 64bit.
 - New data collection plugins: [`openldap`](collectors/python.d.plugin/openldap/), [`tor`](collectors/python.d.plugin/tor/), [`nvidia_smi`](collectors/python.d.plugin/nvidia_smi/).
-- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/python.d.plugin/cpufreq/), [`sensors`](collectors/python.d.plugin/sensors/).
+- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/proc.plugin/README.md#cpu-frequency), [`sensors`](collectors/python.d.plugin/sensors/).
 - Health monitoring improvements: network interface congestion alarm restored, [`alerta.io`](health/notifications/alerta/), `conntrack_max`.
-- `my-netdata`menu has been refactored. 
+- `my-netdata`menu has been refactored.
 - Packaging: `openrc` service definition got a few improvements.
 
----  
-  
-`Sep 18, 2018` - **netdata has its own organization**  
-  
-Netdata used to be a [firehol.org](https://firehol.org) project, accessible as `firehol/netdata`.  
-  
-Netdata now has its own github organization `netdata`, so all github URLs are now `netdata/netdata`. The old github URLs, repo clones, forks, etc redirect automatically to the new repo.    
+---
+
+`Sep 18, 2018` - **netdata has its own organization**
+
+Netdata used to be a [firehol.org](https://firehol.org) project, accessible as `firehol/netdata`.
+
+Netdata now has its own github organization `netdata`, so all github URLs are now `netdata/netdata`. The old github URLs, repo clones, forks, etc redirect automatically to the new repo.
 
 ## How it works
 
@@ -183,12 +264,12 @@ Function|Description|Documentation
 
 The result is a highly efficient, low latency system, supporting multiple readers and one writer on each metric.
 
-## Infographic  
-  
-This is a high level overview of netdata feature set and architecture.  
-Click it to to interact with it (it has direct links to documentation).  
-  
-[![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)  
+## Infographic
+
+This is a high level overview of netdata feature set and architecture.
+Click it to to interact with it (it has direct links to documentation).
+
+[![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)
 
 
 ## Features
@@ -205,13 +286,13 @@ This is what you should expect from Netdata:
 - **Zero disk I/O** - while it runs, it does not load or save anything (except `error` and `access` logs).
 - **Zero configuration** - auto-detects everything, it can collect up to 10000 metrics per server out of the box.
 - **Zero maintenance** - You just run it, it does the rest.
-- **Zero dependencies** - it is even its own web server, for its static web files and its web API (though its plugins may require additional libraries, depending on the applications monitored).  
+- **Zero dependencies** - it is even its own web server, for its static web files and its web API (though its plugins may require additional libraries, depending on the applications monitored).
 - **Scales to infinity** - you can install it on all your servers, containers, VMs and IoTs. Metrics are not centralized by default, so there is no limit.
 - **Several operating modes** - Autonomous host monitoring (the default), headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations. Each node may have different metrics retention policy and run with or without health monitoring.
 
 ### Health Monitoring & Alarms
 - **Sophisticated alerting** - comes with hundreds of alarms, **out of the box**! Supports dynamic thresholds, hysteresis, alarm templates, multiple role-based notification methods.
-- **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [irs](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/).
+- **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [irc](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [prowl](health/notifications/prowl/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [smstools3](health/notifications/smstools3/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/) and [custom notifications](health/notifications/custom/).
 
 ### Integrations
 - **time-series dbs** - can archive its metrics to `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected).
@@ -262,7 +343,7 @@ To improve visual anomaly detection across charts, the user can highlight a time
 > Highlighted ranges are propagated from netdata server to netdata server, when navigating via the [`my-netdata` menu](registry#registry).
 
 
-## What does it monitor  
+## What does it monitor
 
 Netdata data collection is **extensible** - you can monitor anything you can get a metric for.
 Its [Plugin API](collectors/plugins.d/) supports all programing languages (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
@@ -282,8 +363,8 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[SoftIRQs](collectors/proc.plugin/)** - total and per core SoftIRQs.
 - **[SoftNet](collectors/proc.plugin/)** - total and per core SoftIRQs related to network activity.
 - **[CPU Throttling](collectors/proc.plugin/)** - collects per core CPU throttling.
-- **[CPU Frequency](collectors/python.d.plugin/couchdb/)** - collects the current CPU frequency.
-- **[CPU Idle](collectors/python.d.plugin/cpuidle/)** - collects the time spent per processor state.
+- **[CPU Frequency](collectors/proc.plugin/)** - collects the current CPU frequency.
+- **[CPU Idle](collectors/proc.plugin/)** - collects the time spent per processor state.
 - **[IdleJitter](collectors/idlejitter.plugin/)** - measures CPU latency.
 - **[Entropy](collectors/proc.plugin/)** - random numbers pool, using in cryptography.
 - **[Interprocess Communication - IPC](collectors/proc.plugin/)** - such as semaphores and semaphores arrays.
@@ -301,21 +382,22 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[slab](collectors/proc.plugin/)** - collects info about the Linux kernel memory usage.
 
 #### Disks
-- **[block devices](collectors/proc.plugin/)** - per disk: I/O, operations, backlog, utilization, space, etc.  
+- **[block devices](collectors/proc.plugin/)** - per disk: I/O, operations, backlog, utilization, space, etc.
 - **[BCACHE](collectors/proc.plugin/)** - detailed performance of SSD caching devices.
 - **[DiskSpace](collectors/proc.plugin/)** - monitors disk space usage.
-- **[mdstat](collectors/python.d.plugin/mdstat/)** - software RAID.
+- **[mdstat](collectors/proc.plugin/)** - software RAID.
 - **[hddtemp](collectors/python.d.plugin/hddtemp/)** - disk temperatures.
 - **[smartd](collectors/python.d.plugin/smartd_log/)** - disk S.M.A.R.T. values.
 - **[device mapper](collectors/proc.plugin/)** - naming disks.
 - **[Veritas Volume Manager](collectors/proc.plugin/)** - naming disks.
 - **[megacli](collectors/python.d.plugin/megacli/)** - adapter, physical drives and battery stats.
 - **[adaptec_raid](collectors/python.d.plugin/adaptec_raid/)** -  logical and physical devices health metrics.
+- **[ioping](collectors/ioping.plugin/)** - to measure disk read/write latency.
 
 #### Filesystems
 - **[BTRFS](collectors/proc.plugin/)** - detailed disk space allocation and usage.
 - **[Ceph](collectors/python.d.plugin/ceph/)** - OSD usage, Pool usage, number of objects, etc.
-- **[NFS file servers and clients](collectors/proc.plugin/)** - NFS v2, v3, v4: I/O, cache, read ahead, RPC calls  
+- **[NFS file servers and clients](collectors/proc.plugin/)** - NFS v2, v3, v4: I/O, cache, read ahead, RPC calls
 - **[Samba](collectors/python.d.plugin/samba/)** - performance metrics of Samba SMB2 file sharing.
 - **[ZFS](collectors/proc.plugin/)** - detailed performance and resource usage.
 
@@ -324,7 +406,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[Netfilter](collectors/proc.plugin/)** - everything about the netfilter connection tracker.
 - **[SynProxy](collectors/proc.plugin/)** - collects performance data about the linux SYNPROXY (DDoS).
 - **[NFacct](collectors/nfacct.plugin/)** - collects accounting data from iptables.
-- **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time  
+- **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time
 - **[FPing](collectors/fping.plugin/)** - to measure latency and packet loss between any number of hosts.
 - **[ISC dhcpd](collectors/python.d.plugin/isc_dhcpd/)** - pools utilization, leases, etc.
 - **[AP](collectors/charts.d.plugin/ap/)** - collects Linux access point performance data (`hostapd`).
@@ -338,7 +420,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 
 #### Processes
 - **[System Processes](collectors/proc.plugin/)** - running, blocked, forks, active.
-- **[Applications](collectors/apps.plugin/)** - by grouping the process tree and reporting CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets - per process group.  
+- **[Applications](collectors/apps.plugin/)** - by grouping the process tree and reporting CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets - per process group.
 - **[systemd](collectors/cgroups.plugin/)** - monitors systemd services using CGROUPS.
 
 #### Users
@@ -395,7 +477,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[dns_query_time](collectors/python.d.plugin/dns_query_time/)** - DNS query time statistics.
 
 #### Time Servers
-- **[chrony](collectors/python.d.plugin/chrony/)** - uses the `chronyc` command to collect chrony statistics (Frequency, Last offset, RMS offset, Residual freq, Root delay, Root dispersion, Skew, System time).  
+- **[chrony](collectors/python.d.plugin/chrony/)** - uses the `chronyc` command to collect chrony statistics (Frequency, Last offset, RMS offset, Residual freq, Root delay, Root dispersion, Skew, System time).
 - **[ntpd](collectors/python.d.plugin/ntpd/)** - connects to multiple ntpd servers (local or remote) to provide statistics of system variables and optional also peer variables.
 
 #### Mail Servers
@@ -413,7 +495,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### UPSes
 - **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
 - **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
-- **[Linux Power Supply](collectors/python.d.plugin/linux_power_supply/)** - collects metrics reported by power supply drivers on Linux.
+- **[Linux Power Supply](collectors/proc.plugin/)** - collects metrics reported by power supply drivers on Linux.
 
 #### Social Sharing Servers
 - **[RetroShare](collectors/python.d.plugin/retroshare/)** - connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.
@@ -447,10 +529,10 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 #### Provisioning Systems
 - **[Puppet](collectors/python.d.plugin/puppet/)** - connects to multiple Puppet Server and Puppet DB instances (local or remote) to collect real-time status metrics.
 
-You can easily extend Netdata, by writing plugins that collect data from any source, using any computer language.  
-  
----  
-  
+You can easily extend Netdata, by writing plugins that collect data from any source, using any computer language.
+
+---
+
 ## Documentation
 
 The netdata documentation is at [https://docs.netdata.cloud](https://docs.netdata.cloud). But you can also find it inside the repo, so by just navigating the repo on github you can find all the documentation.
@@ -488,8 +570,8 @@ You can also find netdata on:
 - [StackShare](https://stackshare.io/netdata)
 
 ## License
-  
-netdata is [GPLv3+](LICENSE).  
+
+netdata is [GPLv3+](LICENSE).
 
 Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](REDISTRIBUTED.md).
 

@@ -5,7 +5,7 @@
 AC_PREREQ(2.60)
 
 # We do not use m4_esyscmd_s to support older autoconf.
-define([VERSION_STRING], m4_esyscmd([git describe --always 2>/dev/null | tr -d '\n']))
+define([VERSION_STRING], m4_esyscmd([git describe 2>/dev/null | tr -d '\n']))
 define([VERSION_FROM_FILE], m4_esyscmd([cat packaging/version | tr -d '\n']))
 m4_ifval(VERSION_STRING, [], [define([VERSION_STRING], VERSION_FROM_FILE)])
 
@@ -37,6 +37,7 @@ m4_ifdef([AM_SILENT_RULES], [
 AC_CANONICAL_HOST
 AC_PROG_CC
 AM_PROG_CC_C_O
+AC_PROG_CXX
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
@@ -57,12 +58,24 @@ AC_ARG_ENABLE(
     ,
     [enable_plugin_freeipmi="detect"]
 )
- AC_ARG_ENABLE(
+AC_ARG_ENABLE(
     [plugin-cups],
     [AS_HELP_STRING([--enable-plugin-cups], [enable cups plugin @<:@default autodetect@:>@])],
     ,
     [enable_plugin_cups="detect"]
-  )
+)
+AC_ARG_ENABLE(
+    [plugin-xenstat],
+    [AS_HELP_STRING([--enable-plugin-xenstat], [enable xenstat plugin @<:@default autodetect@:>@])],
+    ,
+    [enable_plugin_xenstat="detect"]
+)
+AC_ARG_ENABLE(
+    [backend-kinesis],
+    [AS_HELP_STRING([--enable-backend-kinesis], [enable kinesis backend @<:@default autodetect@:>@])],
+    ,
+    [enable_backend_kinesis="detect"]
+)
 
 AC_ARG_ENABLE(
     [pedantic],
@@ -117,6 +130,12 @@ AC_ARG_ENABLE(
     [AS_HELP_STRING([--disable-lto], [Link Time Optimizations @<:@default autodetect@:>@])],
     ,
     [enable_lto="detect"]
+)
+AC_ARG_ENABLE(
+    [dbengine],
+    [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
+    ,
+    [enable_dbengine="detect"]
 )
 
 
@@ -175,7 +194,7 @@ case "$host_os" in
 freebsd*)
     build_target=freebsd
     build_target_id=2
-    CFLAGS="${CFLAGS} -I/usr/local/include"
+    CFLAGS="${CFLAGS} -I/usr/local/include -L/usr/local/lib"
     ;;
 darwin*)
     build_target=macos
@@ -230,6 +249,46 @@ AC_MSG_RESULT([${with_math}])
 
 
 # -----------------------------------------------------------------------------
+# libuv multi-platform support library with a focus on asynchronous I/O
+# TODO: check version, uv_fs_scandir_next only available in version >= 1.0
+
+AC_CHECK_LIB(
+    [uv],
+    [uv_fs_scandir_next],
+    [UV_LIBS="-luv"]
+)
+
+OPTIONAL_UV_CLFAGS="${UV_CFLAGS}"
+OPTIONAL_UV_LIBS="${UV_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# lz4 Extremely Fast Compression algorithm
+
+AC_CHECK_LIB(
+    [lz4],
+    [LZ4_decompress_safe],
+    [LZ4_LIBS="-llz4"]
+)
+
+OPTIONAL_LZ4_CLFAGS="${LZ4_CFLAGS}"
+OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# Judy General purpose dynamic array
+
+AC_CHECK_LIB(
+    [Judy],
+    [JudyLIns],
+    [JUDY_LIBS="-lJudy"]
+)
+
+OPTIONAL_JUDY_CLFAGS="${JUDY_CFLAGS}"
+OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
+
+
+# -----------------------------------------------------------------------------
 # zlib
 
 PKG_CHECK_MODULES(
@@ -244,7 +303,7 @@ AC_MSG_CHECKING([if zlib should be used])
 if test "${with_zlib}" != "no" -a "${have_zlib}" = "yes"; then
     with_zlib="yes"
     AC_DEFINE([NETDATA_WITH_ZLIB], [1], [zlib usability])
-    OPTIONAL_ZLIB_CLFAGS="${ZLIB_CFLAGS}"
+    OPTIONAL_ZLIB_CFLAGS="${ZLIB_CFLAGS}"
     OPTIONAL_ZLIB_LIBS="${ZLIB_LIBS}"
 else
     with_zlib="no"
@@ -262,8 +321,45 @@ PKG_CHECK_MODULES(
     [AC_MSG_ERROR([libuuid required but not found. Try installing 'uuid-dev' or 'libuuid-devel'.])]
 )
 AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
-OPTIONAL_UUID_CLFAGS="${UUID_CFLAGS}"
+OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
+
+
+# -----------------------------------------------------------------------------
+# OpenSSL Cryptography and SSL/TLS Toolkit
+
+AC_CHECK_LIB(
+    [crypto],
+    [SHA256_Init],
+    [SSL_LIBS="-lcrypto -lssl"]
+)
+
+OPTIONAL_SSL_CLFAGS="${SSL_CFLAGS}"
+OPTIONAL_SSL_LIBS="${SSL_LIBS}"
+
+# -----------------------------------------------------------------------------
+# DB engine
+test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
+    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
+    AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
+    AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+
+AC_MSG_CHECKING([if netdata dbengine should be used])
+if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
+    enable_dbengine="yes"
+    AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
+else
+    enable_dbengine="no"
+fi
+AC_MSG_RESULT([${enable_dbengine}])
+AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -336,7 +432,7 @@ AC_MSG_CHECKING([if libcap should be used])
 if test "${with_libcap}" != "no" -a "${have_libcap}" = "yes"; then
     with_libcap="yes"
     AC_DEFINE([HAVE_CAPABILITY], [1], [libcap usability])
-    OPTIONAL_LIBCAP_CLFAGS="${LIBCAP_CFLAGS}"
+    OPTIONAL_LIBCAP_CFLAGS="${LIBCAP_CFLAGS}"
     OPTIONAL_LIBCAP_LIBS="${LIBCAP_LIBS}"
 else
     with_libcap="no"
@@ -397,7 +493,7 @@ AC_MSG_CHECKING([if freeipmi.plugin should be enabled])
 if test "${enable_plugin_freeipmi}" != "no" -a "${have_ipmimonitoring}" = "yes"; then
     enable_plugin_freeipmi="yes"
     AC_DEFINE([HAVE_FREEIPMI], [1], [ipmimonitoring usability])
-    OPTIONAL_IPMIMONITORING_CLFAGS="${IPMIMONITORING_CFLAGS}"
+    OPTIONAL_IPMIMONITORING_CFLAGS="${IPMIMONITORING_CFLAGS}"
     OPTIONAL_IPMIMONITORING_LIBS="${IPMIMONITORING_LIBS}"
 else
     enable_plugin_freeipmi="no"
@@ -407,10 +503,10 @@ AM_CONDITIONAL([ENABLE_PLUGIN_FREEIPMI], [test "${enable_plugin_freeipmi}" = "ye
 
 
 # -----------------------------------------------------------------------------
-# cups.plugin - libmnl, libnetfilter_acct
+# cups.plugin - libcups
 
 # Only check most recently added method of cups
- AC_CHECK_LIB([cups], [httpConnect2],
+AC_CHECK_LIB([cups], [httpConnect2],
     [AC_CHECK_HEADER(
         [cups/cups.h],
         [have_cups=yes],
@@ -443,9 +539,9 @@ if test "${enable_plugin_cups}" != "no" -a "${have_cups}" = "yes"; then
     AC_DEFINE([HAVE_CUPS], [1], [cups usability])
 
     CUPS_CFLAGS="${CUPS_CFLAGS} `$CUPSCONFIG --cflags`"
-    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --image --libs`"
+    CUPS_LIBS="${CUPS_LIBS} `$CUPSCONFIG --libs`"
 
-    OPTIONAL_CUPS_CLFAGS="${CUPS_CFLAGS}"
+    OPTIONAL_CUPS_CFLAGS="${CUPS_CFLAGS}"
     OPTIONAL_CUPS_LIBS="${CUPS_LIBS}"
 else
     enable_plugin_cups="no"
@@ -462,14 +558,24 @@ AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
 PKG_CHECK_MODULES(
     [NFACCT],
     [libnetfilter_acct],
-    [have_libnetfilter_acct=yes],
+    [AC_CHECK_LIB(
+        [netfilter_acct],
+        [nfacct_alloc],
+        [have_libnetfilter_acct=yes],
+        [have_libnetfilter_acct=no]
+    )],
     [have_libnetfilter_acct=no]
 )
 
 PKG_CHECK_MODULES(
     [LIBMNL],
     [libmnl],
-    [have_libmnl=yes],
+    [AC_CHECK_LIB(
+        [mnl],
+        [mnl_socket_open],
+        [have_libmnl=yes],
+        [have_libmnl=no]
+    )],
     [have_libmnl=no]
 )
 
@@ -484,13 +590,191 @@ if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes"
     enable_plugin_nfacct="yes"
     AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
     AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
-    OPTIONAL_NFACCT_CLFAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
+    OPTIONAL_NFACCT_CFLAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
     OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
 else
     enable_plugin_nfacct="no"
 fi
 AC_MSG_RESULT([${enable_plugin_nfacct}])
 AM_CONDITIONAL([ENABLE_PLUGIN_NFACCT], [test "${enable_plugin_nfacct}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# xenstat.plugin - libxenstat
+
+PKG_CHECK_MODULES(
+    [YAJL],
+    [yajl],
+    [AC_CHECK_LIB(
+        [yajl],
+        [yajl_tree_get],
+        [have_libyajl=yes],
+        [have_libyajl=no]
+    )],
+    [have_libyajl=no]
+)
+
+AC_CHECK_LIB(
+    [xenstat],
+    [xenstat_init],
+    [AC_CHECK_HEADER(
+        [xenstat.h],
+        [have_libxenstat=yes],
+        [have_libxenstat=no]
+    )],
+    [have_libxenstat=no],
+    [-lyajl]
+)
+
+PKG_CHECK_MODULES(
+    [XENLIGHT],
+    [xenlight],
+    [AC_CHECK_LIB(
+        [xenlight],
+        [libxl_domain_info],
+        [AC_CHECK_HEADER(
+            [libxl.h],
+            [have_libxenlight=yes],
+            [have_libxenlight=no]
+        )],
+        [have_libxenlight=no]
+    )],
+    [have_libxenlight=no]
+)
+
+test "${enable_plugin_xenstat}" = "yes" -a "${have_libxenstat}" != "yes" && \
+    AC_MSG_ERROR([libxenstat required but not found. try installing 'xen-dom0-libs-devel'])
+
+test "${enable_plugin_xenstat}" = "yes" -a "${have_libxenlight}" != "yes" && \
+    AC_MSG_ERROR([libxenlight required but not found. try installing 'xen-dom0-libs-devel'])
+
+test "${enable_plugin_xenstat}" = "yes" -a "${have_libyajl}" != "yes" && \
+    AC_MSG_ERROR([libyajl required but not found. Try installing 'yajl-devel'])
+
+AC_MSG_CHECKING([if xenstat.plugin should be enabled])
+if test "${enable_plugin_xenstat}" != "no" -a "${have_libxenstat}" = "yes" -a "${have_libxenlight}" = "yes" -a "${have_libyajl}" = "yes"; then
+    enable_plugin_xenstat="yes"
+    AC_DEFINE([HAVE_LIBXENSTAT], [1], [libxenstat usability])
+    AC_DEFINE([HAVE_LIBXENLIGHT], [1], [libxenlight usability])
+    AC_DEFINE([HAVE_LIBYAJL], [1], [libyajl usability])
+    OPTIONAL_XENSTAT_CFLAGS="${XENLIGHT_CFLAGS} ${YAJL_CFLAGS}"
+    OPTIONAL_XENSTAT_LIBS="-lxenstat ${XENLIGHT_LIBS} ${YAJL_LIBS}"
+else
+    enable_plugin_xenstat="no"
+fi
+AC_MSG_RESULT([${enable_plugin_xenstat}])
+AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# AWS Kinesis backend - libaws-cpp-sdk-kinesis, libaws-cpp-sdk-core, libssl, libcrypto, libcurl
+
+PKG_CHECK_MODULES(
+    [LIBCRYPTO],
+    [libcrypto],
+    [AC_CHECK_LIB(
+        [crypto],
+        [CRYPTO_new_ex_data],
+        [have_libcrypto=yes],
+        [have_libcrypto=no]
+    )],
+    [have_libcrypto=no]
+)
+
+PKG_CHECK_MODULES(
+    [LIBSSL],
+    [libssl],
+    [AC_CHECK_LIB(
+        [ssl],
+        [SSL_connect],
+        [have_libssl=yes],
+        [have_libssl=no]
+    )],
+    [have_libssl=no]
+)
+
+PKG_CHECK_MODULES(
+    [LIBCURL],
+    [libcurl],
+    [AC_CHECK_LIB(
+        [curl],
+        [curl_easy_init],
+        [have_libcurl=yes],
+        [have_libcurl=no]
+    )],
+    [have_libcurl=no]
+)
+
+AC_CHECK_LIB(
+    [aws-cpp-sdk-core],
+    [cJSON_free],
+    [have_libaws_cpp_sdk_core=yes],
+    [have_libaws_cpp_sdk_core=no],
+    [${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}]
+)
+
+AC_MSG_CHECKING([for Aws::Kinesis::Model::PutRecordRequest in -laws-cpp-sdk-kinesis])
+
+if test "${have_libaws_cpp_sdk_core}" = "yes" -a "${have_libcrypto}" = "yes" -a "${have_libssl}" = "yes" -a "${have_libcurl}" = "yes"; then
+    AC_LANG_SAVE
+    AC_LANG_CPLUSPLUS
+    save_LIBS="${LIBS}"
+    LIBS="-laws-cpp-sdk-kinesis -laws-cpp-sdk-core ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
+    save_CXXFLAGS="${CXXFLAGS}"
+    CXXFLAGS="${CXXFLAGS} -std=c++11"
+
+    AC_TRY_LINK(
+    [
+    #include <aws/core/Aws.h>
+    #include <aws/core/client/ClientConfiguration.h>
+    #include <aws/core/auth/AWSCredentials.h>
+    #include <aws/core/utils/Outcome.h>
+    #include <aws/kinesis/KinesisClient.h>
+    #include <aws/kinesis/model/PutRecordRequest.h>
+    ],
+    [Aws::Kinesis::Model::PutRecordRequest request;],
+    [have_libaws_cpp_sdk_kinesis=yes],
+    [have_libaws_cpp_sdk_kinesis=no]
+    )
+
+    LIBS="${save_LIBS}"
+    CXXFLAGS="${save_CXXFLAGS}"
+    AC_LANG_RESTORE
+else
+    have_libaws_cpp_sdk_kinesis=no
+fi
+
+AC_MSG_RESULT([${have_libaws_cpp_sdk_kinesis}])
+
+test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_kinesis}" != "yes" && \
+    AC_MSG_ERROR([libaws-cpp-sdk-kinesis required but not found. try installing AWS C++ SDK])
+
+test "${enable_backend_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_core}" != "yes" && \
+    AC_MSG_ERROR([libaws-cpp-sdk-core required but not found. try installing AWS C++ SDK])
+
+test "${enable_backend_kinesis}" = "yes" -a "${have_libcurl}" != "yes" && \
+    AC_MSG_ERROR([libcurl required but not found])
+
+test "${enable_backend_kinesis}" = "yes" -a "${have_libssl}" != "yes" && \
+    AC_MSG_ERROR([libssl required but not found])
+
+test "${enable_backend_kinesis}" = "yes" -a "${have_libcrypto}" != "yes" && \
+    AC_MSG_ERROR([libcrypto required but not found])
+
+AC_MSG_CHECKING([if kinesis backend should be enabled])
+if test "${enable_backend_kinesis}" != "no" -a "${have_libaws_cpp_sdk_kinesis}" = "yes" -a "${have_libaws_cpp_sdk_core}" = "yes" \
+                                            -a "${have_libcurl}" = "yes" -a "${have_libssl}" = "yes" -a "${have_libcrypto}" = "yes"; then
+    enable_backend_kinesis="yes"
+    AC_DEFINE([HAVE_KINESIS], [1], [libaws-cpp-sdk-kinesis usability])
+    OPTIONAL_KINESIS_CFLAGS="${LIBCRYPTO_CFLAGS} ${LIBSSL_CFLAGS} ${LIBCURL_CFLAGS}"
+    CXX11FLAG="-std=c++11"
+    OPTIONAL_KINESIS_LIBS="-laws-cpp-sdk-kinesis -laws-cpp-sdk-core ${LIBCRYPTO_LIBS} ${LIBSSL_LIBS} ${LIBCURL_LIBS}"
+else
+    enable_backend_kinesis="no"
+fi
+
+AC_MSG_RESULT([${enable_backend_kinesis}])
+AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -517,7 +801,7 @@ if test "${enable_lto}" != "no"; then
 fi
 if test "${have_lto}" = "yes"; then
     oCFLAGS="${CFLAGS}"
-    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CLFAGS} ${OPTIONAL_NFACCT_CLFAGS} ${OPTIONAL_ZLIB_CLFAGS} ${OPTIONAL_UUID_CLFAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CLFAGS}"
+    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} ${OPTIONAL_KINESIS_CFLAGS}"
     ac_cv_c_lto_cross_compile="${enable_lto}"
     test "${ac_cv_c_lto_cross_compile}" != "yes" && ac_cv_c_lto_cross_compile="no"
     AC_C_LTO
@@ -564,6 +848,8 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
+CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
+
 CPPFLAGS="\
     -DTARGET_OS=${build_target_id} \
 	-DVARLIB_DIR=\"\\\"${varlibdir}\\\"\" \
@@ -576,13 +862,18 @@ CPPFLAGS="\
 	-DWEB_DIR=\"\\\"${webdir}\\\"\" \
 "
 
-AC_SUBST([OPTIONAL_MATH_CLFAGS])
+AC_SUBST([OPTIONAL_MATH_CFLAGS])
 AC_SUBST([OPTIONAL_MATH_LIBS])
+AC_SUBST([OPTIONAL_RT_CLFAGS])
+AC_SUBST([OPTIONAL_UV_LIBS])
+AC_SUBST([OPTIONAL_LZ4_LIBS])
+AC_SUBST([OPTIONAL_JUDY_LIBS])
+AC_SUBST([OPTIONAL_SSL_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CLFAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
-AC_SUBST([OPTIONAL_ZLIB_CLFAGS])
+AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
-AC_SUBST([OPTIONAL_UUID_CLFAGS])
+AC_SUBST([OPTIONAL_UUID_CFLAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
 AC_SUBST([OPTIONAL_LIBCAP_CFLAGS])
 AC_SUBST([OPTIONAL_LIBCAP_LIBS])
@@ -590,6 +881,10 @@ AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_LIBS])
 AC_SUBST([OPTIONAL_CUPS_CFLAGS])
 AC_SUBST([OPTIONAL_CUPS_LIBS])
+AC_SUBST([OPTIONAL_XENSTAT_CFLAGS])
+AC_SUBST([OPTIONAL_XENSTAT_LIBS])
+AC_SUBST([OPTIONAL_KINESIS_CFLAGS])
+AC_SUBST([OPTIONAL_KINESIS_LIBS])
 
 
 AC_CONFIG_FILES([
@@ -600,6 +895,7 @@ AC_CONFIG_FILES([
     backends/Makefile
     backends/opentsdb/Makefile
     backends/prometheus/Makefile
+    backends/aws_kinesis/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile
@@ -607,6 +903,7 @@ AC_CONFIG_FILES([
     collectors/checks.plugin/Makefile
     collectors/diskspace.plugin/Makefile
     collectors/fping.plugin/Makefile
+    collectors/ioping.plugin/Makefile
     collectors/freebsd.plugin/Makefile
     collectors/freeipmi.plugin/Makefile
     collectors/cups.plugin/Makefile
@@ -619,8 +916,10 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
+    collectors/xenstat.plugin/Makefile
     daemon/Makefile
     database/Makefile
+    database/engine/Makefile
     diagrams/Makefile
     health/Makefile
     health/notifications/Makefile

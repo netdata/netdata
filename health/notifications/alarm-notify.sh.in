@@ -32,6 +32,7 @@
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
+#  - RocketChat notifications by @Hermsi1337 #3777
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -163,6 +164,8 @@ msteam
 kavenegar
 prowl
 awssns
+rocketchat
+sms
 "
 
 # -----------------------------------------------------------------------------
@@ -535,6 +538,14 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	fi
 fi
 
+if [ "${SEND_SMS}" = "YES" ]; then
+	if [ -z "${sendsms}" ]; then
+		sendsms="$(command -v sendsms 2>/dev/null)"
+	fi
+	if [ -z "${sendsms}" ]; then
+		SEND_SMS="NO"
+	fi
+fi
 # if we need sendmail, check for the sendmail command
 if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
 	sendmail="$(command -v sendmail 2>/dev/null)"
@@ -643,10 +654,12 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_KAFKA}" \
 	"${SEND_PD}" \
 	"${SEND_FLEEP}" \
+	"${SEND_PROWL}" \
 	"${SEND_CUSTOM}" \
 	"${SEND_IRC}" \
 	"${SEND_AWSSNS}" \
 	"${SEND_SYSLOG}" \
+	"${SEND_SMS}" \
 	"${SEND_MSTEAM}"; do
 	if [ "${method}" == "YES" ]; then
 		proceed=1
@@ -1240,7 +1253,7 @@ send_slack() {
                         }
                     ],
                     "thumb_url": "${image}",
-                    "footer": "by <${goto_url}|${host}>",
+                    "footer": "by ${host}",
                     "ts": ${when}
                 }
             ]
@@ -1725,6 +1738,37 @@ send_syslog() {
 }
 
 # -----------------------------------------------------------------------------
+# SMS sender
+
+send_sms() {
+	local recipients="${1}" errcode errmessage sent=0
+
+    # Human readable SMS
+    local msg="${host} ${status_message}: ${chart} (${family}), ${alarm}"
+
+    # limit it to 160 characters
+    msg="${msg:0:160}"
+
+	if [ "${SEND_SMS}" = "YES" ] && [ -n "${sendsms}" ] && [ -n "${recipients}" ] && [ -n "${msg}" ]; then
+		# http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
+		for phone in ${recipients}; do
+			errmessage=$($sendsms $phone "$msg" 2>&1)
+			errcode=$?
+			if [ ${errcode} -eq 0 ]; then
+				info "sent smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${errcode}: ${errmessage}."
+			fi
+		done
+
+		[ ${sent} -gt 0 ] && return 0
+	fi
+
+	return 1
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -1994,6 +2038,13 @@ ${info}"
 SENT_IRC=$?
 
 # -----------------------------------------------------------------------------
+# send the SMS message with smstools3
+
+send_sms "${to_sms}"
+
+SENT_SMS=$?
+
+# -----------------------------------------------------------------------------
 # send the custom message
 
 send_custom() {
@@ -2207,6 +2258,7 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_IRC}" \
 	"${SENT_AWSSNS}" \
 	"${SENT_SYSLOG}" \
+	"${SENT_SMS}" \
 	"${SENT_MSTEAM}"; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something

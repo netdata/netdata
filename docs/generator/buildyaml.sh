@@ -87,7 +87,6 @@ markdown_extensions:
  - admonition
  - codehilite
  - meta
- - nl2br
  - sane_lists
  - smarty
  - toc:
@@ -156,6 +155,7 @@ echo -ne "        - Running behind another web server:
 "
 #navpart 2 system
 navpart 2 database
+navpart 2 database/engine
 navpart 2 registry
 
 echo -ne "    - 'docs/Performance.md'
@@ -167,7 +167,7 @@ navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
     - Internal plugins:
 "
-navpart 3 collectors/apps.plugin
+
 navpart 3 collectors/proc.plugin
 navpart 3 collectors/statsd.plugin
 navpart 3 collectors/cgroups.plugin
@@ -221,10 +221,14 @@ echo -ne "        - BASH:
                 - 'collectors/charts.d.plugin/phpfpm/README.md'
 "
 
-navpart 3 collectors/fping.plugin
-navpart 3 collectors/freeipmi.plugin
+navpart 3 collectors/apps.plugin
 navpart 3 collectors/cups.plugin
+navpart 3 collectors/fping.plugin
+navpart 3 collectors/ioping.plugin
+navpart 3 collectors/freeipmi.plugin
 navpart 3 collectors/nfacct.plugin
+navpart 3 collectors/xenstat.plugin
+
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'
 "

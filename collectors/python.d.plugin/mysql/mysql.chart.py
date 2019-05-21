@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: MySQL netdata python.d module
 # Author: Pawel Krupa (paulfantom)
-# Author: Ilya Mashchenko (l2isbad)
+# Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from bases.FrameworkServices.MySQLService import MySQLService
@@ -313,7 +313,7 @@ CHARTS = {
         ]
     },
     'threads_creation_rate': {
-        'options': [None, 'Threads Creation Rate', 'threads', 'threads/s', 'mysql.threads', 'line'],
+        'options': [None, 'Threads Creation Rate', 'threads/s', 'threads', 'mysql.threads', 'line'],
         'lines': [
             ['Threads_created', 'created', 'incremental'],
         ]

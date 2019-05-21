@@ -53,6 +53,9 @@ cups.plugin
 nfacct.plugin
 !nfacct.plugin/
 
+xenstat.plugin
+!xenstat.plugin/
+
 cgroup-network
 !cgroup-network/
 
@@ -109,10 +112,12 @@ collectors/charts.d.plugin/charts.d.plugin
 collectors/node.d.plugin/node.d.plugin
 collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
+collectors/ioping.plugin/ioping.plugin
 collectors/go.d.plugin
 
 # installer generated files
-netdata-uninstaller.sh
+/netdata-uninstaller.sh
+/netdata-updater.sh
 
 # cmake files
 cmake-build-debug/
@@ -125,6 +130,7 @@ cmake_install.cmake
 .jetbrains*
 
 .DS_Store
+webcopylocal*
 
 contrib/debian/changelog
 
@@ -164,5 +170,4 @@ docs/generator/src
 docs/generator/build
 docs/generator/mkdocs.yml
 
-netdata-updater.sh
 .environment.sh

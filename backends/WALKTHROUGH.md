@@ -209,7 +209,7 @@ Prometheus. In order to do this let’s keep our metrics page open for reference
 http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes  We are
 setting out to graph the data in the CPU chart so let’s search for “system.cpu”
 in the metrics page above. We come across a section of metrics with the first
-comments  `# COMMENT homogeneus chart "system.cpu", context "system.cpu", family
+comments  `# COMMENT homogeneous chart "system.cpu", context "system.cpu", family
 "cpu", units "percentage"` Followed by the metrics. This is a good start now let
 us drill down to the specific metric we would like to graph.
 
@@ -251,9 +251,9 @@ http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&so
 If you choose to use this method you will need to use Prometheus's set of
 functions here: https://prometheus.io/docs/querying/functions/ to obtain useful
 metrics as you are now dealing with raw counters from the system. For example
-you will have to use the `irate()` function over a counter to get that metric’s
+you will have to use the `irate()` function over a counter to get that metric's
 rate per second. If your graphing needs are met by using the metrics returned by
-NetData’s internal database (not specifying any source= url parameter) then use
+NetData's internal database (not specifying any source= url parameter) then use
 that. If you find limitations then consider re-writing your queries using the
 raw data and using Prometheus functions to get the desired chart.
 

@@ -71,7 +71,7 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
 
 ### disk names
 
-netdata will automatically set the name of disks on the dashboard, from the mount point they are mounted, of course only when they are mounted. Changes in mount points are not currently detected (you will have to restart netdata to change the name of the disk).
+netdata will automatically set the name of disks on the dashboard, from the mount point they are mounted, of course only when they are mounted. Changes in mount points are not currently detected (you will have to restart netdata to change the name of the disk). To use disk IDs provided by `/dev/disk/by-id`, the `name disks by id` option should be enabled. The `preferred disk ids` simple pattern allows choosing disk IDs to be used in the first place.
 
 ### performance metrics
 
@@ -99,28 +99,33 @@ Then edit `netdata.conf` and find the following section. This is the basic plugi
 
 ```
 [plugin:proc:/proc/diskstats]
-	# enable new disks detected at runtime = yes
-	# performance metrics for physical disks = auto
-	# performance metrics for virtual disks = no
-	# performance metrics for partitions = no
-	# performance metrics for mounted filesystems = no
-	# performance metrics for mounted virtual disks = auto
-	# space metrics for mounted filesystems = auto
-	# bandwidth for all disks = auto
-	# operations for all disks = auto
-	# merged operations for all disks = auto
-	# i/o time for all disks = auto
-	# queued operations for all disks = auto
-	# utilization percentage for all disks = auto
-	# backlog for all disks = auto
-	# space usage for all disks = auto
-	# inodes usage for all disks = auto
-	# filename to monitor = /proc/diskstats
-	# path to get block device infos = /sys/dev/block/%lu:%lu/%s
-	# path to get h/w sector size = /sys/block/%s/queue/hw_sector_size
-	# path to get h/w sector size for partitions = /sys/dev/block/%lu:%lu/subsystem/%s/../queue
-/hw_sector_size
-
+  # enable new disks detected at runtime = yes
+  # performance metrics for physical disks = auto
+  # performance metrics for virtual disks = auto
+  # performance metrics for partitions = no
+  # bandwidth for all disks = auto
+  # operations for all disks = auto
+  # merged operations for all disks = auto
+  # i/o time for all disks = auto
+  # queued operations for all disks = auto
+  # utilization percentage for all disks = auto
+  # backlog for all disks = auto
+  # bcache for all disks = auto
+  # bcache priority stats update every = 0
+  # remove charts of removed disks = yes
+  # path to get block device = /sys/block/%s
+  # path to get block device bcache = /sys/block/%s/bcache
+  # path to get virtual block device = /sys/devices/virtual/block/%s
+  # path to get block device infos = /sys/dev/block/%lu:%lu/%s
+  # path to device mapper = /dev/mapper
+  # path to /dev/disk/by-label = /dev/disk/by-label
+  # path to /dev/disk/by-id = /dev/disk/by-id
+  # path to /dev/vx/dsk = /dev/vx/dsk
+  # name disks by id = no
+  # preferred disk ids = *
+  # exclude disks = loop* ram*
+  # filename to monitor = /proc/diskstats
+  # performance metrics for disks with major 8 = yes
 ```
 
 For each virtual disk, physical disk and partition you will have a section like this:
@@ -387,12 +392,12 @@ and metrics:
 
 ```
 [plugin:proc:/sys/class/power_supply]
-    # battery capacity = yes
-    # battery charge = no
-    # battery energy = no
-    # power supply voltage = no
-    # keep files open = auto
-    # directory to monitor = /sys/class/power_supply
+  # battery capacity = yes
+  # battery charge = no
+  # battery energy = no
+  # power supply voltage = no
+  # keep files open = auto
+  # directory to monitor = /sys/class/power_supply
 ```
 
 #### notes
@@ -413,16 +418,27 @@ This way, alerts which match on these will still work.
 
 ## IPC
 
-This module monitors the number of semaphores, semaphore arrays, number of messages in message queues, and amount of memory used by message queues. As far as the message queue charts are dynamic, sane limits are applied for the number of dimensions per chart (the limit is configurable).
+### Monitored IPC metrics
 
-#### configuration
+- **number of messages in message queues**
+- **amount of memory used by message queues**
+- **number of semaphores**
+- **number of semaphore arrays**
+- **number of shared memory segments**
+- **amount of memory used by shared memory segments**
+
+As far as the message queue charts are dynamic, sane limits are applied for the number of dimensions per chart (the limit is configurable).
+
+### configuration
 
 ```
 [plugin:proc:ipc]
-    # semaphore totals = yes
-    # message queues = yes
-    # msg filename to monitor = /proc/sysvipc/msg
-    # max dimensions in memory allowed = 50
+  # message queues = yes
+  # semaphore totals = yes
+  # shared memory totals = yes
+  # msg filename to monitor = /proc/sysvipc/msg
+  # shm filename to monitor = /proc/sysvipc/shm
+  # max dimensions in memory allowed = 50
 ```
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fproc.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

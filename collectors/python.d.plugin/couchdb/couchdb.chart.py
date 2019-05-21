@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Description: couchdb netdata python.d module
 # Author: wohali <wohali@apache.org>
-# Thanks to l2isbad for good examples :)
+# Thanks to ilyam8 for good examples :)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from collections import namedtuple, defaultdict
@@ -351,7 +351,7 @@ class Service(UrlService):
                 try:
                     for m in metrics_list:
                         value = value[m]
-                except KeyError as e:
+                except (KeyError, TypeError) as e:
                     self.debug('cannot process ' + metric + ' for ' + db
                                + ": " + str(e))
                     continue
@@ -367,7 +367,7 @@ class Service(UrlService):
             try:
                 for m in metrics_list:
                     value = value[m]
-            except KeyError as e:
+            except (KeyError, TypeError) as e:
                 self.debug('cannot process ' + metric + ': ' + str(e))
                 continue
             # strip off .value from end of stat

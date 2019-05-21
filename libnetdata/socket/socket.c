@@ -944,6 +944,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
 
+#ifdef __FreeBSD__
+        if(((struct sockaddr *)&sadr)->sa_family == AF_LOCAL)
+            strncpyz(client_ip, "localhost", ipsize);
+#endif
+
         client_ip[ipsize - 1] = '\0';
         client_port[portsize - 1] = '\0';
 

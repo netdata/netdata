@@ -198,6 +198,8 @@ void cancel_main_threads() {
         }
     }
 
+    netdata_exit = 1;
+
     while(found && max > 0) {
         max -= step;
         info("Waiting %d threads to finish...", found);
@@ -299,6 +301,7 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
@@ -352,6 +355,10 @@ void log_init(void) {
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_GLOBAL, "access log", filename);
+
+	char deffacility[8];
+	snprintfz(deffacility,7,"%s","daemon");
+	facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
 
     error_log_throttle_period = config_get_number(CONFIG_SECTION_GLOBAL, "errors flood protection period", error_log_throttle_period);
     error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
@@ -456,12 +463,8 @@ static void get_netdata_configured_variables() {
     netdata_configured_home_dir         = config_get(CONFIG_SECTION_GLOBAL, "home directory",         netdata_configured_home_dir);
 
     {
-        char plugins_dirs[(FILENAME_MAX * 2) + 1];
-        snprintfz(plugins_dirs, FILENAME_MAX * 2, "\"%s\" \"%s/custom-plugins.d\"", PLUGINS_DIR, CONFIG_DIR);
-        netdata_configured_plugins_dir_base = strdupz(config_get(CONFIG_SECTION_GLOBAL, "plugins directory",  plugins_dirs));
-        quoted_strings_splitter(netdata_configured_plugins_dir_base, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
-        netdata_configured_plugins_dir = plugin_directories[0];
-
+        pluginsd_initialize_plugin_directories();
+        netdata_configured_primary_plugins_dir = plugin_directories[PLUGINSD_STOCK_PLUGINS_DIRECTORY_PATH];
     }
 
     // ------------------------------------------------------------------------
@@ -469,6 +472,25 @@ static void get_netdata_configured_variables() {
 
     default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
 
+#ifdef ENABLE_DBENGINE
+    // ------------------------------------------------------------------------
+    // get default Database Engine page cache size in MiB
+
+    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
+    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+    }
+
+    // ------------------------------------------------------------------------
+    // get default Database Engine disk space quota in MiB
+
+    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine disk space", default_rrdeng_disk_quota_mb);
+    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+    }
+#endif
     // ------------------------------------------------------------------------
 
     netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
@@ -590,7 +612,7 @@ void set_global_environment() {
     setenv("NETDATA_CONFIG_DIR"       , verify_required_directory(netdata_configured_user_config_dir),  1);
     setenv("NETDATA_USER_CONFIG_DIR"  , verify_required_directory(netdata_configured_user_config_dir),  1);
     setenv("NETDATA_STOCK_CONFIG_DIR" , verify_required_directory(netdata_configured_stock_config_dir), 1);
-    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_plugins_dir),      1);
+    setenv("NETDATA_PLUGINS_DIR"      , verify_required_directory(netdata_configured_primary_plugins_dir),      1);
     setenv("NETDATA_WEB_DIR"          , verify_required_directory(netdata_configured_web_dir),          1);
     setenv("NETDATA_CACHE_DIR"        , verify_required_directory(netdata_configured_cache_dir),        1);
     setenv("NETDATA_LIB_DIR"          , verify_required_directory(netdata_configured_varlib_dir),       1);
@@ -648,6 +670,51 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
+int get_system_info(struct rrdhost_system_info *system_info) {
+    char *script;
+    script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
+    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
+    if (unlikely(access(script, R_OK) != 0)) {
+        info("System info script %s not found.",script);
+        freez(script);
+        return 1;
+    }
+
+    pid_t command_pid;
+
+    info("Executing %s", script);
+
+    FILE *fp = mypopen(script, &command_pid);
+    if(fp) {
+        char buffer[200 + 1];
+        while (fgets(buffer, 200, fp) != NULL) {
+            char *name=buffer;
+            char *value=buffer;
+            while (*value && *value != '=') value++;
+            if (*value=='=') {
+                *value='\0';
+                value++;
+                if (strlen(value)>1) {
+                    char *newline = value + strlen(value) - 1;
+                    (*newline) = '\0';
+                }
+                char n[51], v[101];
+                snprintfz(n, 50,"%s",name);
+                snprintfz(v, 101,"%s",value);
+                if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
+                    info("Unexpected environment variable %s=%s", n, v);
+                }
+                else {
+                    info("%s=%s", n, v);
+                    setenv(n, v, 1);
+                }
+            }
+        }
+        mypclose(fp, command_pid);
+    }
+    freez(script);
+    return 0;
+}
 
 void send_statistics( const char *action, const char *action_result, const char *action_data) {
     static char *as_script;
@@ -655,8 +722,8 @@ void send_statistics( const char *action, const char *action_result, const char 
         char *optout_file = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) +strlen(".opt-out-from-anonymous-statistics") + 2));
         sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
         if (likely(access(optout_file, R_OK) != 0)) {
-            as_script = mallocz(sizeof(char) * (strlen(netdata_configured_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
-            sprintf(as_script, "%s/%s", netdata_configured_plugins_dir, "anonymous-statistics.sh");
+            as_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
+            sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
 			if (unlikely(access(as_script, R_OK) != 0)) {
 				netdata_anonymous_statistics_enabled=0;
 				info("Anonymous statistics script %s not found.",as_script);
@@ -695,6 +762,7 @@ int main(int argc, char **argv) {
     int dont_fork = 0;
     size_t default_stacksize;
 
+    netdata_ready=0;
     // set the name for logging
     program_name = "netdata";
 
@@ -793,6 +861,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+                        char* createdataset_string = "createdataset=";
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -801,11 +870,25 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
-                            rrd_init("unittest");
+                            rrd_init("unittest", NULL);
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if(test_dbengine()) return 1;
+#endif
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
+                            return 0;
+                        }
+                        else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
+                            unsigned history_seconds;
+
+                            optarg += strlen(createdataset_string);
+                            history_seconds = (unsigned )strtoull(optarg, NULL, 0);
+
+#ifdef ENABLE_DBENGINE
+                            generate_dbengine_dataset(history_seconds);
+#endif
                             return 0;
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
@@ -962,9 +1045,6 @@ int main(int argc, char **argv) {
         get_netdata_configured_variables();
         set_global_environment();
 
-        netdata_anonymous_statistics_enabled=-1;
-        send_statistics("START","-", "-");
-
         // work while we are cd into config_dir
         // to allow the plugins refer to their config
         // files using relative filenames
@@ -997,10 +1077,8 @@ int main(int argc, char **argv) {
 
         // --------------------------------------------------------------------
         // get log filenames and settings
-
         log_init();
         error_log_limit_unlimited();
-
 
         // --------------------------------------------------------------------
         // setup process signals
@@ -1042,6 +1120,7 @@ int main(int argc, char **argv) {
             user = config_get(CONFIG_SECTION_GLOBAL, "run as user", (passwd && passwd->pw_name)?passwd->pw_name:"");
         }
 
+
         // --------------------------------------------------------------------
         // create the listening sockets
 
@@ -1054,6 +1133,10 @@ int main(int argc, char **argv) {
 
     // initialize the log files
     open_all_log_files();
+
+	netdata_anonymous_statistics_enabled=-1;
+    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
+    if (get_system_info(system_info) == 0) send_statistics("START","-", "-");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1088,13 +1171,12 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
-    rrd_init(netdata_configured_hostname);
-
+    rrd_init(netdata_configured_hostname, system_info);
+    rrdhost_system_info_free(system_info);
     // ------------------------------------------------------------------------
     // enable log flood protection
 
     error_log_limit_reset();
-
 
     // ------------------------------------------------------------------------
     // spawn the threads
@@ -1113,7 +1195,7 @@ int main(int argc, char **argv) {
     }
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
-
+    netdata_ready = 1;
 
     // ------------------------------------------------------------------------
     // unblock signals

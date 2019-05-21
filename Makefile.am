@@ -15,6 +15,9 @@ MAINTAINERCLEANFILES= \
 	$(srcdir)/m4/ltoptions.m4 \
 	$(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
+CLEANFILES= \
+	$(srcdir)/$(distdir).tar.gz
+
 EXTRA_DIST = \
 	.gitignore \
 	.codacy.yml \
@@ -71,7 +74,9 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
+	coverity-install.sh \
 	packaging/installer/netdata-updater.sh \
+	packaging/installer/netdata-uninstaller.sh \
 	packaging/installer/kickstart.sh \
 	packaging/installer/kickstart-static64.sh \
 	packaging/installer/functions.sh \
@@ -107,6 +112,7 @@ AM_CFLAGS = \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
 	$(OPTIONAL_CUPS_CFLAGS) \
+	$(OPTIONAL_XENSTAT_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS =
@@ -224,6 +230,11 @@ NFACCT_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+XENSTAT_PLUGIN_FILES = \
+    collectors/xenstat.plugin/xenstat_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
 PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/ipc.c \
 	collectors/proc.plugin/plugin_proc.c \
@@ -299,6 +310,24 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.c \
     database/rrdvar.h \
     $(NULL)
+
+if ENABLE_DBENGINE
+    RRD_PLUGIN_FILES += \
+        database/engine/rrdengine.c \
+        database/engine/rrdengine.h \
+        database/engine/rrddiskprotocol.h \
+        database/engine/datafile.c \
+        database/engine/datafile.h \
+        database/engine/journalfile.c \
+        database/engine/journalfile.h \
+        database/engine/rrdenginelib.c \
+        database/engine/rrdenginelib.h \
+        database/engine/rrdengineapi.c \
+        database/engine/rrdengineapi.h \
+        database/engine/pagecache.c \
+        database/engine/pagecache.h \
+        $(NULL)
+endif
 
 API_PLUGIN_FILES = \
     web/api/badges/web_buffer_svg.c \
@@ -401,6 +430,13 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
+KINESIS_BACKEND_FILES = \
+    backends/aws_kinesis/aws_kinesis.c \
+    backends/aws_kinesis/aws_kinesis.h \
+    backends/aws_kinesis/aws_kinesis_put_record.cc \
+    backends/aws_kinesis/aws_kinesis_put_record.h \
+    $(NULL)
+
 DAEMON_FILES = \
 	daemon/common.c \
 	daemon/common.h \
@@ -459,14 +495,23 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
+	$(OPTIONAL_UV_LIBS) \
+	$(OPTIONAL_LZ4_LIBS) \
+	$(OPTIONAL_JUDY_LIBS) \
+	$(OPTIONAL_SSL_LIBS) \
 	$(NULL)
-
+# TODO: Find more graceful way to add libs for AWS Kinesis
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(NULL)
+if ENABLE_BACKEND_KINESIS
+    netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
+else
+    netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
+endif
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
@@ -510,4 +555,18 @@ if ENABLE_PLUGIN_NFACCT
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_NFACCT_LIBS) \
         $(NULL)
+endif
+
+if ENABLE_PLUGIN_XENSTAT
+    plugins_PROGRAMS += xenstat.plugin
+    xenstat_plugin_SOURCES = $(XENSTAT_PLUGIN_FILES)
+    xenstat_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_XENSTAT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_BACKEND_KINESIS
+    netdata_SOURCES += $(KINESIS_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
 endif

@@ -11,7 +11,8 @@ struct prometheus_output_options {
         { "names",      PROMETHEUS_OUTPUT_NAMES      },
         { "timestamps", PROMETHEUS_OUTPUT_TIMESTAMPS },
         { "variables",  PROMETHEUS_OUTPUT_VARIABLES  },
-
+        { "oldunits",   PROMETHEUS_OUTPUT_OLDUNITS   },
+        { "hideunits",  PROMETHEUS_OUTPUT_HIDEUNITS  },
         // terminator
         { NULL, PROMETHEUS_OUTPUT_NONE },
 };

@@ -3176,21 +3176,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "cpu", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (kernel_uint_t)(w->stime * stime_fix_ratio) + (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio) + (kernel_uint_t)(w->cstime * cstime_fix_ratio) + (kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_user", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->utime * utime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cutime * cutime_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "cpu_system", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->stime * stime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cstime * cstime_fix_ratio)):0ULL));
     }
     send_END();
@@ -3198,7 +3198,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     if(show_guest_time) {
         send_BEGIN(type, "cpu_guest", dt);
         for (w = root; w ; w = w->next) {
-            if(unlikely(w->exposed))
+            if(unlikely(w->exposed && w->processes))
                 send_SET(w->name, (kernel_uint_t)(w->gtime * gtime_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cgtime * cgtime_fix_ratio)):0ULL));
         }
         send_END();
@@ -3206,28 +3206,28 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "threads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->num_threads);
     }
     send_END();
 
     send_BEGIN(type, "processes", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->processes);
     }
     send_END();
 
     send_BEGIN(type, "mem", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (w->status_vmrss > w->status_vmshared)?(w->status_vmrss - w->status_vmshared):0ULL);
     }
     send_END();
 
     send_BEGIN(type, "vmem", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->status_vmsize);
     }
     send_END();
@@ -3235,7 +3235,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "swap", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->status_vmswap);
     }
     send_END();
@@ -3243,14 +3243,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "minor_faults", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->minflt * minflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cminflt * cminflt_fix_ratio)):0ULL));
     }
     send_END();
 
     send_BEGIN(type, "major_faults", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, (kernel_uint_t)(w->majflt * majflt_fix_ratio) + (include_exited_childs?((kernel_uint_t)(w->cmajflt * cmajflt_fix_ratio)):0ULL));
     }
     send_END();
@@ -3258,14 +3258,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 #ifndef __FreeBSD__
     send_BEGIN(type, "lreads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_logical_bytes_read);
     }
     send_END();
 
     send_BEGIN(type, "lwrites", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_logical_bytes_written);
     }
     send_END();
@@ -3273,14 +3273,14 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
 
     send_BEGIN(type, "preads", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_storage_bytes_read);
     }
     send_END();
 
     send_BEGIN(type, "pwrites", dt);
     for (w = root; w ; w = w->next) {
-        if(unlikely(w->exposed))
+        if(unlikely(w->exposed && w->processes))
             send_SET(w->name, w->io_storage_bytes_written);
     }
     send_END();
@@ -3288,21 +3288,21 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     if(enable_file_charts) {
         send_BEGIN(type, "files", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openfiles);
         }
         send_END();
 
         send_BEGIN(type, "sockets", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->opensockets);
         }
         send_END();
 
         send_BEGIN(type, "pipes", dt);
         for (w = root; w; w = w->next) {
-            if (unlikely(w->exposed))
+            if (unlikely(w->exposed && w->processes))
                 send_SET(w->name, w->openpipes);
         }
         send_END();
