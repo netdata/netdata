@@ -171,6 +171,8 @@ We continued improving the [Kubernetes helmchart](https://github.com/netdata/hel
 
 Finally, we built a process to quickly replace any problematic nightly builds and added more automated CI tests to prevent such builds from being published in the first place.
 
+---
+
 `Apr 26th, 2019` - **[netdata v1.14.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release 1.14 contains 14 bug fixes and 24 improvements.
@@ -180,6 +182,8 @@ The release introduces major additions to Kubernetes monitoring, with tens of ne
 Two new collectors were added, to monitor [Docker hub](https://docs.netdata.cloud/collectors/go.d.plugin/modules/dockerhub/) and [Docker engine](https://docs.netdata.cloud/collectors/go.d.plugin/modules/docker_engine/) metrics. 
 
 Finally, v1.14  adds support for [version 2 cgroups](https://github.com/netdata/netdata/pull/5407), [OpenLDAP over TLS](https://github.com/netdata/netdata/pull/5859), [NVIDIA SMI free and per process memory](https://github.com/netdata/netdata/pull/5796/files) and [configurable syslog facilities](https://github.com/netdata/netdata/pull/5792). 
+
+---
 
 `Mar 14th, 2019` - **[netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)**
 
@@ -191,6 +195,8 @@ A [major refactoring of the python.d plugin](https://github.com/netdata/netdata/
 
 We also added charts for IPC shared memory segments and total memory used.
 
+---
+
 `Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)**
 
 Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
@@ -200,9 +206,13 @@ A "stable" installation and update channel was always on our roadmap, but it bec
 
 We are also introducing a new **Oracle DB collector** module, implemented in Python.
 
+---
+
 `Feb 21st, 2019` - **[netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)**
 
 Patch release 1.12.1 contains 22 bug fixes and 8 improvements.
+
+---
 
 `Feb 14th, 2019` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)**
 
@@ -215,6 +225,8 @@ The key improvements are:
 - A new management API for all netdata servers
 - Bind different functions of the netdata APIs to different ports
 - Improved installation and updates
+
+---
 
 `Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**
 
