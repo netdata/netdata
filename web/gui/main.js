@@ -1402,6 +1402,7 @@ function enrichChartData(chart) {
             break;
 
         case 'smartd':
+        case 'mail':
         case 'web':
             chart.menu = chart.type;
             if (parts.length > 2 && parts[1] === 'log') {

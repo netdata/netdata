@@ -81,22 +81,7 @@ class MailParser(object):
     """Abstract MailParser class, mail log parsers must implement the _parse_line method"""
 
     def __init__(self, log_service):
-        self.charts = log_service.charts
-        self.stats = log_service.stats
-
-    def increment_incoming_code(self, code):
-        """Increments number of incoming messages per status code, adds a new line to chart if required"""
-        if code not in self.stats.incoming_codes:
-            self.charts["incoming_codes"].add_dimension(['mail_incoming_codes_' + code, code, 'incremental', 1, 1])
-            self.stats.incoming_codes[code] = 0
-        self.stats.incoming_codes[code] += 1
-
-    def increment_outgoing_code(self, code):
-        """Increments number of outgoing messages per status code, adds a new line to chart if required"""
-        if code not in self.stats.outgoing_codes:
-            self.charts["outgoing_codes"].add_dimension(['mail_outgoing_codes_' + code, code, 'incremental', 1, 1])
-            self.stats.outgoing_codes[code] = 0
-        self.stats.outgoing_codes[code] += 1
+        self.service = log_service
 
     def _parse_line(self, line):
         raise NotImplementedError
@@ -113,7 +98,7 @@ class PostfixParser(MailParser):
     STATUS_RE = re.compile(r'dsn=(\d+\.\d+\.\d+).*status=(\w+)')
 
     def __init__(self, log_service):
-        super().__init__(log_service)
+        super(PostfixParser, self).__init__(log_service)
         self.greylist_status = log_service.configuration.get("greylist_status", "Try again later")
         # Since postfix does not log messages passing milters (only rejected ones) we store last 50 ids of messages
         # received by the `cleanup` process and count them as accepted when queued for delivery for the first time.
@@ -123,24 +108,24 @@ class PostfixParser(MailParser):
         """Parses queue manager log"""
         if self.QUEUE_RE.search(line) and msg_id in self.queue_ids.keys():
             self.queue_ids.pop(msg_id)
-            self.stats.accepted += 1
-            self.increment_incoming_code("2.0.0")
+            self.service.stats.accepted += 1
+            self.service.increment_incoming_code("2.0.0")
 
     def parse_smtpd_and_cleanup(self, line, first, service):
         """Parses smtpd and cleanup logs"""
         if service == "smtpd" and first == "connect":
-            self.stats.connections += 1
+            self.service.stats.connections += 1
             return
         reject = self.REJECT_RE.search(line)
         if reject:
             code = reject.group(2)
-            self.increment_incoming_code(code)
+            self.service.increment_incoming_code(code)
             if self.greylist_status and self.greylist_status in line:
-                self.stats.greylisted += 1
+                self.service.stats.greylisted += 1
             if code.startswith("4"):
-                self.stats.temp_rejected += 1
+                self.service.stats.temp_rejected += 1
             elif code.startswith("5"):
-                self.stats.perm_rejected += 1
+                self.service.stats.perm_rejected += 1
             return
         if service == "cleanup":
             self.queue_ids[first] = None
@@ -151,14 +136,14 @@ class PostfixParser(MailParser):
         """Parses smtp client log"""
         status = self.STATUS_RE.search(line)
         if status:
-            self.increment_outgoing_code(status.group(1))
+            self.service.increment_outgoing_code(status.group(1))
             stat = status.group(2)
             if stat == "sent":
-                self.stats.sent += 1
+                self.service.stats.sent += 1
             elif stat == "deferred":
-                self.stats.deferred += 1
+                self.service.stats.deferred += 1
             elif stat == "bounced":
-                self.stats.bounced += 1
+                self.service.stats.bounced += 1
 
     def _parse_line(self, line):
         match = self.POSTFIX_RE.search(line)
@@ -180,7 +165,9 @@ class Service(LogService):
         self.order = ORDER
         self.definitions = CHARTS
         self.stats = MailStatistics()
-        self.parsers = [PostfixParser(self)]
+        self.parser = {
+            "postfix": PostfixParser
+        }.get(configuration.get("type", "postfix"))(self)
 
     def check(self):
         """
@@ -199,8 +186,7 @@ class Service(LogService):
         return True
 
     def parse_line(self, line):
-        for parser in self.parsers:
-            parser.parse_line(line)
+        self.parser.parse_line(line)
 
     def _get_data(self):
         """
@@ -232,3 +218,17 @@ class Service(LogService):
         except (ValueError, AttributeError) as ex:
             self.error(ex)
             return None
+
+    def increment_incoming_code(self, code):
+        """Increments number of incoming messages per status code, adds a new line to chart if required"""
+        if code not in self.stats.incoming_codes:
+            self.charts["incoming_codes"].add_dimension(['mail_incoming_codes_' + code, code, 'incremental', 1, 1])
+            self.stats.incoming_codes[code] = 0
+        self.stats.incoming_codes[code] += 1
+
+    def increment_outgoing_code(self, code):
+        """Increments number of outgoing messages per status code, adds a new line to chart if required"""
+        if code not in self.stats.outgoing_codes:
+            self.charts["outgoing_codes"].add_dimension(['mail_outgoing_codes_' + code, code, 'incremental', 1, 1])
+            self.stats.outgoing_codes[code] = 0
+        self.stats.outgoing_codes[code] += 1
