@@ -1,10 +1,11 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-21)
 
 **Fixed bugs:**
 
 - netdata/dbengine: constant restarts on octopuscs [\#6053](https://github.com/netdata/netdata/issues/6053)
+- Nodes are inconsistently unreachables [\#6051](https://github.com/netdata/netdata/issues/6051)
 - BUG when compiling code in mac OS [\#6043](https://github.com/netdata/netdata/issues/6043)
 - Unexpected change to metrics sent to backends with new dbengine [\#6039](https://github.com/netdata/netdata/issues/6039)
 - packages installer failed [\#6027](https://github.com/netdata/netdata/issues/6027)
