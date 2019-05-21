@@ -119,43 +119,28 @@ Netdata supports access lists in `netdata.conf`:
 
 When the certificate is defined as one of the configuration to use, the Netdata will enable the TLS and it will redirect all HTTP request to HTTPS, on the other hand, the stream will be text pure until the user define an ACL to it, of course it is also possible to change the server behavior changing the ACL. For both cases we will use the variable `bind to` to change the default behavior.
 
-To change the behavior of master or slave we will use the definition `^SSL` that can have two possible values
+To change the behavior of the master we will use the definition `^SSL` that can have two possible values
 
-- `force` - This is the default on master, and it will always encrypt the communication, except for stream from slaves that are not configured to use SSL. Case we use this on slave, every communication will be encrypted.
-- `optional` - This is default on slave. When it is used on master, the master will accept both HTTP and HTTPS requests.
+- `force` - This is the default on master, and it will always encrypt the communication, except for stream from slaves that are not configured to use SSL.
+- `optional` - When it is set, the master will accept both HTTP and HTTPS requests.
 
-Let us see some configuration with SSL, we are assuming in these configuration example that we are accepting connections in the default port `19999` from all hosts.
+For the next examples we are assuming in these configuration that we are accepting connections in the default port `19999` from all hosts.
 
 # Default configuration
 
-In normal situation when nothing is defined by the user, the master and slave will assume that it is working with the next ACLs
+In normal situation when nothing is defined by the user, the master will assume that it is working with the next ACLs
 
 `master`
 - bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
-
- `slave`
-- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
-
 
 # Accept communication either using TLS or pure text
 
-This is the unique option not recommended, but case there is a real necessity to use unencrypted connection, master and slaves can be configured like below
+This option is not recommended, but case there is a real necessity to use unencrypted connection, master can accept HTTP requests using the following ACL
 
 `master`
 - bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
 
- `slave`
-- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
-
-# Everything encrypted
-
-This is the best option available to protect not only the communication but the whole structure, because it avoids server information move around the network in pure text. To encrypt everything master and slave must be configured as following
-
-`master`
-- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
-
- `slave`
-- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+For information how to configure the slave check [Stream documentation](../streaming) .
 
 ### Other netdata.conf [web] section options
 setting | default | info

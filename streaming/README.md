@@ -391,6 +391,14 @@ This is how such a solution will work:
 <img src="https://cloud.githubusercontent.com/assets/2662304/23627295/e3569adc-02b8-11e7-9d55-4014bf98c1b3.png"/>
 </p>
 
+### SSL on stream
+
+The Netdata does not activate the encryptation on the slave by default. To enable encrypt connection, firstly is necessary to enable it on the server, see [server documentation](../server) for more details. When the server has the encryptation enabled, we can change the destination to send data encrypted.
+
+`destination = 10.0.0.1:19999:SSL`
+
+The word SSL appended to the end of the destination says for Netdata that the connection must be encrypted from the slave to master.
+
 ### An advanced setup
 
 netdata also supports `proxies` with and without a local database, and data retention can be different between all nodes.

@@ -27,7 +27,9 @@ void security_openssl_library()
 
     SSL_library_init();
 #else
-    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL);
+    if ( OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL) != 1 ){
+        error("SSL library cannot be initialized.");
+    }
 #endif
 }
 
@@ -80,7 +82,7 @@ static SSL_CTX * security_initialize_openssl_server(){
     SSL_CTX_use_PrivateKey_file(ctx, security_key, SSL_FILETYPE_PEM);
     if ( !SSL_CTX_check_private_key(ctx) ){
         ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
-		error("Private key check error: %s",lerror);
+		error("SSL cannot check the private key: %s",lerror);
         SSL_CTX_free(ctx);
         return NULL;
     }
@@ -100,7 +102,7 @@ void security_start_ssl(int type){
     if ( !type){
         struct stat statbuf;
         if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ){
-            info("To use encryptation it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
+            info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
             return;
         }
 
@@ -141,12 +143,12 @@ int security_process_accept(SSL *ssl,int msg) {
          switch(sslerrno) {
              case SSL_ERROR_WANT_READ:
              {
-                 error("Handshake did not finish and it wanna read on socket %d!",sock);
+                 error("SSL handshake did not finish and it wanna read on socket %d!",sock);
                  return NETDATA_SSL_WANT_READ;
              }
              case SSL_ERROR_WANT_WRITE:
              {
-                 error("Handshake did not finish and it wanna read on socket %d!",sock);
+                 error("SSL handshake did not finish and it wanna read on socket %d!",sock);
                  return NETDATA_SSL_WANT_WRITE;
              }
              case SSL_ERROR_SSL:

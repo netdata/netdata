@@ -79,6 +79,18 @@ int rrdpush_init() {
         default_rrdpush_enabled = 0;
     }
 
+#ifdef ENABLE_HTTPS
+    if (netdata_use_ssl_on_stream == NETDATA_SSL_OPTIONAL) {
+        if (default_rrdpush_destination){
+            char *test = strstr(default_rrdpush_destination,":SSL");
+            if(test){
+                *test = 0X00;
+                netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+            }
+        }
+    }
+#endif
+
     return default_rrdpush_enabled;
 }
 
@@ -914,10 +926,6 @@ static int rrdpush_receive(int fd
                            , struct netdata_ssl *ssl
 #endif
 ) {
-
-#ifdef ENABLE_HTTPS
-    (void)ssl;
-#endif
     RRDHOST *host;
     int history = default_rrd_history_entries;
     RRD_MEMORY_MODE mode = default_rrd_memory_mode;
@@ -1031,6 +1039,7 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
 #ifdef ENABLE_HTTPS
+
     if(send_timeout((!ssl->flags)?ssl->conn:NULL,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
