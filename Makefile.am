@@ -514,12 +514,7 @@ netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(NULL)
-if ENABLE_BACKEND_KINESIS
-    netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
-else
-    netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
-endif
-if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
     netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
@@ -586,4 +581,9 @@ endif
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+
+backends/prometheus/remote_write/remote_write.pb.cc \
+backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
+	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
+
 endif

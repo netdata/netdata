@@ -783,7 +783,7 @@ AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "ye
 
 
 # -----------------------------------------------------------------------------
-# Prometheus remote write backend - libprotobuf, libsnappy
+# Prometheus remote write backend - libprotobuf, libsnappy, protoc
 
 PKG_CHECK_MODULES(
     [PROTOBUF],
@@ -799,14 +799,29 @@ PKG_CHECK_MODULES(
     [have_libsnappy=no]
 )
 
+AC_PATH_PROG(
+    [PROTOC],
+    [protoc],
+    [no]
+)
+AS_IF(
+    [test x"${PROTOC}" == x"no"],
+    [have_protoc=no],
+    [have_protoc=yes]
+)
+
 test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libprotobuf}" != "yes" && \
     AC_MSG_ERROR([libprotobuf required but not found. try installing protobuf])
 
 test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libsnappy}" != "yes" && \
     AC_MSG_ERROR([libsnappy required but not found. try installing snappy])
 
+test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_protoc}" != "yes" && \
+    AC_MSG_ERROR([protoc compiler required but not found. try installing protobuf])
+
 AC_MSG_CHECKING([if prometheus remote write backend should be enabled])
-if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes"; then
+if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
+                                                           -a "${have_protoc}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([HAVE_PROTOBUF], [1], [libprotobuf usability])
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS}"
@@ -864,6 +879,8 @@ AC_MSG_RESULT([${enable_lto}])
 
 
 # -----------------------------------------------------------------------------
+
+AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" -o "${enable_backend_prometheus_remote_write}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 

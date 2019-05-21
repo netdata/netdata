@@ -254,11 +254,16 @@ void *backends_main(void *ptr) {
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
-    int do_kinesis = 0, do_prometheus_remote_write = 0;
 
 #if HAVE_KINESIS
+    int do_kinesis = 0;
     char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
 #endif
+
+#if HAVE_PROTOBUF
+    int do_prometheus_remote_write = 0;
+#endif
+
 
     // ------------------------------------------------------------------------
     // collect configuration options

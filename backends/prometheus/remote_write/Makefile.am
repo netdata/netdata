@@ -3,10 +3,12 @@
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
-%.pb.cc %.pb.h: %.proto
-	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
+CLEANFILES = \
+	remote_write.pb.cc \
+	remote_write.pb.h \
+	$(NULL)
 
 dist_noinst_DATA = \
 	remote_write.proto \
-    README.md \
-    $(NULL)
+	README.md \
+	$(NULL)

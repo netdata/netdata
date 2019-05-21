@@ -594,14 +594,6 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
                         if(unlikely(rd->last_collected_time.tv_sec < after))
                             continue;
 
-                        const char *t = "gauge", *h = "gives";
-                        if(rd->algorithm == RRD_ALGORITHM_INCREMENTAL ||
-                           rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL) {
-                            t = "counter";
-                            h = "delta gives";
-                            suffix = "_total";
-                        }
-
                         if(homogeneous) {
                             // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                             // we add all dimensions as labels
