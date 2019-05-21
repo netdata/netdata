@@ -57,6 +57,30 @@ The API requests are serviced as follows:
 - `badges` gives access only to the badges API calls.
 - `management` gives access only to the management API calls.
 
+### Enabling TLS support
+
+Netdata since version 1.16 has the feature to encrypt connections. To enable this option it is necessary to have a certificate and a key, case you do not have one yet, it is possible to generate them  with the following command
+
+$ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
+
+, it is important to say that the previous command will create a self signed certificate and the browsers will show warnings about it.
+
+To start using HTTPS with Netdata it is only necessary to write the path for your certificate (`ssl certificate`) and key(`ssl key`) inside the `web section`
+
+```
+[web]
+	ssl key = /etc/netdata/ssl/key.pem
+	ssl certificate = /etc/netdata/ssl/cert.pem
+```
+
+TIP: The openssl when work with 4096 bits key will need more CPU to process the whole communication, this can be verified using
+
+$ openssl speed rsa2048 rsa4096
+
+, the rsa4096 can be until 4 times slower than rsa2048,  so we recommend to use 2048 bits.
+
+Netdata has default rules that are defined when TLS is enabled, please, read next section for more information.
+
 ### Access lists
 
 Netdata supports access lists in `netdata.conf`:
@@ -91,37 +115,57 @@ Netdata supports access lists in `netdata.conf`:
 
 - `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](../api/health/#health-management-api)
 
-### Enabling TLS/SSL support
+## SSL access list
 
-Netdata since version 1.15 ports encrypted connections. To enable this option it is necessary to genereate a certificate and a key, case you do not have one it is possible to generate them  with the following command
+When the certificate is defined as one of the configuration to use, the Netdata will enable the TLS and it will redirect all HTTP request to HTTPS, on the other hand, the stream will be text pure until the user define an ACL to it, of course it is also possible to change the server behavior changing the ACL. For both cases we will use the variable `bind to` to change the default behavior.
 
-$ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -nodes -keyout key.pem -out cert.pem
+To change the behavior of master or slave we will use the definition `^SSL` that can have two possible values
 
-, it is important to say that the previous command will create a self signed certificate and the browsers will show warnings about it.
+- `force` - This is the default on master, and it will always encrypt the communication, except for stream from slaves that are not configured to use SSL. Case we use this on slave, every communication will be encrypted.
+- `optional` - This is default on slave. When it is used on master, the master will accept both HTTP and HTTPS requests.
 
-To start using HTTPS with Netdata it is only necessary to write the path for your certificate (`ssl certificate`) and key(`ssl key`) inside the `web section`
+Let us see some configuration with SSL, we are assuming in these configuration example that we are accepting connections in the default port `19999` from all hosts.
 
-```
-[web]
-	ssl key = /etc/netdata/key.pem
-	ssl certificate = /etc/netdata/cert.pem
-```
+# Default configuration
 
-TIP: The openssl when work with 4096 bits key will forceh high CPU usage due the math with large numbers, according with our tests using the command
+In normal situation when nothing is defined by the user, the master and slave will assume that it is working with the next ACLs
 
-$ openssl speed rsa2048 rsa4096
+`master`
+- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 
-, the rsa4096 can be until 4 times slower than rsa2048,  so we recommend to use 2048 bits.
+ `slave`
+- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
+
+
+# Accept communication either using TLS or pure text
+
+This is the unique option not recommended, but case there is a real necessity to use unencrypted connection, master and slaves can be configured like below
+
+`master`
+- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
+
+ `slave`
+- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
+
+# Everything encrypted
+
+This is the best option available to protect not only the communication but the whole structure, because it avoids server information move around the network in pure text. To encrypt everything master and slave must be configured as following
+
+`master`
+- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+
+ `slave`
+- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 
 ### Other netdata.conf [web] section options
 setting | default | info
 :------:|:-------:|:----
 ses max window | `15` | See [single exponential smoothing](../api/queries/des/)
 des max window | `15` | See [double exponential smoothing](../api/queries/des/)
-listen backlog | `4096` | The port backlog. Check `man 2 listen`.  
-web files owner | `netdata` | The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`. 
+listen backlog | `4096` | The port backlog. Check `man 2 listen`.
+web files owner | `netdata` | The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`.
 web files group | `netdata` | If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.
-disconnect idle clients after seconds | `60` | The time in seconds to disconnect web clients after being totally idle. 
+disconnect idle clients after seconds | `60` | The time in seconds to disconnect web clients after being totally idle.
 timeout for first request | `60` | How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.
 accept a streaming request every seconds | `0` | Can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves in a [streaming and replication setup](../../streaming)
 respect do not track policy | `no` | If set to `yes`, will respect the client's browser preferences on storing cookies. 
