@@ -59,11 +59,15 @@ The API requests are serviced as follows:
 
 ### Enabling TLS support
 
+## Certificate and key
 Netdata since version 1.16 has the feature to encrypt connections. To enable this option it is necessary to have a certificate and a key, case you do not have one yet, it is possible to generate them  with the following command
 
 $ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
 
 , it is important to say that the previous command will create a self signed certificate and the browsers will show warnings about it.
+
+
+## Configuration
 
 To start using HTTPS with Netdata it is only necessary to write the path for your certificate (`ssl certificate`) and key(`ssl key`) inside the `web section`
 
@@ -72,6 +76,8 @@ To start using HTTPS with Netdata it is only necessary to write the path for you
 	ssl key = /etc/netdata/ssl/key.pem
 	ssl certificate = /etc/netdata/ssl/cert.pem
 ```
+
+The netdata must be able to read both files defined in the options inside the `netdata.conf`. Check the permission of the files(`ls -l /etc/netdata/ssl`) and change it(`chow -R netdata /etc/netdata/ssl/*`) case necessary.
 
 TIP: The openssl when work with 4096 bits key will need more CPU to process the whole communication, this can be verified using
 
