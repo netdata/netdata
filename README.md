@@ -147,6 +147,32 @@ not just visualize metrics.
 
 ## News
 
+`May 21st, 2019` - **[netdata v1.15.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.15.0 contains 11 bug fixes and 30 improvements.
+
+We are very happy and proud to be able to include two major improvements in this release: The aggregated node view and the [new database engine](https://docs.netdata.cloud/database/engine/). 
+
+*Aggregated node view*
+
+The No. 1 request from our community has been a better way to view and manage their Netdata installations, via an aggregated view. The node menu with the simple list of hosts on the agent UI just didn't do it for people with hundreds, or thousands of instances. This release introduces the node view, which uses the power of [Netdata Cloud](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to deliver powerful views of a Netdata-based monitoring infrastructure. You can read more about Netdata Cloud and the future of netdata [here](https://blog.netdata.cloud/posts/netdata-cloud-announcement/).
+
+*New database engine*
+
+Historically, Netdata has required a lot of memory for long-term metrics storage. To mitigate this we've been building a new DB engine for several months and will continue improving until it can become the default `memory mode` for new Netdata installations. The version included in release v1.15.0 already permits longer-term storage of compressed data and we'll continue reducing the required memory in following releases.
+
+*Other major additions*
+
+We have added support for the [AWS Kinesis backend](https://docs.netdata.cloud/backends/aws_kinesis/) and new collectors for [OpenVPN](https://docs.netdata.cloud/collectors/go.d.plugin/modules/openvpn/), the [Tengine web server](https://docs.netdata.cloud/collectors/go.d.plugin/modules/tengine/), [ScaleIO (VxFlex OS)](https://docs.netdata.cloud/collectors/go.d.plugin/modules/scaleio/), [ioping-like latency metrics](https://docs.netdata.cloud/collectors/ioping.plugin/) and [Energi Core node instances](https://docs.netdata.cloud/collectors/python.d.plugin/energid/).
+
+We now have a new, ["text-only" chart type](https://github.com/netdata/netdata/issues/5578), [cpu limits for v2 cgroups](https://github.com/netdata/netdata/issues/5850), [docker swarm metrics](https://docs.netdata.cloud/collectors/go.d.plugin/modules/docker_engine/) and improved [documentation](https://docs.netdata.cloud/).
+
+We continued improving the [Kubernetes helmchart](https://github.com/netdata/helmchart) with liveness probes for slaves, persistence options, a fix for a `Cannot allocate memory` issue and easy configuration for the kubelet, kube-proxy and coredns collectors. 
+
+Finally, we built a process to quickly replace any problematic nightly builds and added more automated CI tests to prevent such builds from being published in the first place.
+
+---
+
 `Apr 26th, 2019` - **[netdata v1.14.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release 1.14 contains 14 bug fixes and 24 improvements.
@@ -156,6 +182,8 @@ The release introduces major additions to Kubernetes monitoring, with tens of ne
 Two new collectors were added, to monitor [Docker hub](https://docs.netdata.cloud/collectors/go.d.plugin/modules/dockerhub/) and [Docker engine](https://docs.netdata.cloud/collectors/go.d.plugin/modules/docker_engine/) metrics. 
 
 Finally, v1.14  adds support for [version 2 cgroups](https://github.com/netdata/netdata/pull/5407), [OpenLDAP over TLS](https://github.com/netdata/netdata/pull/5859), [NVIDIA SMI free and per process memory](https://github.com/netdata/netdata/pull/5796/files) and [configurable syslog facilities](https://github.com/netdata/netdata/pull/5792). 
+
+---
 
 `Mar 14th, 2019` - **[netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)**
 
@@ -167,6 +195,8 @@ A [major refactoring of the python.d plugin](https://github.com/netdata/netdata/
 
 We also added charts for IPC shared memory segments and total memory used.
 
+---
+
 `Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)**
 
 Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
@@ -176,9 +206,13 @@ A "stable" installation and update channel was always on our roadmap, but it bec
 
 We are also introducing a new **Oracle DB collector** module, implemented in Python.
 
+---
+
 `Feb 21st, 2019` - **[netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)**
 
 Patch release 1.12.1 contains 22 bug fixes and 8 improvements.
+
+---
 
 `Feb 14th, 2019` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)**
 
@@ -191,6 +225,8 @@ The key improvements are:
 - A new management API for all netdata servers
 - Bind different functions of the netdata APIs to different ports
 - Improved installation and updates
+
+---
 
 `Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**
 
