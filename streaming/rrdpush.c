@@ -525,6 +525,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 #ifdef ENABLE_HTTPS
     if (!host->ssl.flags) {
         ERR_clear_error();
+        SSL_set_connect_state(host->ssl.conn);
         int err = SSL_connect(host->ssl.conn);
         if (err != 1){
             err = SSL_get_error(host->ssl.conn, err);

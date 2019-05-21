@@ -210,8 +210,6 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
             }
         }
 
-        error("KILLME %s %d",test,w->ssl.flags);
-
         sock_setnonblock(w->ifd);
     }
 #endif

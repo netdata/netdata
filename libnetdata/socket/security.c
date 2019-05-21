@@ -17,14 +17,15 @@ static void security_info_callback(const SSL *ssl, int where, int ret) {
 void security_openssl_library()
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-    # if (SSLEAY_VERSION_NUMBER >= 0x0907000L)
-        OPENSSL_config(NULL);
+# if (SSLEAY_VERSION_NUMBER >= 0x0907000L)
+    OPENSSL_config(NULL);
 # endif
-        SSL_library_init();
 
 # if OPENSSL_API_COMPAT < 0x10100000L
-        SSL_load_error_strings();
+    SSL_load_error_strings();
 # endif
+
+    SSL_library_init();
 #else
     OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL);
 #endif
@@ -127,8 +128,6 @@ void security_clean_openssl(){
 }
 
 int security_process_accept(SSL *ssl,int msg) {
-    usec_t end = now_realtime_usec() + 60000000;
-    usec_t curr;
     int sock = SSL_get_fd(ssl);
     int test;
     if (msg > 0x17)
@@ -136,49 +135,38 @@ int security_process_accept(SSL *ssl,int msg) {
         return NETDATA_SSL_NO_HANDSHAKE;
     }
 
-    while (!SSL_is_init_finished(ssl)) {
-        ERR_clear_error();
-        if ((test = SSL_do_handshake(ssl)) <= 0) {
-            int sslerrno = SSL_get_error(ssl, test);
-            curr = now_realtime_sec();
-            switch(sslerrno) {
-                case SSL_ERROR_WANT_READ:
-                {
-                    if ( curr >=  end)
-                    {
-                        error("Handshake did not finish due timeout %d!",sock);
-                        return NETDATA_SSL_WANT_READ;
-                    }
-                    break;
-                }
-                case SSL_ERROR_WANT_WRITE:
-                {
-                    if ( curr >=  end)
-                    {
-                        error("Handshake did not finish due timeout %d!",sock);
-                        return NETDATA_SSL_WANT_WRITE;
-                    }
-                    break;
-                }
-				case SSL_ERROR_SSL:
-				{
-					debug(D_WEB_CLIENT_ACCESS,"There is not a SSL request on socket %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                	return NETDATA_SSL_NO_HANDSHAKE;
-				}
-                case SSL_ERROR_NONE:
-                {
-                    debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_NONE on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                    break;
-                }
-                case SSL_ERROR_SYSCALL:
-                default:
-                {
+     ERR_clear_error();
+     if ((test = SSL_accept(ssl)) <= 0) {
+         int sslerrno = SSL_get_error(ssl, test);
+         switch(sslerrno) {
+             case SSL_ERROR_WANT_READ:
+             {
+                 error("Handshake did not finish and it wanna read on socket %d!",sock);
+                 return NETDATA_SSL_WANT_READ;
+             }
+             case SSL_ERROR_WANT_WRITE:
+             {
+                 error("Handshake did not finish and it wanna read on socket %d!",sock);
+                 return NETDATA_SSL_WANT_WRITE;
+             }
+             case SSL_ERROR_SSL:
+			 {
+				debug(D_WEB_CLIENT_ACCESS,"There is not a SSL request on socket %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                return NETDATA_SSL_NO_HANDSHAKE;
+			 }
+             case SSL_ERROR_NONE:
+             {
+                debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_NONE on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
+                 break;
+             }
+             case SSL_ERROR_SYSCALL:
+             default:
+             {
                     debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_SYSCALL on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
                     break;
-                }
-            }
-        }
-    }
+             }
+          }
+      }
 
     if ( SSL_is_init_finished(ssl) )
     {

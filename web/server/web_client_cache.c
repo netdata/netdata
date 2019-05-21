@@ -7,25 +7,6 @@
 // allocate and free web_clients
 
 #ifdef ENABLE_HTTPS
-/*
-static void web_client_release_ssl(struct web_client *w){
-    if ( netdata_ctx )
-    {
-        if ( w->ssl )
-        {
-            int test;
-            debug(D_WEB_CLIENT_ACCESS,"RELEASING SSL %d",w->ifd);
-            test = SSL_shutdown(w->ssl);
-            if (  !test )
-            {
-                SSL_shutdown(w->ssl);
-            }
-            SSL_free(w->ssl);
-            w->ssl = NULL;
-        }
-    }
-}
- */
 
 static void web_client_reuse_ssl(struct web_client *w) {
     if (netdata_srv_ctx) {
@@ -197,8 +178,8 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         if(w->next) w->next->prev = w->prev;
         web_clients_cache.avail_count--;
 #ifdef ENABLE_HTTPS
-        SSL *ssl = w->ssl.conn;
         web_client_reuse_ssl(w);
+        SSL *ssl = w->ssl.conn;
 #endif
         web_client_zero(w);
         web_clients_cache.reused++;

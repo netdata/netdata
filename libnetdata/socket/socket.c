@@ -302,6 +302,20 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
 }
 
 WEB_CLIENT_ACL read_acl(char *st) {
+    char *ssl = strchr(st,'^');
+    if (ssl){
+        ssl++;
+        if ( !strncmp("SSL=",ssl,4)){
+            ssl += 4;
+            if (!strcmp(ssl,"force")){
+                netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+            }
+            if (!strcmp(ssl,"optional")){
+                netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
+            }
+        }
+    }
+
     if (!strcmp(st,"dashboard")) return WEB_CLIENT_ACL_DASHBOARD;
     if (!strcmp(st,"registry")) return WEB_CLIENT_ACL_REGISTRY;
     if (!strcmp(st,"badges")) return WEB_CLIENT_ACL_BADGE;
