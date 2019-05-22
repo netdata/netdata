@@ -544,10 +544,11 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
     prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
 
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
-    buffer_sprintf(wb, "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"} 1 %llu\n", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
+    add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
 
     if(host->tags && *(host->tags)) {
-        buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
+        // add_host_info("netdata_host_tags_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
+        // TODO: buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
     }
 
     snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
@@ -555,6 +556,7 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
+        char name[PROMETHEUS_LABELS_MAX + 1];
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         char context[PROMETHEUS_ELEMENT_MAX + 1];
         char family[PROMETHEUS_ELEMENT_MAX + 1];
@@ -599,38 +601,42 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
                             // we add all dimensions as labels
 
                             prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", prefix, context, suffix);
 
-                            buffer_sprintf(wb
-                                           , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
-                                           , prefix
-                                           , context
-                                           , suffix
-                                           , chart
-                                           , family
-                                           , dimension
-                                           , labels
-                                           , rd->last_collected_value
-                                           , timeval_msec(&rd->last_collected_time)
-                            );
+                            // add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            // buffer_sprintf(wb
+                            //                , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                            //                , prefix
+                            //                , context
+                            //                , suffix
+                            //                , chart
+                            //                , family
+                            //                , dimension
+                            //                , labels
+                            //                , rd->last_collected_value
+                            //                , timeval_msec(&rd->last_collected_time)
+                            // );
                         }
                         else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
                             // we create a metric per dimension
 
                             prometheus_name_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", prefix, context, dimension, suffix);
 
-                            buffer_sprintf(wb
-                                           , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
-                                           , prefix
-                                           , context
-                                           , dimension
-                                           , suffix
-                                           , chart
-                                           , family
-                                           , labels
-                                           , rd->last_collected_value
-                                           , timeval_msec(&rd->last_collected_time)
-                            );
+                            // add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            // buffer_sprintf(wb
+                            //                , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
+                            //                , prefix
+                            //                , context
+                            //                , dimension
+                            //                , suffix
+                            //                , chart
+                            //                , family
+                            //                , labels
+                            //                , rd->last_collected_value
+                            //                , timeval_msec(&rd->last_collected_time)
+                            // );
                         }
                     }
                     else {
@@ -647,19 +653,21 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
                                 suffix = "_sum";
 
                             prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
 
-                            buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
-                                           , prefix
-                                           , context
-                                           , units
-                                           , suffix
-                                           , chart
-                                           , family
-                                           , dimension
-                                           , labels
-                                           , value
-                                           , last_t * MSEC_PER_SEC
-                            );
+                            // add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            // buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
+                            //                , prefix
+                            //                , context
+                            //                , units
+                            //                , suffix
+                            //                , chart
+                            //                , family
+                            //                , dimension
+                            //                , labels
+                            //                , value
+                            //                , last_t * MSEC_PER_SEC
+                            // );
                         }
                     }
                 }
@@ -741,9 +749,16 @@ void rrd_stats_remote_write_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFE
     // we start at the point we had stopped before
     time_t after = prometheus_preparation(host, wb, backend_options, server, before, 0);
 
+    clear_write_request();
+    buffer_reset(wb);
+
     rrd_rdlock();
     rrdhost_foreach_read(host) {
         rrd_stats_remote_write_allmetrics_prometheus(host, wb, prefix, backend_options, after, before);
     }
     rrd_unlock();
+}
+
+int process_prometheus_remote_write_response(BUFFER *b) {
+    return discard_response(b, "prometheus remote write");
 }

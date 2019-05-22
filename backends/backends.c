@@ -262,6 +262,8 @@ void *backends_main(void *ptr) {
 
 #if HAVE_PROTOBUF
     int do_prometheus_remote_write = 0;
+
+    BUFFER *http_request_header = buffer_create(1);
 #endif
 
 
@@ -366,6 +368,8 @@ void *backends_main(void *ptr) {
 #if HAVE_PROTOBUF
         do_prometheus_remote_write = 1;
 
+        backend_response_checker = process_prometheus_remote_write_response;
+
         init_write_request();
 #else
         error("Prometheus remote write support isn't compiled");
@@ -376,10 +380,12 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
+#if !HAVE_PROTOBUF
     if(backend_request_formatter == NULL || backend_response_checker == NULL) {
         error("BACKEND: backend is misconfigured - disabling it.");
         goto cleanup;
     }
+#endif
 
 
     // ------------------------------------------------------------------------
@@ -691,6 +697,32 @@ void *backends_main(void *ptr) {
                 flags += MSG_NOSIGNAL;
     #endif
 
+#if HAVE_PROTOBUF
+                if(do_prometheus_remote_write) {
+                    size_t data_size = get_write_request_size();
+
+                    buffer_flush(b);
+                    buffer_need_bytes(b, data_size);
+                    pack_write_request(b->buffer, &data_size);
+                    b->len = data_size;
+
+                    buffer_flush(http_request_header);
+                    buffer_sprintf(http_request_header,
+                                    "POST /receive HTTP/1.1\r\n"
+                                    "Host: localhost:1234\r\n"
+                                    "Accept: */*\r\n"
+                                    "Content-Length: %zu\r\n"
+                                    "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
+                                    data_size
+                    );
+
+                    len = buffer_strlen(http_request_header);
+                    send(sock, buffer_tostring(http_request_header), len, flags);
+
+                    len = data_size;
+                }
+#endif
+
                 ssize_t written = send(sock, buffer_tostring(b), len, flags);
                 // chart_backend_latency += now_monotonic_usec() - start_ut;
                 if(written != -1 && (size_t)written == len) {
@@ -796,6 +828,7 @@ cleanup:
 
 #if HAVE_PROTOBUF
     if(do_prometheus_remote_write) {
+        buffer_free(http_request_header);
         protocol_buffers_shutdown();
     }
 #endif

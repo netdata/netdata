@@ -66,9 +66,11 @@ int add_metric(const char *name, const char *chart, const char *family, const ch
     label->set_name("family");
     label->set_value(family);
 
-    label = timeseries->add_labels();
-    label->set_name("dimension");
-    label->set_value(dimension);
+    if(dimension) {
+        label = timeseries->add_labels();
+        label->set_name("dimension");
+        label->set_value(dimension);
+    }
 
     label = timeseries->add_labels();
     label->set_name("instance");
