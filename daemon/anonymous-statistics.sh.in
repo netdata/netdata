@@ -22,6 +22,9 @@ if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ]; then
 	exit 0
 fi
 
+# Shorten version for easier reporting
+NETDATA_VERSION=$(echo "${NETDATA_VERSION}" | sed 's/-.*//g' | tr -d 'v')
+
 echo "&av=${NETDATA_VERSION}\
 &ec=${ACTION}\
 &ea=${ACTION_RESULT}\
@@ -62,7 +65,7 @@ if [ -n "$(command -v curl 2>/dev/null)" ]; then
 		--data-urlencode "cd2=${NETDATA_SYSTEM_OS_ID}" \
 		--data-urlencode "cd3=${NETDATA_SYSTEM_OS_ID_LIKE}" \
 		--data-urlencode "cd4=${NETDATA_SYSTEM_OS_VERSION}" \
-		--data-urlencode "cd5=${NETDATA_SYSTEM_OS_DETECTION}" \
+		--data-urlencode "cd5=${NETDATA_SYSTEM_OS_VERSION_ID}" \
 		--data-urlencode "cd6=${NETDATA_SYSTEM_OS_DETECTION}" \
 		--data-urlencode "cd7=${NETDATA_SYSTEM_KERNEL_NAME}" \
 		--data-urlencode "cd8=${NETDATA_SYSTEM_KERNEL_VERSION}" \
