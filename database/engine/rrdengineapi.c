@@ -287,8 +287,6 @@ void *rrdeng_create_page(uuid_t *id, struct rrdeng_page_cache_descr **ret_descr)
 {
     struct rrdeng_page_cache_descr *descr;
     void *page;
-    int ret;
-
     /* TODO: check maximum number of pages in page cache limit */
 
     page = mallocz(RRDENG_BLOCK_SIZE); /*TODO: add page size */
