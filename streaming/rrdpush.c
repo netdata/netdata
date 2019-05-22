@@ -486,7 +486,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
-    snprintfz(http, HTTP_HEADER_SIZE,
+    int eol = snprintfz(http, HTTP_HEADER_SIZE,
             "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
                     "&NETDATA_SYSTEM_OS_NAME=%s"
                     "&NETDATA_SYSTEM_OS_ID=%s"
@@ -533,6 +533,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->program_name
               , host->program_version
     );
+    http[eol] = 0x00;
 
 #ifdef ENABLE_HTTPS
     if (!host->ssl.flags) {

@@ -1451,9 +1451,10 @@ ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
     debug(D_DEFLATE, "%llu: OPEN CHUNK of %zu bytes (hex: %zx).", w->id, len, len);
     char buf[24];
-    sprintf(buf, "%zX\r\n", len);
-
     ssize_t bytes;
+    bytes = (ssize_t)sprintf(buf, "%zX\r\n", len);
+    buf[bytes] = 0x00;
+
     bytes = web_client_send_data(w,buf,strlen(buf),0);
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk header %zd bytes.", w->id, bytes);

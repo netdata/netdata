@@ -66,7 +66,6 @@ $ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -o
 
 , it is important to say that the previous command will create a self signed certificate and the browsers will show warnings about it.
 
-
 ## Configuration
 
 To start using HTTPS with Netdata it is only necessary to write the path for your certificate (`ssl certificate`) and key(`ssl key`) inside the `web section`
