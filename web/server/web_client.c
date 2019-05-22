@@ -829,40 +829,49 @@ typedef enum {
 #endif
 } HTTP_VALIDATION;
 
-static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
-    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
-
-    size_t last_pos = w->header_parse_last_size;
-    if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
-    else last_pos = 0;
-
-    w->header_parse_tries++;
-    w->header_parse_last_size = buffer_strlen(w->response.data);
-
-    if(w->header_parse_tries > 1) {
-        if(w->header_parse_last_size < last_pos)
-            last_pos = 0;
-
-        if(strstr(&s[last_pos], "\r\n\r\n") == NULL) {
-            if(w->header_parse_tries > 10) {
-                info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
-                w->header_parse_tries = 0;
-                w->header_parse_last_size = 0;
-                web_client_disable_wait_receive(w);
-                return HTTP_VALIDATION_NOT_SUPPORTED;
-            }
-
-            return HTTP_VALIDATION_INCOMPLETE;
-        }
+static inline HTTP_VALIDATION web_client_is_complete(char *begin,char *end,size_t length){
+    if ( begin == end){
+        return HTTP_VALIDATION_INCOMPLETE;
     }
 
-    // is is a valid request?
+    if ( length > 3  ){
+        begin = end - 4;
+    }
+
+    uint32_t counter = 0;
+    do{
+        if (*begin == '\r'){
+            begin++;
+            if ( begin == end )
+            {
+                break;
+            }
+
+            if (*begin == '\n')
+            {
+                counter++;
+            }
+        } else if (*begin == '\n') {
+            begin++;
+            counter++;
+        }
+
+        if ( counter == 2){
+            break;
+        }
+    }
+    while(begin != end);
+
+    return (counter == 2)?HTTP_VALIDATION_OK:HTTP_VALIDATION_INCOMPLETE;
+}
+
+static inline char *web_client_parse_method(struct web_client *w,char *s) {
     if(!strncmp(s, "GET ", 4)) {
-        encoded_url = s = &s[4];
+        s = &s[4];
         w->mode = WEB_CLIENT_MODE_NORMAL;
     }
     else if(!strncmp(s, "OPTIONS ", 8)) {
-        encoded_url = s = &s[8];
+        s = &s[8];
         w->mode = WEB_CLIENT_MODE_OPTIONS;
     }
     else if(!strncmp(s, "STREAM ", 7)) {
@@ -891,21 +900,20 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 hostname[13] = 0x00;
             }
             error("The server is configured to always use encrypt connection, please enable the SSL on slave with hostname '%s'.",hostname);
-            return HTTP_VALIDATION_NOT_SUPPORTED;
+            return NULL;
         }
 #endif
-
-        encoded_url = s = &s[7];
+        s = &s[7];
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
-        w->header_parse_tries = 0;
-        w->header_parse_last_size = 0;
-        web_client_disable_wait_receive(w);
-        return HTTP_VALIDATION_NOT_SUPPORTED;
+        s = NULL;
     }
 
-    // find the SPACE + "HTTP/"
+    return s;
+}
+
+static inline char *web_client_find_protocol(char *s){
     while(*s) {
         // find the next space
         while (*s && *s != ' ') s++;
@@ -915,6 +923,62 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         else s++;
     }
 
+    return s;
+}
+
+static inline void web_client_parse_headers(struct web_client *w,char *s){
+    while(*s) {
+        // find a line feed
+        while(*s && *s++ != '\r');
+
+        // did we reach the end?
+        if(unlikely(!*s)) break;
+
+        s = http_header_parse(w, s,
+                              (w->mode == WEB_CLIENT_MODE_STREAM) // parse user agent
+        );
+
+    }
+}
+
+static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
+    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+    size_t status;
+
+    w->header_parse_tries++;
+    w->header_parse_last_size = buffer_strlen(w->response.data);
+    status = w->header_parse_last_size;
+
+    // make sure we have complete request
+    // complete requests contain: \r\n\r\n
+    status = web_client_is_complete(s,&s[status],status);
+    if (w->header_parse_tries > 10 ){
+        if (status == HTTP_VALIDATION_INCOMPLETE){
+            info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
+            w->header_parse_tries = 0;
+            w->header_parse_last_size = 0;
+            web_client_disable_wait_receive(w);
+            return HTTP_VALIDATION_NOT_SUPPORTED;
+        }
+    } else{
+        if (status == HTTP_VALIDATION_INCOMPLETE){
+            web_client_enable_wait_receive(w);
+            return HTTP_VALIDATION_INCOMPLETE;
+        }
+    }
+
+    //Parse the method used to communicate
+    s = web_client_parse_method(w,s);
+    if (!s){
+        w->header_parse_tries = 0;
+        w->header_parse_last_size = 0;
+        web_client_disable_wait_receive(w);
+        return HTTP_VALIDATION_NOT_SUPPORTED;
+    }
+
+    encoded_url = s;
+
+    s = web_client_find_protocol(s);
     // incomplete requests
     if(unlikely(!*s)) {
         web_client_enable_wait_receive(w);
@@ -923,57 +987,31 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // we have the end of encoded_url - remember it
     char *ue = s;
+    w->decoded_length = ue - encoded_url;
 
-    // make sure we have complete request
-    // complete requests contain: \r\n\r\n
-    while(*s) {
-        // find a line feed
-        while(*s && *s++ != '\r');
+    *ue = '\0';
+    url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+    *ue = ' ';
 
-        // did we reach the end?
-        if(unlikely(!*s)) break;
+    web_client_parse_headers(w,s);
 
-        // is it \r\n ?
-        if(likely(*s++ == '\n')) {
-
-            // is it again \r\n ? (header end)
-            if(unlikely(*s == '\r' && s[1] == '\n')) {
-                // a valid complete HTTP request found
-
-                *ue = '\0';
-                url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-                *ue = ' ';
-                
-                // copy the URL - we are going to overwrite parts of it
-                // TODO -- ideally we we should avoid copying buffers around
-                strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
-#ifdef ENABLE_HTTPS
-                if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
-                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
-                        w->header_parse_tries = 0;
-                        w->header_parse_last_size = 0;
-                        web_client_disable_wait_receive(w);
-                        return HTTP_VALIDATION_REDIRECT;
-                    }
-                }
-#endif
-
-                w->header_parse_tries = 0;
-                w->header_parse_last_size = 0;
-                web_client_disable_wait_receive(w);
-                return HTTP_VALIDATION_OK;
-            }
-
-            // another header line
-            s = http_header_parse(w, s,
-                    (w->mode == WEB_CLIENT_MODE_STREAM) // parse user agent
-            );
-        }
+    w->path = w->decoded_url;
+    s = strchr(w->path,'?');
+    if (s){
+        s++;
+        w->query_string = s;
+    } else{
+        w->query_string = NULL;
     }
 
-    // incomplete request
-    web_client_enable_wait_receive(w);
-    return HTTP_VALIDATION_INCOMPLETE;
+    // copy the URL - we are going to overwrite parts of it
+    // TODO -- ideally we we should avoid copying buffers around
+    strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+
+    w->header_parse_tries = 0;
+    w->header_parse_last_size = 0;
+    web_client_disable_wait_receive(w);
+    return HTTP_VALIDATION_OK;
 }
 
 static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,size_t len, int flags)
@@ -1102,7 +1140,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         buffer_sprintf(w->response.header_output,
                 "Cache-Control: %s\r\n"
                         "Expires: %s\r\n",
-                (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache, no-store, must-revalidate\r\nPragma: no-cache":"public",
+                (w->response.data->options & WB_CONTENT_NO_CACHEABLE)?"no-cache":"public",
                 edate);
     }
 
@@ -1258,7 +1296,10 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #endif
     }
 
+    error("KILLME %s",url);
+
     char *tok = mystrsep(&url, "/?");
+    error("KILLME %s",tok);
     if(likely(tok && *tok)) {
         uint32_t hash = simple_hash(tok);
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);

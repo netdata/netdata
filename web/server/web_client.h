@@ -128,6 +128,9 @@ struct web_client {
     char client_port[NI_MAXSERV+1];
 
     char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the URL in this buffer
+    char *path;
+    char *query_string;
+    size_t decoded_length;
     char last_url[NETDATA_WEB_REQUEST_URL_SIZE+1];       // we keep a copy of the decoded URL here
     char host[256];
 
