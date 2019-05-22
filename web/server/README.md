@@ -145,7 +145,7 @@ This option is not recommended, but case there is a real necessity to use unencr
 `master`
 - bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
 
-For information how to configure the slave check [Stream documentation](../streaming) .
+For information how to configure the slave check [Stream documentation](../../streaming) .
 
 ### Other netdata.conf [web] section options
 setting | default | info

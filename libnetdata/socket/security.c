@@ -38,6 +38,7 @@ void security_openssl_common_options(SSL_CTX *ctx){
     SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
     SSL_CTX_set_min_proto_version(ctx,TLS1_VERSION);
+    SSL_CTX_set_max_proto_version(ctx,TLS1_2_VERSION);
 #endif
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 }

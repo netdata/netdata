@@ -393,7 +393,7 @@ This is how such a solution will work:
 
 ### SSL on stream
 
-The Netdata does not activate the encryptation on the slave by default. To enable encrypt connection, firstly is necessary to enable it on the server, see [server documentation](../server) for more details. When the server has the encryptation enabled, we can change the destination to send data encrypted.
+The Netdata does not activate the encryptation on the slave by default. To enable encrypt connection, firstly is necessary to enable it on the server, see [server documentation](../web/server) for more details. When the server has the encryptation enabled, we can change the destination to send data encrypted.
 
 `destination = 10.0.0.1:19999:SSL`
 
