@@ -403,6 +403,15 @@ progress "Compile netdata"
 run make -j$(find_processors) || exit 1
 
 # -----------------------------------------------------------------------------
+progress "Create custom-plugins.d"
+if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
+	# the configuration directory exists
+
+	if [ ! -d "${NETDATA_PREFIX}/etc/netdata/charts.d" ]; then
+		run mkdir "${NETDATA_PREFIX}/etc/netdata/custom-plugins.d"
+	fi
+	
+# -----------------------------------------------------------------------------
 progress "Migrate configuration files for node.d.plugin and charts.d.plugin"
 
 # migrate existing configuration files
