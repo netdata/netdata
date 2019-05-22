@@ -1,6 +1,7 @@
 ---
 name: Question
 about: You just want to ask a question? Go on.
+labels: question, "no changelog"
 ---
 
 <!---
