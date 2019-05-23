@@ -1136,7 +1136,6 @@ int main(int argc, char **argv) {
 
 	netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
-    if (get_system_info(system_info) == 0) send_statistics("START","-", "-");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1196,6 +1195,7 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
+    if (get_system_info(system_info) == 0) send_statistics("START","-", "-");
 
     // ------------------------------------------------------------------------
     // unblock signals
