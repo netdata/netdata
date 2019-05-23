@@ -515,20 +515,24 @@ progress "Fix generated files permissions"
 run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.logrotate -exec chmod 755 {} \;
 
 # -----------------------------------------------------------------------------
-progress "Add user netdata to required user groups"
+progress "Creating standard user and groups for netdata"
 
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
 NETDATA_ADDED_TO_GROUPS=""
 if [ "${UID}" -eq 0 ]; then
+	progress "Adding group 'netdata'"
 	portable_add_group netdata || :
+
+	progress "Adding user 'netdata'"
 	portable_add_user netdata "${NETDATA_PREFIX}/var/lib/netdata" || :
 
+	progress "Assign user 'netdata' to required groups"
 	for g in ${NETDATA_WANTED_GROUPS}; do
 		# shellcheck disable=SC2086
 		portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
 	done
 else
-	run_failed "The installer does not run as root."
+	run_failed "The installer does not run as root. Nothing to do for user and groups"
 fi
 
 # -----------------------------------------------------------------------------
@@ -567,6 +571,7 @@ else
 fi
 NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
+echo >&2 "Netdata user and group is finally set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
 # the owners of the web files
 NETDATA_WEB_USER="$(config_option "web" "web files owner" "${NETDATA_USER}")"
@@ -958,39 +963,58 @@ To start netdata run:
 
   ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_START_CMD}${TPUT_RESET}
 
-
 END
 echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh${TPUT_RESET}"
+echo >&2
 
-if [ "${AUTOUPDATE}" = "1" ]; then
-	if [ "${UID}" -ne "0" ]; then
-		echo >&2 "You need to run the installer as root for auto-updating via cron."
+progress "Install netdata updater tool"
+
+if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
+	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" || exit 1
+else
+	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" || exit 1
+fi
+
+chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh
+echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh${TPUT_RESET}"
+echo >&2
+
+# Figure out the cron directory for the distro
+crondir=
+[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
+[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
+
+if [ -z "${crondir}" ]; then
+	echo >&2 "Cannot figure out the cron directory to handle netdata-updater.sh activation/deactivation"
+elif [ "${UID}" -ne "0" ]; then
+	# We cant touch cron if we are not running as root
+	echo >&2 "You need to run the installer as root for auto-updating via cron."
+else
+	progress "Check if we must enable/disable the netdata updater"
+	if [ "${AUTOUPDATE}" = "1" ]; then
+		if [ -f "${crondir}/netdata-updater.sh" ]; then
+			progress "Removing incorrect netdata-updater filename in cron"
+			rm -f "${crondir}/netdata-updater.sh"
+		fi
+
+		echo >&2 "Adding to cron"
+
+		rm -f "${crondir}/netdata-updater"
+		ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" "${crondir}/netdata-updater"
+
+		echo >&2 "Auto-updating has been enabled. Updater script linked to: ${TPUT_RED}${TPUT_BOLD}${crondir}/netdata-update${TPUT_RESET}"
+		echo >&2
+		echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
+		echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
 	else
-		crondir=
-		[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
-		[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
+		echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
+		echo >&2
 
-		if [ -z "${crondir}" ]; then
-			echo >&2 "Cannot figure out the cron directory to install netdata-updater"
-		else
-			if [ -f "${crondir}/netdata-updater.sh" ]; then
-				progress "Removing incorrect netdata-updater filename in cron"
-				rm -f "${crondir}/netdata-updater.sh"
-			fi
-			progress "Installing new netdata-updater in cron"
-
+		if [ -f "${crondir}/netdata-updater" ]; then
+			echo >&2 "Removing cron reference: ${crondir}/netdata-updater"
 			rm -f "${crondir}/netdata-updater"
-			if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
-			else
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
-			fi
-
-			chmod 0755 ${crondir}/netdata-updater
-			echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
-			echo >&2
-			echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
-			echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
+		else
+			echo >&2 "Did not find any cron entries to remove"
 		fi
 	fi
 fi

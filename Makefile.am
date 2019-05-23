@@ -106,7 +106,7 @@ SUBDIRS += \
 
 AM_CFLAGS = \
 	$(OPTIONAL_MATH_CFLAGS) \
-	$(OPTIONAL_NFACCT_CLFAGS) \
+	$(OPTIONAL_NFACCT_CFLAGS) \
 	$(OPTIONAL_ZLIB_CFLAGS) \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
@@ -508,9 +508,9 @@ netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(NULL)
 if ENABLE_BACKEND_KINESIS
-    netdata_LINK = $(CXXLD) $(CXXFLAGS) -o $@
+    netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
-    netdata_LINK = $(CCLD) $(CFLAGS) -o $@
+    netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 endif
 
 if ENABLE_PLUGIN_APPS
