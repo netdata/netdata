@@ -628,7 +628,7 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d"; do
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d"; do
 	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
 		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
 		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
