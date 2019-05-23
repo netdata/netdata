@@ -152,15 +152,23 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port, pi->port_acl);
     w->pollinfo_slot = pi->slot;
 
-    if(unlikely(pi->socktype == AF_UNIX)) {
-        web_client_set_unix(w);
+    struct sockaddr info;
+    socklen_t infolen = sizeof(info);
+    if (getpeername(w->ifd,&info,&infolen) == -1){
+        error("Cannot get information from the socket to set flags, I am assuming TCP");
+        web_client_set_tcp(w);
     }
     else {
-        web_client_set_tcp(w);
+        if (info.sa_family == AF_UNIX) {
+            error("KILLME I AM A UNIX GUY.");
+            web_client_set_unix(w);
+        } else {
+            web_client_set_tcp(w);
+        }
     }
 
 #ifdef ENABLE_HTTPS
-    if ( netdata_srv_ctx ) {
+    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )) {
         if( sock_delnonblock(w->ifd) < 0 ){
             error("Web server cannot remove the non-blocking flag from socket %d",w->ifd);
         }
@@ -170,6 +178,12 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         char test[8];
         if ( recv(w->ifd,test, 7,MSG_PEEK) == 7 ) {
             test[7] = 0x00;
+            if (( netdata_use_ssl_on_stream == NETDATA_SSL_FORCE ) && (test[0] == 'S') ){
+                error("The Netdata is working with SSL in force mode, so it cannot accept plain text connection.");
+                WEB_CLIENT_IS_DEAD(w);
+                sock_setnonblock(w->ifd);
+                return w;
+            }
         }
         else {
             //Case I do not have success to read 7 bytes,
@@ -211,6 +225,8 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         }
 
         sock_setnonblock(w->ifd);
+    } else{
+        w->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
     }
 #endif
 

@@ -117,6 +117,34 @@ Using the above, you access netdata on the backend servers, like this:
 - `http://nginx.server/netdata/server1/` to reach `backend-server1`
 - `http://nginx.server/netdata/server2/` to reach `backend-server2`
 
+###  Using TLS communication
+
+Case the Netdata Master has a certificate and key that allows the Netdata to run in encrypt mode,
+it is possible to encrypt the communication between Nginx and Netdata.
+
+To enable this encryptation firstly it is necessary to create a certificate and key for Nginx, after
+this it is necessary to append the following line inside the location section
+
+```
+proxy_set_header X-Forwarded-Proto https;
+```
+
+and to change the proxy_pass from http to https like the following example
+
+```
+proxy_pass https://localhost:19999;
+```
+
+Finally in the server section it is necessary to give the path to certificate, key and to enable SSL
+
+```
+ssl on;
+ssl_certificate /etc/nginx/cert.pem;
+ssl_certificate_key /etc/nginx/key.pem;
+```
+
+Case you have the master with encryptation enabled and the nginx is not configured as described in this
+section, probably you will receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
 
@@ -200,5 +228,6 @@ If you get an 502 Bad Gateway error you might check your nginx error log:
 ```
 
 If you see something like the above, chances are high that SELinux prevents nginx from connecting to the backend server. To fix that, just use this policy: `setsebool -P httpd_can_network_connect true`.
+
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-nginx&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

@@ -310,6 +310,9 @@ WEB_CLIENT_ACL read_acl(char *st) {
             if (!strcmp(ssl,"optional")){
                 netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
             }
+            else if (!strcmp(ssl,"force")){
+                netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+            }
         }
     }
 

@@ -815,7 +815,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
 
 #ifdef ENABLE_HTTPS
-    if (netdata_srv_ctx) {
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
         if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (s[0] != 'S'))  ) {
             return HTTP_VALIDATION_REDIRECT;
         }
@@ -939,7 +939,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if (netdata_srv_ctx){
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
         if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
             bytes = SSL_write(w->ssl.conn,buf, len) ;
         } else {
@@ -1084,7 +1084,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     size_t count = 0;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if (netdata_srv_ctx){
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
            if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
                 while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
@@ -1103,7 +1103,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
                     }
                 }
             }
-        } else {
+    } else {
             while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
                 count++;
 
@@ -1112,7 +1112,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
                     break;
                 }
             }
-        }
+    }
 #else
     while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
         count++;
@@ -1377,7 +1377,7 @@ void web_client_process_request(struct web_client *w) {
         {
             buffer_flush(w->response.data);
             w->response.data->contenttype = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection...</body></html>");
+            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection, case your browser does not support redirection, please click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">here</a>.</body></html>");
             w->response.code = 301;
             break;
         }
@@ -1753,7 +1753,7 @@ ssize_t web_client_receive(struct web_client *w)
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
 #ifdef ENABLE_HTTPS
-    if (netdata_srv_ctx) {
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
         if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
             bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
         }else {

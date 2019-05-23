@@ -460,7 +460,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         host->ssl.flags = NETDATA_SSL_START;
         if (!host->ssl.conn){
             host->ssl.conn = SSL_new(netdata_cli_ctx);
-            if(host->ssl.conn){
+            if(!host->ssl.conn){
                 error("Failed to allocate SSL structure.");
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
             }
