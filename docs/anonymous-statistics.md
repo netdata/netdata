@@ -1,6 +1,6 @@
 # Anonymous Statistics
 
-From Netdata v1.12 and above, anonymous usage information is collected by default and send to Google Analytics. 
+From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. 
 The statistics calculated from this information will be used for:
 
 1. **Quality assurance**, to help us understand if netdata behaves as expected and help us identify repeating issues for certain distributions or environment.
@@ -60,3 +60,4 @@ To opt-out from sending anonymous statistics, you can create a file called `.opt
 - The anonymous statistics script will exit immediately if called via any other way (e.g. shell)
 - The Google Tag Manager Javascript snippet will remain in the page, but the linked tag will not be fired. The effect is that no data will ever be sent to GA. 
 
+You can also disable telemetry by passing the option `--disable-telemetry` to any of the installers.
