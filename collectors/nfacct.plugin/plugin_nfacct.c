@@ -715,15 +715,18 @@ static void nfacct_send_metrics() {
                 printf("CHART netfilter.nfacct_packets '' 'Netfilter Accounting Packets' 'packets/s'\n");
                 printf("DIMENSION %s '' incremental 1 %d\n", d->name, nfacct_root.update_every);
             }
-            printf(
-                    "BEGIN netfilter.nfacct_packets\n"
-                    "SET %s = %lld\n"
-                    "END\n"
+        }
+    }
+    printf("BEGIN netfilter.nfacct_packets\n");
+    for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
+        if(likely(d->updated)) {
+            printf("SET %s = %lld\n"
                     , d->name
                     , (collected_number)d->pkts
             );
         }
     }
+    printf("END\n");
 
     // ----------------------------------------------------------------
 
@@ -743,15 +746,18 @@ static void nfacct_send_metrics() {
                 printf("CHART netfilter.nfacct_bytes '' 'Netfilter Accounting Bandwidth' 'kilobytes/s'\n");
                 printf("DIMENSION %s '' incremental 1 %d\n", d->name, 1000 * nfacct_root.update_every);
             }
-            printf(
-                   "BEGIN netfilter.nfacct_bytes\n"
-                   "SET %s = %lld\n"
-                   "END\n"
+        }
+    }
+    printf("BEGIN netfilter.nfacct_bytes\n");
+    for(d = nfacct_root.nfacct_metrics; d ; d = d->next) {
+        if(likely(d->updated)) {
+            printf("SET %s = %lld\n"
                    , d->name
                    , (collected_number)d->bytes
             );
         }
     }
+    printf("END\n");
 }
 
 #endif // HAVE_LIBNETFILTER_ACCT
