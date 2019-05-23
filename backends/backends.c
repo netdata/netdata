@@ -292,6 +292,10 @@ void *backends_main(void *ptr) {
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
     hosts_pattern  = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
+#if HAVE_PROTOBUF
+    const char *remote_write_path = config_get(CONFIG_SECTION_BACKEND, "remote write URL path", "/receive");
+#endif
+
     // ------------------------------------------------------------------------
     // validate configuration options
     // and prepare for sending data to our backend
@@ -364,7 +368,7 @@ void *backends_main(void *ptr) {
         error("AWS Kinesis support isn't compiled");
 #endif /* HAVE_KINESIS */
     }
-    else if (!strcmp(type, "prometheus remote write")) {
+    else if (!strcmp(type, "prometheus_remote_write")) {
 #if HAVE_PROTOBUF
         do_prometheus_remote_write = 1;
 
@@ -708,11 +712,13 @@ void *backends_main(void *ptr) {
 
                     buffer_flush(http_request_header);
                     buffer_sprintf(http_request_header,
-                                    "POST /receive HTTP/1.1\r\n"
-                                    "Host: localhost:1234\r\n"
+                                    "POST %s HTTP/1.1\r\n"
+                                    "Host: %s\r\n"
                                     "Accept: */*\r\n"
                                     "Content-Length: %zu\r\n"
                                     "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
+                                    remote_write_path,
+                                    hostname,
                                     data_size
                     );
 
