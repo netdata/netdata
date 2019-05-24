@@ -113,6 +113,8 @@ For more information about running netdata in docker, check the [docker installa
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
+From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read more about the information collected and how to opt-out, check the [anonymous statistics page](docs/anonymous-statistics.md).
+
 ## Why Netdata
 
 Netdata has a quite different approach to monitoring.

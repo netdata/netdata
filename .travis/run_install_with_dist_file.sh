@@ -39,7 +39,7 @@ fi
 
 echo "Entering ${NETDATA_DIST_FOLDER} and starting docker compilation"
 cd ${NETDATA_DIST_FOLDER}
-docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O'-' 'http://127.0.0.1:19999/api/v1/info' | grep version"
+docker run -it -v "${PWD}:/code:rw" -w /code "netdata/os-test:centos7" /bin/bash -c "./netdata-installer.sh --dont-wait --install /tmp && echo \"Validating netdata instance is running\" && wget -O'-' 'http://localhost:19999/api/v1/info' | grep version"
 
 echo "Installation completed with no errors! Removing temporary folders"
 
