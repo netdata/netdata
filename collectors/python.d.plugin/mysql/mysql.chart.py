@@ -11,6 +11,7 @@ from bases.FrameworkServices.MySQLService import MySQLService
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
 QUERY_VARIABLES = 'SHOW GLOBAL VARIABLES LIKE \'max_connections\';'
+QUERY_USER_STATISTICS = 'SHOW USER_STATISTICS;'
 
 GLOBAL_STATS = [
     'Bytes_received',
@@ -149,6 +150,18 @@ SLAVE_STATS = [
     ('Slave_IO_Running', slave_running)
 ]
 
+USER_STATISTICS = [
+    'Select_commands',
+    'Update_commands',
+    'Other_commands',
+    'Cpu_time',
+    'Rows_read',
+    'Rows_sent',
+    'Rows_deleted',
+    'Rows_inserted',
+    'Rows_updated'
+]
+
 VARIABLES = [
     'max_connections'
 ]
@@ -200,7 +213,8 @@ ORDER = [
     'galera_bytes',
     'galera_queue',
     'galera_conflicts',
-    'galera_flow_control'
+    'galera_flow_control',
+    'userstats_cpu'
 ]
 
 CHARTS = {
@@ -570,6 +584,10 @@ CHARTS = {
         'lines': [
             ['wsrep_flow_control_paused_ns', 'paused', 'incremental', 1, 1000000],
         ]
+    },
+    'userstats_cpu': {
+        'options': [None, 'Users CPU time', 'percentage', 'userstats', 'mysql.userstats_cpu', 'stacked'],
+        'lines': []
     }
 }
 
@@ -583,6 +601,7 @@ class Service(MySQLService):
             global_status=QUERY_GLOBAL,
             slave_status=QUERY_SLAVE,
             variables=QUERY_VARIABLES,
+            user_statistics=QUERY_USER_STATISTICS,
         )
 
     def _get_data(self):
@@ -612,6 +631,21 @@ class Service(MySQLService):
             else:
                 self.queries.pop('slave_status')
 
+        if 'user_statistics' in raw_data:
+            if raw_data['user_statistics'][0]:
+                userstats_vars = [e[0] for e in raw_data['user_statistics'][1]]
+                for i in range(len(raw_data['user_statistics'][0])):
+                    name = raw_data['user_statistics'][0][i][0]
+                    userstats_raw_data = dict(zip(userstats_vars, raw_data['user_statistics'][0][i]))
+                    if len(self.charts) > 0:
+                        if ('userstats_{0}_Cpu_time'.format(name)) not in self.charts['userstats_cpu']:
+                            self.add_userstats(name)
+                    for key in USER_STATISTICS:
+                        if key in userstats_raw_data:
+                            to_netdata['userstats_{0}_{1}'.format(name, key)] = userstats_raw_data[key]
+            else:
+                self.queries.pop('user_statistics')
+
         if 'variables' in raw_data:
             variables = dict(raw_data['variables'][0])
             for key in VARIABLES:
@@ -619,3 +653,42 @@ class Service(MySQLService):
                     to_netdata[key] = variables[key]
 
         return to_netdata or None
+
+    def add_userstats(self, name):
+        self.charts['userstats_cpu'].add_dimension(['userstats_{0}_Cpu_time'.format(name), name, 'incremental', 100, 1])
+
+        rows = self.charts.add_chart(self.userstats_rows_chart(name))
+        rows.add_dimension(['userstats_{0}_Rows_read'.format(name), 'read', 'incremental'])
+        rows.add_dimension(['userstats_{0}_Rows_send'.format(name), 'send', 'incremental'])
+        rows.add_dimension(['userstats_{0}_Rows_updated'.format(name), 'updated', 'incremental'])
+        rows.add_dimension(['userstats_{0}_Rows_inserted'.format(name), 'inserted', 'incremental'])
+        rows.add_dimension(['userstats_{0}_Rows_deleted'.format(name), 'deleted', 'incremental'])
+
+        commands = self.charts.add_chart(self.userstats_commands_chart(name))
+        commands.add_dimension(['userstats_{0}_Select_commands'.format(name), 'select', 'incremental'])
+        commands.add_dimension(['userstats_{0}_Update_commands'.format(name), 'update', 'incremental'])
+        commands.add_dimension(['userstats_{0}_Other_commands'.format(name), 'other', 'incremental'])
+
+    @staticmethod
+    def userstats_rows_chart(name):
+        return [
+            'userstats_rows_' + name,
+            None,
+            '{0} User Rows Operations'.format(name.title()),
+            'operations/s',
+            'userstats',
+            'mysql.userstats_rows_' + name,
+            'stacked'
+        ]
+
+    @staticmethod
+    def userstats_commands_chart(name):
+        return [
+            'userstats_commands_' + name,
+            None,
+            '{0} User Commands'.format(name.title()),
+            'commands/s',
+            'userstats',
+            'mysql.userstats_commands_' + name,
+            'stacked'
+        ]
