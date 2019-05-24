@@ -1,5 +1,30 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Fixed bugs:**
+
+- Telemetry rarely received from docker containers [\#6095](https://github.com/netdata/netdata/issues/6095)
+- invalid help links on platform \(web log nginx/apache\) [\#6086](https://github.com/netdata/netdata/issues/6086)
+- netdata: Fix labels usage, quotes are not needed [\#6091](https://github.com/netdata/netdata/pull/6091) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+
+**Closed issues:**
+
+- Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
+- \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
+
+**Merged pull requests:**
+
+- installer: include go.d.plugin version v0.6.0 [\#6097](https://github.com/netdata/netdata/pull/6097) ([ilyam8](https://github.com/ilyam8))
+- Move call to send\_statistics later, to get more events from docker [\#6096](https://github.com/netdata/netdata/pull/6096) ([cakrit](https://github.com/cakrit))
+- Fix path \#6085 [\#6093](https://github.com/netdata/netdata/pull/6093) ([gmosx](https://github.com/gmosx))
+- Fix minor typos [\#6090](https://github.com/netdata/netdata/pull/6090) ([Steve8291](https://github.com/Steve8291))
+- Create missing /etc/netdata/custom-plugins.d [\#6089](https://github.com/netdata/netdata/pull/6089) ([Steve8291](https://github.com/Steve8291))
+- Corrected links to web\_log.conf [\#6087](https://github.com/netdata/netdata/pull/6087) ([cakrit](https://github.com/cakrit))
+- Mention anonymous statistics in additional places in the docs [\#6084](https://github.com/netdata/netdata/pull/6084) ([cakrit](https://github.com/cakrit))
+- wmi alarms [\#6068](https://github.com/netdata/netdata/pull/6068) ([ilyam8](https://github.com/ilyam8))
+- use github templating mechanisms to classify issues when they are created [\#5776](https://github.com/netdata/netdata/pull/5776) ([paulfantom](https://github.com/paulfantom))
+
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
 **Fixed bugs:**
