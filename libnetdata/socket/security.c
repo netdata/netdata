@@ -6,6 +6,7 @@ const char *security_key=NULL;
 const char *security_cert=NULL;
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 int netdata_use_ssl_on_http = NETDATA_SSL_FORCE; //We force SSL due safety reasons
+int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 static void security_info_callback(const SSL *ssl, int where, int ret) {
     (void)ssl;
@@ -179,4 +180,26 @@ int security_process_accept(SSL *ssl,int msg) {
     }
 
     return 0;
+}
+
+int security_test_certificate(SSL *ssl){
+    X509* cert = SSL_get_peer_certificate(ssl);
+    int ret;
+    long status;
+    if (!cert){
+        return -1;
+    }
+
+    status = SSL_get_verify_result(ssl);
+    if((X509_V_OK != status))
+    {
+        char error[512];
+        ERR_error_string_n(ERR_get_error(),error,sizeof(error));
+        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s",status,error);
+        ret = -1;
+    }
+    else {
+        ret = 0;
+    }
+    return ret;
 }

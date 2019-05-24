@@ -14,6 +14,8 @@
 #define NETDATA_SSL_NO_HANDSHAKE 8          //Continue without encrypt connection.
 #define NETDATA_SSL_OPTIONAL 16             //Flag to define the HTTP request
 #define NETDATA_SSL_FORCE 32                //We only accepts HTTPS request
+#define NETDATA_SSL_INVALID_CERTIFICATE 64  //Accepts invalid certificate
+#define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts invalid certificate
 struct netdata_ssl{
     SSL *conn; //SSL connection
     int flags;
@@ -25,10 +27,12 @@ extern const char *security_key;
 extern const char *security_cert;
 extern int netdata_use_ssl_on_stream;
 extern int netdata_use_ssl_on_http;
+extern int netdata_validate_server;
 
 void security_openssl_library();
 void security_clean_openssl();
 void security_start_ssl(int type);
 int security_process_accept(SSL *ssl,int msg);
+int security_test_certificate(SSL *ssl);
 
 #endif //NETDATA_SECURITY_H

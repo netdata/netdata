@@ -856,15 +856,16 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         w->mode = WEB_CLIENT_MODE_OPTIONS;
     }
     else if(!strncmp(s, "STREAM ", 7)) {
-   // else if(!strncmp(s, "STREAM", 6)) {
+#ifdef ENABLE_HTTPS
+        if ( (w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)){
+            w->header_parse_tries = 0;
+            w->header_parse_last_size = 0;
+            web_client_disable_wait_receive(w);
+            return HTTP_VALIDATION_NOT_SUPPORTED;
+        }
+#endif
 
         encoded_url = s = &s[7];
-        /*
-        if(*encoded_url != 'k')
-        {
-            encoded_url++;
-        }
-         */
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {

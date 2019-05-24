@@ -89,6 +89,13 @@ int rrdpush_init() {
             }
         }
     }
+    char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl invalid certificate", "no");
+    if ( !strcmp(invalid_certificate,"yes")){
+        if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
+            info("The Netdata is configured to accept invalid certificate.");
+            netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
+        }
+    }
 #endif
 
     return default_rrdpush_enabled;
@@ -504,11 +511,6 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                     " HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
-                    /*
-#ifdef ENABLE_HTTPS
-              ,((!host->ssl.flags ) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE) )?"S ":" "
-#endif
-                     */
               , host->rrdpush_send_api_key
               , host->hostname
               , host->registry_hostname
@@ -543,6 +545,23 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         if (err != 1){
             err = SSL_get_error(host->ssl.conn, err);
             error("SSL cannot connect ith the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
+            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+                rrdpush_sender_thread_close_socket(host);
+                return 0;
+            }else {
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            }
+        }
+        else {
+            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+                if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
+                    if ( security_test_certificate(host->ssl.conn)) {
+                        error("Closing the stream connection, because the server SSL certificate is not valid.");
+                        rrdpush_sender_thread_close_socket(host);
+                        return 0;
+                    }
+                }
+            }
         }
     }
     if(send_timeout((!host->ssl.flags)?host->ssl.conn:NULL,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {

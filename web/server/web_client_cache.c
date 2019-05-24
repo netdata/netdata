@@ -238,7 +238,7 @@ void web_client_release(struct web_client *w) {
         w->ifd = w->ofd = -1;
 #ifdef ENABLE_HTTPS
         web_client_reuse_ssl(w);
-        w->ssl.flags = 1;
+        w->ssl.flags = NETDATA_SSL_START;
 #endif
 
     }
