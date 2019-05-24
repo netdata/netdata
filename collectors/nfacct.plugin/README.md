@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-1. install `libmnl-dev` and `libnetfilter_acct-dev` using the package manager of your system.
+1. install `libmnl-dev` and `libnetfilter-acct-dev` using the package manager of your system.
 
 2. re-install netdata from source. The installer will detect that the required libraries are now available and will also build netdata.plugin.
 
