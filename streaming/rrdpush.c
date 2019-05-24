@@ -89,7 +89,7 @@ int rrdpush_init() {
             }
         }
     }
-    char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl invalid certificate", "no");
+    char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
     if ( !strcmp(invalid_certificate,"yes")){
         if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
             info("The Netdata is configured to accept invalid certificate.");

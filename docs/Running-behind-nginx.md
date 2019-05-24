@@ -117,7 +117,7 @@ Using the above, you access netdata on the backend servers, like this:
 - `http://nginx.server/netdata/server1/` to reach `backend-server1`
 - `http://nginx.server/netdata/server2/` to reach `backend-server2`
 
-###  Using TLS communication
+### Using TLS communication
 
 Case the Netdata Master has a certificate and key that allows the Netdata to run in encrypt mode,
 it is possible to encrypt the communication between Nginx and Netdata.
