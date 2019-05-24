@@ -1195,6 +1195,7 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
+  
     if (get_system_info(localhost, system_info) == 0) send_statistics("START","-", "-");
 
     // ------------------------------------------------------------------------
