@@ -429,6 +429,7 @@ stop_netdata_on_pid() {
 		ret=$?
 
 		test ${ret} -eq 0 && printf >&2 "." && sleep 2
+
 	done
 
 	echo >&2
@@ -445,8 +446,6 @@ netdata_pids() {
 	local p myns ns
 
 	myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
-
-	# echo >&2 "Stopping a (possibly) running netdata (namespace '${myns}')..."
 
 	for p in \
 		$(cat /var/run/netdata.pid 2>/dev/null) \
@@ -477,12 +476,15 @@ restart_netdata() {
 
 	local started=0
 
-	progress "Start netdata"
+	progress "Restarting netdata instance"
 
 	if [ "${UID}" -eq 0 ]; then
-		service netdata stop
-		stop_all_netdata
-		service netdata restart && started=1
+		echo >&2
+		echo >&2 "Stopping all netdata threads"
+		run stop_all_netdata
+
+		echo >&2 "Starting netdata using command '${NETDATA_START_CMD}'"
+		run ${NETDATA_START_CMD} && started=1
 
 		if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
 			echo >&2 "Ooops! it seems netdata is not started."
@@ -490,7 +492,8 @@ restart_netdata() {
 		fi
 
 		if [ ${started} -eq 0 ]; then
-			service netdata start && started=1
+			echo >&2 "Attempting another netdata start using command '${NETDATA_START_CMD}'"
+			run ${NETDATA_START_CMD} && started=1
 		fi
 	fi
 
@@ -500,8 +503,8 @@ restart_netdata() {
 	fi
 
 	if [ ${started} -eq 0 ]; then
-		# still not started...
-
+		# still not started... another forced attempt, just run the binary
+		echo >&2 "Netdata service still not started, attempting another forced restart by running '${netdata} ${@}'"
 		run stop_all_netdata
 		run "${netdata}" "${@}"
 		return $?
