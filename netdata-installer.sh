@@ -834,6 +834,7 @@ NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 
 if grep -q docker /proc/1/cgroup >/dev/null 2>&1; then
 	echo >&2 "We are running within a docker container, will not be installing netdata service"
+	echo >&2
 else
 	install_netdata_service || run_failed "Cannot install netdata init service."
 fi
