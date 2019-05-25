@@ -3,7 +3,16 @@
 Description=Real time performance monitoring
 
 # append here other services you want netdata to wait for them to start
-After=network.target httpd.service squid.service nfs-server.service mysqld.service mysql.service named.service postfix.service chronyd.service
+After=apache2.service beanstalkd.service bind9.service boinc-client.service chronyd.service chrony.service
+After=couchdb.service cups.service dhcpd6.service dhcpd.service dnsdist.service docker.service dovecot.service
+After=elasticsearch.service energid.service exim4.service exim.service fail2ban.service freeradius.service
+After=haproxy.service hddtemp.service httpd.service icecast2.service icecast.service ipfs.service isc-dhcp-server.service
+After=lm-sensors.service lm_sensors.service lshttpd.service mariadb.service memcached.service mongodb.service
+After=mongod.service monit.service mysql.service named.service network.target nfs-server.service nginx.service nsd.service
+After=ntpd.service ntp.service openvpn.service pdns.service php-fpm.service postfix.service postgresql.service
+After=proxysql.service puppet-master.service puppetmaster.service rabbitmq-server.service radiusd.service redis-server.service
+After=redis.service slapd.service smartd.service smbd.service smb.service squid.service tomcat.service tor.service
+After=unbound.service uwsgi.service varnish.service
 
 [Service]
 Type=simple

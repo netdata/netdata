@@ -22,6 +22,7 @@ At minimum, to be buildable and testable, the PR needs to include:
 * A line for the plugin in the appropriate `Makefile.am` file: `node.d/Makefile.am` under `dist_node_DATA`.
 * A line for the plugin configuration file in `conf.d/Makefile.am`: under `dist_nodeconfig_DATA`
 * Optionally, chart information in `web/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
+* If the plugin requires a systemd service to be running before Netdata starts add it to `After=` in `system/netdata.service.in`.
 
 ## Motivation
 
