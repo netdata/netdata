@@ -760,5 +760,22 @@ void rrd_stats_remote_write_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFE
 }
 
 int process_prometheus_remote_write_response(BUFFER *b) {
-    return discard_response(b, "prometheus remote write");
+    if(!b) return 1;
+
+    char *s = buffer_tostring(b);
+    int len = buffer_strlen(b);
+
+    // do nothing with HTTP response 200
+
+    while(!isspace(*s) && len) {
+        s++;
+        len--;
+    }
+    s++;
+    len--;
+
+    if(len > 4 && !strncmp(s, "200 ", 4))
+        return 0;
+    else
+        return discard_response(b, "prometheus remote write");
 }
