@@ -351,10 +351,14 @@ install_netdata_service() {
 
 		elif [ "${uname}" = "FreeBSD" ]; then
 
-			run cp system/netdata-freebsd /etc/rc.d/netdata &&
-				NETDATA_START_CMD="service netdata start" &&
-				NETDATA_STOP_CMD="service netdata stop" &&
-				return 0
+			run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
+									   NETDATA_STOP_CMD="service netdata stop"
+			myret=$?
+
+			echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
+			echo >&2 ""
+
+			return ${myret}
 
 		elif issystemd; then
 			# systemd is running on this system
@@ -482,9 +486,14 @@ restart_netdata() {
 		echo >&2
 		echo >&2 "Stopping all netdata threads"
 		run stop_all_netdata
+		local start_cmd="${NETDATA_START_CMD}"
 
-		echo >&2 "Starting netdata using command '${NETDATA_START_CMD}'"
-		run ${NETDATA_START_CMD} && started=1
+		if [ "$(uname 2> /dev/null)" == "FreeBSD" ]; then
+			start_cmd="${NETDATA_START_CMD/ start/ onestart}"
+		fi
+
+		echo >&2 "Starting netdata using command '${start_cmd}'"
+		run ${start_cmd} && started=1
 
 		if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
 			echo >&2 "Ooops! it seems netdata is not started."
@@ -492,8 +501,8 @@ restart_netdata() {
 		fi
 
 		if [ ${started} -eq 0 ]; then
-			echo >&2 "Attempting another netdata start using command '${NETDATA_START_CMD}'"
-			run ${NETDATA_START_CMD} && started=1
+			echo >&2 "Attempting another netdata start using command '${start_cmd}'"
+			run ${start_cmd} && started=1
 		fi
 	fi
 
