@@ -1,6 +1,6 @@
 # Netdata via lighttpd v1.4.x
 
-Here is a config for accessing netdata in a suburl via lighttpd 1.4.46 and newer:
+Here is a config for accessing Netdata in a suburl via lighttpd 1.4.46 and newer:
 
 ```txt
 $HTTP["url"] =~ "^/netdata/" {
@@ -24,7 +24,7 @@ $SERVER["socket"] == ":19998" {
 
 ---
 
-If the only thing the server is exposing via the web is netdata (and thus no suburl rewriting required),
+If the only thing the server is exposing via the web is Netdata (and thus no suburl rewriting required),
 then you can get away with just
 ```
 proxy.server  = ( "" => ( ( "host" => "127.0.0.1", "port" => 19999 )))
@@ -45,7 +45,7 @@ other auth methods, and more info on htdigest, can be found in lighttpd's [mod_a
 ---
 
 It seems that lighttpd (or some versions of it), fail to proxy compressed web responses.
-To solve this issue, disable web response compression in netdata.
+To solve this issue, disable web response compression in Netdata.
 
 Open /etc/netdata/netdata.conf and set in [global]:
 
@@ -53,10 +53,10 @@ Open /etc/netdata/netdata.conf and set in [global]:
 enable web responses gzip compression = no
 ```
 
-## limit direct access to netdata
+## limit direct access to Netdata
 
-You would also need to instruct netdata to listen only to `127.0.0.1` or `::1`.
+You would also need to instruct Netdata to listen only to `127.0.0.1` or `::1`.
 
-To limit access to netdata only from localhost, set `bind socket to IP = 127.0.0.1` or `bind socket to IP = ::1` in `/etc/netdata/netdata.conf`.
+To limit access to Netdata only from localhost, set `bind socket to IP = 127.0.0.1` or `bind socket to IP = ::1` in `/etc/netdata/netdata.conf`.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-lighttpd&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

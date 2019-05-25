@@ -3,9 +3,9 @@
 From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. 
 The statistics calculated from this information will be used for:
 
-1. **Quality assurance**, to help us understand if netdata behaves as expected and help us identify repeating issues for certain distributions or environment.
+1. **Quality assurance**, to help us understand if Netdata behaves as expected and help us identify repeating issues for certain distributions or environment.
 
-2. **Usage statistics**, to help us focus on the parts of netdata that are used the most, or help us identify the extend our development decisions influence the community.
+2. **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extend our development decisions influence the community.
 
 Information is sent to Netdata via two different channels:
 - Google Tag Manager is used when an agent's dashboard is accessed.
@@ -42,7 +42,7 @@ The only thing that's impossible for us to prevent from being **sent** is the UR
 
 ## Anonymous Statistics Script
 
-Every time the daemon is started or stopped and every time a fatal condition is encountered, netdata uses the anonymous statistics script to collect system information and send it to GA via an http call. The information collected for all events is:
+Every time the daemon is started or stopped and every time a fatal condition is encountered, Netdata uses the anonymous statistics script to collect system information and send it to GA via an http call. The information collected for all events is:
  - Netdata version
  - OS name, version, id, id_like
  - Kernel name, version, architecture
