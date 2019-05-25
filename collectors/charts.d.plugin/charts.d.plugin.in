@@ -17,7 +17,7 @@ export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 
 PROGRAM_FILE="$0"
 PROGRAM_NAME="$(basename $0)"
-PROGRAM_NAME="${PROGRAM_NAME/.plugin/}"
+PROGRAM_NAME="${PROGRAM_NAME}/.plugin/"
 MODULE_NAME="main"
 
 # -----------------------------------------------------------------------------
@@ -39,7 +39,7 @@ trap chartsd_cleanup EXIT QUIT HUP INT TERM
 if [ $UID = "0" ]; then
 	TMP_DIR="$(mktemp -d /var/run/netdata-${PROGRAM_NAME}-XXXXXXXXXX)"
 else
-	TMP_DIR="$(mktemp -d /tmp/.netdata-${PROGRAM_NAME}-XXXXXXXXXX)"
+	TMP_DIR="$(mktemp -d /tmp/netdata-${PROGRAM_NAME}-XXXXXXXXXX)"
 fi
 
 logdate() {
