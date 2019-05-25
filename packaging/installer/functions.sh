@@ -332,6 +332,8 @@ install_non_systemd_init() {
 
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
+NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
 	local uname="$(uname 2>/dev/null)"
@@ -352,7 +354,9 @@ install_netdata_service() {
 		elif [ "${uname}" = "FreeBSD" ]; then
 
 			run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
-									   NETDATA_STOP_CMD="service netdata stop"
+									   NETDATA_STOP_CMD="service netdata stop" &&
+									   NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
+									   NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 			myret=$?
 
 			echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
@@ -364,6 +368,8 @@ install_netdata_service() {
 			# systemd is running on this system
 			NETDATA_START_CMD="systemctl start netdata"
 			NETDATA_STOP_CMD="systemctl stop netdata"
+			NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+			NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 			SYSTEMD_DIRECTORY=""
 
@@ -394,6 +400,8 @@ install_netdata_service() {
 					NETDATA_START_CMD="rc-service netdata start"
 					NETDATA_STOP_CMD="rc-service netdata stop"
 				fi
+				NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+				NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 			fi
 
 			return ${ret}
@@ -486,14 +494,9 @@ restart_netdata() {
 		echo >&2
 		echo >&2 "Stopping all netdata threads"
 		run stop_all_netdata
-		local start_cmd="${NETDATA_START_CMD}"
 
-		if [ "$(uname 2> /dev/null)" == "FreeBSD" ]; then
-			start_cmd="${NETDATA_START_CMD/ start/ onestart}"
-		fi
-
-		echo >&2 "Starting netdata using command '${start_cmd}'"
-		run ${start_cmd} && started=1
+		echo >&2 "Starting netdata using command '${NETDATA_INSTALLER_START_CMD}'"
+		run ${NETDATA_INSTALLER_START_CMD} && started=1
 
 		if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
 			echo >&2 "Ooops! it seems netdata is not started."
@@ -501,8 +504,8 @@ restart_netdata() {
 		fi
 
 		if [ ${started} -eq 0 ]; then
-			echo >&2 "Attempting another netdata start using command '${start_cmd}'"
-			run ${start_cmd} && started=1
+			echo >&2 "Attempting another netdata start using command '${NETDATA_INSTALLER_START_CMD}'"
+			run ${NETDATA_INSTALLER_START_CMD} && started=1
 		fi
 	fi
 
