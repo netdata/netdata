@@ -76,11 +76,17 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         if (descr) {
             descr->handle = NULL;
             if (descr->page_length) {
+                int ret;
+
 #ifdef NETDATA_INTERNAL_CHECKS
                 rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 #endif
                 /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
-                ++descr->refcnt;
+                uv_mutex_lock(&descr->mutex);
+                ret = pg_cache_try_get_unsafe(descr, 0);
+                uv_mutex_unlock(&descr->mutex);
+                assert (1 == ret);
+
                 rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
                 if (handle->prev_descr) {
                     /* unpin old second page */
@@ -287,8 +293,6 @@ void *rrdeng_create_page(uuid_t *id, struct rrdeng_page_cache_descr **ret_descr)
 {
     struct rrdeng_page_cache_descr *descr;
     void *page;
-    int ret;
-
     /* TODO: check maximum number of pages in page cache limit */
 
     page = mallocz(RRDENG_BLOCK_SIZE); /*TODO: add page size */

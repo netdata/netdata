@@ -670,7 +670,7 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
-int get_system_info(struct rrdhost_system_info *system_info) {
+int get_system_info(RRDHOST* host, struct rrdhost_system_info *system_info) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
     sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
@@ -701,7 +701,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 char n[51], v[101];
                 snprintfz(n, 50,"%s",name);
                 snprintfz(v, 101,"%s",value);
-                if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
+                if(unlikely(rrdhost_set_system_info_variable(host, system_info, n, v))) {
                     info("Unexpected environment variable %s=%s", n, v);
                 }
                 else {
@@ -1134,10 +1134,6 @@ int main(int argc, char **argv) {
     // initialize the log files
     open_all_log_files();
 
-	netdata_anonymous_statistics_enabled=-1;
-    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
-    if (get_system_info(system_info) == 0) send_statistics("START","-", "-");
-
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -1171,8 +1167,11 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
+	netdata_anonymous_statistics_enabled=-1;
+    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
+    get_system_info(NULL, system_info);
+
     rrd_init(netdata_configured_hostname, system_info);
-    rrdhost_system_info_free(system_info);
     // ------------------------------------------------------------------------
     // enable log flood protection
 
@@ -1196,6 +1195,8 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
+  
+    if (get_system_info(localhost, system_info) == 0) send_statistics("START","-", "-");
 
     // ------------------------------------------------------------------------
     // unblock signals

@@ -1079,7 +1079,6 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         freez(rpt->client_port);
         freez(rpt->program_name);
         freez(rpt->program_version);
-        rrdhost_system_info_free(rpt->system_info);
         freez(rpt);
     }
 }
@@ -1179,7 +1178,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else if(!strcmp(name, "tags"))
             tags = value;
         else
-            if(unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
+            if(unlikely(rrdhost_set_system_info_variable(NULL, system_info, name, value))) {
                 info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
             }
     }
