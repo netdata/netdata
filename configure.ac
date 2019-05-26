@@ -810,6 +810,17 @@ AS_IF(
     [have_protoc=yes]
 )
 
+AC_PATH_PROG(
+    [CXX_BINARY],
+    [${CXX}],
+    [no]
+)
+AS_IF(
+    [test x"${CXX_BINARY}" == x"no"],
+    [have_CXX_compiler=no],
+    [have_CXX_compiler=yes]
+)
+
 test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libprotobuf}" != "yes" && \
     AC_MSG_ERROR([libprotobuf required but not found. try installing protobuf])
 
@@ -819,9 +830,12 @@ test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libsnappy}" 
 test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_protoc}" != "yes" && \
     AC_MSG_ERROR([protoc compiler required but not found. try installing protobuf])
 
+test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler}" != "yes" && \
+    AC_MSG_ERROR([C++ compiler required but not found. try installing g++])
+
 AC_MSG_CHECKING([if prometheus remote write backend should be enabled])
 if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
-                                                           -a "${have_protoc}" = "yes"; then
+                                                           -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([HAVE_PROTOBUF], [1], [libprotobuf usability])
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS}"

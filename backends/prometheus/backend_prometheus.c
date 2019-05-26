@@ -762,7 +762,7 @@ void rrd_stats_remote_write_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFE
 int process_prometheus_remote_write_response(BUFFER *b) {
     if(!b) return 1;
 
-    char *s = buffer_tostring(b);
+    const char *s = buffer_tostring(b);
     int len = buffer_strlen(b);
 
     // do nothing with HTTP response 200
