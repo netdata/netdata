@@ -41,13 +41,13 @@ apcupsd_check() {
 
 	local host working=0 failed=0
 	for host in "${!apcupsd_sources[@]}"; do
-		run apcupsd_get "${apcupsd_sources[${host}]}" >/dev/null
+		apcupsd_get "${apcupsd_sources[${host}]}" >/dev/null
 		# shellcheck disable=2181
 		if [ $? -ne 0 ]; then
 			error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
 			failed=$((failed + 1))
 		else
-			apcupsd_status = "$(apcupsd_get ${apcupsd_sources[${host}]} | awk '/^STATUS.*/{ print $3 }')"
+			apcupsd_status=$(apcupsd_get ${apcupsd_sources[${host}]} | awk '/^STATUS.*/{ print $3 }')
 			if [ ${apcupsd_status} != "ONLINE" ]  && [ ${apcupsd_status} != "ONBATT" ]; then
 				error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
 				failed=$((failed + 1))
