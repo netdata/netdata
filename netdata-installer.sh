@@ -781,7 +781,7 @@ install_go() {
 		for index in "${ARCH_MAP[@]}" ; do
 			KEY="${index%%::*}"
 			VALUE="${index##*::}"
-			if [ "$KEY" == "$ARCH" ]; then
+			if [ "$KEY" = "$ARCH" ]; then
 				ARCH="${VALUE}"
 				break
 			fi
