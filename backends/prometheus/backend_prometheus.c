@@ -556,7 +556,6 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        char name[PROMETHEUS_LABELS_MAX + 1];
         char chart[PROMETHEUS_ELEMENT_MAX + 1];
         char context[PROMETHEUS_ELEMENT_MAX + 1];
         char family[PROMETHEUS_ELEMENT_MAX + 1];
@@ -587,6 +586,7 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
                 if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+                    char name[PROMETHEUS_LABELS_MAX + 1];
                     char dimension[PROMETHEUS_ELEMENT_MAX + 1];
                     char *suffix = "";
 
