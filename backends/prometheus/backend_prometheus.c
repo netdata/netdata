@@ -537,6 +537,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
     rrdhost_unlock(host);
 }
 
+#if HAVE_PROTOBUF
 static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, BACKEND_OPTIONS backend_options, time_t after, time_t before) {
     rrdhost_rdlock(host);
 
@@ -679,6 +680,7 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
 
     rrdhost_unlock(host);
 }
+#endif /* HAVE_PROTOBUF */
 
 static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_OPTIONS backend_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";
@@ -743,6 +745,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
     rrd_unlock();
 }
 
+#if HAVE_PROTOBUF
 void rrd_stats_remote_write_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options) {
     time_t before = now_realtime_sec();
 
@@ -779,3 +782,4 @@ int process_prometheus_remote_write_response(BUFFER *b) {
     else
         return discard_response(b, "prometheus remote write");
 }
+#endif

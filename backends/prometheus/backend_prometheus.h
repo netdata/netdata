@@ -20,6 +20,8 @@ extern void rrd_stats_api_v1_charts_allmetrics_prometheus_single_host(RRDHOST *h
 extern void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options, PROMETHEUS_OUTPUT_OPTIONS output_options);
 extern void rrd_stats_remote_write_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options);
 
+#if HAVE_PROTOBUF
 extern int process_prometheus_remote_write_response(BUFFER *b);
+#endif
 
 #endif //NETDATA_BACKEND_PROMETHEUS_H
