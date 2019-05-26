@@ -61,18 +61,13 @@ dist_web_DATA = \
 	index.html \
 	main.css \
 	main.js \
+	console.html \
 	infographic.html \
 	robots.txt \
 	refresh-badges.js \
 	sitemap.xml \
 	tv.html \
 	version.txt \
-	$(NULL)
-
-
-webconsoledir=$(webdir)/console
-dist_webconsole_DATA = \
-	console/index.html \
 	$(NULL)
 
 webstaticdir=$(webdir)/static/img

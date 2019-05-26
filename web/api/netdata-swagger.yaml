@@ -63,6 +63,28 @@ paths:
             $ref: '#/definitions/chart'
         '404':
           description: 'No chart with the given id is found.'
+  /alarm_variables:
+    get:
+      summary: 'List variables available to configure alarms for a chart'
+      description: 'Returns the basic information of a chart and all the variables that can be used in alarm and template health configurations for the particular chart or family'
+      parameters:
+        - name: chart
+          in: query
+          description: 'The id of the chart as returned by the /charts call.'
+          required: true
+          type: string
+          format: 'as returned by /charts'
+      responses:
+        '200':
+            description: 'A javascript object with information about the chart and the available variables'
+            schema:
+              $ref: '#/definitions/alarm_variables'
+        '400':
+          description: 'Bad request - the body will include a message stating what is wrong.'
+        '404':
+          description: 'No chart with the given id is found.'
+        '500':
+          description: 'Internal server error. This usually means the server is out of memory.'
   /data:
     get:
       summary: 'Get collected data for a specific chart'
@@ -638,6 +660,51 @@ definitions:
       red:
         type: number
         description: 'Chart health red trheshold'
+  alarm_variables:
+    type: object
+    properties:
+      chart:
+        type: string
+        description: 'The unique id of the chart'
+      chart_name:
+        type: string
+        description: 'The name of the chart'
+      cnart_context:
+        type: string
+        description: 'The context of the chart. It is shared across multiple monitored software or hardware instances and used in alarm templates'
+      family:
+        type: string
+        description: 'The family of the chart.'
+      host:
+        type: string
+        description: 'The host containing the chart.'
+      chart_variables:
+        type: object
+        properties:
+          varname1:
+            type: number
+            format: float
+          varname2:
+            type: number
+            format: float
+      family_variables:
+        type: object
+        properties:
+          varname1:
+            type: number
+            format: float
+          varname2:
+            type: number
+            format: float
+      host_variables:
+        type: object
+        properties:
+          varname1:
+            type: number
+            format: float
+          varname2:
+            type: number
+            format: float
   dimension:
     type: object
     properties:

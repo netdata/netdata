@@ -4,13 +4,49 @@
 
 **Fixed bugs:**
 
+- Telemetry rarely received from docker containers [\#6095](https://github.com/netdata/netdata/issues/6095)
+- opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6092](https://github.com/netdata/netdata/issues/6092)
+- invalid help links on platform \(web log nginx/apache\) [\#6086](https://github.com/netdata/netdata/issues/6086)
+- Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
+- netdata: Fix labels usage, quotes are not needed [\#6091](https://github.com/netdata/netdata/pull/6091) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+
+**Closed issues:**
+
+- Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
+- \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
+
+**Merged pull requests:**
+
+- Remove system\_info copying [\#6113](https://github.com/netdata/netdata/pull/6113) ([vlvkobal](https://github.com/vlvkobal))
+- Fix incorrect module name: energi [\#6112](https://github.com/netdata/netdata/pull/6112) ([Steve8291](https://github.com/Steve8291))
+- installer: include go.d.plugin version v0.6.0 [\#6097](https://github.com/netdata/netdata/pull/6097) ([ilyam8](https://github.com/ilyam8))
+- Move call to send\_statistics later, to get more events from docker [\#6096](https://github.com/netdata/netdata/pull/6096) ([cakrit](https://github.com/cakrit))
+- Fix path \#6085 [\#6093](https://github.com/netdata/netdata/pull/6093) ([gmosx](https://github.com/gmosx))
+- Fix minor typos [\#6090](https://github.com/netdata/netdata/pull/6090) ([Steve8291](https://github.com/Steve8291))
+- Create missing /etc/netdata/custom-plugins.d [\#6089](https://github.com/netdata/netdata/pull/6089) ([Steve8291](https://github.com/Steve8291))
+- Corrected links to web\_log.conf [\#6087](https://github.com/netdata/netdata/pull/6087) ([cakrit](https://github.com/cakrit))
+- Mention anonymous statistics in additional places in the docs [\#6084](https://github.com/netdata/netdata/pull/6084) ([cakrit](https://github.com/cakrit))
+- wmi alarms [\#6068](https://github.com/netdata/netdata/pull/6068) ([ilyam8](https://github.com/ilyam8))
+- use github templating mechanisms to classify issues when they are created [\#5776](https://github.com/netdata/netdata/pull/5776) ([paulfantom](https://github.com/paulfantom))
+
+## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
+
+**Fixed bugs:**
+
+- Fix rrdengineapi compiler warning [\#6075](https://github.com/netdata/netdata/issues/6075)
+- New dbengine stil creates directories for individual charts in the cache directory. [\#6067](https://github.com/netdata/netdata/issues/6067)
+- v1.15.0 fails to build due to missing CFLAGS [\#6066](https://github.com/netdata/netdata/issues/6066)
+- netdata/dbengine: constant restarts on octopuscs [\#6053](https://github.com/netdata/netdata/issues/6053)
+- Nodes are inconsistently unreachables [\#6051](https://github.com/netdata/netdata/issues/6051)
 - BUG when compiling code in mac OS [\#6043](https://github.com/netdata/netdata/issues/6043)
 - Unexpected change to metrics sent to backends with new dbengine [\#6039](https://github.com/netdata/netdata/issues/6039)
+- packages installer failed [\#6027](https://github.com/netdata/netdata/issues/6027)
 - netdata/packaging: Fix installer failure on missing packages [\#6026](https://github.com/netdata/netdata/issues/6026)
 - Prowl notifications ignored by alarm-notify.sh [\#6021](https://github.com/netdata/netdata/issues/6021)
 - using with docker. got error after update. [\#6018](https://github.com/netdata/netdata/issues/6018)
 - Segfault on NetData v1.14.0-51-g18336910 [\#6013](https://github.com/netdata/netdata/issues/6013)
 - Slack does not send to channel [\#6003](https://github.com/netdata/netdata/issues/6003)
+- api/v1/chart and api/v1/data calls don't return chart variables names, values [\#5990](https://github.com/netdata/netdata/issues/5990)
 - elasticsearch throws exception and kills whole python.d [\#5978](https://github.com/netdata/netdata/issues/5978)
 - System info doesn't show OS name and version in Mac OS X [\#5950](https://github.com/netdata/netdata/issues/5950)
 - nvidia\_smi wrong power draw numbers [\#5939](https://github.com/netdata/netdata/issues/5939)
@@ -31,6 +67,7 @@
 - \[Question\] Are python-pymongo and python-yaml needed for a barebones install of netdata? [\#5632](https://github.com/netdata/netdata/issues/5632)
 - python SocketService: lack of connect timeout, python.d.plugin hangs [\#5541](https://github.com/netdata/netdata/issues/5541)
 - installer wrong message on centos [\#5474](https://github.com/netdata/netdata/issues/5474)
+- Misleading information on memory consumption [\#5203](https://github.com/netdata/netdata/issues/5203)
 - File not found by glob when building an rpm \(latest code - 20181218\) [\#5033](https://github.com/netdata/netdata/issues/5033)
 - Issue creating deb package from v1.11.1 [\#4979](https://github.com/netdata/netdata/issues/4979)
 - netdata service fails to start - pfsense [\#3469](https://github.com/netdata/netdata/issues/3469)
@@ -43,6 +80,7 @@
 
 **Closed issues:**
 
+- \[feature\] collects windows metrics from wmi\_exporter [\#6001](https://github.com/netdata/netdata/issues/6001)
 - \[Binary releases\] Establish RPM repository servers and software [\#5966](https://github.com/netdata/netdata/issues/5966)
 - \[Binary releases\] Establish Debian/Ubuntu repository servers and software [\#5965](https://github.com/netdata/netdata/issues/5965)
 - Add collectors list and system information to /api/v1/info [\#5888](https://github.com/netdata/netdata/issues/5888)
@@ -74,6 +112,15 @@
 
 **Merged pull requests:**
 
+- Shorten netdata version and correctly send OS\_VERSION\_ID [\#6082](https://github.com/netdata/netdata/pull/6082) ([cakrit](https://github.com/cakrit))
+- Fix build errors [\#6081](https://github.com/netdata/netdata/pull/6081) ([mfundul](https://github.com/mfundul))
+- Fix race condition in DB engine API [\#6079](https://github.com/netdata/netdata/pull/6079) ([mfundul](https://github.com/mfundul))
+- Fix creating chart directories when not necessary with memory mode dbengine [\#6078](https://github.com/netdata/netdata/pull/6078) ([mfundul](https://github.com/mfundul))
+- Add more metrics to the prometheus bats tests [\#6074](https://github.com/netdata/netdata/pull/6074) ([cakrit](https://github.com/cakrit))
+- Add 1.15 to news section of main README [\#6065](https://github.com/netdata/netdata/pull/6065) ([cakrit](https://github.com/cakrit))
+- Fix delete datafile error [\#6057](https://github.com/netdata/netdata/pull/6057) ([mfundul](https://github.com/mfundul))
+- Update swagger with definition of api/v1/alarm\_variables [\#6055](https://github.com/netdata/netdata/pull/6055) ([cakrit](https://github.com/cakrit))
+- Reiterate the proper way to persist configurations in the Configuration guid [\#6052](https://github.com/netdata/netdata/pull/6052) ([cakrit](https://github.com/cakrit))
 - netdata/daemon/backends: Fix AWS Kinesis link error [\#6047](https://github.com/netdata/netdata/pull/6047) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Fix makeself packaging [\#6041](https://github.com/netdata/netdata/pull/6041) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix timestamps being reversed for backends [\#6040](https://github.com/netdata/netdata/pull/6040) ([mfundul](https://github.com/mfundul))

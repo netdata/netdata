@@ -162,7 +162,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
-    host->system_info = rrdhost_system_info_dup(system_info);
+    host->system_info = system_info;
 
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
@@ -811,82 +811,68 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 
-int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
+int rrdhost_set_system_info_variable(RRDHOST *host, struct rrdhost_system_info *system_info, char *name, char *value) {
+    int res = 0;
+
+    if(host) rrdhost_wrlock(host);
+
     if(!strcmp(name, "NETDATA_SYSTEM_OS_NAME")){
+        freez(system_info->os_name);
         system_info->os_name = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID")){
+        freez(system_info->os_id);
         system_info->os_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE")){
+        freez(system_info->os_id_like);
         system_info->os_id_like = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION")){
+        freez(system_info->os_version);
         system_info->os_version = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID")){
+        freez(system_info->os_version_id);
         system_info->os_version_id = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION")){
+        freez(system_info->os_detection);
         system_info->os_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
+        freez(system_info->kernel_name);
         system_info->kernel_name = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_VERSION")){
+        freez(system_info->kernel_version);
         system_info->kernel_version = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_ARCHITECTURE")){
+        freez(system_info->architecture);
         system_info->architecture = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_VIRTUALIZATION")){
+        freez(system_info->virtualization);
         system_info->virtualization = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_VIRT_DETECTION")){
+        freez(system_info->virt_detection);
         system_info->virt_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER")){
+        freez(system_info->container);
         system_info->container = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER_DETECTION")){
+        freez(system_info->container_detection);
         system_info->container_detection = strdupz(value);
     }
-    else return 1;
-
-    return 0;
-}
-
-struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info) {
-    struct rrdhost_system_info *ret = callocz(1, sizeof(struct rrdhost_system_info));
-
-    if(likely(system_info)) {
-        if(system_info->os_name)
-            ret->os_name = strdupz(system_info->os_name);
-        if(system_info->os_id)
-            ret->os_id = strdupz(system_info->os_id);
-        if(system_info->os_id_like)
-            ret->os_id_like = strdupz(system_info->os_id_like);
-        if(system_info->os_version)
-            ret->os_version = strdupz(system_info->os_version);
-        if(system_info->os_version_id)
-            ret->os_version_id = strdupz(system_info->os_version_id);
-        if(system_info->os_detection)
-            ret->os_detection = strdupz(system_info->os_detection);
-        if(system_info->kernel_name)
-            ret->kernel_name = strdupz(system_info->kernel_name);
-        if(system_info->kernel_version)
-            ret->kernel_version = strdupz(system_info->kernel_version);
-        if(system_info->architecture)
-            ret->architecture = strdupz(system_info->architecture);
-        if(system_info->virtualization)
-            ret->virtualization = strdupz(system_info->virtualization);
-        if(system_info->virt_detection)
-            ret->virt_detection = strdupz(system_info->virt_detection);
-        if(system_info->container)
-            ret->container = strdupz(system_info->container);
-        if(system_info->container_detection)
-            ret->container_detection = strdupz(system_info->container_detection);
+    else {
+        res = 1;
     }
 
-    return ret;
+    if(host) rrdhost_unlock(host);
+
+    return res;
 }

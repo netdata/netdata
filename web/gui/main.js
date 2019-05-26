@@ -775,7 +775,7 @@ function renderMyNetdataMenu(machinesArray) {
         html += (
             `<div class="agent-item">
                 <i class="fas fa-tv"></i>
-                <a onClick="openAuthenticatedUrl('console/index.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
+                <a onClick="openAuthenticatedUrl('console.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -793,7 +793,7 @@ function renderMyNetdataMenu(machinesArray) {
         html += (
             `<div class="agent-item">
                 <i class="fas fa-tv"></i>
-                <a onclick="openAuthenticatedUrl('console/index.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
+                <a onclick="openAuthenticatedUrl('console.html');" target="_blank">Nodes<sup class="beta"> beta</sup></a>
                 <div></div>
             </div>
             <div class="agent-item">
@@ -4840,12 +4840,11 @@ function renderAccountUI() {
         container.removeAttribute("title");
         container.removeAttribute("data-original-title");
         container.removeAttribute("data-placement");
-        // <a href="/console/index.html#/charts/${NETDATA.registry.machine_guid}" target="_blank" class="btn">
         container.innerHTML = (
             `<a href="#" class="dropdown-toggle" data-toggle="dropdown"><span id="amc-account-name"></span> <strong class="caret"></strong></a>
             <ul id="cloud-menu" class="dropdown-menu scrollable-menu inpagemenu" role="menu">   
                 <li>
-                    <a onclick="openAuthenticatedUrl('console/index.html');" target="_blank" class="btn">
+                    <a onclick="openAuthenticatedUrl('console.html');" target="_blank" class="btn">
                     <i class="fas fa-tv"></i>&nbsp;&nbsp;<span class="hidden-sm hidden-md">Nodes<sup class="beta"> beta</sup></span>
                     </a>
                 </li>

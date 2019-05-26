@@ -114,6 +114,7 @@ extern void pg_cache_replaceQ_delete(struct rrdengine_instance *ctx,
 extern void pg_cache_replaceQ_set_hot(struct rrdengine_instance *ctx,
                                       struct rrdeng_page_cache_descr *descr);
 extern struct rrdeng_page_cache_descr *pg_cache_create_descr(void);
+extern int pg_cache_try_get_unsafe(struct rrdeng_page_cache_descr *descr, int exclusive_access);
 extern void pg_cache_put_unsafe(struct rrdeng_page_cache_descr *descr);
 extern void pg_cache_put(struct rrdeng_page_cache_descr *descr);
 extern void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,

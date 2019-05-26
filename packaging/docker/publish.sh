@@ -21,6 +21,8 @@ ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
 ARCHS="${!ARCH_MAP[@]}"
 DOCKER_CMD="docker --config ${WORKDIR}"
+GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
+GIT_USER=${GIT_USER:-"netdatabot"}
 
 if [ -z ${REPOSITORY} ]; then
 	REPOSITORY="${TRAVIS_REPO_SLUG}"
@@ -36,6 +38,10 @@ fi
 if [ ! -z ${DEVEL+x} ]; then
     declare -a ARCHS=(${DEVEL_ARCHS[@]})
 fi
+
+echo "Syncing repository with latest changes (We may have updated with package versions)"
+git checkout master
+git pull
 
 # Ensure there is a version, the most appropriate one
 if [ "${VERSION}" == "" ]; then
