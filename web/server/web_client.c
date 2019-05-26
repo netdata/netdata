@@ -1007,8 +1007,8 @@ static inline void web_client_set_directory(struct web_client *w,char *enddir){
         }
     }
     else{
-        w->directory.body = NULL;
-        w->directory.length = 0;
+        w->directory.body = w->path.body+1;
+        w->directory.length = w->path.length - 1;
         w->version.body = NULL;
         w->version.length = 0;
     }
@@ -1020,15 +1020,16 @@ static inline void web_client_set_without_query_string(struct web_client *w){
     w->total_params = 0;
 }
 
-static inline void web_client_split_path_query(struct web_client *w,char *ue){
+static inline void web_client_split_path_query(struct web_client *w){
     w->path.body = w->decoded_url;
     char *moveme = strchr(w->path.body,'?');
+    char *enddir;
     if (moveme){
         w->path.length = moveme - w->path.body;
         w->query_string.body = moveme;
         w->query_string.length = w->decoded_length - w->path.length;
 
-        char *enddir = strchr(w->path.body+1,'/');
+        enddir = strchr(w->path.body+1,'/');
         web_client_set_directory(w,enddir);
         if (w->query_string.body){
             enddir = strchr(moveme,'=');
@@ -1036,38 +1037,12 @@ static inline void web_client_split_path_query(struct web_client *w,char *ue){
         }
     } else {
         w->path.length = w->decoded_length;
+
+        enddir = strchr(w->path.body+1,'/');
+        w->directory.body = w->path.body + 1;
+        w->directory.length = (enddir)?(size_t)(enddir - w->directory.body):w->decoded_length - 1;
         web_client_set_without_query_string(w);
     }
-
-    /*
-    w->path.body = w->decoded_url;
-    char *moveme = strchr(w->path.body,'?');
-    if (!moveme){
-        moveme = strchr(w->path.body,'/');
-    }
-
-    if (moveme){
-        if(w->decoded_length > 1){
-            w->path.length = moveme - w->path.body;
-
-            if (w->path.length){
-                w->query_string.body = moveme;
-                w->query_string.length = w->decoded_length - w->path.length;
-
-                web_client_set_directory(w);
-                web_client_parse_request(w);
-            }
-        } else {
-            w->path.length = 1;
-
-            w->query_string.body = NULL;
-            w->query_string.length = 0;
-        }
-    } else{
-        w->path.length = ue - w->path.body;
-        web_client_set_without_query_string(w);
-    }
-    */
 }
 
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
@@ -1095,6 +1070,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             return HTTP_VALIDATION_INCOMPLETE;
         }
     }
+    error("============================================");
     error("KILLME START : %s ",s);
 
     //Parse the method used to communicate
@@ -1118,11 +1094,12 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     // we have the end of encoded_url - remember it
     char *ue = s;
     w->decoded_length = ue - encoded_url;
+    error("KILLME ENCODED %lu: %s ",w->decoded_length,encoded_url);
 
     *ue = '\0';
     url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
-    web_client_split_path_query(w,ue);
+    web_client_split_path_query(w);
     *ue = ' ';
     web_client_parse_headers(w,s);
 
@@ -1426,13 +1403,13 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
     char *tok = mystrsep(&url, "/?");
     error("KILLME TOK %s",tok);
-    if(likely(tok && *tok)) {
+    //if(likely(tok && *tok)) {
+    if (w->path.length > 1){
         uint32_t hash = simple_hash(tok);
- //   if (w->path.length > 1){
         char *cmp = w->directory.body;
         size_t len = w->directory.length;
         //uint32_t hash = simple_nhash(cmp,w->directory.length);
- //       error("KILLME HASH %u %u %d",hash,simple_hash(tok), ( hash == simple_hash(tok) ));
+  //      error("KILLME HASH %u %u %d",hash,simple_nhash(cmp,len),( hash == simple_nhash(cmp,len) ));
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
         if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
