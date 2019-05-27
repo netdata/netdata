@@ -440,8 +440,6 @@ KINESIS_BACKEND_FILES = \
 PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
     backends/prometheus/remote_write/remote_write.cc \
     backends/prometheus/remote_write/remote_write.h \
-    backends/prometheus/remote_write/remote_write.pb.cc \
-    backends/prometheus/remote_write/remote_write.pb.h \
     backends/prometheus/remote_write/remote_write.proto \
     $(NULL)
 
@@ -581,6 +579,11 @@ endif
 if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
     netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    BUILT_SOURCES = \
+        backends/prometheus/remote_write/remote_write.pb.cc \
+        backends/prometheus/remote_write/remote_write.pb.h \
+        $(NULL)
+    nodist_netdata_SOURCES = $(BUILT_SOURCES)
 
 backends/prometheus/remote_write/remote_write.pb.cc \
 backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
