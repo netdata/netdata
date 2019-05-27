@@ -1180,7 +1180,6 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         freez(rpt->client_port);
         freez(rpt->program_name);
         freez(rpt->program_version);
-        rrdhost_system_info_free(rpt->system_info);
         freez(rpt);
     }
 }

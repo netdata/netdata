@@ -332,6 +332,8 @@ install_non_systemd_init() {
 
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
+NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
 	local uname="$(uname 2>/dev/null)"
@@ -351,15 +353,23 @@ install_netdata_service() {
 
 		elif [ "${uname}" = "FreeBSD" ]; then
 
-			run cp system/netdata-freebsd /etc/rc.d/netdata &&
-				NETDATA_START_CMD="service netdata start" &&
-				NETDATA_STOP_CMD="service netdata stop" &&
-				return 0
+			run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
+									   NETDATA_STOP_CMD="service netdata stop" &&
+									   NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
+									   NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
+			myret=$?
+
+			echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
+			echo >&2 ""
+
+			return ${myret}
 
 		elif issystemd; then
 			# systemd is running on this system
 			NETDATA_START_CMD="systemctl start netdata"
 			NETDATA_STOP_CMD="systemctl stop netdata"
+			NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+			NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 			SYSTEMD_DIRECTORY=""
 
@@ -390,6 +400,8 @@ install_netdata_service() {
 					NETDATA_START_CMD="rc-service netdata start"
 					NETDATA_STOP_CMD="rc-service netdata stop"
 				fi
+				NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+				NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 			fi
 
 			return ${ret}
@@ -429,6 +441,7 @@ stop_netdata_on_pid() {
 		ret=$?
 
 		test ${ret} -eq 0 && printf >&2 "." && sleep 2
+
 	done
 
 	echo >&2
@@ -445,8 +458,6 @@ netdata_pids() {
 	local p myns ns
 
 	myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
-
-	# echo >&2 "Stopping a (possibly) running netdata (namespace '${myns}')..."
 
 	for p in \
 		$(cat /var/run/netdata.pid 2>/dev/null) \
@@ -477,12 +488,15 @@ restart_netdata() {
 
 	local started=0
 
-	progress "Start netdata"
+	progress "Restarting netdata instance"
 
 	if [ "${UID}" -eq 0 ]; then
-		service netdata stop
-		stop_all_netdata
-		service netdata restart && started=1
+		echo >&2
+		echo >&2 "Stopping all netdata threads"
+		run stop_all_netdata
+
+		echo >&2 "Starting netdata using command '${NETDATA_INSTALLER_START_CMD}'"
+		run ${NETDATA_INSTALLER_START_CMD} && started=1
 
 		if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
 			echo >&2 "Ooops! it seems netdata is not started."
@@ -490,7 +504,8 @@ restart_netdata() {
 		fi
 
 		if [ ${started} -eq 0 ]; then
-			service netdata start && started=1
+			echo >&2 "Attempting another netdata start using command '${NETDATA_INSTALLER_START_CMD}'"
+			run ${NETDATA_INSTALLER_START_CMD} && started=1
 		fi
 	fi
 
@@ -500,8 +515,8 @@ restart_netdata() {
 	fi
 
 	if [ ${started} -eq 0 ]; then
-		# still not started...
-
+		# still not started... another forced attempt, just run the binary
+		echo >&2 "Netdata service still not started, attempting another forced restart by running '${netdata} ${@}'"
 		run stop_all_netdata
 		run "${netdata}" "${@}"
 		return $?

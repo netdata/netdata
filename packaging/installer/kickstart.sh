@@ -141,7 +141,7 @@ warning() {
 
 create_tmp_directory() {
 	# Check if tmp is mounted as noexec
-	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts > /dev/null 2>&1; then
 		pattern="$(pwd)/netdata-kickstart-XXXXXX"
 	else
 		pattern="/tmp/netdata-kickstart-XXXXXX"
@@ -163,7 +163,7 @@ download() {
 }
 
 set_tarball_urls() {
-	if [ "$1" == "stable" ]; then
+	if [ "$1" = "stable" ]; then
 		local latest
 		# Simple version
 		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
@@ -200,9 +200,9 @@ detect_bash4() {
 }
 
 dependencies() {
-	SYSTEM="$(uname -s)"
-	OS="$(uname -o)"
-	MACHINE="$(uname -m)"
+	SYSTEM="$(uname -s 2> /dev/null || uname -v)"
+	OS="$(uname -o 2> /dev/null || uname -rs)"
+	MACHINE="$(uname -m 2> /dev/null)"
 
 	echo "System            : ${SYSTEM}"
 	echo "Operating System  : ${OS}"

@@ -1157,10 +1157,6 @@ int main(int argc, char **argv) {
     // initialize the log files
     open_all_log_files();
 
-	netdata_anonymous_statistics_enabled=-1;
-    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
-    if (get_system_info(system_info) == 0) send_statistics("START","-", "-");
-
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -1194,8 +1190,11 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
+	netdata_anonymous_statistics_enabled=-1;
+    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
+    get_system_info(system_info);
+
     rrd_init(netdata_configured_hostname, system_info);
-    rrdhost_system_info_free(system_info);
     // ------------------------------------------------------------------------
     // enable log flood protection
 
@@ -1219,6 +1218,8 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
+  
+    send_statistics("START","-", "-");
 
     // ------------------------------------------------------------------------
     // unblock signals
