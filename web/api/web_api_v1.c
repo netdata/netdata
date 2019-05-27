@@ -241,6 +241,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
 }
 
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
+    (void)url;
     int ret = 400;
     char *chart = NULL;
 
@@ -249,15 +250,6 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     uint32_t  i = 0;
     uint32_t end = w->total_params;
     do{
- //   while(url) {
-        /*
-        char *value = mystrsep(&url, "&");
-        if(!value || !*value) continue;
-
-        char *name = mystrsep(&value, "=");
-        if(!name || !*name) continue;
-        if(!value || !*value) continue;
-         */
         char *name = w->param_name[i].body;
         size_t nlength  = w->param_name[i].length;
         char *value = w->param_values[i].body;
@@ -302,7 +294,6 @@ inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_c
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
 
-    error("KILLME CHARTS %s",url);
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     charts2json(host, w->response.data);
@@ -361,6 +352,12 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         char *name = mystrsep(&value, "=");
         if(!name || !*name) continue;
         if(!value || !*value) continue;
+        /*
+        char *name = w->param_name[i].body;
+        size_t lname = w->param_name[i].length;
+        char *value = w->param_values[i].body;
+        size_t lvalue = w->param_values[i].length;
+         */
 
         debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
@@ -579,15 +576,6 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     }
 
     do{
-    //while(url) {
-    /*
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value) continue;
-
-        char *name = mystrsep(&value, "=");
-        if (!name || !*name) continue;
-        if (!value || !*value) continue;
-        */
         char *name = w->param_name[i].body;
         size_t nlength = w->param_name[i].length;
         char *value = w->param_values[i].body;
@@ -603,13 +591,6 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             //uint32_t vhash = simple_hash(value);
             uint32_t vhash = simple_nhash(value,vlength);
 
-            /*
-            if(vhash == hash_access && !strcmp(value, "access")) action = 'A';
-            else if(vhash == hash_hello && !strcmp(value, "hello")) action = 'H';
-            else if(vhash == hash_delete && !strcmp(value, "delete")) action = 'D';
-            else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
-            else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
-             */
             if(vhash == hash_access && !strncmp(value, "access",vlength)) action = 'A';
             else if(vhash == hash_hello && !strncmp(value, "hello",vlength)) action = 'H';
             else if(vhash == hash_delete && !strncmp(value, "delete",vlength)) action = 'D';
@@ -624,30 +605,24 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
             redirects = atoi(value);
 */
         else if(hash == hash_machine && !strncmp(name, "machine",nlength))
- //     else if(hash == hash_machine && !strcmp(name, "machine"))
             machine_guid = value;
 
         else if(hash == hash_url && !strncmp(name, "url",nlength))
-        //else if(hash == hash_url && !strcmp(name, "url"))
             machine_url = value;
 
         else if(action == 'A') {
-            //if(hash == hash_name && !strcmp(name, "name"))
             if(hash == hash_name && !strncmp(name, "name",nlength))
                 url_name = value;
         }
         else if(action == 'D') {
-            //if(hash == hash_delete_url && !strcmp(name, "delete_url"))
             if(hash == hash_delete_url && !strncmp(name, "delete_url",nlength))
                 delete_url = value;
         }
         else if(action == 'S') {
             if(hash == hash_for && !strncmp(name, "for",nlength))
-            //if(hash == hash_for && !strcmp(name, "for"))
                 search_machine_guid = value;
         }
         else if(action == 'W') {
-            //if(hash == hash_to && !strcmp(name, "to"))
             if(hash == hash_to && !strncmp(name, "to",nlength))
                 to_person_guid = value;
         }
@@ -827,8 +802,8 @@ static struct api_command {
         // badges can be fetched with both dashboard and badge permissions
         { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          }, //OK
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       }, //OK
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables }, //OK
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      }, //OK
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },

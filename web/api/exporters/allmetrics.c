@@ -29,16 +29,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     uint32_t i = 0;
     uint32_t end = w->total_params;
     do {
-        /*
-    while(url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value) continue;
-
-        char *name = mystrsep(&value, "=");
-        if(!name || !*name) continue;
-        if(!value || !*value) continue;
-         */
-
         char *name = w->param_name[i].body;
         size_t lname = w->param_name[i].length;
         char *value = w->param_values[i].body;
