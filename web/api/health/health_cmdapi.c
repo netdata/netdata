@@ -37,8 +37,6 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
     int ret = 400;
     (void) host;
 
-
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_TEXT_PLAIN;

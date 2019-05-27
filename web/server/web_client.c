@@ -594,15 +594,26 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
 {
     // get the api version
     char *tok = mystrsep(&url, "/");
-    if(tok && *tok) {
-        debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
-        if(strcmp(tok, "v1") == 0)
+    (void)tok;
+    char *body = w->version.body;
+    size_t length = w->version.length;
+    if(body) {
+    //if(tok && *tok) {
+        //debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
+        debug(D_WEB_CLIENT, "%llu: Searching for API version'.", w->id);
+        //if(strcmp(tok, "v1") == 0)
+        if(strncmp(body, "v1",length) == 0) {
             return web_client_api_request_v1(host, w, url);
-        else {
+        } else {
+            char response[NETDATA_WEB_REQUEST_URL_SIZE];
+            strncpy(response,w->version.body,length);
+            response[length] = 0x00;
             buffer_flush(w->response.data);
+
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Unsupported API version: ");
-            buffer_strcat_htmlescape(w->response.data, tok);
+            buffer_strcat_htmlescape(w->response.data, response);
+            //buffer_strcat_htmlescape(w->response.data, tok);
             return 404;
         }
     }
@@ -991,7 +1002,7 @@ void web_client_parse_request(struct web_client *w,char *divisor){
     error("KILLME TOTAL %u",w->total_params);
 }
 
-static inline void web_client_set_directory(struct web_client *w,char *enddir){
+static inline void web_client_set_directory(struct web_client *w,char *enddir,char *endcmd){
     if (enddir ){
         char *begin = w->path.body+1;
         w->directory.body = begin;
@@ -1003,6 +1014,10 @@ static inline void web_client_set_directory(struct web_client *w,char *enddir){
             if(enddir){
                 w->version.body = begin;
                 w->version.length = enddir - begin;
+
+                enddir++;
+                w->command.body = enddir;
+                w->command.length = (size_t) (endcmd - enddir);
             }
         }
     }
@@ -1011,17 +1026,23 @@ static inline void web_client_set_directory(struct web_client *w,char *enddir){
         w->directory.length = w->path.length - 1;
         w->version.body = NULL;
         w->version.length = 0;
+        w->command.body = NULL;
+        w->command.length = 0;
     }
 }
 
 static inline void web_client_set_without_query_string(struct web_client *w){
     w->query_string.body = NULL;
     w->query_string.length = 0;
+
+    w->command.body = NULL;
+    w->command.length = 0;
     w->total_params = 0;
 }
 
 static inline void web_client_split_path_query(struct web_client *w){
     w->path.body = w->decoded_url;
+    w->decoded_length = strlen(w->decoded_url);
     char *moveme = strchr(w->path.body,'?');
     char *enddir;
     if (moveme){
@@ -1030,7 +1051,7 @@ static inline void web_client_split_path_query(struct web_client *w){
         w->query_string.length = w->decoded_length - w->path.length;
 
         enddir = strchr(w->path.body+1,'/');
-        web_client_set_directory(w,enddir);
+        web_client_set_directory(w,enddir,moveme);
         if (w->query_string.body){
             enddir = strchr(moveme,'=');
             web_client_parse_request(w,enddir);
@@ -1040,7 +1061,25 @@ static inline void web_client_split_path_query(struct web_client *w){
 
         enddir = strchr(w->path.body+1,'/');
         w->directory.body = w->path.body + 1;
-        w->directory.length = (enddir)?(size_t)(enddir - w->directory.body):w->decoded_length - 1;
+        if(enddir){
+            w->directory.length = (size_t)(enddir - w->directory.body);
+            enddir++;
+
+            w->version.body = enddir;
+            enddir = strchr(++enddir,'/');
+            if(enddir){
+                w->version.length = (size_t)(enddir - w->version.body);
+
+                enddir++;
+                w->command.body = enddir;
+                w->command.length = (size_t)(moveme - enddir);
+            } else{
+                w->version.length = strlen(w->version.body);
+            }
+
+        }else {
+            w->directory.length = w->decoded_length - 1;
+        }
         web_client_set_without_query_string(w);
     }
 }
@@ -1070,7 +1109,6 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             return HTTP_VALIDATION_INCOMPLETE;
         }
     }
-    error("============================================");
     error("KILLME START : %s ",s);
 
     //Parse the method used to communicate
@@ -1093,8 +1131,6 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // we have the end of encoded_url - remember it
     char *ue = s;
-    w->decoded_length = ue - encoded_url;
-    error("KILLME ENCODED %lu: %s ",w->decoded_length,encoded_url);
 
     *ue = '\0';
     url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
@@ -1103,9 +1139,11 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     *ue = ' ';
     web_client_parse_headers(w,s);
 
+    error("KILLME DECODED %lu: %s ",w->decoded_length,encoded_url);
     error("KILLME PATH %lu: %s ",w->path.length,w->path.body);
     error("KILLME DIRECTORY %lu: %s ",w->directory.length,w->directory.body);
     error("KILLME VERSION %lu: %s ",w->version.length,w->version.body);
+    error("KILLME COMMAND %lu: %s ",w->command.length,w->command.body);
     error("KILLME QUERY STRING %lu: %s ",w->query_string.length,w->query_string.body);
     error("KILLME PROTOCOL %lu: %s ",w->protocol.length,w->protocol.body);
 
@@ -1405,24 +1443,21 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     error("KILLME TOK %s",tok);
     //if(likely(tok && *tok)) {
     if (w->path.length > 1){
-        uint32_t hash = simple_hash(tok);
         char *cmp = w->directory.body;
         size_t len = w->directory.length;
-        //uint32_t hash = simple_nhash(cmp,w->directory.length);
-  //      error("KILLME HASH %u %u %d",hash,simple_nhash(cmp,len),( hash == simple_nhash(cmp,len) ));
+        uint32_t hash = simple_nhash(cmp,len);
+        error("KILLME HASH %u %u %d",hash,simple_hash(tok),( hash == simple_hash(tok) ));
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-        if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
-   //     if(unlikely(hash == hash_api && strncmp(cmp, "api",len) == 0)) {                           // current API
+        if(unlikely(hash == hash_api && strncmp(cmp, "api",len) == 0)) {                           // current API
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, url, web_client_api_request);
         }
-        else if(unlikely(hash == hash_host && strcmp(tok, "host") == 0)) {                    // host switching
+        else if(unlikely(hash == hash_host && strncmp(cmp, "host",len) == 0)) {                    // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
             return web_client_switch_host(host, w, url);
         }
-        else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
-        //else if(unlikely(hash == hash_netdata_conf && strncmp(cmp, "netdata.conf",len) == 0)) {                           // current API
+        else if(unlikely(hash == hash_netdata_conf && strncmp(cmp, "netdata.conf",len) == 0)) {                           // current API
             if(unlikely(!web_client_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
@@ -1433,7 +1468,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return 200;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
-        else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
+        else if(unlikely(hash == hash_exit && strncmp(cmp, "exit",len) == 0)) {
             if(unlikely(!web_client_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
@@ -1449,7 +1484,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             netdata_cleanup_and_exit(0);
             return 200;
         }
-        else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
+        else if(unlikely(hash == hash_debug && strncmp(cmp, "debug",len) == 0)) {
             if(unlikely(!web_client_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
@@ -1489,7 +1524,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             buffer_strcat(w->response.data, "debug which chart?\r\n");
             return 400;
         }
-        else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
+        else if(unlikely(hash == hash_mirror && strncmp(cmp, "mirror",len) == 0)) {
             if(unlikely(!web_client_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
@@ -1511,7 +1546,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     strncpyz(filename, w->last_url, FILENAME_MAX);
     tok = mystrsep(&url, "?");
     buffer_flush(w->response.data);
-    return mysendfile(w, (tok && *tok)?tok:"/");
+
+    //return mysendfile(w, (tok && *tok)?tok:"/");
+    return mysendfile(w, (w->path.length > 1)?tok:"/");
 }
 
 void web_client_process_request(struct web_client *w) {

@@ -139,6 +139,7 @@ struct web_client {
     struct web_fields directory;
     struct web_fields query_string;
     struct web_fields version;
+    struct web_fields command;
     struct web_fields protocol;
     struct web_fields param_name[WEB_FIELDS_MAX];
     struct web_fields param_values[WEB_FIELDS_MAX];
