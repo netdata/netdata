@@ -49,9 +49,9 @@ download_go() {
 	dest="${2}"
 
 	if command -v curl >/dev/null 2>&1; then
-		run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${dest}"
+		run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
 	elif command -v wget >/dev/null 2>&1; then
-		run wget --waitretry 3 -T 10 -O - "${url}" >"${dest}"
+		run wget --waitretry 3 -T 10 -O "${dest}" "${url}"
 	else
 		echo >&2
 		echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
@@ -792,8 +792,11 @@ install_go() {
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
-		if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ]; then
+
+		if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
 			run_failed "go.d plugin download failed, go.d plugin will not be available"
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
 			return 0
 		fi
 
@@ -803,12 +806,12 @@ install_go() {
 		# Checksum validation
 		if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
 
-			echo >&2
 			echo >&2 "go.d plugin checksum validation failure."
 			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
 			echo >&2
 
 			run_failed "go.d.plugin package files checksum validation failed."
+			return 0
 		fi
 
 		# Install new files
