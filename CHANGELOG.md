@@ -5,7 +5,9 @@
 **Fixed bugs:**
 
 - Telemetry rarely received from docker containers [\#6095](https://github.com/netdata/netdata/issues/6095)
+- opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6092](https://github.com/netdata/netdata/issues/6092)
 - invalid help links on platform \(web log nginx/apache\) [\#6086](https://github.com/netdata/netdata/issues/6086)
+- Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
 - netdata: Fix labels usage, quotes are not needed [\#6091](https://github.com/netdata/netdata/pull/6091) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 **Closed issues:**
@@ -15,6 +17,8 @@
 
 **Merged pull requests:**
 
+- Remove system\_info copying [\#6113](https://github.com/netdata/netdata/pull/6113) ([vlvkobal](https://github.com/vlvkobal))
+- Fix incorrect module name: energi [\#6112](https://github.com/netdata/netdata/pull/6112) ([Steve8291](https://github.com/Steve8291))
 - installer: include go.d.plugin version v0.6.0 [\#6097](https://github.com/netdata/netdata/pull/6097) ([ilyam8](https://github.com/ilyam8))
 - Move call to send\_statistics later, to get more events from docker [\#6096](https://github.com/netdata/netdata/pull/6096) ([cakrit](https://github.com/cakrit))
 - Fix path \#6085 [\#6093](https://github.com/netdata/netdata/pull/6093) ([gmosx](https://github.com/gmosx))
