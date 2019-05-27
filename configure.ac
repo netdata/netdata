@@ -799,22 +799,14 @@ PKG_CHECK_MODULES(
     [have_libsnappy=no]
 )
 
-AC_PATH_PROG(
-    [PROTOC],
-    [protoc],
-    [no]
-)
+AC_PATH_PROG([PROTOC], [protoc], [no])
 AS_IF(
     [test x"${PROTOC}" == x"no"],
     [have_protoc=no],
     [have_protoc=yes]
 )
 
-AC_PATH_PROG(
-    [CXX_BINARY],
-    [${CXX}],
-    [no]
-)
+AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
 AS_IF(
     [test x"${CXX_BINARY}" == x"no"],
     [have_CXX_compiler=no],
