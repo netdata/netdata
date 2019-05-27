@@ -780,7 +780,7 @@ extern RRDHOST *rrdhost_find_or_create(
         , struct rrdhost_system_info *system_info
 );
 
-extern int rrdhost_set_system_info_variable(RRDHOST *host, struct rrdhost_system_info *system_info, char *name, char *value);
+extern int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
 extern void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
