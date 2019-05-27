@@ -64,7 +64,7 @@ Netdata since version 1.16 has the feature to encrypt connections. To enable thi
 
 $ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
 
-, it is important to say that the previous command will create a self signed certificate and the browsers will show warnings about it.
+, it is necessary to say that the previous command will create a self signed certificate that is rejected by the slaves initially and the browsers will also show warnings about it.
 
 ## Configuration
 
@@ -76,7 +76,7 @@ To start using HTTPS with Netdata it is only necessary to write the path for you
 	ssl certificate = /etc/netdata/ssl/cert.pem
 ```
 
-The netdata must be able to read both files defined in the options inside the `netdata.conf`. Check the permission of the files(`ls -l /etc/netdata/ssl`) and change it(`chow -R netdata /etc/netdata/ssl/*`) case necessary.
+The netdata must be able to read both files defined in the options inside the `netdata.conf`. Check the permission of the files(`ls -l /etc/netdata/ssl`) to confirm that the netdata user has permission to read, cat it has not change the permissions(`chow -R netdata /etc/netdata/ssl/*`).
 
 TIP: The openssl when work with 4096 bits key will need more CPU to process the whole communication, this can be verified using
 
@@ -131,21 +131,25 @@ To change the behavior of the master we will use the definition `^SSL` that can 
 
 For the next examples we are assuming in these configuration that we are accepting connections in the default port `19999` from all hosts.
 
-# Default configuration
+# Everything encrypted
 
-In normal situation when nothing is defined by the user, the master will assume that it is working with the next ACLs
+When we define the `^SSL` as `force`, the netdata will redirect HTTP to HTTPS and it won't accept connection from the slaves.
 
-`master`
-- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+```
+[web]
+    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+```
 
 # Accept communication either using TLS or pure text
 
-This option is not recommended, but case there is a real necessity to use unencrypted connection, master can accept HTTP requests using the following ACL
+This option is not recommended, but case there is a real necessity to use unencrypted connection, master can accept HTTP requests from browsers and pure text from slaves using the following ACL
 
-`master`
-- bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
+```
+[web]
+    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
+```
 
-For information how to configure the slave check [Stream documentation](../../streaming) .
+For information how to configure the slave check [Stream documentation](../../streaming), there you will also find the expected behavior for client and server when their respective SSL options are enabled.
 
 ### Other netdata.conf [web] section options
 setting | default | info

@@ -441,11 +441,12 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
 			fi
 		done
 	done
+fi
 
-    # default directory for certificates
-	if [ ! -d "${NETDATA_PREFIX}/etc/netdata/ssl" ]; then
-		run mkdir "${NETDATA_PREFIX}/etc/netdata/ssl"
-	fi
+# default directory for certificates
+if [ ! -d "${NETDATA_PREFIX}/etc/netdata/ssl" ]; then
+	run mkdir "${NETDATA_PREFIX}/etc/netdata/ssl"
+    run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_PREFIX}/etc/netdata/ssl"
 fi
 
 # -----------------------------------------------------------------------------

@@ -395,9 +395,38 @@ This is how such a solution will work:
 
 The Netdata does not activate the encryptation on the slave by default. To enable encrypt connection, firstly is necessary to enable it on the server, see [server documentation](../web/server) for more details. When the server has the encryptation enabled, we can change the destination to send data encrypted.
 
-`destination = 10.0.0.1:19999:SSL`
+```
+[stream]
+    destination = 10.0.0.1:19999:SSL
+```
 
 The word SSL appended to the end of the destination says for Netdata that the connection must be encrypted from the slave to master.
+
+## Certificate verification
+
+When the SSL is enabled on the slave, the default behavior will be do not connect with the master case the server's certificate has a problem, case you wanna avoid this check, set the variable `ssl skip certificate verification` as
+
+```
+[stream]
+    ssl skip certificate verification = yes
+```
+
+## Expected behaviors
+
+With the introduction of the SSL, the Netdata is expected to work with the following behaviors depending of the configuration:
+
+ Master | Slave | Behavior
+:------:|:-----:|:--------
+There is not any SSL configuration. | There is not any SSL configuration.| In this case both master and slave will be working with plain text.
+The [web] section has `ssl key` and `ssl certificate`.| There is not any SSL configuration | The master will accept both HTTP and HTTPS from browsers, but the slaves won't have their connections changed.
+The [web] section has `ssl key` and `ssl certificate`.| The destination has `:SSL` at the end. | The master will accept both HTTP and HTTPS from browsers and the streams will connect with servers that has valid SSL certificate.
+The [web] section has `ssl key` and `ssl certificate`.| The destination has `:SSL` at the end and `ssl skip certificate verification`  is yes.| The master will accept both HTTP and HTTPS from browsers and the streams will not check the certificate when there is a connection.
+The [web] section has `ssl key`, `ssl certificate` and the `bind to` has the option '^SSL=force`.| There is not any SSL configuration.| The master only accepts HTTPS from browser and it will reject all slave connections.
+The [web] section has `ssl key`, `ssl certificate` and the `bind to` has the option '^SSL=force`.| The destination has `:SSL` at the end. | The master only accepts HTTPS from browsers and the slave will connect with servers that has valid SSL certificate.
+The [web] section has `ssl key`, `ssl certificate` and the `bind to` has the option '^SSL=force`.| The destination has `:SSL` at the end and `ssl skip certificate verification`  is yes.|The master only accepts HTTPS from browsers and the slaves won't check the certificate.
+The [web] section has `ssl key`, `ssl certificate` and the `bind to` has the option '^SSL=optional`.| There is not any SSL configuration.| The master accepts both HTTP and HTTPS from browser and it will accept connection from slave with pure text.
+The [web] section has `ssl key`, `ssl certificate` and the `bind to` has the option '^SSL=optional`.| The destination has `:SSL` at the end. | The master accepts both HTTP and  HTTPS from browsers and the slave will connect with servers that has valid SSL certificate.
+The [web] section has `ssl key`, `ssl certificate` and the `bind to` has the option '^SSL=optional`.| The destination has `:SSL` at the end and `ssl skip certificate verification`  is yes.|The master accepts both HTTP and  HTTPS from browsers and the slaves won't check the certificate.
 
 ### An advanced setup
 
