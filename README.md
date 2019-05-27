@@ -1,4 +1,4 @@
-# netdata [![Build Status](https://travis-ci.com/netdata/netdata.svg?branch=master)](https://travis-ci.com/netdata/netdata) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2231/badge)](https://bestpractices.coreinfrastructure.org/projects/2231) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+# Netdata [![Build Status](https://travis-ci.com/netdata/netdata.svg?branch=master)](https://travis-ci.com/netdata/netdata) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2231/badge)](https://bestpractices.coreinfrastructure.org/projects/2231) [![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-blue.svg)](https://www.gnu.org/licenses/gpl-3.0) [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Freadme&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
 
 [![Code Climate](https://codeclimate.com/github/netdata/netdata/badges/gpa.svg)](https://codeclimate.com/github/netdata/netdata) [![Codacy Badge](https://api.codacy.com/project/badge/Grade/a994873f30d045b9b4b83606c3eb3498)](https://www.codacy.com/app/netdata/netdata?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=netdata/netdata&amp;utm_campaign=Badge_Grade) [![LGTM C](https://img.shields.io/lgtm/grade/cpp/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:cpp) [![LGTM JS](https://img.shields.io/lgtm/grade/javascript/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:javascript) [![LGTM PYTHON](https://img.shields.io/lgtm/grade/python/g/netdata/netdata.svg?logo=lgtm)](https://lgtm.com/projects/g/netdata/netdata/context:python)
 
@@ -19,39 +19,39 @@ Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d
 
 ---
 
-People get **addicted to netdata**.<br/>
+People get **addicted to Netdata**.<br/>
 Once you use it on your systems, **there is no going back**! *You have been warned...*
 
 ![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
-[![Tweet about netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Tweet%20about%20netdata)](https://twitter.com/intent/tweet?text=Netdata,%20real-time%20performance%20and%20health%20monitoring,%20done%20right!&url=https://my-netdata.io/&via=linuxnetdata&hashtags=netdata,monitoring)
+[![Tweet about Netdata!](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Tweet%20about%20netdata)](https://twitter.com/intent/tweet?text=Netdata,%20real-time%20performance%20and%20health%20monitoring,%20done%20right!&url=https://my-netdata.io/&via=linuxnetdata&hashtags=netdata,monitoring)
 
 
 ## Contents
 
 1. [How it looks](#how-it-looks) - have a quick look at it
-2. [User base](#user-base) - who uses netdata?
+2. [User base](#user-base) - who uses Netdata?
 3. [Quick Start](#quick-start) - try it now on your systems
-4. [Why Netdata](#why-netdata) - why people love netdata, how it compares with other solutions
-5. [News](#news) - latest news about netdata
-6. [How it works](#how-it-works) - high level diagram of how netdata works
-7. [infographic](#infographic) - everything about netdata, in a page
+4. [Why Netdata](#why-netdata) - why people love Netdata, how it compares with other solutions
+5. [News](#news) - latest news about Netdata
+6. [How it works](#how-it-works) - high level diagram of how Netdata works
+7. [infographic](#infographic) - everything about Netdata, in a page
 8. [Features](#features) - what features does it have
 9. [Visualization](#visualization) - unique visualization features
 10. [What does it monitor](#what-does-it-monitor) - which metrics it collects
 11. [Documentation](#documentation) - read the docs
 12. [Community](#community) - discuss with others and get support
-13. [License](#license) - check the license of netdata
+13. [License](#license) - check the license of Netdata
 14. [Is it any good?](#is-it-any-good) - Yes
 15. [Is it awesome?](#is-it-awesome) - Yes
 
 ## How it looks
 
-The following animated image, shows the top part of a typical netdata dashboard.
+The following animated image, shows the top part of a typical Netdata dashboard.
 
 ![peek 2018-11-11 02-40](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
-*A typical netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
+*A typical Netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
 
 > *We have a few online demos to experience it live: [https://my-netdata.io](https://my-netdata.io)*
 
@@ -70,7 +70,7 @@ We provide docker images for the most common architectures. These are statistics
 [![netdata/netdata (official)](https://img.shields.io/docker/pulls/netdata/netdata.svg?label=netdata/netdata+%28official%29)](https://hub.docker.com/r/netdata/netdata/) [![firehol/netdata (deprecated)](https://img.shields.io/docker/pulls/firehol/netdata.svg?label=firehol/netdata+%28deprecated%29)](https://hub.docker.com/r/firehol/netdata/) [![titpetric/netdata (donated)](https://img.shields.io/docker/pulls/titpetric/netdata.svg?label=titpetric/netdata+%28third+party%29)](https://hub.docker.com/r/titpetric/netdata/)
 
 ### Registry
-When you install multiple netdata, they are integrated into **one distributed application**, via a [netdata registry](registry/#registry). This is a web browser feature and it allows us to count the number of unique users and unique netdata servers installed. The following information comes from the global public netdata registry we run:
+When you install multiple Netdata, they are integrated into **one distributed application**, via a [Netdata registry](registry/#registry). This is a web browser feature and it allows us to count the number of unique users and unique Netdata servers installed. The following information comes from the global public Netdata registry we run:
 
 [![User Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=M&value_color=blue&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Monitored Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=k&divide=1000&value_color=orange&precision=2&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=M&value_color=yellowgreen&precision=2&divide=1000000&v43)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
@@ -78,13 +78,13 @@ When you install multiple netdata, they are integrated into **one distributed ap
 
 ## Quick Start
 
-You can quickly install netdata on a Linux box (physical, virtual, container, IoT) with the following command:
+You can quickly install Netdata on a Linux box (physical, virtual, container, IoT) with the following command:
 
 ```sh
 # make sure you run `bash` for your shell
 bash
 
-# install netdata, directly from github sources
+# install Netdata, directly from github sources
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
@@ -96,7 +96,7 @@ The above command will:
 
 More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
 
-To try netdata in a docker container, run this:
+To try Netdata in a docker container, run this:
 
 ```
 docker run -d --name=netdata \
@@ -109,7 +109,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running netdata in docker, check the [docker installation page](packaging/docker/).
+For more information about running Netdata in docker, check the [docker installation page](packaging/docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -128,9 +128,9 @@ Netdata is a monitoring agent you install on all your systems. It is:
 
 All the above, are packaged together in a very flexible, extremely modular, distributed application.
 
-This is how netdata compares to other monitoring solutions:
+This is how Netdata compares to other monitoring solutions:
 
-netdata|others (open-source and commercial)
+Netdata|others (open-source and commercial)
 :---:|:---:
 **High resolution metrics** (1s granularity)|Low resolution metrics (10s granularity at best)
 Monitors everything, **thousands of metrics per node**|Monitor just a few metrics
@@ -149,7 +149,7 @@ not just visualize metrics.
 
 ## News
 
-`May 21st, 2019` - **[netdata v1.15.0 released!](https://github.com/netdata/netdata/releases)**
+`May 21st, 2019` - **[Netdata v1.15.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release v1.15.0 contains 11 bug fixes and 30 improvements.
 
@@ -157,7 +157,7 @@ We are very happy and proud to be able to include two major improvements in this
 
 *Aggregated node view*
 
-The No. 1 request from our community has been a better way to view and manage their Netdata installations, via an aggregated view. The node menu with the simple list of hosts on the agent UI just didn't do it for people with hundreds, or thousands of instances. This release introduces the node view, which uses the power of [Netdata Cloud](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to deliver powerful views of a Netdata-based monitoring infrastructure. You can read more about Netdata Cloud and the future of netdata [here](https://blog.netdata.cloud/posts/netdata-cloud-announcement/).
+The No. 1 request from our community has been a better way to view and manage their Netdata installations, via an aggregated view. The node menu with the simple list of hosts on the agent UI just didn't do it for people with hundreds, or thousands of instances. This release introduces the node view, which uses the power of [Netdata Cloud](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to deliver powerful views of a Netdata-based monitoring infrastructure. You can read more about Netdata Cloud and the future of Netdata [here](https://blog.netdata.cloud/posts/netdata-cloud-announcement/).
 
 *New database engine*
 
@@ -175,11 +175,11 @@ Finally, we built a process to quickly replace any problematic nightly builds an
 
 ---
 
-`Apr 26th, 2019` - **[netdata v1.14.0 released!](https://github.com/netdata/netdata/releases)**
+`Apr 26th, 2019` - **[Netdata v1.14.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release 1.14 contains 14 bug fixes and 24 improvements.
 
-The release introduces major additions to Kubernetes monitoring, with tens of new charts for [Kubelet](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubelet/), [kube-proxy](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubeproxy/) and [coredns](https://github.com/netdata/go.d.plugin/tree/master/modules/coredns) metrics, as well as significant improvements to the netdata [helm chart](https://github.com/netdata/helmchart/). 
+The release introduces major additions to Kubernetes monitoring, with tens of new charts for [Kubelet](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubelet/), [kube-proxy](https://docs.netdata.cloud/collectors/go.d.plugin/modules/k8s_kubeproxy/) and [coredns](https://github.com/netdata/go.d.plugin/tree/master/modules/coredns) metrics, as well as significant improvements to the Netdata [helm chart](https://github.com/netdata/helmchart/). 
  
 Two new collectors were added, to monitor [Docker hub](https://docs.netdata.cloud/collectors/go.d.plugin/modules/dockerhub/) and [Docker engine](https://docs.netdata.cloud/collectors/go.d.plugin/modules/docker_engine/) metrics. 
 
@@ -187,19 +187,19 @@ Finally, v1.14  adds support for [version 2 cgroups](https://github.com/netdata/
 
 ---
 
-`Mar 14th, 2019` - **[netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)**
+`Mar 14th, 2019` - **[Netdata v1.13.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release 1.13.0 contains 14 bug fixes and 8 improvements.
 
-netdata has taken the first step into the world of Kubernetes, with a beta version of a [Helm chart](https://github.com/netdata/helmchart) for deployment to a k8s cluster and [proper naming](https://github.com/netdata/netdata/pull/5576) of the cgroup containers. We have [big plans](https://github.com/netdata/netdata/issues/5392) for Kubernetes, so stay tuned!
+Netdata has taken the first step into the world of Kubernetes, with a beta version of a [Helm chart](https://github.com/netdata/helmchart) for deployment to a k8s cluster and [proper naming](https://github.com/netdata/netdata/pull/5576) of the cgroup containers. We have [big plans](https://github.com/netdata/netdata/issues/5392) for Kubernetes, so stay tuned!
 
-A [major refactoring of the python.d plugin](https://github.com/netdata/netdata/pull/5552) has resulted in a dramatic decrease of the required memory, making netdata even more resource efficient.
+A [major refactoring of the python.d plugin](https://github.com/netdata/netdata/pull/5552) has resulted in a dramatic decrease of the required memory, making Netdata even more resource efficient.
 
 We also added charts for IPC shared memory segments and total memory used.
 
 ---
 
-`Feb 28th, 2019` - **[netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)**
+`Feb 28th, 2019` - **[Netdata v1.12.2 released!](https://github.com/netdata/netdata/releases)**
 
 Patch release 1.12.2 contains 7 bug fixes and 4 improvements.
 
@@ -210,38 +210,38 @@ We are also introducing a new **Oracle DB collector** module, implemented in Pyt
 
 ---
 
-`Feb 21st, 2019` - **[netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)**
+`Feb 21st, 2019` - **[Netdata v1.12.1 released!](https://github.com/netdata/netdata/releases)**
 
 Patch release 1.12.1 contains 22 bug fixes and 8 improvements.
 
 ---
 
-`Feb 14th, 2019` - **[netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)**
+`Feb 14th, 2019` - **[Netdata v1.12.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release 1.12 is made out of 211 pull requests and 22 bug fixes.
 The key improvements are:
 
-- Introducing `netdata.cloud`, the free netdata service for all netdata users
+- Introducing `netdata.cloud`, the free Netdata service for all Netdata users
 - High performance plugins with go.d.plugin (data collection orchestrator written in Go)
 - 7 new data collectors and 11 rewrites of existing data collectors for improved performance
-- A new management API for all netdata servers
-- Bind different functions of the netdata APIs to different ports
+- A new management API for all Netdata servers
+- Bind different functions of the Netdata APIs to different ports
 - Improved installation and updates
 
 ---
 
-`Nov 22nd, 2018` - **[netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**
+`Nov 22nd, 2018` - **[Netdata v1.11.1 released!](https://github.com/netdata/netdata/releases)**
 
 - Improved internal database to support values above 64bit.
 - New data collection plugins: [`openldap`](collectors/python.d.plugin/openldap/), [`tor`](collectors/python.d.plugin/tor/), [`nvidia_smi`](collectors/python.d.plugin/nvidia_smi/).
-- Improved data collection plugins: netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/proc.plugin/README.md#cpu-frequency), [`sensors`](collectors/python.d.plugin/sensors/).
+- Improved data collection plugins: Netdata now supports monitoring network interface aliases, [`smartd_log`](collectors/python.d.plugin/smartd_log/), [`cpufreq`](collectors/proc.plugin/README.md#cpu-frequency), [`sensors`](collectors/python.d.plugin/sensors/).
 - Health monitoring improvements: network interface congestion alarm restored, [`alerta.io`](health/notifications/alerta/), `conntrack_max`.
 - `my-netdata`menu has been refactored.
 - Packaging: `openrc` service definition got a few improvements.
 
 ---
 
-`Sep 18, 2018` - **netdata has its own organization**
+`Sep 18, 2018` - **Netdata has its own organization**
 
 Netdata used to be a [firehol.org](https://firehol.org) project, accessible as `firehol/netdata`.
 
@@ -260,7 +260,7 @@ Function|Description|Documentation
 **Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[`collectors`](collectors/#data-collection-plugins)
 **Store**|Metrics are stored in RAM in a round robin database (ring buffer), using a custom made floating point number for minimal footprint.|[`database`](database/#database)
 **Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)
-**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote netdata servers, as soon as they are collected.|[`streaming`](streaming/#streaming-and-replication)
+**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.|[`streaming`](streaming/#streaming-and-replication)
 **Archive**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)
 **Query**|Multiple independent workers are attached to the [internal web server](web/server/#web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web/api`](web/api/#api)
 
@@ -268,7 +268,7 @@ The result is a highly efficient, low latency system, supporting multiple reader
 
 ## Infographic
 
-This is a high level overview of netdata feature set and architecture.
+This is a high level overview of Netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
 [![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)
@@ -309,7 +309,7 @@ This is what you should expect from Netdata:
 
 ### Positive and negative values
 
-To improve clarity on charts, netdata dashboards present **positive** values for metrics representing `read`, `input`, `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
+To improve clarity on charts, Netdata dashboards present **positive** values for metrics representing `read`, `input`, `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
 
 ![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
 
@@ -325,13 +325,13 @@ Netdata charts automatically zoom vertically, to visualize the variation of each
 
 ### Charts are synchronized
 
-Charts on netdata dashboards are synchronized to each other. There is no master chart. Any chart can be panned or zoomed at any time, and all other charts will follow.
+Charts on Netdata dashboards are synchronized to each other. There is no master chart. Any chart can be panned or zoomed at any time, and all other charts will follow.
 
 ![charts-are-synchronized](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
 *Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the mouse pointer is over a chart.*
 
-> The visible time-frame (pan and zoom) is propagated from netdata server to netdata server, when navigating via the [`my-netdata` menu](registry#registry).
+> The visible time-frame (pan and zoom) is propagated from Netdata server to Netdata server, when navigating via the [`my-netdata` menu](registry#registry).
 
 
 ### Highlighted time-frame
@@ -342,19 +342,19 @@ To improve visual anomaly detection across charts, the user can highlight a time
 
 *A highlighted time-frame can be given by pressing `ALT` + `mouse selection` on any chart. Netdata will highlight the same range on all charts.*
 
-> Highlighted ranges are propagated from netdata server to netdata server, when navigating via the [`my-netdata` menu](registry#registry).
+> Highlighted ranges are propagated from Netdata server to Netdata server, when navigating via the [`my-netdata` menu](registry#registry).
 
 
 ## What does it monitor
 
 Netdata data collection is **extensible** - you can monitor anything you can get a metric for.
-Its [Plugin API](collectors/plugins.d/) supports all programing languages (anything can be a netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
+Its [Plugin API](collectors/plugins.d/) supports all programing languages (anything can be a Netdata plugin, BASH, python, perl, node.js, java, Go, ruby, etc).
 
 - For better performance, most system related plugins (cpu, memory, disks, filesystems, networking, etc) have been written in `C`.
 - For faster development and easier contributions, most application related plugins (databases, web servers, etc) have been written in `python`.
 
 #### APM (Application Performance Monitoring)
-- **[statsd](collectors/statsd.plugin/)** - netdata is a fully featured statsd server.
+- **[statsd](collectors/statsd.plugin/)** - Netdata is a fully featured statsd server.
 - **[Go expvar](collectors/python.d.plugin/go_expvar/)** - collects metrics exposed by applications written in the Go programming language using the expvar package.
 - **[Spring Boot](collectors/python.d.plugin/springboot/)** - monitors running Java Spring Boot applications that expose their metrics with the use of the Spring Boot Actuator included in Spring Boot library.
 - **[uWSGI](collectors/python.d.plugin/uwsgi/)** - collects performance metrics from uWSGI applications.
@@ -537,23 +537,23 @@ You can easily extend Netdata, by writing plugins that collect data from any sou
 
 ## Documentation
 
-The netdata documentation is at [https://docs.netdata.cloud](https://docs.netdata.cloud). But you can also find it inside the repo, so by just navigating the repo on github you can find all the documentation.
+The Netdata documentation is at [https://docs.netdata.cloud](https://docs.netdata.cloud). But you can also find it inside the repo, so by just navigating the repo on github you can find all the documentation.
 
 Here is a quick list:
 
 Directory|Description
 :---|:---
-[`installer`](packaging/installer/)|Instructions to install netdata on your systems.
-[`docker`](packaging/docker/)|Instructions to install netdata using docker.
-[`daemon`](daemon/)|Information about the netdata daemon and its configuration.
+[`installer`](packaging/installer/)|Instructions to install Netdata on your systems.
+[`docker`](packaging/docker/)|Instructions to install Netdata using docker.
+[`daemon`](daemon/)|Information about the Netdata daemon and its configuration.
 [`collectors`](collectors/)|Information about data collection plugins.
-[`health`](health/)|How netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods.
-[`streaming`](streaming/)|How to build hierarchies of netdata servers, by streaming metrics between them.
+[`health`](health/)|How Netdata's health monitoring works, how to create your own alarms and how to configure alarm notification methods.
+[`streaming`](streaming/)|How to build hierarchies of Netdata servers, by streaming metrics between them.
 [`backends`](backends/)|Long term archiving of metrics to industry standard time-series databases, like `prometheus`, `graphite`, `opentsdb`.
-[`web/api`](web/api/)|Learn how to query the netdata API and the queries it supports.
+[`web/api`](web/api/)|Learn how to query the Netdata API and the queries it supports.
 [`web/api/badges`](web/api/badges/)|Learn how to generate badges (SVG images) from live data.
-[`web/gui/custom`](web/gui/custom/)|Learn how to create custom netdata dashboards.
-[`web/gui/confluence`](web/gui/confluence/)|Learn how to create netdata dashboards on Atlassian's Confluence.
+[`web/gui/custom`](web/gui/custom/)|Learn how to create custom Netdata dashboards.
+[`web/gui/confluence`](web/gui/confluence/)|Learn how to create Netdata dashboards on Atlassian's Confluence.
 
 You can also check all the other directories. Most of them have plenty of documentation.
 
@@ -563,7 +563,7 @@ We welcome [contributions](CONTRIBUTING.md). So, feel free to join the team.
 
 To report bugs, or get help, use [GitHub Issues](https://github.com/netdata/netdata/issues).
 
-You can also find netdata on:
+You can also find Netdata on:
 
 - [Facebook](https://www.facebook.com/linuxnetdata/)
 - [Twitter](https://twitter.com/linuxnetdata)
@@ -573,7 +573,7 @@ You can also find netdata on:
 
 ## License
 
-netdata is [GPLv3+](LICENSE).
+Netdata is [GPLv3+](LICENSE).
 
 Netdata re-distributes other open-source tools and libraries. Please check the [third party licenses](REDISTRIBUTED.md).
 

@@ -1,10 +1,10 @@
 # Getting Started
 
-These are your first steps **after** you have installed netdata. If you haven't installed it already, please check the [installation page](../packaging/installer).
+These are your first steps **after** you have installed Netdata. If you haven't installed it already, please check the [installation page](../packaging/installer).
 
 ## Accessing the dashboard
 
-To access the netdata dashboard, navigate with your browser to:
+To access the Netdata dashboard, navigate with your browser to:
 
 ```
 http://your.server.ip:19999/
@@ -14,7 +14,7 @@ http://your.server.ip:19999/
 
 **Verify Netdata is running.**
 
-Open an ssh session to the server and execute `sudo ps -e | grep netdata`. It should respond with the PID of the netdata daemon. If it prints nothing, Netdata is not running. Check the [installation page](../packaging/installer) to install it.
+Open an ssh session to the server and execute `sudo ps -e | grep netdata`. It should respond with the PID of the Netdata daemon. If it prints nothing, Netdata is not running. Check the [installation page](../packaging/installer) to install it.
 
 **Verify Netdata responds to HTTP requests.**
 
@@ -32,9 +32,9 @@ If still Netdata does not receive the requests, something is blocking them. A fi
 
 </details>&nbsp;<br/>
 
-When you install multiple Netdata servers, all your servers will appear at the `my-netdata` menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your netdata servers.
+When you install multiple Netdata servers, all your servers will appear at the `my-netdata` menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your Netdata servers.
 
-The `my-netdata` menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other netdata server:
+The `my-netdata` menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other Netdata server:
 
 - the current charts panning (drag the charts left or right),
 - the current charts zooming (`SHIFT` + mouse wheel over a chart),
@@ -43,7 +43,7 @@ The `my-netdata` menu is more than just browser bookmarks. When switching Netdat
 - the theme you use,
 - etc.
 
-are all sent over to other netdata server, to allow you troubleshoot cross-server performance issues easily.
+are all sent over to other Netdata server, to allow you troubleshoot cross-server performance issues easily.
 
 ## Starting and stopping Netdata
 
@@ -55,15 +55,15 @@ To start/stop Netdata, depending on your environment, you should use:
 - `service netdata start` and `service netdata stop`
 - `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
 
-Once netdata is installed, the installer configures it to start at boot and stop at shutdown.
+Once Netdata is installed, the installer configures it to start at boot and stop at shutdown.
 
 For more information about using these commands, consult your system documentation.
 
 ## Sizing Netdata
 
-The default installation of netdata is configured for a small round-robin database: just 1 hour of data. Depending on the memory your system has and the amount you can dedicate to Netdata, you should adapt this. On production systems with limited RAM, we suggest to set this to 3-4 hours. For best results you should set this to 24 or 48 hours.
+The default installation of Netdata is configured for a small round-robin database: just 1 hour of data. Depending on the memory your system has and the amount you can dedicate to Netdata, you should adapt this. On production systems with limited RAM, we suggest to set this to 3-4 hours. For best results you should set this to 24 or 48 hours.
 
-For every hour of data, Netdata needs about 25MB of RAM. If you can dedicate about 100MB of RAM to netdata, you should set its database size to 4 hours.
+For every hour of data, Netdata needs about 25MB of RAM. If you can dedicate about 100MB of RAM to Netdata, you should set its database size to 4 hours.
 
 To do this, edit `/etc/netdata/netdata.conf` (or `/opt/netdata/etc/netdata/netdata.conf`) and set:
 
@@ -77,24 +77,24 @@ Make sure the `history` line is not commented (comment lines start with `#`).
 1 hour is 3600 seconds, so the number you need to set is the result of `HOURS * 3600`.
 
 !!! danger
-    Be careful when you set this on production systems. If you set it too high, your system may run out of memory. By default, netdata is configured to be killed first when the system starves for memory, but better be careful to avoid issues.
+    Be careful when you set this on production systems. If you set it too high, your system may run out of memory. By default, Netdata is configured to be killed first when the system starves for memory, but better be careful to avoid issues.
 
 For more information about Netdata memory requirements, [check this page](../database).
 
-If your kernel supports KSM (most do), you can [enable KSM to half netdata memory requirement](../database#ksm).
+If your kernel supports KSM (most do), you can [enable KSM to half Netdata memory requirement](../database#ksm).
 
 ## Service discovery and auto-detection
 
 Netdata supports auto-detection of data collection sources. It auto-detects almost everything: database servers, web servers, dns server, etc.
 
-This auto-detection process happens **only once**, when netdata starts. To have Netdata re-discover data sources, you need to restart it. There are a few exceptions to this:
+This auto-detection process happens **only once**, when Netdata starts. To have Netdata re-discover data sources, you need to restart it. There are a few exceptions to this:
 
 - containers and VMs are auto-detected forever (when Netdata is running at the host).
 - many data sources are collected but are silenced by default, until there is useful information to collect (for example network interface dropped packet, will appear after a packet has been dropped).
 - services that are not optimal to collect on all systems, are disabled by default.
 - services we received feedback from users that caused issues when monitored, are also disabled by default (for example, `chrony` is disabled by default, because CentOS ships a version of it that uses 100% CPU when queried for statistics).
 
-Once a data collection source is detected, netdata will never quit trying to collect data from it, until Netdata is restarted. So, if you stop your web server, netdata will pick it up automatically when it is started again.
+Once a data collection source is detected, Netdata will never quit trying to collect data from it, until Netdata is restarted. So, if you stop your web server, Netdata will pick it up automatically when it is started again.
 
 Since Netdata is installed on all your systems (even inside containers), auto-detection is limited to `localhost`. This simplifies significantly the security model of a Netdata monitored infrastructure, since most applications allow `localhost` access  by default.
 
@@ -104,10 +104,10 @@ A few well known data collection sources that commonly need to be configured are
 
 ## Configuration quick start
 
-In netdata we have:
+In Netdata we have:
 
-- **internal** data collection plugins (running inside the netdata daemon)
-- **external** data collection plugins (independent processes, sending data to netdata over pipes)
+- **internal** data collection plugins (running inside the Netdata daemon)
+- **external** data collection plugins (independent processes, sending data to Netdata over pipes)
 - modular plugin **orchestrators** (external plugins that have multiple data collection modules)
 
 You can enable and disable plugins (internal and external) via `netdata.conf` at the section `[plugins]`.
@@ -151,7 +151,7 @@ sudo /etc/netdata/edit-config python.d/nginx.conf
 
 Netdata ships hundreds of health monitoring alarms for detecting anomalies. These are optimized for production servers.
 
-Many users install netdata on workstations and are frustrated by the default alarms shipped with netdata. On these cases, we suggest to disable health monitoring.
+Many users install Netdata on workstations and are frustrated by the default alarms shipped with Netdata. On these cases, we suggest to disable health monitoring.
 
 To disable it, edit `/etc/netdata/netdata.conf` (or `/opt/netdata/etc/netdata/netdata.conf` if you installed the static 64bit package) and set:
 
@@ -176,7 +176,7 @@ and set `SEND_EMAIL="NO"`.
 
 - Check [Data Collection](../collectors) for configuring data collection plugins.
 - Check [Health Monitoring](../health) for configuring your own alarms, or setting up alarm notifications.
-- Check [Streaming](../streaming) for centralizing netdata metrics.
-- Check [Backends](../backends) for long term archiving of netdata metrics to time-series databases.
+- Check [Streaming](../streaming) for centralizing Netdata metrics.
+- Check [Backends](../backends) for long term archiving of Netdata metrics to time-series databases.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FGettingStarted&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
