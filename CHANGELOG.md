@@ -4,21 +4,36 @@
 
 **Fixed bugs:**
 
+- Optimize calls that gather system-info [\#6130](https://github.com/netdata/netdata/issues/6130)
+- Fix telemetry config in installer [\#6129](https://github.com/netdata/netdata/issues/6129)
+- Netdata 1.15 crashes on Ubuntu 16.04 [\#6117](https://github.com/netdata/netdata/issues/6117)
 - Telemetry rarely received from docker containers [\#6095](https://github.com/netdata/netdata/issues/6095)
+- netdata/packaging/installer: Fine tuning based on user feedback and findings from testing [\#6094](https://github.com/netdata/netdata/issues/6094)
 - opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6092](https://github.com/netdata/netdata/issues/6092)
+- Problem updating [\#6088](https://github.com/netdata/netdata/issues/6088)
 - invalid help links on platform \(web log nginx/apache\) [\#6086](https://github.com/netdata/netdata/issues/6086)
 - Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
+- netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
+- netdata/packaging/installer: nits and fixes [\#6121](https://github.com/netdata/netdata/pull/6121) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata: Fix labels usage, quotes are not needed [\#6091](https://github.com/netdata/netdata/pull/6091) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 **Closed issues:**
 
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
 - \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
+- alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
 
 **Merged pull requests:**
 
+- Change 'netdata' to 'Netdata' in /docs/ and /README.md [\#6137](https://github.com/netdata/netdata/pull/6137) ([apardyl](https://github.com/apardyl))
+- Optimize calls that gather system info [\#6128](https://github.com/netdata/netdata/pull/6128) ([cakrit](https://github.com/cakrit))
+- Fix telemetry config in netdata-installer [\#6127](https://github.com/netdata/netdata/pull/6127) ([cakrit](https://github.com/cakrit))
+- Add modules to charts.d.conf [\#6120](https://github.com/netdata/netdata/pull/6120) ([Steve8291](https://github.com/Steve8291))
+- Active processes number alert [\#6116](https://github.com/netdata/netdata/pull/6116) ([apardyl](https://github.com/apardyl))
+- add mysql deadlocks chart [\#6115](https://github.com/netdata/netdata/pull/6115) ([kam1kaze](https://github.com/kam1kaze))
 - Remove system\_info copying [\#6113](https://github.com/netdata/netdata/pull/6113) ([vlvkobal](https://github.com/vlvkobal))
 - Fix incorrect module name: energi [\#6112](https://github.com/netdata/netdata/pull/6112) ([Steve8291](https://github.com/Steve8291))
+- Update README.md [\#6111](https://github.com/netdata/netdata/pull/6111) ([mfundul](https://github.com/mfundul))
 - installer: include go.d.plugin version v0.6.0 [\#6097](https://github.com/netdata/netdata/pull/6097) ([ilyam8](https://github.com/ilyam8))
 - Move call to send\_statistics later, to get more events from docker [\#6096](https://github.com/netdata/netdata/pull/6096) ([cakrit](https://github.com/cakrit))
 - Fix path \#6085 [\#6093](https://github.com/netdata/netdata/pull/6093) ([gmosx](https://github.com/gmosx))
