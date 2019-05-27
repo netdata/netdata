@@ -546,6 +546,7 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate
 
+
 # -----------------------------------------------------------------------------
 progress "Read installation options from netdata.conf"
 
@@ -831,6 +832,16 @@ install_go() {
 install_go
 
 # -----------------------------------------------------------------------------
+progress "Telemetry configuration"
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+	run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+else
+	printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+fi
+
+# -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
@@ -1055,12 +1066,6 @@ RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF
 
-# Opt-out from telemetry program
-if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
-	touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
-else
-	progress "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
-fi
 
 # -----------------------------------------------------------------------------
 echo >&2
