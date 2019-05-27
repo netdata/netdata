@@ -6,10 +6,12 @@
 
 using namespace prometheus;
 
+
 google::protobuf::Arena arena;
 WriteRequest *write_request;
 
 void init_write_request() {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
     write_request = google::protobuf::Arena::CreateMessage<WriteRequest>(&arena);
 }
 
@@ -84,7 +86,7 @@ int add_metric(const char *name, const char *chart, const char *family, const ch
 }
 
 size_t get_write_request_size(){
-    return snappy::MaxCompressedLength(write_request->ByteSizeLong());
+    return (size_t)snappy::MaxCompressedLength(write_request->ByteSize());
 }
 
 int pack_write_request(char *buffer, size_t *size) {
