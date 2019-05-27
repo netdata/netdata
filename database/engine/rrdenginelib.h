@@ -6,10 +6,12 @@
 #include "rrdengine.h"
 
 /* Forward declarations */
-struct rrdeng_page_cache_descr;
+struct rrdeng_page_descr;
 
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
+
+#define BITS_PER_ULONG (sizeof(unsigned long) * 8)
 
 /* Taken from linux kernel */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
@@ -24,6 +26,13 @@ typedef uintptr_t rrdeng_stats_t;
 #else
 #define rrd_stat_atomic_add(p, n) do {(void) __sync_fetch_and_add(p, n);} while(0)
 #endif
+
+/* returns old *ptr value */
+static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,
+                                                   unsigned long oldval, unsigned long newval)
+{
+    return __sync_val_compare_and_swap(ptr, oldval, newval);
+}
 
 #ifndef O_DIRECT
 /* Workaround for OS X */
@@ -77,7 +86,8 @@ static inline void crc32set(void *crcp, uLong crc)
     *(uint32_t *)crcp = crc;
 }
 
-extern void print_page_cache_descr(struct rrdeng_page_cache_descr *page_cache_descr);
+extern void print_page_cache_descr(struct rrdeng_page_descr *page_cache_descr);
+extern void print_page_descr(struct rrdeng_page_descr *descr);
 extern int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
 extern char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
 
