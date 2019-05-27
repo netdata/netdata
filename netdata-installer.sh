@@ -51,7 +51,7 @@ download_go() {
 	if command -v curl >/dev/null 2>&1; then
 		run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
 	elif command -v wget >/dev/null 2>&1; then
-		run wget --waitretry 3 -T 10 -O "${dest}" "${url}"
+		run wget -T 15 -O - "${url}" > "${dest}"
 	else
 		echo >&2
 		echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
