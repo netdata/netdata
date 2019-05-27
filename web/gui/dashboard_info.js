@@ -1163,6 +1163,10 @@ netdataDashboard.context = {
             '</ul>'
     },
 
+    'mysql.innodb_deadlocks': {
+        info: 'A deadlock happens when two or more transactions mutually hold and request for locks, creating a cycle of dependencies. For more information about <a href="https://dev.mysql.com/doc/refman/5.7/en/innodb-deadlocks-handling.html" target="_blank">how to minimize and handle deadlocks</a>.'
+    },
+
     // ------------------------------------------------------------------------
     // POSTGRESQL
 
