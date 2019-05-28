@@ -66,7 +66,7 @@ extern int sock_setreuse(int fd, int reuse);
 extern int sock_setreuse_port(int fd, int reuse);
 extern int sock_enlarge_in(int fd);
 extern int sock_enlarge_out(int fd);
-extern char ipredirect[256];
+extern char ipredirect[64];
 
 extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, SIMPLE_PATTERN *access_list);
 

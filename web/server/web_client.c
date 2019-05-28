@@ -1004,6 +1004,20 @@ static inline void web_client_send_http_header(struct web_client *w) {
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
     }
 
+    char headerbegin[128];
+    if (w->response.code == 301) {
+        memcpy(headerbegin,"\r\nLocation: https://",20);
+        size_t headerlength = strlen(ipredirect);
+        memcpy(&headerbegin[20],ipredirect,headerlength);
+        headerlength += 20;
+        memcpy(&headerbegin[headerlength],"\r\n",2);
+        headerlength += 2;
+        headerbegin[headerlength] = 0x00;
+    }else {
+        strncpy(headerbegin,"\r\n",2);
+        headerbegin[2]=0x00;
+    }
+
     buffer_sprintf(w->response.header_output,
             "HTTP/1.1 %d %s\r\n"
                     "Connection: %s\r\n"
@@ -1011,13 +1025,14 @@ static inline void web_client_send_http_header(struct web_client *w) {
                     "Access-Control-Allow-Origin: %s\r\n"
                     "Access-Control-Allow-Credentials: true\r\n"
                     "Content-Type: %s\r\n"
-                    "Date: %s\r\n"
+                    "Date: %s%s"
                    , w->response.code, code_msg
                    , web_client_has_keepalive(w)?"keep-alive":"close"
                    , VERSION
                    , w->origin
                    , content_type_string
                    , date
+                   , headerbegin
     );
 
     if(unlikely(web_x_frame_options))
