@@ -14,7 +14,7 @@ For our convenience, Netdata provides 2 more layers:
 
 Charts information is stored at /usr/share/netdata/web/[dashboard_info.js](gui/dashboard_info.js). This file includes information that is rendered on the dashboard, controls chart colors, section and subsection heading, titles, etc.
 
-If you change that file, your changes will be overwritten when Netdata is updated. You can preserve your settings by creating a new such file (there is /usr/share/netdata/web/[dashboard_info_custom.example.js](gui/dashboard_info_custom_example.js) you can use to start with).
+If you change that file, your changes will be overwritten when Netdata is updated. You can preserve your settings by creating a new such file (there is /usr/share/netdata/web/[dashboard_info_custom_example.js](gui/dashboard_info_custom_example.js) you can use to start with).
 
 You have to copy the example file under a new name, so that it will not be overwritten with Netdata updates.
 

@@ -21,8 +21,8 @@ printhelp () {
 	By default, nothing is actually checked. The following options tell it what to check:
 	 -a Check all link types
 	 -w Check wiki links (and just warn if you see one)
-	 -b Check absolute links to the netdata repo (and change them to relative). Only checks links to https://github.com/netdata/netdata/????/master*
-	 -l Check relative links to the netdata repo (and replace them with links that the html static site can live with, under docs/generator/src only)
+	 -b Check absolute links to the Netdata repo (and change them to relative). Only checks links to https://github.com/netdata/netdata/????/master*
+	 -l Check relative links to the Netdata repo (and replace them with links that the html static site can live with, under docs/generator/src only)
 	 -e Check external links, outside the wiki or the repo (useless without adding the -u option, to verify that they're not broken)
 	"
 }
@@ -233,7 +233,7 @@ checklinks () {
 						if [ "$CHKWIKI" -eq 1 ] ; then echo "-- WARNING: $f - $lnk points to the wiki. Please replace it manually" ; fi
 					;;
 					https://github.com/netdata/netdata/????/master* )
-						echo "-- ERROR: $f - $lnk is an absolute link to a netdata file. Please convert to relative."
+						echo "-- ERROR: $f - $lnk is an absolute link to a Netdata file. Please convert to relative."
 						EXITCODE=1
 					;;
 					http* ) 

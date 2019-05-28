@@ -1,16 +1,16 @@
 # Netdata Security and Disclosure Information
 
-This page describes netdata security and disclosure information.
+This page describes Netdata security and disclosure information.
 
 ## Security Announcements
 
-Every time a security issue is fixed in netdata, we immediately release a new version of it. So, to get notified of all security incidents, please subscribe to our releases on github.
+Every time a security issue is fixed in Netdata, we immediately release a new version of it. So, to get notified of all security incidents, please subscribe to our releases on github.
 
 ## Report a Vulnerability
 
 We’re extremely grateful for security researchers and users that report vulnerabilities to Netdata Open Source Community. All reports are thoroughly investigated by a set of community volunteers.
 
-To make a report, please email the private [security@netdata.cloud](mailto:security@netdata.cloud) list with the security details and the details expected for [all netdata bug reports](../.github/ISSUE_TEMPLATE/bug_report.md).
+To make a report, please email the private [security@netdata.cloud](mailto:security@netdata.cloud) list with the security details and the details expected for [all Netdata bug reports](../.github/ISSUE_TEMPLATE/bug_report.md).
 
 ## When Should I Report a Vulnerability?
 

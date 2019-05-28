@@ -139,7 +139,7 @@ echo -ne "    - 'docs/Demo-Sites.md'
     - 'packaging/installer/UPDATE.md'
     - 'packaging/installer/UNINSTALL.md'
 - 'docs/GettingStarted.md'
-- Running netdata:
+- Running Netdata:
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'
     - 'daemon/config/README.md'
@@ -251,7 +251,7 @@ navpart 2 web/api/badges "" "" 2
 navpart 2 web/api/health "" "" 2
 navpart 2 web/api/queries "" "Queries" 2
 
-echo -ne "- Hacking netdata:
+echo -ne "- Hacking Netdata:
     - CODE_OF_CONDUCT.md
     - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md

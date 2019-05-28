@@ -811,10 +811,8 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 
-int rrdhost_set_system_info_variable(RRDHOST *host, struct rrdhost_system_info *system_info, char *name, char *value) {
+int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
-
-    if(host) rrdhost_wrlock(host);
 
     if(!strcmp(name, "NETDATA_SYSTEM_OS_NAME")){
         freez(system_info->os_name);
@@ -871,8 +869,6 @@ int rrdhost_set_system_info_variable(RRDHOST *host, struct rrdhost_system_info *
     else {
         res = 1;
     }
-
-    if(host) rrdhost_unlock(host);
 
     return res;
 }
