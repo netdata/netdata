@@ -331,8 +331,7 @@ Charts on Netdata dashboards are synchronized to each other. There is no master 
 
 *Charts are panned by dragging them with the mouse. Charts can be zoomed in/out with`SHIFT` + `mouse wheel` while the mouse pointer is over a chart.*
 
-> The visible time-frame (pan and zoom) is propagated from Netdata server to Netdata server, when navigating via the [`my-netdata` menu](registry#registry).
-
+> The visible time-frame (pan and zoom) is propagated from Netdata server to Netdata server, when navigating via the [node menu](registry#registry).
 
 ### Highlighted time-frame
 
@@ -342,7 +341,7 @@ To improve visual anomaly detection across charts, the user can highlight a time
 
 *A highlighted time-frame can be given by pressing `ALT` + `mouse selection` on any chart. Netdata will highlight the same range on all charts.*
 
-> Highlighted ranges are propagated from Netdata server to Netdata server, when navigating via the [`my-netdata` menu](registry#registry).
+> Highlighted ranges are propagated from Netdata server to Netdata server, when navigating via the [node menu](registry#registry).
 
 
 ## What does it monitor
