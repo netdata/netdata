@@ -35,15 +35,22 @@ void security_openssl_library()
 }
 
 void security_openssl_common_options(SSL_CTX *ctx){
+    static char *ciphers = {"ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384"};
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
-    SSL_CTX_set_min_proto_version(ctx,TLS1_VERSION);
+    SSL_CTX_set_min_proto_version(ctx,TLS1_1_VERSION);
     //We are avoiding the TLS v1.3 for while, because Google Chrome
     //is giving the message net::ERR_SSL_VERSION_INTERFERENCE with it.
     SSL_CTX_set_max_proto_version(ctx,TLS1_2_VERSION);
 #endif
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+
+    if (!SSL_CTX_set_cipher_list(ctx,ciphers) ){
+        error("SSL error. cannot set the cipher list");
+    }
+
+
 }
 
 static SSL_CTX * security_initialize_openssl_client() {
@@ -83,7 +90,8 @@ static SSL_CTX * security_initialize_openssl_server(){
 #endif
     security_openssl_common_options(ctx);
 
-    SSL_CTX_use_PrivateKey_file(ctx, security_key, SSL_FILETYPE_PEM);
+    SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
+
     if ( !SSL_CTX_check_private_key(ctx) ){
         ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
 		error("SSL cannot check the private key: %s",lerror);
@@ -141,8 +149,8 @@ int security_process_accept(SSL *ssl,int msg) {
         return NETDATA_SSL_NO_HANDSHAKE;
     }
 
-     ERR_clear_error();
-     if ((test = SSL_accept(ssl)) <= 0) {
+    ERR_clear_error();
+    if ((test = SSL_accept(ssl)) <= 0) {
          int sslerrno = SSL_get_error(ssl, test);
          switch(sslerrno) {
              case SSL_ERROR_WANT_READ:
@@ -155,24 +163,16 @@ int security_process_accept(SSL *ssl,int msg) {
                  error("SSL handshake did not finish and it wanna read on socket %d!",sock);
                  return NETDATA_SSL_WANT_WRITE;
              }
-             case SSL_ERROR_SSL:
-			 {
-				debug(D_WEB_CLIENT_ACCESS,"There is not a SSL request on socket %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                return NETDATA_SSL_NO_HANDSHAKE;
-			 }
              case SSL_ERROR_NONE:
-             {
-                debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_NONE on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                 break;
-             }
+             case SSL_ERROR_SSL:
              case SSL_ERROR_SYSCALL:
              default:
-             {
-                    debug(D_WEB_CLIENT_ACCESS,"SSL Handshake ERROR_SYSCALL on socket fd %d : %s ",sock,ERR_error_string((long)SSL_get_error(ssl,test),NULL));
-                    break;
-             }
-          }
-      }
+			 {
+				error("SSL Handshake error (%s) on socket %d ",ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
+                return NETDATA_SSL_NO_HANDSHAKE;
+			 }
+         }
+    }
 
     if ( SSL_is_init_finished(ssl) )
     {

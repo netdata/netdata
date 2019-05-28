@@ -119,32 +119,17 @@ Using the above, you access netdata on the backend servers, like this:
 
 ### Using TLS communication
 
-Case the Netdata Master has a certificate and key that allows the Netdata to run in encrypt mode,
-it is possible to encrypt the communication between Nginx and Netdata.
+In case the Netdata web server has been [configured to use TLS](../web/server/#enabling-tls-support),
+you must also encrypt the communication between Nginx and Netdata.
 
-To enable this encryptation firstly it is necessary to create a certificate and key for Nginx, after
-this it is necessary to append the following line inside the location section
+To enable encryption, first [enable SSL on nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of the Nginx configuration:
 
 ```
 proxy_set_header X-Forwarded-Proto https;
-```
-
-and to change the proxy_pass from http to https like the following example
-
-```
 proxy_pass https://localhost:19999;
 ```
 
-Finally in the server section it is necessary to give the path to certificate, key and to enable SSL
-
-```
-ssl on;
-ssl_certificate /etc/nginx/cert.pem;
-ssl_certificate_key /etc/nginx/key.pem;
-```
-
-Case you have the master with encryptation enabled and the nginx is not configured as described in this
-section, probably you will receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
+If nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
 

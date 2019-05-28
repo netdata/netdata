@@ -544,7 +544,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         int err = SSL_connect(host->ssl.conn);
         if (err != 1){
             err = SSL_get_error(host->ssl.conn, err);
-            error("SSL cannot connect ith the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
+            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
             if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
                 rrdpush_sender_thread_close_socket(host);
                 return 0;

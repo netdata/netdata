@@ -143,7 +143,19 @@ void web_client_request_done(struct web_client *w) {
             debug(D_WEB_CLIENT, "%llu: Closing filecopy input file descriptor %d.", w->id, w->ifd);
 
             if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
-                if (w->ifd != -1) close(w->ifd);
+                if (w->ifd != -1){
+#ifdef ENABLE_HTTPS
+                    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )){
+                        if (w->ssl.conn){
+                            SSL_set_shutdown(w->ssl.conn, SSL_RECEIVED_SHUTDOWN);
+                            if (!SSL_shutdown(w->ssl.conn)){
+                                SSL_shutdown(w->ssl.conn);
+                            }
+                        }
+                    }
+#endif
+                    close(w->ifd);
+                }
             }
 
             w->ifd = w->ofd;
@@ -688,6 +700,9 @@ const char *web_response_code_to_string(int code) {
         case 200:
             return "OK";
 
+        case 301:
+            return "Moved Permanently";
+
         case 307:
             return "Temporary Redirect";
 
@@ -814,14 +829,6 @@ typedef enum {
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
 
-#ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
-        if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (s[0] != 'S'))  ) {
-            return HTTP_VALIDATION_REDIRECT;
-        }
-    }
-#endif
-
     size_t last_pos = w->header_parse_last_size;
     if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
     else last_pos = 0;
@@ -861,6 +868,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
+            error("The server is configured to always use encrypt connection, please enable the SSL on slave.");
             return HTTP_VALIDATION_NOT_SUPPORTED;
         }
 #endif
@@ -917,6 +925,16 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+#ifdef ENABLE_HTTPS
+                if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
+                        w->header_parse_tries = 0;
+                        w->header_parse_last_size = 0;
+                        web_client_disable_wait_receive(w);
+                        return HTTP_VALIDATION_REDIRECT;
+                    }
+                }
+#endif
 
                 w->header_parse_tries = 0;
                 w->header_parse_last_size = 0;
@@ -1378,7 +1396,7 @@ void web_client_process_request(struct web_client *w) {
         {
             buffer_flush(w->response.data);
             w->response.data->contenttype = CT_TEXT_HTML;
-            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection, case your browser does not support redirection, please click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">here</a>.</body></html>");
+            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection, case your browser does not support redirection, please click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">here</a>.</body></html>");
             w->response.code = 301;
             break;
         }
