@@ -47,8 +47,8 @@ apcupsd_check() {
 			error "cannot get information for apcupsd server ${host} on ${apcupsd_sources[${host}]}."
 			failed=$((failed + 1))
 		else
-			apcupsd_status = "$(apcupsd_get ${apcupsd_sources[${host}]} | awk '/^STATUS.*/{ print $3 }')"
-			if [ ${apcupsd_status} != "ONLINE" ]  && [ ${apcupsd_status} != "ONBATT" ]; then
+			apcupsd_status=$(apcupsd_get ${apcupsd_sources[${host}]} | awk '/^STATUS.*/{ print $3 }')
+			if [ "$apcupsd_status" != "ONLINE" ]  && [ "$apcupsd_status" != "ONBATT" ]; then
 				error "APC UPS ${host} on ${apcupsd_sources[${host}]} is not online."
 				failed=$((failed + 1))
 			else

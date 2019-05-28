@@ -1,12 +1,12 @@
 # Netdata via nginx
 
-To pass netdata via a nginx, use this:
+To pass Netdata via a nginx, use this:
 
 ### As a virtual host
 
 ```
 upstream backend {
-    # the netdata server
+    # the Netdata server
     server 127.0.0.1:19999;
     keepalive 64;
 }
@@ -69,7 +69,7 @@ server {
 }
 ```
 
-### As a subfolder for multiple netdata servers, via one nginx
+### As a subfolder for multiple Netdata servers, via one nginx
 
 ```
 upstream backend-server1 {
@@ -112,7 +112,7 @@ server {
 
 Of course you can add as many backend servers as you like.
 
-Using the above, you access netdata on the backend servers, like this:
+Using the above, you access Netdata on the backend servers, like this:
 
 - `http://nginx.server/netdata/server1/` to reach `backend-server1`
 - `http://nginx.server/netdata/server2/` to reach `backend-server2`
@@ -139,9 +139,9 @@ server {
 }
 ```
 
-## limit direct access to netdata
+## limit direct access to Netdata
 
-If your nginx is on `localhost`, you can use this to protect your netdata:
+If your nginx is on `localhost`, you can use this to protect your Netdata:
 
 ```
 [web]
@@ -150,13 +150,13 @@ If your nginx is on `localhost`, you can use this to protect your netdata:
 
 ---
 
-You can also use a unix domain socket. This will also provide a faster route between nginx and netdata:
+You can also use a unix domain socket. This will also provide a faster route between nginx and Netdata:
 
 ```
 [web]
     bind to = unix:/tmp/netdata.sock
 ```
-_note: netdata v1.8+ support unix domain sockets_
+_note: Netdata v1.8+ support unix domain sockets_
 
 At the nginx side, use something like this to use the same unix domain socket:
 
@@ -177,13 +177,13 @@ If your nginx server is not on localhost, you can set:
     allow connections from = IP_OF_NGINX_SERVER
 ```
 
-_note: netdata v1.9+ support `allow connections from`_
+_note: Netdata v1.9+ support `allow connections from`_
 
-`allow connections from` accepts [netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
+`allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
 ## prevent the double access.log
 
-nginx logs accesses and netdata logs them too. You can prevent netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
+nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```
 [global]

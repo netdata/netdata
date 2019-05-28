@@ -19,12 +19,12 @@ GO_D_DIR="collectors/go.d.plugin"
 rm -rf ${GO_D_DIR}
 git clone https://github.com/netdata/go.d.plugin.git ${GO_D_DIR}
 
-# Copy all netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
+# Copy all Netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
 echo "Copying files"
 rm -rf ${SRC_DIR}
 find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${SRC_DIR}
 
-# Copy netdata html resources
+# Copy Netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
 
 
@@ -81,7 +81,7 @@ prep_html() {
 	# Build html docs
 	mkdocs build --config-file="${MKDOCS_CONFIG_FILE}"
 
-	# Fix edit buttons for the markdowns that are not on the main netdata repo
+	# Fix edit buttons for the markdowns that are not on the main Netdata repo
 	find "${GENERATOR_DIR}/${SITE_DIR}/${GO_D_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/collectors\/go.d.plugin/https:\/\/github.com\/netdata\/go.d.plugin\/blob\/master/g'
 	if [ "${lang}" != "en" ] ; then
 		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'

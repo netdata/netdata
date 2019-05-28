@@ -1,6 +1,6 @@
 # Configuration guide
 
-No configuration is required to run netdata, but you will find plenty of options to tweak, so that you can adapt it to your particular needs.
+No configuration is required to run Netdata, but you will find plenty of options to tweak, so that you can adapt it to your particular needs.
 
 <details markdown="1"><summary>Configuration files are placed in `/etc/netdata`.</summary>
 Depending on your installation method, Netdata will have been installed either directly under `/`, or under `/opt/netdata`. The paths mentioned here and in the documentation in general assume that your installation is under `/`. If it is not, you will find the exact same paths under `/opt/netdata` as well. (i.e. `/etc/netdata` will be `/opt/netdata/etc/netdata`).</details>
@@ -20,7 +20,7 @@ Under that directory you will see the following:
     - `stats.d` is a directory under which you can add .conf files to add [synthetic charts](../collectors/statsd.plugin/#synthetic-statsd-charts).
     - Individual collector plugin config files, such as `fping.conf` for the [fping plugin](../collectors/fping.plugin/) and `apps_groups.conf` for the [apps plugin](../collectors/apps.plugin/) 
 
-So there are many configuration files to control every aspect of Netdata's behavior. It can be overwhelming at first, but you won't have to deal with any of them, unless you have specific things you need to change. The following HOWTO will guide you on how to customize your netdata, based on what you want to do. 
+So there are many configuration files to control every aspect of Netdata's behavior. It can be overwhelming at first, but you won't have to deal with any of them, unless you have specific things you need to change. The following HOWTO will guide you on how to customize your Netdata, based on what you want to do. 
 
 
 ## How to
@@ -69,9 +69,9 @@ Just set `enabled = no` in the [netdata.conf [health]](../daemon/config/#health-
 
 ##### Modify or disable a specific alarm
 
-The `health.d` directory that contains the alarm triggers for [health monitoring](../health/#health-monitoring). It has one .conf file per collector. You can easily find the .conf file you will need to modify, by looking for the "source" line on the table that appears on the right side of an alarm on the netdata gui. 
+The `health.d` directory that contains the alarm triggers for [health monitoring](../health/#health-monitoring). It has one .conf file per collector. You can easily find the .conf file you will need to modify, by looking for the "source" line on the table that appears on the right side of an alarm on the Netdata gui. 
 
-For example, if you click on Alarms and go to the tab 'All', the default netdata installation will show you at the top the configured alarm for `10 min cpu usage` (it's the name of the badge). Looking at the table on the right side, you will see a row that says: `source	4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. This way, you know that you will need to run `/etc/netdata/edit-config health.d/cpu.conf` and look for alarm at line 4 of the conf file. 
+For example, if you click on Alarms and go to the tab 'All', the default Netdata installation will show you at the top the configured alarm for `10 min cpu usage` (it's the name of the badge). Looking at the table on the right side, you will see a row that says: `source	4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. This way, you know that you will need to run `/etc/netdata/edit-config health.d/cpu.conf` and look for alarm at line 4 of the conf file. 
 
 As stated at the top of the .conf file, **you can disable an alarm notification by setting the 'to' line to: silent**.
 To modify how the alarm gets triggered, we suggest that you go through the guide on [health monitoring](../health/#health-monitoring).
@@ -82,7 +82,7 @@ You only need to configure `health_alarm_notify.conf`. To learn how to do it, re
 
 ### Make security-related customizations
 
-##### Change the netdata web server access lists
+##### Change the Netdata web server access lists
 
 You have several options under the [netdata.conf [web]](../web/server/#access-lists) section. 
 
@@ -90,38 +90,38 @@ You have several options under the [netdata.conf [web]](../web/server/#access-li
 
 You will need to configure the [registry] section in netdata.conf. First read the [registry documentation](../registry/). In it, are instructions on how to [run your own registry](../registry/#run-your-own-registry).
 
-##### Change the IP address/port netdata listens to
+##### Change the IP address/port Netdata listens to
 
 The settings are under netdata.conf [web]. Look at the [web server documentation](../web/server/#binding-netdata-to-multiple-ports) for more info.
 
 ### System resource usage
 
-##### Reduce the resources netdata uses
+##### Reduce the resources Netdata uses
 
-The page on [netdata performance](Performance.md) has an excellent guide on how to reduce the netdata cpu/disk/RAM utilization to levels suitable even for the weakest [IoT devices](netdata-for-IoT.md).
+The page on [Netdata performance](Performance.md) has an excellent guide on how to reduce the Netdata cpu/disk/RAM utilization to levels suitable even for the weakest [IoT devices](netdata-for-IoT.md).
 
-##### Change when netdata saves metrics to disk
+##### Change when Netdata saves metrics to disk
 
 [netdata.conf [global]](../daemon/config/#global-section-options) : `memory mode`</details>
 
-##### Prevent netdata from getting immediately killed when my server runs out of memory
+##### Prevent Netdata from getting immediately killed when my server runs out of memory
 
-You can change the netdata [OOM score](../daemon/#oom-score) in netdata.conf [global]. 
+You can change the Netdata [OOM score](../daemon/#oom-score) in netdata.conf [global]. 
 
 ### Other
 
-##### Move netdata directories
+##### Move Netdata directories
 
 The various directory paths are in [netdata.conf [global]](../daemon/config/#global-section-options).
 
 
-## How netdata configuration works
+## How Netdata configuration works
 
 The configuration files are `name = value` dictionaries with `[sections]`. Write whatever you like there as long as it follows this simple format.
 
 Netdata loads this dictionary and then when the code needs a value from it, it just looks up the `name` in the dictionary at the proper `section`. In all places, in the code, there are both the `names` and their `default values`, so if something is not found in the configuration file, the default is used. The lookup is made using B-Trees and hashes (no string comparisons), so they are super fast. Also the `names` of the settings can be `my super duper setting that once set to yes, will turn the world upside down = no` - so goodbye to most of the documentation involved.
 
-Next, netdata can generate a valid configuration for the user to edit. No need to remember anything. Just get the configuration from the server (`/netdata.conf` on your netdata server), edit it and save it.
+Next, Netdata can generate a valid configuration for the user to edit. No need to remember anything. Just get the configuration from the server (`/netdata.conf` on your Netdata server), edit it and save it.
 
 Last, what about options you believe you have set, but you misspelled?When you get the configuration file from the server, there will be a comment above all `name = value` pairs the server does not use. So you know that whatever you wrote there, is not used.
 
@@ -129,6 +129,6 @@ Last, what about options you believe you have set, but you misspelled?When you g
 
 Unix prefers regular expressions. But they are just too hard, too cryptic to use, write and understand.
 
-So, netdata supports [simple patterns](../libnetdata/simple_pattern/). 
+So, Netdata supports [simple patterns](../libnetdata/simple_pattern/). 
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfiguration-guide&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

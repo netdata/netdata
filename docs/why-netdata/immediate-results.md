@@ -20,7 +20,7 @@ Open-source solutions rely almost entirely on configuration. So, you have to go 
 
 Monitoring SaaS providers offer a very basic set of pre-configured metrics, dashboards and alarms. They assume that you will configure the rest you may need. So, once more, the result will reflect your skills, your experience, your understanding.
 
-## What does netdata do?
+## What does Netdata do?
 
 1. Metrics are auto-detected, so for 99% of the cases data collection works out of the box.
 2. Metrics are converted to human readable units, right after data collection, before storing them into the database.

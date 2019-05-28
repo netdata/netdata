@@ -232,7 +232,7 @@ quit_msg() {
 
 user_input() {
 	TEXT="$1"
-	if [ "${INTERACTIVITY}" == "-i" ]; then
+	if [ "${INTERACTIVITY}" = "-i" ]; then
 		read -r -p "$TEXT" >&2
 	fi
 }
