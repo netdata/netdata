@@ -303,19 +303,27 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
     sockets->failed = 0;
 }
 
+WEB_CLIENT_ACL socket_ssl_acl(char *ssl){
+    if (!strcmp(ssl,"optional")){
+        netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
+        return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+    }
+    else if (!strcmp(ssl,"force")){
+        netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+        return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+    }
+
+    return WEB_CLIENT_ACL_NONE;
+}
+
 WEB_CLIENT_ACL read_acl(char *st) {
     char *ssl = strchr(st,'^');
     if (ssl){
         ssl++;
         if ( !strncmp("SSL=",ssl,4)){
             ssl += 4;
-            if (!strcmp(ssl,"optional")){
-                netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
-            }
-            else if (!strcmp(ssl,"force")){
-                netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
-            }
         }
+        socket_ssl_acl(ssl);
     }
 
     if (!strcmp(st,"dashboard")) return WEB_CLIENT_ACL_DASHBOARD;
@@ -324,7 +332,8 @@ WEB_CLIENT_ACL read_acl(char *st) {
     if (!strcmp(st,"management")) return WEB_CLIENT_ACL_MGMT;
     if (!strcmp(st,"streaming")) return WEB_CLIENT_ACL_STREAMING;
     if (!strcmp(st,"netdata.conf")) return WEB_CLIENT_ACL_NETDATACONF;
-    return WEB_CLIENT_ACL_NONE;
+
+    return socket_ssl_acl(st);
 }
 
 static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
