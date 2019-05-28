@@ -18,7 +18,7 @@ a netdata performs:
 Local netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
 another netdata (`master`).
 
-The `my-netdata` menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/. 
+The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/. 
 
 Alarms for the `slave` are served by the `master`.
 
@@ -213,7 +213,7 @@ For netdata v1.9+, streaming can also be monitored via `access.log`.
 ## Viewing remote host dashboards, using mirrored databases
 
 On any receiving netdata, that maintains remote databases and has its web server enabled,
-`my-netdata` menu will include a list of the mirrored databases.
+The node menu will include a list of the mirrored databases.
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/24080824/24cd2d3c-0caf-11e7-909d-a8dd1dbb95d7.png)
 
