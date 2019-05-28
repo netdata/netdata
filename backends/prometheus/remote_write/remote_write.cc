@@ -34,17 +34,35 @@ int add_host_info(const char *name, const char *instance, const char *applicatio
     label->set_name("instance");
     label->set_value(instance);
 
-    label = timeseries->add_labels();
-    label->set_name("application");
-    label->set_value(application);
+    if(application) {
+        label = timeseries->add_labels();
+        label->set_name("application");
+        label->set_value(application);
+    }
 
-    label = timeseries->add_labels();
-    label->set_name("version");
-    label->set_value(version);
+    if(version) {
+        label = timeseries->add_labels();
+        label->set_name("version");
+        label->set_value(version);
+    }
 
     sample = timeseries->add_samples();
     sample->set_value(1);
     sample->set_timestamp(timestamp);
+
+    return 0;
+}
+
+// adds tag to the last created timeseries
+int add_tag(char *tag, char *value) {
+    TimeSeries *timeseries;
+    Label *label;
+
+    timeseries = write_request->mutable_timeseries(write_request->timeseries_size() - 1);
+
+    label = timeseries->add_labels();
+    label->set_name(tag);
+    label->set_value(value);
 
     return 0;
 }

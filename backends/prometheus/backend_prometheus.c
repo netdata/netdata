@@ -153,6 +153,8 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable,
 #define PROMETHEUS_LABELS_MAX 1024
 #define PROMETHEUS_VARIABLE_MAX 256
 
+#define PROMETHEUS_LABELS_MAX_NUMBER 128
+
 struct host_variables_callback_options {
     RRDHOST *host;
     BUFFER *wb;
@@ -538,6 +540,49 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 }
 
 #if HAVE_PROTOBUF
+inline static void remote_write_split_words(char *str, char **words, int max_words) {
+    char *s = str;
+    int i = 0;
+
+    while(*s && i < max_words - 1) {
+        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag name
+
+        if(*s)
+            words[i] = s;
+
+        while(*s && !isspace(*s) && *s != '=') s++; // find the end of the tag name
+
+        if(!*s || *s != '=') {
+            words[i] = NULL;
+            break;
+        }
+        if(*s != '\0') {
+            *s = '\0';
+            s++;
+            i++;
+        }
+
+        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag value
+
+        if(*s && *s == '"') s++; // strip an opening quote
+        if(*s)
+            words[i] = s;
+
+        while(*s && !isspace(*s) && *s != ',') s++; // find the end of the tag value
+
+        if(*s && *s != ',') {
+            words[i] = NULL;
+            break;
+        }
+        if(s != words[i] && *(s - 1) == '"') *(s - 1) = '\0'; // strip a closing quote
+        if(*s != '\0') {
+            *s = '\0';
+            s++;
+            i++;
+        }
+    }
+}
+
 void rrd_stats_remote_write_allmetrics_prometheus(
         RRDHOST *host
         , const char *__hostname
@@ -555,8 +600,18 @@ void rrd_stats_remote_write_allmetrics_prometheus(
     add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
 
     if(host->tags && *(host->tags)) {
-        // add_host_info("netdata_host_tags_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
-        // TODO: buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
+        char tags[PROMETHEUS_LABELS_MAX + 1];
+        strncpy(tags, host->tags, PROMETHEUS_LABELS_MAX);
+        char *words[PROMETHEUS_LABELS_MAX_NUMBER] = {NULL};
+        int i;
+
+        remote_write_split_words(tags, words, PROMETHEUS_LABELS_MAX_NUMBER);
+
+        add_host_info("netdata_host_tags_info", hostname, NULL, NULL, now_realtime_usec() / USEC_PER_MS);
+
+        for(i = 0; words[i] != NULL && words[i + 1] != NULL && (i + 1) < PROMETHEUS_LABELS_MAX_NUMBER; i += 2) {
+            add_tag(words[i], words[i + 1]);
+        }
     }
 
     // for each chart
