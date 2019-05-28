@@ -151,6 +151,8 @@ void web_client_request_done(struct web_client *w) {
                             if (!SSL_shutdown(w->ssl.conn)){
                                 SSL_shutdown(w->ssl.conn);
                             }
+                            SSL_free(w->ssl.conn);
+                            w->ssl.conn = NULL;
                         }
                     }
 #endif
