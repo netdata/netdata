@@ -70,7 +70,9 @@ To enable SSL, provide the path to your certificate and private key in the `[web
 	ssl certificate = /etc/netdata/ssl/cert.pem
 ```
 
-Both files must be readable by the netdata user. For a master/slave connection, only the master needs these settings. 
+Both files must be readable by the netdata user. If any of the two files does not exist or is unreadable, Netdata falls back to HTTP.
+
+For a master/slave connection, only the master needs these settings. 
 
 For test purposes, you can generate self-signed certificates with the following command:
 
