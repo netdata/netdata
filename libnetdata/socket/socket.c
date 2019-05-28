@@ -11,6 +11,8 @@
 #define LARGE_SOCK_SIZE 4096
 #endif
 
+char ipredirect[256];
+
 int sock_setnonblock(int fd) {
     int flags;
 

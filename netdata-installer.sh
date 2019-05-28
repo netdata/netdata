@@ -443,12 +443,6 @@ if [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
 	done
 fi
 
-# default directory for certificates
-if [ ! -d "${NETDATA_PREFIX}/etc/netdata/ssl" ]; then
-    run mkdir "${NETDATA_PREFIX}/etc/netdata/ssl"
-    run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_PREFIX}/etc/netdata/ssl"
-fi
-
 # -----------------------------------------------------------------------------
 
 # shellcheck disable=SC2230
@@ -641,7 +635,7 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d"; do
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d" "ssl"; do
 	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
 		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
 		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1

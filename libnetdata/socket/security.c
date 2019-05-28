@@ -35,7 +35,7 @@ void security_openssl_library()
 }
 
 void security_openssl_common_options(SSL_CTX *ctx){
-    static char *ciphers = {"ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-SHA384"};
+    static char *ciphers = {"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"};
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else

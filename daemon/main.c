@@ -437,8 +437,19 @@ static void get_netdata_configured_variables() {
     // get the hostname
 
     char buf[HOSTNAME_MAX + 1];
-    if(gethostname(buf, HOSTNAME_MAX) == -1)
+    if(gethostname(buf, HOSTNAME_MAX) == -1){
         error("Cannot get machine hostname.");
+        ipredirect[0] = 0x00;
+    }else {
+        struct hostent *host_entry;
+        host_entry = gethostbyname(buf);
+        if (host_entry){
+            char *localip = inet_ntoa(*(struct in_addr *)*host_entry->h_addr_list);
+            size_t len = strlen(localip);
+            strncpy(ipredirect,localip,len);
+            ipredirect[len] = 0x00;
+        }
+    }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
