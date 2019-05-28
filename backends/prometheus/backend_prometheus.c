@@ -538,11 +538,19 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 }
 
 #if HAVE_PROTOBUF
-static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, BACKEND_OPTIONS backend_options, time_t after, time_t before) {
-    rrdhost_rdlock(host);
-
+void rrd_stats_remote_write_allmetrics_prometheus(
+        RRDHOST *host
+        , const char *__hostname
+        , const char *prefix
+        , BACKEND_OPTIONS backend_options
+        , time_t after
+        , time_t before
+        , size_t *count_charts
+        , size_t *count_dims
+        , size_t *count_dims_skipped
+) {
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, host->hostname, PROMETHEUS_ELEMENT_MAX);
+    prometheus_label_copy(hostname, __hostname, PROMETHEUS_ELEMENT_MAX);
 
     char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
@@ -569,6 +577,8 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
         if(likely(backends_can_send_rrdset(backend_options, st))) {
             rrdset_rdlock(st);
 
+            (*count_charts)++;
+
             int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             if(as_collected) {
@@ -594,8 +604,11 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
                     if (as_collected) {
                         // we need as-collected / raw data
 
-                        if(unlikely(rd->last_collected_time.tv_sec < after))
+                        if(unlikely(rd->last_collected_time.tv_sec < after)) {
+                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
+                            (*count_dims_skipped)++;
                             continue;
+                        }
 
                         if(homogeneous) {
                             // all the dimensions of the chart, has the same algorithm, multiplier and divisor
@@ -605,6 +618,8 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", prefix, context, suffix);
 
                             // add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            (*count_dims)++;
+
                             // buffer_sprintf(wb
                             //                , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
                             //                , prefix
@@ -626,6 +641,8 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", prefix, context, dimension, suffix);
 
                             // add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            (*count_dims)++;
+
                             // buffer_sprintf(wb
                             //                , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
                             //                , prefix
@@ -657,6 +674,8 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
 
                             // add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            (*count_dims)++;
+
                             // buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
                             //                , prefix
                             //                , context
@@ -677,8 +696,6 @@ static void rrd_stats_remote_write_allmetrics_prometheus(RRDHOST *host, BUFFER *
             rrdset_unlock(st);
         }
     }
-
-    rrdhost_unlock(host);
 }
 #endif /* HAVE_PROTOBUF */
 
@@ -746,22 +763,6 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
 }
 
 #if HAVE_PROTOBUF
-void rrd_stats_remote_write_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFFER *wb, const char *server, const char *prefix, BACKEND_OPTIONS backend_options) {
-    time_t before = now_realtime_sec();
-
-    // we start at the point we had stopped before
-    time_t after = prometheus_preparation(host, wb, backend_options, server, before, 0);
-
-    clear_write_request();
-    buffer_reset(wb);
-
-    rrd_rdlock();
-    rrdhost_foreach_read(host) {
-        rrd_stats_remote_write_allmetrics_prometheus(host, wb, prefix, backend_options, after, before);
-    }
-    rrd_unlock();
-}
-
 int process_prometheus_remote_write_response(BUFFER *b) {
     if(!b) return 1;
 

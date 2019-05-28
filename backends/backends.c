@@ -262,7 +262,6 @@ void *backends_main(void *ptr) {
 
 #if HAVE_PROTOBUF
     int do_prometheus_remote_write = 0;
-
     BUFFER *http_request_header = buffer_create(1);
 #endif
 
@@ -384,12 +383,10 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
-#if !HAVE_PROTOBUF
-    if(backend_request_formatter == NULL || backend_response_checker == NULL) {
+    if((backend_request_formatter == NULL && !do_prometheus_remote_write) || backend_response_checker == NULL) {
         error("BACKEND: backend is misconfigured - disabling it.");
         goto cleanup;
     }
-#endif
 
 
     // ------------------------------------------------------------------------
@@ -476,9 +473,8 @@ void *backends_main(void *ptr) {
         size_t count_dims_total = 0;
 
 #if HAVE_PROTOBUF
-        RRDHOST *host = localhost;
-        rrd_stats_remote_write_allmetrics_prometheus_all_hosts(host, b, NULL, global_backend_prefix, global_backend_options);
-#else
+        clear_write_request();
+#endif
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
@@ -506,26 +502,43 @@ void *backends_main(void *ptr) {
 
             const char *__hostname = (host == localhost)?hostname:host->hostname;
 
-            RRDSET *st;
-            rrdset_foreach_read(st, host) {
-                if(likely(backends_can_send_rrdset(global_backend_options, st))) {
-                    rrdset_rdlock(st);
+#if HAVE_PROTOBUF
+            if(do_prometheus_remote_write)
+                rrd_stats_remote_write_allmetrics_prometheus(
+                    host
+                    , __hostname
+                    , global_backend_prefix
+                    , global_backend_options
+                    , after
+                    , before
+                    , &count_charts
+                    , &count_dims
+                    , &count_dims_skipped
+                );
+            else
+#endif
+            {
+                RRDSET *st;
+                rrdset_foreach_read(st, host) {
+                    if(likely(backends_can_send_rrdset(global_backend_options, st))) {
+                        rrdset_rdlock(st);
 
-                    count_charts++;
+                        count_charts++;
 
-                    RRDDIM *rd;
-                    rrddim_foreach_read(rd, st) {
-                        if (likely(rd->last_collected_time.tv_sec >= after)) {
-                            chart_buffered_metrics += backend_request_formatter(b, global_backend_prefix, host, __hostname, st, rd, after, before, global_backend_options);
-                            count_dims++;
+                        RRDDIM *rd;
+                        rrddim_foreach_read(rd, st) {
+                            if (likely(rd->last_collected_time.tv_sec >= after)) {
+                                chart_buffered_metrics += backend_request_formatter(b, global_backend_prefix, host, __hostname, st, rd, after, before, global_backend_options);
+                                count_dims++;
+                            }
+                            else {
+                                debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
+                                count_dims_skipped++;
+                            }
                         }
-                        else {
-                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
-                            count_dims_skipped++;
-                        }
+
+                        rrdset_unlock(st);
                     }
-
-                    rrdset_unlock(st);
                 }
             }
 
@@ -536,7 +549,6 @@ void *backends_main(void *ptr) {
             rrdhost_unlock(host);
         }
         rrd_unlock();
-#endif /* HAVE_PROTOBUF */
 
         netdata_thread_enable_cancelability();
 
