@@ -383,7 +383,11 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
+#if HAVE_PROTOBUF
     if((backend_request_formatter == NULL && !do_prometheus_remote_write) || backend_response_checker == NULL) {
+#else
+    if(backend_request_formatter == NULL || backend_response_checker == NULL) {
+#endif
         error("BACKEND: backend is misconfigured - disabling it.");
         goto cleanup;
     }
