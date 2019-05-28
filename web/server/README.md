@@ -33,15 +33,15 @@ The ports to bind are controlled via `[web].bind to`, like this:
 ```
 [web]
    default port = 19999
-   bind to = 127.0.0.1=dashboard 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming localhost:19995=registry *:http=dashboard unix:/tmp/netdata.sock
+   bind to = 127.0.0.1=dashboard^SSL=optional 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming^SSL=force localhost:19995=registry *:http=dashboard unix:/tmp/netdata.sock
 ```
 
 Using the above, netdata will bind to:
 
-- IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. 
+- IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. Both HTTP and HTTPS requests will be accepted.
 - IPv4 10.1.1.1 at port 19998. The management API and netdata.conf will be accessible on this port.
 - All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
-- All IPv6 IPs at port 19996. Only metric streaming requests from other netdata agents will be accepted on this port.
+- All IPv6 IPs at port 19996. Only metric streaming requests from other netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. slaves also need to be [configured for TLS](../../streaming).
 - All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
 - All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port. 
 - Unix domain socket `/tmp/netdata.sock`. All requests are serviceable on this socket.
@@ -59,16 +59,10 @@ The API requests are serviced as follows:
 
 ### Enabling TLS support
 
-## Certificate and key
-Netdata since version 1.16 has the feature to encrypt connections. To enable this option it is necessary to have a certificate and a key, case you do not have one yet, it is possible to generate them  with the following command
 
-$ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
-
-, it is necessary to say that the previous command will create a self signed certificate that is rejected by the slaves initially and the browsers will also show warnings about it.
-
-## Configuration
-
-To start using HTTPS with Netdata it is only necessary to write the path for your certificate (`ssl certificate`) and key(`ssl key`) inside the `web section`
+Netdata since version 1.16 supports encrypted HTTP connections to the web server and encryption of the data stream between a slave and a master. 
+Inbound unix socket connections are unaffected, regardless of the SSL settings.  
+To enable SSL, provide the path to your certificate and private key in the `[web]` section of `netdata.conf`:
 
 ```
 [web]
@@ -76,15 +70,45 @@ To start using HTTPS with Netdata it is only necessary to write the path for you
 	ssl certificate = /etc/netdata/ssl/cert.pem
 ```
 
-The netdata must be able to read both files defined in the options inside the `netdata.conf`. Check the permission of the files(`ls -l /etc/netdata/ssl`) to confirm that the netdata user has permission to read, cat it has not change the permissions(`chow -R netdata /etc/netdata/ssl/*`).
+Both files must be readable by the netdata user. For a master/slave connection, only the master needs these settings. 
 
-TIP: The openssl when work with 4096 bits key will need more CPU to process the whole communication, this can be verified using
+For test purposes, you can generate self-signed certificates with the following command:
 
+```
+$ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
+```
+
+TIP: If you use 4096 bits for the key and the certificate, netdata will need more CPU to process the whole communication. 
+rsa4096 can be until 4 times slower than rsa2048, so we recommend using 2048 bits. You can verify the difference by running
+
+```
 $ openssl speed rsa2048 rsa4096
+```
 
-, the rsa4096 can be until 4 times slower than rsa2048,  so we recommend to use 2048 bits.
+#### SSL enforcement
 
-Netdata has default rules that are defined when TLS is enabled, please, read next section for more information.
+When the certificates are defined and unless any other options are provided, a Netdata server will:
+- Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, netdata.conf and badges.
+- Allow incoming slave connections to use both unencrypted and encrypted communications for streaming.
+ 
+To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`.
+At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
+
+SSL setting | HTTP requests | HTTPS requests | Unencrypted Streams | Encrypted Streams 
+:------:|:-----:|:-----:|:-----:|:-------- 
+none | Redirected to HTTPS | Accepted | Accepted | Accepted
+`force` | Redirected to HTTPS | Accepted | Denied | Accepted
+`optional` | Accepted | Accepted | Accepted | Accepted
+
+Example:
+
+```
+[web]
+    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+```
+
+For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-the-communication) in the streaming documentation.
+You will find there additional details on the expected behavior for client and server nodes, when their respective SSL options are enabled.
 
 ### Access lists
 
@@ -119,37 +143,6 @@ Netdata supports access lists in `netdata.conf`:
    The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
 
 - `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](../api/health/#health-management-api)
-
-## SSL access list
-
-When the certificate is defined as one of the configuration to use, the Netdata will enable the TLS and it will redirect all HTTP request to HTTPS, on the other hand, the stream will be text pure until the user define an ACL to it, of course it is also possible to change the server behavior changing the ACL. For both cases we will use the variable `bind to` to change the default behavior.
-
-To change the behavior of the master we will use the definition `^SSL` that can have two possible values
-
-- `force` - This is the default on master, and it will always encrypt the communication, except for stream from slaves that are not configured to use SSL.
-- `optional` - When it is set, the master will accept both HTTP and HTTPS requests.
-
-For the next examples we are assuming in these configuration that we are accepting connections in the default port `19999` from all hosts.
-
-# Everything encrypted
-
-When we define the `^SSL` as `force`, the netdata will redirect HTTP to HTTPS and it won't accept connection from the slaves.
-
-```
-[web]
-    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
-```
-
-# Accept communication either using TLS or pure text
-
-This option is not recommended, but case there is a real necessity to use unencrypted connection, master can accept HTTP requests from browsers and pure text from slaves using the following ACL
-
-```
-[web]
-    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=optional
-```
-
-For information how to configure the slave check [Stream documentation](../../streaming), there you will also find the expected behavior for client and server when their respective SSL options are enabled.
 
 ### Other netdata.conf [web] section options
 setting | default | info

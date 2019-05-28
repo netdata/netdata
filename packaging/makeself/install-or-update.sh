@@ -175,7 +175,7 @@ fi
 
 progress "create user config directories"
 
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "custom-plugins.d"
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "custom-plugins.d" "ssl"
 do
     if [ ! -d "etc/netdata/${x}" ]
         then
