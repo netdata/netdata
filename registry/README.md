@@ -53,7 +53,7 @@ The registry keeps track of 4 entities:
 4. **accounts**: i.e. the information used to sign-in via one of the available sign-in methods. Depending on the method, this may include an email, an email and a profile picture.
 
 For *persons*/*accounts* and *machines*, the registry keeps links to *URLs*, each link with 2 timestamps (first time seen, last time seen) and a counter (number of times it has been seen).
-*machines*, *persons*, and timestamps are stored in the netdata registry regardless of whether you sign in or not. 
+*machines*, *persons* and timestamps are stored in the netdata registry regardless of whether you sign in or not. 
 
 ## Who talks to the registry?
 
