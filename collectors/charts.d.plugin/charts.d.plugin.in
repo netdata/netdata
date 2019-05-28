@@ -304,7 +304,7 @@ run() {
 			printf " --- END TRACE ---\n"
 		} >&2
 	fi
-	rm "${TMP_DIR}/run.${pid}"
+	rm -f "${TMP_DIR}/run.${pid}"
 
 	return ${ret}
 }
