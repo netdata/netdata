@@ -30,7 +30,7 @@ cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
 
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
-sed -i -e '0,/# netdata /s//# Introduction\n\n/' ${SRC_DIR}/README.md
+sed -i -e '0,/# Netdata /s//# Introduction\n\n/' ${SRC_DIR}/README.md
 
 # Remove all GA tracking code
 find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
