@@ -4,9 +4,12 @@
 
 **Fixed bugs:**
 
+- Reduce number of codacy issues [\#6131](https://github.com/netdata/netdata/issues/6131)
 - Optimize calls that gather system-info [\#6130](https://github.com/netdata/netdata/issues/6130)
 - Fix telemetry config in installer [\#6129](https://github.com/netdata/netdata/issues/6129)
+- web\_log reports unmatched lines [\#6125](https://github.com/netdata/netdata/issues/6125)
 - Netdata 1.15 crashes on Ubuntu 16.04 [\#6117](https://github.com/netdata/netdata/issues/6117)
+- netdata doesn't start with the new dbengine [\#6110](https://github.com/netdata/netdata/issues/6110)
 - Telemetry rarely received from docker containers [\#6095](https://github.com/netdata/netdata/issues/6095)
 - netdata/packaging/installer: Fine tuning based on user feedback and findings from testing [\#6094](https://github.com/netdata/netdata/issues/6094)
 - opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6092](https://github.com/netdata/netdata/issues/6092)
@@ -25,9 +28,14 @@
 
 **Merged pull requests:**
 
+- Fix typo in README [\#6146](https://github.com/netdata/netdata/pull/6146) ([cakrit](https://github.com/cakrit))
+- Documentation fixes [\#6144](https://github.com/netdata/netdata/pull/6144) ([cakrit](https://github.com/cakrit))
+- x509check: add last\_collected alarm [\#6139](https://github.com/netdata/netdata/pull/6139) ([ilyam8](https://github.com/ilyam8))
+- web\_log: remove trailing space from nginx\_ext2 pattern [\#6138](https://github.com/netdata/netdata/pull/6138) ([ilyam8](https://github.com/ilyam8))
 - Change 'netdata' to 'Netdata' in /docs/ and /README.md [\#6137](https://github.com/netdata/netdata/pull/6137) ([apardyl](https://github.com/apardyl))
 - Optimize calls that gather system info [\#6128](https://github.com/netdata/netdata/pull/6128) ([cakrit](https://github.com/cakrit))
 - Fix telemetry config in netdata-installer [\#6127](https://github.com/netdata/netdata/pull/6127) ([cakrit](https://github.com/cakrit))
+- Pass correct info to run funct. [\#6126](https://github.com/netdata/netdata/pull/6126) ([Steve8291](https://github.com/Steve8291))
 - Add modules to charts.d.conf [\#6120](https://github.com/netdata/netdata/pull/6120) ([Steve8291](https://github.com/Steve8291))
 - Active processes number alert [\#6116](https://github.com/netdata/netdata/pull/6116) ([apardyl](https://github.com/apardyl))
 - add mysql deadlocks chart [\#6115](https://github.com/netdata/netdata/pull/6115) ([kam1kaze](https://github.com/kam1kaze))
@@ -41,6 +49,7 @@
 - Create missing /etc/netdata/custom-plugins.d [\#6089](https://github.com/netdata/netdata/pull/6089) ([Steve8291](https://github.com/Steve8291))
 - Corrected links to web\_log.conf [\#6087](https://github.com/netdata/netdata/pull/6087) ([cakrit](https://github.com/cakrit))
 - Mention anonymous statistics in additional places in the docs [\#6084](https://github.com/netdata/netdata/pull/6084) ([cakrit](https://github.com/cakrit))
+- Add "custom-plugins.d" to fix error in log file [\#6080](https://github.com/netdata/netdata/pull/6080) ([Steve8291](https://github.com/Steve8291))
 - wmi alarms [\#6068](https://github.com/netdata/netdata/pull/6068) ([ilyam8](https://github.com/ilyam8))
 - use github templating mechanisms to classify issues when they are created [\#5776](https://github.com/netdata/netdata/pull/5776) ([paulfantom](https://github.com/paulfantom))
 
