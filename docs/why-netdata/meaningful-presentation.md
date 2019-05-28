@@ -42,9 +42,9 @@ Of course, it is just not practical to work that way when the database has 10,00
 
 So, they collect very limited metrics. Basic dashboards can be created with these metrics, but for any issue that needs to be troubleshooted, the monitoring system is just not adequate. It cannot help. So, engineers are using the console to access the rest of the metrics and find the root cause.
 
-## What does netdata do?
+## What does Netdata do?
 
-In netdata, the meaning of metrics is incorporated into the database:
+In Netdata, the meaning of metrics is incorporated into the database:
 
 1. all metrics are converted and stored to human-friendly units. This is a data-collection process, not a visualization process. For example, cpu utilization in Netdata is stored as percentage, not as kernel ticks.
 
