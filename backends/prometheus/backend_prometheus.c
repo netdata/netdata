@@ -552,15 +552,12 @@ void rrd_stats_remote_write_allmetrics_prometheus(
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
     prometheus_label_copy(hostname, __hostname, PROMETHEUS_ELEMENT_MAX);
 
-    char labels[PROMETHEUS_LABELS_MAX + 1] = "";
     add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
 
     if(host->tags && *(host->tags)) {
         // add_host_info("netdata_host_tags_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
         // TODO: buffer_sprintf(wb, "netdata_host_tags_info{instance=\"%s\",%s} 1 %llu\n", hostname, host->tags, now_realtime_usec() / USEC_PER_MS);
     }
-
-    snprintfz(labels, PROMETHEUS_LABELS_MAX, ",instance=\"%s\"", hostname);
 
     // for each chart
     RRDSET *st;
@@ -619,19 +616,6 @@ void rrd_stats_remote_write_allmetrics_prometheus(
 
                             // add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
                             (*count_dims)++;
-
-                            // buffer_sprintf(wb
-                            //                , "%s_%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
-                            //                , prefix
-                            //                , context
-                            //                , suffix
-                            //                , chart
-                            //                , family
-                            //                , dimension
-                            //                , labels
-                            //                , rd->last_collected_value
-                            //                , timeval_msec(&rd->last_collected_time)
-                            // );
                         }
                         else {
                             // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
@@ -642,19 +626,6 @@ void rrd_stats_remote_write_allmetrics_prometheus(
 
                             // add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
                             (*count_dims)++;
-
-                            // buffer_sprintf(wb
-                            //                , "%s_%s_%s%s{chart=\"%s\",family=\"%s\"%s} " COLLECTED_NUMBER_FORMAT " %llu\n"
-                            //                , prefix
-                            //                , context
-                            //                , dimension
-                            //                , suffix
-                            //                , chart
-                            //                , family
-                            //                , labels
-                            //                , rd->last_collected_value
-                            //                , timeval_msec(&rd->last_collected_time)
-                            // );
                         }
                     }
                     else {
@@ -675,19 +646,6 @@ void rrd_stats_remote_write_allmetrics_prometheus(
 
                             // add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
                             (*count_dims)++;
-
-                            // buffer_sprintf(wb, "%s_%s%s%s{chart=\"%s\",family=\"%s\",dimension=\"%s\"%s} " CALCULATED_NUMBER_FORMAT " %llu\n"
-                            //                , prefix
-                            //                , context
-                            //                , units
-                            //                , suffix
-                            //                , chart
-                            //                , family
-                            //                , dimension
-                            //                , labels
-                            //                , value
-                            //                , last_t * MSEC_PER_SEC
-                            // );
                         }
                     }
                 }
