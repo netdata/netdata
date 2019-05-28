@@ -195,18 +195,19 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 
 
 inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
+    (void)url;
     int all = 0;
 
-    if ( w->query_string.length ){
-        url = w->query_string.body+1;
-    }
+    uint32_t  i = 0;
+    uint32_t end = w->total_params;
+    if(end){
+        do{
+            char *value = w->param_values[i].body;
+            size_t length = w->param_values[i].length;
 
-    while(url) {
-        char *value = mystrsep(&url, "&");
-        if (!value || !*value) continue;
-
-        if(!strcmp(value, "all")) all = 1;
-        else if(!strcmp(value, "active")) all = 0;
+            if(!strncmp(value, "all",length)) all = 1;
+            else if(!strncmp(value, "active",length)) all = 0;
+        } while(++i < end);
     }
 
     buffer_flush(w->response.data);
