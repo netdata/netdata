@@ -39,7 +39,7 @@ void security_openssl_common_options(SSL_CTX *ctx){
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
-    SSL_CTX_set_min_proto_version(ctx,TLS1_1_VERSION);
+    SSL_CTX_set_min_proto_version(ctx,TLS1_2_VERSION);
     //We are avoiding the TLS v1.3 for while, because Google Chrome
     //is giving the message net::ERR_SSL_VERSION_INTERFERENCE with it.
     SSL_CTX_set_max_proto_version(ctx,TLS1_2_VERSION);
@@ -168,8 +168,14 @@ int security_process_accept(SSL *ssl,int msg) {
              case SSL_ERROR_SYSCALL:
              default:
 			 {
-				error("SSL Handshake error (%s) on socket %d ",ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
-                return NETDATA_SSL_NO_HANDSHAKE;
+                 u_long err;
+                 char buf[256];
+                 int counter = 0;
+                 while ((err = ERR_get_error()) != 0){
+                     ERR_error_string_n(err, buf, sizeof(buf));
+                     error("%d SSL Handshake error (%s) on socket %d ",counter++,ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
+			     }
+                 return NETDATA_SSL_NO_HANDSHAKE;
 			 }
          }
     }
