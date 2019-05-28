@@ -552,15 +552,13 @@ inline static void remote_write_split_words(char *str, char **words, int max_wor
 
         while(*s && !isspace(*s) && *s != '=') s++; // find the end of the tag name
 
-        if(!*s || *s != '=') {
+        if(*s != '=') {
             words[i] = NULL;
             break;
         }
-        if(*s != '\0') {
-            *s = '\0';
-            s++;
-            i++;
-        }
+        *s = '\0';
+        s++;
+        i++;
 
         while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag value
 
