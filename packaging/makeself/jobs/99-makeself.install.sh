@@ -8,7 +8,7 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 # -----------------------------------------------------------------------------
 # find the netdata version
 
-VERSION="$(git describe --always 2>/dev/null)"
+VERSION="$(git describe 2>/dev/null)"
 if [ -z "${VERSION}" ]; then
     VERSION=$(cat packaging/version)
 fi
@@ -92,4 +92,8 @@ FILE="netdata-${VERSION}.gz.run"
 
 run mkdir -p artifacts
 run mv "${NETDATA_INSTALL_PATH}.gz.run" "artifacts/${FILE}"
+
+[ -f netdata-latest.gz.run ] && rm netdata-latest.gz.run
+run ln -s "artifacts/${FILE}" netdata-latest.gz.run
+
 echo >&2 "Self-extracting installer moved to 'artifacts/${FILE}'"

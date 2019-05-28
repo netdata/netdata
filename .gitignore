@@ -47,6 +47,15 @@ apps.plugin
 freeipmi.plugin
 !freeipmi.plugin/
 
+cups.plugin
+!cups.plugin/
+
+nfacct.plugin
+!nfacct.plugin/
+
+xenstat.plugin
+!xenstat.plugin/
+
 cgroup-network
 !cgroup-network/
 
@@ -94,6 +103,8 @@ system/netdata.plist
 system/netdata-freebsd
 system/edit-config
 
+daemon/anonymous-statistics.sh
+
 health/notifications/alarm-notify.sh
 collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh
@@ -101,9 +112,12 @@ collectors/charts.d.plugin/charts.d.plugin
 collectors/node.d.plugin/node.d.plugin
 collectors/python.d.plugin/python.d.plugin
 collectors/fping.plugin/fping.plugin
+collectors/ioping.plugin/ioping.plugin
+collectors/go.d.plugin
 
 # installer generated files
-netdata-uninstaller.sh
+/netdata-uninstaller.sh
+/netdata-updater.sh
 
 # cmake files
 cmake-build-debug/
@@ -116,6 +130,7 @@ cmake_install.cmake
 .jetbrains*
 
 .DS_Store
+webcopylocal*
 
 contrib/debian/changelog
 
@@ -154,3 +169,5 @@ python.d/python-modules-installer.sh
 docs/generator/src
 docs/generator/build
 docs/generator/mkdocs.yml
+
+.environment.sh

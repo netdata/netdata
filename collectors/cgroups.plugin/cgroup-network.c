@@ -24,6 +24,13 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 
+void send_statistics( const char *action, const char *action_result, const char *action_data) {
+    (void) action;
+    (void) action_result;
+    (void) action_data;
+    return;
+}
+
 // callbacks required by popen()
 void signals_block(void) {};
 void signals_unblock(void) {};
@@ -79,13 +86,18 @@ unsigned int read_iface_ifindex(const char *prefix, const char *iface) {
     return (unsigned int)ifindex;
 }
 
-struct iface *read_proc_net_dev(const char *prefix) {
+struct iface *read_proc_net_dev(const char *scope, const char *prefix) {
     if(!prefix) prefix = "";
 
     procfile *ff = NULL;
     char filename[FILENAME_MAX + 1];
 
     snprintfz(filename, FILENAME_MAX, "%s%s", prefix, (*prefix)?"/proc/1/net/dev":"/proc/net/dev");
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("parsing '%s'", filename);
+#endif
+
     ff = procfile_open(filename, " \t,:|", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
         error("Cannot open file '%s'", filename);
@@ -110,6 +122,10 @@ struct iface *read_proc_net_dev(const char *prefix) {
         t->iflink  = read_iface_iflink(prefix, t->device);
         t->next = root;
         root = t;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        info("added %s interface '%s', ifindex %u, iflink %u", scope, t->device, t->ifindex, t->iflink);
+#endif
     }
 
     procfile_close(ff);
@@ -233,7 +249,7 @@ int switch_namespace(const char *prefix, pid_t pid) {
     // This code cannot switch user namespace (it can all the other namespaces)
     // Fortunately, we don't need to switch user namespaces.
 
-    int pass, errors = 0;
+    int pass;
     for(pass = 0; pass < 2 ;pass++) {
         for(i = 0; all_ns[i].name ; i++) {
             if (all_ns[i].fd != -1 && all_ns[i].status == -1) {
@@ -241,7 +257,6 @@ int switch_namespace(const char *prefix, pid_t pid) {
                     if(pass == 1) {
                         all_ns[i].status = 0;
                         error("Cannot switch to %s namespace of pid %d", all_ns[i].name, (int) pid);
-                        errors++;
                     }
                 }
                 else
@@ -317,6 +332,11 @@ pid_t read_pid_from_cgroup_file(const char *filename) {
     }
 
     fclose(fp);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(pid > 0) info("found pid %d on file '%s'", pid, filename);
+#endif
+
     return pid;
 }
 
@@ -374,6 +394,10 @@ struct found_device {
 } *detected_devices = NULL;
 
 void add_device(const char *host, const char *guest) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("adding device with host '%s', guest '%s'", host, guest);
+#endif
+
     uint32_t hash = simple_hash(host);
 
     if(guest && (!*guest || strcmp(host, guest) == 0))
@@ -381,10 +405,12 @@ void add_device(const char *host, const char *guest) {
 
     struct found_device *f;
     for(f = detected_devices; f ; f = f->next) {
-        if(f->host_device_hash == hash && strcmp(host, f->host_device) == 0) {
+        if(f->host_device_hash == hash && !strcmp(host, f->host_device)) {
 
-            if(guest && !f->guest_device)
+            if(guest && (!f->guest_device || !strcmp(f->host_device, f->guest_device))) {
+                if(f->guest_device) freez((void *)f->guest_device);
                 f->guest_device = strdupz(guest);
+            }
 
             return;
         }
@@ -416,9 +442,10 @@ int send_devices(void) {
 // since it switches namespaces, so after this call, everything is different!
 
 void detect_veth_interfaces(pid_t pid) {
-    struct iface *host = NULL, *cgroup = NULL, *h, *c;
+    struct iface *cgroup = NULL;
+    struct iface *host, *h, *c;
 
-    host = read_proc_net_dev(netdata_configured_host_prefix);
+    host = read_proc_net_dev("host", netdata_configured_host_prefix);
     if(!host) {
         errno = 0;
         error("cannot read host interface list.");
@@ -437,7 +464,11 @@ void detect_veth_interfaces(pid_t pid) {
         goto cleanup;
     }
 
-    cgroup = read_proc_net_dev(NULL);
+#ifdef NETDATA_INTERNAL_CHECKS
+    info("switched to namespaces of pid %d", pid);
+#endif
+
+    cgroup = read_proc_net_dev("cgroup", NULL);
     if(!cgroup) {
         errno = 0;
         error("cannot read cgroup interface list.");

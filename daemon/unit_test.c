@@ -1566,3 +1566,215 @@ int unit_test(long delay, long shift)
 
     return ret;
 }
+
+#ifdef ENABLE_DBENGINE
+static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number value, time_t now)
+{
+    rd->last_collected_time.tv_sec = now;
+    rd->last_collected_time.tv_usec = 0;
+    rd->collected_value = value;
+    rd->updated = 1;
+
+    rd->collections_counter++;
+
+    collected_number v = (value >= 0) ? value : -value;
+    if(unlikely(v > rd->collected_value_max)) rd->collected_value_max = v;
+}
+
+int test_dbengine(void)
+{
+    const int CHARTS = 128;
+    const int DIMS = 16; /* That gives us 2048 metrics */
+    const int POINTS = 16384; /* This produces 128MiB of metric data */
+    const int QUERY_BATCH = 4096;
+    uint8_t same;
+    int i, j, k, c, errors;
+    RRDHOST *host = NULL;
+    RRDSET *st[CHARTS];
+    RRDDIM *rd[CHARTS][DIMS];
+    char name[101];
+    time_t time_now;
+    collected_number last;
+    struct rrddim_query_handle handle;
+    calculated_number value, expected;
+    storage_number n;
+
+    error_log_limit_unlimited();
+    fprintf(stderr, "\nRunning DB-engine test\n");
+
+    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+
+    debug(D_RRDHOST, "Initializing localhost with hostname 'unittest-dbengine'");
+    host = rrdhost_find_or_create(
+            "unittest-dbengine"
+            , "unittest-dbengine"
+            , "unittest-dbengine"
+            , os_type
+            , netdata_configured_timezone
+            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , program_name
+            , program_version
+            , default_rrd_update_every
+            , default_rrd_history_entries
+            , RRD_MEMORY_MODE_DBENGINE
+            , default_health_enabled
+            , default_rrdpush_enabled
+            , default_rrdpush_destination
+            , default_rrdpush_api_key
+            , default_rrdpush_send_charts_matching
+            , NULL
+    );
+    if (NULL == host)
+        return 1;
+
+    for (i = 0 ; i < CHARTS ; ++i) {
+        snprintfz(name, 100, "dbengine-chart-%d", i);
+
+        // create the chart
+        st[i] = rrdset_create(host, "netdata", name, name, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                NULL, 1, 1, RRDSET_TYPE_LINE);
+        rrdset_flag_set(st[i], RRDSET_FLAG_DEBUG);
+        rrdset_flag_set(st[i], RRDSET_FLAG_STORE_FIRST);
+        for (j = 0 ; j < DIMS ; ++j) {
+            snprintfz(name, 100, "dim-%d", j);
+
+            rd[i][j] = rrddim_add(st[i], name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+    }
+
+    // feed it with the test data
+    time_now = 1;
+    last = 0;
+    for (i = 0 ; i < CHARTS ; ++i) {
+        for (j = 0 ; j < DIMS ; ++j) {
+            rd[i][j]->last_collected_time.tv_sec =
+            st[i]->last_collected_time.tv_sec = st[i]->last_updated.tv_sec = time_now;
+            rd[i][j]->last_collected_time.tv_usec =
+                    st[i]->last_collected_time.tv_usec = st[i]->last_updated.tv_usec = 0;
+        }
+    }
+    for(c = 0; c < POINTS ; ++c) {
+        ++time_now; // time_now = c + 2
+        for (i = 0 ; i < CHARTS ; ++i) {
+            st[i]->usec_since_last_update = USEC_PER_SEC;
+
+            for (j = 0; j < DIMS; ++j) {
+                last = i * DIMS * POINTS + j * POINTS + c;
+                rrddim_set_by_pointer_fake_time(rd[i][j], last, time_now);
+            }
+            rrdset_done(st[i]);
+        }
+    }
+
+    // check the result
+    errors = 0;
+
+    for(c = 0; c < POINTS ; c += QUERY_BATCH) {
+        time_now = c + 2;
+        for (i = 0 ; i < CHARTS ; ++i) {
+            for (j = 0; j < DIMS; ++j) {
+                rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH);
+                for (k = 0; k < QUERY_BATCH; ++k) {
+                    last = i * DIMS * POINTS + j * POINTS + c + k;
+                    expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
+
+                    n = rd[i][j]->state->query_ops.next_metric(&handle);
+                    value = unpack_storage_number(n);
+
+                    same = (calculated_number_round(value * 10000000.0) == calculated_number_round(expected * 10000000.0)) ? 1 : 0;
+                    if(!same) {
+                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
+                                        CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
+                                st[i]->name, rd[i][j]->name, (unsigned long)time_now + k, expected, value);
+                        errors++;
+                    }
+                }
+                rd[i][j]->state->query_ops.finalize(&handle);
+            }
+        }
+    }
+
+    rrdeng_exit(host->rrdeng_ctx);
+    rrd_wrlock();
+    rrdhost_delete_charts(host);
+    rrd_unlock();
+
+    return errors;
+}
+
+void generate_dbengine_dataset(unsigned history_seconds)
+{
+    const int DIMS = 128;
+    const uint64_t EXPECTED_COMPRESSION_RATIO = 94;
+    int j;
+    RRDHOST *host = NULL;
+    RRDSET *st;
+    RRDDIM *rd[DIMS];
+    char name[101];
+    time_t time_current, time_present;
+
+    default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+    default_rrdeng_page_cache_mb = 128;
+    /* Worst case for uncompressible data */
+    default_rrdeng_disk_quota_mb = (((uint64_t)DIMS) * sizeof(storage_number) * history_seconds) / (1024 * 1024);
+    default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+
+    error_log_limit_unlimited();
+    debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-dataset'");
+
+    host = rrdhost_find_or_create(
+            "dbengine-dataset"
+            , "dbengine-dataset"
+            , "dbengine-dataset"
+            , os_type
+            , netdata_configured_timezone
+            , config_get(CONFIG_SECTION_BACKEND, "host tags", "")
+            , program_name
+            , program_version
+            , default_rrd_update_every
+            , default_rrd_history_entries
+            , RRD_MEMORY_MODE_DBENGINE
+            , default_health_enabled
+            , default_rrdpush_enabled
+            , default_rrdpush_destination
+            , default_rrdpush_api_key
+            , default_rrdpush_send_charts_matching
+            , NULL
+    );
+    if (NULL == host)
+        return;
+
+    fprintf(stderr, "\nRunning DB-engine workload generator\n");
+
+    // create the chart
+    st = rrdset_create(host, "example", "random", "random", "example", NULL, "random", "random", "random",
+                          NULL, 1, 1, RRDSET_TYPE_LINE);
+    for (j = 0 ; j < DIMS ; ++j) {
+        snprintfz(name, 100, "random%d", j);
+
+        rd[j] = rrddim_add(st, name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    time_present = now_realtime_sec();
+    // feed it with the test data
+    time_current = time_present - history_seconds;
+    for (j = 0 ; j < DIMS ; ++j) {
+        rd[j]->last_collected_time.tv_sec =
+        st->last_collected_time.tv_sec = st->last_updated.tv_sec = time_current;
+        rd[j]->last_collected_time.tv_usec =
+        st->last_collected_time.tv_usec = st->last_updated.tv_usec = 0;
+    }
+    for( ; time_current < time_present; ++time_current) {
+        st->usec_since_last_update = USEC_PER_SEC;
+
+        for (j = 0; j < DIMS; ++j) {
+            rrddim_set_by_pointer_fake_time(rd[j], (time_current + j) % 128, time_current);
+        }
+        rrdset_done(st);
+    }
+    rrd_wrlock();
+    rrdhost_free(host);
+    rrd_unlock();
+
+}
+#endif

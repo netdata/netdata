@@ -15,6 +15,9 @@ MAINTAINERCLEANFILES= \
 	$(srcdir)/m4/ltoptions.m4 \
 	$(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
+CLEANFILES= \
+	$(srcdir)/$(distdir).tar.gz
+
 EXTRA_DIST = \
 	.gitignore \
 	.codacy.yml \
@@ -60,6 +63,7 @@ dist_noinst_DATA= \
 	package.json \
 	docs \
 	packaging/version \
+	packaging/go.d.checksums \
 	packaging/installer/README.md \
 	packaging/installer/UNINSTALL.md \
 	packaging/installer/UPDATE.md \
@@ -70,7 +74,9 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
+	coverity-install.sh \
 	packaging/installer/netdata-updater.sh \
+	packaging/installer/netdata-uninstaller.sh \
 	packaging/installer/kickstart.sh \
 	packaging/installer/kickstart-static64.sh \
 	packaging/installer/functions.sh \
@@ -100,11 +106,13 @@ SUBDIRS += \
 
 AM_CFLAGS = \
 	$(OPTIONAL_MATH_CFLAGS) \
-	$(OPTIONAL_NFACCT_CLFAGS) \
+	$(OPTIONAL_NFACCT_CFLAGS) \
 	$(OPTIONAL_ZLIB_CFLAGS) \
 	$(OPTIONAL_UUID_CFLAGS) \
 	$(OPTIONAL_LIBCAP_LIBS) \
 	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
+	$(OPTIONAL_CUPS_CFLAGS) \
+	$(OPTIONAL_XENSTAT_CFLAGS) \
 	$(NULL)
 
 sbin_PROGRAMS =
@@ -212,9 +220,19 @@ FREEIPMI_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+CUPS_PLUGIN_FILES = \
+	collectors/cups.plugin/cups_plugin.c \
+	$(LIBNETDATA_FILES) \
+	$(NULL)
+
 NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
-	collectors/nfacct.plugin/plugin_nfacct.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+XENSTAT_PLUGIN_FILES = \
+    collectors/xenstat.plugin/xenstat_plugin.c \
+    $(LIBNETDATA_FILES) \
     $(NULL)
 
 PROC_PLUGIN_FILES = \
@@ -292,6 +310,24 @@ RRD_PLUGIN_FILES = \
     database/rrdvar.c \
     database/rrdvar.h \
     $(NULL)
+
+if ENABLE_DBENGINE
+    RRD_PLUGIN_FILES += \
+        database/engine/rrdengine.c \
+        database/engine/rrdengine.h \
+        database/engine/rrddiskprotocol.h \
+        database/engine/datafile.c \
+        database/engine/datafile.h \
+        database/engine/journalfile.c \
+        database/engine/journalfile.h \
+        database/engine/rrdenginelib.c \
+        database/engine/rrdenginelib.h \
+        database/engine/rrdengineapi.c \
+        database/engine/rrdengineapi.h \
+        database/engine/pagecache.c \
+        database/engine/pagecache.h \
+        $(NULL)
+endif
 
 API_PLUGIN_FILES = \
     web/api/badges/web_buffer_svg.c \
@@ -394,6 +430,13 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
+KINESIS_BACKEND_FILES = \
+    backends/aws_kinesis/aws_kinesis.c \
+    backends/aws_kinesis/aws_kinesis.h \
+    backends/aws_kinesis/aws_kinesis_put_record.cc \
+    backends/aws_kinesis/aws_kinesis_put_record.h \
+    $(NULL)
+
 DAEMON_FILES = \
 	daemon/common.c \
 	daemon/common.h \
@@ -442,7 +485,6 @@ if LINUX
     NETDATA_FILES += \
         $(CGROUPS_PLUGIN_FILES) \
         $(DISKSPACE_PLUGIN_FILES) \
-        $(NFACCT_PLUGIN_FILES) \
         $(PROC_PLUGIN_FILES) \
         $(TC_PLUGIN_FILES) \
         $(NULL)
@@ -453,15 +495,23 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
+	$(OPTIONAL_UV_LIBS) \
+	$(OPTIONAL_LZ4_LIBS) \
+	$(OPTIONAL_JUDY_LIBS) \
+	$(OPTIONAL_SSL_LIBS) \
 	$(NULL)
-
+# TODO: Find more graceful way to add libs for AWS Kinesis
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
-	$(OPTIONAL_NFACCT_LIBS) \
 	$(NULL)
+if ENABLE_BACKEND_KINESIS
+    netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
+else
+    netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
+endif
 
 if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
@@ -487,4 +537,36 @@ if ENABLE_PLUGIN_FREEIPMI
     	$(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
         $(NULL)
+endif
+
+if ENABLE_PLUGIN_CUPS
+    plugins_PROGRAMS += cups.plugin
+    cups_plugin_SOURCES = $(CUPS_PLUGIN_FILES)
+    cups_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_CUPS_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_NFACCT
+    plugins_PROGRAMS += nfacct.plugin
+    nfacct_plugin_SOURCES = $(NFACCT_PLUGIN_FILES)
+    nfacct_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_NFACCT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_XENSTAT
+    plugins_PROGRAMS += xenstat.plugin
+    xenstat_plugin_SOURCES = $(XENSTAT_PLUGIN_FILES)
+    xenstat_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(OPTIONAL_XENSTAT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_BACKEND_KINESIS
+    netdata_SOURCES += $(KINESIS_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
 endif

@@ -205,6 +205,9 @@
 #endif
 #define abs(x) (((x) < 0)? (-(x)) : (x))
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 #define GUID_LEN 36
 
 extern void netdata_fix_chart_id(char *s);
@@ -286,8 +289,8 @@ extern void recursive_config_double_dir_load(
 
 
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
+extern void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
-
 #include "os.h"
 #include "storage_number/storage_number.h"
 #include "threads/threads.h"

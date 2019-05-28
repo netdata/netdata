@@ -39,7 +39,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, BUFFER *wb) {
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->collections_counter) {
+                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[SHELL_ELEMENT_MAX + 1];
                     shell_name_copy(dimension, rd->name?rd->name:rd->id, SHELL_ELEMENT_MAX);
 
@@ -126,7 +126,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
-                if(rd->collections_counter) {
+                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
 
                     buffer_sprintf(wb, "%s\n"
                                        "\t\t\t\"%s\": {\n"

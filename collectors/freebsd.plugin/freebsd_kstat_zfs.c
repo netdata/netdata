@@ -11,6 +11,10 @@ extern struct arcstats arcstats;
 int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     (void)dt;
 
+    static int show_zero_charts = -1;
+    if(unlikely(show_zero_charts == -1))
+        show_zero_charts = config_get_boolean_ondemand("plugin:freebsd:zfs_arcstats", "show zero charts", CONFIG_BOOLEAN_NO);
+
     unsigned long long l2_size;
     size_t uint64_t_size = sizeof(uint64_t);
     static struct mibs {
@@ -31,11 +35,11 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         int deleted[5];
         int mutex_miss[5];
         int evict_skip[5];
-        int evict_not_enough[5];
-        int evict_l2_cached[5];
-        int evict_l2_eligible[5];
-        int evict_l2_ineligible[5];
-        int evict_l2_skip[5];
+        // int evict_not_enough[5];
+        // int evict_l2_cached[5];
+        // int evict_l2_eligible[5];
+        // int evict_l2_ineligible[5];
+        // int evict_l2_skip[5];
         int hash_elements[5];
         int hash_elements_max[5];
         int hash_collisions[5];
@@ -46,65 +50,65 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         int c_min[5];
         int c_max[5];
         int size[5];
-        int hdr_size[5];
-        int data_size[5];
-        int metadata_size[5];
-        int other_size[5];
-        int anon_size[5];
-        int anon_evictable_data[5];
-        int anon_evictable_metadata[5];
+        // int hdr_size[5];
+        // int data_size[5];
+        // int metadata_size[5];
+        // int other_size[5];
+        // int anon_size[5];
+        // int anon_evictable_data[5];
+        // int anon_evictable_metadata[5];
         int mru_size[5];
-        int mru_evictable_data[5];
-        int mru_evictable_metadata[5];
-        int mru_ghost_size[5];
-        int mru_ghost_evictable_data[5];
-        int mru_ghost_evictable_metadata[5];
+        // int mru_evictable_data[5];
+        // int mru_evictable_metadata[5];
+        // int mru_ghost_size[5];
+        // int mru_ghost_evictable_data[5];
+        // int mru_ghost_evictable_metadata[5];
         int mfu_size[5];
-        int mfu_evictable_data[5];
-        int mfu_evictable_metadata[5];
-        int mfu_ghost_size[5];
-        int mfu_ghost_evictable_data[5];
-        int mfu_ghost_evictable_metadata[5];
+        // int mfu_evictable_data[5];
+        // int mfu_evictable_metadata[5];
+        // int mfu_ghost_size[5];
+        // int mfu_ghost_evictable_data[5];
+        // int mfu_ghost_evictable_metadata[5];
         int l2_hits[5];
         int l2_misses[5];
-        int l2_feeds[5];
-        int l2_rw_clash[5];
+        // int l2_feeds[5];
+        // int l2_rw_clash[5];
         int l2_read_bytes[5];
         int l2_write_bytes[5];
-        int l2_writes_sent[5];
-        int l2_writes_done[5];
-        int l2_writes_error[5];
-        int l2_writes_lock_retry[5];
-        int l2_evict_lock_retry[5];
-        int l2_evict_reading[5];
-        int l2_evict_l1cached[5];
-        int l2_free_on_write[5];
-        int l2_cdata_free_on_write[5];
-        int l2_abort_lowmem[5];
-        int l2_cksum_bad[5];
-        int l2_io_error[5];
+        // int l2_writes_sent[5];
+        // int l2_writes_done[5];
+        // int l2_writes_error[5];
+        // int l2_writes_lock_retry[5];
+        // int l2_evict_lock_retry[5];
+        // int l2_evict_reading[5];
+        // int l2_evict_l1cached[5];
+        // int l2_free_on_write[5];
+        // int l2_cdata_free_on_write[5];
+        // int l2_abort_lowmem[5];
+        // int l2_cksum_bad[5];
+        // int l2_io_error[5];
         int l2_size[5];
         int l2_asize[5];
-        int l2_hdr_size[5];
-        int l2_compress_successes[5];
-        int l2_compress_zeros[5];
-        int l2_compress_failures[5];
+        // int l2_hdr_size[5];
+        // int l2_compress_successes[5];
+        // int l2_compress_zeros[5];
+        // int l2_compress_failures[5];
         int memory_throttle_count[5];
-        int duplicate_buffers[5];
-        int duplicate_buffers_size[5];
-        int duplicate_reads[5];
-        int memory_direct_count[5];
-        int memory_indirect_count[5];
-        int arc_no_grow[5];
-        int arc_tempreserve[5];
-        int arc_loaned_bytes[5];
-        int arc_prune[5];
-        int arc_meta_used[5];
-        int arc_meta_limit[5];
-        int arc_meta_max[5];
-        int arc_meta_min[5];
-        int arc_need_free[5];
-        int arc_sys_free[5];
+        // int duplicate_buffers[5];
+        // int duplicate_buffers_size[5];
+        // int duplicate_reads[5];
+        // int memory_direct_count[5];
+        // int memory_indirect_count[5];
+        // int arc_no_grow[5];
+        // int arc_tempreserve[5];
+        // int arc_loaned_bytes[5];
+        // int arc_prune[5];
+        // int arc_meta_used[5];
+        // int arc_meta_limit[5];
+        // int arc_meta_max[5];
+        // int arc_meta_min[5];
+        // int arc_need_free[5];
+        // int arc_sys_free[5];
     } mibs;
 
     arcstats.l2exist = -1;
@@ -209,8 +213,8 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_need_free", mibs.arc_need_free, arcstats.arc_need_free);
     // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_sys_free", mibs.arc_sys_free, arcstats.arc_sys_free);
 
-    generate_charts_arcstats("freebsd", "zfs", update_every);
-    generate_charts_arc_summary("freebsd", "zfs", update_every);
+    generate_charts_arcstats("freebsd", "zfs", show_zero_charts, update_every);
+    generate_charts_arc_summary("freebsd", "zfs", show_zero_charts, update_every);
 
     return 0;
 }
@@ -261,7 +265,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
 
         rrddim_set_by_pointer(st_bytes, rd_bytes, bytes);
         rrdset_done(st_bytes);
-        
+
         // --------------------------------------------------------------------
 
         static RRDSET *st_requests = NULL;
@@ -293,7 +297,7 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st_requests, rd_failed,      failed);
         rrddim_set_by_pointer(st_requests, rd_unsupported, unsupported);
         rrdset_done(st_requests);
-        
+
      }
 
     return 0;

@@ -36,21 +36,6 @@ echo "===== Looking up available labels ====="
 LABELS_FILE=/tmp/labels
 hub issue labels >$LABELS_FILE
 
-echo "===== Categorizing issues ====="
-# This won't touch issues which already have at least one label assigned
-for STATE in "open" "closed"; do
-	for ISSUE in $(hub issue -f "%I %l%n" -s "$STATE" -d "$(date +%F -d '1 day ago')" | grep -v -f $LABELS_FILE); do
-		echo "-------- Processing $STATE issue no. $ISSUE --------"
-		BODY="$(curl -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/netdata/netdata/issues/$ISSUE" 2>/dev/null | jq .body)"
-		case "${BODY}" in
-		*"# Question summary"*) new_labels "$ISSUE" "question" "no changelog" ;;
-		*"# Bug report summary"*) new_labels "$ISSUE" "needs triage" "bug" ;;
-		*"# Feature idea summary"*) new_labels "$ISSUE" "needs triage" "feature request" ;;
-		*) new_labels "$ISSUE" "needs triage" "no changelog" ;;
-		esac
-	done
-done
-
 # Change all 'area' labels assigned to PR saving non-area labels.
 echo "===== Categorizing PRs ====="
 NEW_LABELS=/tmp/new_labels

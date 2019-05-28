@@ -49,4 +49,8 @@ extern int discard_response(BUFFER *b, const char *backend);
 #include "backends/json/json.h"
 #include "backends/opentsdb/opentsdb.h"
 
+#if HAVE_KINESIS
+#include "backends/aws_kinesis/aws_kinesis.h"
+#endif
+
 #endif /* NETDATA_BACKENDS_H */

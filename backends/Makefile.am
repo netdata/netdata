@@ -8,6 +8,7 @@ SUBDIRS = \
     json \
     opentsdb \
     prometheus \
+    aws_kinesis \
 	$(NULL)
 
 dist_noinst_DATA = \

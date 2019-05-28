@@ -1,3 +1,8 @@
+---
+about: General issue template
+labels: "needs triage", "no changelog"
+---
+
 <!---
 This is a generic issue template. We usually prefer contributors to use one
 of 3 other specific issue templates (bug report, feature request, question)

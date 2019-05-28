@@ -38,14 +38,14 @@ if [ "${1}" = "install" ]
 
     run cd /usr/src
 
-    if [ -d fping-4.0 ]
+    if [ -d fping-4.2 ]
         then
-        run rm -rf fping-4.0 || exit 1
+        run rm -rf fping-4.2 || exit 1
     fi
 
-    download 'https://github.com/schweikert/fping/releases/download/v4.0/fping-4.0.tar.gz' | run tar -zxvpf -
+    download 'https://github.com/schweikert/fping/releases/download/v4.2/fping-4.2.tar.gz' | run tar -zxvpf -
     [ $? -ne 0 ] && exit 1
-    run cd fping-4.0 || exit 1
+    run cd fping-4.2 || exit 1
 
     run ./configure --prefix=/usr/local
     run make clean

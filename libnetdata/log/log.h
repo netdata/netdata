@@ -36,6 +36,7 @@
 #define D_STATSD            0x0000000010000000
 #define D_POLLFD            0x0000000020000000
 #define D_STREAM            0x0000000040000000
+#define D_RRDENGINE         0x0000000100000000
 #define D_SYSTEM            0x8000000000000000
 
 //#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
@@ -54,6 +55,7 @@ extern FILE *stdaccess;
 extern const char *stdaccess_filename;
 extern const char *stderr_filename;
 extern const char *stdout_filename;
+extern const char *facility_log;
 
 extern int access_log_syslog;
 extern int error_log_syslog;
@@ -85,6 +87,7 @@ static inline void debug_dummy(void) {}
 #define error(args...)   error_int("ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define fatal(args...)   fatal_int(__FILE__, __FUNCTION__, __LINE__, ##args)
 
+extern void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
 extern void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
 extern void error_int( const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);

@@ -38,7 +38,7 @@ run ./configure \
 
 
 run make clean
-run make -j${SYSTEM_CPUS}
+run make -j$(find_processors)
 
 cat >examples/loadables/Makefile <<EOF
 all:

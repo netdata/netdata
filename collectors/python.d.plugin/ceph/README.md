@@ -1,6 +1,6 @@
 # ceph
 
-This module monitors the ceph cluster usage and consuption data of a server.
+This module monitors the ceph cluster usage and consumption data of a server.
 
 It produces:
 

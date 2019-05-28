@@ -151,13 +151,15 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 
     // properly set the name for the remote end to parse it
     char *name = "";
-    if(unlikely(strcmp(st->id, st->name))) {
-        // they differ
-        name = strchr(st->name, '.');
-        if(name)
-            name++;
-        else
-            name = "";
+    if(likely(st->name)) {
+        if(unlikely(strcmp(st->id, st->name))) {
+            // they differ
+            name = strchr(st->name, '.');
+            if(name)
+                name++;
+            else
+                name = "";
+        }
     }
 
     // info("CHART '%s' '%s'", st->id, name);
@@ -188,12 +190,13 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         buffer_sprintf(
                 host->rrdpush_sender_buffer
-                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s\"\n"
+                , "DIMENSION \"%s\" \"%s\" \"%s\" " COLLECTED_NUMBER_FORMAT " " COLLECTED_NUMBER_FORMAT " \"%s %s %s\"\n"
                 , rd->id
                 , rd->name
                 , rrd_algorithm_name(rd->algorithm)
                 , rd->multiplier
                 , rd->divisor
+                , rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)?"obsolete":""
                 , rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)?"hidden":""
                 , rrddim_flag_check(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS)?"noreset":""
         );
@@ -442,7 +445,21 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s HTTP/1.1\r\n"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
+                    "&NETDATA_SYSTEM_OS_NAME=%s"
+                    "&NETDATA_SYSTEM_OS_ID=%s"
+                    "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
+                    "&NETDATA_SYSTEM_OS_VERSION=%s"
+                    "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
+                    "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                    "&NETDATA_SYSTEM_KERNEL_NAME=%s"
+                    "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
+                    "&NETDATA_SYSTEM_ARCHITECTURE=%s"
+                    "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
+                    "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
+                    "&NETDATA_SYSTEM_CONTAINER=%s"
+                    "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
+                    " HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
               , host->rrdpush_send_api_key
@@ -452,7 +469,20 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , default_rrd_update_every
               , host->os
               , host->timezone
-              , (host->tags)?host->tags:""
+              , (host->tags) ? host->tags : ""
+              , (host->system_info->os_name) ? host->system_info->os_name : ""
+              , (host->system_info->os_id) ? host->system_info->os_id : ""
+              , (host->system_info->os_id_like) ? host->system_info->os_id_like : ""
+              , (host->system_info->os_version) ? host->system_info->os_version : ""
+              , (host->system_info->os_version_id) ? host->system_info->os_version_id : ""
+              , (host->system_info->os_detection) ? host->system_info->os_detection : ""
+              , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
+              , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
+              , (host->system_info->architecture) ? host->system_info->architecture : ""
+              , (host->system_info->virtualization) ? host->system_info->virtualization : ""
+              , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
+              , (host->system_info->container) ? host->system_info->container : ""
+              , (host->system_info->container_detection) ? host->system_info->container_detection : ""
               , host->program_name
               , host->program_version
     );
@@ -737,16 +767,16 @@ void *rrdpush_sender_thread(void *ptr) {
 
                 if(host->rrdpush_sender_socket != -1) {
                     char *error = NULL;
-                    
+
                     if (unlikely(ofd->revents & POLLERR))
                         error = "socket reports errors (POLLERR)";
-                        
+
                     else if (unlikely(ofd->revents & POLLHUP))
                         error = "connection closed by remote end (POLLHUP)";
-                        
+
                     else if (unlikely(ofd->revents & POLLNVAL))
                         error = "connection is invalid (POLLNVAL)";
-                    
+
                     if(unlikely(error)) {
                         debug(D_STREAM, "STREAM: %s - closing socket...", error);
                         error("STREAM %s [send to %s]: %s - reopening socket - we have sent %zu bytes on this connection.", host->hostname, connected_to, error, sent_bytes_on_this_connection);
@@ -818,6 +848,7 @@ static int rrdpush_receive(int fd
                            , const char *tags
                            , const char *program_name
                            , const char *program_version
+                           , struct rrdhost_system_info *system_info
                            , int update_every
                            , char *client_ip
                            , char *client_port
@@ -867,8 +898,12 @@ static int rrdpush_receive(int fd
     tags = appconfig_set_default(&stream_config, machine_guid, "host tags", (tags)?tags:"");
     if(tags && !*tags) tags = NULL;
 
-    if(!strcmp(machine_guid, "localhost"))
-        host = localhost;
+    if (strcmp(machine_guid, localhost->machine_guid) == 0) {
+        log_stream_connection(client_ip, client_port, key, machine_guid, hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO MASTER");
+        error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the master/proxy machine guid to a slave?", hostname, client_ip, client_port, machine_guid);
+        close(fd);
+        return 1;
+    }
     else
         host = rrdhost_find_or_create(
                 hostname
@@ -887,6 +922,7 @@ static int rrdpush_receive(int fd
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , system_info
         );
 
     if(!host) {
@@ -1020,6 +1056,7 @@ struct rrdpush_thread {
     char *client_port;
     char *program_name;
     char *program_version;
+    struct rrdhost_system_info *system_info;
     int update_every;
 };
 
@@ -1049,24 +1086,25 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 static void *rrdpush_receiver_thread(void *ptr) {
     netdata_thread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
 
-        struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
-        info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+    struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
+    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
-        rrdpush_receive(
-                rpt->fd
-                , rpt->key
-                , rpt->hostname
-                , rpt->registry_hostname
-                , rpt->machine_guid
-                , rpt->os
-                , rpt->timezone
-                , rpt->tags
-                , rpt->program_name
-                , rpt->program_version
-                , rpt->update_every
-                , rpt->client_ip
-                , rpt->client_port
-        );
+    rrdpush_receive(
+	    rpt->fd
+	    , rpt->key
+	    , rpt->hostname
+	    , rpt->registry_hostname
+	    , rpt->machine_guid
+	    , rpt->os
+	    , rpt->timezone
+	    , rpt->tags
+	    , rpt->program_name
+	    , rpt->program_version
+        , rpt->system_info
+	    , rpt->update_every
+	    , rpt->client_ip
+	    , rpt->client_port
+    );
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1113,6 +1151,8 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     int update_every = default_rrd_update_every;
     char buf[GUID_LEN + 1];
 
+    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+
     while(url) {
         char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
@@ -1138,40 +1178,48 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else if(!strcmp(name, "tags"))
             tags = value;
         else
-            info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
+            if(unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
+                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
+            }
     }
 
     if(!key || !*key) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO KEY");
         error("STREAM [receive from [%s]:%s]: request without an API key. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!hostname || !*hostname) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO HOSTNAME");
         error("STREAM [receive from [%s]:%s]: request without a hostname. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!machine_guid || !*machine_guid) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: request without a machine GUID. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(key, buf) == -1) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID KEY");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not valid GUID (use the command uuidgen to generate one). Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(machine_guid, buf) == -1) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!appconfig_get_boolean(&stream_config, key, "enabled", 0)) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - KEY NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
@@ -1182,6 +1230,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         if(key_allow_from) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
                 simple_pattern_free(key_allow_from);
+                rrdhost_system_info_free(system_info);
                 log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: API key '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, key);
                 return rrdpush_receiver_permission_denied(w);
@@ -1191,6 +1240,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     if(!appconfig_get_boolean(&stream_config, machine_guid, "enabled", 1)) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - MACHINE GUID NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         return rrdpush_receiver_permission_denied(w);
@@ -1201,6 +1251,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         if(machine_allow_from) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
                 simple_pattern_free(machine_allow_from);
+                rrdhost_system_info_free(system_info);
                 log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: Machine GUID '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, machine_guid);
                 return rrdpush_receiver_permission_denied(w);
@@ -1221,6 +1272,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
         if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
             netdata_mutex_unlock(&stream_rate_mutex);
+            rrdhost_system_info_free(system_info);
             error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Will be allowed in %ld secs.", w->client_ip, w->client_port, (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
             return rrdpush_receiver_too_busy_now(w);
         }
@@ -1241,6 +1293,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
+    rpt->system_info       = system_info;
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');
@@ -1252,6 +1305,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         rpt->program_name = strdupz(w->user_agent);
         if(t && *t) rpt->program_version = strdupz(t);
     }
+
 
     netdata_thread_t thread;
 

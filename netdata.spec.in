@@ -80,17 +80,19 @@ Recommends:	python2-psycopg2 \
 %endif
 
 Summary:	Real-time performance monitoring, done right
-Name:		@PACKAGE_NAME@
-Version:	@PACKAGE_RPM_VERSION@
+Name:		netdata
+Version:	@PACKAGE_VERSION@
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://github.com/netdata/%{name}/releases/download/v@PACKAGE_VERSION@/%{name}-@PACKAGE_VERSION@.tar.gz
+Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
 URL:		http://my-netdata.io
 BuildRequires:	pkgconfig
 BuildRequires:	xz
 BuildRequires:	zlib-devel
 BuildRequires:	libuuid-devel
+BuildRequires:	autoconf
+BuildRequires:	automake
 Requires:	zlib
 Requires:	libuuid
 
@@ -126,7 +128,7 @@ so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
 %prep
-%setup -q -n @PACKAGE_NAME@-@PACKAGE_VERSION@
+%setup -q -n %{name}-%{version}
 
 %build
 autoreconf -i
@@ -226,7 +228,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_libdir}/%{name}/conf.d/charts.d
-%dir %{_libdir}/%{name}/conf.d/node.d
+#%dir %{_libdir}/%{name}/conf.d/node.d
 %dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
@@ -241,7 +243,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
-* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
-- Initial add.
+* Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
+- Temporary set version statically
+- Fix changelog ordering
+- Comment-out node.d configuration directory 
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
 - Fix permissions for log files
+* Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
+- Initial add.
+

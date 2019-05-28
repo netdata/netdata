@@ -1,12 +1,11 @@
-# Terms of use
+# Terms of Use
 
-Netdata Terms of Use for the sites https://my-netdata.io and https://netdata.cloud and their subdomains. For the Netdata agent and the included redistributed software terms of use,  refer to [Redistributed software](../REDISTRIBUTED.md)
-
+Netdata Master Terms of Use
 Effective as of 25 May 2018
 
 ## 1. General Information Regarding These Terms of Use
 
-Master terms: Welcome, and thank you for your interest in Netdata (“Netdata,” “ND,” “we,” “our,” or “us”). Unless otherwise noted on a particular site or service, these master terms of use (“Master Terms”) apply to your use of all of the websites that Netdata Corporation operates. These include https://my-netdata.io and https://netdata.cloud, together with all other subdomains thereof, (collectively, the “Websites”). The Master Terms also apply to all products, information, and services provided through the Websites, such as the NDID Login Service.
+Master terms: Welcome, and thank you for your interest in Netdata (“Netdata, Inc.” “ND,” “we,” “our,” or “us”). Unless otherwise noted on a particular site or service, these master terms of use (“Master Terms”) apply to your use of all of the websites that Netdata Corporation operates. These include https://my-netdata.io and https://netdata.cloud, together with all other subdomains thereof, (collectively, the “Websites”). The Master Terms also apply to all products, information, and services provided through the Websites, such as the NDID Login Service.
 
 Additional terms: In addition to the Master Terms, your use of any Services may also be subject to specific terms applicable to a particular Service (“Additional Terms”). If there is any conflict between the Additional Terms and the Master Terms, then the Additional Terms apply in relation to the relevant Service.
 
@@ -38,7 +37,7 @@ Provided as-is: You acknowledge that Netdata does not make any representations o
 
 You agree that you are solely responsible for your reuse of Content made available through the Services, including providing proper attribution. You should review the terms of the applicable license before you use the Content so that you know what you can and cannot do.
 
-Licensing: ND-Owned Content: Other than the text of Netdata licenses, CC licenses, and other legal tools and the text of the deeds for all legal tools (all of which are made available under the CC Public Domain Dedication), Netdata trademarks (subject to the Trademark Policy), and the software code, all Content on the Websites is licensed under the Creative Commons Attribution 4.0 license, unless otherwise marked. See the ND Policies page for more information.
+Licensing: ND-Owned Content: Other than the text of Netdata licenses, ND licenses, and other legal tools and the text of the deeds for all legal tools, Netdata trademarks (subject to the Trademark Policy), and the software code, all Content on the Websites is licensed under the Creative Commons Attribution 4.0 license, unless otherwise marked. See the ND Policies page for more information.
 
 ND-Owned Code: All of CC’s software code is free software; please check our code repository for the specific license on software you want to reuse.
 
