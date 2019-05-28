@@ -4,9 +4,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import bisect
-import re
 import os
-
+import re
 from collections import namedtuple, defaultdict
 from copy import deepcopy
 
@@ -660,7 +659,7 @@ class Web:
                                        r' (?P<bytes_sent>\d+)'
                                        r' (?P<resp_length>\d+)'
                                        r' (?P<resp_time>\d+\.\d+)'
-                                       r' (?P<resp_time_upstream>[\d.-]+) ')
+                                       r' "?(?P<resp_time_upstream>[\d.-]+)')
 
         nginx_ext_append = re.compile(r'(?P<address>[\da-f.:]+)'
                                       r' -.*?"(?P<request>[^"]*)"'
