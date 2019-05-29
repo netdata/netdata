@@ -145,7 +145,7 @@ extern void pg_cache_put_unsafe(struct rrdeng_page_descr *descr);
 extern void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 extern void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
                             struct rrdeng_page_descr *descr);
-extern void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
+extern void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty);
 extern struct pg_cache_page_index *
         pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time);
 extern struct rrdeng_page_descr *

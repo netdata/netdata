@@ -60,6 +60,24 @@ void rrdeng_store_metric_init(RRDDIM *rd)
     handle->page_index = page_index;
 }
 
+/* The page must be populated and referenced */
+static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
+{
+    unsigned i;
+    uint8_t has_only_empty_metrics = 1;
+    storage_number *page;
+
+    page = descr->pg_cache_descr->page;
+    for (i = 0 ; i < descr->page_length / sizeof(storage_number); ++i) {
+        if (SN_EMPTY_SLOT != page[i]) {
+            has_only_empty_metrics = 0;
+            break;
+        }
+    }
+    return has_only_empty_metrics;
+}
+
+
 void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number)
 {
     struct rrdeng_collect_handle *handle;
@@ -75,23 +93,32 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     if (unlikely(NULL == descr || descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE)) {
         if (descr) {
             if (descr->page_length) {
-                int ret;
+                int ret, page_is_empty;
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 #endif
-                /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
-                rrdeng_page_descr_mutex_lock(ctx, descr);
-                ret = pg_cache_try_get_unsafe(descr, 0);
-                rrdeng_page_descr_mutex_unlock(ctx, descr);
-                assert (1 == ret);
+                page_is_empty = page_has_only_empty_metrics(descr);
+                if (page_is_empty) {
+                    debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
+                    if(unlikely(debug_flags & D_RRDENGINE))
+                        print_page_cache_descr(descr);
+                    pg_cache_put(ctx, descr);
+                    pg_cache_punch_hole(ctx, descr, 1);
+                    handle->descr = NULL;
+                } else {
+                    /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
+                    rrdeng_page_descr_mutex_lock(ctx, descr);
+                    ret = pg_cache_try_get_unsafe(descr, 0);
+                    rrdeng_page_descr_mutex_unlock(ctx, descr);
+                    assert (1 == ret);
 
-                rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+                    rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+                }
                 if (handle->prev_descr) {
                     /* unpin old second page */
                     pg_cache_put(ctx, handle->prev_descr);
                 }
-                handle->prev_descr = descr;
             } else {
                 free(descr->pg_cache_descr->page);
                 rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
@@ -138,10 +165,21 @@ void rrdeng_store_metric_finalize(RRDDIM *rd)
     descr = handle->descr;
     if (descr) {
         if (descr->page_length) {
+            int page_is_empty;
+
 #ifdef NETDATA_INTERNAL_CHECKS
             rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
 #endif
-            rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+            page_is_empty = page_has_only_empty_metrics(descr);
+            if (page_is_empty) {
+                debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
+                if(unlikely(debug_flags & D_RRDENGINE))
+                    print_page_cache_descr(descr);
+                pg_cache_put(ctx, descr);
+                pg_cache_punch_hole(ctx, descr, 1);
+            } else {
+                rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+            }
             if (handle->prev_descr) {
                 /* unpin old second page */
                 pg_cache_put(ctx, handle->prev_descr);
@@ -304,7 +342,7 @@ void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrde
     pg_cache_descr->flags = RRD_PAGE_DIRTY /*| RRD_PAGE_LOCKED */ | RRD_PAGE_POPULATED /* | BEING_COLLECTED */;
     pg_cache_descr->refcnt = 1;
 
-    debug(D_RRDENGINE, "-----------------\nCreated new page:\n-----------------");
+    debug(D_RRDENGINE, "Created new page:");
     if(unlikely(debug_flags & D_RRDENGINE))
         print_page_cache_descr(descr);
     rrdeng_page_descr_mutex_unlock(ctx, descr);
@@ -340,7 +378,7 @@ void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
-    debug(D_RRDENGINE, "----------------------\nReading existing page:\n----------------------");
+    debug(D_RRDENGINE, "Reading existing page:");
     descr = pg_cache_lookup(ctx, NULL, id, INVALID_TIME);
     if (NULL == descr) {
         *handle = NULL;
@@ -359,7 +397,7 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
-    debug(D_RRDENGINE, "----------------------\nReading existing page:\n----------------------");
+    debug(D_RRDENGINE, "Reading existing page:");
     descr = pg_cache_lookup(ctx, NULL, id, point_in_time);
     if (NULL == descr) {
         *handle = NULL;
