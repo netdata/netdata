@@ -535,7 +535,7 @@ void global_statistics_charts(void) {
 
 #ifdef ENABLE_DBENGINE
     if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        unsigned long long stats_array[28];
+        unsigned long long stats_array[RRDENG_NR_STATS];
 
         /* get localhost's DB engine's statistics */
         rrdeng_get_28_statistics(localhost->rrdeng_ctx, stats_array);
