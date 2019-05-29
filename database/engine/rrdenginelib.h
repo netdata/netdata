@@ -13,6 +13,10 @@ struct rrdeng_page_descr;
 
 #define BITS_PER_ULONG (sizeof(unsigned long) * 8)
 
+#ifndef UUID_STR_LEN
+#define UUID_STR_LEN (37)
+#endif
+
 /* Taken from linux kernel */
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 
