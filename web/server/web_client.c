@@ -815,7 +815,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         }
     }
 #endif /* NETDATA_WITH_ZLIB */
-    error("KILLME REQUEST %s",w->host);
 
     *e = ':';
     *ve = '\r';
