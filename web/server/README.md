@@ -112,6 +112,10 @@ Example:
 For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-the-communication) in the streaming documentation.
 You will find there additional details on the expected behavior for client and server nodes, when their respective SSL options are enabled.
 
+#### SSL error
+
+It is possible that when you start to use the Netdata with SSL some erros will be register in the logs, this happens due possible incompatibilities between the browser options related to SSL like Ciphers and TLS/SSL version and the Netdata internal configuration. The most common error would be `error:00000006:lib(0):func(0):EVP lib`. In a near future the Netdata will allow our users to change the internal configuration to avoid errors like this, but until there we are setting the most common and safety options to the communication.
+
 ### Access lists
 
 Netdata supports access lists in `netdata.conf`:

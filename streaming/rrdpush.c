@@ -1156,7 +1156,7 @@ struct rrdpush_thread {
     struct rrdhost_system_info *system_info;
     int update_every;
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl *ssl;
+    struct netdata_ssl ssl;
 #endif
 };
 
@@ -1179,7 +1179,13 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         freez(rpt->client_port);
         freez(rpt->program_name);
         freez(rpt->program_version);
+#ifdef ENABLE_HTTPS
+        if(rpt->ssl.conn){
+            SSL_free(rpt->ssl.conn);
+        }
+#endif
         freez(rpt);
+
     }
 }
 
@@ -1204,7 +1210,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
-	    , rpt->ssl
+	    , &rpt->ssl
     );
 
     netdata_thread_cleanup_pop(1);
@@ -1396,7 +1402,11 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
 #ifdef ENABLE_HTTPS
-    rpt->ssl                = &w->ssl;
+    rpt->ssl.conn          = w->ssl.conn;
+    rpt->ssl.flags         = w->ssl.flags;
+
+    w->ssl.conn = NULL;
+    w->ssl.flags = NETDATA_SSL_START;
 #endif
 
     if(w->user_agent && w->user_agent[0]) {
