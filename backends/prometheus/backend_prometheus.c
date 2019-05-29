@@ -539,7 +539,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
     rrdhost_unlock(host);
 }
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
 inline static void remote_write_split_words(char *str, char **words, int max_words) {
     char *s = str;
     int i = 0;
@@ -708,7 +708,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
         }
     }
 }
-#endif /* HAVE_PROTOBUF */
+#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
 static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_OPTIONS backend_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";
@@ -773,7 +773,7 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
     rrd_unlock();
 }
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
 int process_prometheus_remote_write_response(BUFFER *b) {
     if(!b) return 1;
 

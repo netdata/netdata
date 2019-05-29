@@ -260,7 +260,7 @@ void *backends_main(void *ptr) {
     char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
 #endif
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
     int do_prometheus_remote_write = 0;
     BUFFER *http_request_header = buffer_create(1);
 #endif
@@ -291,7 +291,7 @@ void *backends_main(void *ptr) {
     charts_pattern = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send charts matching", "*"), NULL, SIMPLE_PATTERN_EXACT);
     hosts_pattern  = simple_pattern_create(config_get(CONFIG_SECTION_BACKEND, "send hosts matching", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
     const char *remote_write_path = config_get(CONFIG_SECTION_BACKEND, "remote write URL path", "/receive");
 #endif
 
@@ -368,7 +368,7 @@ void *backends_main(void *ptr) {
 #endif /* HAVE_KINESIS */
     }
     else if (!strcmp(type, "prometheus_remote_write")) {
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
         do_prometheus_remote_write = 1;
 
         backend_response_checker = process_prometheus_remote_write_response;
@@ -376,14 +376,14 @@ void *backends_main(void *ptr) {
         init_write_request();
 #else
         error("Prometheus remote write support isn't compiled");
-#endif /* HAVE_PROTOBUF */
+#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
     }
     else {
         error("BACKEND: Unknown backend type '%s'", type);
         goto cleanup;
     }
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
     if((backend_request_formatter == NULL && !do_prometheus_remote_write) || backend_response_checker == NULL) {
 #else
     if(backend_request_formatter == NULL || backend_response_checker == NULL) {
@@ -476,7 +476,7 @@ void *backends_main(void *ptr) {
         size_t count_charts_total = 0;
         size_t count_dims_total = 0;
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
         clear_write_request();
 #endif
         rrd_rdlock();
@@ -506,7 +506,7 @@ void *backends_main(void *ptr) {
 
             const char *__hostname = (host == localhost)?hostname:host->hostname;
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
             if(do_prometheus_remote_write) {
                 rrd_stats_remote_write_allmetrics_prometheus(
                     host
@@ -719,7 +719,7 @@ void *backends_main(void *ptr) {
                 flags += MSG_NOSIGNAL;
     #endif
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
                 if(do_prometheus_remote_write) {
                     size_t data_size = get_write_request_size();
 
@@ -793,7 +793,7 @@ void *backends_main(void *ptr) {
         }
 
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
         if(failures) {
             (void) buffer_on_failures;
             failures = 0;
@@ -811,7 +811,7 @@ void *backends_main(void *ptr) {
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
         }
-#endif /* HAVE_PROTOBUF */
+#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
         if(unlikely(netdata_exit)) break;
 
@@ -867,7 +867,7 @@ cleanup:
     }
 #endif
 
-#if HAVE_PROTOBUF
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
     if(do_prometheus_remote_write) {
         buffer_free(http_request_header);
         protocol_buffers_shutdown();
