@@ -35,7 +35,9 @@ void security_openssl_library()
 }
 
 void security_openssl_common_options(SSL_CTX *ctx){
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
     static char *ciphers = {"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"};
+#endif
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
@@ -46,9 +48,11 @@ void security_openssl_common_options(SSL_CTX *ctx){
 #endif
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
     if (!SSL_CTX_set_cipher_list(ctx,ciphers) ){
         error("SSL error. cannot set the cipher list");
     }
+#endif
 
 
 }

@@ -1006,12 +1006,15 @@ static inline void web_client_send_http_header(struct web_client *w) {
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
     }
 
-    char headerbegin[128];
+    char headerbegin[8328];
     if (w->response.code == 301) {
         memcpy(headerbegin,"\r\nLocation: https://",20);
         size_t headerlength = strlen(ipredirect);
         memcpy(&headerbegin[20],ipredirect,headerlength);
         headerlength += 20;
+        size_t tmp = strlen(w->last_url);
+        memcpy(&headerbegin[headerlength],w->last_url,tmp);
+        headerlength += tmp;
         memcpy(&headerbegin[headerlength],"\r\n",2);
         headerlength += 2;
         headerbegin[headerlength] = 0x00;
