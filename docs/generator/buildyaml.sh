@@ -127,6 +127,7 @@ echo -ne "    - 'docs/Demo-Sites.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
+    - SECURITY.md
 - Why Netdata:
     - 'docs/why-netdata/README.md'
     - 'docs/why-netdata/1s-granularity.md'
@@ -253,7 +254,6 @@ navpart 2 web/api/queries "" "Queries" 2
 
 echo -ne "- Hacking Netdata:
     - CODE_OF_CONDUCT.md
-    - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
 "
 navpart 2 packaging/makeself "" "" 4
