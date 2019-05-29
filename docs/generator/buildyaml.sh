@@ -127,7 +127,7 @@ echo -ne "    - 'docs/Demo-Sites.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
-    - 'docs/Netdata-Security-and-Disclosure-Information.md'
+    - SECURITY.md
 - Why Netdata:
     - 'docs/why-netdata/README.md'
     - 'docs/why-netdata/1s-granularity.md'
