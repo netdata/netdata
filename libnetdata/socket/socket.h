@@ -53,8 +53,8 @@ extern int connect_to_this(const char *definition, int default_port, struct time
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
 #ifdef ENABLE_HTTPS
-extern ssize_t recv_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
-extern ssize_t send_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+extern ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+extern ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 #else
 extern ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 extern ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);

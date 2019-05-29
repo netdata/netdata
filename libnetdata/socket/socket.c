@@ -848,7 +848,7 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
 #ifdef ENABLE_HTTPS
-ssize_t recv_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
 #else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
 #endif
@@ -881,17 +881,15 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 
 #ifdef ENABLE_HTTPS
-    (void)flags;
-    if (ssl)
-    {
-        return SSL_read(ssl,buf,len);
+    if (ssl->conn){
+        return SSL_read(ssl->conn,buf,len);
     }
 #endif
     return recv(sockfd, buf, len, flags);
 }
 
 #ifdef ENABLE_HTTPS
-ssize_t send_timeout(SSL *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
 #else
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
 #endif
@@ -925,8 +923,8 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 
 #ifdef ENABLE_HTTPS
     (void)flags;
-    if(ssl){
-        return SSL_write(ssl, buf, len);
+    if(ssl->conn){
+        return SSL_write(ssl->conn, buf, len);
     }
 #endif
     return send(sockfd, buf, len, flags);

@@ -564,7 +564,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
             }
         }
     }
-    if(send_timeout((!host->ssl.flags)?host->ssl.conn:NULL,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
+    if(send_timeout(&host->ssl,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #else
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
 #endif
@@ -576,7 +576,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
 #ifdef ENABLE_HTTPS
-    if(recv_timeout((!host->ssl.flags)?host->ssl.conn:NULL,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    if(recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
 #else
     if(recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
 #endif
@@ -1059,8 +1059,7 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
 #ifdef ENABLE_HTTPS
-
-    if(send_timeout((!ssl->flags)?ssl->conn:NULL,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+    if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #endif

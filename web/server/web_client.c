@@ -144,20 +144,6 @@ void web_client_request_done(struct web_client *w) {
 
             if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
                 if (w->ifd != -1){
-                    /*
-#ifdef ENABLE_HTTPS
-                    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )){
-                        if (w->ssl.conn){
-                            SSL_set_shutdown(w->ssl.conn, SSL_RECEIVED_SHUTDOWN);
-                            if (!SSL_shutdown(w->ssl.conn)){
-                                SSL_shutdown(w->ssl.conn);
-                            }
-                            SSL_free(w->ssl.conn);
-                            w->ssl.conn = NULL;
-                        }
-                    }
-#endif
-                     */
                     close(w->ifd);
                 }
             }
