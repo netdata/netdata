@@ -735,8 +735,8 @@ static void basic_functional_test(struct rrdengine_instance *ctx)
     uuid_t uuid[NR_PAGES];
     void *buf;
     struct rrdeng_page_descr *handle[NR_PAGES];
-    char uuid_str[37];
-    char backup[NR_PAGES][37 * 100]; /* backup storage for page data verification */
+    char uuid_str[UUID_STR_LEN];
+    char backup[NR_PAGES][UUID_STR_LEN * 100]; /* backup storage for page data verification */
 
     for (i = 0 ; i < NR_PAGES ; ++i) {
         uuid_generate(uuid[i]);
@@ -745,8 +745,8 @@ static void basic_functional_test(struct rrdengine_instance *ctx)
         buf = rrdeng_create_page(ctx, &uuid[i], &handle[i]);
         /* Each page contains 10 times its own UUID stringified */
         for (j = 0 ; j < 100 ; ++j) {
-            strcpy(buf + 37 * j, uuid_str);
-            strcpy(backup[i] + 37 * j, uuid_str);
+            strcpy(buf + UUID_STR_LEN * j, uuid_str);
+            strcpy(backup[i] + UUID_STR_LEN * j, uuid_str);
         }
         rrdeng_commit_page(ctx, handle[i], (Word_t)i);
     }
@@ -758,7 +758,7 @@ static void basic_functional_test(struct rrdengine_instance *ctx)
             ++failed_validations;
             fprintf(stderr, "Page %d was LOST.\n", i);
         }
-        if (memcmp(backup[i], buf, 37 * 100)) {
+        if (memcmp(backup[i], buf, UUID_STR_LEN * 100)) {
             ++failed_validations;
             fprintf(stderr, "Page %d data comparison with backup FAILED validation.\n", i);
         }

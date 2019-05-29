@@ -404,6 +404,7 @@ void rrdeng_get_28_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[25] = (uint64_t)ctx->stats.journalfile_creations;
     array[26] = (uint64_t)ctx->stats.journalfile_deletions;
     array[27] = (uint64_t)ctx->stats.page_cache_descriptors;
+    assert(RRDENG_NR_STATS == 28);
 }
 
 /* Releases reference to page */

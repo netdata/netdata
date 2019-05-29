@@ -1,49 +1,51 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+#define BUFSIZE (512)
+
 /* Caller must hold descriptor lock */
 void print_page_cache_descr(struct rrdeng_page_descr *descr)
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
-    char uuid_str[37];
-    char str[512];
+    char uuid_str[UUID_STR_LEN];
+    char str[BUFSIZE];
     int pos = 0;
 
     uuid_unparse_lower(*descr->id, uuid_str);
-    pos += snprintfz(str, 512 - pos, "page(%p) id=%s\n"
+    pos += snprintfz(str, BUFSIZE - pos, "page(%p) id=%s\n"
                                     "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
                     pg_cache_descr->page, uuid_str,
                     descr->page_length,
                     (uint64_t)descr->start_time,
                     (uint64_t)descr->end_time);
     if (!descr->extent) {
-        pos += snprintfz(str + pos, 512 - pos, "N/A");
+        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
     } else {
-        pos += snprintfz(str + pos, 512 - pos, "%"PRIu64, descr->extent->offset);
+        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
     }
-    snprintfz(str + pos, 512 - pos, " flags:0x%2.2lX refcnt:%u\n\n", pg_cache_descr->flags, pg_cache_descr->refcnt);
+    snprintfz(str + pos, BUFSIZE - pos, " flags:0x%2.2lX refcnt:%u\n\n", pg_cache_descr->flags, pg_cache_descr->refcnt);
     fputs(str, stderr);
 }
 
 void print_page_descr(struct rrdeng_page_descr *descr)
 {
-    char uuid_str[37];
-    char str[512];
+    char uuid_str[UUID_STR_LEN];
+    char str[BUFSIZE];
     int pos = 0;
 
     uuid_unparse_lower(*descr->id, uuid_str);
-    pos += snprintfz(str, 512 - pos, "id=%s\n"
+    pos += snprintfz(str, BUFSIZE - pos, "id=%s\n"
                                      "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
                      uuid_str,
                      descr->page_length,
                      (uint64_t)descr->start_time,
                      (uint64_t)descr->end_time);
     if (!descr->extent) {
-        pos += snprintfz(str + pos, 512 - pos, "N/A");
+        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
     } else {
-        pos += snprintfz(str + pos, 512 - pos, "%"PRIu64, descr->extent->offset);
+        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
     }
-    snprintfz(str + pos, 512 - pos, "\n\n");
+    snprintfz(str + pos, BUFSIZE - pos, "\n\n");
     fputs(str, stderr);
 }
 

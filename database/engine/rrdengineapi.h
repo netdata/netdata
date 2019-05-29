@@ -7,6 +7,9 @@
 
 #define RRDENG_MIN_PAGE_CACHE_SIZE_MB (32)
 #define RRDENG_MIN_DISK_SPACE_MB (256)
+
+#define RRDENG_NR_STATS (28)
+
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_disk_quota_mb;
 
