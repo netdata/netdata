@@ -439,7 +439,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
                 if(unlikely(!raid->rd_inuse && !(raid->rd_inuse = rrddim_find(raid->st_disks, "inuse"))))
                     raid->rd_inuse = rrddim_add(raid->st_disks, "inuse", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                if(unlikely(!raid->rd_down && !(raid->rd_down = rrddim_find(raid->st_disks, "total"))))
+                if(unlikely(!raid->rd_down && !(raid->rd_down = rrddim_find(raid->st_disks, "down"))))
                     raid->rd_down = rrddim_add(raid->st_disks, "down", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_disks, raid->rd_inuse, raid->inuse_disks);
