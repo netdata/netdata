@@ -507,7 +507,7 @@ void *backends_main(void *ptr) {
             const char *__hostname = (host == localhost)?hostname:host->hostname;
 
 #if HAVE_PROTOBUF
-            if(do_prometheus_remote_write)
+            if(do_prometheus_remote_write) {
                 rrd_stats_remote_write_allmetrics_prometheus(
                     host
                     , __hostname
@@ -519,6 +519,8 @@ void *backends_main(void *ptr) {
                     , &count_dims
                     , &count_dims_skipped
                 );
+                chart_buffered_metrics += count_dims;
+            }
             else
 #endif
             {
@@ -730,6 +732,7 @@ void *backends_main(void *ptr) {
                     buffer_need_bytes(b, data_size);
                     pack_write_request(b->buffer, &data_size);
                     b->len = data_size;
+                    chart_buffered_bytes = (collected_number)buffer_strlen(b);
 
                     buffer_flush(http_request_header);
                     buffer_sprintf(http_request_header,
@@ -789,6 +792,16 @@ void *backends_main(void *ptr) {
             }
         }
 
+
+#if HAVE_PROTOBUF
+        if(failures) {
+            (void) buffer_on_failures;
+            failures = 0;
+            chart_lost_bytes = chart_buffered_bytes = get_write_request_size(); // estimated write request size
+            chart_data_lost_events++;
+            chart_lost_metrics = chart_buffered_metrics;
+        }
+#else
         if(failures > buffer_on_failures) {
             // too bad! we are going to lose data
             chart_lost_bytes += buffer_strlen(b);
@@ -798,6 +811,7 @@ void *backends_main(void *ptr) {
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
         }
+#endif /* HAVE_PROTOBUF */
 
         if(unlikely(netdata_exit)) break;
 
