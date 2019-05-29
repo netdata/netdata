@@ -723,14 +723,14 @@ void *backends_main(void *ptr) {
                 if(do_prometheus_remote_write) {
                     size_t data_size = get_write_request_size();
 
-                    if(!data_size) {
+                    if(unlikely(!data_size)) {
                         error("BACKEND: write request size is out of range");
                         continue;
                     }
 
                     buffer_flush(b);
                     buffer_need_bytes(b, data_size);
-                    if(pack_write_request(b->buffer, &data_size)) {
+                    if(unlikely(pack_write_request(b->buffer, &data_size))) {
                         error("BACKEND: cannot pack write request");
                         continue;
                     }
