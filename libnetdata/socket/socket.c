@@ -11,8 +11,6 @@
 #define LARGE_SOCK_SIZE 4096
 #endif
 
-char ipredirect[64];
-
 int sock_setnonblock(int fd) {
     int flags;
 
@@ -515,11 +513,6 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
         sockets->default_port = (uint16_t) appconfig_set_number(sockets->config, sockets->config_section, "default port", old_port);
     }
     else sockets->default_port = (uint16_t)new_port;
-
-    if ( (ipredirect[0]) && (!strncmp(sockets->config_section,"web",3)) ){
-        new_port = (long long int)strlen(ipredirect);
-        snprintf(&ipredirect[new_port],16,":%d",sockets->default_port);
-    }
 
     debug(D_OPTIONS, "LISTENER: Default listen port set to %d.", sockets->default_port);
 

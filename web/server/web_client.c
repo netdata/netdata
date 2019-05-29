@@ -743,7 +743,7 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0;
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0, hash_host = 0;
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
@@ -752,6 +752,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         hash_donottrack = simple_uhash("DNT");
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
+        hash_host = simple_uhash("Host");
     }
 
     char *e = s;
@@ -799,6 +800,9 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     } else if(hash == hash_authorization&& !strcasecmp(s, "X-Auth-Token")) {
         w->auth_bearer_token = strdupz(v);
     }
+    else if(hash == hash_host && !strcasecmp(s, "Host")){
+        strncpyz(w->host, v, (ve - v));
+    }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
         if(web_enable_gzip) {
@@ -811,6 +815,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         }
     }
 #endif /* NETDATA_WITH_ZLIB */
+    error("KILLME REQUEST %s",w->host);
 
     *e = ':';
     *ve = '\r';
@@ -1011,8 +1016,8 @@ static inline void web_client_send_http_header(struct web_client *w) {
     char headerbegin[8328];
     if (w->response.code == 301) {
         memcpy(headerbegin,"\r\nLocation: https://",20);
-        size_t headerlength = strlen(ipredirect);
-        memcpy(&headerbegin[20],ipredirect,headerlength);
+        size_t headerlength = strlen(w->host);
+        memcpy(&headerbegin[20],w->host,headerlength);
         headerlength += 20;
         size_t tmp = strlen(w->last_url);
         memcpy(&headerbegin[headerlength],w->last_url,tmp);
@@ -1021,7 +1026,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
         headerlength += 2;
         headerbegin[headerlength] = 0x00;
     }else {
-        strncpy(headerbegin,"\r\n",2);
+        memcpy(headerbegin,"\r\n",2);
         headerbegin[2]=0x00;
     }
 
