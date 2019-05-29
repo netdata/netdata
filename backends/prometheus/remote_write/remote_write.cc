@@ -19,7 +19,7 @@ void clear_write_request() {
     write_request->clear_timeseries();
 }
 
-int add_host_info(const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp) {
+void add_host_info(const char *name, const char *instance, const char *application, const char *version, const int64_t timestamp) {
     TimeSeries *timeseries;
     Sample *sample;
     Label *label;
@@ -49,12 +49,10 @@ int add_host_info(const char *name, const char *instance, const char *applicatio
     sample = timeseries->add_samples();
     sample->set_value(1);
     sample->set_timestamp(timestamp);
-
-    return 0;
 }
 
 // adds tag to the last created timeseries
-int add_tag(char *tag, char *value) {
+void add_tag(char *tag, char *value) {
     TimeSeries *timeseries;
     Label *label;
 
@@ -63,11 +61,9 @@ int add_tag(char *tag, char *value) {
     label = timeseries->add_labels();
     label->set_name(tag);
     label->set_value(value);
-
-    return 0;
 }
 
-int add_metric(const char *name, const char *chart, const char *family, const char *dimension, const char *instance, const double value, const int64_t timestamp) {
+void add_metric(const char *name, const char *chart, const char *family, const char *dimension, const char *instance, const double value, const int64_t timestamp) {
     TimeSeries *timeseries;
     Sample *sample;
     Label *label;
@@ -99,17 +95,17 @@ int add_metric(const char *name, const char *chart, const char *family, const ch
     sample = timeseries->add_samples();
     sample->set_value(value);
     sample->set_timestamp(timestamp);
-
-    return 0;
 }
 
 size_t get_write_request_size(){
-    return (size_t)snappy::MaxCompressedLength(write_request->ByteSize());
+    size_t size = (size_t)snappy::MaxCompressedLength(write_request->ByteSize());
+
+    return (size < INT_MAX)?size:0;
 }
 
 int pack_write_request(char *buffer, size_t *size) {
     std::string uncompressed_write_request;
-    write_request->SerializeToString(&uncompressed_write_request);
+    if(write_request->SerializeToString(&uncompressed_write_request) == false) return 1;
 
     snappy::RawCompress(uncompressed_write_request.data(), uncompressed_write_request.size(), buffer, size);
 
