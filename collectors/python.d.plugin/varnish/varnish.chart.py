@@ -205,9 +205,9 @@ class Service(ExecutableService):
 
         ver = parse_varnish_version(reply)
         if not ver:
-            self.error("failed to parse reply from {0} using '{1}' regex, reply : {2}".format(
-                ' '.join(self.command),
-                re_version,
+            self.error("failed to parse reply from '{0}', used regex :'{1}', reply : {2}".format(
+                ' '.join(command),
+                re_version.pattern,
                 reply,
             ))
             return False
