@@ -882,7 +882,9 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
 
 #ifdef ENABLE_HTTPS
     if (ssl->conn){
-        return SSL_read(ssl->conn,buf,len);
+        if (!ssl->flags){
+            return SSL_read(ssl->conn,buf,len);
+        }
     }
 #endif
     return recv(sockfd, buf, len, flags);
@@ -922,9 +924,10 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 
 #ifdef ENABLE_HTTPS
-    (void)flags;
     if(ssl->conn){
-        return SSL_write(ssl->conn, buf, len);
+        if (!ssl->flags){
+            return SSL_write(ssl->conn, buf, len);
+        }
     }
 #endif
     return send(sockfd, buf, len, flags);
