@@ -218,7 +218,7 @@ class Service(ExecutableService):
             self.command = [varnishstat, '-1']
 
         if ver.major > 4:
-            self.command.extend(['-t', '-1'])
+            self.command.extend(['-t', '1'])
 
         self.info("varnish version: {0}, will use command: '{1}'".format(ver, ' '.join(self.command)))
 
