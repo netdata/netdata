@@ -226,7 +226,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     unsigned i, count, payload_length, descr_size, valid_pages;
-    struct rrdeng_page_cache_descr *descr;
+    struct rrdeng_page_descr *descr;
     struct extent_info *extent;
     /* persistent structures */
     struct rrdeng_jf_store_data *jf_metric_data;

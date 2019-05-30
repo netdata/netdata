@@ -326,6 +326,8 @@ if ENABLE_DBENGINE
         database/engine/rrdengineapi.h \
         database/engine/pagecache.c \
         database/engine/pagecache.h \
+        database/engine/rrdenglocking.c \
+        database/engine/rrdenglocking.h \
         $(NULL)
 endif
 

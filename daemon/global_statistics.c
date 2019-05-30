@@ -535,10 +535,10 @@ void global_statistics_charts(void) {
 
 #ifdef ENABLE_DBENGINE
     if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        unsigned long long stats_array[27];
+        unsigned long long stats_array[RRDENG_NR_STATS];
 
         /* get localhost's DB engine's statistics */
-        rrdeng_get_27_statistics(localhost->rrdeng_ctx, stats_array);
+        rrdeng_get_28_statistics(localhost->rrdeng_ctx, stats_array);
 
         // ----------------------------------------------------------------
 
@@ -637,6 +637,7 @@ void global_statistics_charts(void) {
 
         {
             static RRDSET *st_pg_cache_pages = NULL;
+            static RRDDIM *rd_descriptors = NULL;
             static RRDDIM *rd_populated = NULL;
             static RRDDIM *rd_commited = NULL;
             static RRDDIM *rd_insertions = NULL;
@@ -660,6 +661,7 @@ void global_statistics_charts(void) {
                         , RRDSET_TYPE_LINE
                 );
 
+                rd_descriptors = rrddim_add(st_pg_cache_pages, "descriptors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_populated = rrddim_add(st_pg_cache_pages, "populated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_commited = rrddim_add(st_pg_cache_pages, "commited", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_insertions = rrddim_add(st_pg_cache_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -670,6 +672,7 @@ void global_statistics_charts(void) {
             else
                 rrdset_next(st_pg_cache_pages);
 
+            rrddim_set_by_pointer(st_pg_cache_pages, rd_descriptors, (collected_number)stats_array[27]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_populated, (collected_number)stats_array[3]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_commited, (collected_number)stats_array[4]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_insertions, (collected_number)stats_array[5]);

@@ -456,6 +456,8 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdengineapi.h
         database/engine/pagecache.c
         database/engine/pagecache.h
+        database/engine/rrdenglocking.c
+        database/engine/rrdenglocking.h
         )
 
 set(WEB_PLUGIN_FILES
