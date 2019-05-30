@@ -27,7 +27,8 @@ void read_extent_cb(uv_fs_t* req)
     struct rrdengine_worker_config* wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
-    struct rrdeng_page_cache_descr *descr;
+    struct rrdeng_page_descr *descr;
+    struct page_cache_descr *pg_cache_descr;
     int ret;
     unsigned i, j, count;
     void *page, *uncompressed_buf = NULL;
@@ -97,17 +98,18 @@ void read_extent_cb(uv_fs_t* req)
             (void) memcpy(page, uncompressed_buf + page_offset, descr->page_length);
         }
         pg_cache_replaceQ_insert(ctx, descr);
-        uv_mutex_lock(&descr->mutex);
-        descr->page = page;
-        descr->flags |= RRD_PAGE_POPULATED;
-        descr->flags &= ~RRD_PAGE_READ_PENDING;
+        rrdeng_page_descr_mutex_lock(ctx, descr);
+        pg_cache_descr = descr->pg_cache_descr;
+        pg_cache_descr->page = page;
+        pg_cache_descr->flags |= RRD_PAGE_POPULATED;
+        pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
         debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
         if (xt_io_descr->release_descr) {
             pg_cache_put_unsafe(descr);
         } else {
             pg_cache_wake_up_waiters_unsafe(descr);
         }
-        uv_mutex_unlock(&descr->mutex);
+        rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     if (RRD_NO_COMPRESSION != header->compression_algorithm) {
         free(uncompressed_buf);
@@ -122,11 +124,12 @@ cleanup:
 
 
 static void do_read_extent(struct rrdengine_worker_config* wc,
-                           struct rrdeng_page_cache_descr **descr,
+                           struct rrdeng_page_descr **descr,
                            unsigned count,
                            uint8_t release_descr)
 {
     struct rrdengine_instance *ctx = wc->ctx;
+    struct page_cache_descr *pg_cache_descr;
     int ret;
     unsigned i, size_bytes, pos, real_io_size;
 //    uint32_t payload_length;
@@ -145,10 +148,11 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
         return;*/
     }
     for (i = 0 ; i < count; ++i) {
-        uv_mutex_lock(&descr[i]->mutex);
-        descr[i]->flags |= RRD_PAGE_READ_PENDING;
+        rrdeng_page_descr_mutex_lock(ctx, descr[i]);
+        pg_cache_descr = descr[i]->pg_cache_descr;
+        pg_cache_descr->flags |= RRD_PAGE_READ_PENDING;
 //        payload_length = descr[i]->page_length;
-        uv_mutex_unlock(&descr[i]->mutex);
+        rrdeng_page_descr_mutex_unlock(ctx, descr[i]);
 
         xt_io_descr->descr_array[i] = descr[i];
     }
@@ -227,7 +231,8 @@ void flush_pages_cb(uv_fs_t* req)
     struct rrdengine_instance *ctx = wc->ctx;
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct extent_io_descriptor *xt_io_descr;
-    struct rrdeng_page_cache_descr *descr;
+    struct rrdeng_page_descr *descr;
+    struct page_cache_descr *pg_cache_descr;
     struct rrdengine_datafile *datafile;
     int ret;
     unsigned i, count;
@@ -256,11 +261,12 @@ void flush_pages_cb(uv_fs_t* req)
 
         pg_cache_replaceQ_insert(ctx, descr);
 
-        uv_mutex_lock(&descr->mutex);
-        descr->flags &= ~(RRD_PAGE_DIRTY | RRD_PAGE_WRITE_PENDING);
+        rrdeng_page_descr_mutex_lock(ctx, descr);
+        pg_cache_descr = descr->pg_cache_descr;
+        pg_cache_descr->flags &= ~(RRD_PAGE_DIRTY | RRD_PAGE_WRITE_PENDING);
         /* wake up waiters, care no reference being held */
         pg_cache_wake_up_waiters_unsafe(descr);
-        uv_mutex_unlock(&descr->mutex);
+        rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     if (xt_io_descr->completion)
         complete(xt_io_descr->completion);
@@ -283,7 +289,8 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     int compressed_size, max_compressed_size = 0;
     unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, payload_offset;
-    struct rrdeng_page_cache_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
+    struct rrdeng_page_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
+    struct page_cache_descr *pg_cache_descr;
     struct extent_io_descriptor *xt_io_descr;
     void *compressed_buf = NULL;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
@@ -311,15 +318,16 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         assert(0 != descr->page_length);
 
-        uv_mutex_lock(&descr->mutex);
-        if (!(descr->flags & RRD_PAGE_WRITE_PENDING)) {
+        rrdeng_page_descr_mutex_lock(ctx, descr);
+        pg_cache_descr = descr->pg_cache_descr;
+        if (!(pg_cache_descr->flags & RRD_PAGE_WRITE_PENDING)) {
             /* care, no reference being held */
-            descr->flags |= RRD_PAGE_WRITE_PENDING;
+            pg_cache_descr->flags |= RRD_PAGE_WRITE_PENDING;
             uncompressed_payload_length += descr->page_length;
             descr_commit_idx_array[count] = Index;
             eligible_pages[count++] = descr;
         }
-        uv_mutex_unlock(&descr->mutex);
+        rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     uv_rwlock_rdunlock(&pg_cache->commited_page_index.lock);
 
@@ -347,7 +355,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         fatal("posix_memalign:%s", strerror(ret));
         /* free(xt_io_descr);*/
     }
-    (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_cache_descr *) * count);
+    (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_descr *) * count);
     xt_io_descr->descr_count = count;
 
     pos = 0;
@@ -378,7 +386,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         /* care, we don't hold the descriptor mutex */
-        (void) memcpy(xt_io_descr->buf + pos, descr->page, descr->page_length);
+        (void) memcpy(xt_io_descr->buf + pos, descr->pg_cache_descr->page, descr->page_length);
         descr->extent = extent;
         extent->pages[i] = descr;
 
@@ -464,7 +472,7 @@ static void delete_old_data(uv_work_t *req)
     struct rrdengine_instance *ctx = req->data;
     struct rrdengine_datafile *datafile;
     struct extent_info *extent, *next;
-    struct rrdeng_page_cache_descr *descr;
+    struct rrdeng_page_descr *descr;
     unsigned count, i;
 
     /* Safe to use since it will be deleted after we are done */
@@ -690,14 +698,14 @@ void rrdeng_worker(void* arg)
                 do_commit_transaction(wc, STORE_DATA, NULL);
                 break;
             case RRDENG_FLUSH_PAGES: {
-                unsigned total_bytes, bytes_written;
+                unsigned bytes_written;
 
                 /* First I/O should be enough to call completion */
                 bytes_written = do_flush_pages(wc, 1, cmd.completion);
-                for (total_bytes =  bytes_written ;
-                     bytes_written && (total_bytes < DATAFILE_IDEAL_IO_SIZE) ;
-                     total_bytes += bytes_written) {
-                    bytes_written = do_flush_pages(wc, 1, NULL);
+                if (bytes_written) {
+                    while (do_flush_pages(wc, 1, NULL)) {
+                        ; /* Force flushing of all commited pages. */
+                    }
                 }
                 break;
             }
@@ -726,19 +734,19 @@ static void basic_functional_test(struct rrdengine_instance *ctx)
     int i, j, failed_validations;
     uuid_t uuid[NR_PAGES];
     void *buf;
-    struct rrdeng_page_cache_descr *handle[NR_PAGES];
-    char uuid_str[37];
-    char backup[NR_PAGES][37 * 100]; /* backup storage for page data verification */
+    struct rrdeng_page_descr *handle[NR_PAGES];
+    char uuid_str[UUID_STR_LEN];
+    char backup[NR_PAGES][UUID_STR_LEN * 100]; /* backup storage for page data verification */
 
     for (i = 0 ; i < NR_PAGES ; ++i) {
         uuid_generate(uuid[i]);
         uuid_unparse_lower(uuid[i], uuid_str);
 //      fprintf(stderr, "Generated uuid[%d]=%s\n", i, uuid_str);
-        buf = rrdeng_create_page(&uuid[i], &handle[i]);
+        buf = rrdeng_create_page(ctx, &uuid[i], &handle[i]);
         /* Each page contains 10 times its own UUID stringified */
         for (j = 0 ; j < 100 ; ++j) {
-            strcpy(buf + 37 * j, uuid_str);
-            strcpy(backup[i] + 37 * j, uuid_str);
+            strcpy(buf + UUID_STR_LEN * j, uuid_str);
+            strcpy(backup[i] + UUID_STR_LEN * j, uuid_str);
         }
         rrdeng_commit_page(ctx, handle[i], (Word_t)i);
     }
@@ -750,7 +758,7 @@ static void basic_functional_test(struct rrdengine_instance *ctx)
             ++failed_validations;
             fprintf(stderr, "Page %d was LOST.\n", i);
         }
-        if (memcmp(backup[i], buf, 37 * 100)) {
+        if (memcmp(backup[i], buf, UUID_STR_LEN * 100)) {
             ++failed_validations;
             fprintf(stderr, "Page %d data comparison with backup FAILED validation.\n", i);
         }

@@ -26,7 +26,7 @@ struct extent_info {
     uint8_t number_of_pages;
     struct rrdengine_datafile *datafile;
     struct extent_info *next;
-    struct rrdeng_page_cache_descr *pages[];
+    struct rrdeng_page_descr *pages[];
 };
 
 struct rrdengine_df_extents {
