@@ -482,7 +482,7 @@ static void delete_old_data(uv_work_t *req)
         count = extent->number_of_pages;
         for (i = 0 ; i < count ; ++i) {
             descr = extent->pages[i];
-            pg_cache_punch_hole(ctx, descr);
+            pg_cache_punch_hole(ctx, descr, 0);
         }
         next = extent->next;
         free(extent);

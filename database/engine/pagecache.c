@@ -221,7 +221,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     if (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1)
-        debug(D_RRDENGINE, "=================================\nPage cache full. Reserving %u pages.\n=================================",
+        debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
                 number);
     while (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1) {
         if (!pg_cache_try_evict_one_page_unsafe(ctx)) {
@@ -263,7 +263,7 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     if (pg_cache->populated_pages + number >= ctx->cache_pages_low_watermark + 1) {
         debug(D_RRDENGINE,
-              "=================================\nPage cache full. Trying to reserve %u pages.\n=================================",
+              "==Page cache full. Trying to reserve %u pages.==",
               number);
         do {
             if (!pg_cache_try_evict_one_page_unsafe(ctx))
@@ -337,10 +337,7 @@ static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
     return 0;
 }
 
-/*
- * TODO: last waiter frees descriptor ?
- */
-void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     struct page_cache_descr *pg_cache_descr = NULL;
@@ -382,12 +379,14 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
                 print_page_cache_descr(descr);
             pg_cache_wait_event_unsafe(descr);
         }
-        /* even a locked page could be dirty */
-        while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
-            debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
-            if (unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr);
-            pg_cache_wait_event_unsafe(descr);
+        if (!remove_dirty) {
+            /* even a locked page could be dirty */
+            while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
+                debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
+                if (unlikely(debug_flags & D_RRDENGINE))
+                    print_page_cache_descr(descr);
+                pg_cache_wait_event_unsafe(descr);
+            }
         }
         if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
             /* only after locking can it be safely deleted from LRU */
@@ -403,7 +402,9 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
         rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
     }
 destroy:
-    assert(0 == descr->pg_cache_descr_state);
+    if (!remove_dirty) {
+        assert(0 == descr->pg_cache_descr_state);
+    }
     freez(descr);
     pg_cache_update_metric_times(page_index);
 }
