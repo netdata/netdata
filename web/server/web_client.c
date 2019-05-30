@@ -961,10 +961,10 @@ static inline void web_client_parse_headers(struct web_client *w,char *s){
 void web_client_parse_request(struct web_client *w,char *divisor){
     if(!divisor){
         w->total_params = 0;
-        error("KILLME TOTAL %u",w->total_params);
         return;
     }
-    char *moveme = w->query_string.body + 1;
+
+    char *moveme = w->query_string.body +1;
     uint32_t i = 0;
     uint32_t max = WEB_FIELDS_MAX;
 
@@ -977,28 +977,30 @@ void web_client_parse_request(struct web_client *w,char *divisor){
         }
         if (divisor){
             names[i].body = moveme;
-            names[i].length = divisor - moveme;
+            names[i].length = divisor - moveme;//= - begin
 
-            moveme = ++divisor;
+            moveme = ++divisor; //value
             values[i].body = moveme;
 
-            divisor = strchr(moveme,'&');
+            divisor = strchr(moveme,'&'); //end of value
             if ( divisor){
                 values[i].length = (size_t )(divisor - moveme);
-                divisor++;
             } else{
                 values[i].length = strlen(moveme);
+                break;
             }
-            error("KILLME params %u (%lu,%lu)",i,names[i].length,values[i].length  );
-            i++;
+
+            error("KILLME params %u (%s,%s) (%lu,%lu)",i,names[i].body,values[i].body,names[i].length,values[i].length);
             moveme = divisor;
+            divisor = strchr(++moveme,'='); //end of value
+            i++;
         } else{
             break;
         }
-
     }while (moveme);
 
-    w->total_params = i;
+    error("KILLME params %u (%s,%s) (%lu,%lu)",i,names[i].body,values[i].body,names[i].length,values[i].length);
+    w->total_params = ++i;
     error("KILLME TOTAL %u",w->total_params);
 }
 
