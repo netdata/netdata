@@ -1338,6 +1338,8 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                     do {
                         char client_ip[NI_MAXHOST + 1];
                         char client_port[NI_MAXSERV + 1];
+                        client_ip[0] = 0x00;
+                        client_port[0] = 0x00;
 
                         debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
                         nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, NI_MAXHOST + 1, client_port, NI_MAXSERV + 1, p->access_list);

@@ -729,12 +729,17 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0, hash_host = 0;
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0, hash_host = 0;
+#ifdef NETDATA_WITH_ZLIB
+    static uint32_t hash_accept_encoding = 0;
+#endif
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
         hash_connection = simple_uhash("Connection");
+#ifdef NETDATA_WITH_ZLIB
         hash_accept_encoding = simple_uhash("Accept-Encoding");
+#endif
         hash_donottrack = simple_uhash("DNT");
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
@@ -862,7 +867,26 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
-            error("The server is configured to always use encrypt connection, please enable the SSL on slave.");
+            char hostname[256];
+            char *copyme = strstr(s,"hostname=");
+            if ( copyme ){
+                copyme += 9;
+                char *end = strchr(copyme,'&');
+                if(end){
+                    size_t length = end - copyme;
+                    memcpy(hostname,copyme,length);
+                    hostname[length] = 0X00;
+                }
+                else{
+                    memcpy(hostname,"not available",13);
+                    hostname[13] = 0x00;
+                }
+            }
+            else{
+                memcpy(hostname,"not available",13);
+                hostname[13] = 0x00;
+            }
+            error("The server is configured to always use encrypt connection, please enable the SSL on slave with hostname '%s'.",hostname);
             return HTTP_VALIDATION_NOT_SUPPORTED;
         }
 #endif
