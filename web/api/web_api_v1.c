@@ -351,7 +351,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     uint32_t format = DATASOURCE_JSON;
     uint32_t options = 0x00000000;
 
-    uint32_t i = 0;
     uint32_t end = w->total_params;
     char *save = NULL;
     char *value ;
@@ -359,6 +358,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if(end){
         save = malloc(end*sizeof(char));
         if(save){
+            uint32_t i = 0;
             do {
                 char *name = w->param_name[i].body;
                 size_t lname = w->param_name[i].length;
@@ -520,7 +520,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     cleanup:
     if(save){
-        i = 0;
+        uint32_t i = 0;
         do {
             value = w->param_values[i].body;
             lvalue = w->param_values[i].length;

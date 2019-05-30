@@ -26,9 +26,9 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
 
     error("KILLME ALL METRICS %s",url);
 
-    uint32_t i = 0;
     uint32_t end = w->total_params;
     if (end){
+        uint32_t i = 0;
         do {
             char *name = w->param_name[i].body;
             size_t lname = w->param_name[i].length;
