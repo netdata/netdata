@@ -74,7 +74,7 @@ Both files must be readable by the netdata user. If any of the two files does no
 
 ```
 $ chown root:netdata /etc/netdata/ssl/key.pem /etc/netdata/ssl/cert.pem
-$ chmod 640 /etc/netdata/ssl/key.pem /etc/netdata/ssl/cert.pem
+$ chmod 640 /etc/netdata/ssl/key.pem
 ```
 
 the first command will change the owner of both files to root user and netdata group, while the last command will change the permission for root user to read and write on the files and the group to read them.
