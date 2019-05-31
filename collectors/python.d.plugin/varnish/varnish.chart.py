@@ -5,9 +5,8 @@
 
 import re
 
-from bases.collection import find_binary
 from bases.FrameworkServices.ExecutableService import ExecutableService
-
+from bases.collection import find_binary
 
 ORDER = [
     'session_connections',
@@ -138,6 +137,18 @@ CHARTS = {
 
 VARNISHSTAT = 'varnishstat'
 
+re_version = re.compile(r'varnish-(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)')
+
+
+class VarnishVersion:
+    def __init__(self, major, minor, patch):
+        self.major = major
+        self.minor = minor
+        self.patch = patch
+
+    def __str__(self):
+        return '{0}.{1}.{2}'.format(self.major, self.minor, self.patch)
+
 
 class Parser:
     _backend_new = re.compile(r'VBE.([\d\w_.]+)\(.*?\).(beresp[\w_]+)\s+(\d+)')
@@ -185,10 +196,32 @@ class Service(ExecutableService):
             self.error("can't locate '{0}' binary or binary is not executable by user netdata".format(VARNISHSTAT))
             return False
 
+        command = [varnishstat, '-V']
+        reply = self._get_raw_data(stderr=True, command=command)
+        if not reply:
+            self.error(
+                "no output from '{0}'. Is varnish running? Not enough privileges?".format(' '.join(self.command)))
+            return False
+
+        ver = parse_varnish_version(reply)
+        if not ver:
+            self.error("failed to parse reply from '{0}', used regex :'{1}', reply : {2}".format(
+                ' '.join(command),
+                re_version.pattern,
+                reply,
+            ))
+            return False
+
         if self.instance_name:
-            self.command = [varnishstat, '-1', '-n', self.instance_name, '-t', '1']
+            self.command = [varnishstat, '-1', '-n', self.instance_name]
         else:
-            self.command = [varnishstat, '-1', '-t', '1']
+            self.command = [varnishstat, '-1']
+
+        if ver.major > 4:
+            self.command.extend(['-t', '1'])
+
+        self.info("varnish version: {0}, will use command: '{1}'".format(ver, ' '.join(self.command)))
+
         return True
 
     def check(self):
@@ -198,14 +231,14 @@ class Service(ExecutableService):
         # STDOUT is not empty
         reply = self._get_raw_data()
         if not reply:
-            self.error("No output from 'varnishstat'. Is it running? Not enough privileges?")
+            self.error("no output from '{0}'. Is it running? Not enough privileges?".format(' '.join(self.command)))
             return False
 
         self.parser.init(reply)
 
         # Output is parsable
         if not self.parser.re_default:
-            self.error('Cant parse the output...')
+            self.error('cant parse the output...')
             return False
 
         if self.parser.re_backend:
@@ -260,3 +293,16 @@ class Service(ExecutableService):
 
             self.order.insert(0, chart_name)
             self.definitions.update(chart)
+
+
+def parse_varnish_version(lines):
+    m = re_version.search(lines[0])
+    if not m:
+        return None
+
+    m = m.groupdict()
+    return VarnishVersion(
+        int(m['major']),
+        int(m['minor']),
+        int(m['patch']),
+    )
