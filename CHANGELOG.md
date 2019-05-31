@@ -4,6 +4,10 @@
 
 **Fixed bugs:**
 
+- Fix date in pushbullet alarm notifications [\#6178](https://github.com/netdata/netdata/issues/6178)
+- Why is auto-update not working? V1.14.0 [\#6170](https://github.com/netdata/netdata/issues/6170)
+- httpcheck causes lots of SYN\_SENT dangling sockets [\#6152](https://github.com/netdata/netdata/issues/6152)
+- varnish plugin not showing \(varnish version 4\) [\#6149](https://github.com/netdata/netdata/issues/6149)
 - Reduce number of codacy issues [\#6131](https://github.com/netdata/netdata/issues/6131)
 - Optimize calls that gather system-info [\#6130](https://github.com/netdata/netdata/issues/6130)
 - Fix telemetry config in installer [\#6129](https://github.com/netdata/netdata/issues/6129)
@@ -15,24 +19,36 @@
 - opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6092](https://github.com/netdata/netdata/issues/6092)
 - Problem updating [\#6088](https://github.com/netdata/netdata/issues/6088)
 - invalid help links on platform \(web log nginx/apache\) [\#6086](https://github.com/netdata/netdata/issues/6086)
+- error "cgroup-network-helper.sh: DEBUG: virsh command is not available" with the lastest docker image [\#6073](https://github.com/netdata/netdata/issues/6073)
 - Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
 - netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
+- netdata/packaging/installer: Fix updater issue on empty config value [\#6182](https://github.com/netdata/netdata/pull/6182) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: nits and fixes [\#6121](https://github.com/netdata/netdata/pull/6121) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata: Fix labels usage, quotes are not needed [\#6091](https://github.com/netdata/netdata/pull/6091) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 **Closed issues:**
 
+- SN\_EMPTY\_SLOT RRDDIMM value detection inside DB engine [\#6105](https://github.com/netdata/netdata/issues/6105)
+- Optimize the memory footprint of the Database Engine [\#6010](https://github.com/netdata/netdata/issues/6010)
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
 - \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
 - alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
 
 **Merged pull requests:**
 
+- Make custom notification's instructions clearer [\#6181](https://github.com/netdata/netdata/pull/6181) ([cakrit](https://github.com/cakrit))
+- web log pattern fix [\#6180](https://github.com/netdata/netdata/pull/6180) ([ilyam8](https://github.com/ilyam8))
+- Correct date used in pushbullet notifications [\#6179](https://github.com/netdata/netdata/pull/6179) ([cakrit](https://github.com/cakrit))
+- Add empty page detection in DB engine [\#6173](https://github.com/netdata/netdata/pull/6173) ([mfundul](https://github.com/mfundul))
+- varnish v4 compatibility fix [\#6168](https://github.com/netdata/netdata/pull/6168) ([ilyam8](https://github.com/ilyam8))
+- Update security policy [\#6166](https://github.com/netdata/netdata/pull/6166) ([cakrit](https://github.com/cakrit))
+- Properly add security policy [\#6163](https://github.com/netdata/netdata/pull/6163) ([cakrit](https://github.com/cakrit))
 - Fix typo in README [\#6146](https://github.com/netdata/netdata/pull/6146) ([cakrit](https://github.com/cakrit))
 - Documentation fixes [\#6144](https://github.com/netdata/netdata/pull/6144) ([cakrit](https://github.com/cakrit))
 - x509check: add last\_collected alarm [\#6139](https://github.com/netdata/netdata/pull/6139) ([ilyam8](https://github.com/ilyam8))
 - web\_log: remove trailing space from nginx\_ext2 pattern [\#6138](https://github.com/netdata/netdata/pull/6138) ([ilyam8](https://github.com/ilyam8))
 - Change 'netdata' to 'Netdata' in /docs/ and /README.md [\#6137](https://github.com/netdata/netdata/pull/6137) ([apardyl](https://github.com/apardyl))
+- DB engine optimize RAM usage [\#6134](https://github.com/netdata/netdata/pull/6134) ([mfundul](https://github.com/mfundul))
 - Optimize calls that gather system info [\#6128](https://github.com/netdata/netdata/pull/6128) ([cakrit](https://github.com/cakrit))
 - Fix telemetry config in netdata-installer [\#6127](https://github.com/netdata/netdata/pull/6127) ([cakrit](https://github.com/cakrit))
 - Pass correct info to run funct. [\#6126](https://github.com/netdata/netdata/pull/6126) ([Steve8291](https://github.com/Steve8291))
@@ -51,6 +67,7 @@
 - Mention anonymous statistics in additional places in the docs [\#6084](https://github.com/netdata/netdata/pull/6084) ([cakrit](https://github.com/cakrit))
 - Add "custom-plugins.d" to fix error in log file [\#6080](https://github.com/netdata/netdata/pull/6080) ([Steve8291](https://github.com/Steve8291))
 - wmi alarms [\#6068](https://github.com/netdata/netdata/pull/6068) ([ilyam8](https://github.com/ilyam8))
+- SSL implementation for Netdata [\#5956](https://github.com/netdata/netdata/pull/5956) ([thiagoftsm](https://github.com/thiagoftsm))
 - use github templating mechanisms to classify issues when they are created [\#5776](https://github.com/netdata/netdata/pull/5776) ([paulfantom](https://github.com/paulfantom))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
