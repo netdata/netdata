@@ -171,3 +171,6 @@ docs/generator/build
 docs/generator/mkdocs.yml
 
 .environment.sh
+
+#CLion files
+netdata.cbp
