@@ -95,7 +95,7 @@ update() {
 
 	if [ -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
 		download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt" >&3 2>&3
-		if grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+		if [[ -n "${NETDATA_TARBALL_CHECKSUM}" ]] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
 			info "Newest version is already installed"
 		else
 			download "${NETDATA_TARBALL_URL}" "${tmpdir}/netdata-latest.tar.gz"
