@@ -198,9 +198,9 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     (void)url;
     int all = 0;
 
-    uint32_t  i = 0;
     uint32_t end = w->total_params;
     if(end){
+        uint32_t  i = 0;
         do{
             char *value = w->param_values[i].body;
             size_t length = w->param_values[i].length;
