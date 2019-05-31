@@ -221,9 +221,9 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     (void)url;
     uint32_t after = 0;
 
-    uint32_t  i = 0;
     uint32_t end = w->total_params;
     if(end){
+        uint32_t  i = 0;
         do{
             char *value = w->param_values[i].body;
             size_t lvalue = w->param_values[i].length;
@@ -321,14 +321,11 @@ void fix_google_param(char *s) {
 
 // returns the HTTP code
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
+    (void)url;
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = 400;
     BUFFER *dimensions = NULL;
-
-    if ( w->query_string.length){
-        url = w->query_string.body+1;
-    }
 
     buffer_flush(w->response.data);
 
@@ -352,87 +349,83 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     uint32_t options = 0x00000000;
 
     uint32_t end = w->total_params;
-    char *save = NULL;
+    char save[WEB_FIELDS_MAX];
     char *value ;
     size_t lvalue;
     if(end){
-        save = malloc(end*sizeof(char));
-        if(save){
-            uint32_t i = 0;
-            do {
-                char *name = w->param_name[i].body;
-                size_t lname = w->param_name[i].length;
-                value = w->param_values[i].body;
-                lvalue = w->param_values[i].length;
-                save[i] = value[lvalue];
-                value[lvalue] = 0x00;
+        uint32_t i = 0;
+        do {
+            char *name = w->param_name[i].body;
+            size_t lname = w->param_name[i].length;
+            value = w->param_values[i].body;
+            lvalue = w->param_values[i].length;
+            save[i] = value[lvalue];
+            value[lvalue] = 0x00;
 
-                debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
+            debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
-                error("KILLME LIST (%s,%lu) (%s,%lu)",name,lname,value,lvalue);
+            error("KILLME LIST (%s,%lu) (%s,%lu)",name,lname,value,lvalue);
 
-                // name and value are now the parameters
-                // they are not null and not empty
+            // name and value are now the parameters
+            // they are not null and not empty
 
-                if(!strncmp(name, "chart",lname)) chart = value;
-                else if(!strncmp(name, "dimension",lname) || !strncmp(name, "dim",lname) || !strncmp(name, "dimensions",lname) || !strncmp(name, "dims",lname)) {
-                    if(!dimensions) dimensions = buffer_create(100);
-                    buffer_strcat(dimensions, "|");
-                    buffer_strcat(dimensions, value);
-                }
-                else if(!strncmp(name, "after",lname)) after_str = value;
-                else if(!strncmp(name, "before",lname)) before_str = value;
-                else if(!strncmp(name, "points",lname)) points_str = value;
-                else if(!strncmp(name, "gtime",lname)) group_time_str = value;
-                else if(!strncmp(name, "group",lname)) {
-                    group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
-                }
-                else if(!strncmp(name, "format",lname)) {
-                    format = web_client_api_request_v1_data_format(value);
-                }
-                else if(!strncmp(name, "options",lname)) {
-                    options |= web_client_api_request_v1_data_options(value);
-                }
-                else if(!strncmp(name, "callback",lname)) {
-                    responseHandler = value;
-                }
-                else if(!strncmp(name, "filename",lname)) {
-                    outFileName = value;
-                }
-                else if(!strncmp(name, "tqx",lname)) {
-                    // parse Google Visualization API options
-                    // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
-                    char *tqx_name, *tqx_value;
+            if(!strncmp(name, "chart",lname)) chart = value;
+            else if(!strncmp(name, "dimension",lname) || !strncmp(name, "dim",lname) || !strncmp(name, "dimensions",lname) || !strncmp(name, "dims",lname)) {
+                if(!dimensions) dimensions = buffer_create(100);
+                buffer_strcat(dimensions, "|");
+                buffer_strcat(dimensions, value);
+            }
+            else if(!strncmp(name, "after",lname)) after_str = value;
+            else if(!strncmp(name, "before",lname)) before_str = value;
+            else if(!strncmp(name, "points",lname)) points_str = value;
+            else if(!strncmp(name, "gtime",lname)) group_time_str = value;
+            else if(!strncmp(name, "group",lname)) {
+                group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+            }
+            else if(!strncmp(name, "format",lname)) {
+                format = web_client_api_request_v1_data_format(value);
+            }
+            else if(!strncmp(name, "options",lname)) {
+                options |= web_client_api_request_v1_data_options(value);
+            }
+            else if(!strncmp(name, "callback",lname)) {
+                responseHandler = value;
+            }
+            else if(!strncmp(name, "filename",lname)) {
+                outFileName = value;
+            }
+            else if(!strncmp(name, "tqx",lname)) {
+                // parse Google Visualization API options
+                // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
+                char *tqx_name, *tqx_value;
 
-                    while(value) {
-                        tqx_value = mystrsep(&value, ";");
-                        if(!tqx_value || !*tqx_value) continue;
+                while(value) {
+                    tqx_value = mystrsep(&value, ";");
+                    if(!tqx_value || !*tqx_value) continue;
 
-                        tqx_name = mystrsep(&tqx_value, ":");
-                        if(!tqx_name || !*tqx_name) continue;
-                        if(!tqx_value || !*tqx_value) continue;
+                    tqx_name = mystrsep(&tqx_value, ":");
+                    if(!tqx_name || !*tqx_name) continue;
+                    if(!tqx_value || !*tqx_value) continue;
 
-                        if(!strcmp(tqx_name, "version"))
-                            google_version = tqx_value;
-                        else if(!strcmp(tqx_name, "reqId"))
-                            google_reqId = tqx_value;
-                        else if(!strcmp(tqx_name, "sig")) {
-                            google_sig = tqx_value;
-                            google_timestamp = strtoul(google_sig, NULL, 0);
-                        }
-                        else if(!strcmp(tqx_name, "out")) {
-                            google_out = tqx_value;
-                            format = web_client_api_request_v1_data_google_format(google_out);
-                        }
-                        else if(!strcmp(tqx_name, "responseHandler"))
-                            responseHandler = tqx_value;
-                        else if(!strcmp(tqx_name, "outFileName"))
-                            outFileName = tqx_value;
+                    if(!strcmp(tqx_name, "version"))
+                        google_version = tqx_value;
+                    else if(!strcmp(tqx_name, "reqId"))
+                        google_reqId = tqx_value;
+                    else if(!strcmp(tqx_name, "sig")) {
+                        google_sig = tqx_value;
+                        google_timestamp = strtoul(google_sig, NULL, 0);
                     }
+                    else if(!strcmp(tqx_name, "out")) {
+                        google_out = tqx_value;
+                        format = web_client_api_request_v1_data_google_format(google_out);
+                    }
+                    else if(!strcmp(tqx_name, "responseHandler"))
+                        responseHandler = tqx_value;
+                    else if(!strcmp(tqx_name, "outFileName"))
+                        outFileName = tqx_value;
                 }
-            } while (++i < end);
-
-        }
+            }
+        } while (++i < end);
     }
 
     // validate the google parameters given
@@ -519,14 +512,13 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
     cleanup:
-    if(save){
+    if(end){
         uint32_t i = 0;
         do {
             value = w->param_values[i].body;
             lvalue = w->param_values[i].length;
             value[lvalue] = save[i];
         } while ( ++i < end );
-        free(save);
     }
     buffer_free(dimensions);
     return ret;
