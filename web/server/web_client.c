@@ -1840,6 +1840,4 @@ ssize_t web_client_receive(struct web_client *w)
     }
 
     return(bytes);
-
-    return(bytes);
 }

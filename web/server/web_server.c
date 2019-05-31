@@ -137,5 +137,4 @@ void web_client_initialize_connection(struct web_client *w) {
     web_server_log_connection(w, "CONNECTED");
 
     web_client_cache_verify(0);
-
 }
