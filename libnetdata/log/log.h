@@ -36,6 +36,7 @@
 #define D_STATSD            0x0000000010000000
 #define D_POLLFD            0x0000000020000000
 #define D_STREAM            0x0000000040000000
+#define D_RRDENGINE         0x0000000100000000
 #define D_SYSTEM            0x8000000000000000
 
 //#define DEBUG (D_WEB_CLIENT_ACCESS|D_LISTENER|D_RRD_STATS)
@@ -54,6 +55,7 @@ extern FILE *stdaccess;
 extern const char *stdaccess_filename;
 extern const char *stderr_filename;
 extern const char *stdout_filename;
+extern const char *facility_log;
 
 extern int access_log_syslog;
 extern int error_log_syslog;

@@ -3,6 +3,7 @@
 #ifndef NETDATA_SOCKET_H
 #define NETDATA_SOCKET_H
 
+#include <openssl/ossl_typ.h>
 #include "../libnetdata.h"
 
 #ifndef MAX_LISTEN_FDS
@@ -51,8 +52,13 @@ extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
+#ifdef ENABLE_HTTPS
+extern ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+extern ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+#else
 extern ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 extern ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
+#endif
 
 extern int sock_setnonblock(int fd);
 extern int sock_delnonblock(int fd);

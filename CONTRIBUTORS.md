@@ -97,6 +97,7 @@ username|name|email (optional)
 @ccremer|Christian Cremer|
 @jimcooley|Jim Cooley|jim.cooley@healthvana.com
 @Chocobo1|Mike Tzou|
+@vinyasmusic|Vinyas Malagaudanavar|vinyasmusic@gmail.com
 @cosmix|Dimosthenis Kaponis|
 @shadycuz|Levi Blaney|shadycuz+spam@gmail.com
 @Flums|Philip Gabrielsen|philip@digno.no
@@ -122,5 +123,6 @@ username|name|email (optional)
 @vladmovchan|Vladyslav Movchan|vladislav.movchan@gmail.com
 @gmosx|George Moschovitis
 @adherzog|Adam Herzog|adam@adamherzog.com
+@skrzyp1|Jerzy S.|
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FCONTRIBUTORS&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

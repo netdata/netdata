@@ -4194,6 +4194,23 @@ NETDATA.peityChartCreate = function (state, data) {
     return true;
 };
 
+// ----------------------------------------------------------------------------------------------------------------
+// "Text-only" chart - Just renders the raw value to the DOM
+
+NETDATA.textOnlyCreate = function(state, data) {
+    var decimalPlaces = NETDATA.dataAttribute(state.element, 'textonly-decimal-places', 1);
+    var prefix = NETDATA.dataAttribute(state.element, 'textonly-prefix', '');
+    var suffix = NETDATA.dataAttribute(state.element, 'textonly-suffix', '');
+
+    // Round based on number of decimal places to show
+    var precision = Math.pow(10, decimalPlaces);
+    var value = Math.round(data.result[0] * precision) / precision;
+
+    state.element.textContent = prefix + value + suffix;
+    return true;
+}
+
+NETDATA.textOnlyUpdate = NETDATA.textOnlyCreate;
 // Charts Libraries Registration
 
 NETDATA.chartLibraries = {
@@ -4631,6 +4648,48 @@ NETDATA.chartLibraries = {
             void(state);
             return 'netdata-container-gauge';
         }
+    },
+    "textonly": {
+        autoresize: function (state) {
+            void(state);
+            return false;
+        },
+        container_class: function (state) {
+            void(state);
+            return 'netdata-container';
+        },
+        create: NETDATA.textOnlyCreate,
+        enabled: true,
+        format: function (state) {
+            void(state);
+            return 'array';
+        },
+        initialized: true,
+        initialize: function (callback) {
+            callback();
+        },
+        legend: function (state) {
+            void(state);
+            return null;
+        },
+        max_updates_to_recreate: function (state) {
+            void(state);
+            return 5000;
+        },
+        options: function (state) {
+            void(state);
+            return 'absolute';
+        },
+        pixels_per_point: function (state) {
+            void(state);
+            return 3;
+        },
+        track_colors: function (state) {
+            void(state);
+            return false;
+        },
+        update: NETDATA.textOnlyUpdate,
+        xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
     }
 };
 
@@ -9698,7 +9757,7 @@ NETDATA.registry = {
     machines: null,       // the user's other URLs
     machines_array: null, // the user's other URLs in an array
     person_urls: null,
-
+    anonymous_statistics_checked: false,
     MASKED_DATA: "***",
 
     isUsingGlobalRegistry: function() {
@@ -9771,8 +9830,16 @@ NETDATA.registry = {
                 }
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
-                if (dataLayer) {
-                    if (data.anonymous_statistics) dataLayer.push({"anonymous_statistics" : "true", "machine_guid" : data.machine_guid});
+                if (!NETDATA.registry.anonymous_statistics_checked) {
+                    NETDATA.registry.anonymous_statistics_checked=true;
+                    if (data.anonymous_statistics) {
+                        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+                                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+                            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=false;j.src=
+                            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+                        })(window,document,'script','dataLayer','GTM-N6CBMJD');
+                        dataLayer.push({"anonymous_statistics" : "true", "machine_guid" : data.machine_guid});
+                    }
                 }
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);

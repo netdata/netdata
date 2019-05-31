@@ -58,13 +58,27 @@ setup_terminal() {
 
 	return 0
 }
+setup_terminal || echo >/dev/null
 
-progress() {
-	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+# -----------------------------------------------------------------------------
+fatal() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+	exit 1
 }
 
+run_ok() {
+	printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+}
+
+run_failed() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+}
+
+ESCAPED_PRINT_METHOD=
+printf "%q " test >/dev/null 2>&1
+[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
-	if printf "%q " test >/dev/null 2>&1; then
+	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
 		printf "%q " "${@}"
 	else
 		printf "%s" "${*}"
@@ -72,24 +86,39 @@ escaped_print() {
 	return 0
 }
 
+progress() {
+	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+}
+
+run_logfile="/dev/null"
 run() {
-	local dir="${PWD}" info_console
+	local user="${USER--}" dir="${PWD}" info info_console
 
 	if [ "${UID}" = "0" ]; then
+		info="[root ${dir}]# "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
 	else
+		info="[${user} ${dir}]$ "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	escaped_print "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" "${@}" "${TPUT_RESET}\n" >&2
+	printf >>"${run_logfile}" "${info}"
+	escaped_print >>"${run_logfile}" "${@}"
+	printf >>"${run_logfile}" " ... "
+
+	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+	escaped_print >&2 "${@}"
+	printf >&2 "${TPUT_RESET}\n"
 
 	"${@}"
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+		run_failed
+		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
 	else
-		printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+		run_ok
+		printf >>"${run_logfile}" "OK\n"
 	fi
 
 	return ${ret}
@@ -112,7 +141,7 @@ warning() {
 
 create_tmp_directory() {
 	# Check if tmp is mounted as noexec
-	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
+	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts > /dev/null 2>&1; then
 		pattern="$(pwd)/netdata-kickstart-XXXXXX"
 	else
 		pattern="/tmp/netdata-kickstart-XXXXXX"
@@ -134,7 +163,7 @@ download() {
 }
 
 set_tarball_urls() {
-	if [ "$1" == "stable" ]; then
+	if [ "$1" = "stable" ]; then
 		local latest
 		# Simple version
 		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
@@ -171,9 +200,9 @@ detect_bash4() {
 }
 
 dependencies() {
-	SYSTEM="$(uname -s)"
-	OS="$(uname -o)"
-	MACHINE="$(uname -m)"
+	SYSTEM="$(uname -s 2> /dev/null || uname -v)"
+	OS="$(uname -o 2> /dev/null || uname -rs)"
+	MACHINE="$(uname -m 2> /dev/null)"
 
 	echo "System            : ${SYSTEM}"
 	echo "Operating System  : ${OS}"
@@ -204,14 +233,25 @@ dependencies() {
 	fi
 }
 
+safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
+	fi
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
 umask 022
 
 sudo=""
 [ -z "${UID}" ] && UID="$(id -u)"
 [ "${UID}" -ne "0" ] && sudo="sudo"
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-
-setup_terminal || echo >/dev/null
 
 # ---------------------------------------------------------------------------------------------------------------------
 # try to update using autoupdater in the first place
@@ -275,7 +315,7 @@ set_tarball_urls "${RELEASE_CHANNEL}"
 
 download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
 download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
-if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | sha256sum --check - >/dev/null 2>&1; then
+if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
 	fatal "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${TMPDIR}"
 fi
 run tar -xf netdata-latest.tar.gz

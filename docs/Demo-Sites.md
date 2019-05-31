@@ -1,10 +1,10 @@
 # Demo sites
 
-Live demo installations of netdata are available at **[https://my-netdata.io](https://my-netdata.io)**:
+Live demo installations of Netdata are available at **[https://my-netdata.io](https://my-netdata.io)**:
 
-Location |  netdata demo URL | 60&nbsp;mins&nbsp;reqs | VM Donated by
+Location |  Netdata demo URL | 60&nbsp;mins&nbsp;reqs | VM Donated by
 :-------:|:-----------------:|:----------:|:-------------
-London (UK)|**[london.my-netdata.io](https://london.my-netdata.io)**<br/>(this is the global netdata **registry** and has **named** and **mysql** charts)|[![Requests Per Second](https://london.my-netdata.io/api/v1/badge.svg?chart=netdata.requests&dimensions=requests&after=-3600&options=unaligned&group=sum&label=reqs&units=empty&value_color=blue&precision=0&v42)](https://london.my-netdata.io)|[DigitalOcean.com](https://m.do.co/c/83dc9f941745)
+London (UK)|**[london.my-netdata.io](https://london.my-netdata.io)**<br/>(this is the global Netdata **registry** and has **named** and **mysql** charts)|[![Requests Per Second](https://london.my-netdata.io/api/v1/badge.svg?chart=netdata.requests&dimensions=requests&after=-3600&options=unaligned&group=sum&label=reqs&units=empty&value_color=blue&precision=0&v42)](https://london.my-netdata.io)|[DigitalOcean.com](https://m.do.co/c/83dc9f941745)
 Atlanta (USA)|**[cdn77.my-netdata.io](https://cdn77.my-netdata.io)**<br/>(with **named** and **mysql** charts)|[![Requests Per Second](https://cdn77.my-netdata.io/api/v1/badge.svg?chart=netdata.requests&dimensions=requests&after=-3600&options=unaligned&group=sum&label=reqs&units=empty&value_color=blue&precision=0&v42)](https://cdn77.my-netdata.io)|[CDN77.com](https://www.cdn77.com/)
 Israel|**[octopuscs.my-netdata.io](https://octopuscs.my-netdata.io)**|[![Requests Per Second](https://octopuscs.my-netdata.io/api/v1/badge.svg?chart=netdata.requests&dimensions=requests&after=-3600&options=unaligned&group=sum&label=reqs&units=empty&value_color=blue&precision=0&v42)](https://octopuscs.my-netdata.io)|[OctopusCS.com](https://www.octopuscs.com)
 Roubaix (France)|**[ventureer.my-netdata.io](https://ventureer.my-netdata.io)**|[![Requests Per Second](https://ventureer.my-netdata.io/api/v1/badge.svg?chart=netdata.requests&dimensions=requests&after=-3600&options=unaligned&group=sum&label=reqs&units=empty&value_color=blue&precision=0&v42)](https://ventureer.my-netdata.io)|[Ventureer.com](https://ventureer.com/)

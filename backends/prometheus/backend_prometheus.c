@@ -305,13 +305,13 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             rrdset_rdlock(st);
 
             int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
-            int homogeneus = 1;
+            int homogeneous = 1;
             if(as_collected) {
                 if(rrdset_flag_check(st, RRDSET_FLAG_HOMEGENEOUS_CHECK))
                     rrdset_update_heterogeneous_flag(st);
 
                 if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
-                    homogeneus = 0;
+                    homogeneous = 0;
             }
             else {
                 if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE && !(output_options & PROMETHEUS_OUTPUT_HIDEUNITS))
@@ -320,7 +320,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
 
             if(unlikely(output_options & PROMETHEUS_OUTPUT_HELP))
                 buffer_sprintf(wb, "\n# COMMENT %s chart \"%s\", context \"%s\", family \"%s\", units \"%s\"\n"
-                               , (homogeneus)?"homogeneus":"heterogeneous"
+                               , (homogeneous)?"homogeneous":"heterogeneous"
                                , (output_options & PROMETHEUS_OUTPUT_NAMES && st->name) ? st->name : st->id
                                , st->context
                                , st->family
@@ -348,7 +348,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
                             suffix = "_total";
                         }
 
-                        if(homogeneus) {
+                        if(homogeneous) {
                             // all the dimensions of the chart, has the same algorithm, multiplier and divisor
                             // we add all dimensions as labels
 
