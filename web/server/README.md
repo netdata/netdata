@@ -73,11 +73,11 @@ To enable SSL, provide the path to your certificate and private key in the `[web
 Both files must be readable by the netdata user. If any of the two files does not exist or is unreadable, Netdata falls back to HTTP. Case the files are not readable for Netdata, you can change the owner and permission for the files with the following commands:
 
 ```
-$ chown netdata /etc/netdata/ssl/key.pem /etc/netdata/ssl/cert.pem
+$ chown root:netdata /etc/netdata/ssl/key.pem /etc/netdata/ssl/cert.pem
 $ chmod 640 /etc/netdata/ssl/key.pem /etc/netdata/ssl/cert.pem
 ```
 
-the first command will change the owner of both files to netdata user, while the last command will change the permission for netdata user to read and write on the files and the group to read them.
+the first command will change the owner of both files to root user and netdata group, while the last command will change the permission for root user to read and write on the files and the group to read them.
 
 For a master/slave connection, only the master needs these settings. 
 
