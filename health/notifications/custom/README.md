@@ -1,11 +1,13 @@
 # Custom
 
-Netdata allows you to send custom notifications, to any endpoint you choose.
-To configure custom notifications, you will need to define the `custom_sender()` function in `health_alarm_notify.conf` 
-You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples.
+Netdata allows you to send custom notifications to any endpoint you choose.
+
+To configure custom notifications, you will need to customize `health_alarm_notify.conf`. You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the `custom_sender()` function in `health_alarm_notify.conf`. Ensure you follow the instructions of changing any configuration file to [persist your configuration](../../../docs/configuration-guide/#persist-my-configuration).
+
 As with other notifications, you will also need to define the recipient list in `DEFAULT_RECIPIENT_CUSTOM` and/or the `role_recipients_custom` array.
 
-The following is a sample `custom_sender` function to send an SMS via an imaginary HTTPS endpoint to the SMS gateway:
+The following is a sample `custom_sender` function in `health_alarm_notify.conf`, to send an SMS via an imaginary HTTPS endpoint to the SMS gateway:
+
 ```
  custom_sender() {
     # example human readable SMS
