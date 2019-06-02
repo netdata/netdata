@@ -85,7 +85,8 @@ For this you need to set `smartd_opts` (or `SMARTD_ARGS`, check _smartd.service_
 # dump smartd attrs info every 600 seconds
 smartd_opts="-A /var/log/smartd/ -i 600"
 ```
-
+You may need to create the smartd directory before smartd will write to it:  
+`mkdir -p /var/log/smartd`
 
 `smartd` appends logs at every run. It's strongly recommended to use `logrotate` for smartd files.
 
