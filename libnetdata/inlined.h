@@ -39,7 +39,7 @@ static inline uint32_t simple_nhash(const char *name,size_t len) {
     do {
         hval *= 16777619;
         hval ^= (uint32_t) *s++;
-    }while (++i < len);
+    } while (++i < len);
 
     return hval;
 }
@@ -66,7 +66,7 @@ static inline uint32_t simple_nuhash(const char *name,size_t len) {
         if (unlikely(c >= 'A' && c <= 'Z')) c += 'a' - 'A';
         hval *= 16777619;
         hval ^= c;
-    }while ( ++i < len);
+    } while ( ++i < len);
     return hval;
 }
 

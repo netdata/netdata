@@ -199,9 +199,9 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     int all = 0;
 
     uint32_t end = w->total_params;
-    if(end){
+    if(end) {
         uint32_t  i = 0;
-        do{
+        do {
             char *value = w->param_values[i].body;
             size_t length = w->param_values[i].length;
 
@@ -222,9 +222,9 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     uint32_t after = 0;
 
     uint32_t end = w->total_params;
-    if(end){
+    if(end) {
         uint32_t  i = 0;
-        do{
+        do {
             char *value = w->param_values[i].body;
             size_t lvalue = w->param_values[i].length;
             char save = value[lvalue];
@@ -253,8 +253,8 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
 
     uint32_t  i = 0;
     uint32_t end = w->total_params;
-    if(end){
-        do{
+    if(end) {
+        do {
             char *name = w->param_name[i].body;
             size_t nlength  = w->param_name[i].length;
             char *value = w->param_values[i].body;
@@ -352,7 +352,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char save[WEB_FIELDS_MAX];
     char *value ;
     size_t lvalue;
-    if(end){
+    if(end) {
         uint32_t i = 0;
         do {
             char *name = w->param_name[i].body;
@@ -510,7 +510,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
     cleanup:
-    if(end){
+    if(end) {
         uint32_t i = 0;
         do {
             value = w->param_values[i].body;
@@ -583,11 +583,11 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 
     uint32_t i = 0;
     uint32_t end = w->total_params;
-    if (!end){
+    if (!end) {
         goto nothing;
     }
 
-    do{
+    do {
         char *name = w->param_name[i].body;
         size_t nlength = w->param_name[i].length;
         char *value = w->param_values[i].body;

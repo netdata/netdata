@@ -18,6 +18,7 @@ struct prometheus_output_options {
 };
 
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
+    (void)url;
     int format = ALLMETRICS_SHELL;
     const char *prometheus_server = w->client_ip;
     uint32_t prometheus_backend_options = global_backend_options;
@@ -25,7 +26,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     const char *prometheus_prefix = global_backend_prefix;
 
     uint32_t end = w->total_params;
-    if (end){
+    if (end) {
         uint32_t i = 0;
         do {
             char *name = w->param_name[i].body;

@@ -71,9 +71,9 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             ret = 403;
         } else {
             uint32_t end = w->total_params;
-            if (end){
+            if (end) {
                 uint32_t i = 0;
-                do{
+                do {
                     char *key = w->param_name[i].body;
                     size_t lkey = w->param_name[i].length;
                     char ksave = key[lkey];

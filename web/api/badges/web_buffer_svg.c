@@ -918,8 +918,8 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     char save[WEB_FIELDS_MAX];
     char *value;
     size_t lvalue;
-    if(end){
-        do{
+    if(end) {
+        do {
             value = w->param_values[i].body;
             lvalue = w->param_values[i].length;
             save[i] = value[lvalue];
@@ -960,7 +960,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             else if(!strncmp(name, "scale",lname)) scale_str = value;
             else if(!strncmp(name, "alarm",lname)) alarm = value;
 
-        }while (++i < end );
+        } while (++i < end );
     }
 
     if(!chart || !*chart) {
@@ -1146,13 +1146,13 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     }
 
     cleanup:
-    if(end){
+    if(end) {
         i = 0;
-        do{
+        do {
             value = w->param_values[i].body;
             lvalue = w->param_values[i].length;
             value[lvalue] = save[i];
-        }while(++i < end);
+        } while(++i < end);
     }
     buffer_free(dimensions);
     return ret;
