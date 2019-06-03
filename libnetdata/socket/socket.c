@@ -302,6 +302,7 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
 }
 
 WEB_CLIENT_ACL socket_ssl_acl(char *ssl){
+#ifdef ENABLE_HTTPS
     if (!strcmp(ssl,"optional")){
         netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
         return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
@@ -310,6 +311,7 @@ WEB_CLIENT_ACL socket_ssl_acl(char *ssl){
         netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
         return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
     }
+#endif
 
     return WEB_CLIENT_ACL_NONE;
 }
