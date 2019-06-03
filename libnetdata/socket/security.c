@@ -1,5 +1,7 @@
 #include "../libnetdata.h"
 
+#ifdef ENABLE_HTTPS
+
 SSL_CTX *netdata_cli_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
@@ -213,3 +215,5 @@ int security_test_certificate(SSL *ssl){
     }
     return ret;
 }
+
+#endif
