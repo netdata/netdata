@@ -368,43 +368,37 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
     --pg_cache->page_descriptors;
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
-    if (0 != descr->pg_cache_descr_state) {
-        /* there is page cache descriptor state under possible contention */
-
-        rrdeng_page_descr_mutex_lock(ctx, descr);
-        pg_cache_descr = descr->pg_cache_descr;
-        while (!pg_cache_try_get_unsafe(descr, 1)) {
-            debug(D_RRDENGINE, "%s: Waiting for locked page:", __func__);
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    pg_cache_descr = descr->pg_cache_descr;
+    while (!pg_cache_try_get_unsafe(descr, 1)) {
+        debug(D_RRDENGINE, "%s: Waiting for locked page:", __func__);
+        if (unlikely(debug_flags & D_RRDENGINE))
+            print_page_cache_descr(descr);
+        pg_cache_wait_event_unsafe(descr);
+    }
+    if (!remove_dirty) {
+        /* even a locked page could be dirty */
+        while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
+            debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
             if (unlikely(debug_flags & D_RRDENGINE))
                 print_page_cache_descr(descr);
             pg_cache_wait_event_unsafe(descr);
         }
-        if (!remove_dirty) {
-            /* even a locked page could be dirty */
-            while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
-                debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
-                if (unlikely(debug_flags & D_RRDENGINE))
-                    print_page_cache_descr(descr);
-                pg_cache_wait_event_unsafe(descr);
-            }
-        }
-        if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
-            /* only after locking can it be safely deleted from LRU */
-            pg_cache_replaceQ_delete(ctx, descr);
-
-            uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-            pg_cache_evict_unsafe(ctx, descr);
-            uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
-        }
-        pg_cache_put_unsafe(descr);
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
-
-        rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
     }
+    rrdeng_page_descr_mutex_unlock(ctx, descr);
+
+    if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
+        /* only after locking can it be safely deleted from LRU */
+        pg_cache_replaceQ_delete(ctx, descr);
+
+        uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
+        pg_cache_evict_unsafe(ctx, descr);
+        uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+    }
+    pg_cache_put(ctx, descr);
+
+    rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
 destroy:
-    if (!remove_dirty) {
-        assert(0 == descr->pg_cache_descr_state);
-    }
     freez(descr);
     pg_cache_update_metric_times(page_index);
 }
