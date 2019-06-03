@@ -986,6 +986,7 @@ void web_client_parse_request(struct web_client *w,char *divisor){
             moveme = ++divisor; //value
             values[i].body = moveme;
 
+            (void)divisor;
             divisor = strchr(moveme,'&'); //end of value
             if ( divisor){
                 values[i].length = (size_t )(divisor - moveme);
