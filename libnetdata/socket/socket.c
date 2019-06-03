@@ -301,14 +301,37 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
     sockets->failed = 0;
 }
 
+WEB_CLIENT_ACL socket_ssl_acl(char *ssl){
+    if (!strcmp(ssl,"optional")){
+        netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
+        return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+    }
+    else if (!strcmp(ssl,"force")){
+        netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+        return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+    }
+
+    return WEB_CLIENT_ACL_NONE;
+}
+
 WEB_CLIENT_ACL read_acl(char *st) {
+    char *ssl = strchr(st,'^');
+    if (ssl){
+        ssl++;
+        if ( !strncmp("SSL=",ssl,4)){
+            ssl += 4;
+        }
+        socket_ssl_acl(ssl);
+    }
+
     if (!strcmp(st,"dashboard")) return WEB_CLIENT_ACL_DASHBOARD;
     if (!strcmp(st,"registry")) return WEB_CLIENT_ACL_REGISTRY;
     if (!strcmp(st,"badges")) return WEB_CLIENT_ACL_BADGE;
     if (!strcmp(st,"management")) return WEB_CLIENT_ACL_MGMT;
     if (!strcmp(st,"streaming")) return WEB_CLIENT_ACL_STREAMING;
     if (!strcmp(st,"netdata.conf")) return WEB_CLIENT_ACL_NETDATACONF;
-    return WEB_CLIENT_ACL_NONE;
+
+    return socket_ssl_acl(st);
 }
 
 static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
@@ -824,7 +847,12 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
+#ifdef ENABLE_HTTPS
+ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+#else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+#endif
+
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -852,10 +880,22 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         if(fd.events & POLLIN) break;
     }
 
+#ifdef ENABLE_HTTPS
+    if (ssl->conn){
+        if (!ssl->flags){
+            return SSL_read(ssl->conn,buf,len);
+        }
+    }
+#endif
     return recv(sockfd, buf, len, flags);
 }
 
+#ifdef ENABLE_HTTPS
+ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+#else
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+#endif
+
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -883,6 +923,13 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         if(fd.events & POLLOUT) break;
     }
 
+#ifdef ENABLE_HTTPS
+    if(ssl->conn){
+        if (!ssl->flags){
+            return SSL_write(ssl->conn, buf, len);
+        }
+    }
+#endif
     return send(sockfd, buf, len, flags);
 }
 
@@ -1291,6 +1338,8 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                     do {
                         char client_ip[NI_MAXHOST + 1];
                         char client_port[NI_MAXSERV + 1];
+                        client_ip[0] = 0x00;
+                        client_port[0] = 0x00;
 
                         debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
                         nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, NI_MAXHOST + 1, client_port, NI_MAXSERV + 1, p->access_list);

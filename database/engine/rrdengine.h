@@ -22,6 +22,7 @@
 #include "journalfile.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
+#include "rrdenglocking.h"
 
 #ifdef NETDATA_RRD_INTERNALS
 
@@ -59,10 +60,10 @@ struct rrdeng_cmd {
     enum rrdeng_opcode opcode;
     union {
         struct rrdeng_read_page {
-            struct rrdeng_page_cache_descr *page_cache_descr;
+            struct rrdeng_page_descr *page_cache_descr;
         } read_page;
         struct rrdeng_read_extent {
-            struct rrdeng_page_cache_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
+            struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
             int page_count;
         } read_extent;
         struct completion *completion;
@@ -85,7 +86,7 @@ struct extent_io_descriptor {
     struct completion *completion;
     unsigned descr_count;
     int release_descr;
-    struct rrdeng_page_cache_descr *descr_array[MAX_PAGES_PER_EXTENT];
+    struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
 };
 
@@ -142,6 +143,7 @@ struct rrdengine_statistics {
     rrdeng_stats_t datafile_deletions;
     rrdeng_stats_t journalfile_creations;
     rrdeng_stats_t journalfile_deletions;
+    rrdeng_stats_t page_cache_descriptors;
 };
 
 struct rrdengine_instance {

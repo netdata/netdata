@@ -154,6 +154,8 @@ LIBNETDATA_FILES = \
     libnetdata/simple_pattern/simple_pattern.h \
     libnetdata/socket/socket.c \
     libnetdata/socket/socket.h \
+    libnetdata/socket/security.c \
+    libnetdata/socket/security.h \
     libnetdata/statistical/statistical.c \
     libnetdata/statistical/statistical.h \
     libnetdata/storage_number/storage_number.c \
@@ -326,6 +328,8 @@ if ENABLE_DBENGINE
         database/engine/rrdengineapi.h \
         database/engine/pagecache.c \
         database/engine/pagecache.h \
+        database/engine/rrdenglocking.c \
+        database/engine/rrdenglocking.h \
         $(NULL)
 endif
 
@@ -494,6 +498,7 @@ endif
 NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
+	$(OPTIONAL_SSL_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
 	$(OPTIONAL_UV_LIBS) \
 	$(OPTIONAL_LZ4_LIBS) \

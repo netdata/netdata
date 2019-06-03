@@ -1953,7 +1953,7 @@ send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to
 Severity: ${severity}\\n
 Chart: ${chart}\\n
 Family: ${family}\\n
-$(date -d @${when})\\n
+${date}\\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?

@@ -132,12 +132,17 @@ AC_ARG_ENABLE(
     [enable_lto="detect"]
 )
 AC_ARG_ENABLE(
+    [https],
+    [AS_HELP_STRING([--enable-https], [Enable SSL support @<:@default autodetect@:>@])],
+    ,
+    [enable_https="detect"]
+)
+AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
     [enable_dbengine="detect"]
 )
-
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -338,7 +343,7 @@ OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
 OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 
 # -----------------------------------------------------------------------------
-# DB engine
+# DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
     AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
 
@@ -348,7 +353,7 @@ test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
 test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
     AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
 
-test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
+test "${enable_dbengine}" = "yes" -o "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
     AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
 
 AC_MSG_CHECKING([if netdata dbengine should be used])
@@ -361,6 +366,15 @@ fi
 AC_MSG_RESULT([${enable_dbengine}])
 AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
+AC_MSG_CHECKING([if netdata https should be used])
+if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
+	enable_https="yes"
+	AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+else
+	enable_https="no"
+fi
+AC_MSG_RESULT([${enable_https}])
+AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # compiler options
