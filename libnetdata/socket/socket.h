@@ -3,7 +3,9 @@
 #ifndef NETDATA_SOCKET_H
 #define NETDATA_SOCKET_H
 
-#include <openssl/ossl_typ.h>
+#if defined(ENABLE_HTTPS) || defined(ENABLE_DBENGINE)
+# include <openssl/ossl_typ.h>
+#endif
 #include "../libnetdata.h"
 
 #ifndef MAX_LISTEN_FDS
