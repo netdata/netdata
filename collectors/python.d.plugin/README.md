@@ -150,7 +150,7 @@ Classes implement `_get_raw_data` which should be used to grab raw data. This me
 
 _This is last resort class, if a new module cannot be written by using other framework class this one can be used._
 
-_Example: `mysql`, `sensors`_
+_Example: `ceph`, `sensors`_
 
 It is the lowest-level class which implements most of module logic, like:
 - threading
