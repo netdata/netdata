@@ -613,7 +613,7 @@ RRDSET *rrdset_create_custom(
                     memset(st, 0, size);
                 }
                 else if((now - st->last_updated.tv_sec) > update_every * entries) {
-                    error("File %s is too old. Clearing it.", fullfilename);
+                    info("File %s is too old. Clearing it.", fullfilename);
                     memset(st, 0, size);
                 }
                 else if(st->last_updated.tv_sec > now + update_every) {
