@@ -146,18 +146,10 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     char path[1024];
 
     generate_journalfilepath(datafile, path, sizeof(path));
-    fd = uv_fs_open(NULL, &req, path, O_DIRECT | O_CREAT | O_RDWR | O_TRUNC,
-                    S_IRUSR | S_IWUSR, NULL);
+    fd = open_file_direct_io(path, O_CREAT | O_RDWR | O_TRUNC, &file);
     if (fd < 0) {
         fatal("uv_fs_fsopen: %s", uv_strerror(fd));
     }
-    assert(req.result >= 0);
-    file = req.result;
-    uv_fs_req_cleanup(&req);
-#ifdef __APPLE__
-    info("Disabling OS X caching for file \"%s\".", path);
-    fcntl(fd, F_NOCACHE, 1);
-#endif
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
@@ -411,20 +403,12 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     char path[1024];
 
     generate_journalfilepath(datafile, path, sizeof(path));
-    fd = uv_fs_open(NULL, &req, path, O_DIRECT | O_RDWR, S_IRUSR | S_IWUSR, NULL);
+    fd = open_file_direct_io(path, O_RDWR, &file);
     if (fd < 0) {
         /* if (UV_ENOENT != fd) */
         error("uv_fs_fsopen: %s", uv_strerror(fd));
-        uv_fs_req_cleanup(&req);
         return fd;
     }
-    assert(req.result >= 0);
-    file = req.result;
-    uv_fs_req_cleanup(&req);
-#ifdef __APPLE__
-    info("Disabling OS X caching for file \"%s\".", path);
-    fcntl(fd, F_NOCACHE, 1);
-#endif
     info("Loading journal file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
