@@ -928,8 +928,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             char *name = w->param_name[i].body;
             size_t lname = w->param_name[i].length;
 
-            error("KILLME LIST %c (%s,%s)",*save,name,value);
-
             debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
 
             // name and value are now the parameters

@@ -24,8 +24,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options = PROMETHEUS_OUTPUT_TIMESTAMPS | ((global_backend_options & BACKEND_OPTION_SEND_NAMES)?PROMETHEUS_OUTPUT_NAMES:0);
     const char *prometheus_prefix = global_backend_prefix;
 
-    error("KILLME ALL METRICS %s",url);
-
     uint32_t end = w->total_params;
     if (end){
         uint32_t i = 0;

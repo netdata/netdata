@@ -144,6 +144,7 @@ struct web_client {
     struct web_fields param_name[WEB_FIELDS_MAX];
     struct web_fields param_values[WEB_FIELDS_MAX];
     uint32_t total_params;
+    int switch_host;
 
     char last_url[NETDATA_WEB_REQUEST_URL_SIZE+1];       // we keep a copy of the decoded URL here
     char host[256];

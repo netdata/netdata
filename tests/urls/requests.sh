@@ -7,6 +7,8 @@
 ####																						####
 ################################################################################################
 
+NETDATA_VARLIB_DIR="@varlibdir_POST@"
+
 #CT=`date +'%s%N' |cut -b1-13`
 # The current time
 CT=`date +'%s'`
@@ -159,6 +161,8 @@ wget --execute="robots = off" --mirror --convert-links --no-parent http://127.0.
 
 netdata_create_directory $OUTDIR
 
+netdata_download_various $MURL "netdata.conf" "netdata.conf"
+
 netdata_download_various $MURL "api/v1/info" "info"
 
 netdata_download_various $MURL "api/v1/registry?action=hello"  "action"
@@ -187,7 +191,14 @@ for I in $CHARTS ; do
 	netdata_download_chart $MURL "api/v1/badge.svg?chart" $I "badge.svg"
 done
 
-curl -H "X-Auth-Token: 226c3a9c-50b9-11e9-a35c-704d7b9382ce" "http://127.0.0.1:19999/api/v1/manage/health?cmd=RESET"
+if [ -f "${NETDATA_VARLIB_DIR}/netdata.api.key" ] ;then
+	read -r CORRECT_TOKEN < "${NETDATA_VARLIB_DIR}/netdata.api.key"
+else
+	echo "${NETDATA_VARLIB_DIR}/netdata.api.key not found"
+	echo "Token not found."
+	exit 2
+fi
+curl -H "X-Auth-Token: $TOKEN" "http://127.0.0.1:19999/api/v1/manage/health?cmd=RESET"
 
 echo "ALL the URLS got 200 as answer!"
 

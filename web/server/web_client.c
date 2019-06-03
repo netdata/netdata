@@ -1005,9 +1005,8 @@ void web_client_parse_request(struct web_client *w,char *divisor){
     w->total_params = ++i;
 }
 
-static inline void web_client_set_directory(struct web_client *w,char *enddir,char *endcmd){
+static inline void web_client_set_directory(struct web_client *w,char *begin,char *enddir,char *endcmd){
     if (enddir ){
-        char *begin = w->path.body+1;
         w->directory.body = begin;
         w->directory.length = enddir - begin;
 
@@ -1025,7 +1024,7 @@ static inline void web_client_set_directory(struct web_client *w,char *enddir,ch
         }
     }
     else{
-        w->directory.body = w->path.body+1;
+        w->directory.body = begin;
         w->directory.length = w->path.length - 1;
         w->version.body = NULL;
         w->version.length = 0;
@@ -1069,7 +1068,8 @@ static inline void web_client_split_path_query(struct web_client *w){
         w->query_string.length = w->decoded_length - w->path.length;
 
         enddir = strchr(w->path.body+1,'/');
-        web_client_set_directory(w,enddir,moveme);
+        char *begin = w->path.body+1;
+        web_client_set_directory(w,begin,enddir,moveme);
         if (w->query_string.body){
             enddir = strchr(moveme,'=');
             web_client_parse_request(w,enddir);
@@ -1413,21 +1413,41 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
         return 400;
     }
 
-    char *tok = mystrsep(&url, "/");
-    if(tok && *tok) {
-        debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
+    char *tok = strchr(url,'/');
+    if (tok){
+        w->switch_host = 1;
+        debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, url);
 
         // copy the URL, we need it to serve files
         w->last_url[0] = '/';
-        if(url && *url) strncpyz(&w->last_url[1], url, NETDATA_WEB_REQUEST_URL_SIZE - 1);
-        else w->last_url[1] = '\0';
+        if(*(tok+1) != ' '){
+            strncpyz(&w->last_url[1], tok+1, NETDATA_WEB_REQUEST_URL_SIZE - 1);
+            char *enddir;
+            if (w->total_params){
+                    enddir = strchr(tok+1,'/');
+                    char *moveme = strchr(enddir,'?');
+                    if (moveme){
+                        web_client_set_directory(w,tok+1,enddir,moveme);
+                    }
+            } else {
+                enddir = strchr(tok+1,'/');
+                if(enddir) {
+                    w->directory.body = tok + 1;
+                    w->directory.length = enddir - tok - 1;
+                }
+            }
+        }
+        else {
+            w->last_url[1] = '\0';
+        }
+        *tok = 0x00;
+        uint32_t hash = simple_hash(url);
 
-        uint32_t hash = simple_hash(tok);
+        host = rrdhost_find_by_hostname(url, hash);
+        if(!host) host = rrdhost_find_by_guid(url, hash);
+        *tok = '/';
 
-        host = rrdhost_find_by_hostname(tok, hash);
-        if(!host) host = rrdhost_find_by_guid(tok, hash);
-
-        if(host) return web_client_process_url(host, w, url);
+        if(host) return web_client_process_url(host, w, tok);
     }
 
     buffer_flush(w->response.data);
@@ -1458,14 +1478,11 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #endif
     }
 
-    char *tok = mystrsep(&url, "/?");
-    error("KILLME TOK %s",tok);
-    //if(likely(tok && *tok)) {
-    if (w->path.length > 1){
+    if ( (w->path.length > 1) ){
         char *cmp = w->directory.body;
         size_t len = w->directory.length;
         uint32_t hash = simple_nhash(cmp,len);
-        debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
+        debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, w->command.body);
 
         if(unlikely(hash == hash_api && strncmp(cmp, "api",len) == 0)) {                           // current API
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
@@ -1473,7 +1490,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         }
         else if(unlikely(hash == hash_host && strncmp(cmp, "host",len) == 0)) {                    // host switching
             debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, url);
+            return web_client_switch_host(host, w, cmp+5);
         }
         else if(unlikely(hash == hash_netdata_conf && strncmp(cmp, "netdata.conf",len) == 0)) {                           // current API
             if(unlikely(!web_client_can_access_netdataconf(w)))
@@ -1509,33 +1526,36 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             buffer_flush(w->response.data);
 
             // get the name of the data to show
-            tok = mystrsep(&url, "&");
-            if(tok && *tok) {
-                debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
+            char *tok = mystrsep(&url, "/?");
+            if(likely(tok && *tok)) {
+                tok = mystrsep(&url, "&");
+                if(tok && *tok) {
+                    debug(D_WEB_CLIENT, "%llu: Searching for RRD data with name '%s'.", w->id, tok);
 
-                // do we have such a data set?
-                RRDSET *st = rrdset_find_byname(host, tok);
-                if(!st) st = rrdset_find(host, tok);
-                if(!st) {
+                    // do we have such a data set?
+                    RRDSET *st = rrdset_find_byname(host, tok);
+                    if(!st) st = rrdset_find(host, tok);
+                    if(!st) {
+                        w->response.data->contenttype = CT_TEXT_HTML;
+                        buffer_strcat(w->response.data, "Chart is not found: ");
+                        buffer_strcat_htmlescape(w->response.data, tok);
+                        debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
+                        return 404;
+                    }
+
+                    debug_flags |= D_RRD_STATS;
+
+                    if(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))
+                        rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
+                    else
+                        rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
+
                     w->response.data->contenttype = CT_TEXT_HTML;
-                    buffer_strcat(w->response.data, "Chart is not found: ");
+                    buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
                     buffer_strcat_htmlescape(w->response.data, tok);
-                    debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
-                    return 404;
+                    debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
+                    return 200;
                 }
-
-                debug_flags |= D_RRD_STATS;
-
-                if(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))
-                    rrdset_flag_clear(st, RRDSET_FLAG_DEBUG);
-                else
-                    rrdset_flag_set(st, RRDSET_FLAG_DEBUG);
-
-                w->response.data->contenttype = CT_TEXT_HTML;
-                buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
-                buffer_strcat_htmlescape(w->response.data, tok);
-                debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
-                return 200;
             }
 
             buffer_flush(w->response.data);
@@ -1559,11 +1579,16 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #endif  /* NETDATA_INTERNAL_CHECKS */
     }
 
+    w->switch_host = 0;
+    char *tok = mystrsep(&url, "/?");
+    (void)tok;
+
     char filename[FILENAME_MAX+1];
     url = filename;
     strncpyz(filename, w->last_url, FILENAME_MAX);
     tok = mystrsep(&url, "?");
     buffer_flush(w->response.data);
+
 
     //return mysendfile(w, (tok && *tok)?tok:"/");
     return mysendfile(w, (w->path.length > 1)?tok:"/");
