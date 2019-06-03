@@ -1210,7 +1210,9 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
+#ifdef ENABLE_HTTPS
 	    , &rpt->ssl
+#endif
     );
 
     netdata_thread_cleanup_pop(1);

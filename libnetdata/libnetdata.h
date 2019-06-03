@@ -298,7 +298,9 @@ extern char *netdata_configured_host_prefix;
 #include "clocks/clocks.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
-#include "socket/security.h"
+#ifdef ENABLE_HTTPS
+# include "socket/security.h"
+#endif
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/log.h"

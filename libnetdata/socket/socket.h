@@ -3,7 +3,6 @@
 #ifndef NETDATA_SOCKET_H
 #define NETDATA_SOCKET_H
 
-#include <openssl/ossl_typ.h>
 #include "../libnetdata.h"
 
 #ifndef MAX_LISTEN_FDS
