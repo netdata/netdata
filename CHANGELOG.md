@@ -4,8 +4,14 @@
 
 **Fixed bugs:**
 
+- Update fails because of new system dependencies [\#6200](https://github.com/netdata/netdata/issues/6200)
+- Update frequency for x509check alarm [\#6193](https://github.com/netdata/netdata/issues/6193)
+- kickstart.sh: Getting Nightly SHA256 sums from storage.googleapis.com times out [\#6191](https://github.com/netdata/netdata/issues/6191)
+- tv.html errors on https [\#6188](https://github.com/netdata/netdata/issues/6188)
+- Error messages on old database files [\#6186](https://github.com/netdata/netdata/issues/6186)
 - Fix date in pushbullet alarm notifications [\#6178](https://github.com/netdata/netdata/issues/6178)
 - Why is auto-update not working? V1.14.0 [\#6170](https://github.com/netdata/netdata/issues/6170)
+- \[solved\] ZFS database \(was: netdata FATAL : MAIN :uv\_fs\_fsopen: invalid argument \# : Invalid argument\) [\#6161](https://github.com/netdata/netdata/issues/6161)
 - httpcheck causes lots of SYN\_SENT dangling sockets [\#6152](https://github.com/netdata/netdata/issues/6152)
 - varnish plugin not showing \(varnish version 4\) [\#6149](https://github.com/netdata/netdata/issues/6149)
 - Reduce number of codacy issues [\#6131](https://github.com/netdata/netdata/issues/6131)
@@ -21,7 +27,9 @@
 - invalid help links on platform \(web log nginx/apache\) [\#6086](https://github.com/netdata/netdata/issues/6086)
 - error "cgroup-network-helper.sh: DEBUG: virsh command is not available" with the lastest docker image [\#6073](https://github.com/netdata/netdata/issues/6073)
 - Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
+- HTTP requests are classified as AF\_UNIX [\#5987](https://github.com/netdata/netdata/issues/5987)
 - netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
+- netdata/daemon: SSL fix - broken compilation case when ssl library not present! [\#6201](https://github.com/netdata/netdata/pull/6201) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/packaging/installer: Fix updater issue on empty config value [\#6182](https://github.com/netdata/netdata/pull/6182) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: nits and fixes [\#6121](https://github.com/netdata/netdata/pull/6121) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata: Fix labels usage, quotes are not needed [\#6091](https://github.com/netdata/netdata/pull/6091) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -36,9 +44,16 @@
 
 **Merged pull requests:**
 
+- Turn tv.html links to https [\#6198](https://github.com/netdata/netdata/pull/6198) ([cakrit](https://github.com/cakrit))
+- wmi collector: `fa-server` icon [\#6197](https://github.com/netdata/netdata/pull/6197) ([ilyam8](https://github.com/ilyam8))
+- Change print level from error to info [\#6195](https://github.com/netdata/netdata/pull/6195) ([mfundul](https://github.com/mfundul))
+- health: change x509check\_last\_collected\_secs alarm every to 60s [\#6194](https://github.com/netdata/netdata/pull/6194) ([ilyam8](https://github.com/ilyam8))
+- Documentation: Correct example list for python.d SimpleService [\#6189](https://github.com/netdata/netdata/pull/6189) ([kvisle](https://github.com/kvisle))
+- Terminate email header lines with \r\n [\#6187](https://github.com/netdata/netdata/pull/6187) ([toofar](https://github.com/toofar))
 - Make custom notification's instructions clearer [\#6181](https://github.com/netdata/netdata/pull/6181) ([cakrit](https://github.com/cakrit))
 - web log pattern fix [\#6180](https://github.com/netdata/netdata/pull/6180) ([ilyam8](https://github.com/ilyam8))
 - Correct date used in pushbullet notifications [\#6179](https://github.com/netdata/netdata/pull/6179) ([cakrit](https://github.com/cakrit))
+- Support falling back to buffered I/O when direct I/O is unavailable [\#6174](https://github.com/netdata/netdata/pull/6174) ([mfundul](https://github.com/mfundul))
 - Add empty page detection in DB engine [\#6173](https://github.com/netdata/netdata/pull/6173) ([mfundul](https://github.com/mfundul))
 - varnish v4 compatibility fix [\#6168](https://github.com/netdata/netdata/pull/6168) ([ilyam8](https://github.com/ilyam8))
 - Update security policy [\#6166](https://github.com/netdata/netdata/pull/6166) ([cakrit](https://github.com/cakrit))
@@ -67,7 +82,9 @@
 - Mention anonymous statistics in additional places in the docs [\#6084](https://github.com/netdata/netdata/pull/6084) ([cakrit](https://github.com/cakrit))
 - Add "custom-plugins.d" to fix error in log file [\#6080](https://github.com/netdata/netdata/pull/6080) ([Steve8291](https://github.com/Steve8291))
 - wmi alarms [\#6068](https://github.com/netdata/netdata/pull/6068) ([ilyam8](https://github.com/ilyam8))
+- Add perforce server process monitoring [\#6064](https://github.com/netdata/netdata/pull/6064) ([akwan](https://github.com/akwan))
 - SSL implementation for Netdata [\#5956](https://github.com/netdata/netdata/pull/5956) ([thiagoftsm](https://github.com/thiagoftsm))
+- NEW: local remark-lint checks and autofix support [\#5898](https://github.com/netdata/netdata/pull/5898) ([andvgal](https://github.com/andvgal))
 - use github templating mechanisms to classify issues when they are created [\#5776](https://github.com/netdata/netdata/pull/5776) ([paulfantom](https://github.com/paulfantom))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
@@ -308,7 +325,6 @@
 - Errant netdata-updater logs on root "/" directory [\#5679](https://github.com/netdata/netdata/issues/5679)
 - remove python obsolete modules [\#5647](https://github.com/netdata/netdata/issues/5647)
 - Reinstalling with kickstart.sh fails [\#5584](https://github.com/netdata/netdata/issues/5584)
-- .opt-out-from-anonymous-statistics still leaks referrer [\#5577](https://github.com/netdata/netdata/issues/5577)
 - Uninstaller fixes and instructions [\#5290](https://github.com/netdata/netdata/issues/5290)
 - Installer problem with config files under 'orig' symlink  [\#5039](https://github.com/netdata/netdata/issues/5039)
 
@@ -916,7 +932,6 @@
 - Phusion Passenger monitoring [\#4833](https://github.com/netdata/netdata/issues/4833)
 - Iis monitoring [\#4832](https://github.com/netdata/netdata/issues/4832)
 - Scaleio monitoring [\#4828](https://github.com/netdata/netdata/issues/4828)
-- Gluster monitoring [\#4827](https://github.com/netdata/netdata/issues/4827)
 - Leofs monitoring [\#4826](https://github.com/netdata/netdata/issues/4826)
 - Jumpy data when running on kubernetes [\#4778](https://github.com/netdata/netdata/issues/4778)
 - Create documentation on how to opt-out of anonymous data collection [\#4746](https://github.com/netdata/netdata/issues/4746)
