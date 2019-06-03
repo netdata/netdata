@@ -681,7 +681,7 @@ date=$(date --date=@${when} "${date_format}" 2>/dev/null)
 # ----------------------------------------------------------------------------
 # prepare some extra headers if we've been asked to thread e-mails
 if [ "${SEND_EMAIL}" == "YES" ] && [ "${EMAIL_THREADING}" != "NO" ]; then
-	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\nReferences: <${chart}-${name}@${host}>"
+	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\r\\nReferences: <${chart}-${name}@${host}>"
 else
 	email_thread_headers=
 fi
