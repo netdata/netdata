@@ -141,7 +141,7 @@ jobs:
   - stage: "Artifacts validation on bare OS, stable to current lifecycle checks"
 
     name: Run netdata lifecycle on Ubuntu 16.04 (xenial)
-    script: tests/updater_checks.sh
+    script: sudo -E tests/updater_checks.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 16.04"
 
   - name: Run netdata lifecycle on CentOS 7 (Containerized)
