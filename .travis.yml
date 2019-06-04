@@ -30,6 +30,7 @@ stages:
 - name: Build process
 - name: Artifacts validation
 - name: Artifacts validation on bare OS, stable to current lifecycle checks
+  if: branch = master AND (type = pull_request OR type = cron)
 
   # Nightly operations
 - name: Nightly operations
