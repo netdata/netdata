@@ -33,15 +33,15 @@ The ports to bind are controlled via `[web].bind to`, like this:
 ```
 [web]
    default port = 19999
-   bind to = 127.0.0.1=dashboard 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming localhost:19995=registry *:http=dashboard unix:/tmp/netdata.sock
+   bind to = 127.0.0.1=dashboard^SSL=optional 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming^SSL=force localhost:19995=registry *:http=dashboard unix:/tmp/netdata.sock
 ```
 
 Using the above, netdata will bind to:
 
-- IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. 
+- IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. Both HTTP and HTTPS requests will be accepted.
 - IPv4 10.1.1.1 at port 19998. The management API and netdata.conf will be accessible on this port.
 - All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
-- All IPv6 IPs at port 19996. Only metric streaming requests from other netdata agents will be accepted on this port.
+- All IPv6 IPs at port 19996. Only metric streaming requests from other netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. slaves also need to be [configured for TLS](../../streaming).
 - All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
 - All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port. 
 - Unix domain socket `/tmp/netdata.sock`. All requests are serviceable on this socket.
@@ -56,6 +56,65 @@ The API requests are serviced as follows:
 - `dashboard` gives access to the UI, the read API and badges API calls.
 - `badges` gives access only to the badges API calls.
 - `management` gives access only to the management API calls.
+
+### Enabling TLS support
+
+
+Netdata since version 1.16 supports encrypted HTTP connections to the web server and encryption of the data stream between a slave and a master. 
+Inbound unix socket connections are unaffected, regardless of the SSL settings.  
+To enable SSL, provide the path to your certificate and private key in the `[web]` section of `netdata.conf`:
+
+```
+[web]
+	ssl key = /etc/netdata/ssl/key.pem
+	ssl certificate = /etc/netdata/ssl/cert.pem
+```
+
+Both files must be readable by the netdata user. If any of the two files does not exist or is unreadable, Netdata falls back to HTTP.
+
+For a master/slave connection, only the master needs these settings.
+
+For test purposes, you can generate self-signed certificates with the following command:
+
+```
+$ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
+```
+
+TIP: If you use 4096 bits for the key and the certificate, netdata will need more CPU to process the whole communication. 
+rsa4096 can be until 4 times slower than rsa2048, so we recommend using 2048 bits. You can verify the difference by running
+
+```
+$ openssl speed rsa2048 rsa4096
+```
+
+#### SSL enforcement
+
+When the certificates are defined and unless any other options are provided, a Netdata server will:
+- Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, netdata.conf and badges.
+- Allow incoming slave connections to use both unencrypted and encrypted communications for streaming.
+ 
+To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`.
+At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
+
+SSL setting | HTTP requests | HTTPS requests | Unencrypted Streams | Encrypted Streams 
+:------:|:-----:|:-----:|:-----:|:-------- 
+none | Redirected to HTTPS | Accepted | Accepted | Accepted
+`force` | Redirected to HTTPS | Accepted | Denied | Accepted
+`optional` | Accepted | Accepted | Accepted | Accepted
+
+Example:
+
+```
+[web]
+    bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
+```
+
+For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-the-communication) in the streaming documentation.
+You will find there additional details on the expected behavior for client and server nodes, when their respective SSL options are enabled.
+
+#### SSL error
+
+It is possible that when you start to use the Netdata with SSL some erros will be register in the logs, this happens due possible incompatibilities between the browser options related to SSL like Ciphers and TLS/SSL version and the Netdata internal configuration. The most common error would be `error:00000006:lib(0):func(0):EVP lib`. In a near future the Netdata will allow our users to change the internal configuration to avoid errors like this, but until there we are setting the most common and safety options to the communication.
 
 ### Access lists
 
@@ -96,10 +155,10 @@ setting | default | info
 :------:|:-------:|:----
 ses max window | `15` | See [single exponential smoothing](../api/queries/des/)
 des max window | `15` | See [double exponential smoothing](../api/queries/des/)
-listen backlog | `4096` | The port backlog. Check `man 2 listen`.  
-web files owner | `netdata` | The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`. 
+listen backlog | `4096` | The port backlog. Check `man 2 listen`.
+web files owner | `netdata` | The user that owns the web static files. Netdata will refuse to serve a file that is not owned by this user, even if it has read access to that file. If the user given is not found, netdata will only serve files owned by user given in `run as user`.
 web files group | `netdata` | If this is set, Netdata will check if the file is owned by this group and refuse to serve the file if it's not.
-disconnect idle clients after seconds | `60` | The time in seconds to disconnect web clients after being totally idle. 
+disconnect idle clients after seconds | `60` | The time in seconds to disconnect web clients after being totally idle.
 timeout for first request | `60` | How long to wait for a client to send a request before closing the socket. Prevents slow request attacks.
 accept a streaming request every seconds | `0` | Can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves in a [streaming and replication setup](../../streaming)
 respect do not track policy | `no` | If set to `yes`, will respect the client's browser preferences on storing cookies. 

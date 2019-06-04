@@ -32,24 +32,28 @@ X seconds (though, it can send them per second if you need it to).
 
    - **prometheus** is described at [prometheus page](prometheus/) since it pulls data from netdata.
 
+   - **AWS Kinesis Data Streams**
+
+     metrics are sent to the service in `JSON` format.
+
 2. Only one backend may be active at a time.
 
 3. Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
 
 4. Netdata supports three modes of operation for all backends:
 
-   - `as-collected` sends to backends the metrics as they are collected, in the units they are collected. 
-   So, counters are sent as counters and gauges are sent as gauges, much like all data collectors do. 
+   - `as-collected` sends to backends the metrics as they are collected, in the units they are collected.
+   So, counters are sent as counters and gauges are sent as gauges, much like all data collectors do.
    For example, to calculate CPU utilization in this format, you need to know how to convert kernel ticks to percentage.
 
-   - `average` sends to backends normalized metrics from the netdata database. 
-   In this mode, all metrics are sent as gauges, in the units netdata uses. This abstracts data collection 
-   and simplifies visualization, but you will not be able to copy and paste queries from other sources to convert units. 
-   For example, CPU utilization percentage is calculated by netdata, so netdata will convert ticks to percentage and 
+   - `average` sends to backends normalized metrics from the netdata database.
+   In this mode, all metrics are sent as gauges, in the units netdata uses. This abstracts data collection
+   and simplifies visualization, but you will not be able to copy and paste queries from other sources to convert units.
+   For example, CPU utilization percentage is calculated by netdata, so netdata will convert ticks to percentage and
    send the average percentage to the backend.
 
-   - `sum` or `volume`: the sum of the interpolated values shown on the netdata graphs is sent to the backend. 
-   So, if netdata is configured to send data to the backend every 10 seconds, the sum of the 10 values shown on the 
+   - `sum` or `volume`: the sum of the interpolated values shown on the netdata graphs is sent to the backend.
+   So, if netdata is configured to send data to the backend every 10 seconds, the sum of the 10 values shown on the
    netdata charts will be used.
 
 Time-series databases suggest to collect the raw values (`as-collected`). If you plan to invest on building your monitoring around a time-series database and you already know (or you will invest in learning) how to convert units and normalize the metrics in Grafana or other visualization tools, we suggest to use `as-collected`.
@@ -66,9 +70,9 @@ of `netdata.conf` from your netdata):
 ```
 [backend]
     enabled = yes | no
-    type = graphite | opentsdb | json
+    type = graphite | opentsdb | json | kinesis
     host tags = list of TAG=VALUE
-    destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used
+    destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used, or a region for kinesis
     data source = average | sum | as collected
     prefix = netdata
     hostname = my-name
@@ -82,7 +86,7 @@ of `netdata.conf` from your netdata):
 
 - `enabled = yes | no`, enables or disables sending data to a backend
 
-- `type = graphite | opentsdb | json`, selects the backend type
+- `type = graphite | opentsdb | json | kinesis`, selects the backend type
 
 - `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames,
    IPs (IPv4 and IPv6) and ports to connect to.
@@ -105,7 +109,7 @@ of `netdata.conf` from your netdata):
 ```
 
    Example IPv6 and IPv4 together:
-   
+
 ```
    destination = [ffff:...:0001]:2003 10.11.12.1:2003
 ```
@@ -117,6 +121,8 @@ of `netdata.conf` from your netdata):
    a script that can be used as a fallback backend to save the metrics to disk and push them to the
    time-series database when it becomes available again. It can also be used to monitor / trace / debug
    the metrics netdata generates.
+
+   For kinesis backend `destination` should be set to an AWS region (for example, `us-east-1`).
 
 - `data source = as collected`, or `data source = average`, or `data source = sum`, selects the kind of
    data that will be sent to the backend.
@@ -170,7 +176,7 @@ netdata provides 5 charts:
 
 1. **Buffered metrics**, the number of metrics netdata added to the buffer for dispatching them to the
    backend server.
-   
+
 2. **Buffered data size**, the amount of data (in KB) netdata added the buffer.
 
 3. ~~**Backend latency**, the time the backend server needed to process the data netdata sent.
@@ -178,7 +184,7 @@ netdata provides 5 charts:
    (this chart has been removed, because it only measures the time netdata needs to give the data
    to the O/S - since the backend servers do not ack the reception, netdata does not have any means
    to measure this properly).
-   
+
 4. **Backend operations**, the number of operations performed by netdata.
 
 5. **Backend thread CPU usage**, the CPU resources consumed by the netdata thread, that is responsible

@@ -654,6 +654,7 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_KAFKA}" \
 	"${SEND_PD}" \
 	"${SEND_FLEEP}" \
+	"${SEND_PROWL}" \
 	"${SEND_CUSTOM}" \
 	"${SEND_IRC}" \
 	"${SEND_AWSSNS}" \
@@ -680,7 +681,7 @@ date=$(date --date=@${when} "${date_format}" 2>/dev/null)
 # ----------------------------------------------------------------------------
 # prepare some extra headers if we've been asked to thread e-mails
 if [ "${SEND_EMAIL}" == "YES" ] && [ "${EMAIL_THREADING}" != "NO" ]; then
-	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\nReferences: <${chart}-${name}@${host}>"
+	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\r\\nReferences: <${chart}-${name}@${host}>"
 else
 	email_thread_headers=
 fi
@@ -1740,7 +1741,7 @@ send_syslog() {
 # SMS sender
 
 send_sms() {
-	local recipients="${1}" exitcode sent=0
+	local recipients="${1}" errcode errmessage sent=0
 
     # Human readable SMS
     local msg="${host} ${status_message}: ${chart} (${family}), ${alarm}"
@@ -1751,12 +1752,13 @@ send_sms() {
 	if [ "${SEND_SMS}" = "YES" ] && [ -n "${sendsms}" ] && [ -n "${recipients}" ] && [ -n "${msg}" ]; then
 		# http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
 		for phone in ${recipients}; do
-			exitcode=$($sendsms $phone "$msg")
-			if [ ${exitcode} -eq 0 ]; then
+			errmessage=$($sendsms $phone "$msg" 2>&1)
+			errcode=$?
+			if [ ${errcode} -eq 0 ]; then
 				info "sent smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
 				sent=$((sent + 1))
 			else
-				error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${exitcode}."
+				error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${errcode}: ${errmessage}."
 			fi
 		done
 
@@ -1951,7 +1953,7 @@ send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to
 Severity: ${severity}\\n
 Chart: ${chart}\\n
 Family: ${family}\\n
-$(date -d @${when})\\n
+${date}\\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?

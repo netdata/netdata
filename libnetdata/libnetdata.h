@@ -202,6 +202,9 @@
 #endif
 #define abs(x) (((x) < 0)? (-(x)) : (x))
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 #define GUID_LEN 36
 
 extern void netdata_fix_chart_id(char *s);
@@ -295,6 +298,9 @@ extern char *netdata_configured_host_prefix;
 #include "clocks/clocks.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
+#ifdef ENABLE_HTTPS
+# include "socket/security.h"
+#endif
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/log.h"

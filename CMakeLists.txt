@@ -3,8 +3,8 @@
 # This file is only used for development (netdata in Clion)
 # It can build netdata, but you are on your own...
 
-cmake_minimum_required(VERSION 3.0.2)
-project(netdata C)
+cmake_minimum_required(VERSION 3.1.0)
+project(netdata C CXX)
 
 find_package(Threads REQUIRED)
 find_package(PkgConfig REQUIRED)
@@ -89,6 +89,46 @@ set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${ZLIB_CFLAGS_OTHER})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${ZLIB_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
 
+# -----------------------------------------------------------------------------
+# libuv multi-platform support library with a focus on asynchronous I/O
+
+pkg_check_modules(LIBUV REQUIRED libuv)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${LIBUV_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${LIBUV_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBUV_INCLUDE_DIRS})
+
+# -----------------------------------------------------------------------------
+# lz4 Extremely Fast Compression algorithm
+
+pkg_check_modules(LIBLZ4 REQUIRED liblz4)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${LIBLZ4_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${LIBLZ4_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_DIRS})
+
+# -----------------------------------------------------------------------------
+# Judy General purpose dynamic array
+
+# pkgconfig not working in Ubuntu, why? upstream package broken?
+#pkg_check_modules(JUDY REQUIRED Judy)
+#set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${JUDY_CFLAGS_OTHER})
+#set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${JUDY_LIBRARIES})
+#set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${JUDY_INCLUDE_DIRS})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} "-lJudy")
+set(CMAKE_REQUIRED_LIBRARIES "Judy")
+check_symbol_exists("JudyLLast" "Judy.h" HAVE_JUDY)
+IF(HAVE_JUDY)
+    message(STATUS "Judy library found")
+ELSE()
+    message( FATAL_ERROR "libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'." )
+ENDIF()
+
+# -----------------------------------------------------------------------------
+# OpenSSL Cryptography and SSL/TLS Toolkit
+
+pkg_check_modules(OPENSSL REQUIRED openssl)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${OPENSSL_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${OPENSSL_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
 
 # -----------------------------------------------------------------------------
 # Detect libcap
@@ -158,6 +198,50 @@ ENDIF(MACOS)
 
 
 # -----------------------------------------------------------------------------
+# Detect libcrypto
+
+pkg_check_modules(CRYPTO libcrypto)
+# later we use:
+# ${CRYPTO_LIBRARIES}
+# ${CRYPTO_CFLAGS_OTHER}
+# ${CRYPTO_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libssl
+
+pkg_check_modules(SSL libssl)
+# later we use:
+# ${SSL_LIBRARIES}
+# ${SSL_CFLAGS_OTHER}
+# ${SSL_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libcurl
+
+pkg_check_modules(CURL libcurl)
+# later we use:
+# ${CURL_LIBRARIES}
+# ${CURL_CFLAGS_OTHER}
+# ${CURL_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libaws-cpp-sdk-core
+
+find_library(HAVE_AWS aws-cpp-sdk-core)
+# later we use:
+# ${HAVE_AWS}
+
+# -----------------------------------------------------------------------------
+# Detect libaws-cpp-sdk-kinesis
+
+find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
+# later we use:
+# ${HAVE_KINESIS}
+
+# -----------------------------------------------------------------------------
 # netdata files
 
 set(LIBNETDATA_FILES
@@ -200,7 +284,8 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
-        )
+        libnetdata/socket/security.c
+        libnetdata/socket/security.h)
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
@@ -359,6 +444,21 @@ set(RRD_PLUGIN_FILES
         database/rrdsetvar.h
         database/rrdvar.c
         database/rrdvar.h
+        database/engine/rrdengine.c
+        database/engine/rrdengine.h
+        database/engine/rrddiskprotocol.h
+        database/engine/datafile.c
+        database/engine/datafile.h
+        database/engine/journalfile.c
+        database/engine/journalfile.h
+        database/engine/rrdenginelib.c
+        database/engine/rrdenginelib.h
+        database/engine/rrdengineapi.c
+        database/engine/rrdengineapi.h
+        database/engine/pagecache.c
+        database/engine/pagecache.h
+        database/engine/rrdenglocking.c
+        database/engine/rrdenglocking.h
         )
 
 set(WEB_PLUGIN_FILES
@@ -440,6 +540,13 @@ set(BACKENDS_PLUGIN_FILES
         backends/prometheus/backend_prometheus.h
         )
 
+set(KINESIS_BACKEND_FILES
+        backends/aws_kinesis/aws_kinesis.c
+        backends/aws_kinesis/aws_kinesis.h
+        backends/aws_kinesis/aws_kinesis_put_record.cc
+        backends/aws_kinesis/aws_kinesis_put_record.h
+        )
+
 set(DAEMON_FILES
         daemon/common.c
         daemon/common.h
@@ -486,6 +593,25 @@ add_definitions(
 )
 
 # -----------------------------------------------------------------------------
+# kinesis backend
+
+IF(HAVE_KINESIS AND HAVE_AWS AND CRYPTO_LIBRARIES AND SSL_LIBRARIES AND CURL_LIBRARIES)
+    SET(ENABLE_BACKEND_KINESIS True)
+ELSE()
+    SET(ENABLE_BACKEND_KINESIS False)
+ENDIF()
+
+IF(ENABLE_BACKEND_KINESIS)
+    message(STATUS "kinesis backend: enabled")
+    list(APPEND NETDATA_FILES ${KINESIS_BACKEND_FILES})
+    list(APPEND NETDATA_COMMON_LIBRARIES aws-cpp-sdk-kinesis aws-cpp-sdk-core ${CRYPTO_LIBRARIES} ${SSL_LIBRARIES} ${CURL_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${CRYPTO_INCLUDE_DIRS} ${SSL_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
+    list(APPEND NETDATA_COMMON_CFLAGS ${CRYPTO_CFLAGS_OTHER} ${SSL_CFLAGS_OTHER} ${CURL_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "kinesis backend: disabled (requires AWS SDK for C++)")
+ENDIF()
+
+# -----------------------------------------------------------------------------
 # netdata
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
@@ -520,6 +646,11 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
 
+ENDIF()
+
+IF(ENABLE_BACKEND_KINESIS)
+    set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
+    set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
 
 IF(IPMI_LIBRARIES)

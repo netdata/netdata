@@ -49,6 +49,10 @@ void netdata_cleanup_and_exit(int ret) {
             error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
+#ifdef ENABLE_HTTPS
+	security_clean_openssl();
+#endif
+
     info("EXIT: all done - netdata is now exiting - bye bye...");
     exit(ret);
 }
@@ -301,6 +305,7 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+            "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
@@ -344,7 +349,20 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
-void log_init(void) {
+#ifdef ENABLE_HTTPS
+static void security_init(){
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
+    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
+    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+
+    security_openssl_library();
+}
+#endif
+
+static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
     stdout_filename    = config_get(CONFIG_SECTION_GLOBAL, "debug log",  filename);
@@ -354,6 +372,10 @@ void log_init(void) {
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_GLOBAL, "access log", filename);
+
+	char deffacility[8];
+	snprintfz(deffacility,7,"%s","daemon");
+	facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
 
     error_log_throttle_period = config_get_number(CONFIG_SECTION_GLOBAL, "errors flood protection period", error_log_throttle_period);
     error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
@@ -415,8 +437,9 @@ static void get_netdata_configured_variables() {
     // get the hostname
 
     char buf[HOSTNAME_MAX + 1];
-    if(gethostname(buf, HOSTNAME_MAX) == -1)
+    if(gethostname(buf, HOSTNAME_MAX) == -1){
         error("Cannot get machine hostname.");
+    }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
@@ -467,6 +490,25 @@ static void get_netdata_configured_variables() {
 
     default_rrd_memory_mode = rrd_memory_mode_id(config_get(CONFIG_SECTION_GLOBAL, "memory mode", rrd_memory_mode_name(default_rrd_memory_mode)));
 
+#ifdef ENABLE_DBENGINE
+    // ------------------------------------------------------------------------
+    // get default Database Engine page cache size in MiB
+
+    default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "page cache size", default_rrdeng_page_cache_mb);
+    if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
+        error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
+        default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+    }
+
+    // ------------------------------------------------------------------------
+    // get default Database Engine disk space quota in MiB
+
+    default_rrdeng_disk_quota_mb = (int) config_get_number(CONFIG_SECTION_GLOBAL, "dbengine disk space", default_rrdeng_disk_quota_mb);
+    if(default_rrdeng_disk_quota_mb < RRDENG_MIN_DISK_SPACE_MB) {
+        error("Invalid dbengine disk space %d given. Defaulting to %d.", default_rrdeng_disk_quota_mb, RRDENG_MIN_DISK_SPACE_MB);
+        default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
+    }
+#endif
     // ------------------------------------------------------------------------
 
     netdata_configured_host_prefix = config_get(CONFIG_SECTION_GLOBAL, "host access prefix", "");
@@ -646,6 +688,51 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
+int get_system_info(struct rrdhost_system_info *system_info) {
+    char *script;
+    script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
+    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "system-info.sh");
+    if (unlikely(access(script, R_OK) != 0)) {
+        info("System info script %s not found.",script);
+        freez(script);
+        return 1;
+    }
+
+    pid_t command_pid;
+
+    info("Executing %s", script);
+
+    FILE *fp = mypopen(script, &command_pid);
+    if(fp) {
+        char buffer[200 + 1];
+        while (fgets(buffer, 200, fp) != NULL) {
+            char *name=buffer;
+            char *value=buffer;
+            while (*value && *value != '=') value++;
+            if (*value=='=') {
+                *value='\0';
+                value++;
+                if (strlen(value)>1) {
+                    char *newline = value + strlen(value) - 1;
+                    (*newline) = '\0';
+                }
+                char n[51], v[101];
+                snprintfz(n, 50,"%s",name);
+                snprintfz(v, 101,"%s",value);
+                if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
+                    info("Unexpected environment variable %s=%s", n, v);
+                }
+                else {
+                    info("%s=%s", n, v);
+                    setenv(n, v, 1);
+                }
+            }
+        }
+        mypclose(fp, command_pid);
+    }
+    freez(script);
+    return 0;
+}
 
 void send_statistics( const char *action, const char *action_result, const char *action_data) {
     static char *as_script;
@@ -693,6 +780,7 @@ int main(int argc, char **argv) {
     int dont_fork = 0;
     size_t default_stacksize;
 
+    netdata_ready=0;
     // set the name for logging
     program_name = "netdata";
 
@@ -791,6 +879,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+                        char* createdataset_string = "createdataset=";
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -799,11 +888,25 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
-                            rrd_init("unittest");
+                            rrd_init("unittest", NULL);
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
+#ifdef ENABLE_DBENGINE
+                            if(test_dbengine()) return 1;
+#endif
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
+                            return 0;
+                        }
+                        else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
+                            unsigned history_seconds;
+
+                            optarg += strlen(createdataset_string);
+                            history_seconds = (unsigned )strtoull(optarg, NULL, 0);
+
+#ifdef ENABLE_DBENGINE
+                            generate_dbengine_dataset(history_seconds);
+#endif
                             return 0;
                         }
                         else if(strcmp(optarg, "simple-pattern") == 0) {
@@ -996,6 +1099,12 @@ int main(int argc, char **argv) {
         error_log_limit_unlimited();
 
         // --------------------------------------------------------------------
+        // get the certificate and start security
+#ifdef ENABLE_HTTPS
+        security_init();
+#endif
+
+        // --------------------------------------------------------------------
         // setup process signals
 
         // block signals while initializing threads.
@@ -1048,8 +1157,6 @@ int main(int argc, char **argv) {
 
     // initialize the log files
     open_all_log_files();
-	netdata_anonymous_statistics_enabled=-1;
-	send_statistics("START","-", "-");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1084,13 +1191,15 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
-    rrd_init(netdata_configured_hostname);
+	netdata_anonymous_statistics_enabled=-1;
+    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
+    get_system_info(system_info);
 
+    rrd_init(netdata_configured_hostname, system_info);
     // ------------------------------------------------------------------------
     // enable log flood protection
 
     error_log_limit_reset();
-
 
     // ------------------------------------------------------------------------
     // spawn the threads
@@ -1109,7 +1218,9 @@ int main(int argc, char **argv) {
     }
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
-
+    netdata_ready = 1;
+  
+    send_statistics("START","-", "-");
 
     // ------------------------------------------------------------------------
     // unblock signals

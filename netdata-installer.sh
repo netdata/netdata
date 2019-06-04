@@ -44,15 +44,21 @@ else
 	source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
-download() {
+download_go() {
 	url="${1}"
 	dest="${2}"
+
 	if command -v curl >/dev/null 2>&1; then
-		run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+		run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
 	elif command -v wget >/dev/null 2>&1; then
-		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+		run wget -T 15 -O - "${url}" > "${dest}"
 	else
-		fatal "I need curl or wget to proceed, but neither is available on this system."
+		echo >&2
+		echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
+	        echo >&2 "Either add packages or disable it by issuing '--disable-go' in the installer"
+		echo >&2
+
+		run_failed "I need curl or wget to proceed, but neither is available on this system."
 	fi
 }
 
@@ -156,6 +162,9 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-nfacct
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available
   --disable-plugin-xenstat   Disable the xenstat plugin.
+  --enable-backend-kinesis   Enable AWS Kinesis backend. Default: enable it when libaws_cpp_sdk_kinesis and libraries
+                             it depends on are available.
+  --disable-backend-kinesis
   --enable-lto               Enable Link-Time-Optimization. Default: enabled
   --disable-lto
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
@@ -201,6 +210,8 @@ while [ -n "${1}" ]; do
 		"--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct";;
 		"--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat";;
 		"--disable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-xenstat/} --disable-plugin-xenstat";;
+        "--enable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-kinesis/} --enable-backend-kinesis";;
+        "--disable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-kinesis/} --disable-backend-kinesis";;
 		"--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto";;
 		"--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto";;
 		"--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse";;
@@ -510,26 +521,31 @@ progress "Fix generated files permissions"
 run find ./system/ -type f -a \! -name \*.in -a \! -name Makefile\* -a \! -name \*.conf -a \! -name \*.service -a \! -name \*.logrotate -exec chmod 755 {} \;
 
 # -----------------------------------------------------------------------------
-progress "Add user netdata to required user groups"
+progress "Creating standard user and groups for netdata"
 
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
 NETDATA_ADDED_TO_GROUPS=""
 if [ "${UID}" -eq 0 ]; then
+	progress "Adding group 'netdata'"
 	portable_add_group netdata || :
+
+	progress "Adding user 'netdata'"
 	portable_add_user netdata "${NETDATA_PREFIX}/var/lib/netdata" || :
 
+	progress "Assign user 'netdata' to required groups"
 	for g in ${NETDATA_WANTED_GROUPS}; do
 		# shellcheck disable=SC2086
 		portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
 	done
 else
-	run_failed "The installer does not run as root."
+	run_failed "The installer does not run as root. Nothing to do for user and groups"
 fi
 
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate
+
 
 # -----------------------------------------------------------------------------
 progress "Read installation options from netdata.conf"
@@ -562,6 +578,7 @@ else
 fi
 NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
+echo >&2 "Netdata user and group is finally set to: ${NETDATA_USER}/${NETDATA_GROUP}"
 
 # the owners of the web files
 NETDATA_WEB_USER="$(config_option "web" "web files owner" "${NETDATA_USER}")"
@@ -618,7 +635,7 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d"; do
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d" "ssl"; do
 	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
 		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
 		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
@@ -683,7 +700,7 @@ if [ "${UID}" -eq 0 ]; then
 	run chown -R "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata"
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
-	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0755 {} \;
+	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0750 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.sh -exec chmod 0755 {} \;
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin" ]; then
@@ -718,6 +735,11 @@ if [ "${UID}" -eq 0 ]; then
         run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/xenstat.plugin"
     fi
 
+    if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping" ]; then
+        run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
+        run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping"
+    fi
+
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network" ]; then
 		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network"
@@ -740,7 +762,7 @@ fi
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.3.1"
+	GO_PACKAGE_VERSION="v0.6.0"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
@@ -760,24 +782,37 @@ install_go() {
 		for index in "${ARCH_MAP[@]}" ; do
 			KEY="${index%%::*}"
 			VALUE="${index##*::}"
-			if [ "$KEY" == "$ARCH" ]; then
+			if [ "$KEY" = "$ARCH" ]; then
 				ARCH="${VALUE}"
 				break
 			fi
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-		GO_PACKAGE_BASENAME="go.d.plugin-$GO_PACKAGE_VERSION.$OS-$ARCH"
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
 
-		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 
-		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
+
+		if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
+			run_failed "go.d plugin download failed, go.d plugin will not be available"
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+			return 0
+		fi
+
 		grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
-		if ! (cd "${tmp}" && sha256sum -c "sha256sums.txt"); then
+		if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
+
+			echo >&2 "go.d plugin checksum validation failure."
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+
 			run_failed "go.d.plugin package files checksum validation failed."
-			return 1
+			return 0
 		fi
 
 		# Install new files
@@ -797,10 +832,26 @@ install_go() {
 install_go
 
 # -----------------------------------------------------------------------------
+progress "Telemetry configuration"
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+	run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+else
+	printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+fi
+
+# -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
-install_netdata_service || run_failed "Cannot install netdata init service."
+
+if grep -q docker /proc/1/cgroup >/dev/null 2>&1; then
+	echo >&2 "We are running within a docker container, will not be installing netdata service"
+	echo >&2
+else
+	install_netdata_service || run_failed "Cannot install netdata init service."
+fi
 
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata
@@ -943,39 +994,58 @@ To start netdata run:
 
   ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_START_CMD}${TPUT_RESET}
 
-
 END
 echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh${TPUT_RESET}"
+echo >&2
 
-if [ "${AUTOUPDATE}" = "1" ]; then
-	if [ "${UID}" -ne "0" ]; then
-		echo >&2 "You need to run the installer as root for auto-updating via cron."
+progress "Install netdata updater tool"
+
+if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
+	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" || exit 1
+else
+	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" || exit 1
+fi
+
+chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh
+echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh${TPUT_RESET}"
+echo >&2
+
+# Figure out the cron directory for the distro
+crondir=
+[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
+[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
+
+if [ -z "${crondir}" ]; then
+	echo >&2 "Cannot figure out the cron directory to handle netdata-updater.sh activation/deactivation"
+elif [ "${UID}" -ne "0" ]; then
+	# We cant touch cron if we are not running as root
+	echo >&2 "You need to run the installer as root for auto-updating via cron."
+else
+	progress "Check if we must enable/disable the netdata updater"
+	if [ "${AUTOUPDATE}" = "1" ]; then
+		if [ -f "${crondir}/netdata-updater.sh" ]; then
+			progress "Removing incorrect netdata-updater filename in cron"
+			rm -f "${crondir}/netdata-updater.sh"
+		fi
+
+		echo >&2 "Adding to cron"
+
+		rm -f "${crondir}/netdata-updater"
+		ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" "${crondir}/netdata-updater"
+
+		echo >&2 "Auto-updating has been enabled. Updater script linked to: ${TPUT_RED}${TPUT_BOLD}${crondir}/netdata-update${TPUT_RESET}"
+		echo >&2
+		echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
+		echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
 	else
-		crondir=
-		[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
-		[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
+		echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
+		echo >&2
 
-		if [ -z "${crondir}" ]; then
-			echo >&2 "Cannot figure out the cron directory to install netdata-updater"
-		else
-			if [ -f "${crondir}/netdata-updater.sh" ]; then
-				progress "Removing incorrect netdata-updater filename in cron"
-				rm -f "${crondir}/netdata-updater.sh"
-			fi
-			progress "Installing new netdata-updater in cron"
-
+		if [ -f "${crondir}/netdata-updater" ]; then
+			echo >&2 "Removing cron reference: ${crondir}/netdata-updater"
 			rm -f "${crondir}/netdata-updater"
-			if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
-			else
-				sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${crondir}/netdata-updater" || exit 1
-			fi
-
-			chmod 0755 ${crondir}/netdata-updater
-			echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${crondir}/netdata-updater${TPUT_RESET}"
-			echo >&2
-			echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
-			echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
+		else
+			echo >&2 "Did not find any cron entries to remove"
 		fi
 	fi
 fi
@@ -989,16 +1059,13 @@ NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
+NETDATA_GROUP="${NETDATA_GROUP}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 # This value is meant to be populated by autoupdater (if enabled)
 NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF
 
-# Opt-out from telemetry program
-if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
-	touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
-fi
 
 # -----------------------------------------------------------------------------
 echo >&2

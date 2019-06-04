@@ -155,9 +155,9 @@ Produces the following chart. The `categories` section is matched in the order g
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/22902302/4d25bf06-f23d-11e6-844d-18c0876bdc3d.png)
 
-### HTTP versions
+### HTTP methods
 
-This chart breaks down requests by HTTP version used.
+This chart breaks down requests by HTTP method used.
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/22902323/5ee376d4-f23d-11e6-8457-157d3f438843.png)
 

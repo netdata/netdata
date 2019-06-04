@@ -87,7 +87,6 @@ markdown_extensions:
  - admonition
  - codehilite
  - meta
- - nl2br
  - sane_lists
  - smarty
  - toc:
@@ -128,6 +127,7 @@ echo -ne "    - 'docs/Demo-Sites.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
     - CONTRIBUTING.md
+    - SECURITY.md
 - Why Netdata:
     - 'docs/why-netdata/README.md'
     - 'docs/why-netdata/1s-granularity.md'
@@ -140,7 +140,7 @@ echo -ne "    - 'docs/Demo-Sites.md'
     - 'packaging/installer/UPDATE.md'
     - 'packaging/installer/UNINSTALL.md'
 - 'docs/GettingStarted.md'
-- Running netdata:
+- Running Netdata:
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'
     - 'daemon/config/README.md'
@@ -156,6 +156,7 @@ echo -ne "        - Running behind another web server:
 "
 #navpart 2 system
 navpart 2 database
+navpart 2 database/engine
 navpart 2 registry
 
 echo -ne "    - 'docs/Performance.md'
@@ -224,6 +225,7 @@ echo -ne "        - BASH:
 navpart 3 collectors/apps.plugin
 navpart 3 collectors/cups.plugin
 navpart 3 collectors/fping.plugin
+navpart 3 collectors/ioping.plugin
 navpart 3 collectors/freeipmi.plugin
 navpart 3 collectors/nfacct.plugin
 navpart 3 collectors/xenstat.plugin
@@ -250,9 +252,8 @@ navpart 2 web/api/badges "" "" 2
 navpart 2 web/api/health "" "" 2
 navpart 2 web/api/queries "" "Queries" 2
 
-echo -ne "- Hacking netdata:
+echo -ne "- Hacking Netdata:
     - CODE_OF_CONDUCT.md
-    - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
 "
 navpart 2 packaging/makeself "" "" 4

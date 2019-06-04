@@ -332,6 +332,8 @@ install_non_systemd_init() {
 
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
+NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
 	local uname="$(uname 2>/dev/null)"
@@ -351,15 +353,23 @@ install_netdata_service() {
 
 		elif [ "${uname}" = "FreeBSD" ]; then
 
-			run cp system/netdata-freebsd /etc/rc.d/netdata &&
-				NETDATA_START_CMD="service netdata start" &&
-				NETDATA_STOP_CMD="service netdata stop" &&
-				return 0
+			run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
+									   NETDATA_STOP_CMD="service netdata stop" &&
+									   NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
+									   NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
+			myret=$?
+
+			echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
+			echo >&2 ""
+
+			return ${myret}
 
 		elif issystemd; then
 			# systemd is running on this system
 			NETDATA_START_CMD="systemctl start netdata"
 			NETDATA_STOP_CMD="systemctl stop netdata"
+			NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+			NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 			SYSTEMD_DIRECTORY=""
 
@@ -390,6 +400,8 @@ install_netdata_service() {
 					NETDATA_START_CMD="rc-service netdata start"
 					NETDATA_STOP_CMD="rc-service netdata stop"
 				fi
+				NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+				NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 			fi
 
 			return ${ret}
@@ -429,6 +441,7 @@ stop_netdata_on_pid() {
 		ret=$?
 
 		test ${ret} -eq 0 && printf >&2 "." && sleep 2
+
 	done
 
 	echo >&2
@@ -445,8 +458,6 @@ netdata_pids() {
 	local p myns ns
 
 	myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
-
-	# echo >&2 "Stopping a (possibly) running netdata (namespace '${myns}')..."
 
 	for p in \
 		$(cat /var/run/netdata.pid 2>/dev/null) \
@@ -477,12 +488,15 @@ restart_netdata() {
 
 	local started=0
 
-	progress "Start netdata"
+	progress "Restarting netdata instance"
 
 	if [ "${UID}" -eq 0 ]; then
-		service netdata stop
-		stop_all_netdata
-		service netdata restart && started=1
+		echo >&2
+		echo >&2 "Stopping all netdata threads"
+		run stop_all_netdata
+
+		echo >&2 "Starting netdata using command '${NETDATA_INSTALLER_START_CMD}'"
+		run ${NETDATA_INSTALLER_START_CMD} && started=1
 
 		if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
 			echo >&2 "Ooops! it seems netdata is not started."
@@ -490,7 +504,8 @@ restart_netdata() {
 		fi
 
 		if [ ${started} -eq 0 ]; then
-			service netdata start && started=1
+			echo >&2 "Attempting another netdata start using command '${NETDATA_INSTALLER_START_CMD}'"
+			run ${NETDATA_INSTALLER_START_CMD} && started=1
 		fi
 	fi
 
@@ -500,8 +515,8 @@ restart_netdata() {
 	fi
 
 	if [ ${started} -eq 0 ]; then
-		# still not started...
-
+		# still not started... another forced attempt, just run the binary
+		echo >&2 "Netdata service still not started, attempting another forced restart by running '${netdata} ${@}'"
 		run stop_all_netdata
 		run "${netdata}" "${@}"
 		return $?
@@ -606,6 +621,11 @@ portable_add_user() {
 		run adduser -h "${homedir}" -s "${nologin}" -D -G "${username}" "${username}" && return 0
 	fi
 
+	# mac OS
+	if command -v sysadminctl 1> /dev/null 2>&1; then
+		run sysadminctl -addUser  ${username} && return 0
+	fi
+
 	echo >&2 "Failed to add ${username} user account !"
 
 	return 1
@@ -614,11 +634,11 @@ portable_add_user() {
 portable_add_group() {
 	local groupname="${1}"
 
-    # Check if group exist
+	# Check if group exist
 	if cut -d ':' -f 1 </etc/group | grep "^${groupname}$" 1>/dev/null 2>&1; then
-        echo >&2 "Group '${groupname}' already exists."
-        return 0
-    fi
+		echo >&2 "Group '${groupname}' already exists."
+		return 0
+	fi
 
 	echo >&2 "Adding ${groupname} user group ..."
 
@@ -637,6 +657,11 @@ portable_add_group() {
 		run addgroup "${groupname}" && return 0
 	fi
 
+	# mac OS
+	if command -v dseditgroup 1> /dev/null 2>&1; then
+		dseditgroup -o create "${groupname}" && return 0
+	fi
+
 	echo >&2 "Failed to add ${groupname} user group !"
 	return 1
 }
@@ -644,13 +669,13 @@ portable_add_group() {
 portable_add_user_to_group() {
 	local groupname="${1}" username="${2}"
 
-    # Check if group exist
+	# Check if group exist
 	if ! cut -d ':' -f 1 </etc/group | grep "^${groupname}$" >/dev/null 2>&1; then
-        echo >&2 "Group '${groupname}' does not exist."
-        return 1
-    fi
+		echo >&2 "Group '${groupname}' does not exist."
+		return 1
+	fi
 
-    # Check if user is in group
+	# Check if user is in group
 	if [[ ",$(grep "^${groupname}:" </etc/group | cut -d ':' -f 4)," =~ ,${username}, ]]; then
 		# username is already there
 		echo >&2 "User '${username}' is already in group '${groupname}'."
@@ -674,7 +699,24 @@ portable_add_user_to_group() {
 			run addgroup "${username}" "${groupname}" && return 0
 		fi
 
+		# mac OS
+		if command -v dseditgroup 1> /dev/null 2>&1; then
+			dseditgroup -u "${username}" "${groupname}" && return 0
+		fi
 		echo >&2 "Failed to add user ${username} to group ${groupname} !"
 		return 1
+	fi
+}
+
+
+safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
 	fi
 }

@@ -11,6 +11,7 @@ plugin|language|O/S|description
 [charts.d.plugin](../charts.d.plugin/)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
 [cups.plugin](../cups.plugin/)|`C`|all|monitors **CUPS**
 [fping.plugin](../fping.plugin/)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
+[ioping.plugin](../ioping.plugin/)|`C`|all|measures disk latency.
 [freeipmi.plugin](../freeipmi.plugin/)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.
 [nfacct.plugin](../nfacct.plugin/)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.
 [xenstat.plugin](../xenstat.plugin/)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.
@@ -64,6 +65,7 @@ Example:
 
 	# charts.d = yes
 	# fping = yes
+	# ioping = yes
 	# node.d = yes
 	# python.d = yes
 ```

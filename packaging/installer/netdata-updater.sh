@@ -20,6 +20,18 @@ error() {
 	echo >&3 "$(date) : ERROR: " "${@}"
 }
 
+safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
+	fi
+}
+
 # this is what we will do if it fails (head-less only)
 fatal() {
 	error "FAILED TO UPDATE NETDATA : ${1}"
@@ -55,7 +67,13 @@ download() {
 }
 
 set_tarball_urls() {
-	if [ "$1" == "stable" ]; then
+
+	if [ ! -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
+		info "Not fetching remote tarballs, local override was given"
+		return
+	fi
+
+	if [ "$1" = "stable" ]; then
 		local latest
 		# Simple version
 		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
@@ -71,22 +89,34 @@ set_tarball_urls() {
 update() {
 	[ -z "${logfile}" ] && info "Running on a terminal - (this script also supports running headless from crontab)"
 
-	dir=$(create_tmp_directory)
-	cd "$dir"
+	RUN_INSTALLER=0
+	tmpdir=$(create_tmp_directory)
+	cd "$tmpdir"
 
-	download "${NETDATA_TARBALL_CHECKSUM_URL}" "${dir}/sha256sum.txt" >&3 2>&3
-	if grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
-		info "Newest version is already installed"
-	else
-		download "${NETDATA_TARBALL_URL}" "${dir}/netdata-latest.tar.gz"
-		if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >&3 2>&3; then
-			failed "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${dir}"
+	if [ -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
+		download "${NETDATA_TARBALL_CHECKSUM_URL}" "${tmpdir}/sha256sum.txt" >&3 2>&3
+		if [[ -n "${NETDATA_TARBALL_CHECKSUM}" ]] && grep "${NETDATA_TARBALL_CHECKSUM}" sha256sum.txt >&3 2>&3; then
+			info "Newest version is already installed"
+		else
+			download "${NETDATA_TARBALL_URL}" "${tmpdir}/netdata-latest.tar.gz"
+			if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
+				fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${tmpdir}"
+			fi
+			NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
+			tar -xf netdata-latest.tar.gz >&3 2>&3
+			rm netdata-latest.tar.gz >&3 2>&3
+			cd netdata-*
+			RUN_INSTALLER=1
 		fi
-		NEW_CHECKSUM="$(sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
-		tar -xf netdata-latest.tar.gz >&3 2>&3
-		rm netdata-latest.tar.gz >&3 2>&3
-		cd netdata-*
+	else
+		info "!!Local tarball override detected!! - Entering directory ${NETDATA_LOCAL_TARBAL_OVERRIDE} for installation, not downloading anything"
+		RUN_INSTALLER=1
+		cd ${NETDATA_LOCAL_TARBAL_OVERRIDE}
+	fi
 
+
+	# We got the sources, run the update now
+	if [ ${RUN_INSTALLER} -eq 1 ]; then
 		# signal netdata to start saving its database
 		# this is handy if your database is big
 		pids=$(pidof netdata)
@@ -107,9 +137,9 @@ NETDATA_TARBALL_CHECKSUM="$NEW_CHECKSUM"
 EOF
 	fi
 
-	rm -rf "${dir}" >&3 2>&3
+	rm -rf "${tmpdir}" >&3 2>&3
 	[ -n "${logfile}" ] && rm "${logfile}" && logfile=
-	return 0
+	return
 }
 
 # Usually stored in /etc/netdata/.environment

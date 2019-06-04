@@ -8,23 +8,14 @@ You need:
 1. The **incoming webhook URL** as given by slack.com. You can use the same on all your netdata servers (or you can have multiple if you like - your decision).
 2. One or more channels to post the messages to.
 
-Get them here: https://api.slack.com/incoming-webhooks
+To get a webhook that works on multiple channels, you will need to login to your slack.com workspace and create an incoming webhook using the [Incoming Webhooks App](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks).
+Do NOT use the instructions in https://api.slack.com/incoming-webhooks#enable_webhooks, as the particular webhooks work only for a single channel.
 
-Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+Set the webhook and the recipients in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
 
 ```
-###############################################################################
-# sending slack notifications
-
-# note: multiple recipients can be given like this:
-#                  "RECIPIENT1 RECIPIENT2 ..."
-
-# enable/disable sending pushover notifications
 SEND_SLACK="YES"
 
-# Login to slack.com and create an incoming webhook.
-# You need only one for all your netdata servers.
-# Without it, netdata cannot send slack notifications.
 SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
 # if a role's recipients are not configured, a notification will be send to:

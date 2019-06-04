@@ -57,12 +57,12 @@ cache directory | `/var/cache/netdata` | The directory the memory database will 
 lib directory | `/var/lib/netdata` | Contains the alarm log and the netdata instance guid.
 home directory | `/var/cache/netdata` | Contains the db files for the collected metrics
 plugins directory | `"/usr/libexec/netdata/plugins.d" "/etc/netdata/custom-plugins.d"` | The directory plugin programs are kept. This setting supports multiple directories, space separated. If any directory path contains spaces, enclose it in single or double quotes.
-memory mode | `save` | When set to `save` netdata will save its round robin database on exit and load it on startup. When set to `map` the cache files will be updated in real time (check `man mmap` - do not set this on systems with heavy load or slow disks - the disks will continuously sync the in-memory database of netdata). When set to `ram` the round robin database will be temporary and it will be lost when netdata exits. `none` disables the database at this host. This also disables health monitoring (there cannot be health monitoring without a database). host access prefix | | This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43).
+memory mode | `save` | When set to `save` netdata will save its round robin database on exit and load it on startup. When set to `map` the cache files will be updated in real time (check `man mmap` - do not set this on systems with heavy load or slow disks - the disks will continuously sync the in-memory database of netdata). When set to `dbengine` it behaves similarly to `map` but with much better disk and memory efficiency, however, with higher overhead. When set to `ram` the round robin database will be temporary and it will be lost when netdata exits. `none` disables the database at this host. This also disables health monitoring (there cannot be health monitoring without a database). host access prefix | | This is used in docker environments where /proc, /sys, etc have to be accessed via another path. You may also have to set SYS_PTRACE capability on the docker for this work. Check [issue 43](https://github.com/netdata/netdata/issues/43).
 memory deduplication (ksm) | `yes` | When set to `yes`, netdata will offer its in-memory round robin database to kernel same page merging (KSM) for deduplication. For more information check [Memory Deduplication - Kernel Same Page Merging - KSM](../../database/#ksm)
 TZ environment variable | `:/etc/localtime` | Where to find the timezone
 timezone | auto-detected | The timezone retrieved from the environment variable
 debug flags | `0x0000000000000000` | Bitmap of debug options to enable. For more information check [Tracing Options](../#debugging).
-debug log | `/var/log/netdata/debug.log` | The filename to save debug information. This file will not be created is debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](../#debugging).
+debug log | `/var/log/netdata/debug.log` | The filename to save debug information. This file will not be created if debugging is not enabled. You can also set it to `syslog` to send the debug messages to syslog, or `none` to disable this log. For more information check [Tracing Options](../#debugging).
 error log | `/var/log/netdata/error.log` | The filename to save error messages for netdata daemon and all plugins (`stderr` is sent here for all netdata programs, including the plugins). You can also set it to `syslog` to send the errors to syslog, or `none` to disable this log.
 access log | `/var/log/netdata/access.log` | The filename to save the log of web clients accessing netdata charts. You can also set it to `syslog` to send the access log to syslog, or `none` to disable this log.
 errors flood protection period | `1200` | UNUSED - Length of period (in sec) during which the number of errors should not exceed the `errors to trigger flood protection`.
@@ -110,7 +110,7 @@ stock health configuration directory | `/usr/lib/netdata/conf.d/health.d` | Cont
 health configuration directory | `/etc/netdata/health.d` | The directory containing the user alarm configuration files, to override the stock configurations
 run at least every seconds | `10` | Controls how often all alarm conditions should be evaluated.
 postpone alarms during hibernation for seconds | `60` | Prevents false alarms. May need to be increased if you get alarms during hibernation.
-rotate log every lines | 2000 | Controls the number of alarm log entries stored in `<lib directory>/health-log.db`, where <lib directory> is the one configured in the [[global] section](#global-section-options)
+rotate log every lines | 2000 | Controls the number of alarm log entries stored in `<lib directory>/health-log.db`, where `<lib directory>` is the one configured in the [[global] section](#global-section-options)
 
 ### [registry] section options
 
@@ -141,6 +141,6 @@ External plugins that need additional configuration may support a dedicated file
 
 ### Per chart configuration
 
-In this section you will a separate subsection for each chart shown on the dashboard. You can control all aspects of a specific chart here. You can understand what each option does by reading [how charts are defined](../../collectors/plugins.d/#chart). If you don't know how to find the name of a chart, you can learn about it [here](../../docs/Charts.md).
+In this section you will find a separate subsection for each chart shown on the dashboard. You can control all aspects of a specific chart here. You can understand what each option does by reading [how charts are defined](../../collectors/plugins.d/#chart). If you don't know how to find the name of a chart, you can learn about it [here](../../docs/Charts.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2Fconfig%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
