@@ -30,13 +30,13 @@ void security_openssl_library()
 
     SSL_library_init();
 #else
-    if ( OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL) != 1 ){
+    if ( OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL) != 1 ) {
         error("SSL library cannot be initialized.");
     }
 #endif
 }
 
-void security_openssl_common_options(SSL_CTX *ctx){
+void security_openssl_common_options(SSL_CTX *ctx) {
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
     static char *ciphers = {"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"};
 #endif
@@ -51,7 +51,7 @@ void security_openssl_common_options(SSL_CTX *ctx){
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if (!SSL_CTX_set_cipher_list(ctx,ciphers) ){
+    if (!SSL_CTX_set_cipher_list(ctx,ciphers) ) {
         error("SSL error. cannot set the cipher list");
     }
 #endif
@@ -71,7 +71,7 @@ static SSL_CTX * security_initialize_openssl_client() {
     return ctx;
 }
 
-static SSL_CTX * security_initialize_openssl_server(){
+static SSL_CTX * security_initialize_openssl_server() {
     SSL_CTX *ctx;
     char lerror[512];
 	static int netdata_id_context = 1;
@@ -87,7 +87,7 @@ static SSL_CTX * security_initialize_openssl_server(){
     SSL_CTX_use_certificate_file(ctx, security_cert, SSL_FILETYPE_PEM);
 #else
     ctx = SSL_CTX_new(TLS_server_method());
-    if ( !ctx ){
+    if ( !ctx ) {
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
@@ -98,7 +98,7 @@ static SSL_CTX * security_initialize_openssl_server(){
 
     SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
 
-    if ( !SSL_CTX_check_private_key(ctx) ){
+    if ( !SSL_CTX_check_private_key(ctx) ) {
         ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
 		error("SSL cannot check the private key: %s",lerror);
         SSL_CTX_free(ctx);
@@ -116,10 +116,10 @@ static SSL_CTX * security_initialize_openssl_server(){
     return ctx;
 }
 
-void security_start_ssl(int type){
-    if ( !type){
+void security_start_ssl(int type) {
+    if ( !type) {
         struct stat statbuf;
-        if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ){
+        if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ) {
             info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
             return;
         }
@@ -131,7 +131,7 @@ void security_start_ssl(int type){
     }
 }
 
-void security_clean_openssl(){
+void security_clean_openssl() {
 	if ( netdata_srv_ctx )
 	{
 		SSL_CTX_free(netdata_srv_ctx);
@@ -177,7 +177,7 @@ int security_process_accept(SSL *ssl,int msg) {
                  u_long err;
                  char buf[256];
                  int counter = 0;
-                 while ((err = ERR_get_error()) != 0){
+                 while ((err = ERR_get_error()) != 0) {
                      ERR_error_string_n(err, buf, sizeof(buf));
                      info("%d SSL Handshake error (%s) on socket %d ",counter++,ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
 			     }
@@ -194,11 +194,11 @@ int security_process_accept(SSL *ssl,int msg) {
     return 0;
 }
 
-int security_test_certificate(SSL *ssl){
+int security_test_certificate(SSL *ssl) {
     X509* cert = SSL_get_peer_certificate(ssl);
     int ret;
     long status;
-    if (!cert){
+    if (!cert) {
         return -1;
     }
 
