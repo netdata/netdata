@@ -9,7 +9,7 @@
 #
 
 echo "Syncing/updating repository.."
-running_os="$(cat /etc/os-release |grep '^ID=' | cut -d'=' -f2)"
+running_os="$(cat /etc/os-release |grep '^ID=' | cut -d'=' -f2 | sed -e 's/"//g')"
 
 case "${running_os}" in
 "centos"|"fedora")
