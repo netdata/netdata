@@ -77,6 +77,53 @@ static int page_has_only_empty_metrics(struct rrdeng_page_descr *descr)
     return has_only_empty_metrics;
 }
 
+void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
+{
+    struct rrdeng_collect_handle *handle;
+    struct rrdengine_instance *ctx;
+    struct rrdeng_page_descr *descr;
+
+    handle = &rd->state->handle.rrdeng;
+    ctx = handle->ctx;
+    descr = handle->descr;
+    if (unlikely(NULL == descr)) {
+        return;
+    }
+    if (likely(descr->page_length)) {
+        int ret, page_is_empty;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
+#endif
+        if (handle->prev_descr) {
+            /* unpin old second page */
+            pg_cache_put(ctx, handle->prev_descr);
+        }
+        page_is_empty = page_has_only_empty_metrics(descr);
+        if (page_is_empty) {
+            debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
+            if(unlikely(debug_flags & D_RRDENGINE))
+                print_page_cache_descr(descr);
+            pg_cache_put(ctx, descr);
+            pg_cache_punch_hole(ctx, descr, 1);
+            handle->prev_descr = NULL;
+        } else {
+            /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
+            rrdeng_page_descr_mutex_lock(ctx, descr);
+            ret = pg_cache_try_get_unsafe(descr, 0);
+            rrdeng_page_descr_mutex_unlock(ctx, descr);
+            assert (1 == ret);
+
+            rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+        }
+        handle->prev_descr = descr;
+    } else {
+        free(descr->pg_cache_descr->page);
+        rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
+        free(descr);
+    }
+    handle->descr = NULL;
+}
 
 void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number)
 {
@@ -91,45 +138,13 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
     if (unlikely(NULL == descr || descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE)) {
-        if (descr) {
-            if (descr->page_length) {
-                int ret, page_is_empty;
+        rrdeng_store_metric_flush_current_page(rd);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-                rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
-#endif
-                page_is_empty = page_has_only_empty_metrics(descr);
-                if (page_is_empty) {
-                    debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
-                    if(unlikely(debug_flags & D_RRDENGINE))
-                        print_page_cache_descr(descr);
-                    pg_cache_put(ctx, descr);
-                    pg_cache_punch_hole(ctx, descr, 1);
-                    handle->descr = NULL;
-                } else {
-                    /* added 1 extra reference to keep 2 dirty pages pinned per metric, expected refcnt = 2 */
-                    rrdeng_page_descr_mutex_lock(ctx, descr);
-                    ret = pg_cache_try_get_unsafe(descr, 0);
-                    rrdeng_page_descr_mutex_unlock(ctx, descr);
-                    assert (1 == ret);
-
-                    rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
-                }
-                if (handle->prev_descr) {
-                    /* unpin old second page */
-                    pg_cache_put(ctx, handle->prev_descr);
-                }
-            } else {
-                free(descr->pg_cache_descr->page);
-                rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
-                free(descr);
-                handle->descr = NULL;
-            }
-        }
         page = rrdeng_create_page(ctx, &handle->page_index->id, &descr);
         assert(page);
-        handle->prev_descr = handle->descr;
+
         handle->descr = descr;
+
         uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
         handle->page_correlation_id = pg_cache->commited_page_index.latest_corr_id++;
         uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
@@ -158,37 +173,13 @@ void rrdeng_store_metric_finalize(RRDDIM *rd)
 {
     struct rrdeng_collect_handle *handle;
     struct rrdengine_instance *ctx;
-    struct rrdeng_page_descr *descr;
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
-    descr = handle->descr;
-    if (descr) {
-        if (descr->page_length) {
-            int page_is_empty;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-            rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
-#endif
-            page_is_empty = page_has_only_empty_metrics(descr);
-            if (page_is_empty) {
-                debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
-                if(unlikely(debug_flags & D_RRDENGINE))
-                    print_page_cache_descr(descr);
-                pg_cache_put(ctx, descr);
-                pg_cache_punch_hole(ctx, descr, 1);
-            } else {
-                rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
-            }
-            if (handle->prev_descr) {
-                /* unpin old second page */
-                pg_cache_put(ctx, handle->prev_descr);
-            }
-        } else {
-            free(descr->pg_cache_descr->page);
-            rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
-            free(descr);
-        }
+    rrdeng_store_metric_flush_current_page(rd);
+    if (handle->prev_descr) {
+        /* unpin old second page */
+        pg_cache_put(ctx, handle->prev_descr);
     }
 }
 

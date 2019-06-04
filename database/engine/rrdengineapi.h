@@ -20,6 +20,7 @@ extern void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, 
 extern void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time, void **handle);
 extern void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle);
 extern void rrdeng_store_metric_init(RRDDIM *rd);
+extern void rrdeng_store_metric_flush_current_page(RRDDIM *rd);
 extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number);
 extern void rrdeng_store_metric_finalize(RRDDIM *rd);
 extern void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle,
