@@ -59,6 +59,8 @@ COPY --from=builder /app /
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
 RUN \
+    # APK update before any changes
+    apk update && \
     # provide judy installation to base image
     apk add make alpine-sdk && \
     cd /judy-${JUDY_VER} && make install && cd / && \
