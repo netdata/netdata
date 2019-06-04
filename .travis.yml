@@ -1,3 +1,4 @@
+dist: xenial
 sudo: true
 language: c
 services:
@@ -29,6 +30,8 @@ stages:
 - name: Code quality, linting, syntax, code style
 - name: Build process
 - name: Artifacts validation
+- name: Artifacts validation on bare OS, stable to current lifecycle checks
+  if: branch = master AND (type = pull_request OR type = cron)
 
   # Nightly operations
 - name: Nightly operations
@@ -132,6 +135,30 @@ jobs:
   - name: Build/install for CentOS 7 (Containerized)
     script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
     after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
+
+
+
+  - stage: "Artifacts validation on bare OS, stable to current lifecycle checks"
+
+    name: Run netdata lifecycle on Ubuntu 16.04 (xenial)
+    script: sudo -E tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 16.04"
+
+  - name: Run netdata lifecycle on CentOS 7 (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
+
+  - name: Run netdata lifecycle, on Debian 9 (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:stretch" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 9 (stretch)"
+
+  - name: Run netdata lifecycle, on Ubuntu 19.04 (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.04" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.04"
+
+  - name: Run netdata lifecycle, on Fedora 30 (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
 
 
 

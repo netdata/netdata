@@ -1790,7 +1790,7 @@ if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
 			NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
 		fi
 	fi
-	if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
+	if [ -n "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
 		GOTOCLOUD=1
 	fi
 fi
