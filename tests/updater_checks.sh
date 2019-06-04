@@ -9,12 +9,26 @@
 #
 
 echo "Syncing/updating repository.."
-yum clean all
-yum update -y
+running_os="$(cat /etc/os-release |grep '^ID=' | cut -d'=' -f2)"
 
-echo "Installing extra dependencies.."
-yum install -y epel-release
-yum install -y git bats
+case "${running_os}" in
+"centos"|"fedora")
+	echo "Running on CentOS, updating YUM repository.."
+	yum clean all
+	yum update -y
+
+	echo "Installing extra dependencies.."
+	yum install -y epel-release
+	yum install -y git bats
+	;;
+"debian"|"ubuntu")
+	echo "Running ${running_os}, updating APT repository"
+	apt-get update -y
+	;;
+*)
+	echo "Running on ${running_os}, no repository preparation done"
+	;;
+esac
 
 echo "Running BATS file.."
 bats --tap tests/updater_checks.bats
