@@ -962,10 +962,10 @@ static inline void web_client_parse_headers(struct web_client *w,char *s){
     }
 }
 
-void web_client_parse_request(struct web_client *w,char *divisor){
+int web_client_parse_request(struct web_client *w,char *divisor){
     if(!divisor){
         w->total_params = 0;
-        return;
+        return 0;
     }
 
     char *moveme = w->query_string.body +1;
@@ -974,7 +974,7 @@ void web_client_parse_request(struct web_client *w,char *divisor){
 
     struct web_fields *names = w->param_name;
     struct web_fields *values = w->param_values;
-    do{
+    do {
         if ( i == max){
             error("We are exceeding the maximum number of elements possible(%u) in this query string(%s)",max,w->query_string.body);
             break;
@@ -1001,13 +1001,15 @@ void web_client_parse_request(struct web_client *w,char *divisor){
         } else{
             break;
         }
-    }while (moveme);
+    } while (moveme);
 
     w->total_params = ++i;
+
+    return i;
 }
 
 static inline void web_client_set_directory(struct web_client *w,char *begin,char *enddir,char *endcmd){
-    if (enddir ){
+    if (enddir) {
         w->directory.body = begin;
         w->directory.length = enddir - begin;
 
@@ -1073,7 +1075,16 @@ static inline void web_client_split_path_query(struct web_client *w){
         web_client_set_directory(w,begin,enddir,moveme);
         if (w->query_string.body){
             enddir = strchr(moveme,'=');
-            web_client_parse_request(w,enddir);
+            if ( !web_client_parse_request(w,enddir) ) {
+                moveme++;
+                size_t length = strlen(moveme);
+                w->param_name[0].body = moveme;
+                w->param_name[0].length = length;
+                w->param_values[0].body = moveme;
+                w->param_values[0].length = length;
+
+                w->total_params = 1;
+            }
         }
     } else {
         w->path.length = w->decoded_length;

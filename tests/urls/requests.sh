@@ -172,7 +172,9 @@ CHARTS=$( netdata_download_charts "http://127.0.0.1:19999" "api/v1" )
 
 netdata_download_various $MURL "api/v1/allmetrics?format=json"  "allmetrics"
 
-netdata_download_various $MURL "api/v1/alarms?active&_=$CT"  "alarms"
+netdata_download_various $MURL "api/v1/alarms?all"  "alarms_all"
+
+netdata_download_various $MURL "api/v1/alarms?active"  "alarms_active"
 
 netdata_download_various $MURL "api/v1/alarm_log?after&_=$PT"  "alarm_log"
 
