@@ -12,7 +12,7 @@ Charts:
 
 Currently supported mail transfer agents:
 
-*   Postfix
+-   Postfix
 
 ## Configuration
 
