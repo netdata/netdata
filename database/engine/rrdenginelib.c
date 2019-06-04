@@ -1,25 +1,52 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-void print_page_cache_descr(struct rrdeng_page_cache_descr *page_cache_descr)
+#define BUFSIZE (512)
+
+/* Caller must hold descriptor lock */
+void print_page_cache_descr(struct rrdeng_page_descr *descr)
 {
-    char uuid_str[37];
-    char str[512];
+    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+    char uuid_str[UUID_STR_LEN];
+    char str[BUFSIZE];
     int pos = 0;
 
-    uuid_unparse_lower(*page_cache_descr->id, uuid_str);
-    pos += snprintfz(str, 512 - pos, "page(%p) id=%s\n"
+    uuid_unparse_lower(*descr->id, uuid_str);
+    pos += snprintfz(str, BUFSIZE - pos, "page(%p) id=%s\n"
                                     "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
-                    page_cache_descr->page, uuid_str,
-                    page_cache_descr->page_length,
-                    (uint64_t)page_cache_descr->start_time,
-                    (uint64_t)page_cache_descr->end_time);
-    if (!page_cache_descr->extent) {
-        pos += snprintfz(str + pos, 512 - pos, "N/A");
+                    pg_cache_descr->page, uuid_str,
+                    descr->page_length,
+                    (uint64_t)descr->start_time,
+                    (uint64_t)descr->end_time);
+    if (!descr->extent) {
+        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
     } else {
-        pos += snprintfz(str + pos, 512 - pos, "%"PRIu64, page_cache_descr->extent->offset);
+        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
     }
-    snprintfz(str + pos, 512 - pos, " flags:0x%2.2lX refcnt:%u\n\n", page_cache_descr->flags, page_cache_descr->refcnt);
+
+    snprintfz(str + pos, BUFSIZE - pos, " flags:0x%2.2lX refcnt:%u\n\n", pg_cache_descr->flags, pg_cache_descr->refcnt);
+    debug(D_RRDENGINE, "%s", str);
+}
+
+void print_page_descr(struct rrdeng_page_descr *descr)
+{
+    char uuid_str[UUID_STR_LEN];
+    char str[BUFSIZE];
+    int pos = 0;
+
+    uuid_unparse_lower(*descr->id, uuid_str);
+    pos += snprintfz(str, BUFSIZE - pos, "id=%s\n"
+                                     "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
+                     uuid_str,
+                     descr->page_length,
+                     (uint64_t)descr->start_time,
+                     (uint64_t)descr->end_time);
+    if (!descr->extent) {
+        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
+    } else {
+        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
+    }
+    snprintfz(str + pos, BUFSIZE - pos, "\n\n");
     fputs(str, stderr);
 }
 
@@ -51,6 +78,48 @@ int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
     return 0;
 }
 
+/*
+ * Tries to open a file in direct I/O mode, falls back to buffered mode if not possible.
+ * Returns UV error number that is < 0 on failure.
+ * On success sets (*file) to be the uv_file that was opened.
+ */
+int open_file_direct_io(char *path, int flags, uv_file *file)
+{
+    uv_fs_t req;
+    int fd, current_flags, direct;
+
+    for (direct = 1 ; direct >= 0 ; --direct) {
+#ifdef __APPLE__
+        /* Apple OS does not support O_DIRECT */
+        direct = 0;
+#endif
+        current_flags = flags;
+        if (direct) {
+            current_flags |= O_DIRECT;
+        }
+        fd = uv_fs_open(NULL, &req, path, current_flags, S_IRUSR | S_IWUSR, NULL);
+        if (fd < 0) {
+            if ((direct) && (UV_EINVAL == fd)) {
+                error("File \"%s\" does not support direct I/O, falling back to buffered I/O.", path);
+            } else {
+                error("Failed to open file \"%s\".", path);
+                return fd;
+            }
+        } else {
+            assert(req.result >= 0);
+            *file = req.result;
+#ifdef __APPLE__
+            info("Disabling OS X caching for file \"%s\".", path);
+            fcntl(fd, F_NOCACHE, 1);
+#endif
+            --direct; /* break the loop */
+        }
+        uv_fs_req_cleanup(&req);
+    }
+
+    return fd;
+}
+
 char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size)
 {
     struct page_cache *pg_cache;
@@ -60,6 +129,7 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               "metric_API_producers: %ld\n"
               "metric_API_consumers: %ld\n"
               "page_cache_total_pages: %ld\n"
+              "page_cache_descriptors: %ld\n"
               "page_cache_populated_pages: %ld\n"
               "page_cache_commited_pages: %ld\n"
               "page_cache_insertions: %ld\n"
@@ -87,6 +157,7 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               (long)ctx->stats.metric_API_producers,
               (long)ctx->stats.metric_API_consumers,
               (long)pg_cache->page_descriptors,
+              (long)ctx->stats.page_cache_descriptors,
               (long)pg_cache->populated_pages,
               (long)pg_cache->commited_page_index.nr_commited_pages,
               (long)ctx->stats.pg_cache_insertions,

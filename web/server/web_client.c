@@ -143,7 +143,9 @@ void web_client_request_done(struct web_client *w) {
             debug(D_WEB_CLIENT, "%llu: Closing filecopy input file descriptor %d.", w->id, w->ifd);
 
             if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
-                if (w->ifd != -1) close(w->ifd);
+                if (w->ifd != -1){
+                    close(w->ifd);
+                }
             }
 
             w->ifd = w->ofd;
@@ -688,6 +690,9 @@ const char *web_response_code_to_string(int code) {
         case 200:
             return "OK";
 
+        case 301:
+            return "Moved Permanently";
+
         case 307:
             return "Temporary Redirect";
 
@@ -724,15 +729,21 @@ const char *web_response_code_to_string(int code) {
 }
 
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
-    static uint32_t hash_origin = 0, hash_connection = 0, hash_accept_encoding = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0;
+    static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0, hash_host = 0;
+#ifdef NETDATA_WITH_ZLIB
+    static uint32_t hash_accept_encoding = 0;
+#endif
 
     if(unlikely(!hash_origin)) {
         hash_origin = simple_uhash("Origin");
         hash_connection = simple_uhash("Connection");
+#ifdef NETDATA_WITH_ZLIB
         hash_accept_encoding = simple_uhash("Accept-Encoding");
+#endif
         hash_donottrack = simple_uhash("DNT");
         hash_useragent = simple_uhash("User-Agent");
         hash_authorization = simple_uhash("X-Auth-Token");
+        hash_host = simple_uhash("Host");
     }
 
     char *e = s;
@@ -780,6 +791,9 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     } else if(hash == hash_authorization&& !strcasecmp(s, "X-Auth-Token")) {
         w->auth_bearer_token = strdupz(v);
     }
+    else if(hash == hash_host && !strcasecmp(s, "Host")){
+        strncpyz(w->host, v, (ve - v));
+    }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
         if(web_enable_gzip) {
@@ -807,7 +821,8 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
-    HTTP_VALIDATION_INCOMPLETE
+    HTTP_VALIDATION_INCOMPLETE,
+    HTTP_VALIDATION_REDIRECT
 } HTTP_VALIDATION;
 
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
@@ -847,6 +862,35 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         w->mode = WEB_CLIENT_MODE_OPTIONS;
     }
     else if(!strncmp(s, "STREAM ", 7)) {
+#ifdef ENABLE_HTTPS
+        if ( (w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)){
+            w->header_parse_tries = 0;
+            w->header_parse_last_size = 0;
+            web_client_disable_wait_receive(w);
+            char hostname[256];
+            char *copyme = strstr(s,"hostname=");
+            if ( copyme ){
+                copyme += 9;
+                char *end = strchr(copyme,'&');
+                if(end){
+                    size_t length = end - copyme;
+                    memcpy(hostname,copyme,length);
+                    hostname[length] = 0X00;
+                }
+                else{
+                    memcpy(hostname,"not available",13);
+                    hostname[13] = 0x00;
+                }
+            }
+            else{
+                memcpy(hostname,"not available",13);
+                hostname[13] = 0x00;
+            }
+            error("The server is configured to always use encrypt connection, please enable the SSL on slave with hostname '%s'.",hostname);
+            return HTTP_VALIDATION_NOT_SUPPORTED;
+        }
+#endif
+
         encoded_url = s = &s[7];
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
@@ -899,6 +943,16 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+#ifdef ENABLE_HTTPS
+                if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
+                        w->header_parse_tries = 0;
+                        w->header_parse_last_size = 0;
+                        web_client_disable_wait_receive(w);
+                        return HTTP_VALIDATION_REDIRECT;
+                    }
+                }
+#endif
 
                 w->header_parse_tries = 0;
                 w->header_parse_last_size = 0;
@@ -916,6 +970,26 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     // incomplete request
     web_client_enable_wait_receive(w);
     return HTTP_VALIDATION_INCOMPLETE;
+}
+
+static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,size_t len, int flags)
+{
+    ssize_t bytes;
+#ifdef ENABLE_HTTPS
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+        if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
+            bytes = SSL_write(w->ssl.conn,buf, len) ;
+        } else {
+            bytes = send(w->ofd,buf, len , flags);
+        }
+    } else {
+        bytes = send(w->ofd,buf, len , flags);
+    }
+#else
+    bytes = send(w->ofd, buf, len, flags);
+#endif
+
+    return bytes;
 }
 
 static inline void web_client_send_http_header(struct web_client *w) {
@@ -948,6 +1022,23 @@ static inline void web_client_send_http_header(struct web_client *w) {
         strftime(edate, sizeof(edate), "%a, %d %b %Y %H:%M:%S %Z", tm);
     }
 
+    char headerbegin[8328];
+    if (w->response.code == 301) {
+        memcpy(headerbegin,"\r\nLocation: https://",20);
+        size_t headerlength = strlen(w->host);
+        memcpy(&headerbegin[20],w->host,headerlength);
+        headerlength += 20;
+        size_t tmp = strlen(w->last_url);
+        memcpy(&headerbegin[headerlength],w->last_url,tmp);
+        headerlength += tmp;
+        memcpy(&headerbegin[headerlength],"\r\n",2);
+        headerlength += 2;
+        headerbegin[headerlength] = 0x00;
+    }else {
+        memcpy(headerbegin,"\r\n",2);
+        headerbegin[2]=0x00;
+    }
+
     buffer_sprintf(w->response.header_output,
             "HTTP/1.1 %d %s\r\n"
                     "Connection: %s\r\n"
@@ -955,13 +1046,14 @@ static inline void web_client_send_http_header(struct web_client *w) {
                     "Access-Control-Allow-Origin: %s\r\n"
                     "Access-Control-Allow-Credentials: true\r\n"
                     "Content-Type: %s\r\n"
-                    "Date: %s\r\n"
+                    "Date: %s%s"
                    , w->response.code, code_msg
                    , web_client_has_keepalive(w)?"keep-alive":"close"
                    , VERSION
                    , w->origin
                    , content_type_string
                    , date
+                   , headerbegin
     );
 
     if(unlikely(web_x_frame_options))
@@ -1046,6 +1138,37 @@ static inline void web_client_send_http_header(struct web_client *w) {
 
     size_t count = 0;
     ssize_t bytes;
+#ifdef ENABLE_HTTPS
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+           if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
+                while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
+                    count++;
+                    if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                        error("Cannot send HTTP headers to web client.");
+                        break;
+                    }
+                }
+            } else {
+                while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+                    count++;
+
+                    if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                        error("Cannot send HTTP headers to web client.");
+                        break;
+                    }
+                }
+            }
+    } else {
+            while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+                count++;
+
+                if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                    error("Cannot send HTTP headers to web client.");
+                    break;
+                }
+            }
+    }
+#else
     while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
         count++;
 
@@ -1054,6 +1177,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
             break;
         }
     }
+#endif
 
     if(bytes != (ssize_t) buffer_strlen(w->response.header_output)) {
         if(bytes > 0)
@@ -1303,7 +1427,16 @@ void web_client_process_request(struct web_client *w) {
                 return;
             }
             break;
-
+#ifdef ENABLE_HTTPS
+        case HTTP_VALIDATION_REDIRECT:
+        {
+            buffer_flush(w->response.data);
+            w->response.data->contenttype = CT_TEXT_HTML;
+            buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection, case your browser does not support redirection, please click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">here</a>.</body></html>");
+            w->response.code = 301;
+            break;
+        }
+#endif
         case HTTP_VALIDATION_NOT_SUPPORTED:
             debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
@@ -1373,9 +1506,11 @@ ssize_t web_client_send_chunk_header(struct web_client *w, size_t len)
 {
     debug(D_DEFLATE, "%llu: OPEN CHUNK of %zu bytes (hex: %zx).", w->id, len, len);
     char buf[24];
-    sprintf(buf, "%zX\r\n", len);
-    
-    ssize_t bytes = send(w->ofd, buf, strlen(buf), 0);
+    ssize_t bytes;
+    bytes = (ssize_t)sprintf(buf, "%zX\r\n", len);
+    buf[bytes] = 0x00;
+
+    bytes = web_client_send_data(w,buf,strlen(buf),0);
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk header %zd bytes.", w->id, bytes);
         w->stats_sent_bytes += bytes;
@@ -1397,7 +1532,8 @@ ssize_t web_client_send_chunk_close(struct web_client *w)
 {
     //debug(D_DEFLATE, "%llu: CLOSE CHUNK.", w->id);
 
-    ssize_t bytes = send(w->ofd, "\r\n", 2, 0);
+    ssize_t bytes;
+    bytes = web_client_send_data(w,"\r\n",2,0);
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
         w->stats_sent_bytes += bytes;
@@ -1419,7 +1555,8 @@ ssize_t web_client_send_chunk_finalize(struct web_client *w)
 {
     //debug(D_DEFLATE, "%llu: FINALIZE CHUNK.", w->id);
 
-    ssize_t bytes = send(w->ofd, "\r\n0\r\n\r\n", 7, 0);
+    ssize_t bytes;
+    bytes = web_client_send_data(w,"\r\n0\r\n\r\n",7,0);
     if(bytes > 0) {
         debug(D_DEFLATE, "%llu: Sent chunk suffix %zd bytes.", w->id, bytes);
         w->stats_sent_bytes += bytes;
@@ -1533,7 +1670,7 @@ ssize_t web_client_send_deflate(struct web_client *w)
     
     debug(D_WEB_CLIENT, "%llu: Sending %zu bytes of data (+%zd of chunk header).", w->id, w->response.zhave - w->response.zsent, t);
 
-    len = send(w->ofd, &w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
+    len = web_client_send_data(w,&w->response.zbuffer[w->response.zsent], (size_t) (w->response.zhave - w->response.zsent), MSG_DONTWAIT);
     if(len > 0) {
         w->stats_sent_bytes += len;
         w->response.zsent += len;
@@ -1589,7 +1726,7 @@ ssize_t web_client_send(struct web_client *w) {
         return 0;
     }
 
-    bytes = send(w->ofd, &w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
+    bytes = web_client_send_data(w,&w->response.data->buffer[w->response.sent], w->response.data->len - w->response.sent, MSG_DONTWAIT);
     if(likely(bytes > 0)) {
         w->stats_sent_bytes += bytes;
         w->response.sent += bytes;
@@ -1664,11 +1801,26 @@ ssize_t web_client_receive(struct web_client *w)
     if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY))
         return web_client_read_file(w);
 
+    ssize_t bytes;
+    ssize_t left = w->response.data->size - w->response.data->len;
+
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
-    ssize_t left = w->response.data->size - w->response.data->len;
-    ssize_t bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+#ifdef ENABLE_HTTPS
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+        if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
+            bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+        }else {
+            bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+        }
+    }
+    else{
+        bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+    }
+#else
+    bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
+#endif
 
     if(likely(bytes > 0)) {
         w->stats_received_bytes += bytes;

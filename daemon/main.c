@@ -49,6 +49,10 @@ void netdata_cleanup_and_exit(int ret) {
             error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
+#ifdef ENABLE_HTTPS
+	security_clean_openssl();
+#endif
+
     info("EXIT: all done - netdata is now exiting - bye bye...");
     exit(ret);
 }
@@ -345,7 +349,20 @@ static const char *verify_required_directory(const char *dir) {
     return dir;
 }
 
-void log_init(void) {
+#ifdef ENABLE_HTTPS
+static void security_init(){
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
+    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
+    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+
+    security_openssl_library();
+}
+#endif
+
+static void log_init(void) {
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/debug.log", netdata_configured_log_dir);
     stdout_filename    = config_get(CONFIG_SECTION_GLOBAL, "debug log",  filename);
@@ -420,8 +437,9 @@ static void get_netdata_configured_variables() {
     // get the hostname
 
     char buf[HOSTNAME_MAX + 1];
-    if(gethostname(buf, HOSTNAME_MAX) == -1)
+    if(gethostname(buf, HOSTNAME_MAX) == -1){
         error("Cannot get machine hostname.");
+    }
 
     netdata_configured_hostname = config_get(CONFIG_SECTION_GLOBAL, "hostname", buf);
     debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
@@ -1081,6 +1099,12 @@ int main(int argc, char **argv) {
         error_log_limit_unlimited();
 
         // --------------------------------------------------------------------
+        // get the certificate and start security
+#ifdef ENABLE_HTTPS
+        security_init();
+#endif
+
+        // --------------------------------------------------------------------
         // setup process signals
 
         // block signals while initializing threads.
@@ -1134,10 +1158,6 @@ int main(int argc, char **argv) {
     // initialize the log files
     open_all_log_files();
 
-	netdata_anonymous_statistics_enabled=-1;
-    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
-    if (get_system_info(system_info) == 0) send_statistics("START","-", "-");
-
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
         struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
@@ -1171,8 +1191,11 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
+	netdata_anonymous_statistics_enabled=-1;
+    struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
+    get_system_info(system_info);
+
     rrd_init(netdata_configured_hostname, system_info);
-    rrdhost_system_info_free(system_info);
     // ------------------------------------------------------------------------
     // enable log flood protection
 
@@ -1196,6 +1219,8 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
+  
+    send_statistics("START","-", "-");
 
     // ------------------------------------------------------------------------
     // unblock signals

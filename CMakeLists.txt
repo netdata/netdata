@@ -284,7 +284,8 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
-        )
+        libnetdata/socket/security.c
+        libnetdata/socket/security.h)
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
@@ -456,6 +457,8 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdengineapi.h
         database/engine/pagecache.c
         database/engine/pagecache.h
+        database/engine/rrdenglocking.c
+        database/engine/rrdenglocking.h
         )
 
 set(WEB_PLUGIN_FILES

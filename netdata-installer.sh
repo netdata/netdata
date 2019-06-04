@@ -44,15 +44,21 @@ else
 	source "${NETDATA_SOURCE_DIR}/packaging/installer/functions.sh" || exit 1
 fi
 
-download() {
+download_go() {
 	url="${1}"
 	dest="${2}"
+
 	if command -v curl >/dev/null 2>&1; then
-		run curl -sSL --connect-timeout 10 --retry 3 "${url}" >"${dest}" || fatal "Cannot download ${url}"
+		run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
 	elif command -v wget >/dev/null 2>&1; then
-		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
+		run wget -T 15 -O - "${url}" > "${dest}"
 	else
-		fatal "I need curl or wget to proceed, but neither is available on this system."
+		echo >&2
+		echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
+	        echo >&2 "Either add packages or disable it by issuing '--disable-go' in the installer"
+		echo >&2
+
+		run_failed "I need curl or wget to proceed, but neither is available on this system."
 	fi
 }
 
@@ -540,6 +546,7 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate
 
+
 # -----------------------------------------------------------------------------
 progress "Read installation options from netdata.conf"
 
@@ -628,7 +635,7 @@ fi
 
 # --- conf dir ----
 
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d"; do
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d" "ssl"; do
 	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
 		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
 		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
@@ -755,7 +762,7 @@ fi
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.5.0"
+	GO_PACKAGE_VERSION="v0.6.0"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
@@ -775,24 +782,37 @@ install_go() {
 		for index in "${ARCH_MAP[@]}" ; do
 			KEY="${index%%::*}"
 			VALUE="${index##*::}"
-			if [ "$KEY" == "$ARCH" ]; then
+			if [ "$KEY" = "$ARCH" ]; then
 				ARCH="${VALUE}"
 				break
 			fi
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-		GO_PACKAGE_BASENAME="go.d.plugin-$GO_PACKAGE_VERSION.$OS-$ARCH"
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
 
-		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/$GO_PACKAGE_BASENAME" "${tmp}/$GO_PACKAGE_BASENAME"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 
-		download "https://github.com/netdata/go.d.plugin/releases/download/$GO_PACKAGE_VERSION/config.tar.gz" "${tmp}/config.tar.gz"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
+
+		if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
+			run_failed "go.d plugin download failed, go.d plugin will not be available"
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+			return 0
+		fi
+
 		grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
 		if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
+
+			echo >&2 "go.d plugin checksum validation failure."
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+
 			run_failed "go.d.plugin package files checksum validation failed."
-			return 1
+			return 0
 		fi
 
 		# Install new files
@@ -812,12 +832,23 @@ install_go() {
 install_go
 
 # -----------------------------------------------------------------------------
+progress "Telemetry configuration"
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+	run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+else
+	printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+fi
+
+# -----------------------------------------------------------------------------
 progress "Install netdata at system init"
 
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 
 if grep -q docker /proc/1/cgroup >/dev/null 2>&1; then
 	echo >&2 "We are running within a docker container, will not be installing netdata service"
+	echo >&2
 else
 	install_netdata_service || run_failed "Cannot install netdata init service."
 fi
@@ -1035,10 +1066,6 @@ RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF
 
-# Opt-out from telemetry program
-if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
-	touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
-fi
 
 # -----------------------------------------------------------------------------
 echo >&2

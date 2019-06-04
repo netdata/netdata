@@ -258,6 +258,11 @@ void rrdset_reset(RRDSET *st) {
         rd->last_collected_time.tv_usec = 0;
         rd->collections_counter = 0;
         // memset(rd->values, 0, rd->entries * sizeof(storage_number));
+#ifdef ENABLE_DBENGINE
+        if (RRD_MEMORY_MODE_DBENGINE == st->rrd_memory_mode) {
+            rrdeng_store_metric_flush_current_page(rd);
+        }
+#endif
     }
 }
 
@@ -613,7 +618,7 @@ RRDSET *rrdset_create_custom(
                     memset(st, 0, size);
                 }
                 else if((now - st->last_updated.tv_sec) > update_every * entries) {
-                    error("File %s is too old. Clearing it.", fullfilename);
+                    info("File %s is too old. Clearing it.", fullfilename);
                     memset(st, 0, size);
                 }
                 else if(st->last_updated.tv_sec > now + update_every) {
@@ -1272,6 +1277,22 @@ void rrdset_done(RRDSET *st) {
         store_this_entry = 0;
         first_entry = 1;
     }
+
+#ifdef ENABLE_DBENGINE
+    // check if we will re-write the entire page
+    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
+                dt_usec(&st->last_collected_time, &st->last_updated) > (RRDENG_BLOCK_SIZE / sizeof(storage_number)) * update_every_ut)) {
+        info("%s: too old data (last updated at %ld.%ld, last collected at %ld.%ld). Resetting it. Will not store the next entry.", st->name, st->last_updated.tv_sec, st->last_updated.tv_usec, st->last_collected_time.tv_sec, st->last_collected_time.tv_usec);
+        rrdset_reset(st);
+        rrdset_init_last_updated_time(st);
+
+        st->usec_since_last_update = update_every_ut;
+
+        // the first entry should not be stored
+        store_this_entry = 0;
+        first_entry = 1;
+    }
+#endif
 
     // these are the 3 variables that will help us in interpolation
     // last_stored_ut = the last time we added a value to the storage

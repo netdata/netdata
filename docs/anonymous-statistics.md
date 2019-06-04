@@ -1,11 +1,11 @@
 # Anonymous Statistics
 
-From Netdata v1.12 and above, anonymous usage information is collected by default and send to Google Analytics. 
+From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. 
 The statistics calculated from this information will be used for:
 
-1. **Quality assurance**, to help us understand if netdata behaves as expected and help us identify repeating issues for certain distributions or environment.
+1. **Quality assurance**, to help us understand if Netdata behaves as expected and help us identify repeating issues for certain distributions or environment.
 
-2. **Usage statistics**, to help us focus on the parts of netdata that are used the most, or help us identify the extend our development decisions influence the community.
+2. **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extend our development decisions influence the community.
 
 Information is sent to Netdata via two different channels:
 - Google Tag Manager is used when an agent's dashboard is accessed.
@@ -42,7 +42,7 @@ The only thing that's impossible for us to prevent from being **sent** is the UR
 
 ## Anonymous Statistics Script
 
-Every time the daemon is started or stopped and every time a fatal condition is encountered, netdata uses the anonymous statistics script to collect system information and send it to GA via an http call. The information collected for all events is:
+Every time the daemon is started or stopped and every time a fatal condition is encountered, Netdata uses the anonymous statistics script to collect system information and send it to GA via an http call. The information collected for all events is:
  - Netdata version
  - OS name, version, id, id_like
  - Kernel name, version, architecture
@@ -56,7 +56,8 @@ To see exactly what and how is collected, you can review the script template `da
 ## Opt-Out
 
 To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). The effect of creating the file is the following:
-- The daemon will never execute the anonymous statistics script
-- The anonymous statistics script will exit immediately if called via any other way (e.g. shell)
-- The Google Tag Manager Javascript snippet will remain in the page, but the linked tag will not be fired. The effect is that no data will ever be sent to GA. 
+ - The daemon will never execute the anonymous statistics script
+ - The anonymous statistics script will exit immediately if called via any other way (e.g. shell)
+ - The Google Tag Manager Javascript snippet will remain in the page, but the linked tag will not be fired. The effect is that no data will ever be sent to GA. 
 
+You can also disable telemetry by passing the option `--disable-telemetry` to any of the installers.

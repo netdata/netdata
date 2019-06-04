@@ -127,7 +127,7 @@ download() {
 }
 
 set_tarball_urls() {
-	if [ "$1" == "stable" ]; then
+	if [ "$1" = "stable" ]; then
 		local latest
 		# Simple version
 		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"

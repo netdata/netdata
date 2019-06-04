@@ -152,10 +152,67 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
     struct web_client *w = web_client_create_on_fd(pi->fd, pi->client_ip, pi->client_port, pi->port_acl);
     w->pollinfo_slot = pi->slot;
 
-    if(unlikely(pi->socktype == AF_UNIX))
+    if ( !strncmp(pi->client_port,"UNIX",4)){
         web_client_set_unix(w);
-    else
+    } else {
         web_client_set_tcp(w);
+    }
+
+#ifdef ENABLE_HTTPS
+    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )) {
+        if( sock_delnonblock(w->ifd) < 0 ){
+            error("Web server cannot remove the non-blocking flag from socket %d",w->ifd);
+        }
+
+        //Read the first 7 bytes from the message, but the message
+        //is not removed from the queue, because we are using MSG_PEEK
+        char test[8];
+        if ( recv(w->ifd,test, 7,MSG_PEEK) == 7 ) {
+            test[7] = 0x00;
+        }
+        else {
+            //Case I do not have success to read 7 bytes,
+            //this means that the mensage was not completely read, so
+            //I cannot identify it yet.
+            sock_setnonblock(w->ifd);
+            return w;
+        }
+
+        //The next two ifs are not together because I am reusing SSL structure
+        if (!w->ssl.conn)
+        {
+            w->ssl.conn = SSL_new(netdata_srv_ctx);
+            if ( w->ssl.conn ) {
+                SSL_set_accept_state(w->ssl.conn);
+            } else {
+                error("Failed to create SSL context on socket fd %d.", w->ifd);
+                if (test[0] < 0x18){
+                    WEB_CLIENT_IS_DEAD(w);
+                    sock_setnonblock(w->ifd);
+                    return w;
+                }
+            }
+        }
+
+        if (w->ssl.conn) {
+            if (SSL_set_fd(w->ssl.conn, w->ifd) != 1) {
+                error("Failed to set the socket to the SSL on socket fd %d.", w->ifd);
+                //The client is not set dead, because I received a normal HTTP request
+                //instead a Client Hello(HTTPS).
+                if ( test[0] < 0x18 ){
+                    WEB_CLIENT_IS_DEAD(w);
+                }
+            }
+            else{
+                w->ssl.flags = security_process_accept(w->ssl.conn, (int)test[0]);
+            }
+        }
+
+        sock_setnonblock(w->ifd);
+    } else{
+        w->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+    }
+#endif
 
     debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
     return w;
@@ -188,6 +245,8 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
+
+    //BRING IT TO HERE
 
     if(unlikely(web_client_receive(w) < 0))
         return -1;
@@ -398,6 +457,9 @@ void *socket_listen_main_static_threaded(void *ptr) {
             if(!api_sockets.opened)
                 fatal("LISTENER: no listen sockets available.");
 
+#ifdef ENABLE_HTTPS
+            security_start_ssl(0);
+#endif
             // 6 threads is the optimal value
             // since 6 are the parallel connections browsers will do
             // so, if the machine has more CPUs, avoid using resources unnecessarily

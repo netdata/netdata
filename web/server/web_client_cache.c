@@ -6,6 +6,18 @@
 // ----------------------------------------------------------------------------
 // allocate and free web_clients
 
+#ifdef ENABLE_HTTPS
+
+static void web_client_reuse_ssl(struct web_client *w) {
+    if (netdata_srv_ctx) {
+        if (w->ssl.conn) {
+            SSL_clear(w->ssl.conn);
+        }
+    }
+}
+#endif
+
+
 static void web_client_zero(struct web_client *w) {
     // zero everything about it - but keep the buffers
 
@@ -35,6 +47,14 @@ static void web_client_free(struct web_client *w) {
     buffer_free(w->response.header);
     buffer_free(w->response.data);
     freez(w->user_agent);
+#ifdef ENABLE_HTTPS
+    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )) {
+        if (w->ssl.conn) {
+            SSL_free(w->ssl.conn);
+            w->ssl.conn = NULL;
+        }
+    }
+#endif
     freez(w);
 }
 
@@ -159,12 +179,25 @@ struct web_client *web_client_get_from_cache_or_allocate() {
         if(w->prev) w->prev->next = w->next;
         if(w->next) w->next->prev = w->prev;
         web_clients_cache.avail_count--;
+#ifdef ENABLE_HTTPS
+        web_client_reuse_ssl(w);
+        SSL *ssl = w->ssl.conn;
+#endif
         web_client_zero(w);
         web_clients_cache.reused++;
+#ifdef ENABLE_HTTPS
+        w->ssl.conn = ssl;
+        w->ssl.flags = NETDATA_SSL_START;
+        debug(D_WEB_CLIENT_ACCESS,"Reusing SSL structure with (w->ssl = NULL, w->accepted = %d)",w->ssl.flags);
+#endif
     }
     else {
         // allocate it
         w = web_client_alloc();
+#ifdef ENABLE_HTTPS
+        w->ssl.flags = NETDATA_SSL_START;
+        debug(D_WEB_CLIENT_ACCESS,"Starting SSL structure with (w->ssl = NULL, w->accepted = %d)",w->ssl.flags);
+#endif
         web_clients_cache.allocated++;
     }
 
@@ -205,6 +238,11 @@ void web_client_release(struct web_client *w) {
         if (w->ifd != -1) close(w->ifd);
         if (w->ofd != -1 && w->ofd != w->ifd) close(w->ofd);
         w->ifd = w->ofd = -1;
+#ifdef ENABLE_HTTPS
+        web_client_reuse_ssl(w);
+        w->ssl.flags = NETDATA_SSL_START;
+#endif
+
     }
 
     // unlink it from the used

@@ -17,7 +17,7 @@ typedef struct alarm_entry ALARM_ENTRY;
 // forward declarations
 struct rrddim_volatile;
 #ifdef ENABLE_DBENGINE
-struct rrdeng_page_cache_descr;
+struct rrdeng_page_descr;
 struct rrdengine_instance;
 struct pg_cache_page_index;
 #endif
@@ -246,7 +246,7 @@ union rrddim_collect_handle {
     } slotted;                           // state the legacy code uses
 #ifdef ENABLE_DBENGINE
     struct rrdeng_collect_handle {
-        struct rrdeng_page_cache_descr *descr, *prev_descr;
+        struct rrdeng_page_descr *descr, *prev_descr;
         unsigned long page_correlation_id;
         struct rrdengine_instance *ctx;
         struct pg_cache_page_index *page_index;
@@ -268,7 +268,7 @@ struct rrddim_query_handle {
         } slotted;                         // state the legacy code uses
 #ifdef ENABLE_DBENGINE
         struct rrdeng_query_handle {
-            struct rrdeng_page_cache_descr *descr;
+            struct rrdeng_page_descr *descr;
             struct rrdengine_instance *ctx;
             struct pg_cache_page_index *page_index;
             time_t now; //TODO: remove now to implement next point iteration
@@ -723,6 +723,10 @@ struct rrdhost {
     struct rrdengine_instance *rrdeng_ctx;          // DB engine instance for this host
 #endif
 
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl ssl;                         //Structure used to encrypt the connection
+#endif
+
     struct rrdhost *next;
 };
 extern RRDHOST *localhost;
@@ -781,7 +785,6 @@ extern RRDHOST *rrdhost_find_or_create(
 );
 
 extern int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
-extern struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info);
 
 #if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
 extern void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);

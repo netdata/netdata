@@ -1,12 +1,12 @@
 # Netdata via nginx
 
-To pass netdata via a nginx, use this:
+To pass Netdata via a nginx, use this:
 
 ### As a virtual host
 
 ```
 upstream backend {
-    # the netdata server
+    # the Netdata server
     server 127.0.0.1:19999;
     keepalive 64;
 }
@@ -69,7 +69,7 @@ server {
 }
 ```
 
-### As a subfolder for multiple netdata servers, via one nginx
+### As a subfolder for multiple Netdata servers, via one nginx
 
 ```
 upstream backend-server1 {
@@ -112,11 +112,24 @@ server {
 
 Of course you can add as many backend servers as you like.
 
-Using the above, you access netdata on the backend servers, like this:
+Using the above, you access Netdata on the backend servers, like this:
 
 - `http://nginx.server/netdata/server1/` to reach `backend-server1`
 - `http://nginx.server/netdata/server2/` to reach `backend-server2`
 
+### Using TLS communication
+
+In case the Netdata web server has been [configured to use TLS](../web/server/#enabling-tls-support),
+you must also encrypt the communication between Nginx and Netdata.
+
+To enable encryption, first [enable SSL on nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of the Nginx configuration:
+
+```
+proxy_set_header X-Forwarded-Proto https;
+proxy_pass https://localhost:19999;
+```
+
+If nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
 
@@ -139,9 +152,9 @@ server {
 }
 ```
 
-## limit direct access to netdata
+## limit direct access to Netdata
 
-If your nginx is on `localhost`, you can use this to protect your netdata:
+If your nginx is on `localhost`, you can use this to protect your Netdata:
 
 ```
 [web]
@@ -150,13 +163,13 @@ If your nginx is on `localhost`, you can use this to protect your netdata:
 
 ---
 
-You can also use a unix domain socket. This will also provide a faster route between nginx and netdata:
+You can also use a unix domain socket. This will also provide a faster route between nginx and Netdata:
 
 ```
 [web]
     bind to = unix:/tmp/netdata.sock
 ```
-_note: netdata v1.8+ support unix domain sockets_
+_note: Netdata v1.8+ support unix domain sockets_
 
 At the nginx side, use something like this to use the same unix domain socket:
 
@@ -177,13 +190,13 @@ If your nginx server is not on localhost, you can set:
     allow connections from = IP_OF_NGINX_SERVER
 ```
 
-_note: netdata v1.9+ support `allow connections from`_
+_note: Netdata v1.9+ support `allow connections from`_
 
-`allow connections from` accepts [netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
+`allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
 ## prevent the double access.log
 
-nginx logs accesses and netdata logs them too. You can prevent netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
+nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```
 [global]
@@ -200,5 +213,6 @@ If you get an 502 Bad Gateway error you might check your nginx error log:
 ```
 
 If you see something like the above, chances are high that SELinux prevents nginx from connecting to the backend server. To fix that, just use this policy: `setsebool -P httpd_can_network_connect true`.
+
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-nginx&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

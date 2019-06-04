@@ -681,7 +681,7 @@ date=$(date --date=@${when} "${date_format}" 2>/dev/null)
 # ----------------------------------------------------------------------------
 # prepare some extra headers if we've been asked to thread e-mails
 if [ "${SEND_EMAIL}" == "YES" ] && [ "${EMAIL_THREADING}" != "NO" ]; then
-	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\nReferences: <${chart}-${name}@${host}>"
+	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\r\\nReferences: <${chart}-${name}@${host}>"
 else
 	email_thread_headers=
 fi
@@ -1790,7 +1790,7 @@ if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
 			NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
 		fi
 	fi
-	if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
+	if [ -n "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
 		GOTOCLOUD=1
 	fi
 fi
@@ -1953,7 +1953,7 @@ send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to
 Severity: ${severity}\\n
 Chart: ${chart}\\n
 Family: ${family}\\n
-$(date -d @${when})\\n
+${date}\\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?

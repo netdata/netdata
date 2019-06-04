@@ -20,6 +20,8 @@ The best way to install Netdata is directly from source. Our **automatic install
 
 See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
 
+Note: From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read more about the information collected and how to opt-out, check the [anonymous statistics page](../../docs/anonymous-statistics.md).
+
 ---
 
 ## One line installation
@@ -42,7 +44,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 Verify the integrity of the script with this:
 
 ```bash
-[ "fe451cd039c8f99b2ba4ca0feab88033" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "8a2b054081a108dff915994ce77f2f2d" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 *It should print `OK, VALID` if the script is the one we ship.*
 
@@ -99,7 +101,7 @@ To install Netdata with a binary package on any Linux distro, any kernel version
 Verify the integrity of the script with this:
 
 ```bash
-[ "9ff4f5f37d23dff431f80d5349e0a25c" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "8779d8717ccaa8dac18d599502eef591" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -198,6 +200,9 @@ dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-de
 
 # CentOS / Red Hat Enterprise Linux
 yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel lm_sensors make MySQL-python nc pkgconfig python python-psycopg2 PyYAML zlib-devel
+
+# openSUSE
+zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils
 
 ```
 

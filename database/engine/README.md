@@ -96,9 +96,9 @@ There are explicit memory requirements **per** DB engine **instance**, meaning *
 
 - `page cache size` must be at least `#dimensions-being-collected x 4096 x 2` bytes.
 
-- an additional `#pages-on-disk x 4096 x 0.06` bytes of RAM are allocated for metadata.
+- an additional `#pages-on-disk x 4096 x 0.03` bytes of RAM are allocated for metadata.
 
-    - roughly speaking this is 6% of the uncompressed disk space taken by the DB files.
+    - roughly speaking this is 3% of the uncompressed disk space taken by the DB files.
 
     - for very highly compressible data (compression ratio > 90%) this RAM overhead
       is comparable to the disk space footprint.

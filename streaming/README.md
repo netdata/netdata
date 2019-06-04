@@ -18,7 +18,7 @@ a netdata performs:
 Local netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
 another netdata (`master`).
 
-The `my-netdata` menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/. 
+The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/. 
 
 Alarms for the `slave` are served by the `master`.
 
@@ -123,7 +123,7 @@ a `proxy`).
 ```
 [stream]
     enabled = yes | no
-    destination = IP:PORT ...
+    destination = IP:PORT[:SSL] ...
     api key = XXXXXXXXXXX
 ```
 
@@ -135,6 +135,8 @@ headless collector|`none`|`none`|`yes`|only for `data source = as collected`|not
 headless proxy|`none`|not `none`|`yes`|only for `data source = as collected`|not possible|no
 proxy with db|not `none`|not `none`|`yes`|possible|possible|yes
 central netdata|not `none`|not `none`|`no`|possible|possible|yes
+
+For the options to encrypt the data stream between the slave and the master, refer to [securing the communication](#securing-the-communication)
 
 ##### options for the receiving node
 
@@ -209,11 +211,46 @@ The receiving end (`proxy` or `master`) logs entries like these:
 
 For netdata v1.9+, streaming can also be monitored via `access.log`.
 
+### Securing the communication
+
+Netdata does not activate TLS encryption by default. To encrypt the connection, you first need to [enable TLS support](../web/server/#enabling-tls-support) on the master. With encryption enabled on the receiving side, we need to instruct the slave to use SSL as well. On the slave's `stream.conf`, configure the destination as follows:
+
+```
+[stream]
+    destination = host:port:SSL
+```
+
+The word SSL appended to the end of the destination tells the slave that the connection must be encrypted.
+
+#### Certificate verification
+
+When SSL is enabled on the slave, the default behavior will be do not connect with the master unless the server's certificate can be verified via the default chain. In case you want to avoid this check, add to the slave's `stream.conf` the following:
+
+```
+[stream]
+    ssl skip certificate verification = yes
+```
+
+#### Expected behaviors
+
+With the introduction of SSL, the master-slave communication behaves as shown in the table below, depending on the following configurations:
+- Master TLS (Yes/No): Whether the `[web]` section in `netdata.conf` has `ssl key` and `ssl certificate`.
+- Master port SSL (-/force/optional): Depends on whether the `[web]` section `bind to` contains a `^SSL=force` or `^SSL=optional` directive on the port(s) used for streaming.
+- Slave TLS (Yes/No): Whether the destination in the slave's `stream.conf` has `:SSL` at the end.
+- Slave SSL Verification (yes/no): Value of the slave's `stream.conf` `ssl skip certificate verification` parameter (default is no).
+
+ Master TLS enabled | Master port SSL | Slave TLS | Slave SSL Ver. | Behavior
+:------:|:-----:|:-----:|:-----:|:--------
+No | - | No | no | Legacy behavior. The master-slave stream is unencrypted.
+Yes | force | No | no | The master rejects the slave connection.
+Yes | -/optional | No | no | The master-slave stream is unencrypted (expected situation for legacy slaves and newer masters)
+Yes | -/force/optional | Yes | no | The master-slave stream is encrypted, provided that the master has a valid SSL certificate. Otherwise, the slave refuses to connect.
+Yes | -/force/optional | Yes | yes | The master-slave stream is encrypted.
 
 ## Viewing remote host dashboards, using mirrored databases
 
 On any receiving netdata, that maintains remote databases and has its web server enabled,
-`my-netdata` menu will include a list of the mirrored databases.
+The node menu will include a list of the mirrored databases.
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/24080824/24cd2d3c-0caf-11e7-909d-a8dd1dbb95d7.png)
 
