@@ -2831,17 +2831,16 @@ void update_cgroup_charts(int update_every) {
                                     , RRDSET_TYPE_LINE
                             );
 
-                            rrddim_add(cg->st_cpu_limit, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                            if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED))
+                                rrddim_add(cg->st_cpu_limit, "used", NULL, 1, system_hz, RRD_ALGORITHM_ABSOLUTE);
+                            else
+                                rrddim_add(cg->st_cpu_limit, "used", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                         }
                         else
                             rrdset_next(cg->st_cpu_limit);
 
                         calculated_number cpu_usage = 0;
-                        if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED))
-                            cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / system_hz;
-                        else
-                            cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100 / 1000000;
-
+                        cpu_usage = (calculated_number)(cg->cpuacct_stat.user + cg->cpuacct_stat.system) * 100;
                         calculated_number cpu_used = 100 * (cpu_usage - cg->prev_cpu_usage) / (value * update_every);
 
                         rrdset_isnot_obsolete(cg->st_cpu_limit);
