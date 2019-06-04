@@ -83,6 +83,8 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     char vsave = value[lvalue];
                     value[lvalue] = 0x00;
 
+                    fprintf(stderr,"KILLME (%lu,%s) (%lu,%s) \n",lkey,key,lvalue,value);
+
                     debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
 
                     // name and value are now the parameters
@@ -123,6 +125,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                             }
                         }
 
+                        fprintf(stderr,"KILLME \n");
                         if (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
                             silencer->alarms = strdupz(value);
                             silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT);

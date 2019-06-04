@@ -203,10 +203,9 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
         uint32_t  i = 0;
         do {
             char *value = w->param_values[i].body;
-            size_t length = w->param_values[i].length;
 
-            if(!strncmp(value, "all",length)) all = 1;
-            else if(!strncmp(value, "active",length)) all = 0;
+            if(!strncmp(value, "all",3)) all = 1;
+            else if(!strncmp(value, "active",6)) all = 0;
         } while(++i < end);
     }
 
@@ -803,7 +802,7 @@ static struct api_command {
     WEB_CLIENT_ACL acl;
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
 } api_commands[] = {
-        { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            }, //OK
+        { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
