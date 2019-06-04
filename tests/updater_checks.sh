@@ -24,6 +24,7 @@ case "${running_os}" in
 "debian"|"ubuntu")
 	echo "Running ${running_os}, updating APT repository"
 	apt-get update -y
+	apt-get install -y git bats
 	;;
 *)
 	echo "Running on ${running_os}, no repository preparation done"
