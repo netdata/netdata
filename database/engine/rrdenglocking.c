@@ -40,9 +40,7 @@ void rrdeng_page_descr_mutex_lock(struct rrdengine_instance *ctx, struct rrdeng_
 
         if (unlikely(we_locked)) {
             assert(old_state & PG_CACHE_DESCR_LOCKED);
-            new_state = (1 << PG_CACHE_DESCR_SHIFT) | (old_state & PG_CACHE_DESCR_FLAGS_MASK);
-            new_state &= ~PG_CACHE_DESCR_LOCKED;
-            new_state |= PG_CACHE_DESCR_ALLOCATED;
+            new_state = (1 << PG_CACHE_DESCR_SHIFT) | PG_CACHE_DESCR_ALLOCATED;
             ret_state = ulong_compare_and_swap(&descr->pg_cache_descr_state, old_state, new_state);
             if (old_state == ret_state) {
                 /* success */
@@ -87,7 +85,7 @@ void rrdeng_page_descr_mutex_lock(struct rrdengine_instance *ctx, struct rrdeng_
     }
 
     if (pg_cache_descr) {
-        free(pg_cache_descr);
+        rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
     }
     pg_cache_descr = descr->pg_cache_descr;
     uv_mutex_lock(&pg_cache_descr->mutex);
@@ -158,24 +156,47 @@ void rrdeng_try_deallocate_pg_cache_descr(struct rrdengine_instance *ctx, struct
 {
     unsigned long old_state, new_state, ret_state, old_users;
     struct page_cache_descr *pg_cache_descr;
-    uint8_t we_locked;
+    uint8_t just_locked, we_freed, must_unlock;
 
-    we_locked = 0;
+    just_locked = 0;
+    we_freed = 0;
+    must_unlock = 0;
     while (1) { /* spin */
         old_state = descr->pg_cache_descr_state;
         old_users = old_state >> PG_CACHE_DESCR_SHIFT;
 
-        if (unlikely(we_locked)) {
+        if (unlikely(just_locked)) {
             assert(0 == old_users);
 
-            ret_state = ulong_compare_and_swap(&descr->pg_cache_descr_state, old_state, 0);
-            if (old_state == ret_state) {
+            must_unlock = 1;
+            just_locked = 0;
+            /* Try deallocate if there are no pending references on the page */
+            if (!pg_cache_descr->flags && !pg_cache_descr->refcnt) {
+                rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
+                we_freed = 1;
                 /* success */
-                break;
+                continue;
             }
             continue; /* spin */
         }
-        if (!(old_state & PG_CACHE_DESCR_ALLOCATED) || (old_state & PG_CACHE_DESCR_DESTROY)) {
+        if (unlikely(must_unlock)) {
+            assert(0 == old_users);
+
+            if (we_freed) {
+                /* success */
+                new_state = 0;
+            } else {
+                new_state = old_state | PG_CACHE_DESCR_DESTROY;
+                new_state &= ~PG_CACHE_DESCR_LOCKED;
+            }
+            ret_state = ulong_compare_and_swap(&descr->pg_cache_descr_state, old_state, new_state);
+            if (old_state == ret_state) {
+                /* unlocked */
+                return;
+            }
+            continue; /* spin */
+        }
+        if (!(old_state & PG_CACHE_DESCR_ALLOCATED)) {
             /* don't do anything */
             return;
         }
@@ -184,17 +205,20 @@ void rrdeng_try_deallocate_pg_cache_descr(struct rrdengine_instance *ctx, struct
             continue; /* spin */
         }
         pg_cache_descr = descr->pg_cache_descr;
-        /* caller is the only page cache descriptor user and there are no pending references on the page */
-        if ((0 == old_users) && !pg_cache_descr->flags && !pg_cache_descr->refcnt) {
-            new_state = PG_CACHE_DESCR_LOCKED;
+        /* caller is the only page cache descriptor user */
+        if (0 == old_users) {
+            new_state = old_state | PG_CACHE_DESCR_LOCKED;
             ret_state = ulong_compare_and_swap(&descr->pg_cache_descr_state, old_state, new_state);
             if (old_state == ret_state) {
-                we_locked = 1;
-                rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
+                just_locked = 1;
                 /* retry */
                 continue;
             }
             continue; /* spin */
+        }
+        if (old_state & PG_CACHE_DESCR_DESTROY) {
+            /* don't do anything */
+            return;
         }
         /* plant PG_CACHE_DESCR_DESTROY so that other contexts eventually free the page cache descriptor */
         new_state = old_state | PG_CACHE_DESCR_DESTROY;
@@ -202,7 +226,7 @@ void rrdeng_try_deallocate_pg_cache_descr(struct rrdengine_instance *ctx, struct
         ret_state = ulong_compare_and_swap(&descr->pg_cache_descr_state, old_state, new_state);
         if (old_state == ret_state) {
             /* success */
-            break;
+            return;
         }
         /* spin */
     }
