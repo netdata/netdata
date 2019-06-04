@@ -13,7 +13,7 @@ struct raid {
     unsigned long long failed_disks;
 
     RRDSET *st_disks;
-    RRDDIM *rd_total;
+    RRDDIM *rd_down;
     RRDDIM *rd_inuse;
     unsigned long long total_disks;
     unsigned long long inuse_disks;
@@ -439,11 +439,11 @@ int do_proc_mdstat(int update_every, usec_t dt) {
 
                 if(unlikely(!raid->rd_inuse && !(raid->rd_inuse = rrddim_find(raid->st_disks, "inuse"))))
                     raid->rd_inuse = rrddim_add(raid->st_disks, "inuse", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                if(unlikely(!raid->rd_total && !(raid->rd_total = rrddim_find(raid->st_disks, "total"))))
-                    raid->rd_total = rrddim_add(raid->st_disks, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                if(unlikely(!raid->rd_down && !(raid->rd_down = rrddim_find(raid->st_disks, "down"))))
+                    raid->rd_down = rrddim_add(raid->st_disks, "down", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
                 rrddim_set_by_pointer(raid->st_disks, raid->rd_inuse, raid->inuse_disks);
-                rrddim_set_by_pointer(raid->st_disks, raid->rd_total, raid->total_disks);
+                rrddim_set_by_pointer(raid->st_disks, raid->rd_down, raid->failed_disks);
 
                 rrdset_done(raid->st_disks);
             }
