@@ -77,13 +77,13 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     char *key = w->param_name[i].body;
                     size_t lkey = w->param_name[i].length;
                     char ksave = key[lkey];
+                    key[lkey] = 0x00;
 
                     char *value = w->param_values[i].body;
                     size_t lvalue = w->param_values[i].length;
                     char vsave = value[lvalue];
                     value[lvalue] = 0x00;
 
-                    fprintf(stderr,"KILLME (%lu,%s) (%lu,%s) \n",lkey,key,lvalue,value);
 
                     debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
 
@@ -125,20 +125,19 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                             }
                         }
 
-                        fprintf(stderr,"KILLME \n");
-                        if (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
+                        if (hash == hash_alarm && !strncasecmp(key, HEALTH_ALARM_KEY,lkey)) {
                             silencer->alarms = strdupz(value);
                             silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) {
+                        } else if (hash == hash_chart && !strncasecmp(key, HEALTH_CHART_KEY,lkey)) {
                             silencer->charts = strdupz(value);
                             silencer->charts_pattern = simple_pattern_create(silencer->charts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) {
+                        } else if (hash == hash_context && !strncasecmp(key, HEALTH_CONTEXT_KEY,lkey)) {
                             silencer->contexts = strdupz(value);
                             silencer->contexts_pattern = simple_pattern_create(silencer->contexts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
+                        } else if (hash == hash_host && !strncasecmp(key, HEALTH_HOST_KEY,lkey)) {
                             silencer->hosts = strdupz(value);
                             silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
+                        } else if (hash == hash_families && !strncasecmp(key, HEALTH_FAMILIES_KEY,lkey)) {
                             silencer->families = strdupz(value);
                             silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT);
                         } else {
