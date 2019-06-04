@@ -130,6 +130,7 @@ For C contributions in particular, we try to respect the [Linux kernel style](ht
  - Use 4 space indentation instead of 8
  - We occassionally have multiple statements on a single line (e.g. `if (a) b;`)
  - Allow max line length of 120 chars 
+ - Allow opening brace at the end of a function declaration: `function() {`. 
 
 ### Your first pull request
 
