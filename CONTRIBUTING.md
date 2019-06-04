@@ -124,7 +124,12 @@ When you contribute code to Netdata, you are automatically accepting that you wi
 
 The single most important rule when writing code is this: *check the surrounding code and try to imitate it*. [Reference](https://developer.gnome.org/programming-guidelines/stable/c-coding-style.html.en)
 
-We use several different languages and have had contributions from several people with different styles. When in doubt, you can check similar existing code. For C contributions in particular, we try to respect the [Linux kernel style](https://www.kernel.org/doc/html/v4.10/process/coding-style.html), with the exceptions that we use 4 space indentation instead of 8 and we occassionally have multiple statements on a single line (e.g. `if (a) b;`).
+We use several different languages and have had contributions from several people with different styles. When in doubt, you can check similar existing code. 
+
+For C contributions in particular, we try to respect the [Linux kernel style](https://www.kernel.org/doc/html/v4.10/process/coding-style.html), with the following exceptions:
+ - Use 4 space indentation instead of 8
+ - We occassionally have multiple statements on a single line (e.g. `if (a) b;`)
+ - Allow max line length of 120 chars 
 
 ### Your first pull request
 
