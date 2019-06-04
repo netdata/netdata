@@ -133,6 +133,22 @@ jobs:
     script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
     after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
 
+  - name: Run netdata lifecycle from stable to current, on CentOS 7 bare OS (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
+
+  - name: Run netdata lifecycle from stable to current, on Debian 9 bare OS (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:stretch" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
+
+  - name: Run netdata lifecycle from stable to current, on Ubuntu 1904 bare OS (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.04" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
+
+  - name: Run netdata lifecycle from stable to current, on Fedora 30 bare OS (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
+
 
 
   - stage: Packaging for release

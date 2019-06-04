@@ -8,6 +8,10 @@
 # Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud)
 #
 
+echo "Syncing/updating repository.."
+yum clean all
+yum update -y
+
 echo "Installing extra dependencies.."
 yum install -y epel-release
 yum install -y git bats
