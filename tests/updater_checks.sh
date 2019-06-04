@@ -19,12 +19,12 @@ case "${running_os}" in
 
 	echo "Installing extra dependencies.."
 	yum install -y epel-release
-	yum install -y git bats
+	yum install -y git bats curl
 	;;
 "debian"|"ubuntu")
 	echo "Running ${running_os}, updating APT repository"
 	apt-get update -y
-	apt-get install -y git bats
+	apt-get install -y git bats curl
 	;;
 *)
 	echo "Running on ${running_os}, no repository preparation done"
