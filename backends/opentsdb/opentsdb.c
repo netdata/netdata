@@ -101,7 +101,6 @@ int format_dimension_collected_opentsdb_http(
     (void)host;
     (void)after;
     (void)before;
-    (void)backend_options;
 
     char protocol[8];
     memcpy(protocol,"http",4);
@@ -113,59 +112,22 @@ int format_dimension_collected_opentsdb_http(
 #endif
     protocol[end] = 0x00;
 
-    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
-    if(!tags) tags = "";
+    char message[1024];
 
-    if(*tags) {
-        if(*tags == '{' || *tags == '[' || *tags == '"') {
-            tags_pre = "\"host_tags\":";
-            tags_post = ",";
-        }
-        else {
-            tags_pre = "\"host_tags\":\"";
-            tags_post = "\",";
-        }
-    }
+    int length =  snprintfz(message, sizeof(message),"{ }");
 
     buffer_sprintf(
             b
             , "POST %s://%s/api/put HTTP/1.1\r\n"
               "Host: %s\r\n"
               "Content-Type: application/json\r\n"
-              "Content-Length: %llu\r\n"
+              "Content-Length: %d\r\n"
               "\r\n"
-              "{"
-              "\"prefix\":\"%s\","
-              "\"hostname\":\"%s\","
-              "%s%s%s"
-
-              "\"chart_id\":\"%s\","
-              "\"chart_name\":\"%s\","
-              "\"chart_family\":\"%s\","
-              "\"chart_context\": \"%s\","
-              "\"chart_type\":\"%s\","
-              "\"units\": \"%s\","
-
-              "\"id\":\"%s\","
-              "\"name\":\"%s\","
-              "\"value\":" COLLECTED_NUMBER_FORMAT ","
-
               "\"timestamp\": %llu}\n"
             , protocol
             , hostname
             , hostname
-            , prefix
-            , hostname
-            , tags_pre, tags, tags_post
-            , st->id
-            , st->name
-            , st->family
-            , st->context
-            , st->type
-            , st->units
-            , rd->id
-            , rd->name
-            , rd->last_collected_value
+            , length
             , (unsigned long long) rd->last_collected_time.tv_sec);
 
     return 1;
