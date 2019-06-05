@@ -143,7 +143,7 @@ void web_client_request_done(struct web_client *w) {
             debug(D_WEB_CLIENT, "%llu: Closing filecopy input file descriptor %d.", w->id, w->ifd);
 
             if(web_server_mode != WEB_SERVER_MODE_STATIC_THREADED) {
-                if (w->ifd != -1){
+                if (w->ifd != -1) {
                     close(w->ifd);
                 }
             }
@@ -352,7 +352,7 @@ int mysendfile(struct web_client *w, char *filename) {
     // if the filename contains "strange" characters, refuse to serve it
     char *s;
     for(s = filename; *s ;s++) {
-        if( !isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
+        if(!isalnum(*s) && *s != '/' && *s != '.' && *s != '-' && *s != '_') {
             debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_sprintf(w->response.data, "Filename contains invalid characters: ");
@@ -802,7 +802,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     } else if(hash == hash_authorization&& !strcasecmp(s, "X-Auth-Token")) {
         w->auth_bearer_token = strdupz(v);
     }
-    else if(hash == hash_host && !strcasecmp(s, "Host")){
+    else if(hash == hash_host && !strcasecmp(s, "Host")) {
         strncpyz(w->host, v, (ve - v));
     }
 #ifdef NETDATA_WITH_ZLIB
@@ -870,21 +870,20 @@ static inline char *web_client_parse_method(struct web_client *w,char *s) {
     }
     else if(!strncmp(s, "STREAM ", 7)) {
 #ifdef ENABLE_HTTPS
-        if ( (w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)){
+        if ((w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
             char hostname[256];
             char *copyme = strstr(s,"hostname=");
-            if ( copyme ){
+            if (copyme) {
                 copyme += 9;
                 char *end = strchr(copyme,'&');
-                if(end){
+                if(end) {
                     size_t length = end - copyme;
                     memcpy(hostname,copyme,length);
                     hostname[length] = 0X00;
-                }
-                else{
+                } else {
                     memcpy(hostname,"not available",13);
                     hostname[13] = 0x00;
                 }
@@ -907,19 +906,19 @@ static inline char *web_client_parse_method(struct web_client *w,char *s) {
     return s;
 }
 
-static inline char *web_client_find_protocol(struct web_client *w,char *s){
+static inline char *web_client_find_protocol(struct web_client *w,char *s) {
     s = url_find_protocol(s);
 
     w->protocol.body = s+1;
     char *end = strchr(s+6,'\n');
-    if (end){
+    if (end) {
         w->protocol.length = end - w->protocol.body ;
     }
 
     return s;
 }
 
-static inline void web_client_parse_headers(struct web_client *w,char *s){
+static inline void web_client_parse_headers(struct web_client *w,char *s) {
     while(*s) {
         // find a line feed
         while(*s && *s++ != '\r');
@@ -927,7 +926,7 @@ static inline void web_client_parse_headers(struct web_client *w,char *s){
         // did we reach the end?
         if(unlikely(!*s)) break;
 
-        if (*s == '\n'){
+        if (*s == '\n') {
             s++;
         }
 
@@ -938,8 +937,8 @@ static inline void web_client_parse_headers(struct web_client *w,char *s){
     }
 }
 
-int web_client_parse_request(struct web_client *w,char *divisor){
-    if(!divisor){
+int web_client_parse_request(struct web_client *w,char *divisor) {
+    if(!divisor) {
         w->total_params = 0;
         return 0;
     }
@@ -950,15 +949,15 @@ int web_client_parse_request(struct web_client *w,char *divisor){
     return i;
 }
 
-static inline void web_client_set_directory(struct web_client *w,char *begin,char *enddir,char *endcmd){
+static inline void web_client_set_directory(struct web_client *w,char *begin,char *enddir,char *endcmd) {
     if (enddir) {
         w->directory.body = begin;
         w->directory.length = enddir - begin;
 
-        if ( !strncmp(w->directory.body,"api",w->directory.length)){
+        if (!strncmp(w->directory.body,"api",w->directory.length)) {
             begin = enddir + 1;
             enddir = strchr(begin,'/');
-            if(enddir){
+            if(enddir) {
                 w->version.body = begin;
                 w->version.length = enddir - begin;
 
@@ -978,17 +977,17 @@ static inline void web_client_set_directory(struct web_client *w,char *begin,cha
     }
 }
 
-static inline void web_client_set_without_query_string(struct web_client *w){
+static inline void web_client_set_without_query_string(struct web_client *w) {
     w->query_string.body = NULL;
     w->query_string.length = 0;
 
     char *test = w->path.body+1;
-    if ( !strncmp(test,"api/v1/",7) ){
+    if (!strncmp(test,"api/v1/",7) ) {
         test += 7;
-        if (!strncmp(test,"info",4)){
+        if (!strncmp(test,"info",4)) {
             w->command.length = 4;
         }
-        else if (!strncmp(test,"charts",6)){
+        else if (!strncmp(test,"charts",6)) {
             w->command.length = 6;
         }
         else {
@@ -1002,12 +1001,12 @@ static inline void web_client_set_without_query_string(struct web_client *w){
     w->total_params = 0;
 }
 
-static inline void web_client_split_path_query(struct web_client *w){
+static inline void web_client_split_path_query(struct web_client *w) {
     w->path.body = w->decoded_url;
     w->decoded_length = strlen(w->decoded_url);
     char *moveme = strchr(w->path.body,'?');
     char *enddir;
-    if (moveme){
+    if (moveme) {
         w->path.length = moveme - w->path.body;
         w->query_string.body = moveme;
         w->query_string.length = w->decoded_length - w->path.length;
@@ -1015,9 +1014,9 @@ static inline void web_client_split_path_query(struct web_client *w){
         enddir = strchr(w->path.body+1,'/');
         char *begin = w->path.body+1;
         web_client_set_directory(w,begin,enddir,moveme);
-        if (w->query_string.body){
+        if (w->query_string.body) {
             enddir = strchr(moveme,'=');
-            if ( !web_client_parse_request(w,enddir) ) {
+            if (!web_client_parse_request(w,enddir) ) {
                 moveme++;
                 size_t length = strlen(moveme);
                 w->param_name[0].body = moveme;
@@ -1033,13 +1032,13 @@ static inline void web_client_split_path_query(struct web_client *w){
 
         enddir = strchr(w->path.body+1,'/');
         w->directory.body = w->path.body + 1;
-        if(enddir){
+        if(enddir) {
             w->directory.length = (size_t)(enddir - w->directory.body);
             enddir++;
 
             w->version.body = enddir;
             enddir = strchr(++enddir,'/');
-            if(enddir){
+            if(enddir) {
                 w->version.length = (size_t)(enddir - w->version.body);
 
                 enddir++;
@@ -1067,8 +1066,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     // make sure we have complete request
     // complete requests contain: \r\n\r\n
     status = url_is_request_complete(s,&s[status],status);
-    if (w->header_parse_tries > 10 ){
-        if (status == HTTP_VALIDATION_INCOMPLETE){
+    if (w->header_parse_tries > 10) {
+        if (status == HTTP_VALIDATION_INCOMPLETE) {
             info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
@@ -1076,14 +1075,14 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             return HTTP_VALIDATION_NOT_SUPPORTED;
         }
     } else{
-        if (status == HTTP_VALIDATION_INCOMPLETE){
+        if (status == HTTP_VALIDATION_INCOMPLETE) {
             web_client_enable_wait_receive(w);
             return HTTP_VALIDATION_INCOMPLETE;
         }
     }
     //Parse the method used to communicate
     s = web_client_parse_method(w,s);
-    if (!s){
+    if (!s) {
         w->header_parse_tries = 0;
         w->header_parse_last_size = 0;
         web_client_disable_wait_receive(w);
@@ -1114,7 +1113,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
 
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+    if ((!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
         if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM)) ) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
@@ -1134,8 +1133,8 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
+    if ((!web_client_check_unix(w)) && (netdata_srv_ctx)) {
+        if ((w->ssl.conn) && (!w->ssl.flags)) {
             bytes = SSL_write(w->ssl.conn,buf, len) ;
         } else {
             bytes = send(w->ofd,buf, len , flags);
@@ -1297,8 +1296,8 @@ static inline void web_client_send_http_header(struct web_client *w) {
     size_t count = 0;
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
-           if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
+    if ((!web_client_check_unix(w)) && (netdata_srv_ctx)) {
+           if ((w->ssl.conn) && (!w->ssl.flags)) {
                 while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
                     if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
@@ -1368,26 +1367,37 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     }
 
     char *tok = strchr(url,'/');
-    if (tok){
+    if (tok) {
         w->switch_host = 1;
         debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, url);
 
         // copy the URL, we need it to serve files
         w->last_url[0] = '/';
-        if(*(tok+1) != ' '){
+        if(*(tok+1) != ' ') {
             strncpyz(&w->last_url[1], tok+1, NETDATA_WEB_REQUEST_URL_SIZE - 1);
             char *enddir;
-            if (w->total_params){
-                    enddir = strchr(tok+1,'/');
+            if (w->total_params) {
+                enddir = strchr(tok+1,'/');
+                if (enddir) {
                     char *moveme = strchr(enddir,'?');
-                    if (moveme){
+                    if (moveme) {
                         web_client_set_directory(w,tok+1,enddir,moveme);
                     }
+                }
+                else {
+                    w->directory.body = tok;
+                    w->directory.length = strlen(tok);
+                }
             } else {
                 enddir = strchr(tok+1,'/');
                 if(enddir) {
                     w->directory.body = tok + 1;
                     w->directory.length = enddir - tok - 1;
+                } else {
+                    if (!strlen(tok + 1)) {
+                        w->directory.body = tok;
+                        w->directory.length = 1;
+                    }
                 }
             }
         }
@@ -1432,7 +1442,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #endif
     }
 
-    if ( (w->path.length > 1) ){
+    if (w->path.length > 1) {
         char *cmp = w->directory.body;
         size_t len = w->directory.length;
         uint32_t hash = simple_nhash(cmp,len);
@@ -1543,8 +1553,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     tok = mystrsep(&url, "?");
     buffer_flush(w->response.data);
 
-
-    //return mysendfile(w, (tok && *tok)?tok:"/");
     return mysendfile(w, (w->path.length > 1)?tok:"/");
 }
 
@@ -1997,8 +2005,8 @@ ssize_t web_client_receive(struct web_client *w)
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
 
 #ifdef ENABLE_HTTPS
-    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
+    if ((!web_client_check_unix(w)) && (netdata_srv_ctx)) {
+        if ((w->ssl.conn) && (!w->ssl.flags)) {
             bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
         }else {
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
