@@ -20,13 +20,9 @@ CLEANFILES= \
 
 EXTRA_DIST = \
 	.gitignore \
-	.codacy.yml \
-	.codeclimate.yml \
 	.csslintrc \
 	.eslintignore \
 	.eslintrc \
-	.lgtm.yml \
-	.travis \
 	.github/CODEOWNERS \
 	build/m4/jemalloc.m4 \
 	build/m4/ax_c___atomic.m4 \
@@ -55,6 +51,7 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA= \
+	CHANGELOG.md \
 	cppcheck.sh \
 	configs.signatures \
 	contrib \

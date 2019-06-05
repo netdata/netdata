@@ -4,10 +4,14 @@ language: c
 services:
 - docker
 
+
+
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
   allow_failures:
     - env: ALLOW_SOFT_FAILURE_HERE=true
+
+
 
 # Install dependencies for all, once
 #
@@ -18,10 +22,14 @@ install:
 - docker info
 - source tests/installer/slack.sh
 
+
+
 # Setup notification system
 #
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
+
+
 
 # Define the stage sequence and conditionals
 #
@@ -45,6 +53,149 @@ stages:
 
 - name: Publish for release
   if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
+
+  # Build DEB packages under special conditions
+  # Ubuntu
+- name: "Package ubuntu/disco"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+- name: "Package ubuntu/cosmic"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+- name: "Package ubuntu/bionic"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+- name: "Package ubuntu/artful"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+
+  # Debian
+- name: "Package debian/buster"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+- name: "Package debian/stretch"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+- name: "Package debian/jessie"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+- name: "Package debian/wheezy"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+
+  # Build RPM packages under special conditions
+  # Enterprise linux (Covers CentOS, Redhat, Amazon linux)
+- name: "Package Enterprise Linux 7"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+- name: "Package Enterprise linux 6"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+
+  # Fedora
+- name: "Package Fedora 30"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+- name: "Package Fedora 29"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+- name: "Package Fedora 28"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+
+  # OpenSuSE
+- name: "Package OpenSuSE 15.1"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+- name: "Package OpenSuSE 15.0"
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+
+
+
+# DEB and RPM template flows
+- stage: &_RPM_TEMPLATE
+    name: "Build & Publish RPM package"
+    before_install:
+    - sudo apt-get install -y wget lxc lxc-templates
+    - source tests/installer/slack.sh
+    before_script:
+    - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
+    - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+    - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
+    script:
+    - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
+    - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
+    - sudo chmod -R 755 "/var/lib/lxc"
+    - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
+    before_deploy:
+    - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
+    deploy:
+      # Beta packages deployment
+      - provider: packagecloud
+        repository: "netdata"
+        username: "$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
+        token: "${PKG_CLOUD_TOKEN}"
+        dist: "${BUILD_STRING}"
+        local_dir: "${PACKAGES_DIRECTORY}"
+        skip_cleanup: true
+        on:
+          # Only deploy on ${USER}/netdata, master branch, when packages directory is created
+          repo: ${TRAVIS_REPO_SLUG}
+          branch: master
+          condition: -d "${PACKAGES_DIRECTORY}"
+      # Production release packages deployment
+      - provider: packagecloud
+        repository: "netdata"
+        username: "netdata"
+        token: "${PKG_CLOUD_TOKEN}"
+        dist: "${BUILD_STRING}"
+        local_dir: "${PACKAGES_DIRECTORY}"
+        skip_cleanup: true
+        on:
+          # Only deploy on ${USER}/netdata, master branch, when packages directory is created
+          repo: "${TRAVIS_REPO_SLUG}"
+          branch: master
+          condition: -d "${PACKAGES_DIRECTORY}"
+    after_deploy:
+      - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
+      - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
+
+
+
+- stage: &_DEB_TEMPLATE
+    name: "Build & Publish DEB package"
+    before_install:
+    - sudo apt-get install -y wget lxc lxc-templates
+    - source tests/installer/slack.sh
+    before_script:
+    - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
+    - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
+    - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
+    script:
+    - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
+    - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
+    - sudo chmod -R 755 "/var/lib/lxc"
+    - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
+    before_deploy:
+    - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
+    deploy:
+      # Beta packages deployment
+      - provider: packagecloud
+        repository: "netdata"
+        username: "$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
+        token: "${PKG_CLOUD_TOKEN}"
+        dist: "${BUILD_STRING}"
+        local_dir: "${PACKAGES_DIRECTORY}"
+        skip_cleanup: true
+        on:
+          # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
+          repo: ${TRAVIS_REPO_SLUG}
+          branch: master
+          condition: -d "${PACKAGES_DIRECTORY}"
+      # Production release packages deployment
+      - provider: packagecloud
+        repository: "netdata"
+        username: "netdata"
+        token: "${PKG_CLOUD_TOKEN}"
+        dist: "${BUILD_STRING}"
+        local_dir: "${PACKAGES_DIRECTORY}"
+        skip_cleanup: true
+        on:
+          # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
+          repo: "${TRAVIS_REPO_SLUG}"
+          branch: master
+          condition: -d "${PACKAGES_DIRECTORY}"
+    after_deploy:
+      - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
+      - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
 
 
@@ -181,7 +332,173 @@ jobs:
 
 
 
-    # We only publish if a TAG has been set during packaging
+  # ###### Packaging workflow section ######
+  # References:
+  # https://us.images.linuxcontainers.org
+  # https://packagecloud.io/docs#install_repo
+
+  # Ubuntu distros build
+  #
+  - stage:
+    <<: *_DEB_TEMPLATE
+    stage: "Package ubuntu/disco"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="disco" BUILD_STRING="ubuntu/disco"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_DEB_TEMPLATE
+    stage: "Package ubuntu/cosmic"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="cosmic" BUILD_STRING="ubuntu/cosmic"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_DEB_TEMPLATE
+    stage: "Package ubuntu/bionic"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="bionic" BUILD_STRING="ubuntu/bionic"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_DEB_TEMPLATE
+    stage: "Package ubuntu/artful"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  # Debian distros build
+  - stage:
+    <<: *_DEB_TEMPLATE
+    stage: "Package debian/buster"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="buster" BUILD_STRING="debian/buster"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage: 
+    <<: *_DEB_TEMPLATE
+    stage: "Package debian/stretch"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="stretch" BUILD_STRING="debian/stretch"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_DEB_TEMPLATE
+    stage: "Package debian/jessie"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_DEB_TEMPLATE
+    stage: "Package debian/wheezy"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
+    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  # Enterprise linux builds (Centos, Redhat, Amazon linux (el/6))
+  #
+  - stage:
+    <<: *_RPM_TEMPLATE
+    stage: "Package Enterprise Linux 7"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
+    - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_RPM_TEMPLATE
+    stage: "Package Enterprise linux 6"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
+    - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  # Fedora distros build
+  #
+  - stage:
+    <<: *_RPM_TEMPLATE
+    stage: "Package Fedora 30"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="30" BUILD_STRING="fedora/30"
+    - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_RPM_TEMPLATE
+    stage: "Package Fedora 29"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="29" BUILD_STRING="fedora/29"
+    - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_RPM_TEMPLATE
+    stage: "Package Fedora 28"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
+    - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  # Opensuse distros build
+  #
+  - stage:
+    <<: *_RPM_TEMPLATE
+    stage: "Package OpenSuSE 15.1"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
+    - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
+    - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
+  - stage:
+    <<: *_RPM_TEMPLATE
+    stage: "Package OpenSuSE 15.0"
+    env:
+    - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.0"
+    - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
+    - ALLOW_SOFT_FAILURE_HERE=true
+  # ###### End of packaging workflow section ###### #
+  # ############################################### #
+
+
+
+  # We only publish if a TAG has been set during packaging
   - stage: Publish for release
 
     name: Build & Publish docker images
@@ -218,7 +535,7 @@ jobs:
 
 
 
-    # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
+  # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
   - stage: Nightly operations
 
     name: Run coverity scan
@@ -242,8 +559,8 @@ jobs:
 
 
 
-    # This is the nightly execution step
-    #
+  # This is the nightly execution step
+  #
   - stage: Nightly release
 
     name: Build & Publish docker images
