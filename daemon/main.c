@@ -742,13 +742,13 @@ void send_statistics( const char *action, const char *action_result, const char 
         if (likely(access(optout_file, R_OK) != 0)) {
             as_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
             sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
-                        if (unlikely(access(as_script, R_OK) != 0)) {
-                                netdata_anonymous_statistics_enabled=0;
-                                info("Anonymous statistics script %s not found.",as_script);
-                                freez(as_script);
-                         } else {
-                                netdata_anonymous_statistics_enabled=1;
-                         }
+            if (unlikely(access(as_script, R_OK) != 0)) {
+               netdata_anonymous_statistics_enabled=0;
+               info("Anonymous statistics script %s not found.",as_script);
+               freez(as_script);
+            } else {
+               netdata_anonymous_statistics_enabled=1;
+            }
         } else {
             netdata_anonymous_statistics_enabled = 0;
             as_script = NULL;
