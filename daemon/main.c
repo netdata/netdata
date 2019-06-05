@@ -24,7 +24,7 @@ void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
-	send_statistics("EXIT", ret?"ERROR":"OK","-");
+    send_statistics("EXIT", ret?"ERROR":"OK","-");
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
@@ -50,7 +50,7 @@ void netdata_cleanup_and_exit(int ret) {
     }
 
 #ifdef ENABLE_HTTPS
-	security_clean_openssl();
+    security_clean_openssl();
 #endif
 
     info("EXIT: all done - netdata is now exiting - bye bye...");
@@ -373,9 +373,9 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_GLOBAL, "access log", filename);
 
-	char deffacility[8];
-	snprintfz(deffacility,7,"%s","daemon");
-	facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
+    char deffacility[8];
+    snprintfz(deffacility,7,"%s","daemon");
+    facility_log = config_get(CONFIG_SECTION_GLOBAL, "facility log",  deffacility);
 
     error_log_throttle_period = config_get_number(CONFIG_SECTION_GLOBAL, "errors flood protection period", error_log_throttle_period);
     error_log_errors_per_period = (unsigned long)config_get_number(CONFIG_SECTION_GLOBAL, "errors to trigger flood protection", (long long int)error_log_errors_per_period);
@@ -742,20 +742,20 @@ void send_statistics( const char *action, const char *action_result, const char 
         if (likely(access(optout_file, R_OK) != 0)) {
             as_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("anonymous-statistics.sh") + 2));
             sprintf(as_script, "%s/%s", netdata_configured_primary_plugins_dir, "anonymous-statistics.sh");
-			if (unlikely(access(as_script, R_OK) != 0)) {
-				netdata_anonymous_statistics_enabled=0;
-				info("Anonymous statistics script %s not found.",as_script);
-				freez(as_script);
-			} else {
-				netdata_anonymous_statistics_enabled=1;
-			}
-		} else {
+            if (unlikely(access(as_script, R_OK) != 0)) {
+               netdata_anonymous_statistics_enabled=0;
+               info("Anonymous statistics script %s not found.",as_script);
+               freez(as_script);
+            } else {
+               netdata_anonymous_statistics_enabled=1;
+            }
+        } else {
             netdata_anonymous_statistics_enabled = 0;
             as_script = NULL;
         }
         freez(optout_file);
     }
-	if(!netdata_anonymous_statistics_enabled) return;
+    if(!netdata_anonymous_statistics_enabled) return;
     if (!action) return;
     if (!action_result) action_result="";
     if (!action_data) action_data="";
@@ -899,12 +899,9 @@ int main(int argc, char **argv) {
                             return 0;
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
-                            unsigned history_seconds;
-
                             optarg += strlen(createdataset_string);
-                            history_seconds = (unsigned )strtoull(optarg, NULL, 0);
-
 #ifdef ENABLE_DBENGINE
+                            unsigned history_seconds = (unsigned )strtoull(optarg, NULL, 0);
                             generate_dbengine_dataset(history_seconds);
 #endif
                             return 0;
@@ -1191,7 +1188,7 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
-	netdata_anonymous_statistics_enabled=-1;
+    netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
