@@ -315,7 +315,7 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_stored_graphite_plaintext;
 
     }
-    else if( (!strcmp(type, "opentsdb:telnet")) ) {
+    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet") ) {
 
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
