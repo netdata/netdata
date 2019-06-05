@@ -12,8 +12,8 @@ int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 static void security_info_callback(const SSL *ssl, int where, int ret) {
     (void)ssl;
-    if ( where & SSL_CB_ALERT ) {
-        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s",SSL_alert_type_string( ret ),SSL_alert_desc_string_long(ret));
+    if (where & SSL_CB_ALERT) {
+        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s",SSL_alert_type_string(ret),SSL_alert_desc_string_long(ret));
     }
 }
 
@@ -30,7 +30,7 @@ void security_openssl_library()
 
     SSL_library_init();
 #else
-    if ( OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL) != 1 ) {
+    if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL) != 1) {
         error("SSL library cannot be initialized.");
     }
 #endif
@@ -51,7 +51,7 @@ void security_openssl_common_options(SSL_CTX *ctx) {
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if (!SSL_CTX_set_cipher_list(ctx,ciphers) ) {
+    if (!SSL_CTX_set_cipher_list(ctx,ciphers)) {
         error("SSL error. cannot set the cipher list");
     }
 #endif
@@ -79,7 +79,7 @@ static SSL_CTX * security_initialize_openssl_server() {
     //TO DO: Confirm the necessity to check return for other OPENSSL function
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	ctx = SSL_CTX_new(SSLv23_server_method());
-    if ( !ctx ) {
+    if (!ctx) {
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
@@ -87,18 +87,18 @@ static SSL_CTX * security_initialize_openssl_server() {
     SSL_CTX_use_certificate_file(ctx, security_cert, SSL_FILETYPE_PEM);
 #else
     ctx = SSL_CTX_new(TLS_server_method());
-    if ( !ctx ) {
+    if (!ctx) {
 		error("Cannot create a new SSL context, netdata won't encrypt communication");
         return NULL;
     }
 
-    SSL_CTX_use_certificate_chain_file(ctx, security_cert );
+    SSL_CTX_use_certificate_chain_file(ctx, security_cert);
 #endif
     security_openssl_common_options(ctx);
 
     SSL_CTX_use_PrivateKey_file(ctx,security_key,SSL_FILETYPE_PEM);
 
-    if ( !SSL_CTX_check_private_key(ctx) ) {
+    if (!SSL_CTX_check_private_key(ctx)) {
         ERR_error_string_n(ERR_get_error(),lerror,sizeof(lerror));
 		error("SSL cannot check the private key: %s",lerror);
         SSL_CTX_free(ctx);
@@ -117,9 +117,9 @@ static SSL_CTX * security_initialize_openssl_server() {
 }
 
 void security_start_ssl(int type) {
-    if ( !type) {
+    if (!type) {
         struct stat statbuf;
-        if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ) {
+        if ((stat(security_key,&statbuf)) || (stat(security_cert,&statbuf))) {
             info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
             return;
         }
@@ -132,12 +132,12 @@ void security_start_ssl(int type) {
 }
 
 void security_clean_openssl() {
-	if ( netdata_srv_ctx )
+	if (netdata_srv_ctx)
 	{
 		SSL_CTX_free(netdata_srv_ctx);
 	}
 
-    if ( netdata_cli_ctx )
+    if (netdata_cli_ctx)
     {
         SSL_CTX_free(netdata_cli_ctx);
     }
@@ -186,7 +186,7 @@ int security_process_accept(SSL *ssl,int msg) {
          }
     }
 
-    if ( SSL_is_init_finished(ssl) )
+    if (SSL_is_init_finished(ssl))
     {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
     }
