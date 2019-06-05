@@ -320,7 +320,7 @@ WEB_CLIENT_ACL read_acl(char *st) {
     char *ssl = strchr(st,'^');
     if (ssl) {
         ssl++;
-        if ( !strncmp("SSL=",ssl,4)) {
+        if (!strncmp("SSL=",ssl,4)) {
             ssl += 4;
         }
         socket_ssl_acl(ssl);
