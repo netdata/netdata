@@ -56,6 +56,9 @@ nfacct.plugin
 xenstat.plugin
 !xenstat.plugin/
 
+perf.plugin
+!perf.plugin/
+
 cgroup-network
 !cgroup-network/
 

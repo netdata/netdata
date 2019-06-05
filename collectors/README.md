@@ -37,6 +37,7 @@ plugin|lang|O/S|runs as|modular|description
 [macos.plugin](macos.plugin/)|`C`|macos|internal|yes|collects resource usage and performance data on MacOS systems
 [nfacct.plugin](nfacct.plugin/)|`C`|linux|external|-|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`
 [xenstat.plugin](xenstat.plugin/)|`C`|linux|external|-|collects XenServer and XCP-ng metrics using `libxenstat`
+[perf.plugin](perf.plugin/)|`C`|linux|external|-|collects CPU performance metrics using performance monitoring units (PMU).
 [node.d.plugin](node.d.plugin/)|`node.js`|any|external|yes|a **plugin orchestrator** for data collection modules written in `node.js`.
 [plugins.d](plugins.d/)|`C`|any|internal|-|implements the **external plugins** API and serves external plugins
 [proc.plugin](proc.plugin/)|`C`|linux|internal|yes|collects resource usage and performance data on Linux systems
