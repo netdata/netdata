@@ -13,7 +13,7 @@ int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 static void security_info_callback(const SSL *ssl, int where, int ret) {
     (void)ssl;
     if (where & SSL_CB_ALERT) {
-        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s",SSL_alert_type_string(ret),SSL_alert_desc_string_long(ret));
+        debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
     }
 }
 
@@ -119,7 +119,7 @@ static SSL_CTX * security_initialize_openssl_server() {
 void security_start_ssl(int type) {
     if (!type) {
         struct stat statbuf;
-        if ((stat(security_key,&statbuf)) || (stat(security_cert,&statbuf))) {
+        if (stat(security_key,&statbuf) || stat(security_cert,&statbuf)) {
             info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
             return;
         }
@@ -161,12 +161,12 @@ int security_process_accept(SSL *ssl,int msg) {
          switch(sslerrno) {
              case SSL_ERROR_WANT_READ:
              {
-                 error("SSL handshake did not finish and it wanna read on socket %d!",sock);
+                 error("SSL handshake did not finish and it wanna read on socket %d!", sock);
                  return NETDATA_SSL_WANT_READ;
              }
              case SSL_ERROR_WANT_WRITE:
              {
-                 error("SSL handshake did not finish and it wanna read on socket %d!",sock);
+                 error("SSL handshake did not finish and it wanna read on socket %d!", sock);
                  return NETDATA_SSL_WANT_WRITE;
              }
              case SSL_ERROR_NONE:
@@ -179,7 +179,7 @@ int security_process_accept(SSL *ssl,int msg) {
                  int counter = 0;
                  while ((err = ERR_get_error()) != 0) {
                      ERR_error_string_n(err, buf, sizeof(buf));
-                     info("%d SSL Handshake error (%s) on socket %d ",counter++,ERR_error_string((long)SSL_get_error(ssl,test),NULL),sock);
+                     info("%d SSL Handshake error (%s) on socket %d ", counter++, ERR_error_string((long)SSL_get_error(ssl, test), NULL), sock);
 			     }
                  return NETDATA_SSL_NO_HANDSHAKE;
 			 }
@@ -188,7 +188,7 @@ int security_process_accept(SSL *ssl,int msg) {
 
     if (SSL_is_init_finished(ssl))
     {
-        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d",ERR_error_string((long)SSL_get_error(ssl,test),NULL),errno,sock);
+        debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d", ERR_error_string((long)SSL_get_error(ssl, test), NULL), errno, sock);
     }
 
     return 0;
@@ -207,7 +207,7 @@ int security_test_certificate(SSL *ssl) {
     {
         char error[512];
         ERR_error_string_n(ERR_get_error(),error,sizeof(error));
-        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s",status,error);
+        error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s", status, error);
         ret = -1;
     }
     else {
