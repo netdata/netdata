@@ -56,8 +56,8 @@ run_command(["apt-get", "update", "-y"])
 run_command(["apt-get", "install", "-y", "sudo"])
 run_command(["apt-get", "install", "-y", "wget"])
 run_command(["apt-get", "install", "-y", "bash"])
-run_command(["wget", "-T", "15", "-O", "/tmp/install-required-packages.sh", "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
-run_command(["bash", "/tmp/install-required-packages.sh", "netdata", "--dont-wait", "--non-interactive"])
+run_command(["wget", "-T", "15", "-O", "~/.install-required-packages.sh", "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+run_command(["bash", "~/.install-required-packages.sh", "netdata", "--dont-wait", "--non-interactive"])
 
 # Download the source
 dest_archive="/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
