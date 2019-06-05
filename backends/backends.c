@@ -315,7 +315,7 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_stored_graphite_plaintext;
 
     }
-    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+    else if( (!strcmp(type, "opentsdb:telnet")) ) {
 
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
@@ -324,7 +324,16 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_collected_opentsdb_telnet;
         else
             backend_request_formatter = format_dimension_stored_opentsdb_telnet;
+    }
+    else if( (!strcmp(type, "opentsdb:http")) ) {
 
+        default_port = 4242;
+        backend_response_checker = process_opentsdb_response;
+
+        if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+            backend_request_formatter = format_dimension_collected_opentsdb_http;
+        else
+            backend_request_formatter = format_dimension_stored_opentsdb_http;
     }
     else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
 

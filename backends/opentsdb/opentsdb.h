@@ -31,5 +31,28 @@ extern int format_dimension_stored_opentsdb_telnet(
 
 extern int process_opentsdb_response(BUFFER *b);
 
+int format_dimension_collected_opentsdb_http(
+        BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
+);
+
+int format_dimension_stored_opentsdb_http(
+        BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
+);
 
 #endif //NETDATA_BACKEND_OPENTSDB_H
