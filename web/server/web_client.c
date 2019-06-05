@@ -821,8 +821,12 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
+#ifdef ENABLE_HTTPS
     HTTP_VALIDATION_INCOMPLETE,
     HTTP_VALIDATION_REDIRECT
+#else
+    HTTP_VALIDATION_INCOMPLETE
+#endif
 } HTTP_VALIDATION;
 
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
