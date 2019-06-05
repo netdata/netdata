@@ -4,7 +4,9 @@
 
 **Fixed bugs:**
 
-- Update fails because of new system dependencies [\#6200](https://github.com/netdata/netdata/issues/6200)
+- Use major/minor from sys/types.h [\#6218](https://github.com/netdata/netdata/issues/6218)
+- Update fails because of new system dependencies \(\*\*Resolved\*\*\) [\#6200](https://github.com/netdata/netdata/issues/6200)
+- netdata/database: db engine crashing under certain conditions [\#6199](https://github.com/netdata/netdata/issues/6199)
 - Update frequency for x509check alarm [\#6193](https://github.com/netdata/netdata/issues/6193)
 - kickstart.sh: Getting Nightly SHA256 sums from storage.googleapis.com times out [\#6191](https://github.com/netdata/netdata/issues/6191)
 - tv.html errors on https [\#6188](https://github.com/netdata/netdata/issues/6188)
@@ -12,6 +14,7 @@
 - Fix date in pushbullet alarm notifications [\#6178](https://github.com/netdata/netdata/issues/6178)
 - Why is auto-update not working? V1.14.0 [\#6170](https://github.com/netdata/netdata/issues/6170)
 - \[solved\] ZFS database \(was: netdata FATAL : MAIN :uv\_fs\_fsopen: invalid argument \# : Invalid argument\) [\#6161](https://github.com/netdata/netdata/issues/6161)
+- httpcheck does not export some metrics in version 1.15 [\#6157](https://github.com/netdata/netdata/issues/6157)
 - httpcheck causes lots of SYN\_SENT dangling sockets [\#6152](https://github.com/netdata/netdata/issues/6152)
 - varnish plugin not showing \(varnish version 4\) [\#6149](https://github.com/netdata/netdata/issues/6149)
 - Reduce number of codacy issues [\#6131](https://github.com/netdata/netdata/issues/6131)
@@ -20,6 +23,7 @@
 - web\_log reports unmatched lines [\#6125](https://github.com/netdata/netdata/issues/6125)
 - Netdata 1.15 crashes on Ubuntu 16.04 [\#6117](https://github.com/netdata/netdata/issues/6117)
 - netdata doesn't start with the new dbengine [\#6110](https://github.com/netdata/netdata/issues/6110)
+- "mdstat.mdX\_disks" chart's total is misleading [\#6108](https://github.com/netdata/netdata/issues/6108)
 - Telemetry rarely received from docker containers [\#6095](https://github.com/netdata/netdata/issues/6095)
 - netdata/packaging/installer: Fine tuning based on user feedback and findings from testing [\#6094](https://github.com/netdata/netdata/issues/6094)
 - opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6092](https://github.com/netdata/netdata/issues/6092)
@@ -28,7 +32,10 @@
 - error "cgroup-network-helper.sh: DEBUG: virsh command is not available" with the lastest docker image [\#6073](https://github.com/netdata/netdata/issues/6073)
 - Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
 - HTTP requests are classified as AF\_UNIX [\#5987](https://github.com/netdata/netdata/issues/5987)
+- Netdata behind caddy reverse proxy wont login. [\#5794](https://github.com/netdata/netdata/issues/5794)
 - netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
+- netdata/daemon: Eliminate a couple of warnings, plus tabs removal [\#6222](https://github.com/netdata/netdata/pull/6222) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/ci: Add lifecycle checks to bare operating system installations [\#6209](https://github.com/netdata/netdata/pull/6209) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/daemon: SSL fix - broken compilation case when ssl library not present! [\#6201](https://github.com/netdata/netdata/pull/6201) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/packaging/installer: Fix updater issue on empty config value [\#6182](https://github.com/netdata/netdata/pull/6182) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/installer: nits and fixes [\#6121](https://github.com/netdata/netdata/pull/6121) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -36,14 +43,26 @@
 
 **Closed issues:**
 
+- Documentation improvements [\#6214](https://github.com/netdata/netdata/issues/6214)
 - SN\_EMPTY\_SLOT RRDDIMM value detection inside DB engine [\#6105](https://github.com/netdata/netdata/issues/6105)
+- When the collector restarts after having stopped a long time ago fill the chart gaps efficiently [\#6103](https://github.com/netdata/netdata/issues/6103)
 - Optimize the memory footprint of the Database Engine [\#6010](https://github.com/netdata/netdata/issues/6010)
+- Secure streaming via SSL [\#6004](https://github.com/netdata/netdata/issues/6004)
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
 - \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
+- Cookie consent for the Netdata sites [\#4798](https://github.com/netdata/netdata/issues/4798)
 - alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
 
 **Merged pull requests:**
 
+- installer: include go.d.plugin version v0.6.1 [\#6217](https://github.com/netdata/netdata/pull/6217) ([ilyam8](https://github.com/ilyam8))
+- Fill chart gaps efficiently. [\#6216](https://github.com/netdata/netdata/pull/6216) ([mfundul](https://github.com/mfundul))
+- Add code style guidance to CONTRIBUTING [\#6212](https://github.com/netdata/netdata/pull/6212) ([cakrit](https://github.com/cakrit))
+- Simplify health cmdapi tester - no setup/cleanup needed [\#6210](https://github.com/netdata/netdata/pull/6210) ([cakrit](https://github.com/cakrit))
+- Visibility fix in anonymous-statistics.md [\#6208](https://github.com/netdata/netdata/pull/6208) ([cakrit](https://github.com/cakrit))
+- smartd documentation improvements [\#6207](https://github.com/netdata/netdata/pull/6207) ([cakrit](https://github.com/cakrit))
+- Add note to make smartd directory [\#6203](https://github.com/netdata/netdata/pull/6203) ([Steve8291](https://github.com/Steve8291))
+- Fix page cache descriptor race condition [\#6202](https://github.com/netdata/netdata/pull/6202) ([mfundul](https://github.com/mfundul))
 - Turn tv.html links to https [\#6198](https://github.com/netdata/netdata/pull/6198) ([cakrit](https://github.com/cakrit))
 - wmi collector: `fa-server` icon [\#6197](https://github.com/netdata/netdata/pull/6197) ([ilyam8](https://github.com/ilyam8))
 - Change print level from error to info [\#6195](https://github.com/netdata/netdata/pull/6195) ([mfundul](https://github.com/mfundul))
@@ -55,8 +74,10 @@
 - Correct date used in pushbullet notifications [\#6179](https://github.com/netdata/netdata/pull/6179) ([cakrit](https://github.com/cakrit))
 - Support falling back to buffered I/O when direct I/O is unavailable [\#6174](https://github.com/netdata/netdata/pull/6174) ([mfundul](https://github.com/mfundul))
 - Add empty page detection in DB engine [\#6173](https://github.com/netdata/netdata/pull/6173) ([mfundul](https://github.com/mfundul))
+- Increase the cpu\_limit chart precision in cgroup plugin [\#6172](https://github.com/netdata/netdata/pull/6172) ([vlvkobal](https://github.com/vlvkobal))
 - varnish v4 compatibility fix [\#6168](https://github.com/netdata/netdata/pull/6168) ([ilyam8](https://github.com/ilyam8))
 - Update security policy [\#6166](https://github.com/netdata/netdata/pull/6166) ([cakrit](https://github.com/cakrit))
+- Fix mdstat disks chart [\#6164](https://github.com/netdata/netdata/pull/6164) ([vlvkobal](https://github.com/vlvkobal))
 - Properly add security policy [\#6163](https://github.com/netdata/netdata/pull/6163) ([cakrit](https://github.com/cakrit))
 - Fix typo in README [\#6146](https://github.com/netdata/netdata/pull/6146) ([cakrit](https://github.com/cakrit))
 - Documentation fixes [\#6144](https://github.com/netdata/netdata/pull/6144) ([cakrit](https://github.com/cakrit))
