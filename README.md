@@ -12,10 +12,7 @@ _Netdata is **fast** and **efficient**, designed to permanently run on all syste
 
 Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
-![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)
-
-Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars) and it is the 3rd most starred open-source project.
-Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).
+Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars).
 
 ---
 
