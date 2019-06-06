@@ -823,23 +823,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     return ve;
 }
 
-// http_request_validate()
-// returns:
-// = 0 : all good, process the request
-// > 0 : request is not supported
-// < 0 : request is incomplete - wait for more data
-
-typedef enum {
-    HTTP_VALIDATION_OK,
-    HTTP_VALIDATION_NOT_SUPPORTED,
-#ifdef ENABLE_HTTPS
-    HTTP_VALIDATION_INCOMPLETE,
-    HTTP_VALIDATION_REDIRECT
-#else
-    HTTP_VALIDATION_INCOMPLETE
-#endif
-} HTTP_VALIDATION;
-
 static inline HTTP_VALIDATION web_client_is_complete(char *begin,char *end,size_t length){
     if ( begin == end){
         return HTTP_VALIDATION_INCOMPLETE;
@@ -925,14 +908,7 @@ static inline char *web_client_parse_method(struct web_client *w,char *s) {
 }
 
 static inline char *web_client_find_protocol(struct web_client *w,char *s){
-    while(*s) {
-        // find the next space
-        while (*s && *s != ' ') s++;
-
-        // is it SPACE + "HTTP/" ?
-        if(*s && !strncmp(s, " HTTP/", 6)) break;
-        else s++;
-    }
+    s = url_find_protocol(s);
 
     w->protocol.body = s+1;
     char *end = strchr(s+6,'\n');
@@ -968,42 +944,8 @@ int web_client_parse_request(struct web_client *w,char *divisor){
         return 0;
     }
 
-    char *moveme = w->query_string.body +1;
-    uint32_t i = 0;
-    uint32_t max = WEB_FIELDS_MAX;
-
-    struct web_fields *names = w->param_name;
-    struct web_fields *values = w->param_values;
-    do {
-        if ( i == max){
-            error("We are exceeding the maximum number of elements possible(%u) in this query string(%s)",max,w->query_string.body);
-            break;
-        }
-        if (divisor){
-            names[i].body = moveme;
-            names[i].length = divisor - moveme;//= - begin
-
-            moveme = ++divisor; //value
-            values[i].body = moveme;
-
-            (void)divisor;
-            divisor = strchr(moveme,'&'); //end of value
-            if ( divisor){
-                values[i].length = (size_t )(divisor - moveme);
-            } else{
-                values[i].length = strlen(moveme);
-                break;
-            }
-
-            moveme = divisor;
-            divisor = strchr(++moveme,'='); //end of value
-            i++;
-        } else{
-            break;
-        }
-    } while (moveme);
-
-    w->total_params = ++i;
+    uint32_t i = url_parse_query_string(w->param_name,w->param_values,w->query_string.body+1,divisor);
+    w->total_params = i;
 
     return i;
 }
@@ -1124,7 +1066,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // make sure we have complete request
     // complete requests contain: \r\n\r\n
-    status = web_client_is_complete(s,&s[status],status);
+    status = url_is_request_complete(s,&s[status],status);
     if (w->header_parse_tries > 10 ){
         if (status == HTTP_VALIDATION_INCOMPLETE){
             info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));

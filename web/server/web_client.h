@@ -108,12 +108,6 @@ struct response {
 
 };
 
-#define WEB_FIELDS_MAX 200
-struct web_fields{
-    char *body;
-    size_t length;
-};
-
 struct web_client {
     unsigned long long id;
 
@@ -172,12 +166,9 @@ struct web_client {
     // STATIC-THREADED WEB SERVER MEMBERS
     size_t pollinfo_slot;           // POLLINFO slot of the web client
     size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
-<<<<<<< HEAD
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
-=======
->>>>>>> URL_parameter parsing 2
 };
 
 extern uid_t web_files_uid(void);

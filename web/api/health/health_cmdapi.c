@@ -84,26 +84,25 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     char vsave = value[lvalue];
                     value[lvalue] = 0x00;
 
-
                     debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
 
                     // name and value are now the parameters
                     if (!strncmp(key, "cmd",lkey)) {
-                        if (!strncmp(value, HEALTH_CMDAPI_CMD_SILENCEALL,lvalue)) {
+                        if (!strcmp(value, HEALTH_CMDAPI_CMD_SILENCEALL)) {
                             silencers->all_alarms = 1;
                             silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
                             buffer_strcat(wb, HEALTH_CMDAPI_MSG_SILENCEALL);
-                        } else if (!strncmp(value, HEALTH_CMDAPI_CMD_DISABLEALL,lvalue)) {
+                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_DISABLEALL)) {
                             silencers->all_alarms = 1;
                             silencers->stype = STYPE_DISABLE_ALARMS;
                             buffer_strcat(wb, HEALTH_CMDAPI_MSG_DISABLEALL);
-                        } else if (!strncmp(value, HEALTH_CMDAPI_CMD_SILENCE,lvalue)) {
+                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_SILENCE)) {
                             silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
                             buffer_strcat(wb, HEALTH_CMDAPI_MSG_SILENCE);
-                        } else if (!strncmp(value, HEALTH_CMDAPI_CMD_DISABLE,lvalue)) {
+                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_DISABLE)) {
                             silencers->stype = STYPE_DISABLE_ALARMS;
                             buffer_strcat(wb, HEALTH_CMDAPI_MSG_DISABLE);
-                        } else if (!strncmp(value, HEALTH_CMDAPI_CMD_RESET,lvalue)) {
+                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_RESET)) {
                             silencers->all_alarms = 0;
                             silencers->stype = STYPE_NONE;
                             free_silencers(silencers->silencers);
@@ -169,6 +168,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             ret = 200;
         }
     }
+
     w->response.data = wb;
     buffer_no_cacheable(w->response.data);
     return ret;
