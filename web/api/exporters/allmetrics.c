@@ -136,4 +136,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
         size_t lvalue = w->param_values[i].length;
         value[lvalue] = svalue[i];
     } while( ++i < end);
+
+    return ret;
 }
