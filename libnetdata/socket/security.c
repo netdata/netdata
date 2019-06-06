@@ -30,7 +30,7 @@ void security_openssl_library()
 
     SSL_library_init();
 #else
-    if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG,NULL) != 1) {
+    if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
         error("SSL library cannot be initialized.");
     }
 #endif
@@ -43,15 +43,15 @@ void security_openssl_common_options(SSL_CTX *ctx) {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
     SSL_CTX_set_options (ctx,SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_COMPRESSION);
 #else
-    SSL_CTX_set_min_proto_version(ctx,TLS1_2_VERSION);
+    SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
     //We are avoiding the TLS v1.3 for while, because Google Chrome
     //is giving the message net::ERR_SSL_VERSION_INTERFERENCE with it.
-    SSL_CTX_set_max_proto_version(ctx,TLS1_2_VERSION);
+    SSL_CTX_set_max_proto_version(ctx, TLS1_2_VERSION);
 #endif
     SSL_CTX_set_mode(ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
-    if (!SSL_CTX_set_cipher_list(ctx,ciphers)) {
+    if (!SSL_CTX_set_cipher_list(ctx, ciphers)) {
         error("SSL error. cannot set the cipher list");
     }
 #endif
@@ -206,11 +206,10 @@ int security_test_certificate(SSL *ssl) {
     if((X509_V_OK != status))
     {
         char error[512];
-        ERR_error_string_n(ERR_get_error(),error,sizeof(error));
+        ERR_error_string_n(ERR_get_error(), error, sizeof(error));
         error("SSL RFC4158 check:  We have a invalid certificate, the tests result with %ld and message %s", status, error);
         ret = -1;
-    }
-    else {
+    } else {
         ret = 0;
     }
     return ret;
