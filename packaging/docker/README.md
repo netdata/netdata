@@ -63,7 +63,8 @@ This group number can be found by running the following (if socket group ownersh
 grep docker /etc/group | cut -d ':' -f 3
 ```
 
-**Important Note**: You should seriously consider the necessity activating this option, as it provides netdata with access to the privileged socket connection of docker service
+**Important Note**: You should seriously consider the necessity activating this option,
+as it provides netdata with access to the privileged socket connection of docker service
 
 ### Pass command line options to Netdata 
 
