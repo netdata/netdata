@@ -18,6 +18,7 @@ SUBDIRS = \
     macos.plugin \
     nfacct.plugin \
     xenstat.plugin \
+    perf.plugin \
     node.d.plugin \
     proc.plugin \
     python.d.plugin \
