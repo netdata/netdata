@@ -79,3 +79,88 @@ char *url_decode_r(char *to, char *url, size_t size) {
 
     return to;
 }
+
+inline HTTP_VALIDATION url_is_request_complete(char *begin,char *end,size_t length) {
+    if ( begin == end) {
+        return HTTP_VALIDATION_INCOMPLETE;
+    }
+
+    if ( length > 3  ) {
+        begin = end - 4;
+    }
+
+    uint32_t counter = 0;
+    do {
+        if (*begin == '\r') {
+            begin++;
+            if ( begin == end )
+            {
+                break;
+            }
+
+            if (*begin == '\n')
+            {
+                counter++;
+            }
+        } else if (*begin == '\n') {
+            begin++;
+            counter++;
+        }
+
+        if ( counter == 2) {
+            break;
+        }
+    }
+    while (begin != end);
+
+    return (counter == 2)?HTTP_VALIDATION_OK:HTTP_VALIDATION_INCOMPLETE;
+}
+
+inline char *url_find_protocol(char *s) {
+    while(*s) {
+        // find the next space
+        while (*s && *s != ' ') s++;
+
+        // is it SPACE + "HTTP/" ?
+        if(*s && !strncmp(s, " HTTP/", 6)) break;
+        else s++;
+    }
+
+    return s;
+}
+
+int url_parse_query_string(struct web_fields *names,struct web_fields *values,char *moveme,char *divisor) {
+    uint32_t i = 0;
+    uint32_t max = WEB_FIELDS_MAX;
+
+    do {
+        if ( i == max) {
+            error("We are exceeding the maximum number of elements possible(%u) in this query string(%s)",max,moveme);
+            break;
+        }
+        if (divisor) {
+            names[i].body = moveme;
+            names[i].length = divisor - moveme;//= - begin
+
+            moveme = ++divisor; //value
+            values[i].body = moveme;
+
+            (void)divisor;
+            divisor = strchr(moveme,'&'); //end of value
+            if (divisor) {
+                values[i].length = (size_t )(divisor - moveme);
+            } else{
+                values[i].length = strlen(moveme);
+                break;
+            }
+
+            moveme = divisor;
+            divisor = strchr(++moveme,'='); //end of value
+            i++;
+        } else {
+            break;
+        }
+    } while (moveme);
+
+    return ++i;
+}
