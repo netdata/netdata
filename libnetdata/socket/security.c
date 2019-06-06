@@ -3,6 +3,7 @@
 #ifdef ENABLE_HTTPS
 
 SSL_CTX *netdata_cli_ctx=NULL;
+SSL_CTX *netdata_opentsdb_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
@@ -55,8 +56,6 @@ void security_openssl_common_options(SSL_CTX *ctx){
         error("SSL error. cannot set the cipher list");
     }
 #endif
-
-
 }
 
 static SSL_CTX * security_initialize_openssl_client() {
@@ -117,7 +116,7 @@ static SSL_CTX * security_initialize_openssl_server(){
 }
 
 void security_start_ssl(int type){
-    if ( !type){
+    if (!type){
         struct stat statbuf;
         if ( (stat(security_key,&statbuf)) || (stat(security_cert,&statbuf)) ){
             info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
@@ -127,7 +126,11 @@ void security_start_ssl(int type){
         netdata_srv_ctx =  security_initialize_openssl_server();
     }
     else {
-        netdata_cli_ctx =  security_initialize_openssl_client();
+        if(type == 1) {
+            netdata_cli_ctx =  security_initialize_openssl_client();
+        } else if (type == 2) {
+            netdata_opentsdb_ctx =  security_initialize_openssl_client();
+        }
     }
 }
 
@@ -140,6 +143,11 @@ void security_clean_openssl(){
     if ( netdata_cli_ctx )
     {
         SSL_CTX_free(netdata_cli_ctx);
+    }
+
+    if ( netdata_opentsdb_ctx )
+    {
+        SSL_CTX_free(netdata_opentsdb_ctx);
     }
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L

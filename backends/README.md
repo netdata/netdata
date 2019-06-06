@@ -70,7 +70,7 @@ of `netdata.conf` from your netdata):
 ```
 [backend]
     enabled = yes | no
-    type = graphite | opentsdb:telnet | opentsdb:http | json | kinesis
+    type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis
     host tags = list of TAG=VALUE
     destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used, or a region for kinesis
     data source = average | sum | as collected
@@ -86,7 +86,7 @@ of `netdata.conf` from your netdata):
 
 - `enabled = yes | no`, enables or disables sending data to a backend
 
-- `type = graphite | opentsdb:telnet | opentsdb:http | json | kinesis`, selects the backend type
+- `type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis`, selects the backend type
 
 - `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames,
    IPs (IPv4 and IPv6) and ports to connect to.

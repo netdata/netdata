@@ -325,10 +325,16 @@ void *backends_main(void *ptr) {
         else
             backend_request_formatter = format_dimension_stored_opentsdb_telnet;
     }
-    else if( (!strcmp(type, "opentsdb:http")) ) {
+    else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
 
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
+
+#ifdef ENABLE_HTTPS
+        if (!strcmp(type+12,"ps")) {
+            security_start_ssl(2);
+        }
+#endif
 
         if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
             backend_request_formatter = format_dimension_collected_opentsdb_http;
