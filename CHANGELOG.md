@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+-  kickstart.sh: Getting Nightly SHA256 sums from storage.googleapis.com times out [\#6227](https://github.com/netdata/netdata/issues/6227)
 - Use major/minor from sys/types.h [\#6218](https://github.com/netdata/netdata/issues/6218)
 - Update fails because of new system dependencies \(\*\*Resolved\*\*\) [\#6200](https://github.com/netdata/netdata/issues/6200)
 - netdata/database: db engine crashing under certain conditions [\#6199](https://github.com/netdata/netdata/issues/6199)
@@ -55,6 +56,8 @@
 
 **Merged pull requests:**
 
+- URL\_parser fixing allmetrics! [\#6231](https://github.com/netdata/netdata/pull/6231) ([thiagoftsm](https://github.com/thiagoftsm))
+- SSL\_fix\_format Fix wrong format used with SSL! [\#6219](https://github.com/netdata/netdata/pull/6219) ([thiagoftsm](https://github.com/thiagoftsm))
 - installer: include go.d.plugin version v0.6.1 [\#6217](https://github.com/netdata/netdata/pull/6217) ([ilyam8](https://github.com/ilyam8))
 - Fill chart gaps efficiently. [\#6216](https://github.com/netdata/netdata/pull/6216) ([mfundul](https://github.com/mfundul))
 - Add code style guidance to CONTRIBUTING [\#6212](https://github.com/netdata/netdata/pull/6212) ([cakrit](https://github.com/cakrit))
@@ -102,6 +105,7 @@
 - Corrected links to web\_log.conf [\#6087](https://github.com/netdata/netdata/pull/6087) ([cakrit](https://github.com/cakrit))
 - Mention anonymous statistics in additional places in the docs [\#6084](https://github.com/netdata/netdata/pull/6084) ([cakrit](https://github.com/cakrit))
 - Add "custom-plugins.d" to fix error in log file [\#6080](https://github.com/netdata/netdata/pull/6080) ([Steve8291](https://github.com/Steve8291))
+- New URL parser [\#6070](https://github.com/netdata/netdata/pull/6070) ([thiagoftsm](https://github.com/thiagoftsm))
 - wmi alarms [\#6068](https://github.com/netdata/netdata/pull/6068) ([ilyam8](https://github.com/ilyam8))
 - Add perforce server process monitoring [\#6064](https://github.com/netdata/netdata/pull/6064) ([akwan](https://github.com/akwan))
 - SSL implementation for Netdata [\#5956](https://github.com/netdata/netdata/pull/5956) ([thiagoftsm](https://github.com/thiagoftsm))
