@@ -108,6 +108,12 @@ struct response {
 
 };
 
+#define WEB_FIELDS_MAX 200
+struct web_fields{
+    char *body;
+    size_t length;
+};
+
 struct web_client {
     unsigned long long id;
 
@@ -128,9 +134,16 @@ struct web_client {
     char client_port[NI_MAXSERV+1];
 
     char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the URL in this buffer
-    char *path;
-    char *query_string;
     size_t decoded_length;
+    struct web_fields path;
+    struct web_fields directory;
+    struct web_fields query_string;
+    struct web_fields version;
+    struct web_fields protocol;
+    struct web_fields param_name[WEB_FIELDS_MAX];
+    struct web_fields param_values[WEB_FIELDS_MAX];
+    uint32_t total_params;
+
     char last_url[NETDATA_WEB_REQUEST_URL_SIZE+1];       // we keep a copy of the decoded URL here
     char host[256];
 
@@ -157,9 +170,12 @@ struct web_client {
     // STATIC-THREADED WEB SERVER MEMBERS
     size_t pollinfo_slot;           // POLLINFO slot of the web client
     size_t pollinfo_filecopy_slot;  // POLLINFO slot of the file read
+<<<<<<< HEAD
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
+=======
+>>>>>>> URL_parameter parsing 2
 };
 
 extern uid_t web_files_uid(void);

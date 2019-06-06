@@ -913,7 +913,7 @@ static inline char *web_client_parse_method(struct web_client *w,char *s) {
     return s;
 }
 
-static inline char *web_client_find_protocol(char *s){
+static inline char *web_client_find_protocol(struct web_client *w,char *s){
     while(*s) {
         // find the next space
         while (*s && *s != ' ') s++;
@@ -921,6 +921,12 @@ static inline char *web_client_find_protocol(char *s){
         // is it SPACE + "HTTP/" ?
         if(*s && !strncmp(s, " HTTP/", 6)) break;
         else s++;
+    }
+
+    w->protocol.body = s+1;
+    char *end = strchr(s+6,'\n');
+    if (end){
+        w->protocol.length = end - w->protocol.body ;
     }
 
     return s;
@@ -939,6 +945,129 @@ static inline void web_client_parse_headers(struct web_client *w,char *s){
         );
 
     }
+}
+
+void web_client_parse_request(struct web_client *w,char *divisor){
+    if(!divisor){
+        w->total_params = 0;
+        error("KILLME TOTAL %u",w->total_params);
+        return;
+    }
+    char *moveme = w->query_string.body + 1;
+    uint32_t i = 0;
+    uint32_t max = WEB_FIELDS_MAX;
+
+    struct web_fields *names = w->param_name;
+    struct web_fields *values = w->param_values;
+    do{
+        if ( i == max){
+            error("We are exceeding the maximum number of elements possible(%u) in this query string(%s)",max,w->query_string.body);
+            break;
+        }
+        if (divisor){
+            names[i].body = moveme;
+            names[i].length = divisor - moveme;
+
+            moveme = ++divisor;
+            values[i].body = moveme;
+
+            divisor = strchr(moveme,'&');
+            if ( divisor){
+                values[i].length = (size_t )(divisor - moveme);
+                divisor++;
+            } else{
+                values[i].length = strlen(moveme);
+            }
+            error("KILLME params %u (%lu,%lu)",i,names[i].length,values[i].length  );
+            i++;
+            moveme = divisor;
+        } else{
+            break;
+        }
+
+    }while (moveme);
+
+    w->total_params = i;
+    error("KILLME TOTAL %u",w->total_params);
+}
+
+static inline void web_client_set_directory(struct web_client *w,char *enddir){
+    if (enddir ){
+        char *begin = w->path.body+1;
+        w->directory.body = begin;
+        w->directory.length = enddir - begin;
+
+        if ( !strncmp(w->directory.body,"api",w->directory.length)){
+            begin = enddir + 1;
+            enddir = strchr(begin,'/');
+            if(enddir){
+                w->version.body = begin;
+                w->version.length = enddir - begin;
+            }
+        }
+    }
+    else{
+        w->directory.body = NULL;
+        w->directory.length = 0;
+        w->version.body = NULL;
+        w->version.length = 0;
+    }
+}
+
+static inline void web_client_set_without_query_string(struct web_client *w){
+    w->query_string.body = NULL;
+    w->query_string.length = 0;
+    w->total_params = 0;
+}
+
+static inline void web_client_split_path_query(struct web_client *w,char *ue){
+    w->path.body = w->decoded_url;
+    char *moveme = strchr(w->path.body,'?');
+    if (moveme){
+        w->path.length = moveme - w->path.body;
+        w->query_string.body = moveme;
+        w->query_string.length = w->decoded_length - w->path.length;
+
+        char *enddir = strchr(w->path.body+1,'/');
+        web_client_set_directory(w,enddir);
+        if (w->query_string.body){
+            enddir = strchr(moveme,'=');
+            web_client_parse_request(w,enddir);
+        }
+    } else {
+        w->path.length = w->decoded_length;
+        web_client_set_without_query_string(w);
+    }
+
+    /*
+    w->path.body = w->decoded_url;
+    char *moveme = strchr(w->path.body,'?');
+    if (!moveme){
+        moveme = strchr(w->path.body,'/');
+    }
+
+    if (moveme){
+        if(w->decoded_length > 1){
+            w->path.length = moveme - w->path.body;
+
+            if (w->path.length){
+                w->query_string.body = moveme;
+                w->query_string.length = w->decoded_length - w->path.length;
+
+                web_client_set_directory(w);
+                web_client_parse_request(w);
+            }
+        } else {
+            w->path.length = 1;
+
+            w->query_string.body = NULL;
+            w->query_string.length = 0;
+        }
+    } else{
+        w->path.length = ue - w->path.body;
+        web_client_set_without_query_string(w);
+    }
+    */
 }
 
 static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
@@ -966,6 +1095,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             return HTTP_VALIDATION_INCOMPLETE;
         }
     }
+    error("KILLME START : %s ",s);
 
     //Parse the method used to communicate
     s = web_client_parse_method(w,s);
@@ -978,7 +1108,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     encoded_url = s;
 
-    s = web_client_find_protocol(s);
+    s = web_client_find_protocol(w,s);
     // incomplete requests
     if(unlikely(!*s)) {
         web_client_enable_wait_receive(w);
@@ -991,18 +1121,16 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     *ue = '\0';
     url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-    *ue = ' ';
 
+    web_client_split_path_query(w,ue);
+    *ue = ' ';
     web_client_parse_headers(w,s);
 
-    w->path = w->decoded_url;
-    s = strchr(w->path,'?');
-    if (s){
-        s++;
-        w->query_string = s;
-    } else{
-        w->query_string = NULL;
-    }
+    error("KILLME PATH %lu: %s ",w->path.length,w->path.body);
+    error("KILLME DIRECTORY %lu: %s ",w->directory.length,w->directory.body);
+    error("KILLME VERSION %lu: %s ",w->version.length,w->version.body);
+    error("KILLME QUERY STRING %lu: %s ",w->query_string.length,w->query_string.body);
+    error("KILLME PROTOCOL %lu: %s ",w->protocol.length,w->protocol.body);
 
     // copy the URL - we are going to overwrite parts of it
     // TODO -- ideally we we should avoid copying buffers around
@@ -1296,15 +1424,19 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #endif
     }
 
-    error("KILLME %s",url);
-
     char *tok = mystrsep(&url, "/?");
-    error("KILLME %s",tok);
+    error("KILLME TOK %s",tok);
     if(likely(tok && *tok)) {
         uint32_t hash = simple_hash(tok);
+ //   if (w->path.length > 1){
+        char *cmp = w->directory.body;
+        size_t len = w->directory.length;
+        //uint32_t hash = simple_nhash(cmp,w->directory.length);
+ //       error("KILLME HASH %u %u %d",hash,simple_hash(tok), ( hash == simple_hash(tok) ));
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
         if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
+   //     if(unlikely(hash == hash_api && strncmp(cmp, "api",len) == 0)) {                           // current API
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, url, web_client_api_request);
         }
@@ -1313,6 +1445,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return web_client_switch_host(host, w, url);
         }
         else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
+        //else if(unlikely(hash == hash_netdata_conf && strncmp(cmp, "netdata.conf",len) == 0)) {                           // current API
             if(unlikely(!web_client_can_access_netdataconf(w)))
                 return web_client_permission_denied(w);
 
