@@ -951,6 +951,10 @@ static inline void web_client_parse_headers(struct web_client *w,char *s){
         // did we reach the end?
         if(unlikely(!*s)) break;
 
+        if (*s == '\n'){
+            s++;
+        }
+
         s = http_header_parse(w, s,
                               (w->mode == WEB_CLIENT_MODE_STREAM) // parse user agent
         );
@@ -990,7 +994,6 @@ void web_client_parse_request(struct web_client *w,char *divisor){
                 break;
             }
 
-            error("KILLME params %u (%s,%s) (%lu,%lu)",i,names[i].body,values[i].body,names[i].length,values[i].length);
             moveme = divisor;
             divisor = strchr(++moveme,'='); //end of value
             i++;
@@ -999,9 +1002,7 @@ void web_client_parse_request(struct web_client *w,char *divisor){
         }
     }while (moveme);
 
-    error("KILLME params %u (%s,%s) (%lu,%lu)",i,names[i].body,values[i].body,names[i].length,values[i].length);
     w->total_params = ++i;
-    error("KILLME TOTAL %u",w->total_params);
 }
 
 static inline void web_client_set_directory(struct web_client *w,char *enddir,char *endcmd){
@@ -1037,8 +1038,23 @@ static inline void web_client_set_without_query_string(struct web_client *w){
     w->query_string.body = NULL;
     w->query_string.length = 0;
 
-    w->command.body = NULL;
-    w->command.length = 0;
+    char *test = w->path.body+1;
+    if ( !strncmp(test,"api/v1/",7) ){
+        test += 7;
+        if (!strncmp(test,"info",4)){
+            w->command.length = 4;
+        }
+        else if (!strncmp(test,"charts",6)){
+            w->command.length = 6;
+        }
+        else {
+            test = NULL;
+            w->command.length = 0;
+        }
+    }else{
+        w->command.length = w->path.length;
+    }
+    w->command.body = test;
     w->total_params = 0;
 }
 
@@ -1111,8 +1127,6 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
             return HTTP_VALIDATION_INCOMPLETE;
         }
     }
-    error("KILLME START : %s ",s);
-
     //Parse the method used to communicate
     s = web_client_parse_method(w,s);
     if (!s){
@@ -1141,17 +1155,20 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     *ue = ' ';
     web_client_parse_headers(w,s);
 
-    error("KILLME DECODED %lu: %s ",w->decoded_length,encoded_url);
-    error("KILLME PATH %lu: %s ",w->path.length,w->path.body);
-    error("KILLME DIRECTORY %lu: %s ",w->directory.length,w->directory.body);
-    error("KILLME VERSION %lu: %s ",w->version.length,w->version.body);
-    error("KILLME COMMAND %lu: %s ",w->command.length,w->command.body);
-    error("KILLME QUERY STRING %lu: %s ",w->query_string.length,w->query_string.body);
-    error("KILLME PROTOCOL %lu: %s ",w->protocol.length,w->protocol.body);
-
     // copy the URL - we are going to overwrite parts of it
     // TODO -- ideally we we should avoid copying buffers around
     strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+
+#ifdef ENABLE_HTTPS
+    if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
+        if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM)) ) {
+            w->header_parse_tries = 0;
+            w->header_parse_last_size = 0;
+            web_client_disable_wait_receive(w);
+            return HTTP_VALIDATION_REDIRECT;
+        }
+    }
+#endif
 
     w->header_parse_tries = 0;
     w->header_parse_last_size = 0;
@@ -1448,7 +1465,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         char *cmp = w->directory.body;
         size_t len = w->directory.length;
         uint32_t hash = simple_nhash(cmp,len);
-        error("KILLME HASH %u %u %d",hash,simple_hash(tok),( hash == simple_hash(tok) ));
         debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
         if(unlikely(hash == hash_api && strncmp(cmp, "api",len) == 0)) {                           // current API

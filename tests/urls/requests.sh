@@ -154,6 +154,9 @@ netdata_download_allmetrics() {
 ####																						####
 ################################################################################################
 MURL="http://127.0.0.1:19999"
+
+wget --execute="robots = off" --mirror --convert-links --no-parent http://127.0.0.1:19999
+
 netdata_create_directory $OUTDIR
 
 netdata_download_various $MURL "api/v1/info" "info"
@@ -162,16 +165,6 @@ netdata_download_various $MURL "api/v1/registry?action=hello"  "action"
 
 netdata_print_header "Getting all the netdata charts"
 CHARTS=$( netdata_download_charts "http://127.0.0.1:19999" "api/v1" )
-
-netdata_create_directory "$OUTDIR/data"
-for I in $CHARTS ; do
-	netdata_download_chart $MURL "api/v1/data?chart" $I "data"
-done
-
-netdata_create_directory "$OUTDIR/badge.svg"
-for I in $CHARTS ; do
-	netdata_download_chart $MURL "api/v1/badge.svg?chart" $I "badge.svg"
-done
 
 netdata_download_various $MURL "api/v1/allmetrics?format=json"  "allmetrics"
 
@@ -184,7 +177,17 @@ for I in $CHARTS ; do
 	netdata_download_various $MURL "api/v1/alarm_variables?chart=$NAME"  "alarm_variables_$NAME"
 done
 
-wget --execute="robots = off" --mirror --convert-links --no-parent http://127.0.0.1:19999
+netdata_create_directory "$OUTDIR/data"
+for I in $CHARTS ; do
+	netdata_download_chart $MURL "api/v1/data?chart" $I "data"
+done
+
+netdata_create_directory "$OUTDIR/badge.svg"
+for I in $CHARTS ; do
+	netdata_download_chart $MURL "api/v1/badge.svg?chart" $I "badge.svg"
+done
+
+curl -H "X-Auth-Token: 226c3a9c-50b9-11e9-a35c-704d7b9382ce" "http://127.0.0.1:19999/api/v1/manage/health?cmd=RESET"
 
 echo "ALL the URLS got 200 as answer!"
 

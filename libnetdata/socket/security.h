@@ -21,7 +21,7 @@
 
 struct netdata_ssl{
     SSL *conn; //SSL connection
-    int flags;
+    uint32_t flags;
 };
 
 extern SSL_CTX *netdata_cli_ctx;

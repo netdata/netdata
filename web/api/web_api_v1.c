@@ -364,8 +364,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
             debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
-            error("KILLME LIST (%s,%lu) (%s,%lu)",name,lname,value,lvalue);
-
             // name and value are now the parameters
             // they are not null and not empty
 
@@ -806,20 +804,20 @@ static struct api_command {
     int (*callback)(RRDHOST *host, struct web_client *w, char *url);
 } api_commands[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_info            }, //OK
-        { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            }, //OK (see google again)
-        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           }, //OK
-        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          }, //OK
+        { "data",            0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_data            },
+        { "chart",           0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_chart           },
+        { "charts",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_charts          },
 
         // registry checks the ACL by itself, so we allow everything
-        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,   web_client_api_request_v1_registry        }, //OK
+        { "registry",        0, WEB_CLIENT_ACL_NOCHECK,   web_client_api_request_v1_registry        },
 
         // badges can be fetched with both dashboard and badge permissions
-        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge }, //OK
+        { "badge.svg",       0, WEB_CLIENT_ACL_DASHBOARD|WEB_CLIENT_ACL_BADGE, web_client_api_request_v1_badge },
 
-        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          }, //OK
-        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       }, //OK
-        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables }, //OK
-        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      }, //OK
+        { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
+        { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
+        { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
+        { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
         // terminator
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
@@ -837,28 +835,27 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
     }
 
     // get the command
-    char *tok = mystrsep(&url, "?");
-    if(tok && *tok) {
-        debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
-        uint32_t hash = simple_hash(tok);
 
-        for(i = 0; api_commands[i].command ;i++) {
-            if(unlikely(hash == api_commands[i].hash && !strcmp(tok, api_commands[i].command))) {
-                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
-                    return web_client_permission_denied(w);
+    char *cmd = w->command.body;
+    size_t length = w->command.length;
+    uint32_t hash = simple_nhash(cmd,length);
 
-                return api_commands[i].callback(host, w, url);
-            }
+    for(i = 0; api_commands[i].command ;i++) {
+        if(unlikely(hash == api_commands[i].hash && !strncmp(cmd, api_commands[i].command,length))) {
+            if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
+                return web_client_permission_denied(w);
+
+            return api_commands[i].callback(host, w, url);
         }
+    }
 
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Unsupported v1 API command: ");
-        buffer_strcat_htmlescape(w->response.data, tok);
-        return 404;
-    }
-    else {
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Which API v1 command?");
-        return 400;
-    }
+    char copyme[256];
+    length = w->path.length;
+    memcpy(copyme,w->path.body,length);
+    copyme[length] = 0x00;
+
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "Unsupported v1 API command: ");
+    buffer_strcat_htmlescape(w->response.data, copyme);
+    return 404;
 }
