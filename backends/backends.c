@@ -291,6 +291,10 @@ void *backends_main(void *ptr) {
 
     global_backend_options = backend_parse_data_source(source, global_backend_options);
 
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl opentsdb_ssl = { NULL , NETDATA_SSL_START};
+#endif
+
     if(timeoutms < 1) {
         error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, global_backend_update_every * 2 * 1000);
         timeoutms = global_backend_update_every * 2 * 1000;
@@ -465,6 +469,9 @@ void *backends_main(void *ptr) {
         size_t count_hosts = 0;
         size_t count_charts_total = 0;
         size_t count_dims_total = 0;
+
+#ifdef ENABLE_HTTPS
+#endif
 
         rrd_rdlock();
         RRDHOST *host;
@@ -795,6 +802,14 @@ cleanup:
 
     buffer_free(b);
     buffer_free(response);
+
+#ifdef ENABLE_HTTPS
+    if(netdata_opentsdb_ctx) {
+        if(opentsdb_ssl.conn) {
+            SSL_free(opentsdb_ssl.conn);
+        }
+    }
+#endif
 
     netdata_thread_cleanup_pop(1);
     return NULL;
