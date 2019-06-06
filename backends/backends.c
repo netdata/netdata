@@ -471,6 +471,17 @@ void *backends_main(void *ptr) {
         size_t count_dims_total = 0;
 
 #ifdef ENABLE_HTTPS
+        if(netdata_opentsdb_ctx) {
+            if(!opentsdb_ssl.conn) {
+                opentsdb_ssl.conn = SSL_new(netdata_opentsdb_ctx);
+                if(!opentsdb_ssl.conn) {
+                    error("Failed to allocate SSL structure.");
+                    opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                }
+            }
+        } else {
+            SSL_clear(opentsdb_ssl.conn);
+        }
 #endif
 
         rrd_rdlock();
@@ -676,6 +687,19 @@ void *backends_main(void *ptr) {
                 size_t reconnects = 0;
 
                 sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
+
+#ifdef ENABLE_HTTPS
+                if(opentsdb_ssl.conn) {
+                    if (SSL_set_fd(opentsdb_ssl.conn, sock) != 1) {
+                        error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
+                        opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                    } else {
+                        opentsdb_ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                        SSL_set_connect_state(host->ssl.conn);
+                    }
+                }
+#endif
+
 
                 chart_backend_reconnects += reconnects;
                 // chart_backend_latency += now_monotonic_usec() - start_ut;
