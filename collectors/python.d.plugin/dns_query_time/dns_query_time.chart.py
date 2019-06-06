@@ -90,10 +90,13 @@ def dns_request(server_list, timeout, domains):
 
         try:
             dns_start = time()
-            dns.query.udp(request, ns, timeout=t)
+            r = dns.query.udp(request, ns, timeout=t)
             dns_end = time()
-            query_time = round((dns_end - dns_start) * 1000)
-            q.put({'_'.join(['ns', ns.replace('.', '_')]): query_time})
+            if not r.answer:
+                q.put({'_'.join(['ns', ns.replace('.', '_')]): -50})
+            else:
+                query_time = round((dns_end - dns_start) * 1000, 2)
+                q.put({'_'.join(['ns', ns.replace('.', '_')]): query_time})
         except dns.exception.Timeout:
             q.put({'_'.join(['ns', ns.replace('.', '_')]): -100})
 
