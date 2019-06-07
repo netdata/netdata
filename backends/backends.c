@@ -337,6 +337,7 @@ void *backends_main(void *ptr) {
 #ifdef ENABLE_HTTPS
         if (!strcmp(type+12,"ps")) {
             security_start_ssl(2);
+            fprintf(stderr,"KILLME STARTING SSL \n");
         }
 #endif
 
@@ -469,20 +470,6 @@ void *backends_main(void *ptr) {
         size_t count_hosts = 0;
         size_t count_charts_total = 0;
         size_t count_dims_total = 0;
-
-#ifdef ENABLE_HTTPS
-        if(netdata_opentsdb_ctx) {
-            if(!opentsdb_ssl.conn) {
-                opentsdb_ssl.conn = SSL_new(netdata_opentsdb_ctx);
-                if(!opentsdb_ssl.conn) {
-                    error("Failed to allocate SSL structure.");
-                    opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-                }
-            }
-        } else {
-            SSL_clear(opentsdb_ssl.conn);
-        }
-#endif
 
         rrd_rdlock();
         RRDHOST *host;
@@ -654,7 +641,20 @@ void *backends_main(void *ptr) {
                 while(sock != -1 && errno != EWOULDBLOCK) {
                     buffer_need_bytes(response, 4096);
 
+                    ssize_t r;
+#ifdef ENABLE_HTTPS
+                    if(opentsdb_ssl.conn) {
+                        if(!opentsdb_ssl.flags) {
+                            r = SSL_read(opentsdb_ssl.conn,&response->buffer[response->len], response->size - response->len);
+                        } else {
+                            r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+                        }
+                    } else {
+                        r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+                    }
+#else
                     ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+#endif
                     if(likely(r > 0)) {
                         // we received some data
                         response->len += r;
@@ -685,22 +685,45 @@ void *backends_main(void *ptr) {
             if(unlikely(sock == -1)) {
                 // usec_t start_ut = now_monotonic_usec();
                 size_t reconnects = 0;
+                fprintf(stderr,"KILLME CREATING SOCKET\n");
 
                 sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
-
 #ifdef ENABLE_HTTPS
-                if(opentsdb_ssl.conn) {
-                    if (SSL_set_fd(opentsdb_ssl.conn, sock) != 1) {
-                        error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
-                        opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
-                    } else {
-                        opentsdb_ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
-                        SSL_set_connect_state(host->ssl.conn);
+                if(sock != -1) {
+                    if(netdata_opentsdb_ctx) {
+                        fprintf(stderr,"KILLME I HAVE CONTEXT %d\n",sock);
+                        if(!opentsdb_ssl.conn) {
+                            fprintf(stderr,"KILLME I AM TRYING TO CREATE SSL %d\n",sock);
+                            opentsdb_ssl.conn = SSL_new(netdata_opentsdb_ctx);
+                            if(!opentsdb_ssl.conn) {
+                                error("Failed to allocate SSL structure %d.",sock);
+                                opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                            }
+                        } else {
+                            SSL_clear(opentsdb_ssl.conn);
+                        }
+                    }
+
+                    if(opentsdb_ssl.conn) {
+                        fprintf(stderr,"KILLME STARTED SSL \n");
+                        if(SSL_set_fd(opentsdb_ssl.conn, sock) != 1) {
+                            error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
+                            opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                        } else {
+                            opentsdb_ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+                            SSL_set_connect_state(opentsdb_ssl.conn);
+                            int err = SSL_connect(opentsdb_ssl.conn);
+                            if (err != 1) {
+                                err = SSL_get_error(opentsdb_ssl.conn, err);
+                                fprintf(stderr,"KILLME ERR CONNECT %s\n",ERR_error_string((long)SSL_get_error(opentsdb_ssl.conn,err),NULL));
+                                error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(opentsdb_ssl.conn,err),NULL));
+                                opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+                            } //TODO: check certificate here
+                            fprintf(stderr,"KILLME CONNECTED %d\n",err);
+                        }
                     }
                 }
 #endif
-
-
                 chart_backend_reconnects += reconnects;
                 // chart_backend_latency += now_monotonic_usec() - start_ut;
             }
@@ -718,7 +741,22 @@ void *backends_main(void *ptr) {
                 flags += MSG_NOSIGNAL;
     #endif
 
-                ssize_t written = send(sock, buffer_tostring(b), len, flags);
+
+                ssize_t written;
+#ifdef ENABLE_HTTPS
+                if(opentsdb_ssl.conn) {
+                    if(!opentsdb_ssl.flags) {
+                        written = SSL_write(opentsdb_ssl.conn,buffer_tostring(b), len);
+                    } else {
+                        written = send(sock, buffer_tostring(b), len, flags);
+                    }
+                } else {
+                    written = send(sock, buffer_tostring(b), len, flags);
+                }
+                fprintf(stderr,"KILLME CONNECTED %ld\n",written);
+#else
+                written = send(sock, buffer_tostring(b), len, flags);
+#endif
                 // chart_backend_latency += now_monotonic_usec() - start_ut;
                 if(written != -1 && (size_t)written == len) {
                     // we sent the data successfully

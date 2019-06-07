@@ -65,7 +65,9 @@ static SSL_CTX * security_initialize_openssl_client() {
 #else
     ctx = SSL_CTX_new(TLS_client_method());
 #endif
-    security_openssl_common_options(ctx);
+    if(ctx) {
+        security_openssl_common_options(ctx);
+    }
 
     return ctx;
 }
@@ -127,9 +129,9 @@ void security_start_ssl(int type) {
     }
     else {
         if(type == 1) {
-            netdata_cli_ctx =  security_initialize_openssl_client();
+            netdata_cli_ctx = security_initialize_openssl_client();
         } else if (type == 2) {
-            netdata_opentsdb_ctx =  security_initialize_openssl_client();
+            netdata_opentsdb_ctx = security_initialize_openssl_client();
         }
     }
 }
