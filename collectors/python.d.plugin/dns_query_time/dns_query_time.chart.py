@@ -143,8 +143,6 @@ def create_charts(aggregate, server_list):
                         '_'.join(['ns', ns.replace('.', '_')]),
                         ns,
                         'absolute',
-                        1,
-                        100,
                     ]
                 ]
             }
