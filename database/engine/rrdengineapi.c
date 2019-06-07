@@ -41,6 +41,7 @@ void rrdeng_store_metric_init(RRDDIM *rd)
 
     handle->descr = NULL;
     handle->prev_descr = NULL;
+    handle->unaligned_page = 0;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
     PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, &temp_id, sizeof(uuid_t));
@@ -102,7 +103,7 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
         page_is_empty = page_has_only_empty_metrics(descr);
         if (page_is_empty) {
             debug(D_RRDENGINE, "Page has empty metrics only, deleting:");
-            if(unlikely(debug_flags & D_RRDENGINE))
+            if (unlikely(debug_flags & D_RRDENGINE))
                 print_page_cache_descr(descr);
             pg_cache_put(ctx, descr);
             pg_cache_punch_hole(ctx, descr, 1);
@@ -115,8 +116,8 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             assert (1 == ret);
 
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
+            handle->prev_descr = descr;
         }
-        handle->prev_descr = descr;
     } else {
         free(descr->pg_cache_descr->page);
         rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
@@ -132,12 +133,38 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     struct page_cache *pg_cache;
     struct rrdeng_page_descr *descr;
     storage_number *page;
+    uint8_t must_flush_unaligned_page = 0, perfect_page_alignment = 0;
 
     handle = &rd->state->handle.rrdeng;
     ctx = handle->ctx;
     pg_cache = &ctx->pg_cache;
     descr = handle->descr;
-    if (unlikely(NULL == descr || descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE)) {
+
+    if (descr) {
+        /* Make alignment decisions */
+
+        if (descr->page_length == rd->rrdset->rrddim_page_alignment) {
+            /* this is the leading dimension that defines chart alignment */
+            perfect_page_alignment = 1;
+        }
+        /* is the metric far enough out of alignment with the others? */
+        if (unlikely(descr->page_length + sizeof(number) < rd->rrdset->rrddim_page_alignment)) {
+            handle->unaligned_page = 1;
+            debug(D_RRDENGINE, "Metric page is not aligned with chart:");
+            if (unlikely(debug_flags & D_RRDENGINE))
+                print_page_cache_descr(descr);
+        }
+        if (unlikely(handle->unaligned_page &&
+                     /* did the other metrics change page? */
+                     rd->rrdset->rrddim_page_alignment <= sizeof(number))) {
+            debug(D_RRDENGINE, "Flushing unaligned metric page.");
+            must_flush_unaligned_page = 1;
+            handle->unaligned_page = 0;
+        }
+    }
+    if (unlikely(NULL == descr ||
+                 descr->page_length + sizeof(number) > RRDENG_BLOCK_SIZE ||
+                 must_flush_unaligned_page)) {
         rrdeng_store_metric_flush_current_page(rd);
 
         page = rrdeng_create_page(ctx, &handle->page_index->id, &descr);
@@ -148,12 +175,18 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
         handle->page_correlation_id = pg_cache->commited_page_index.latest_corr_id++;
         uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+
+        if (0 == rd->rrdset->rrddim_page_alignment) {
+            /* this is the leading dimension that defines chart alignment */
+            perfect_page_alignment = 1;
+        }
     }
     page = descr->pg_cache_descr->page;
-
     page[descr->page_length / sizeof(number)] = number;
     descr->end_time = point_in_time;
     descr->page_length += sizeof(number);
+    if (perfect_page_alignment)
+        rd->rrdset->rrddim_page_alignment = descr->page_length;
     if (unlikely(INVALID_TIME == descr->start_time)) {
         descr->start_time = point_in_time;
 
@@ -334,7 +367,7 @@ void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrde
     pg_cache_descr->refcnt = 1;
 
     debug(D_RRDENGINE, "Created new page:");
-    if(unlikely(debug_flags & D_RRDENGINE))
+    if (unlikely(debug_flags & D_RRDENGINE))
         print_page_cache_descr(descr);
     rrdeng_page_descr_mutex_unlock(ctx, descr);
     *ret_descr = descr;

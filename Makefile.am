@@ -441,6 +441,12 @@ KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis_put_record.h \
     $(NULL)
 
+PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
+    backends/prometheus/remote_write/remote_write.cc \
+    backends/prometheus/remote_write/remote_write.h \
+    backends/prometheus/remote_write/remote_write.proto \
+    $(NULL)
+
 DAEMON_FILES = \
 	daemon/common.c \
 	daemon/common.h \
@@ -505,14 +511,13 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_JUDY_LIBS) \
 	$(OPTIONAL_SSL_LIBS) \
 	$(NULL)
-# TODO: Find more graceful way to add libs for AWS Kinesis
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(NULL)
-if ENABLE_BACKEND_KINESIS
+if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
     netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
@@ -574,4 +579,19 @@ endif
 if ENABLE_BACKEND_KINESIS
     netdata_SOURCES += $(KINESIS_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
+endif
+
+if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    BUILT_SOURCES = \
+        backends/prometheus/remote_write/remote_write.pb.cc \
+        backends/prometheus/remote_write/remote_write.pb.h \
+        $(NULL)
+    nodist_netdata_SOURCES = $(BUILT_SOURCES)
+
+backends/prometheus/remote_write/remote_write.pb.cc \
+backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
+	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
+
 endif

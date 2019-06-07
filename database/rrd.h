@@ -250,6 +250,8 @@ union rrddim_collect_handle {
         unsigned long page_correlation_id;
         struct rrdengine_instance *ctx;
         struct pg_cache_page_index *page_index;
+        // set to 1 when this dimension is not page aligned with the other dimensions in the chart
+        uint8_t unaligned_page;
     } rrdeng; // state the database engine uses
 #endif
 };
@@ -351,7 +353,7 @@ typedef enum rrdset_flags {
     RRDSET_FLAG_UPSTREAM_EXPOSED    = 1 << 8, // if set, we have sent this chart definition to netdata master (streaming)
     RRDSET_FLAG_STORE_FIRST         = 1 << 9, // if set, do not eliminate the first collection during interpolation
     RRDSET_FLAG_HETEROGENEOUS       = 1 << 10, // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMEGENEOUS_CHECK   = 1 << 11, // if set, the chart should be checked to determine if the dimensions as homogeneous
+    RRDSET_FLAG_HOMOGENEOUS_CHECK   = 1 << 11, // if set, the chart should be checked to determine if the dimensions are homogeneous
     RRDSET_FLAG_HIDDEN              = 1 << 12, // if set, do not show this chart on the dashboard, but use it for backends
     RRDSET_FLAG_SYNC_CLOCK          = 1 << 13, // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
     RRDSET_FLAG_OBSOLETE_DIMENSIONS = 1 << 14  // this is marked by the collector/module when a chart has obsolete dimensions
@@ -431,7 +433,9 @@ struct rrdset {
     char *plugin_name;                              // the name of the plugin that generated this
     char *module_name;                              // the name of the plugin module that generated this
 
-    size_t unused[6];
+    size_t unused[5];
+
+    size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons

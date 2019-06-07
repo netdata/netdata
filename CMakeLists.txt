@@ -241,6 +241,27 @@ find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
 # later we use:
 # ${HAVE_KINESIS}
 
+
+# -----------------------------------------------------------------------------
+# Detect libprotobuf
+
+pkg_check_modules(PROTOBUF protobuf)
+# later we use:
+# ${PROTOBUF_LIBRARIES}
+# ${PROTOBUF_CFLAGS_OTHER}
+# ${PROTOBUF_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libsnappy
+
+pkg_check_modules(SNAPPY snappy)
+# later we use:
+# ${SNAPPY_LIBRARIES}
+# ${SNAPPY_CFLAGS_OTHER}
+# ${SNAPPY_INCLUDE_DIRS}
+
+
 # -----------------------------------------------------------------------------
 # netdata files
 
@@ -547,6 +568,11 @@ set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis_put_record.h
         )
 
+set(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES
+        backends/prometheus/remote_write/remote_write.cc
+        backends/prometheus/remote_write/remote_write.h
+        )
+
 set(DAEMON_FILES
         daemon/common.c
         daemon/common.h
@@ -612,6 +638,29 @@ ELSE()
 ENDIF()
 
 # -----------------------------------------------------------------------------
+# prometheus remote write backend
+
+IF(PROTOBUF_LIBRARIES AND SNAPPY_LIBRARIES)
+    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE True)
+ELSE()
+    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE False)
+ENDIF()
+
+IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
+    message(STATUS "prometheus remote write backend: enabled")
+
+    find_package(Protobuf REQUIRED)
+    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS backends/prometheus/remote_write/remote_write.proto)
+
+    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
+    list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
+    list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER} ${SNAPPY_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "prometheus remote write backend: disabled (requires protobuf and snappy libraries)")
+ENDIF()
+
+# -----------------------------------------------------------------------------
 # netdata
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
@@ -648,7 +697,7 @@ ELSEIF(MACOS)
 
 ENDIF()
 
-IF(ENABLE_BACKEND_KINESIS)
+IF(ENABLE_BACKEND_KINESIS OR ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
     set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()

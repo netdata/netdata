@@ -819,11 +819,15 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
     while(*s) {
         const char *e = s;
 
+        // skip path, moving both s(tart) and e(nd)
+        if(*e == '/')
+            while(!isspace(*e) && *e != ',') s = ++e;
+
         // skip separators, moving both s(tart) and e(nd)
         while(isspace(*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
+        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
 
         // is there anything?
         if(!*s || s == e) break;
