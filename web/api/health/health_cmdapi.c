@@ -87,7 +87,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
 
                     // name and value are now the parameters
-                    if (!strncmp(key, "cmd",lkey)) {
+                    if (!strcmp(key, "cmd")) {
                         if (!strcmp(value, HEALTH_CMDAPI_CMD_SILENCEALL)) {
                             silencers->all_alarms = 1;
                             silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
@@ -124,19 +124,19 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                             }
                         }
 
-                        if (hash == hash_alarm && !strncasecmp(key, HEALTH_ALARM_KEY,lkey)) {
+                        if (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
                             silencer->alarms = strdupz(value);
                             silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_chart && !strncasecmp(key, HEALTH_CHART_KEY,lkey)) {
+                        } else if (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) {
                             silencer->charts = strdupz(value);
                             silencer->charts_pattern = simple_pattern_create(silencer->charts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_context && !strncasecmp(key, HEALTH_CONTEXT_KEY,lkey)) {
+                        } else if (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) {
                             silencer->contexts = strdupz(value);
                             silencer->contexts_pattern = simple_pattern_create(silencer->contexts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_host && !strncasecmp(key, HEALTH_HOST_KEY,lkey)) {
+                        } else if (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
                             silencer->hosts = strdupz(value);
                             silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_families && !strncasecmp(key, HEALTH_FAMILIES_KEY,lkey)) {
+                        } else if (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
                             silencer->families = strdupz(value);
                             silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT);
                         } else {
