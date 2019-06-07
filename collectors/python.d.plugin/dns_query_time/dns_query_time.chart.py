@@ -8,11 +8,6 @@ from socket import getaddrinfo, gaierror
 from threading import Thread
 
 try:
-    from time import monotonic as time
-except ImportError:
-    from time import time
-
-try:
     import dns.message
     import dns.query
     import dns.name
@@ -89,16 +84,15 @@ def dns_request(server_list, timeout, domains):
         request = dns.message.make_query(domain, dns.rdatatype.A)
 
         try:
-            dns_start = time()
-            r = dns.query.udp(request, ns, timeout=t)
-            dns_end = time()
-            if not r.answer:
-                q.put({'_'.join(['ns', ns.replace('.', '_')]): -50})
+            resp = dns.query.udp(request, ns, timeout=t)
+            if not (resp.rcode == dns.rcode.NOERROR or resp.answer):
+                query_time = -100
             else:
-                query_time = round((dns_end - dns_start) * 1000)
-                q.put({'_'.join(['ns', ns.replace('.', '_')]): query_time})
+                query_time = resp.time * 1000
         except dns.exception.Timeout:
-            q.put({'_'.join(['ns', ns.replace('.', '_')]): -100})
+            query_time = -100
+        finally:
+            q.put({'_'.join(['ns', ns.replace('.', '_')]): query_time})
 
     for server in server_list:
         th = Thread(target=dns_req, args=(server, timeout, que))
@@ -149,6 +143,8 @@ def create_charts(aggregate, server_list):
                         '_'.join(['ns', ns.replace('.', '_')]),
                         ns,
                         'absolute',
+                        1,
+                        100,
                     ]
                 ]
             }
