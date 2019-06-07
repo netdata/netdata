@@ -26,21 +26,13 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     const char *prometheus_prefix = global_backend_prefix;
 
     uint32_t end = w->total_params;
-    uint32_t i;
-    char sname[WEB_FIELDS_MAX];
-    char svalue[WEB_FIELDS_MAX];
     if (end) {
-        i = 0;
+        uint32_t i = 0;
         do {
             char *name = w->param_name[i].body;
             size_t lname = w->param_name[i].length;
-            sname[i] = name[lname];
-            name[lname] = 0x00;
-
             char *value = w->param_values[i].body;
             size_t lvalue = w->param_values[i].length;
-            svalue[i] = value[lvalue];
-            value[lvalue] = 0x00;
 
             if(!strncmp(name, "format",lname)) {
                 if(!strncmp(value, ALLMETRICS_FORMAT_SHELL,lvalue))
@@ -82,7 +74,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     buffer_flush(w->response.data);
     buffer_no_cacheable(w->response.data);
 
-    int ret;
     switch(format) {
         case ALLMETRICS_JSON:
             w->response.data->contenttype = CT_APPLICATION_JSON;
@@ -104,8 +95,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
                     , prometheus_backend_options
                     , prometheus_output_options
             );
-            ret = 200;
-            break;
+            return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
@@ -117,25 +107,11 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
                     , prometheus_backend_options
                     , prometheus_output_options
             );
-            ret = 200;
-            break;
+            return 200;
 
         default:
             w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_strcat(w->response.data, "Which format? '" ALLMETRICS_FORMAT_SHELL "', '" ALLMETRICS_FORMAT_PROMETHEUS "', '" ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS "' and '" ALLMETRICS_FORMAT_JSON "' are currently supported.");
             return 400;
     }
-
-    i = 0;
-    do {
-        char *name = w->param_name[i].body;
-        size_t lname = w->param_name[i].length;
-        name[lname] = sname[i];
-
-        char *value = w->param_values[i].body;
-        size_t lvalue = w->param_values[i].length;
-        value[lvalue] = svalue[i];
-    } while( ++i < end);
-
-    return ret;
 }
