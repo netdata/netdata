@@ -984,16 +984,9 @@ static inline void web_client_set_without_query_string(struct web_client *w) {
     char *test = w->path.body+1;
     if (!strncmp(test,"api/v1/",7) ) {
         test += 7;
-        if (!strncmp(test,"info",4)) {
-            w->command.length = 4;
-        }
-        else if (!strncmp(test,"charts",6)) {
-            w->command.length = 6;
-        }
-        else {
-            test = NULL;
-            w->command.length = 0;
-        }
+        char* endofcommand=strchr(test,' ');
+        if (endofcommand) w->command.length=(size_t)endofcommand-(size_t)test;
+        else w->command.length=strlen(test);
     }else{
         w->command.length = w->path.length;
     }
