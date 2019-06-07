@@ -217,3 +217,125 @@ fail_cleanup:
     *d = '\0';
     return NULL;
 }
+
+/**
+ * Is request complete?
+ *
+ * The URL will be ready top be parsed when the last characters are the string "\r\n\r\n",
+ * this function checks the last characters of the message.
+ *
+ * @param begin is the first character of the sequence to analyse.
+ * @param end is the last character of the sequence
+ * @param length is the length of the total of bytes read, it is not the difference between end and begin.
+ *
+ * @return It returns HTTP_VALIDATION_OK when the message is complete and HTTP_VALIDATION_INCOMPLETE otherwise.
+ */
+inline HTTP_VALIDATION url_is_request_complete(char *begin,char *end,size_t length) {
+    //Message cannot be complete when first and last address are the same
+    if ( begin == end) {
+        return HTTP_VALIDATION_INCOMPLETE;
+    }
+
+    //We always set as begin the first character of the message, but we wanna check
+    //the last characters, so I am adjusting it case it is possible.
+    if ( length > 3  ) {
+        begin = end - 4;
+    }
+
+    //I wanna have a pair of '\r\n', so I will count them.
+    uint32_t counter = 0;
+    do {
+        if (*begin == '\r') {
+            begin++;
+            if ( begin == end )
+            {
+                break;
+            }
+
+            if (*begin == '\n')
+            {
+                counter++;
+            }
+        } else if (*begin == '\n') {
+            begin++;
+            counter++;
+        }
+
+        //Case I already have the total expected, I stop it.
+        if ( counter == 2) {
+            break;
+        }
+    }
+    while (begin != end);
+
+    return (counter == 2)?HTTP_VALIDATION_OK:HTTP_VALIDATION_INCOMPLETE;
+}
+
+/**
+ * Find protocol
+ *
+ * Search for the string ' HTTP/' in the message given.
+ *
+ * @param s is the start of the user request.
+ * @return
+ */
+inline char *url_find_protocol(char *s) {
+    while(*s) {
+        // find the next space
+        while (*s && *s != ' ') s++;
+
+        // is it SPACE + "HTTP/" ?
+        if(*s && !strncmp(s, " HTTP/", 6)) break;
+        else s++;
+    }
+
+    return s;
+}
+
+/**
+ * Parse query string
+ *
+ * Parse the query string sent by the client.
+ *
+ * @param names is the vector to store the variable names
+ * @param values is the vector to store the values of the variables.
+ * @param moveme the query string vector
+ * @param divisor the place of the first equal
+ *
+ * @return It returns the number of variables processed
+ */
+int url_parse_query_string(struct web_fields *names,struct web_fields *values,char *moveme,char *divisor) {
+    uint32_t i = 0;
+    uint32_t max = WEB_FIELDS_MAX;
+
+    do {
+        if ( i == max) {
+            error("We are exceeding the maximum number of elements possible(%u) in this query string(%s)",max,moveme);
+            break;
+        }
+        if (divisor) {
+            names[i].body = moveme;
+            names[i].length = divisor - moveme;//= - begin
+
+            moveme = ++divisor; //value
+            values[i].body = moveme;
+
+            (void)divisor;
+            divisor = strchr(moveme,'&'); //end of value
+            if (divisor) {
+                values[i].length = (size_t )(divisor - moveme);
+            } else{
+                values[i].length = strlen(moveme);
+                break;
+            }
+
+            moveme = divisor;
+            divisor = strchr(++moveme,'='); //end of value
+            i++;
+        } else {
+            break;
+        }
+    } while (moveme);
+
+    return ++i;
+}

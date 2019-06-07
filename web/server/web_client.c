@@ -858,6 +858,21 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     }
 
     // is is a valid request?
+    return (counter == 2)?HTTP_VALIDATION_OK:HTTP_VALIDATION_INCOMPLETE;
+}
+
+/**
+ *  Client parse method
+ *
+ *  The begining of any request is the type of the message, in this function
+ *  we set the variables according to the data sent by the client.
+ *
+ * @param w is the structure with all information of the client request.
+ * @param s is the start of the message
+ *
+ * @return It returns the next position to continue parsing on success or NULL otherwise
+ */
+static inline char *web_client_parse_method(struct web_client *w,char *s) {
     if(!strncmp(s, "GET ", 4)) {
         encoded_url = s = &s[4];
         w->mode = WEB_CLIENT_MODE_NORMAL;
@@ -868,7 +883,9 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     }
     else if(!strncmp(s, "STREAM ", 7)) {
 #ifdef ENABLE_HTTPS
-        if ( (w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)){
+        //CASE THIS CONDITIONS ARE TRUE, THE CLIENT IS SENDING A MESSAGE THAT IS NOT
+        //ENCRYPTED, SO I MUST LOG AND RETURN AN ERROR FOR IT.
+        if ((w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)) {
             w->header_parse_tries = 0;
             w->header_parse_last_size = 0;
             web_client_disable_wait_receive(w);
@@ -886,35 +903,273 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                     memcpy(hostname,"not available",13);
                     hostname[13] = 0x00;
                 }
-            }
-            else{
+            } else {
                 memcpy(hostname,"not available",13);
                 hostname[13] = 0x00;
             }
+
             error("The server is configured to always use encrypt connection, please enable the SSL on slave with hostname '%s'.",hostname);
             return HTTP_VALIDATION_NOT_SUPPORTED;
         }
 #endif
 
-        encoded_url = s = &s[7];
+        s = &s[7];
         w->mode = WEB_CLIENT_MODE_STREAM;
+    } else {
+        s = NULL;
     }
-    else {
+
+    return s;
+}
+
+/**
+ *  Find Protocol
+ *
+ *  The end of the url is the place where starts the protocol of the message,
+ *  this function finds the exact position where it starts.
+ *
+ * @param w is the structure with all information of the client request.
+ * @param s is the start of the user request
+ *
+ * @return
+ */
+static inline char *web_client_find_protocol(struct web_client *w,char *s) {
+    s = url_find_protocol(s);
+    if (s) {
+        //I must add 1, because I searched the separator+protocol
+        w->protocol.body = s+1;
+        //I know this string has at least ' HTTP/', so I do not need to search from the beginning
+        char *end = strchr(s+6,'\n');
+        if (end) {
+            w->protocol.length = end - w->protocol.body ;
+        }
+    }
+
+    return s;
+}
+
+/**
+ *  Parse header
+ *
+ *  Parse the headers sent together with the URL.
+ *
+ * @param w is the structure with all information of the client request.
+ * @param s is the string where the URL finished
+ */
+static inline void web_client_parse_headers(struct web_client *w,char *s) {
+    while(*s) {
+        // find a line feed
+        while(*s && *s++ != '\r');
+
+        // did we reach the end?
+        if(unlikely(!*s)) break;
+
+        if (*s == '\n') {
+            s++;
+        }
+
+        s = http_header_parse(w, s,
+                              (w->mode == WEB_CLIENT_MODE_STREAM) // parse user agent
+        );
+
+    }
+}
+
+/**
+ *  Parse request
+ *
+ * @param w is the structure with all information of the client request.
+ * @param divisor the place with the first equal sign
+ *
+ * @return It returns the number of variables in the query string.
+ */
+int web_client_parse_request(struct web_client *w,char *divisor) {
+    if(!divisor) {
+        w->total_params = 0;
+        return 0;
+    }
+
+    uint32_t i = url_parse_query_string(w->param_name,w->param_values,w->query_string.body+1,divisor);
+    w->total_params = i;
+
+    return i;
+}
+
+/**
+ *  Set Directory
+ *
+ *  Map directory variables
+ *
+ * @param w is the structure with all information of the client request.
+ * @param begin is the end of the first directory
+ * @param enddir a pointer to the position with the last valid character
+ * @param endcmd the end of the last character.
+ */
+static inline void web_client_set_directory(struct web_client *w,char *begin,char *enddir,char *endcmd) {
+    if (enddir) {
+        w->directory.body = begin;
+        w->directory.length = enddir - begin;
+
+        if (!strncmp(w->directory.body,"api",w->directory.length)) {
+            begin = enddir + 1;
+            enddir = strchr(begin,'/');
+            if(enddir) {
+                w->version.body = begin;
+                w->version.length = enddir - begin;
+
+                enddir++;
+                w->command.body = enddir;
+                w->command.length = (size_t) (endcmd - enddir);
+            }
+        }
+    }
+    else{
+        w->directory.body = begin;
+        w->directory.length = w->path.length - 1;
+        w->version.body = NULL;
+        w->version.length = 0;
+        w->command.body = NULL;
+        w->command.length = 0;
+    }
+}
+
+/**
+ *  Set without query string
+ *
+ *  When I do not have query string, it is necessary to set some default values.
+ *
+ * @param w is the structure with all information of the client request.
+ */
+static inline void web_client_set_without_query_string(struct web_client *w) {
+    w->query_string.body = NULL;
+    w->query_string.length = 0;
+
+    char *test = w->path.body+1;
+    if (!strncmp(test,"api/v1/",7) ) {
+        test += 7;
+        char *endofcommand=strchr(test,' ');
+        w->command.length=(endofcommand)?(size_t)endofcommand-(size_t)test:strlen(test);
+    } else {
+        w->command.length = w->path.length;
+    }
+    w->command.body = test;
+    w->total_params = 0;
+}
+
+/**
+ *  Split path and query
+ *
+ *  This function splits path and query string case there is one.
+ *
+ * @param w is the structure with all information of the client request.
+ */
+static inline void web_client_split_path_query(struct web_client *w) {
+    //I am working now with the decoded URL instead the original
+    w->path.body = w->decoded_url;
+    w->decoded_length = strlen(w->decoded_url);
+
+    //Is thre a separator?
+    char *moveme = strchr(w->path.body,'?');
+    char *enddir;
+    if (moveme) { //I have a query string
+        w->path.length = moveme - w->path.body;
+        w->query_string.body = moveme;
+        w->query_string.length = w->decoded_length - w->path.length;
+
+        enddir = strchr(w->path.body+1,'/');
+        char *begin = w->path.body+1;
+        web_client_set_directory(w,begin,enddir,moveme);
+        if (w->query_string.body) {
+            enddir = strchr(moveme,'=');
+            if (!web_client_parse_request(w,enddir) ) {
+                moveme++;
+                size_t length = strlen(moveme);
+                w->param_name[0].body = moveme;
+                w->param_name[0].length = length;
+                w->param_values[0].body = moveme;
+                w->param_values[0].length = length;
+
+                w->total_params = 1;
+            }
+        }
+    } else { //I do not have query string
+        w->path.length = w->decoded_length;
+
+        //The fact that I do not have query string, does not mean I do not have directories,
+        //so it is necessary to continue working
+        enddir = strchr(w->path.body+1,'/');
+        w->directory.body = w->path.body + 1;
+        if(enddir) {
+            w->directory.length = (size_t)(enddir - w->directory.body);
+            enddir++;
+
+            w->version.body = enddir;
+            enddir = strchr(++enddir,'/');
+            w->version.length = (enddir)?(size_t)(enddir - w->version.body):strlen(w->version.body);
+        } else {
+            w->directory.length = w->decoded_length - 1;
+        }
+
+        web_client_set_without_query_string(w);
+    }
+}
+
+/**
+ *  Request Validate
+ *
+ *  Validate the request done by users and call functions to map their request.
+ *
+ * @param w is the structure with all information of the client request.
+ *
+ * @return This function has the following possible returns:
+ *      HTTP_VALIDATION_OK - Everything was fine so the Netdata can move in front to deliver the request
+ *      HTTP_VALIDATION_NOT_SUPPORTED - The request is invalid(It does not has \r\n\r\n), so we are closing it.
+ *      HTTP_VALIDATION_INCOMPLETE - We are using async socket. This return will happen, if and only if, we tried to parse
+ *                                  before the Netdata reads everything from the socket.
+ *      HTTP_VALIDATION_REDIRECT - The system is using SSL, so we won't process without encryptation
+ */
+static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
+    //Get the data read from the socket
+    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+    size_t status;
+
+    //count the number of times I tried to parse the message.
+    w->header_parse_tries++;
+    //get the size of the current message
+    w->header_parse_last_size = buffer_strlen(w->response.data);
+    status = w->header_parse_last_size;
+
+    // make sure we have complete request
+    // complete requests contain: \r\n\r\n
+    status = url_is_request_complete(s,&s[status],status);
+    if (w->header_parse_tries > 10) {
+        //I already wait too much, it is time to finish this client.
+        if (status == HTTP_VALIDATION_INCOMPLETE) {
+            info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
+            w->header_parse_tries = 0;
+            w->header_parse_last_size = 0;
+            web_client_disable_wait_receive(w);
+            return HTTP_VALIDATION_NOT_SUPPORTED;
+        }
+    } else {
+        //I do not have the message complete, so I will try again late.
+        if (status == HTTP_VALIDATION_INCOMPLETE) {
+            web_client_enable_wait_receive(w);
+            return HTTP_VALIDATION_INCOMPLETE;
+        }
+    }
+
+    //Parse the method used to communicate
+    s = web_client_parse_method(w,s);
+    if (!s) {
         w->header_parse_tries = 0;
         w->header_parse_last_size = 0;
         web_client_disable_wait_receive(w);
         return HTTP_VALIDATION_NOT_SUPPORTED;
     }
 
-    // find the SPACE + "HTTP/"
-    while(*s) {
-        // find the next space
-        while (*s && *s != ' ') s++;
-
-        // is it SPACE + "HTTP/" ?
-        if(*s && !strncmp(s, " HTTP/", 6)) break;
-        else s++;
-    }
+    //I am in the start of the user request now
+    encoded_url = s;
 
     // incomplete requests
     if(unlikely(!*s)) {
@@ -925,14 +1180,10 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     // we have the end of encoded_url - remember it
     char *ue = s;
 
-    // make sure we have complete request
-    // complete requests contain: \r\n\r\n
-    while(*s) {
-        // find a line feed
-        while(*s && *s++ != '\r');
-
-        // did we reach the end?
-        if(unlikely(!*s)) break;
+    //Setting separator to NULL
+    *ue = '\0';
+    //Decode the URL
+    url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
 
         // is it \r\n ?
         if(likely(*s++ == '\n')) {
@@ -998,6 +1249,13 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     return bytes;
 }
 
+/**
+ *  Send HTTP Header
+ *
+ *  Mount and send the HTTP header as answer to the client
+ *
+ * @param w is the structure with all information of the client request.
+ */
 static inline void web_client_send_http_header(struct web_client *w) {
     if(unlikely(w->response.code != 200))
         buffer_no_cacheable(w->response.data);
@@ -1239,6 +1497,17 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     return 404;
 }
 
+/**
+ * Process URL
+ *
+ * Process the URL request
+ *
+ * @param host main structure with a lot of information about the client!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return
+ */
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url) {
     static uint32_t
             hash_api = 0,
@@ -1260,10 +1529,12 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 #endif
     }
 
-    char *tok = mystrsep(&url, "/?");
-    if(likely(tok && *tok)) {
-        uint32_t hash = simple_hash(tok);
-        debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
+    //Is client asking something different of / ?
+    if (w->path.length > 1) {
+        char *cmp = w->directory.body;
+        size_t len = w->directory.length;
+        uint32_t hash = simple_nhash(cmp,len);
+        debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, w->command.body);
 
         if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
             debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
@@ -1365,6 +1636,13 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     return mysendfile(w, (tok && *tok)?tok:"/");
 }
 
+/**
+ * Process request
+ *
+ * Process the request done by the client, this function process since the header sent until the answer.
+ *
+ * @param w is the structure with all information of the client request.
+ */
 void web_client_process_request(struct web_client *w) {
 
     // start timing us
