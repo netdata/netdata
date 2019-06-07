@@ -4,6 +4,8 @@
 
 **Fixed bugs:**
 
+- netdata daemon collectors stuck [\#6239](https://github.com/netdata/netdata/issues/6239)
+- URL Parser changes, correct health cmd api conditions to create silencer [\#6238](https://github.com/netdata/netdata/issues/6238)
 -  kickstart.sh: Getting Nightly SHA256 sums from storage.googleapis.com times out [\#6227](https://github.com/netdata/netdata/issues/6227)
 - Use major/minor from sys/types.h [\#6218](https://github.com/netdata/netdata/issues/6218)
 - Update fails because of new system dependencies \(\*\*Resolved\*\*\) [\#6200](https://github.com/netdata/netdata/issues/6200)
@@ -45,17 +47,24 @@
 **Closed issues:**
 
 - Documentation improvements [\#6214](https://github.com/netdata/netdata/issues/6214)
+- Scope of 1.16-rc1 [\#6159](https://github.com/netdata/netdata/issues/6159)
 - SN\_EMPTY\_SLOT RRDDIMM value detection inside DB engine [\#6105](https://github.com/netdata/netdata/issues/6105)
+- force page alignment per dimension of chart [\#6104](https://github.com/netdata/netdata/issues/6104)
 - When the collector restarts after having stopped a long time ago fill the chart gaps efficiently [\#6103](https://github.com/netdata/netdata/issues/6103)
 - Optimize the memory footprint of the Database Engine [\#6010](https://github.com/netdata/netdata/issues/6010)
 - Secure streaming via SSL [\#6004](https://github.com/netdata/netdata/issues/6004)
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
 - \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
+- Feature: add VictoriaMetrics backend for long-term archiving [\#5619](https://github.com/netdata/netdata/issues/5619)
 - Cookie consent for the Netdata sites [\#4798](https://github.com/netdata/netdata/issues/4798)
 - alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
 
 **Merged pull requests:**
 
+- PR to fix issue \#6238 [\#6242](https://github.com/netdata/netdata/pull/6242) ([thiagoftsm](https://github.com/thiagoftsm))
+- Update CODEOWNERS [\#6241](https://github.com/netdata/netdata/pull/6241) ([cakrit](https://github.com/cakrit))
+- Force page alignment per dimension of chart. [\#6240](https://github.com/netdata/netdata/pull/6240) ([mfundul](https://github.com/mfundul))
+- Remove CNCF logo and TOC presentation reference [\#6234](https://github.com/netdata/netdata/pull/6234) ([dankohn](https://github.com/dankohn))
 - URL\_parser fixing allmetrics! [\#6231](https://github.com/netdata/netdata/pull/6231) ([thiagoftsm](https://github.com/thiagoftsm))
 - SSL\_fix\_format Fix wrong format used with SSL! [\#6219](https://github.com/netdata/netdata/pull/6219) ([thiagoftsm](https://github.com/thiagoftsm))
 - installer: include go.d.plugin version v0.6.1 [\#6217](https://github.com/netdata/netdata/pull/6217) ([ilyam8](https://github.com/ilyam8))
@@ -108,6 +117,7 @@
 - New URL parser [\#6070](https://github.com/netdata/netdata/pull/6070) ([thiagoftsm](https://github.com/thiagoftsm))
 - wmi alarms [\#6068](https://github.com/netdata/netdata/pull/6068) ([ilyam8](https://github.com/ilyam8))
 - Add perforce server process monitoring [\#6064](https://github.com/netdata/netdata/pull/6064) ([akwan](https://github.com/akwan))
+- Prometheus remote write backend [\#6062](https://github.com/netdata/netdata/pull/6062) ([vlvkobal](https://github.com/vlvkobal))
 - SSL implementation for Netdata [\#5956](https://github.com/netdata/netdata/pull/5956) ([thiagoftsm](https://github.com/thiagoftsm))
 - NEW: local remark-lint checks and autofix support [\#5898](https://github.com/netdata/netdata/pull/5898) ([andvgal](https://github.com/andvgal))
 - use github templating mechanisms to classify issues when they are created [\#5776](https://github.com/netdata/netdata/pull/5776) ([paulfantom](https://github.com/paulfantom))
