@@ -889,7 +889,6 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 }
 
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     int ret = 400;
     buffer_flush(w->response.data);
 
@@ -913,54 +912,46 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t options = 0x00000000;
 
-    uint32_t i = 0;
-    uint32_t end = w->total_params;
-    char save[WEB_FIELDS_MAX];
-    char *value;
-    size_t lvalue;
-    if(end) {
-        do {
-            value = w->param_values[i].body;
-            lvalue = w->param_values[i].length;
-            save[i] = value[lvalue];
-            value[lvalue] = 0x00;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
 
-            char *name = w->param_name[i].body;
-            size_t lname = w->param_name[i].length;
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
-            debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
+        debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
 
-            // name and value are now the parameters
-            // they are not null and not empty
-            if(!strncmp(name, "chart",lname)) chart = value;
-            else if(!strncmp(name, "dimension",lname) || !strncmp(name, "dim",lname) || !strncmp(name, "dimensions",lname) || !strncmp(name, "dims",lname)) {
-                if(!dimensions)
-                    dimensions = buffer_create(100);
+        // name and value are now the parameters
+        // they are not null and not empty
 
-                buffer_strcat(dimensions, "|");
-                buffer_strcat(dimensions, value);
-            }
-            else if(!strncmp(name, "after",lname)) after_str = value;
-            else if(!strncmp(name, "before",lname)) before_str = value;
-            else if(!strncmp(name, "points",lname)) points_str = value;
-            else if(!strncmp(name, "group",lname)) {
-                group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
-            }
-            else if(!strncmp(name, "options",lname)) {
-                options |= web_client_api_request_v1_data_options(value);
-            }
-            else if(!strncmp(name, "label",lname)) label = value;
-            else if(!strncmp(name, "units",lname)) units = value;
-            else if(!strncmp(name, "label_color",lname)) label_color = value;
-            else if(!strncmp(name, "value_color",lname)) value_color = value;
-            else if(!strncmp(name, "multiply",lname)) multiply_str = value;
-            else if(!strncmp(name, "divide",lname)) divide_str = value;
-            else if(!strncmp(name, "refresh",lname)) refresh_str = value;
-            else if(!strncmp(name, "precision",lname)) precision_str = value;
-            else if(!strncmp(name, "scale",lname)) scale_str = value;
-            else if(!strncmp(name, "alarm",lname)) alarm = value;
+        if(!strcmp(name, "chart")) chart = value;
+        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+            if(!dimensions)
+                dimensions = buffer_create(100);
 
-        } while (++i < end );
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
+        }
+        else if(!strcmp(name, "after")) after_str = value;
+        else if(!strcmp(name, "before")) before_str = value;
+        else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "group")) {
+            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+        }
+        else if(!strcmp(name, "options")) {
+            options |= web_client_api_request_v1_data_options(value);
+        }
+        else if(!strcmp(name, "label")) label = value;
+        else if(!strcmp(name, "units")) units = value;
+        else if(!strcmp(name, "label_color")) label_color = value;
+        else if(!strcmp(name, "value_color")) value_color = value;
+        else if(!strcmp(name, "multiply")) multiply_str = value;
+        else if(!strcmp(name, "divide")) divide_str = value;
+        else if(!strcmp(name, "refresh")) refresh_str = value;
+        else if(!strcmp(name, "precision")) precision_str = value;
+        else if(!strcmp(name, "scale")) scale_str = value;
+        else if(!strcmp(name, "alarm")) alarm = value;
     }
 
     if(!chart || !*chart) {
@@ -1146,14 +1137,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     }
 
     cleanup:
-    if(end) {
-        i = 0;
-        do {
-            value = w->param_values[i].body;
-            lvalue = w->param_values[i].length;
-            value[lvalue] = save[i];
-        } while(++i < end);
-    }
     buffer_free(dimensions);
     return ret;
 }
