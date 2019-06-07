@@ -153,6 +153,8 @@ static inline char *prometheus_units_copy(char *d, const char *s, size_t usable,
 #define PROMETHEUS_LABELS_MAX 1024
 #define PROMETHEUS_VARIABLE_MAX 256
 
+#define PROMETHEUS_LABELS_MAX_NUMBER 128
+
 struct host_variables_callback_options {
     RRDHOST *host;
     BUFFER *wb;
@@ -307,7 +309,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
             int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
             int homogeneous = 1;
             if(as_collected) {
-                if(rrdset_flag_check(st, RRDSET_FLAG_HOMEGENEOUS_CHECK))
+                if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
                     rrdset_update_heterogeneous_flag(st);
 
                 if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
@@ -537,6 +539,177 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER 
     rrdhost_unlock(host);
 }
 
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+inline static void remote_write_split_words(char *str, char **words, int max_words) {
+    char *s = str;
+    int i = 0;
+
+    while(*s && i < max_words - 1) {
+        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag name
+
+        if(*s)
+            words[i] = s;
+
+        while(*s && !isspace(*s) && *s != '=') s++; // find the end of the tag name
+
+        if(*s != '=') {
+            words[i] = NULL;
+            break;
+        }
+        *s = '\0';
+        s++;
+        i++;
+
+        while(*s && isspace(*s)) s++; // skip spaces to the begining of a tag value
+
+        if(*s && *s == '"') s++; // strip an opening quote
+        if(*s)
+            words[i] = s;
+
+        while(*s && !isspace(*s) && *s != ',') s++; // find the end of the tag value
+
+        if(*s && *s != ',') {
+            words[i] = NULL;
+            break;
+        }
+        if(s != words[i] && *(s - 1) == '"') *(s - 1) = '\0'; // strip a closing quote
+        if(*s != '\0') {
+            *s = '\0';
+            s++;
+            i++;
+        }
+    }
+}
+
+void rrd_stats_remote_write_allmetrics_prometheus(
+        RRDHOST *host
+        , const char *__hostname
+        , const char *prefix
+        , BACKEND_OPTIONS backend_options
+        , time_t after
+        , time_t before
+        , size_t *count_charts
+        , size_t *count_dims
+        , size_t *count_dims_skipped
+) {
+    char hostname[PROMETHEUS_ELEMENT_MAX + 1];
+    prometheus_label_copy(hostname, __hostname, PROMETHEUS_ELEMENT_MAX);
+
+    add_host_info("netdata_info", hostname, host->program_name, host->program_version, now_realtime_usec() / USEC_PER_MS);
+
+    if(host->tags && *(host->tags)) {
+        char tags[PROMETHEUS_LABELS_MAX + 1];
+        strncpy(tags, host->tags, PROMETHEUS_LABELS_MAX);
+        char *words[PROMETHEUS_LABELS_MAX_NUMBER] = {NULL};
+        int i;
+
+        remote_write_split_words(tags, words, PROMETHEUS_LABELS_MAX_NUMBER);
+
+        add_host_info("netdata_host_tags_info", hostname, NULL, NULL, now_realtime_usec() / USEC_PER_MS);
+
+        for(i = 0; words[i] != NULL && words[i + 1] != NULL && (i + 1) < PROMETHEUS_LABELS_MAX_NUMBER; i += 2) {
+            add_tag(words[i], words[i + 1]);
+        }
+    }
+
+    // for each chart
+    RRDSET *st;
+    rrdset_foreach_read(st, host) {
+        char chart[PROMETHEUS_ELEMENT_MAX + 1];
+        char context[PROMETHEUS_ELEMENT_MAX + 1];
+        char family[PROMETHEUS_ELEMENT_MAX + 1];
+        char units[PROMETHEUS_ELEMENT_MAX + 1] = "";
+
+        prometheus_label_copy(chart, (backend_options & BACKEND_OPTION_SEND_NAMES && st->name)?st->name:st->id, PROMETHEUS_ELEMENT_MAX);
+        prometheus_label_copy(family, st->family, PROMETHEUS_ELEMENT_MAX);
+        prometheus_name_copy(context, st->context, PROMETHEUS_ELEMENT_MAX);
+
+        if(likely(backends_can_send_rrdset(backend_options, st))) {
+            rrdset_rdlock(st);
+
+            (*count_charts)++;
+
+            int as_collected = (BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED);
+            int homogeneous = 1;
+            if(as_collected) {
+                if(rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK))
+                    rrdset_update_heterogeneous_flag(st);
+
+                if(rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS))
+                    homogeneous = 0;
+            }
+            else {
+                if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+                    prometheus_units_copy(units, st->units, PROMETHEUS_ELEMENT_MAX, 0);
+            }
+
+            // for each dimension
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
+                    char name[PROMETHEUS_LABELS_MAX + 1];
+                    char dimension[PROMETHEUS_ELEMENT_MAX + 1];
+                    char *suffix = "";
+
+                    if (as_collected) {
+                        // we need as-collected / raw data
+
+                        if(unlikely(rd->last_collected_time.tv_sec < after)) {
+                            debug(D_BACKEND, "BACKEND: not sending dimension '%s' of chart '%s' from host '%s', its last data collection (%lu) is not within our timeframe (%lu to %lu)", rd->id, st->id, __hostname, (unsigned long)rd->last_collected_time.tv_sec, (unsigned long)after, (unsigned long)before);
+                            (*count_dims_skipped)++;
+                            continue;
+                        }
+
+                        if(homogeneous) {
+                            // all the dimensions of the chart, has the same algorithm, multiplier and divisor
+                            // we add all dimensions as labels
+
+                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s", prefix, context, suffix);
+
+                            add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            (*count_dims)++;
+                        }
+                        else {
+                            // the dimensions of the chart, do not have the same algorithm, multiplier or divisor
+                            // we create a metric per dimension
+
+                            prometheus_name_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s_%s%s", prefix, context, dimension, suffix);
+
+                            add_metric(name, chart, family, NULL, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            (*count_dims)++;
+                        }
+                    }
+                    else {
+                        // we need average or sum of the data
+
+                        time_t first_t = after, last_t = before;
+                        calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
+
+                        if(!isnan(value) && !isinf(value)) {
+
+                            if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_AVERAGE)
+                                suffix = "_average";
+                            else if(BACKEND_OPTIONS_DATA_SOURCE(backend_options) == BACKEND_SOURCE_DATA_SUM)
+                                suffix = "_sum";
+
+                            prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
+                            snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
+
+                            add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            (*count_dims)++;
+                        }
+                    }
+                }
+            }
+
+            rrdset_unlock(st);
+        }
+    }
+}
+#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
+
 static inline time_t prometheus_preparation(RRDHOST *host, BUFFER *wb, BACKEND_OPTIONS backend_options, const char *server, time_t now, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     if(!server || !*server) server = "default";
 
@@ -599,3 +772,26 @@ void rrd_stats_api_v1_charts_allmetrics_prometheus_all_hosts(RRDHOST *host, BUFF
     }
     rrd_unlock();
 }
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+int process_prometheus_remote_write_response(BUFFER *b) {
+    if(unlikely(!b)) return 1;
+
+    const char *s = buffer_tostring(b);
+    int len = buffer_strlen(b);
+
+    // do nothing with HTTP response 200
+
+    while(!isspace(*s) && len) {
+        s++;
+        len--;
+    }
+    s++;
+    len--;
+
+    if(likely(len > 4 && !strncmp(s, "200 ", 4)))
+        return 0;
+    else
+        return discard_response(b, "prometheus remote write");
+}
+#endif
