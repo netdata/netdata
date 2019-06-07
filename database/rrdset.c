@@ -251,6 +251,7 @@ void rrdset_reset(RRDSET *st) {
     st->current_entry = 0;
     st->counter = 0;
     st->counter_done = 0;
+    st->rrddim_page_alignment = 0;
 
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
@@ -707,6 +708,7 @@ RRDSET *rrdset_create_custom(
     st->last_collected_time.tv_sec = 0;
     st->last_collected_time.tv_usec = 0;
     st->counter_done = 0;
+    st->rrddim_page_alignment = 0;
 
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
 

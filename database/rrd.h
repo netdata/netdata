@@ -250,6 +250,8 @@ union rrddim_collect_handle {
         unsigned long page_correlation_id;
         struct rrdengine_instance *ctx;
         struct pg_cache_page_index *page_index;
+        // set to 1 when this dimension is not page aligned with the other dimensions in the chart
+        uint8_t unaligned_page;
     } rrdeng; // state the database engine uses
 #endif
 };
@@ -431,7 +433,9 @@ struct rrdset {
     char *plugin_name;                              // the name of the plugin that generated this
     char *module_name;                              // the name of the plugin module that generated this
 
-    size_t unused[6];
+    size_t unused[5];
+
+    size_t rrddim_page_alignment;                   // keeps metric pages in alignment when using dbengine
 
     uint32_t hash;                                  // a simple hash on the id, to speed up searching
                                                     // we first compare hashes, and only if the hashes are equal we do string comparisons
