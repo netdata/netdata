@@ -49,19 +49,31 @@ services:
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - /path/to/actual/docker/on/the/host:/usr/bin/docker
 ```
 
 ### Docker container names resolution
 
-If you want to have your container names resolved by netdata it needs to have access to docker group.
-To achive that just add environment variable `PGID=999` to netdata container,
-where `999` is practically the group id of the group assigned to the docker socket, on your host.
-This group number can be found by running the following (if socket group ownership is docker):
-```bash
-grep docker /etc/group | cut -d ':' -f 3
-```
+If you want to have your container names resolved by netdata, you need to do two things:
+1) Make netdata user be part of the group that owns the socket.
+   To achive that just add environment variable `PGID=999` to netdata container,
+   where `999` is practically the group id of the group assigned to the docker socket, on your host.
+   This group number can be found by running the following (if socket group ownership is docker):
+   ```bash
+   grep docker /etc/group | cut -d ':' -f 3
+   ```
+
+2) Change docker socket access level to read/write like so:
+   from
+   ```
+   /var/run/docker.sock:/var/run/docker.sock:ro
+   ```
+
+   change to
+   ```
+   /var/run/docker.sock:/var/run/docker.sock:rw
+   ```
 
 **Important Note**: You should seriously consider the necessity activating this option,
 as it provides netdata with access to the privileged socket connection of docker service
