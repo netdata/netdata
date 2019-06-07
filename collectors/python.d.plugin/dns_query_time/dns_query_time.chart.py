@@ -85,10 +85,10 @@ def dns_request(server_list, timeout, domains):
 
         try:
             resp = dns.query.udp(request, ns, timeout=t)
-            if (resp.rcode == dns.rcode.NOERROR and not resp.answer):
-                query_time = -100
-            else:
+            if (resp.rcode() == dns.rcode.NOERROR and resp.answer):
                 query_time = resp.time * 1000
+            else:
+                query_time = -100
         except dns.exception.Timeout:
             query_time = -100
         finally:
