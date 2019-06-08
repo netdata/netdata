@@ -591,6 +591,35 @@ CHARTS = {
     }
 }
 
+def userstats_chart_template(name):
+    order = [
+        'userstats_rows_{0}'.format(name),
+        'userstats_commands_{0}'.format(name)
+    ]
+    family = 'userstats {0}'.format(name)
+
+    charts = {
+        order[0]: {
+            'options': [None, 'Rows Operations', 'operations/s', family, 'mysql.userstats_rows', 'stacked'],
+            'lines': [
+                ['userstats_{0}_Rows_read'.format(name), 'read', 'incremental'],
+                ['userstats_{0}_Rows_send'.format(name), 'send', 'incremental'],
+                ['userstats_{0}_Rows_updated'.format(name), 'updated', 'incremental'],
+                ['userstats_{0}_Rows_inserted'.format(name), 'inserted', 'incremental'],
+                ['userstats_{0}_Rows_deleted'.format(name), 'deleted', 'incremental']
+            ]
+        },
+        order[1]: {
+            'options': [None, 'Commands', 'commands/s', family, 'mysql.userstats_commands', 'stacked'],
+            'lines': [
+                ['userstats_{0}_Select_commands'.format(name), 'select', 'incremental'],
+                ['userstats_{0}_Update_commands'.format(name), 'update', 'incremental'],
+                ['userstats_{0}_Other_commands'.format(name), 'other', 'incremental']
+            ]
+        }
+    }
+
+    return order, charts
 
 class Service(MySQLService):
     def __init__(self, configuration=None, name=None):
@@ -639,7 +668,8 @@ class Service(MySQLService):
                     userstats_raw_data = dict(zip(userstats_vars, raw_data['user_statistics'][0][i]))
                     if len(self.charts) > 0:
                         if ('userstats_{0}_Cpu_time'.format(name)) not in self.charts['userstats_cpu']:
-                            self.add_userstats(name)
+                            self.add_userstats_dimensions(name)
+                            self.create_new_userstats_charts(name)
                     for key in USER_STATISTICS:
                         if key in userstats_raw_data:
                             to_netdata['userstats_{0}_{1}'.format(name, key)] = userstats_raw_data[key]
@@ -654,41 +684,16 @@ class Service(MySQLService):
 
         return to_netdata or None
 
-    def add_userstats(self, name):
+    def add_userstats_dimensions(self, name):
         self.charts['userstats_cpu'].add_dimension(['userstats_{0}_Cpu_time'.format(name), name, 'incremental', 100, 1])
 
-        rows = self.charts.add_chart(self.userstats_rows_chart(name))
-        rows.add_dimension(['userstats_{0}_Rows_read'.format(name), 'read', 'incremental'])
-        rows.add_dimension(['userstats_{0}_Rows_send'.format(name), 'send', 'incremental'])
-        rows.add_dimension(['userstats_{0}_Rows_updated'.format(name), 'updated', 'incremental'])
-        rows.add_dimension(['userstats_{0}_Rows_inserted'.format(name), 'inserted', 'incremental'])
-        rows.add_dimension(['userstats_{0}_Rows_deleted'.format(name), 'deleted', 'incremental'])
+    def create_new_userstats_charts(self, tube):
+        order, charts = userstats_chart_template(tube)
 
-        commands = self.charts.add_chart(self.userstats_commands_chart(name))
-        commands.add_dimension(['userstats_{0}_Select_commands'.format(name), 'select', 'incremental'])
-        commands.add_dimension(['userstats_{0}_Update_commands'.format(name), 'update', 'incremental'])
-        commands.add_dimension(['userstats_{0}_Other_commands'.format(name), 'other', 'incremental'])
+        for chart_name in order:
+            params = [chart_name] + charts[chart_name]['options']
+            dimensions = charts[chart_name]['lines']
 
-    @staticmethod
-    def userstats_rows_chart(name):
-        return [
-            'userstats_rows_' + name,
-            None,
-            '{0} User Rows Operations'.format(name.title()),
-            'operations/s',
-            'userstats',
-            'mysql.userstats_rows_' + name,
-            'stacked'
-        ]
-
-    @staticmethod
-    def userstats_commands_chart(name):
-        return [
-            'userstats_commands_' + name,
-            None,
-            '{0} User Commands'.format(name.title()),
-            'commands/s',
-            'userstats',
-            'mysql.userstats_commands_' + name,
-            'stacked'
-        ]
+            new_chart = self.charts.add_chart(params)
+            for dimension in dimensions:
+                new_chart.add_dimension(dimension)
