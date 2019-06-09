@@ -91,7 +91,7 @@ jobs:
     - echo "packaging/version:" && cat packaging/version
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
-    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" /bin/bash -c "autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2"
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make dist
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
     - .travis/run_install_with_dist_file.sh
@@ -174,7 +174,7 @@ jobs:
 
     # Alpine runs
   - name: Run netdata lifecycle, on Alpine linux
-    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" apk add bash && tests/updater_checks.sh
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" /bin/bash -c "apk add bash && tests/updater_checks.sh"
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Alpine"
 
     # Arch linux runs
