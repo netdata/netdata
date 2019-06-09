@@ -44,6 +44,7 @@ char *netdata_configured_host_prefix = "";
 
 #define NO_FD -1
 #define ALL_PIDS -1
+#define UINT64_SIZE 8
 
 static int debug = 0;
 
@@ -122,15 +123,16 @@ static struct perf_event {
     int *fd;
 
     int disabled;
+    int updated;
 
-    unsigned long long value;
+    uint64_t value;
 } perf_events[] = {
-    {EV_ID_CPU_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,     &group_leader_fds[EV_GROUP_0], NULL, 0, 0},
-    {EV_ID_INSTRUCTIONS,   PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,   &group_leader_fds[EV_GROUP_1], NULL, 0, 0},
-    {EV_ID_BUS_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,     &group_leader_fds[EV_GROUP_1], NULL, 0, 0},
-    {EV_ID_REF_CPU_CYCLES, PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES, &group_leader_fds[EV_GROUP_1], NULL, 0, 0},
+    {EV_ID_CPU_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,     &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
+    {EV_ID_INSTRUCTIONS,   PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,   &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    {EV_ID_BUS_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,     &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    {EV_ID_REF_CPU_CYCLES, PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES, &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
 
-    {EV_ID_END, 0, 0, NULL, NULL, 0, 0}
+    {EV_ID_END, 0, 0, NULL, NULL, 0, 0, 0}
 };
 
 static int perf_init() {
@@ -183,7 +185,7 @@ static int perf_init() {
                     default:
                         error("PERF: Cannot open perf event");
                 }
-                error("PERF: Disabling event <name>");
+                error("PERF: Disabling event %u", current_event->id);
                 current_event->disabled = 1;
             }
 
@@ -197,8 +199,40 @@ static int perf_init() {
     return 0;
 }
 
+static void perf_free(void) {
+    struct perf_event *current_event = NULL;
+
+    for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
+        free(current_event->fd);
+        free(*current_event->group_leader_fd);
+    }
+}
+
 static int perf_collect() {
-    // perf_root.seq++;
+    int cpu;
+    struct perf_event *current_event = NULL;
+    uint64_t value;
+
+    for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
+        current_event->updated = 0;
+        current_event->value = 0;
+
+        for(cpu = 0; cpu < number_of_cpus; cpu++) {
+            if(unlikely(current_event->disabled)) continue;
+
+            ssize_t read_size = read(current_event->fd[cpu], &value, UINT64_SIZE);
+
+            if(likely(read_size == UINT64_SIZE)) {
+                current_event->value += value;
+                current_event->updated = 1;
+            }
+            else {
+                error("Cannot update value for event %u", current_event->id);
+                return 1;
+            }
+        }
+        info("Successful read. value = %lu", current_event->value);
+    }
 
     return 0;
 }
@@ -354,4 +388,5 @@ int main(int argc, char **argv) {
     }
 
     info("PERF process exiting");
+    perf_free();
 }
