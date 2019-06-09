@@ -50,6 +50,10 @@ case "${running_os}" in
 	pacman -Sy
 	pacman -S bash-bats curl
 	;;
+"alpine")
+	apk update
+	apk add bash curl bats
+	;;
 *)
 	echo "Running on ${running_os}, no repository preparation done"
 	;;
