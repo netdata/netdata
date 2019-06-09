@@ -25,7 +25,6 @@ DIRS="usr/sbin/netdata
       var/log/netdata"
 
 setup() {
-
 	# If we are not in netdata git repo, at the top level directory, fail
 	TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
 	CWD=$(git rev-parse --show-cdup || echo "")

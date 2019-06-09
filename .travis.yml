@@ -242,7 +242,7 @@ jobs:
     - echo "packaging/version:" && cat packaging/version
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make clean || echo "Nothing to clean"
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make distclean || echo "Nothing to distclean"
-    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2
+    - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" /bin/bash -c "autoreconf -ivf && ./configure --prefix=/netdata_install/usr --sysconfdir=/netdata_install/etc --localstatedir=/netdata_install/var --with-zlib --with-math --with-user=netdata CFLAGS=-O2"
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" make dist
     - docker run -it -v "${PWD}:/netdata:rw" -v "/tmp/netdata-makedist-test:/netdata_install:rw" -w /netdata "netdata/os-test:ubuntu1804" ls -ltr ./netdata-$(git describe).tar.gz || ls -ltr ./netdata-$(cat packaging/version | tr -d '\n').tar.gz
     - .travis/run_install_with_dist_file.sh
@@ -291,21 +291,56 @@ jobs:
 
   - stage: "Artifacts validation on bare OS, stable to current lifecycle checks"
 
+    # Ubuntu runs
     name: Run netdata lifecycle on Ubuntu 16.04 (xenial)
     script: sudo -E tests/updater_checks.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 16.04"
 
+  - name: Run netdata lifecycle, on Ubuntu 19.04 (Containerized)
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.04" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.04"
+
+    # Centos runs
   - name: Run netdata lifecycle on CentOS 7 (Containerized)
     script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
 
+    # Debian runs
   - name: Run netdata lifecycle, on Debian 9 (Containerized)
     script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:stretch" tests/updater_checks.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 9 (stretch)"
 
-  - name: Run netdata lifecycle, on Ubuntu 19.04 (Containerized)
-    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.04" tests/updater_checks.sh
-    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.04"
+    # openSuSE runs
+  - name: Run netdata lifecycle, on openSuSE 15.0
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.0" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.0"
+
+  - name: Run netdata lifecycle, on openSuSE 15.1
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:15.1" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.1"
+
+  - name: Run netdata lifecycle, on openSuSE Tumbleweed
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/tumbleweed:latest" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/tumbleweed:latest"
+
+    # Alpine runs
+  - name: Run netdata lifecycle, on Alpine linux
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Alpine"
+
+    # Arch linux runs
+  - name: Run netdata lifecycle, on ArchLinux
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "archlinux/base:latest" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
+
+    # Fedora runs
+  - name: Run netdata lifecycle, on Fedora 28
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:28" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 28"
+
+  - name: Run netdata lifecycle, on Fedora 29
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:29" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 29"
 
   - name: Run netdata lifecycle, on Fedora 30 (Containerized)
     script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
