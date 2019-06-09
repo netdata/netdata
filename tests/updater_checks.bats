@@ -25,13 +25,6 @@ DIRS="usr/sbin/netdata
       var/log/netdata"
 
 setup() {
-	# Download and run depednency scriptlet
-	#
-	deps_tool="/tmp/deps_tool.$$.sh"
-	curl -Ss -o ${deps_tool} https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh
-	chmod +x "${deps_tool}"
-	${deps_tool} --non-interactive netdata
-
 	# If we are not in netdata git repo, at the top level directory, fail
 	TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
 	CWD=$(git rev-parse --show-cdup || echo "")

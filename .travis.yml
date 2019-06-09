@@ -169,8 +169,8 @@ jobs:
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:15.1"
 
   - name: Run netdata lifecycle, on openSuSE Tumbleweed
-    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/leap:tumbleweed" tests/updater_checks.sh
-    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/leap:tumbleweed"
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "opensuse/tumbleweed:latest" tests/updater_checks.sh
+    after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare opensuse/tumbleweed:latest"
 
     # Alpine runs
   - name: Run netdata lifecycle, on Alpine linux
