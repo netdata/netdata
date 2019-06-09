@@ -42,7 +42,7 @@ case "${running_os}" in
 	apt-get update -y
 	apt-get install -y bats curl
 	;;
-"opensuse-leap")
+"opensuse-leap"|"opensuse-tumbleweed")
 	zypper update -y
 	zypper install -y bats curl
 	;;
