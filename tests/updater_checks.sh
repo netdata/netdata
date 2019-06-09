@@ -20,7 +20,7 @@ blind_arch_grep_install() {
 	if command -v pacman > /dev/null 2>&1; then
 		echo "Executing grep installation"
 		pacman -Sy
-		pacman -S grep
+		pacman --noconfirm --needed -S grep
 	fi
 }
 blind_arch_grep_install || echo "Workaround failed, proceed as usual"
@@ -48,7 +48,7 @@ case "${running_os}" in
 	;;
 "arch")
 	pacman -Sy
-	pacman -S bash-bats curl
+	pacman --noconfirm --needed -S bash-bats curl
 	;;
 "alpine")
 	apk update
