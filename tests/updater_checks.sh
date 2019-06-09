@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 #
 # Wrapper script that installs the required dependencies
 # for the BATS script to run successfully
@@ -52,7 +52,7 @@ case "${running_os}" in
 	;;
 "alpine")
 	apk update
-	apk add curl bats
+	apk add bash curl bats
 	;;
 *)
 	echo "Running on ${running_os}, no repository preparation done"
