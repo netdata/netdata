@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- "Missing charts" on v1.15.0-70-nightly  \(\*\*solved\*\*\) [\#6244](https://github.com/netdata/netdata/issues/6244)
 - netdata daemon collectors stuck [\#6239](https://github.com/netdata/netdata/issues/6239)
 - URL Parser changes, correct health cmd api conditions to create silencer [\#6238](https://github.com/netdata/netdata/issues/6238)
 -  kickstart.sh: Getting Nightly SHA256 sums from storage.googleapis.com times out [\#6227](https://github.com/netdata/netdata/issues/6227)
@@ -32,11 +33,13 @@
 - opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6092](https://github.com/netdata/netdata/issues/6092)
 - Problem updating [\#6088](https://github.com/netdata/netdata/issues/6088)
 - invalid help links on platform \(web log nginx/apache\) [\#6086](https://github.com/netdata/netdata/issues/6086)
+- install on debian jessie [\#6083](https://github.com/netdata/netdata/issues/6083)
 - error "cgroup-network-helper.sh: DEBUG: virsh command is not available" with the lastest docker image [\#6073](https://github.com/netdata/netdata/issues/6073)
 - Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
 - HTTP requests are classified as AF\_UNIX [\#5987](https://github.com/netdata/netdata/issues/5987)
 - Netdata behind caddy reverse proxy wont login. [\#5794](https://github.com/netdata/netdata/issues/5794)
 - netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
+- netdata/packaging/docker: Fix docker socket utilization, first pass [\#6233](https://github.com/netdata/netdata/pull/6233) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/daemon: Eliminate a couple of warnings, plus tabs removal [\#6222](https://github.com/netdata/netdata/pull/6222) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/ci: Add lifecycle checks to bare operating system installations [\#6209](https://github.com/netdata/netdata/pull/6209) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/daemon: SSL fix - broken compilation case when ssl library not present! [\#6201](https://github.com/netdata/netdata/pull/6201) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -53,6 +56,7 @@
 - When the collector restarts after having stopped a long time ago fill the chart gaps efficiently [\#6103](https://github.com/netdata/netdata/issues/6103)
 - Optimize the memory footprint of the Database Engine [\#6010](https://github.com/netdata/netdata/issues/6010)
 - Secure streaming via SSL [\#6004](https://github.com/netdata/netdata/issues/6004)
+- \[Binary releases\] Create a script to containerise the RPM build process [\#5967](https://github.com/netdata/netdata/issues/5967)
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
 - \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
 - Feature: add VictoriaMetrics backend for long-term archiving [\#5619](https://github.com/netdata/netdata/issues/5619)
@@ -66,6 +70,7 @@
 - Force page alignment per dimension of chart. [\#6240](https://github.com/netdata/netdata/pull/6240) ([mfundul](https://github.com/mfundul))
 - Remove CNCF logo and TOC presentation reference [\#6234](https://github.com/netdata/netdata/pull/6234) ([dankohn](https://github.com/dankohn))
 - URL\_parser fixing allmetrics! [\#6231](https://github.com/netdata/netdata/pull/6231) ([thiagoftsm](https://github.com/thiagoftsm))
+- netdata/packaging: Introducing automatic binary packages generation and delivery for RPM types \(Phase 1\) [\#6223](https://github.com/netdata/netdata/pull/6223) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - SSL\_fix\_format Fix wrong format used with SSL! [\#6219](https://github.com/netdata/netdata/pull/6219) ([thiagoftsm](https://github.com/thiagoftsm))
 - installer: include go.d.plugin version v0.6.1 [\#6217](https://github.com/netdata/netdata/pull/6217) ([ilyam8](https://github.com/ilyam8))
 - Fill chart gaps efficiently. [\#6216](https://github.com/netdata/netdata/pull/6216) ([mfundul](https://github.com/mfundul))
