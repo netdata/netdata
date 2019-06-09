@@ -2,10 +2,11 @@
 
 #include "../../libnetdata/libnetdata.h"
 
+#include <linux/perf_event.h>
+
 #define PLUGIN_PERF_NAME "perf.plugin"
 
 #define NETDATA_CHART_PRIO_PERF_CPU_CYCLES            8701
-
 #define NETDATA_CHART_PRIO_PERF_CACHE_LL              8906
 
 // callback required by fatal()
@@ -39,41 +40,165 @@ char *netdata_configured_host_prefix = "";
 
 // Variables
 
-static int debug = 0;
-
-static int netdata_update_every = 1;
-
 #define RRD_TYPE_PERF "perf"
 
-static struct {
-    int update_every;
-    char *buf;
-    size_t buf_size;
-    unsigned int seq;
-    uint32_t portid;
-    kernel_uint_t metrics[10];
-} perf_root = {
-        .update_every = 1,
-        .buf = NULL,
-        .buf_size = 0,
-        .seq = 0,
-        .metrics = {},
+#define NO_FD -1
+#define ALL_PIDS -1
+
+static int debug = 0;
+
+static int update_every = 1;
+
+typedef enum perf_event_id {
+    // Hardware counters
+    EV_ID_CPU_CYCLES,
+    EV_ID_INSTRUCTIONS,
+    EV_ID_CACHE_REFERENCES,
+    EV_ID_CACHE_MISSES,
+    EV_ID_BRANCH_INSTRUCTIONS,
+    EV_ID_BRANCH_MISSES,
+    EV_ID_BUS_CYCLES,
+    EV_ID_CYCLES_FRONTEND,
+    EV_ID_CYCLES_BACKEND,
+    EV_ID_REF_CPU_CYCLES,
+
+    // Software counters
+    EV_ID_CPU_CLOCK,
+    EV_ID_TASK_CLOCK,
+    EV_ID_PAGE_FAULTS,
+    EV_ID_CONTEXT_SWITCHES,
+    EV_ID_CPU_MIGRATIONS,
+    EV_ID_PAGE_FAULTS_MIN,
+    EV_ID_PAGE_FAULTS_MAJ,
+    EV_ID_ALIGNMENT_FAULTS,
+    EV_ID_EMULATION_FAULTS,
+
+    // Hardware cache counters
+    EV_ID_L1D_READ_ACCESS,
+    EV_ID_L1D_READ_MISS,
+    EV_ID_L1D_WRITE_ACCESS,
+    EV_ID_L1D_WRITE_MISS,
+    EV_ID_L1D_PREFETCH_ACCESS,
+
+    EV_ID_L1I_READ_ACCESS,
+    EV_ID_L1I_READ_MISS,
+
+    EV_ID_LL_READ_ACCESS,
+    EV_ID_LL_READ_MISS,
+    EV_ID_LL_WRITE_ACCESS,
+    EV_ID_LL_WRITE_MISS,
+
+    EV_ID_DTLB_READ_ACCESS,
+    EV_ID_DTLB_READ_MISS,
+    EV_ID_DTLB_WRITE_ACCESS,
+    EV_ID_DTLB_WRITE_MISS,
+
+    EV_ID_ITLB_READ_ACCESS,
+    EV_ID_ITLB_READ_MISS,
+
+    EV_ID_PBU_READ_ACCESS,
+
+    EV_ID_END
+} perf_event_id_t;
+
+enum perf_event_group {
+    EV_GROUP_0,
+    EV_GROUP_1,
+
+    EV_GROUP_NUM
 };
 
+static int number_of_cpus;
 
-static int perf_init(int update_every) {
-    perf_root.update_every = update_every;
+static int *group_leader_fds[EV_GROUP_NUM];
 
-    perf_root.buf_size = 10;
-    perf_root.buf = mallocz(perf_root.buf_size);
+static struct perf_event {
+    perf_event_id_t id;
 
-    perf_root.seq = (unsigned int)now_realtime_sec() - 1;
+    int type;
+    int config;
+
+    int **group_leader_fd;
+    int *fd;
+
+    int disabled;
+
+    unsigned long long value;
+} perf_events[] = {
+    {EV_ID_CPU_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,     &group_leader_fds[EV_GROUP_0], NULL, 0, 0},
+    {EV_ID_INSTRUCTIONS,   PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,   &group_leader_fds[EV_GROUP_1], NULL, 0, 0},
+    {EV_ID_BUS_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,     &group_leader_fds[EV_GROUP_1], NULL, 0, 0},
+    {EV_ID_REF_CPU_CYCLES, PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES, &group_leader_fds[EV_GROUP_1], NULL, 0, 0},
+
+    {EV_ID_END, 0, 0, NULL, NULL, 0, 0}
+};
+
+static int perf_init() {
+    int cpu;
+    struct perf_event_attr perf_event_attr;
+    struct perf_event *current_event = NULL;
+    unsigned long flags = 0;
+
+    number_of_cpus = (int)get_system_cpus();
+
+    // initialize all perf event file descriptors
+    for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
+        current_event->fd = mallocz(number_of_cpus * sizeof(int));
+        memset(current_event->fd, NO_FD, number_of_cpus * sizeof(int));
+
+        *current_event->group_leader_fd = mallocz(number_of_cpus * sizeof(int));
+        memset(*current_event->group_leader_fd, NO_FD, number_of_cpus * sizeof(int));
+    }
+
+    memset(&perf_event_attr, 0, sizeof(perf_event_attr));
+
+    for(cpu = 0; cpu < number_of_cpus; cpu++) {
+        for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
+            if(unlikely(current_event->disabled)) continue;
+
+            perf_event_attr.type = current_event->type;
+            perf_event_attr.config = current_event->config;
+
+            int fd, group_leader_fd = *(*current_event->group_leader_fd + cpu);
+
+            fd = syscall(
+                __NR_perf_event_open,
+                &perf_event_attr,
+                ALL_PIDS,
+                cpu,
+                group_leader_fd,
+                flags
+            );
+
+            if(group_leader_fd == NO_FD) group_leader_fd = fd;
+
+            if(fd < 0) {
+                switch errno {
+                    case EACCES:
+                        error("PERF: Cannot access to the PMU: Permission denied");
+                        break;
+                    case EBUSY:
+                        error("PERF: Another event already has exclusive access to the PMU");
+                        break;
+                    default:
+                        error("PERF: Cannot open perf event");
+                }
+                error("PERF: Disabling event <name>");
+                current_event->disabled = 1;
+            }
+
+            *(current_event->fd + cpu) = fd;
+            *(*current_event->group_leader_fd + cpu) = group_leader_fd;
+
+            info("fd = %d, leader_fd = %d", fd, group_leader_fd);
+        }
+    }
 
     return 0;
 }
 
 static int perf_collect() {
-    perf_root.seq++;
+    // perf_root.seq++;
 
     return 0;
 }
@@ -89,7 +214,7 @@ static void perf_send_metrics() {
                , "cpu_cycles"
                , RRD_TYPE_PERF
                , NETDATA_CHART_PRIO_PERF_CPU_CYCLES
-               , perf_root.update_every
+               , update_every
                , PLUGIN_PERF_NAME
         );
         printf("DIMENSION %s '' incremental 1 1\n", "cycles");
@@ -103,7 +228,7 @@ static void perf_send_metrics() {
     printf(
            "SET %s = %lld\n"
            , "cycles"
-           , (collected_number) perf_root.metrics[0]
+           , (collected_number) perf_events[EV_ID_CPU_CYCLES].value
     );
     printf("END\n");
 }
@@ -171,7 +296,7 @@ int main(int argc, char **argv) {
                     " https://github.com/netdata/netdata/tree/master/collectors/perf.plugin\n"
                     "\n"
                     , VERSION
-                    , netdata_update_every
+                    , update_every
             );
             exit(1);
         }
@@ -181,13 +306,13 @@ int main(int argc, char **argv) {
 
     errno = 0;
 
-    if(freq >= netdata_update_every)
-        netdata_update_every = freq;
+    if(freq >= update_every)
+        update_every = freq;
     else if(freq)
-        error("update frequency %d seconds is too small for PERF. Using %d.", freq, netdata_update_every);
+        error("update frequency %d seconds is too small for PERF. Using %d.", freq, update_every);
 
     if(debug) fprintf(stderr, "perf.plugin: calling perf_init()\n");
-    int perf = !perf_init(netdata_update_every);
+    int perf = !perf_init();
 
     // ------------------------------------------------------------------------
     // the main loop
@@ -197,7 +322,7 @@ int main(int argc, char **argv) {
     time_t started_t = now_monotonic_sec();
 
     size_t iteration;
-    usec_t step = netdata_update_every * USEC_PER_SEC;
+    usec_t step = update_every * USEC_PER_SEC;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
