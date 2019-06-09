@@ -174,7 +174,7 @@ jobs:
 
     # Alpine runs
   - name: Run netdata lifecycle, on Alpine linux
-    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" tests/updater_checks.sh
+    script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" apk add bash && tests/updater_checks.sh
     after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Alpine"
 
     # Arch linux runs

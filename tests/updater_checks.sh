@@ -52,7 +52,7 @@ case "${running_os}" in
 	;;
 "alpine")
 	apk update
-	apk add bash curl bats
+	apk add curl bats
 	;;
 *)
 	echo "Running on ${running_os}, no repository preparation done"
