@@ -398,12 +398,15 @@ void fix_google_param(char *s) {
 }
 
 /**
+ * Request V1 Data
+ *
+ * Get collected data for a specific chart.
  *
  * @param host main structure with client information!
  * @param w is the structure with all information of the client request.
  * @param url is the url that netdata is working
  *
- * @return
+ * @return It returns 200 on success and other number otherwise.
  */
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
@@ -434,7 +437,12 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     uint32_t options = 0x00000000;
 
     uint32_t end = w->total_params;
+    //Save the value present in the options different of tqx
     char save[WEB_FIELDS_MAX];
+    //Save the pointer where ';' and ':' are in tqx to restore
+    char *tqxname[WEB_FIELDS_MAX];
+    char *tqxvalue[WEB_FIELDS_MAX];
+    uint32_t tqxtotal=0;
     char *value ;
     size_t lvalue;
     if(end) {
@@ -482,30 +490,49 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                 // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
                 char *tqx_name, *tqx_value;
 
-                while(value) {
-                    tqx_value = mystrsep(&value, ";");
-                    if(!tqx_value || !*tqx_value) continue;
+                char *moveme = value;
+                char *end = &moveme[lvalue];
+                while(moveme < end) {
+                    tqx_value = strchr(moveme,';');
+                    if(!tqx_value || !*tqx_value) {
+                        tqx_value = end;
+                    }
 
-                    tqx_name = mystrsep(&tqx_value, ":");
-                    if(!tqx_name || !*tqx_name) continue;
-                    if(!tqx_value || !*tqx_value) continue;
+                    tqx_name = strchr(moveme,':');
+                    if(!tqx_name || !*tqx_name) {
+                        break;
+                    }
+                    if(!tqx_value || !*tqx_value) {
+                        if(tqx_value != end) {
+                            break;
+                        }
+                    }
 
-                    if(!strcmp(tqx_name, "version"))
-                        google_version = tqx_value;
-                    else if(!strcmp(tqx_name, "reqId"))
-                        google_reqId = tqx_value;
-                    else if(!strcmp(tqx_name, "sig")) {
-                        google_sig = tqx_value;
+                    tqxname[tqxtotal] = tqx_name;
+                    tqxvalue[tqxtotal] = tqx_value;
+
+                    tqxtotal++;
+                    *tqx_value = 0x00;
+                    *tqx_name = 0x00;
+
+                    if(!strcmp(moveme, "version"))
+                        google_version = tqx_name+1;
+                    else if(!strcmp(moveme, "reqId"))
+                        google_reqId = tqx_name+1;
+                    else if(!strcmp(moveme, "sig")) {
+                        google_sig = tqx_name+1;
                         google_timestamp = strtoul(google_sig, NULL, 0);
                     }
-                    else if(!strcmp(tqx_name, "out")) {
-                        google_out = tqx_value;
+                    else if(!strcmp(moveme, "out")) {
+                        google_out = tqx_name+1;
                         format = web_client_api_request_v1_data_google_format(google_out);
                     }
-                    else if(!strcmp(tqx_name, "responseHandler"))
-                        responseHandler = tqx_value;
-                    else if(!strcmp(tqx_name, "outFileName"))
-                        outFileName = tqx_value;
+                    else if(!strcmp(moveme, "responseHandler"))
+                        responseHandler = tqx_name+1;
+                    else if(!strcmp(moveme, "outFileName"))
+                        outFileName = tqx_name+1;
+
+                    moveme = tqx_value+1;
                 }
             }
         } while (++i < end);
@@ -582,7 +609,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)
             buffer_strcat(w->response.data, "});");
-
         else {
             // the client already has the latest data
             buffer_flush(w->response.data);
@@ -596,7 +622,16 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     cleanup:
     if(end) {
-        uint32_t i = 0;
+        uint32_t i;
+        if (tqxtotal) {
+            i = 0;
+            do {
+                *tqxname[i] = ':';
+                *tqxvalue[i] = ';';
+            } while (++i < tqxtotal);
+        }
+
+        i = 0;
         do {
             value = w->param_values[i].body;
             lvalue = w->param_values[i].length;
@@ -621,6 +656,17 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 //
 // Impersonate:
 // /api/v1/registry?action=switch&machine=${machine_guid}&name=${hostname}&url=${url}&to=${new_person_guid}
+/**
+ * Request V1 registry
+ *
+ * Where is the documentation for this?
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return
+ */
 inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
             hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
