@@ -1,6 +1,7 @@
 # perf.plugin
 
-`perf.plugin` collects system-wide CPU performance statistics using Performance Monitoring Units (PMU) through the `perf_event_open()` system call.
+`perf.plugin` collects system-wide CPU performance statistics using Performance Monitoring Units (PMU) through
+the `perf_event_open()` system call.
 
 ## Security notes
 
@@ -11,18 +12,20 @@ Keep in mind that accessing hardware PMUs requires root permissions, so the plug
 The plugin provides statistics for general hardware and software performance monitoring events:
 
 Hardware events:
-1. CPU cycles.
-2. BUS cycles.
-3. Instructions
+1.  CPU cycles.
+2.  BUS cycles.
+3.  Instructions
 
 Software events:
-1. Context switches
+1.  Context switches
 
 ## Configuration
 
-The plugin is disabled by default because the number of PMUs is usually quite limited and it is not desired to allow Netdata silently struggle for PMUs, interfering with other performance monitoring software. If you need to enable perf plugin, edit /etc/netdata/netdata.conf and set:
+The plugin is disabled by default because the number of PMUs is usually quite limited and it is not desired to
+allow Netdata silently struggle for PMUs, interfering with other performance monitoring software. If you need to
+enable perf plugin, edit /etc/netdata/netdata.conf and set:
 
-```
+```raw
 [plugins]
     perf = yes
 ```
@@ -31,7 +34,7 @@ The plugin is disabled by default because the number of PMUs is usually quite li
 
 You can run the plugin by hand:
 
-```
+```raw
 sudo /usr/libexec/netdata/plugins.d/perf.plugin 1 debug
 ```
 
