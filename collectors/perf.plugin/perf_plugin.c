@@ -19,6 +19,15 @@
 #define NETDATA_CHART_PRIO_PERF_ALIGNMENT             8811
 #define NETDATA_CHART_PRIO_PERF_EMULATION             8812
 
+// Hardware cache counters
+#define NETDATA_CHART_PRIO_PERF_L1D                   8820
+#define NETDATA_CHART_PRIO_PERF_L1D_PREFETCH          8821
+#define NETDATA_CHART_PRIO_PERF_L1I                   8822
+#define NETDATA_CHART_PRIO_PERF_LL                    8823
+#define NETDATA_CHART_PRIO_PERF_DTLB                  8824
+#define NETDATA_CHART_PRIO_PERF_ITLB                  8825
+#define NETDATA_CHART_PRIO_PERF_PBU                   8826
+
 // callback required by fatal()
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
@@ -300,9 +309,11 @@ static int perf_collect() {
 }
 
 static void perf_send_metrics() {
-    static int cpu_cycles_chart_generated = 0, instructions_chart_generated = 0, branch_chart_generated = 0, cache_chart_generated = 0,
-               bus_cycles_chart_generated = 0, front_back_cycles_chart_generated = 0;
+    static int cpu_cycles_chart_generated = 0, instructions_chart_generated = 0, branch_chart_generated = 0,
+               cache_chart_generated = 0, bus_cycles_chart_generated = 0, front_back_cycles_chart_generated = 0;
     static int migrations_chart_generated = 0, alighnment_chart_generated = 0, emulation_chart_generated = 0;
+    static int L1D_chart_generated = 0, L1D_prefetch_chart_generated = 0, L1I_chart_generated = 0, LL_chart_generated = 0,
+               DTLB_chart_generated = 0, ITLB_chart_generated = 0, PBU_chart_generated = 0;
 
     // ------------------------------------------------------------------------
 
@@ -595,6 +606,319 @@ static void perf_send_metrics() {
                , "faults"
                , (collected_number) perf_events[EV_ID_EMULATION_FAULTS].value
         );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_L1D_READ_ACCESS].updated || perf_events[EV_ID_L1D_READ_MISS].updated
+              || perf_events[EV_ID_L1D_WRITE_ACCESS].updated || perf_events[EV_ID_L1D_WRITE_MISS].updated)) {
+        if(unlikely(!L1D_chart_generated)) {
+            L1D_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'L1D cache operations' 'events/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "l1d_cache"
+                   , RRD_FAMILY_CACHE
+                   , NETDATA_CHART_PRIO_PERF_L1D
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
+            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
+            printf("DIMENSION %s '' incremental -1 1\n", "write_access");
+            printf("DIMENSION %s '' incremental -1 1\n", "write_misses");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "l1d_cache"
+        );
+        if(likely(perf_events[EV_ID_L1D_READ_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_access"
+                   , (collected_number) perf_events[EV_ID_L1D_READ_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_L1D_READ_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_misses"
+                   , (collected_number) perf_events[EV_ID_L1D_READ_MISS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_L1D_WRITE_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "write_access"
+                   , (collected_number) perf_events[EV_ID_L1D_WRITE_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_L1D_WRITE_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "write_misses"
+                   , (collected_number) perf_events[EV_ID_L1D_WRITE_MISS].value
+            );
+        }
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_L1D_PREFETCH_ACCESS].updated)) {
+        if(unlikely(!L1D_prefetch_chart_generated)) {
+            L1D_prefetch_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'L1D prefetch cache operations' 'prefetches/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "l1d_cache_prefetch"
+                   , RRD_FAMILY_CACHE
+                   , NETDATA_CHART_PRIO_PERF_L1D_PREFETCH
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "prefetches");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "l1d_cache_prefetch"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "prefetches"
+               , (collected_number) perf_events[EV_ID_L1D_PREFETCH_ACCESS].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_L1I_READ_ACCESS].updated || perf_events[EV_ID_L1I_READ_MISS].updated)) {
+        if(unlikely(!L1I_chart_generated)) {
+            L1I_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'L1I cache operations' 'events/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "l1i_cache"
+                   , RRD_FAMILY_CACHE
+                   , NETDATA_CHART_PRIO_PERF_L1I
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
+            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "l1i_cache"
+        );
+        if(likely(perf_events[EV_ID_L1I_READ_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_access"
+                   , (collected_number) perf_events[EV_ID_L1I_READ_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_L1I_READ_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_misses"
+                   , (collected_number) perf_events[EV_ID_L1I_READ_MISS].value
+            );
+        }
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_LL_READ_ACCESS].updated || perf_events[EV_ID_LL_READ_MISS].updated
+              || perf_events[EV_ID_LL_WRITE_ACCESS].updated || perf_events[EV_ID_LL_WRITE_MISS].updated)) {
+        if(unlikely(!LL_chart_generated)) {
+            LL_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'LL cache operations' 'events/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "ll_cache"
+                   , RRD_FAMILY_CACHE
+                   , NETDATA_CHART_PRIO_PERF_LL
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
+            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
+            printf("DIMENSION %s '' incremental -1 1\n", "write_access");
+            printf("DIMENSION %s '' incremental -1 1\n", "write_misses");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "ll_cache"
+        );
+        if(likely(perf_events[EV_ID_LL_READ_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_access"
+                   , (collected_number) perf_events[EV_ID_LL_READ_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_LL_READ_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_misses"
+                   , (collected_number) perf_events[EV_ID_LL_READ_MISS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_LL_WRITE_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "write_access"
+                   , (collected_number) perf_events[EV_ID_LL_WRITE_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_LL_WRITE_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "write_misses"
+                   , (collected_number) perf_events[EV_ID_LL_WRITE_MISS].value
+            );
+        }
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_DTLB_READ_ACCESS].updated || perf_events[EV_ID_DTLB_READ_MISS].updated
+              || perf_events[EV_ID_DTLB_WRITE_ACCESS].updated || perf_events[EV_ID_DTLB_WRITE_MISS].updated)) {
+        if(unlikely(!DTLB_chart_generated)) {
+            DTLB_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'DTLB cache operations' 'events/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "dtlb_cache"
+                   , RRD_FAMILY_CACHE
+                   , NETDATA_CHART_PRIO_PERF_DTLB
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
+            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
+            printf("DIMENSION %s '' incremental -1 1\n", "write_access");
+            printf("DIMENSION %s '' incremental -1 1\n", "write_misses");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "dtlb_cache"
+        );
+        if(likely(perf_events[EV_ID_DTLB_READ_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_access"
+                   , (collected_number) perf_events[EV_ID_DTLB_READ_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_DTLB_READ_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_misses"
+                   , (collected_number) perf_events[EV_ID_DTLB_READ_MISS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_DTLB_WRITE_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "write_access"
+                   , (collected_number) perf_events[EV_ID_DTLB_WRITE_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_DTLB_WRITE_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "write_misses"
+                   , (collected_number) perf_events[EV_ID_DTLB_WRITE_MISS].value
+            );
+        }
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_ITLB_READ_ACCESS].updated || perf_events[EV_ID_ITLB_READ_MISS].updated)) {
+        if(unlikely(!ITLB_chart_generated)) {
+            ITLB_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'ITLB cache operations' 'events/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "itlb_cache"
+                   , RRD_FAMILY_CACHE
+                   , NETDATA_CHART_PRIO_PERF_ITLB
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
+            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "itlb_cache"
+        );
+        if(likely(perf_events[EV_ID_ITLB_READ_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_access"
+                   , (collected_number) perf_events[EV_ID_ITLB_READ_ACCESS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_ITLB_READ_MISS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_misses"
+                   , (collected_number) perf_events[EV_ID_ITLB_READ_MISS].value
+            );
+        }
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_PBU_READ_ACCESS].updated)) {
+        if(unlikely(!PBU_chart_generated)) {
+            PBU_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'PBU cache operations' 'events/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "pbu_cache"
+                   , RRD_FAMILY_CACHE
+                   , NETDATA_CHART_PRIO_PERF_PBU
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "pbu_cache"
+        );
+        if(likely(perf_events[EV_ID_PBU_READ_ACCESS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "read_access"
+                   , (collected_number) perf_events[EV_ID_PBU_READ_ACCESS].value
+            );
+        }
         printf("END\n");
     }
 }
