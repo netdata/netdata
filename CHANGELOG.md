@@ -4,6 +4,8 @@
 
 **Fixed bugs:**
 
+- addgroup: gid '999' in use [\#6253](https://github.com/netdata/netdata/issues/6253)
+- Elasticsearch plugin error - 'module' object has no attribute 'Retry' [\#6248](https://github.com/netdata/netdata/issues/6248)
 - "Missing charts" on v1.15.0-70-nightly  \(\*\*solved\*\*\) [\#6244](https://github.com/netdata/netdata/issues/6244)
 - netdata daemon collectors stuck [\#6239](https://github.com/netdata/netdata/issues/6239)
 - URL Parser changes, correct health cmd api conditions to create silencer [\#6238](https://github.com/netdata/netdata/issues/6238)
@@ -51,9 +53,11 @@
 
 - Documentation improvements [\#6214](https://github.com/netdata/netdata/issues/6214)
 - Scope of 1.16-rc1 [\#6159](https://github.com/netdata/netdata/issues/6159)
+- Netdata variable granularity Research [\#6148](https://github.com/netdata/netdata/issues/6148)
 - SN\_EMPTY\_SLOT RRDDIMM value detection inside DB engine [\#6105](https://github.com/netdata/netdata/issues/6105)
 - force page alignment per dimension of chart [\#6104](https://github.com/netdata/netdata/issues/6104)
 - When the collector restarts after having stopped a long time ago fill the chart gaps efficiently [\#6103](https://github.com/netdata/netdata/issues/6103)
+- Introduce cross-distro release testing on our CI  [\#6102](https://github.com/netdata/netdata/issues/6102)
 - Optimize the memory footprint of the Database Engine [\#6010](https://github.com/netdata/netdata/issues/6010)
 - Secure streaming via SSL [\#6004](https://github.com/netdata/netdata/issues/6004)
 - \[Binary releases\] Create a script to containerise the RPM build process [\#5967](https://github.com/netdata/netdata/issues/5967)
@@ -68,6 +72,8 @@
 - PR to fix issue \#6238 [\#6242](https://github.com/netdata/netdata/pull/6242) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update CODEOWNERS [\#6241](https://github.com/netdata/netdata/pull/6241) ([cakrit](https://github.com/cakrit))
 - Force page alignment per dimension of chart. [\#6240](https://github.com/netdata/netdata/pull/6240) ([mfundul](https://github.com/mfundul))
+- dns\_query\_time py module: saving dns request in 'r', checking response for answer, recording '-… [\#6237](https://github.com/netdata/netdata/pull/6237) ([n0coast](https://github.com/n0coast))
+- netdata/packaging: Add more distribution validations [\#6235](https://github.com/netdata/netdata/pull/6235) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Remove CNCF logo and TOC presentation reference [\#6234](https://github.com/netdata/netdata/pull/6234) ([dankohn](https://github.com/dankohn))
 - URL\_parser fixing allmetrics! [\#6231](https://github.com/netdata/netdata/pull/6231) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/packaging: Introducing automatic binary packages generation and delivery for RPM types \(Phase 1\) [\#6223](https://github.com/netdata/netdata/pull/6223) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
