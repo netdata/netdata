@@ -194,6 +194,17 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 }
 
 
+/**
+ * Alarms
+ *
+ * Get a list of active or raised alarms on the server
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It always returns 200
+ */
 inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     int all = 0;
@@ -216,6 +227,17 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
+/**
+ * Alarm Log
+ *
+ * Retrieves the entries of the alarm log
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It always return 200
+ */
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     uint32_t after = 0;
@@ -243,6 +265,14 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     return 200;
 }
 
+/**
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ * @param callback
+ * @return
+ */
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
     (void)url;
     int ret = 400;
@@ -252,15 +282,22 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
 
     uint32_t  i = 0;
     uint32_t end = w->total_params;
+    //In normal situation this vector is not necessary,
+    //but it is safety to have it here.
+    char save[WEB_FIELDS_MAX];
+    char *value;
+    size_t vlength;
     if(end) {
         do {
             char *name = w->param_name[i].body;
             size_t nlength  = w->param_name[i].length;
-            char *value = w->param_values[i].body;
+            value = w->param_values[i].body;
+            vlength  = w->param_values[i].length;
+            save[i] = value[vlength];
+            value[vlength] = 0x00;
 
             // name and value are now the parameters
             // they are not null and not empty
-
             if(!strncmp(name, "chart",nlength)) chart = value;
             //else {
             /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
@@ -286,16 +323,47 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     w->response.data->contenttype = CT_APPLICATION_JSON;
     st->last_accessed_time = now_realtime_sec();
     callback(st, w->response.data);
-    return 200;
+    ret =  200;
 
     cleanup:
+    if(end) {
+        i = 0;
+        do {
+            value = w->param_values[i].body;
+            vlength  = w->param_name[i].length;
+            value[vlength] = save[i];
+        } while (++i < end);
+
+    }
     return ret;
 }
 
+/**
+ * Alarm Variables
+ *
+ * List variables available to configure alarms for a chart
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It forwards the return of web_client_api_request_single_chart
+ */
 inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }
 
+/**
+ * Request v1 Charts
+ *
+ * Get a list of all charts available at the server
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It always return 200;
+ */
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
 
@@ -305,6 +373,17 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
+/**
+ * Request V1 Chart
+ *
+ * Get info about a specific chart
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It forwards the return of web_client_api_request_single_chart
+ */
 inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
@@ -318,7 +397,14 @@ void fix_google_param(char *s) {
     }
 }
 
-// returns the HTTP code
+/**
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return
+ */
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
@@ -753,6 +839,17 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
+/**
+ *  API Requests V1 Info
+ *
+ *  Get netdata basic information
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It returns 200 on success and 503 otherwise
+ */
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     if (!netdata_ready) return 503;
@@ -822,6 +919,17 @@ static struct api_command {
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };
 
+/**
+ * API Request Version 1.0
+ *
+ * Process the request made by the user.
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It returns the code that will be used in the response.
+ */
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
     static int initialized = 0;
     int i;

@@ -566,6 +566,18 @@ void buffer_data_options2string(BUFFER *wb, uint32_t options) {
     }
 }
 
+/**
+ * Check host and call
+ *
+ * This function previously had a check that is not used more, now it only calls the function given in the argument.
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ * @param func a pointer to the function that will be called.
+ *
+ * @return It forward the return of the function called
+ */
 static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char *url, int (*func)(RRDHOST *, struct web_client *, char *)) {
     //if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
     //    buffer_flush(w->response.data);
@@ -590,18 +602,24 @@ static inline int check_host_and_mgmt_acl_and_call(RRDHOST *host, struct web_cli
     return check_host_and_call(host, w, url, func);
 }
 
+/**
+ * API Request
+ *
+ * Process the request done by client.
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return The function returns the code that will be used in the response
+ */
 int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
 {
     // get the api version
-    char *tok = mystrsep(&url, "/");
-    (void)tok;
     char *body = w->version.body;
     size_t length = w->version.length;
     if(body) {
-        //if(tok && *tok) {
-        //debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
         debug(D_WEB_CLIENT, "%llu: Searching for API version'.", w->id);
-        //if(strcmp(tok, "v1") == 0)
         if(strncmp(body, "v1",length) == 0) {
             return web_client_api_request_v1(host, w, url);
         } else {
@@ -739,6 +757,14 @@ const char *web_response_code_to_string(int code) {
     }
 }
 
+/**
+ *
+ * @param w is the structure with all information of the client request.
+ * @param s a pointer to the header begin
+ * @param parse_useragent Do I need to parser user agent?
+ *
+ * @return It returns the position of the next carrier return
+ */
 static inline char *http_header_parse(struct web_client *w, char *s, int parse_useragent) {
     static uint32_t hash_origin = 0, hash_connection = 0, hash_donottrack = 0, hash_useragent = 0, hash_authorization = 0, hash_host = 0;
 #ifdef NETDATA_WITH_ZLIB
@@ -880,12 +906,9 @@ static inline char *web_client_parse_method(struct web_client *w,char *s) {
     }
     else if(!strncmp(s, "STREAM ", 7)) {
 #ifdef ENABLE_HTTPS
-        //CASE THIS CONDITIONS ARE TRUE, THE CLIENT IS SENDING A MESSAGE THAT IS NOT
+        //CASE THESE CONDITIONS ARE TRUE, THE CLIENT IS SENDING A MESSAGE THAT IS NOT
         //ENCRYPTED, SO I MUST LOG AND RETURN AN ERROR FOR IT.
         if ((w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)) {
-            w->header_parse_tries = 0;
-            w->header_parse_last_size = 0;
-            web_client_disable_wait_receive(w);
             char hostname[256];
             char *copyme = strstr(s,"hostname=");
             if (copyme) {
@@ -1063,7 +1086,7 @@ static inline void web_client_split_path_query(struct web_client *w) {
     w->path.body = w->decoded_url;
     w->decoded_length = strlen(w->decoded_url);
 
-    //Is thre a separator?
+    //Is there a separator?
     char *moveme = strchr(w->path.body,'?');
     char *enddir;
     if (moveme) { //I have a query string
@@ -1190,20 +1213,18 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     // TODO -- ideally we we should avoid copying buffers around
     strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
 
+    //These three lines are common for both RETURNS
+    w->header_parse_tries = 0;
+    w->header_parse_last_size = 0;
+    web_client_disable_wait_receive(w);
 #ifdef ENABLE_HTTPS
     if ((!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
         if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM)) ) {
-            w->header_parse_tries = 0;
-            w->header_parse_last_size = 0;
-            web_client_disable_wait_receive(w);
             return HTTP_VALIDATION_REDIRECT;
         }
     }
 #endif
 
-    w->header_parse_tries = 0;
-    w->header_parse_last_size = 0;
-    web_client_disable_wait_receive(w);
     return HTTP_VALIDATION_OK;
 }
 
@@ -1511,7 +1532,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
  *
  * Process the URL request
  *
- * @param host main structure with a lot of information about the client!
+ * @param host main structure with client information!
  * @param w is the structure with all information of the client request.
  * @param url is the url that netdata is working
  *

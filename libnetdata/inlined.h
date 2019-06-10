@@ -31,6 +31,16 @@ static inline uint32_t simple_hash(const char *name) {
     return hval;
 }
 
+/**
+ * Simple N hash
+ *
+ * Calculate the hash for name that has the length len.
+ *
+ * @param name the input to the hash
+ * @param len the length of the input
+ *
+ * @return It returns the hash calculated.
+ */
 static inline uint32_t simple_nhash(const char *name,size_t len) {
     unsigned char *s = (unsigned char *) name;
     size_t i;

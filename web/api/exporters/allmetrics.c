@@ -17,6 +17,17 @@ struct prometheus_output_options {
         { NULL, PROMETHEUS_OUTPUT_NONE },
 };
 
+/**
+ * Request V1 Allmetrics
+ *
+ * Get the values of all metrics maintained by netdata.
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It returns 200 on success and 400 otherwise.
+ */
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     int format = ALLMETRICS_SHELL;

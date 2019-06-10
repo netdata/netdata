@@ -788,6 +788,17 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         BADGE_HORIZONTAL_PADDING );
 }
 
+/**
+ * Rquest V1 Badge
+ *
+ * Generate a SVG image for a chart (or dimension)
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It returns 200 on success and other error number otherwise
+ */
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     int ret = 400;
