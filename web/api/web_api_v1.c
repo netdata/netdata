@@ -642,6 +642,34 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     return ret;
 }
 
+/**
+ * Restore Registry Variable
+ *
+ * Restore the original values for the registry variables.
+ *
+ * @param names the structure where the names are linked
+ * @param sname the value saved for names
+ * @param values the structure where the values are linked
+ * @param svalue the value saved for values
+ * @param end the number of elements to check
+ */
+static void web_client_api_restore_registry_variable(struct web_fields *names,char *sname,struct web_fields *values,char *svalue,uint32_t end) {
+    if(!end) {
+        return;
+    }
+
+    uint32_t i;
+    do {
+        char *name = names[i].body;
+        size_t nlength = names[i].length;
+        name[nlength] = sname[i];
+
+        char *value = values[i].body;
+        size_t vlength = values[i].length;
+        value[vlength] = svalue[i];
+    } while(++i < end);
+}
+
 // Pings a netdata server:
 // /api/v1/registry?action=hello
 //
@@ -718,11 +746,18 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         goto nothing;
     }
 
+    char sname[WEB_FIELDS_MAX];
+    char vname[WEB_FIELDS_MAX];
     do {
         char *name = w->param_name[i].body;
         size_t nlength = w->param_name[i].length;
+        sname[i] = name[nlength];
+        name[nlength] = 0x00;
+
         char *value = w->param_values[i].body;
         size_t vlength = w->param_values[i].length;
+        vname[i] = value[vlength];
+        value[vlength] = 0x00;
 
         debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
 
@@ -778,18 +813,23 @@ nothing:
     if(unlikely(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w))) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
+        web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
         return 400;
     }
 
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
-        if(unlikely(!web_client_can_access_dashboard(w)))
+        if(unlikely(!web_client_can_access_dashboard(w))) {
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return web_client_permission_denied(w);
+        }
     }
     else {
         // everything else, registry ACL
-        if(unlikely(!web_client_can_access_registry(w)))
+        if(unlikely(!web_client_can_access_registry(w))) {
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return web_client_permission_denied(w);
+        }
     }
 
     switch(action) {
@@ -798,10 +838,12 @@ nothing:
                 error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Access request.");
+                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_access_json(host, w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
@@ -809,10 +851,12 @@ nothing:
                 error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Delete request.");
+                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
@@ -820,10 +864,12 @@ nothing:
                 error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
+                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_search_json(host, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
 
         case 'W':
@@ -831,18 +877,22 @@ nothing:
                 error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Switch request.");
+                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_switch_json(host, w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
         case 'H':
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_hello_json(host, w);
 
         default:
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Invalid registry request - you need to set an action: hello, access, delete, search");
+            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return 400;
     }
 }
