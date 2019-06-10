@@ -338,16 +338,20 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "cpu_cycles"
         );
-        printf(
-               "SET %s = %lld\n"
-               , "cpu"
-               , (collected_number) perf_events[EV_ID_CPU_CYCLES].value
-        );
-        printf(
-               "SET %s = %lld\n"
-               , "ref_cpu"
-               , (collected_number) perf_events[EV_ID_REF_CPU_CYCLES].value
-        );
+        if(likely(perf_events[EV_ID_CPU_CYCLES].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "cpu"
+                   , (collected_number) perf_events[EV_ID_CPU_CYCLES].value
+            );
+        }
+        if(likely(perf_events[EV_ID_REF_CPU_CYCLES].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "ref_cpu"
+                   , (collected_number) perf_events[EV_ID_REF_CPU_CYCLES].value
+            );
+        }
         printf("END\n");
     }
 
@@ -404,16 +408,20 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "branch_instructions"
         );
-        printf(
-               "SET %s = %lld\n"
-               , "instructions"
-               , (collected_number) perf_events[EV_ID_BRANCH_INSTRUCTIONS].value
-        );
-        printf(
-               "SET %s = %lld\n"
-               , "misses"
-               , (collected_number) perf_events[EV_ID_BRANCH_MISSES].value
-        );
+        if(likely(perf_events[EV_ID_BRANCH_INSTRUCTIONS].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "instructions"
+                   , (collected_number) perf_events[EV_ID_BRANCH_INSTRUCTIONS].value
+            );
+        }
+        if(likely(perf_events[EV_ID_BRANCH_MISSES].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "misses"
+                   , (collected_number) perf_events[EV_ID_BRANCH_MISSES].value
+            );
+        }
         printf("END\n");
     }
 
@@ -440,16 +448,20 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "cache"
         );
-        printf(
-               "SET %s = %lld\n"
-               , "references"
-               , (collected_number) perf_events[EV_ID_CACHE_REFERENCES].value
-        );
-        printf(
-               "SET %s = %lld\n"
-               , "misses"
-               , (collected_number) perf_events[EV_ID_CACHE_MISSES].value
-        );
+        if(likely(perf_events[EV_ID_CACHE_REFERENCES].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "references"
+                   , (collected_number) perf_events[EV_ID_CACHE_REFERENCES].value
+            );
+        }
+        if(likely(perf_events[EV_ID_CACHE_MISSES].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "misses"
+                   , (collected_number) perf_events[EV_ID_CACHE_MISSES].value
+            );
+        }
         printf("END\n");
     }
 
@@ -506,16 +518,20 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "front_back_cycles"
         );
-        printf(
-               "SET %s = %lld\n"
-               , "stalled_frontend"
-               , (collected_number) perf_events[EV_ID_STALLED_CYCLES_FRONTEND].value
-        );
-        printf(
-               "SET %s = %lld\n"
-               , "stalled_backend"
-               , (collected_number) perf_events[EV_ID_STALLED_CYCLES_BACKEND].value
-        );
+        if(likely(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "stalled_frontend"
+                   , (collected_number) perf_events[EV_ID_STALLED_CYCLES_FRONTEND].value
+            );
+        }
+        if(likely(perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated)) {
+            printf(
+                   "SET %s = %lld\n"
+                   , "stalled_backend"
+                   , (collected_number) perf_events[EV_ID_STALLED_CYCLES_BACKEND].value
+            );
+        }
         printf("END\n");
     }
 
@@ -912,13 +928,11 @@ static void perf_send_metrics() {
                , RRD_TYPE_PERF
                , "pbu_cache"
         );
-        if(likely(perf_events[EV_ID_PBU_READ_ACCESS].updated)) {
-            printf(
-                   "SET %s = %lld\n"
-                   , "read_access"
-                   , (collected_number) perf_events[EV_ID_PBU_READ_ACCESS].value
-            );
-        }
+        printf(
+               "SET %s = %lld\n"
+               , "read_access"
+               , (collected_number) perf_events[EV_ID_PBU_READ_ACCESS].value
+        );
         printf("END\n");
     }
 }
