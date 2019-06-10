@@ -6,8 +6,18 @@
 
 #define PLUGIN_PERF_NAME "perf.plugin"
 
-#define NETDATA_CHART_PRIO_PERF_CPU_CYCLES            8701
-#define NETDATA_CHART_PRIO_PERF_CACHE_LL              8906
+// Hardware counters
+#define NETDATA_CHART_PRIO_PERF_CPU_CYCLES            8800
+#define NETDATA_CHART_PRIO_PERF_INSTRUCTIONS          8801
+#define NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUSTIONS   8802
+#define NETDATA_CHART_PRIO_PERF_CACHE                 8803
+#define NETDATA_CHART_PRIO_PERF_BUS_CYCLES            8804
+#define NETDATA_CHART_PRIO_PERF_FRONT_BACK_CYCLES     8805
+
+// Software counters
+#define NETDATA_CHART_PRIO_PERF_MIGRATIONS            8810
+#define NETDATA_CHART_PRIO_PERF_ALIGNMENT             8811
+#define NETDATA_CHART_PRIO_PERF_EMULATION             8812
 
 // callback required by fatal()
 void netdata_cleanup_and_exit(int ret) {
@@ -41,6 +51,9 @@ char *netdata_configured_host_prefix = "";
 // Variables
 
 #define RRD_TYPE_PERF "perf"
+#define RRD_FAMILY_HW "hardware"
+#define RRD_FAMILY_SW "software"
+#define RRD_FAMILY_CACHE "cache"
 
 #define NO_FD -1
 #define ALL_PIDS -1
@@ -64,13 +77,13 @@ typedef enum perf_event_id {
     EV_ID_REF_CPU_CYCLES,
 
     // Software counters
-    EV_ID_CPU_CLOCK,
-    EV_ID_TASK_CLOCK,
-    EV_ID_PAGE_FAULTS,
-    EV_ID_CONTEXT_SWITCHES,
+    // EV_ID_CPU_CLOCK,
+    // EV_ID_TASK_CLOCK,
+    // EV_ID_PAGE_FAULTS,
+    // EV_ID_CONTEXT_SWITCHES,
     EV_ID_CPU_MIGRATIONS,
-    EV_ID_PAGE_FAULTS_MIN,
-    EV_ID_PAGE_FAULTS_MAJ,
+    // EV_ID_PAGE_FAULTS_MIN,
+    // EV_ID_PAGE_FAULTS_MAJ,
     EV_ID_ALIGNMENT_FAULTS,
     EV_ID_EMULATION_FAULTS,
 
@@ -144,13 +157,13 @@ static struct perf_event {
     {EV_ID_REF_CPU_CYCLES,          PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
 
     // Software counters
-    {EV_ID_CPU_CLOCK,        PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,        &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_TASK_CLOCK,       PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,       &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_PAGE_FAULTS,      PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS,      &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_CONTEXT_SWITCHES, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    // {EV_ID_CPU_CLOCK,        PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,        &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    // {EV_ID_TASK_CLOCK,       PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,       &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    // {EV_ID_PAGE_FAULTS,      PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS,      &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    // {EV_ID_CONTEXT_SWITCHES, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
     {EV_ID_CPU_MIGRATIONS,   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS,   &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_PAGE_FAULTS_MIN,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_PAGE_FAULTS_MAJ,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    // {EV_ID_PAGE_FAULTS_MIN,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    // {EV_ID_PAGE_FAULTS_MAJ,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
     {EV_ID_ALIGNMENT_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
     {EV_ID_EMULATION_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_EMULATION_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
 
@@ -264,8 +277,9 @@ static int perf_collect() {
         current_event->updated = 0;
         current_event->value = 0;
 
+        if(unlikely(current_event->disabled)) continue;
+
         for(cpu = 0; cpu < number_of_cpus; cpu++) {
-            if(unlikely(current_event->disabled)) continue;
 
             ssize_t read_size = read(current_event->fd[cpu], &value, UINT64_SIZE);
 
@@ -278,6 +292,7 @@ static int perf_collect() {
                 return 1;
             }
         }
+
         if(unlikely(debug)) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %lu\n", current_event->id, current_event->value);
     }
 
@@ -285,33 +300,303 @@ static int perf_collect() {
 }
 
 static void perf_send_metrics() {
-    static int new_chart_generated = 0;
+    static int cpu_cycles_chart_generated = 0, instructions_chart_generated = 0, branch_chart_generated = 0, cache_chart_generated = 0,
+               bus_cycles_chart_generated = 0, front_back_cycles_chart_generated = 0;
+    static int migrations_chart_generated = 0, alighnment_chart_generated = 0, emulation_chart_generated = 0;
 
-    if(!new_chart_generated) {
-        new_chart_generated = 1;
+    // ------------------------------------------------------------------------
 
-        printf("CHART %s.%s '' 'CPU cycles' 'cycles/s' %s '' line %d %d %s\n"
+    if(likely(perf_events[EV_ID_CPU_CYCLES].updated || perf_events[EV_ID_REF_CPU_CYCLES].updated)) {
+        if(unlikely(!cpu_cycles_chart_generated)) {
+            cpu_cycles_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'CPU cycles' 'cycles/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "cpu_cycles"
+                   , RRD_FAMILY_HW
+                   , NETDATA_CHART_PRIO_PERF_CPU_CYCLES
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "cpu");
+            printf("DIMENSION %s '' incremental 1 1\n", "ref_cpu");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
                , RRD_TYPE_PERF
                , "cpu_cycles"
-               , RRD_TYPE_PERF
-               , NETDATA_CHART_PRIO_PERF_CPU_CYCLES
-               , update_every
-               , PLUGIN_PERF_NAME
         );
-        printf("DIMENSION %s '' incremental 1 1\n", "cycles");
+        printf(
+               "SET %s = %lld\n"
+               , "cpu"
+               , (collected_number) perf_events[EV_ID_CPU_CYCLES].value
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "ref_cpu"
+               , (collected_number) perf_events[EV_ID_REF_CPU_CYCLES].value
+        );
+        printf("END\n");
     }
 
-    printf(
-           "BEGIN %s.%s\n"
-           , RRD_TYPE_PERF
-           , "cpu_cycles"
-    );
-    printf(
-           "SET %s = %lld\n"
-           , "cycles"
-           , (collected_number) perf_events[EV_ID_CPU_CYCLES].value
-    );
-    printf("END\n");
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_INSTRUCTIONS].updated)) {
+        if(unlikely(!instructions_chart_generated)) {
+            instructions_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Instructions' 'instructions/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "instructions"
+                   , RRD_FAMILY_HW
+                   , NETDATA_CHART_PRIO_PERF_INSTRUCTIONS
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "instructions");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "instructions"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "instructions"
+               , (collected_number) perf_events[EV_ID_INSTRUCTIONS].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_BRANCH_INSTRUCTIONS].updated || perf_events[EV_ID_BRANCH_MISSES].updated)) {
+        if(unlikely(!branch_chart_generated)) {
+            branch_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Branch instructions' 'instructions/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "branch_instructions"
+                   , RRD_FAMILY_HW
+                   , NETDATA_CHART_PRIO_PERF_BRANCH_INSTRUSTIONS
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "instructions");
+            printf("DIMENSION %s '' incremental 1 1\n", "misses");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "branch_instructions"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "instructions"
+               , (collected_number) perf_events[EV_ID_BRANCH_INSTRUCTIONS].value
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "misses"
+               , (collected_number) perf_events[EV_ID_BRANCH_MISSES].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_CACHE_REFERENCES].updated || perf_events[EV_ID_CACHE_MISSES].updated)) {
+        if(unlikely(!cache_chart_generated)) {
+            cache_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Cache operations' 'operations/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "cache"
+                   , RRD_FAMILY_HW
+                   , NETDATA_CHART_PRIO_PERF_CACHE
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "references");
+            printf("DIMENSION %s '' incremental 1 1\n", "misses");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "cache"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "references"
+               , (collected_number) perf_events[EV_ID_CACHE_REFERENCES].value
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "misses"
+               , (collected_number) perf_events[EV_ID_CACHE_MISSES].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_BUS_CYCLES].updated)) {
+        if(unlikely(!bus_cycles_chart_generated)) {
+            bus_cycles_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Bus cycles' 'cycles/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "bus_cycles"
+                   , RRD_FAMILY_HW
+                   , NETDATA_CHART_PRIO_PERF_BUS_CYCLES
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "bus");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "bus_cycles"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "bus"
+               , (collected_number) perf_events[EV_ID_BUS_CYCLES].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated || perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated)) {
+        if(unlikely(!front_back_cycles_chart_generated)) {
+            front_back_cycles_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Stalled frontend and backebd cycles' 'cycles/s' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "front_back_cycles"
+                   , RRD_FAMILY_HW
+                   , NETDATA_CHART_PRIO_PERF_FRONT_BACK_CYCLES
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "stalled_frontend");
+            printf("DIMENSION %s '' incremental 1 1\n", "stalled_backend");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "front_back_cycles"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "stalled_frontend"
+               , (collected_number) perf_events[EV_ID_STALLED_CYCLES_FRONTEND].value
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "stalled_backend"
+               , (collected_number) perf_events[EV_ID_STALLED_CYCLES_BACKEND].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_CPU_MIGRATIONS].updated)) {
+        if(unlikely(!migrations_chart_generated)) {
+            migrations_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'CPU migrations' 'migrations' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "migrations"
+                   , RRD_FAMILY_SW
+                   , NETDATA_CHART_PRIO_PERF_MIGRATIONS
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "migrations");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "migrations"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "migrations"
+               , (collected_number) perf_events[EV_ID_CPU_MIGRATIONS].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_ALIGNMENT_FAULTS].updated)) {
+        if(unlikely(!alighnment_chart_generated)) {
+            alighnment_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Alighnment faults' 'faults' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "alighnment_faults"
+                   , RRD_FAMILY_SW
+                   , NETDATA_CHART_PRIO_PERF_ALIGNMENT
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "faults");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "alighnment_faults"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "faults"
+               , (collected_number) perf_events[EV_ID_ALIGNMENT_FAULTS].value
+        );
+        printf("END\n");
+    }
+
+    // ------------------------------------------------------------------------
+
+    if(likely(perf_events[EV_ID_EMULATION_FAULTS].updated)) {
+        if(unlikely(!emulation_chart_generated)) {
+            emulation_chart_generated = 1;
+
+            printf("CHART %s.%s '' 'Emulation faults' 'faults' %s '' line %d %d %s\n"
+                   , RRD_TYPE_PERF
+                   , "emulation_faults"
+                   , RRD_FAMILY_SW
+                   , NETDATA_CHART_PRIO_PERF_EMULATION
+                   , update_every
+                   , PLUGIN_PERF_NAME
+            );
+            printf("DIMENSION %s '' incremental 1 1\n", "faults");
+        }
+
+        printf(
+               "BEGIN %s.%s\n"
+               , RRD_TYPE_PERF
+               , "emulation_faults"
+        );
+        printf(
+               "SET %s = %lld\n"
+               , "faults"
+               , (collected_number) perf_events[EV_ID_EMULATION_FAULTS].value
+        );
+        printf("END\n");
+    }
 }
 
 int main(int argc, char **argv) {
