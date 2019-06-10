@@ -59,8 +59,8 @@ typedef enum perf_event_id {
     EV_ID_BRANCH_INSTRUCTIONS,
     EV_ID_BRANCH_MISSES,
     EV_ID_BUS_CYCLES,
-    EV_ID_CYCLES_FRONTEND,
-    EV_ID_CYCLES_BACKEND,
+    EV_ID_STALLED_CYCLES_FRONTEND,
+    EV_ID_STALLED_CYCLES_BACKEND,
     EV_ID_REF_CPU_CYCLES,
 
     // Software counters
@@ -105,6 +105,10 @@ typedef enum perf_event_id {
 enum perf_event_group {
     EV_GROUP_0,
     EV_GROUP_1,
+    EV_GROUP_2,
+    EV_GROUP_3,
+    EV_GROUP_4,
+    EV_GROUP_5,
 
     EV_GROUP_NUM
 };
@@ -127,10 +131,53 @@ static struct perf_event {
 
     uint64_t value;
 } perf_events[] = {
-    {EV_ID_CPU_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,     &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
-    {EV_ID_INSTRUCTIONS,   PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,   &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
-    {EV_ID_BUS_CYCLES,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,     &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
-    {EV_ID_REF_CPU_CYCLES, PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES, &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    // Hardware counters
+    {EV_ID_CPU_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
+    {EV_ID_INSTRUCTIONS,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    {EV_ID_CACHE_REFERENCES,        PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    {EV_ID_CACHE_MISSES,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    {EV_ID_BRANCH_INSTRUCTIONS,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    {EV_ID_BRANCH_MISSES,           PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
+    {EV_ID_BUS_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
+    {EV_ID_STALLED_CYCLES_FRONTEND, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
+    {EV_ID_STALLED_CYCLES_BACKEND,  PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
+    {EV_ID_REF_CPU_CYCLES,          PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
+
+    // Software counters
+    {EV_ID_CPU_CLOCK,        PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,        &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_TASK_CLOCK,       PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,       &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_PAGE_FAULTS,      PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS,      &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_CONTEXT_SWITCHES, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_CPU_MIGRATIONS,   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS,   &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_PAGE_FAULTS_MIN,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_PAGE_FAULTS_MAJ,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_ALIGNMENT_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    {EV_ID_EMULATION_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_EMULATION_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+
+    // Hardware cache counters
+    {EV_ID_L1D_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
+    {EV_ID_L1D_READ_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
+    {EV_ID_L1D_WRITE_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
+    {EV_ID_L1D_WRITE_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
+    {EV_ID_L1D_PREFETCH_ACCESS, PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_PREFETCH << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
+
+    {EV_ID_L1I_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1I)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_L1I_READ_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1I)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+
+    {EV_ID_LL_READ_ACCESS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_LL_READ_MISS,        PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_LL_WRITE_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_LL_WRITE_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+
+    {EV_ID_DTLB_READ_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_DTLB_READ_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_DTLB_WRITE_ACCESS,   PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_DTLB_WRITE_MISS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
+
+    {EV_ID_ITLB_READ_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
+    {EV_ID_ITLB_READ_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
+
+    {EV_ID_PBU_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_BPU)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
 
     {EV_ID_END, 0, 0, NULL, NULL, 0, 0, 0}
 };
@@ -192,7 +239,7 @@ static int perf_init() {
             *(current_event->fd + cpu) = fd;
             *(*current_event->group_leader_fd + cpu) = group_leader_fd;
 
-            info("fd = %d, leader_fd = %d", fd, group_leader_fd);
+            if(unlikely(debug)) fprintf(stderr, "event id = %u, cpu = %d, fd = %d, leader_fd = %d\n", current_event->id, cpu, fd, group_leader_fd);
         }
     }
 
@@ -231,7 +278,7 @@ static int perf_collect() {
                 return 1;
             }
         }
-        info("Successful read. value = %lu", current_event->value);
+        if(unlikely(debug)) fprintf(stderr, "Successfully read event id = %u, value = %lu\n", current_event->id, current_event->value);
     }
 
     return 0;
