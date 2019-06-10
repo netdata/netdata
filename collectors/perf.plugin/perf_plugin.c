@@ -239,7 +239,7 @@ static int perf_init() {
             *(current_event->fd + cpu) = fd;
             *(*current_event->group_leader_fd + cpu) = group_leader_fd;
 
-            if(unlikely(debug)) fprintf(stderr, "event id = %u, cpu = %d, fd = %d, leader_fd = %d\n", current_event->id, cpu, fd, group_leader_fd);
+            if(unlikely(debug)) fprintf(stderr, "perf.plugin: event id = %u, cpu = %d, fd = %d, leader_fd = %d\n", current_event->id, cpu, fd, group_leader_fd);
         }
     }
 
@@ -278,7 +278,7 @@ static int perf_collect() {
                 return 1;
             }
         }
-        if(unlikely(debug)) fprintf(stderr, "Successfully read event id = %u, value = %lu\n", current_event->id, current_event->value);
+        if(unlikely(debug)) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %lu\n", current_event->id, current_event->value);
     }
 
     return 0;
