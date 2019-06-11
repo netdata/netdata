@@ -247,15 +247,15 @@ static int perf_init() {
             if(fd < 0) {
                 switch errno {
                     case EACCES:
-                        error("PERF: Cannot access to the PMU: Permission denied");
+                        error("Cannot access to the PMU: Permission denied");
                         break;
                     case EBUSY:
-                        error("PERF: Another event already has exclusive access to the PMU");
+                        error("Another event already has exclusive access to the PMU");
                         break;
                     default:
-                        error("PERF: Cannot open perf event");
+                        error("Cannot open perf event");
                 }
-                error("PERF: Disabling event %u", current_event->id);
+                error("Disabling event %u", current_event->id);
                 current_event->disabled = 1;
             }
 
@@ -304,7 +304,7 @@ static int perf_collect() {
                 current_event->updated = 1;
             }
             else {
-                error("PERF: Cannot update value for event %u", current_event->id);
+                error("Cannot update value for event %u", current_event->id);
                 return 1;
             }
         }
@@ -320,7 +320,7 @@ static int perf_collect() {
                 if(unlikely(ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
                             || ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1))
                 {
-                    error("PERF: Cannot reenable event group");
+                    error("Cannot reenable event group");
                 }
             }
         }
@@ -1150,7 +1150,7 @@ void parse_command_line(int argc, char **argv) {
             exit(1);
         }
 
-        error("perf.plugin: ignoring parameter '%s'", argv[i]);
+        error("ignoring parameter '%s'", argv[i]);
     }
 
     if(!plugin_enabled){
@@ -1225,6 +1225,6 @@ int main(int argc, char **argv) {
         if(now_monotonic_sec() - started_t > 14400) break;
     }
 
-    info("PERF process exiting");
+    info("process exiting");
     perf_free();
 }
