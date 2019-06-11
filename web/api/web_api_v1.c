@@ -441,7 +441,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char save[WEB_FIELDS_MAX];
     //Save the pointer where ';' and ':' are in tqx to restore
     char *tqxname[WEB_FIELDS_MAX];
-    char *tqxvalue[WEB_FIELDS_MAX];
     uint32_t tqxtotal=0;
     char *value ;
     size_t lvalue;
@@ -509,11 +508,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                     }
 
                     tqxname[tqxtotal] = tqx_name;
-                    tqxvalue[tqxtotal] = tqx_value;
 
                     tqxtotal++;
-                    *tqx_value = 0x00;
-                    (void)tqx_value;
                     *tqx_name = 0x00;
 
                     if(!strcmp(moveme, "version"))
@@ -628,7 +624,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             i = 0;
             do {
                 *tqxname[i] = ':';
-                *tqxvalue[i] = ';';
             } while (++i < tqxtotal);
         }
 
