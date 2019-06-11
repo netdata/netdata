@@ -26,9 +26,12 @@ create_group_and_assign_to_user() {
 
 	# Make sure we use the right docker group
 	GRP_TO_ASSIGN="$(grep ":x:${local_DOCKER_GID}:" /etc/group | cut -d':' -f1)"
-	echo >&2 "Group creation and assignment completed, netdata was assigned to group ${GRP_TO_ASSIGN}/${local_DOCKER_GID}"
-
-	echo "${GRP_TO_ASSIGN}"
+	if [ -z "${GRP_TO_ASSIGN}" ]; then
+		echo >&2 "Could not find group ID ${local_DOCKER_GID} in /etc/group. Check your logs and report it if this is an unrecovereable error"
+	else
+		echo >&2 "Group creation and assignment completed, netdata was assigned to group ${GRP_TO_ASSIGN}/${local_DOCKER_GID}"
+		echo "${GRP_TO_ASSIGN}"
+	fi
 }
 
 DOCKER_USR="netdata"
@@ -36,11 +39,11 @@ DOCKER_SOCKET="/var/run/docker.sock"
 DOCKER_GROUP="docker"
 
 if [ -S "${DOCKER_SOCKET}" ] && [ -n "${PGID}" ]; then
-
 	GRP=$(create_group_and_assign_to_user "${DOCKER_GROUP}" "${PGID}" "${DOCKER_USR}")
-
-	echo "Adjusting ownership of mapped docker socket '${DOCKER_SOCKET}' to root:${GRP}"
-	chown "root:${GRP}" "${DOCKER_SOCKET}"
+	if [ -n "${GRP}" ]; then
+		echo "Adjusting ownership of mapped docker socket '${DOCKER_SOCKET}' to root:${GRP}"
+		chown "root:${GRP}" "${DOCKER_SOCKET}"
+	fi
 fi
 
 exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_PORT}" "$@"
