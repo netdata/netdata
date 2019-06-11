@@ -513,6 +513,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
                     tqxtotal++;
                     *tqx_value = 0x00;
+                    (void)tqx_value;
                     *tqx_name = 0x00;
 
                     if(!strcmp(moveme, "version"))
@@ -658,7 +659,7 @@ static void web_client_api_restore_registry_variable(struct web_fields *names,ch
         return;
     }
 
-    uint32_t i;
+    uint32_t i = 0;
     do {
         char *name = names[i].body;
         size_t nlength = names[i].length;
