@@ -332,7 +332,7 @@ static int perf_collect() {
 
 static void perf_send_metrics() {
     static int cpu_cycles_chart_generated = 0, instructions_chart_generated = 0, branch_chart_generated = 0,
-               cache_chart_generated = 0, bus_cycles_chart_generated = 0, front_back_cycles_chart_generated = 0;
+               cache_chart_generated = 0, bus_cycles_chart_generated = 0, stalled_cycles_chart_generated = 0;
     static int migrations_chart_generated = 0, alighnment_chart_generated = 0, emulation_chart_generated = 0;
     static int L1D_chart_generated = 0, L1D_prefetch_chart_generated = 0, L1I_chart_generated = 0, LL_chart_generated = 0,
                DTLB_chart_generated = 0, ITLB_chart_generated = 0, PBU_chart_generated = 0;
@@ -520,37 +520,37 @@ static void perf_send_metrics() {
     // ------------------------------------------------------------------------
 
     if(likely(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated || perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated)) {
-        if(unlikely(!front_back_cycles_chart_generated)) {
-            front_back_cycles_chart_generated = 1;
+        if(unlikely(!stalled_cycles_chart_generated)) {
+            stalled_cycles_chart_generated = 1;
 
             printf("CHART %s.%s '' 'Stalled frontend and backend cycles' 'cycles/s' %s '' line %d %d %s\n"
                    , RRD_TYPE_PERF
-                   , "front_back_cycles"
+                   , "stalled_cycles"
                    , RRD_FAMILY_HW
                    , NETDATA_CHART_PRIO_PERF_FRONT_BACK_CYCLES
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "stalled_frontend");
-            printf("DIMENSION %s '' incremental 1 1\n", "stalled_backend");
+            printf("DIMENSION %s '' incremental 1 1\n", "frontend");
+            printf("DIMENSION %s '' incremental 1 1\n", "backend");
         }
 
         printf(
                "BEGIN %s.%s\n"
                , RRD_TYPE_PERF
-               , "front_back_cycles"
+               , "stalled_cycles"
         );
         if(likely(perf_events[EV_ID_STALLED_CYCLES_FRONTEND].updated)) {
             printf(
                    "SET %s = %lld\n"
-                   , "stalled_frontend"
+                   , "frontend"
                    , (collected_number) perf_events[EV_ID_STALLED_CYCLES_FRONTEND].value
             );
         }
         if(likely(perf_events[EV_ID_STALLED_CYCLES_BACKEND].updated)) {
             printf(
                    "SET %s = %lld\n"
-                   , "stalled_backend"
+                   , "backend"
                    , (collected_number) perf_events[EV_ID_STALLED_CYCLES_BACKEND].value
             );
         }
