@@ -259,6 +259,9 @@ inline HTTP_VALIDATION url_is_request_complete(char *begin,char *end,size_t leng
         } else if (*begin == '\n') {
             begin++;
             counter++;
+        } else {
+            counter = 0;
+            begin++;
         }
 
         //Case I already have the total expected, I stop it.
