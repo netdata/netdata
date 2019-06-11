@@ -454,6 +454,15 @@ int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 		return 0;
 }
 
+/**
+ * Health Main
+ *
+ * The main thread of the health system.
+ *
+ * @param ptr is a pointer to the netdata_static_thread structure.
+ *
+ * @return It always returns NULL
+ */
 void *health_main(void *ptr) {
     netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
