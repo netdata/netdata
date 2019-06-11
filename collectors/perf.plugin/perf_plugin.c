@@ -269,9 +269,14 @@ static int perf_init() {
 }
 
 static void perf_free(void) {
+    int cpu;
     struct perf_event *current_event = NULL;
 
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
+        for(cpu = 0; cpu < number_of_cpus; cpu++) {
+            close(*(current_event->fd + cpu));
+        }
+
         free(current_event->fd);
         free(*current_event->group_leader_fd);
     }
@@ -281,6 +286,7 @@ static int perf_collect() {
     int cpu;
     struct perf_event *current_event = NULL;
     uint64_t value;
+    static uint64_t prev_cpu_cycles_value = 0;
 
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
         current_event->updated = 0;
@@ -297,13 +303,28 @@ static int perf_collect() {
                 current_event->updated = 1;
             }
             else {
-                error("Cannot update value for event %u", current_event->id);
+                error("PERF: Cannot update value for event %u", current_event->id);
                 return 1;
             }
         }
 
         if(unlikely(debug)) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %lu\n", current_event->id, current_event->value);
     }
+
+    if(unlikely(!(perf_events[EV_ID_CPU_CYCLES].value - prev_cpu_cycles_value))) {
+        int group;
+
+        for(group = 0; group < EV_GROUP_NUM; group++) {
+            for(cpu = 0; cpu < number_of_cpus; cpu++) {
+                if(unlikely(ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
+                            || ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1))
+                {
+                    error("PERF: Cannot reenable event group");
+                }
+            }
+        }
+    }
+    prev_cpu_cycles_value = perf_events[EV_ID_CPU_CYCLES].value;
 
     return 0;
 }
