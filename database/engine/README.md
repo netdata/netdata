@@ -106,4 +106,11 @@ There are explicit memory requirements **per** DB engine **instance**, meaning *
 An important observation is that RAM usage depends on both the `page cache size` and the 
 `dbengine disk space` options. 
 
+## File descriptor requirements
+
+The Database Engine may keep a **significant** amount of files open per instance (e.g. per streaming
+slave or master server). When configuring your system you should make sure there are at least 60
+file descriptors available per `dbengine` instance.
+
+
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdatabase%2Fengine%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
