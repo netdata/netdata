@@ -17,7 +17,7 @@ except AttributeError:
 
 
 # https://github.com/urllib3/urllib3/blob/master/CHANGES.rst#19-2014-07-04
-# New retry logic and urllib3.util.retry.Retry configuration object. (Issue #326)
+# New retry logic and urllib3.util.retry.Retry configuration object. (Issue https://github.com/urllib3/urllib3/pull/326)
 URLLIB3_MIN_REQUIRED_VERSION = '1.9'
 URLLIB3_VERSION = urllib3.__version__
 URLLIB3 = 'urllib3'
