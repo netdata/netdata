@@ -73,10 +73,6 @@ static int debug = 0;
 static int update_every = 1;
 static int freq = 0;
 
-static int do_cpu_cycles = 0, do_instructions = 0, do_branch = 0, do_cache = 0, du_bus_cycles = 0, do_front_back_cycles = 0;
-static int do_migrations = 0, do_alighnment = 0, do_emulation = 0;
-static int do_L1D = 0, do_L1D_prefetch = 0, do_L1I = 0, do_LL = 0, do_DTLB = 0, do_ITLB = 0, do_PBU = 0;
-
 typedef enum perf_event_id {
     // Hardware counters
     EV_ID_CPU_CYCLES,
@@ -159,52 +155,52 @@ static struct perf_event {
     uint64_t value;
 } perf_events[] = {
     // Hardware counters
-    {EV_ID_CPU_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
-    {EV_ID_INSTRUCTIONS,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
-    {EV_ID_CACHE_REFERENCES,        PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
-    {EV_ID_CACHE_MISSES,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
-    {EV_ID_BRANCH_INSTRUCTIONS,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
-    {EV_ID_BRANCH_MISSES,           PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           &group_leader_fds[EV_GROUP_1], NULL, 0, 0, 0},
-    {EV_ID_BUS_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
-    {EV_ID_STALLED_CYCLES_FRONTEND, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
-    {EV_ID_STALLED_CYCLES_BACKEND,  PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
-    {EV_ID_REF_CPU_CYCLES,          PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          &group_leader_fds[EV_GROUP_0], NULL, 0, 0, 0},
+    {EV_ID_CPU_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              &group_leader_fds[EV_GROUP_0], NULL, 1, 0, 0},
+    {EV_ID_INSTRUCTIONS,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            &group_leader_fds[EV_GROUP_1], NULL, 1, 0, 0},
+    {EV_ID_CACHE_REFERENCES,        PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        &group_leader_fds[EV_GROUP_1], NULL, 1, 0, 0},
+    {EV_ID_CACHE_MISSES,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            &group_leader_fds[EV_GROUP_1], NULL, 1, 0, 0},
+    {EV_ID_BRANCH_INSTRUCTIONS,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     &group_leader_fds[EV_GROUP_1], NULL, 1, 0, 0},
+    {EV_ID_BRANCH_MISSES,           PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           &group_leader_fds[EV_GROUP_1], NULL, 1, 0, 0},
+    {EV_ID_BUS_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              &group_leader_fds[EV_GROUP_0], NULL, 1, 0, 0},
+    {EV_ID_STALLED_CYCLES_FRONTEND, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, &group_leader_fds[EV_GROUP_0], NULL, 1, 0, 0},
+    {EV_ID_STALLED_CYCLES_BACKEND,  PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  &group_leader_fds[EV_GROUP_0], NULL, 1, 0, 0},
+    {EV_ID_REF_CPU_CYCLES,          PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          &group_leader_fds[EV_GROUP_0], NULL, 1, 0, 0},
 
     // Software counters
-    // {EV_ID_CPU_CLOCK,        PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,        &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    // {EV_ID_TASK_CLOCK,       PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,       &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    // {EV_ID_PAGE_FAULTS,      PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS,      &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    // {EV_ID_CONTEXT_SWITCHES, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_CPU_MIGRATIONS,   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS,   &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    // {EV_ID_PAGE_FAULTS_MIN,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    // {EV_ID_PAGE_FAULTS_MAJ,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ,  &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_ALIGNMENT_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
-    {EV_ID_EMULATION_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_EMULATION_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 0, 0, 0},
+    // {EV_ID_CPU_CLOCK,        PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,        &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    // {EV_ID_TASK_CLOCK,       PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,       &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    // {EV_ID_PAGE_FAULTS,      PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS,      &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    // {EV_ID_CONTEXT_SWITCHES, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    {EV_ID_CPU_MIGRATIONS,   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS,   &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    // {EV_ID_PAGE_FAULTS_MIN,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN,  &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    // {EV_ID_PAGE_FAULTS_MAJ,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ,  &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    {EV_ID_ALIGNMENT_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
+    {EV_ID_EMULATION_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_EMULATION_FAULTS, &group_leader_fds[EV_GROUP_2], NULL, 1, 0, 0},
 
     // Hardware cache counters
-    {EV_ID_L1D_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
-    {EV_ID_L1D_READ_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
-    {EV_ID_L1D_WRITE_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
-    {EV_ID_L1D_WRITE_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
-    {EV_ID_L1D_PREFETCH_ACCESS, PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_PREFETCH << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 0, 0, 0},
+    {EV_ID_L1D_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 1, 0, 0},
+    {EV_ID_L1D_READ_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_3], NULL, 1, 0, 0},
+    {EV_ID_L1D_WRITE_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 1, 0, 0},
+    {EV_ID_L1D_WRITE_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_3], NULL, 1, 0, 0},
+    {EV_ID_L1D_PREFETCH_ACCESS, PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1D)  | (PERF_COUNT_HW_CACHE_OP_PREFETCH << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_3], NULL, 1, 0, 0},
 
-    {EV_ID_L1I_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1I)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
-    {EV_ID_L1I_READ_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1I)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_L1I_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1I)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
+    {EV_ID_L1I_READ_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_L1I)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
 
-    {EV_ID_LL_READ_ACCESS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
-    {EV_ID_LL_READ_MISS,        PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
-    {EV_ID_LL_WRITE_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
-    {EV_ID_LL_WRITE_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
+    {EV_ID_LL_READ_ACCESS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
+    {EV_ID_LL_READ_MISS,        PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
+    {EV_ID_LL_WRITE_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
+    {EV_ID_LL_WRITE_MISS,       PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_LL)   | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
 
-    {EV_ID_DTLB_READ_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
-    {EV_ID_DTLB_READ_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
-    {EV_ID_DTLB_WRITE_ACCESS,   PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 0, 0, 0},
-    {EV_ID_DTLB_WRITE_MISS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
+    {EV_ID_DTLB_READ_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
+    {EV_ID_DTLB_READ_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
+    {EV_ID_DTLB_WRITE_ACCESS,   PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_4], NULL, 1, 0, 0},
+    {EV_ID_DTLB_WRITE_MISS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE    << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_5], NULL, 1, 0, 0},
 
-    {EV_ID_ITLB_READ_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
-    {EV_ID_ITLB_READ_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
+    {EV_ID_ITLB_READ_ACCESS,    PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_5], NULL, 1, 0, 0},
+    {EV_ID_ITLB_READ_MISS,      PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS   << 16), &group_leader_fds[EV_GROUP_5], NULL, 1, 0, 0},
 
-    {EV_ID_PBU_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_BPU)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_5], NULL, 0, 0, 0},
+    {EV_ID_PBU_READ_ACCESS,     PERF_TYPE_HW_CACHE, (PERF_COUNT_HW_CACHE_BPU)  | (PERF_COUNT_HW_CACHE_OP_READ     << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16), &group_leader_fds[EV_GROUP_5], NULL, 1, 0, 0},
 
     {EV_ID_END, 0, 0, NULL, NULL, 0, 0, 0}
 };
@@ -527,7 +523,7 @@ static void perf_send_metrics() {
         if(unlikely(!front_back_cycles_chart_generated)) {
             front_back_cycles_chart_generated = 1;
 
-            printf("CHART %s.%s '' 'Stalled frontend and backebd cycles' 'cycles/s' %s '' line %d %d %s\n"
+            printf("CHART %s.%s '' 'Stalled frontend and backend cycles' 'cycles/s' %s '' line %d %d %s\n"
                    , RRD_TYPE_PERF
                    , "front_back_cycles"
                    , RRD_FAMILY_HW
@@ -964,7 +960,7 @@ static void perf_send_metrics() {
 }
 
 void parse_command_line(int argc, char **argv) {
-    int i;
+    int i, plugin_enabled = 0;
 
     for(i = 1; i < argc ; i++) {
         if(isdigit(*argv[i]) && !freq) {
@@ -977,6 +973,110 @@ void parse_command_line(int argc, char **argv) {
         else if(strcmp("version", argv[i]) == 0 || strcmp("-version", argv[i]) == 0 || strcmp("--version", argv[i]) == 0 || strcmp("-v", argv[i]) == 0 || strcmp("-V", argv[i]) == 0) {
             printf("perf.plugin %s\n", VERSION);
             exit(0);
+        }
+        else if(strcmp("all", argv[i]) == 0) {
+            struct perf_event *current_event = NULL;
+
+            for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++)
+                current_event->disabled = 0;
+
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("cycles", argv[i]) == 0) {
+            perf_events[EV_ID_CPU_CYCLES].disabled = 0;
+            perf_events[EV_ID_REF_CPU_CYCLES].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("instructions", argv[i]) == 0) {
+            perf_events[EV_ID_INSTRUCTIONS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("branch", argv[i]) == 0) {
+            perf_events[EV_ID_BRANCH_INSTRUCTIONS].disabled = 0;
+            perf_events[EV_ID_BRANCH_MISSES].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("cache", argv[i]) == 0) {
+            perf_events[EV_ID_CACHE_REFERENCES].disabled = 0;
+            perf_events[EV_ID_CACHE_MISSES].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("bus", argv[i]) == 0) {
+            perf_events[EV_ID_BUS_CYCLES].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("stalled", argv[i]) == 0) {
+            perf_events[EV_ID_STALLED_CYCLES_FRONTEND].disabled = 0;
+            perf_events[EV_ID_STALLED_CYCLES_BACKEND].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("migrations", argv[i]) == 0) {
+            perf_events[EV_ID_CPU_MIGRATIONS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("alighnment", argv[i]) == 0) {
+            perf_events[EV_ID_ALIGNMENT_FAULTS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("emulation", argv[i]) == 0) {
+            perf_events[EV_ID_EMULATION_FAULTS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("L1D", argv[i]) == 0) {
+            perf_events[EV_ID_L1D_READ_ACCESS].disabled = 0;
+            perf_events[EV_ID_L1D_READ_MISS].disabled = 0;
+            perf_events[EV_ID_L1D_WRITE_ACCESS].disabled = 0;
+            perf_events[EV_ID_L1D_WRITE_MISS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("L1D-prefetch", argv[i]) == 0) {
+            perf_events[EV_ID_L1D_PREFETCH_ACCESS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("L1I", argv[i]) == 0) {
+            perf_events[EV_ID_L1I_READ_ACCESS].disabled = 0;
+            perf_events[EV_ID_L1I_READ_MISS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("LL", argv[i]) == 0) {
+            perf_events[EV_ID_LL_READ_ACCESS].disabled = 0;
+            perf_events[EV_ID_LL_READ_MISS].disabled = 0;
+            perf_events[EV_ID_LL_WRITE_ACCESS].disabled = 0;
+            perf_events[EV_ID_LL_WRITE_MISS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("DTLB", argv[i]) == 0) {
+            perf_events[EV_ID_DTLB_READ_ACCESS].disabled = 0;
+            perf_events[EV_ID_DTLB_READ_MISS].disabled = 0;
+            perf_events[EV_ID_DTLB_WRITE_ACCESS].disabled = 0;
+            perf_events[EV_ID_DTLB_WRITE_MISS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("ITLB", argv[i]) == 0) {
+            perf_events[EV_ID_ITLB_READ_ACCESS].disabled = 0;
+            perf_events[EV_ID_ITLB_READ_MISS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
+        }
+        else if(strcmp("PBU", argv[i]) == 0) {
+            perf_events[EV_ID_PBU_READ_ACCESS].disabled = 0;
+            plugin_enabled = 1;
+            continue;
         }
         else if(strcmp("debug", argv[i]) == 0) {
             debug = 1;
@@ -996,6 +1096,40 @@ void parse_command_line(int argc, char **argv) {
                     "\n"
                     "  COLLECTION_FREQUENCY    data collection frequency in seconds\n"
                     "                          minimum: %d\n"
+                    "\n"
+                    "  all                     enable all charts\n"
+                    "\n"
+                    "  cycles                  enable CPU cycles chart\n"
+                    "\n"
+                    "  instructions            enable Instructions chart\n"
+                    "\n"
+                    "  branch                  enable Branch instructions chart\n"
+                    "\n"
+                    "  cache                   enable Cache operations chart\n"
+                    "\n"
+                    "  bus                     enable Bus cycles chart\n"
+                    "\n"
+                    "  stalled                 enable Stalled frontend and backend cycles chart\n"
+                    "\n"
+                    "  migrations              enable CPU migrations chart\n"
+                    "\n"
+                    "  alighnment              enable Alignment faults chart\n"
+                    "\n"
+                    "  emulation               enable Emulation faults chart\n"
+                    "\n"
+                    "  L1D                     enable L1D cache operations chart\n"
+                    "\n"
+                    "  L1D-prefetch            enable L1D prefetch cache operations chart\n"
+                    "\n"
+                    "  L1I                     enable L1I cache operations chart\n"
+                    "\n"
+                    "  LL                      enable LL cache operations chart\n"
+                    "\n"
+                    "  DTLB                    enable DTLB cache operations chart\n"
+                    "\n"
+                    "  ITLB                    enable ITLB cache operations chart\n"
+                    "\n"
+                    "  PBU                     enable PBU cache operations chart\n"
                     "\n"
                     "  debug                   enable verbose output\n"
                     "                          default: disabled\n"
@@ -1017,6 +1151,12 @@ void parse_command_line(int argc, char **argv) {
         }
 
         error("perf.plugin: ignoring parameter '%s'", argv[i]);
+    }
+
+    if(!plugin_enabled){
+        info("no charts enabled - nothing to do.");
+        printf("DISABLE\n");
+        exit(1);
     }
 }
 
