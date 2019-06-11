@@ -5,6 +5,13 @@
 #include "health_cmdapi.h"
 
 
+/**
+ * Create Silencer
+ *
+ * Allocate a new silencer to Netdata.
+ *
+ * @return It returns the address off the silencer on success and NULL otherwise
+ */
 static SILENCER *create_silencer(void) {
     SILENCER *t = callocz(1, sizeof(SILENCER));
     debug(D_HEALTH, "HEALTH command API: Created empty silencer");
@@ -12,6 +19,13 @@ static SILENCER *create_silencer(void) {
     return t;
 }
 
+/**
+ * Free Silencers
+ *
+ * Clean the silencer structure
+ *
+ * @param t is the structure that will be cleaned.
+ */
 void free_silencers(SILENCER *t) {
     if (!t) return;
     if (t->next) free_silencers(t->next);
@@ -31,13 +45,20 @@ void free_silencers(SILENCER *t) {
     return;
 }
 
-
-
+/**
+ * Request V1 MGMT Health
+ *
+ * Function called by api to management the health.
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It returns 200 on success and another code otherwise.
+ */
 int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url) {
     int ret = 400;
     (void) host;
-
-
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -62,6 +83,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
         hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
     }
 
+    //Local instance of the silencer
     SILENCER *silencer = NULL;
 
     if (!w->auth_bearer_token) {
@@ -85,6 +107,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
 
                 // name and value are now the parameters
                 if (!strcmp(key, "cmd")) {
+                    //In this "if" we are working with the global silencers.
                     if (!strcmp(value, HEALTH_CMDAPI_CMD_SILENCEALL)) {
                         silencers->all_alarms = 1;
                         silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
@@ -107,6 +130,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                         buffer_strcat(wb, HEALTH_CMDAPI_MSG_RESET);
                     }
                 } else {
+                    //In this else we work with local silencer
                     uint32_t hash = simple_uhash(key);
                     if (unlikely(silencer == NULL)) {
                         if (
@@ -142,6 +166,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                 }
 
             }
+
             if (likely(silencer)) {
                 // Add the created instance to the linked list in silencers
                 silencer->next = silencers->silencers;
