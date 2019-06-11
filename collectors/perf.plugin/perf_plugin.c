@@ -242,9 +242,9 @@ static int perf_init() {
                 flags
             );
 
-            if(group_leader_fd == NO_FD) group_leader_fd = fd;
+            if(unlikely(group_leader_fd == NO_FD)) group_leader_fd = fd;
 
-            if(fd < 0) {
+            if(unlikely(fd < 0)) {
                 switch errno {
                     case EACCES:
                         error("Cannot access to the PMU: Permission denied");
@@ -1183,13 +1183,13 @@ int main(int argc, char **argv) {
     else if(freq)
         error("update frequency %d seconds is too small for PERF. Using %d.", freq, update_every);
 
-    if(debug) fprintf(stderr, "perf.plugin: calling perf_init()\n");
+    if(unlikely(debug)) fprintf(stderr, "perf.plugin: calling perf_init()\n");
     int perf = !perf_init();
 
     // ------------------------------------------------------------------------
     // the main loop
 
-    if(debug) fprintf(stderr, "perf.plugin: starting data collection\n");
+    if(unlikely(debug)) fprintf(stderr, "perf.plugin: starting data collection\n");
 
     time_t started_t = now_monotonic_sec();
 
@@ -1203,18 +1203,18 @@ int main(int argc, char **argv) {
 
         if(unlikely(netdata_exit)) break;
 
-        if(debug && iteration)
+        if(unlikely(debug && iteration))
             fprintf(stderr, "perf.plugin: iteration %zu, dt %llu usec\n"
                     , iteration
                     , dt
             );
 
         if(likely(perf)) {
-            if(debug) fprintf(stderr, "perf.plugin: calling perf_collect()\n");
+            if(unlikely(debug)) fprintf(stderr, "perf.plugin: calling perf_collect()\n");
             perf = !perf_collect();
 
             if(likely(perf)) {
-                if(debug) fprintf(stderr, "perf.plugin: calling perf_send_metrics()\n");
+                if(unlikely(debug)) fprintf(stderr, "perf.plugin: calling perf_send_metrics()\n");
                 perf_send_metrics();
             }
         }
