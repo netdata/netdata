@@ -22,7 +22,7 @@ create_group_and_assign_to_user() {
 	addgroup -g "${local_DOCKER_GID}" "${local_DOCKER_GROUP}" || echo >&2 "Could not add group ${local_DOCKER_GROUP} with ID ${local_DOCKER_GID}, its already there probably"
 
 	echo >&2 "Adding user '${local_DOCKER_USR}' to group '${local_DOCKER_GROUP}/${local_DOCKER_GID}'"
-	sed -i "s/${local_DOCKER_GID}:$/${local_DOCKER_GID}:${local_DOCKER_USR}/g" /etc/group
+	sed -i "s/:${local_DOCKER_GID}:$/:${local_DOCKER_GID}:${local_DOCKER_USR}/g" /etc/group
 
 	# Make sure we use the right docker group
 	GRP_TO_ASSIGN="$(grep ":x:${local_DOCKER_GID}:" /etc/group | cut -d':' -f1)"
