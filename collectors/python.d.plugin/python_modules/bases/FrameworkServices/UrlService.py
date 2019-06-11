@@ -23,15 +23,21 @@ URLLIB3_VERSION = urllib3.__version__
 URLLIB3 = 'urllib3'
 
 
+def version_check():
+    if version(URLLIB3_VERSION) >= version(URLLIB3_MIN_REQUIRED_VERSION):
+        return
+
+    err = '{0} version: {1}, minimum required version: {2}, please upgrade'.format(
+        URLLIB3,
+        URLLIB3_VERSION,
+        URLLIB3_MIN_REQUIRED_VERSION,
+    )
+    raise Exception(err)
+
+
 class UrlService(SimpleService):
     def __init__(self, configuration=None, name=None):
-        if version(URLLIB3_VERSION) < version(URLLIB3_MIN_REQUIRED_VERSION):
-            err = '{0} version: {1}, minimum required version: {2}, please upgrade'.format(
-                URLLIB3,
-                URLLIB3_VERSION,
-                URLLIB3_MIN_REQUIRED_VERSION,
-            )
-            raise Exception(err)
+        version_check()
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.debug("{0} version: {1}".format(URLLIB3, URLLIB3_VERSION))
         self.url = self.configuration.get('url')
