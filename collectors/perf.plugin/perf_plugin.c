@@ -71,6 +71,11 @@ char *netdata_configured_host_prefix = "";
 static int debug = 0;
 
 static int update_every = 1;
+static int freq = 0;
+
+static int do_cpu_cycles = 0, do_instructions = 0, do_branch = 0, do_cache = 0, du_bus_cycles = 0, do_front_back_cycles = 0;
+static int do_migrations = 0, do_alighnment = 0, do_emulation = 0;
+static int do_L1D = 0, do_L1D_prefetch = 0, do_L1I = 0, do_LL = 0, do_DTLB = 0, do_ITLB = 0, do_PBU = 0;
 
 typedef enum perf_event_id {
     // Hardware counters
@@ -958,24 +963,9 @@ static void perf_send_metrics() {
     }
 }
 
-int main(int argc, char **argv) {
+void parse_command_line(int argc, char **argv) {
+    int i;
 
-    // ------------------------------------------------------------------------
-    // initialization of netdata plugin
-
-    program_name = "perf.plugin";
-
-    // disable syslog
-    error_log_syslog = 0;
-
-    // set errors flood protection to 100 logs per hour
-    error_log_errors_per_period = 100;
-    error_log_throttle_period = 3600;
-
-    // ------------------------------------------------------------------------
-    // parse command line parameters
-
-    int i, freq = 0;
     for(i = 1; i < argc ; i++) {
         if(isdigit(*argv[i]) && !freq) {
             int n = str2i(argv[i]);
@@ -1028,6 +1018,23 @@ int main(int argc, char **argv) {
 
         error("perf.plugin: ignoring parameter '%s'", argv[i]);
     }
+}
+
+int main(int argc, char **argv) {
+
+    // ------------------------------------------------------------------------
+    // initialization of netdata plugin
+
+    program_name = "perf.plugin";
+
+    // disable syslog
+    error_log_syslog = 0;
+
+    // set errors flood protection to 100 logs per hour
+    error_log_errors_per_period = 100;
+    error_log_throttle_period = 3600;
+
+    parse_command_line(argc, argv);
 
     errno = 0;
 
