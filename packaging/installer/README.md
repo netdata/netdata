@@ -206,7 +206,7 @@ zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libo
 
 ```
 
-Please note that for RHEL/CentOS you might need [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
+Please note that for RHEL/CentOS you might need [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/). Especially for using `memory mode = dbengine` EPEL is strictly required. In addition, RHEL/CentOS version 6 also needs [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1. Arch linux needs arch/aur for package Judy.
 
 Once Netdata is compiled, to run it the following packages are required (already installed using the above commands):
 
