@@ -310,5 +310,6 @@ extern char *netdata_configured_host_prefix;
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
 #include "url/url.h"
+#include "json/json.h"
 
 #endif // NETDATA_LIB_H

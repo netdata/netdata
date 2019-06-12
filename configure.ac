@@ -1037,6 +1037,7 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
+    libnetdata/json/Makefile
     registry/Makefile
     streaming/Makefile
     system/Makefile

@@ -13,16 +13,191 @@ unsigned int default_health_enabled = 1;
 // ----------------------------------------------------------------------------
 // health initialization
 
+/**
+ * User Config directory
+ *
+ * Get the config directory for health and return it.
+ *
+ * @return a pointer to the user config directory
+ */
 inline char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
     return config_get(CONFIG_SECTION_HEALTH, "health configuration directory", buffer);
 }
 
+/**
+ * Stock Config Directory
+ *
+ * Get the Stock config directory and return it.
+ *
+ * @return a pointer to the stock config directory.
+ */
 inline char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
     return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
+}
+
+/**
+ * Create Silencer
+ *
+ * Allocate a new silencer to Netdata.
+ *
+ * @return It returns the address off the silencer on success and NULL otherwise
+ */
+static SILENCER *create_silencer(void) {
+    SILENCER *t = callocz(1, sizeof(SILENCER));
+    debug(D_HEALTH, "HEALTH command API: Created empty silencer");
+
+    return t;
+}
+
+/**
+ * Health Silencers add
+ *
+ * Add more one silencer to the list of silenecers.
+ *
+ * @param silencer
+ */
+void health_silencers_add(SILENCER *silencer) {
+    // Add the created instance to the linked list in silencers
+    silencer->next = silencers->silencers;
+    silencers->silencers = silencer;
+    debug(D_HEALTH, "HEALTH command API: Added silencer %s:%s:%s:%s:%s", silencer->alarms,
+          silencer->charts, silencer->contexts, silencer->hosts, silencer->families
+    );
+}
+
+SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) {
+    static uint32_t
+            hash_alarm = 0,
+            hash_template = 0,
+            hash_chart = 0,
+            hash_context = 0,
+            hash_host = 0,
+            hash_families = 0;
+
+    if (unlikely(!hash_alarm)) {
+        hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
+        hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
+        hash_chart = simple_uhash(HEALTH_CHART_KEY);
+        hash_context = simple_uhash(HEALTH_CONTEXT_KEY);
+        hash_host = simple_uhash(HEALTH_HOST_KEY);
+        hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
+    }
+
+    uint32_t hash = simple_uhash(key);
+    if (unlikely(silencer == NULL)) {
+        if (
+                (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) ||
+                (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) ||
+                (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) ||
+                (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) ||
+                (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) ||
+                (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY))
+                ) {
+            silencer = create_silencer();
+        }
+    }
+
+    if (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
+        silencer->alarms = strdupz(value);
+        silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT);
+    } else if (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) {
+        silencer->charts = strdupz(value);
+        silencer->charts_pattern = simple_pattern_create(silencer->charts, NULL, SIMPLE_PATTERN_EXACT);
+    } else if (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) {
+        silencer->contexts = strdupz(value);
+        silencer->contexts_pattern = simple_pattern_create(silencer->contexts, NULL, SIMPLE_PATTERN_EXACT);
+    } else if (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
+        silencer->hosts = strdupz(value);
+        silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT);
+    } else if (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
+        silencer->families = strdupz(value);
+        silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT);
+    }
+    return silencer;
+}
+
+int health_silencers_json_read_callback(JSON_ENTRY *e)
+{
+    switch(e->type) {
+        case JSON_OBJECT:
+            e->callback_function = health_silencers_json_read_callback;
+            if(e->name && strcmp(e->name,"")) {
+                // init silencer
+                debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
+                e->callback_data=create_silencer();
+                health_silencers_add(e->callback_data);
+            }
+            break;
+
+        case JSON_ARRAY:
+            e->callback_function = health_silencers_json_read_callback;
+            break;
+
+        case JSON_STRING:
+            if(!strcmp(e->name,"type")) {
+                debug(D_HEALTH, "JSON: Processing type=%s",e->data.string);
+                if (!strcmp(e->data.string,"SILENCE")) silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
+                else if (!strcmp(e->data.string,"DISABLE")) silencers->stype = STYPE_DISABLE_ALARMS;
+            } else {
+                debug(D_HEALTH, "JSON: Adding %s=%s", e->name, e->data.string);
+                health_silencers_addparam(e->callback_data, e->name, e->data.string);
+            }
+            break;
+
+        case JSON_BOOLEAN:
+            debug(D_HEALTH, "JSON: Processing all_alarms");
+            silencers->all_alarms=e->data.boolean?1:0;
+            break;
+
+        case JSON_NUMBER:
+        case JSON_NULL:
+            break;
+    }
+    return 0;
+}
+
+void health_silencers_init(void) {
+    silencers = mallocz(sizeof(SILENCERS));
+    silencers->all_alarms=0;
+    silencers->stype=STYPE_NONE;
+    silencers->silencers=NULL;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
+    silencers_filename = config_get(CONFIG_SECTION_HEALTH, "silencers file", filename);
+
+    FILE *fd = fopen(silencers_filename, "r");
+    if (fd) {
+        char *str;
+        long  numbytes;
+        info("Parsing health silencers file %s", silencers_filename);
+        /* Get the number of bytes */
+        fseek(fd, 0L, SEEK_END);
+        numbytes = ftell(fd);
+
+        if (numbytes > HEALTH_SILENCERS_MAX_FILE_LEN) {
+            error("Health silencers file %s exceeds max size %d. Aborting read.", silencers_filename, HEALTH_SILENCERS_MAX_FILE_LEN);
+            fclose(fd);
+            return;
+        }
+        /* reset the file position indicator to the beginning of the file */
+        fseek(fd, 0L, SEEK_SET);
+
+        /* grab sufficient memory for the str to hold the text */
+        str = (char*)mallocz((numbytes+1) * sizeof(char));
+
+        /* copy all the text into the str */
+        fread(str, sizeof(char), numbytes, fd);
+        str[numbytes]='\0';
+        json_parse(str, NULL, health_silencers_json_read_callback);
+        freez(str);
+        fclose(fd);
+        info("Parsed health silencers file %s", silencers_filename);
+    }
 }
 
 void health_init(void) {
@@ -32,6 +207,8 @@ void health_init(void) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
+
+    health_silencers_init();
 }
 
 // ----------------------------------------------------------------------------
@@ -483,11 +660,6 @@ void *health_main(void *ptr) {
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     unsigned int loop = 0;
-
-    silencers =  mallocz(sizeof(SILENCERS));
-    silencers->all_alarms=0;
-    silencers->stype=STYPE_NONE;
-    silencers->silencers=NULL;
 
     while(!netdata_exit) {
 		loop++;

@@ -306,7 +306,12 @@ set(LIBNETDATA_FILES
         libnetdata/url/url.c
         libnetdata/url/url.h
         libnetdata/socket/security.c
-        libnetdata/socket/security.h)
+        libnetdata/socket/security.h
+        libnetdata/json/json.c
+        libnetdata/json/json.h
+        libnetdata/json/jsmn.c
+        libnetdata/json/jsmn.h
+        )
 
 add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 

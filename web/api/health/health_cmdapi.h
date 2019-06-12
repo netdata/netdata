@@ -12,6 +12,7 @@
 #define HEALTH_CMDAPI_CMD_SILENCE "SILENCE"
 #define HEALTH_CMDAPI_CMD_DISABLE "DISABLE"
 #define HEALTH_CMDAPI_CMD_RESET "RESET"
+#define HEALTH_CMDAPI_CMD_LIST "LIST"
 
 #define HEALTH_CMDAPI_MSG_AUTHERROR "Auth Error\n"
 #define HEALTH_CMDAPI_MSG_SILENCEALL "All alarm notifications are silenced\n"
@@ -20,7 +21,6 @@
 #define HEALTH_CMDAPI_MSG_DISABLE "Health checks disabled for alarms matching the selectors\n"
 #define HEALTH_CMDAPI_MSG_SILENCE "Alarm notifications silenced for alarms matching the selectors\n"
 #define HEALTH_CMDAPI_MSG_ADDED "Alarm selector added\n"
-#define HEALTH_CMDAPI_MSG_INVALID_KEY "Invalid key. Ignoring it.\n"
 #define HEALTH_CMDAPI_MSG_STYPEWARNING "WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command.\n"
 #define HEALTH_CMDAPI_MSG_NOSELECTORWARNING "WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors.\n"
 

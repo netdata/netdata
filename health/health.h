@@ -88,7 +88,11 @@ typedef struct silencers {
     SILENCER *silencers;
 } SILENCERS;
 
+#define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 SILENCERS *silencers;
+char *silencers_filename;
+void health_silencers_add(SILENCER *silencer);
+SILENCER * health_silencers_addparam(SILENCER *silencer, char *key, char *value);
 
 extern void health_init(void);
 extern void *health_main(void *ptr);
