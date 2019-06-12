@@ -377,8 +377,9 @@ static int perf_collect() {
 
         for(group = 0; group < EV_GROUP_NUM; group++) {
             for(cpu = 0; cpu < number_of_cpus; cpu++) {
-                if(unlikely(ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
-                            || ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1))
+                if(unlikely(*(group_leader_fds[group] + cpu) != NO_FD
+                            && (ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
+                                || ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)))
                 {
                     error("Cannot reenable event group");
                 }
