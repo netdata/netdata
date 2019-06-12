@@ -1,4 +1,4 @@
-# email
+# Email
 
 You need a working `sendmail` command for email alerts to work. Almost all MTAs provide a `sendmail` interface.
 
@@ -29,5 +29,27 @@ sudo su -s /bin/bash netdata
 ```
 
 Where `[ROLE]` is the role you want to test. The default (if you don't give a `[ROLE]`) is `sysadmin`.
+
+# Simple SMTP transport configuration
+
+If you want an alternative of sendmail in order to have a simple MTA configuration for sending emails and auth to an existing SMTP server :
+
+- Remove all sendmail stuff.
+- Install msmtp.
+- Make a symbolic link of /usr/bin/msmtp to /usr/sbin/sendmail (default debian location of sendmail) :
+```sh
+(sudo) ln -s /usr/bin/msmtp /usr/sbin/sendmail
+```
+- Login as netdata :
+```sh
+(sudo) su -s /bin/bash netdata
+```
+- Create and make configuration of ~/.msmtprc (look at the doc it's simple : https://marlam.de/msmtp/documentation/).
+- Finaly set good permissions on .msmtprc file :
+```sh
+chmod 600 ~/.msmtprc
+```
+
+
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Femail%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
