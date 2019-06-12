@@ -1,5 +1,5 @@
 //
-// Created by christopher on 11/12/18.
+// Created by Christopher on 11/12/18.
 //
 
 #include "health_cmdapi.h"
@@ -164,7 +164,6 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                         buffer_strcat(wb, HEALTH_CMDAPI_MSG_INVALID_KEY);
                     }
                 }
-
             }
 
             if (likely(silencer)) {

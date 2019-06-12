@@ -425,6 +425,16 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
     return STYPE_NONE;
 }
 
+/**
+ * Update Disabled Silenced
+ *
+ * Update the variable rrdcalc_flags of the structure RRDCALC according with the values of the host structure
+ *
+ * @param host structure that contains information about the host monitored.
+ * @param rc structure with information about the alarm
+ *
+ * @return It returns 1 case rrdcalc_flags is DISABLED or 0 otherwise
+ */
 int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 	uint32_t rrdcalc_flags_old = rc->rrdcalc_flags;
 	// Clear the flags
@@ -457,7 +467,7 @@ int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 /**
  * Health Main
  *
- * The main thread of the health system.
+ * The main thread of the health system. In this function all the alarms will be processed.
  *
  * @param ptr is a pointer to the netdata_static_thread structure.
  *
@@ -532,6 +542,7 @@ void *health_main(void *ptr) {
 			// the first loop is to lookup values from the db
 			for (rc = host->alarms; rc; rc = rc->next) {
 
+			    //case it is disabled I will get the next rc
 				if (update_disabled_silenced(host, rc))
 					continue;
 
