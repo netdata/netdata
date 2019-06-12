@@ -293,8 +293,8 @@ static int perf_init() {
     }
 
     for(group = 0; group < EV_GROUP_NUM; group++) {
-        group_leader_fds[group] = mallocz(number_of_cpus * sizeof(uint64_t));
-        memset(group_leader_fds[group], NO_FD, number_of_cpus * sizeof(uint64_t));
+        group_leader_fds[group] = mallocz(number_of_cpus * sizeof(int));
+        memset(group_leader_fds[group], NO_FD, number_of_cpus * sizeof(int));
     }
 
     memset(&perf_event_attr, 0, sizeof(perf_event_attr));
