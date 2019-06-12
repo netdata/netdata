@@ -55,7 +55,7 @@ enable perf plugin, edit /etc/netdata/netdata.conf and set:
 
 You can use the `command options` parameter to pick what data should be collected and which charts should be
 displayed. If `all` is used, all general performance monitoring counters are probed and corresponding charts
-are enabled for the available counters. You can also define the particular set of enabled charts using the
+are enabled for the available counters. You can also define a particular set of enabled charts using the
 following keywords: `cycles`, `instructions`, `branch`, `cache`, `bus`, `stalled`, `migrations`, `alighnment`,
 `emulation`, `L1D`, `L1D-prefetch`, `L1I`, `LL`, `DTLB`, `ITLB`, `PBU`.
 

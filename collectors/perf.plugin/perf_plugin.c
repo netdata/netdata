@@ -66,7 +66,7 @@ char *netdata_configured_host_prefix = "";
 
 #define NO_FD -1
 #define ALL_PIDS -1
-#define UINT64_SIZE 8
+#define RUNNING_THRESHOLD 100
 
 static int debug = 0;
 
@@ -153,116 +153,120 @@ static struct perf_event {
     int updated;
 
     uint64_t value;
+
+    uint64_t *prev_value;
+    uint64_t *prev_time_enabled;
+    uint64_t *prev_time_running;
 } perf_events[] = {
     // Hardware counters
-    {EV_ID_CPU_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0},
-    {EV_ID_INSTRUCTIONS,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0},
-    {EV_ID_CACHE_REFERENCES,        PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0},
-    {EV_ID_CACHE_MISSES,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0},
-    {EV_ID_BRANCH_INSTRUCTIONS,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0},
-    {EV_ID_BRANCH_MISSES,           PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0},
-    {EV_ID_BUS_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0},
-    {EV_ID_STALLED_CYCLES_FRONTEND, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0},
-    {EV_ID_STALLED_CYCLES_BACKEND,  PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0},
-    {EV_ID_REF_CPU_CYCLES,          PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0},
+    {EV_ID_CPU_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES,              &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_INSTRUCTIONS,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS,            &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_CACHE_REFERENCES,        PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES,        &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_CACHE_MISSES,            PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES,            &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_BRANCH_INSTRUCTIONS,     PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS,     &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_BRANCH_MISSES,           PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES,           &group_leader_fds[EV_GROUP_INSTRUCTIONS_AND_CACHE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_BUS_CYCLES,              PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES,              &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_STALLED_CYCLES_FRONTEND, PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_STALLED_CYCLES_BACKEND,  PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND,  &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_REF_CPU_CYCLES,          PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES,          &group_leader_fds[EV_GROUP_CYCLES], NULL, 1, 0, 0, NULL, NULL, NULL},
 
     // Software counters
-    // {EV_ID_CPU_CLOCK,        PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,        &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    // {EV_ID_TASK_CLOCK,       PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,       &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    // {EV_ID_PAGE_FAULTS,      PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS,      &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    // {EV_ID_CONTEXT_SWITCHES, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    {EV_ID_CPU_MIGRATIONS,   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS,   &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    // {EV_ID_PAGE_FAULTS_MIN,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN,  &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    // {EV_ID_PAGE_FAULTS_MAJ,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ,  &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    {EV_ID_ALIGNMENT_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS, &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
-    {EV_ID_EMULATION_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_EMULATION_FAULTS, &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0},
+    // {EV_ID_CPU_CLOCK,        PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK,        &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    // {EV_ID_TASK_CLOCK,       PERF_TYPE_SOFTWARE, PERF_COUNT_SW_TASK_CLOCK,       &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    // {EV_ID_PAGE_FAULTS,      PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS,      &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    // {EV_ID_CONTEXT_SWITCHES, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES, &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_CPU_MIGRATIONS,   PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_MIGRATIONS,   &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    // {EV_ID_PAGE_FAULTS_MIN,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN,  &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    // {EV_ID_PAGE_FAULTS_MAJ,  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ,  &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_ALIGNMENT_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_ALIGNMENT_FAULTS, &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
+    {EV_ID_EMULATION_FAULTS, PERF_TYPE_SOFTWARE, PERF_COUNT_SW_EMULATION_FAULTS, &group_leader_fds[EV_GROUP_SOFTWARE], NULL, 1, 0, 0, NULL, NULL, NULL},
 
     // Hardware cache counters
     {
         EV_ID_L1D_READ_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_L1D_READ_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_L1D_WRITE_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_L1D_WRITE_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_L1D_PREFETCH_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_L1D) | (PERF_COUNT_HW_CACHE_OP_PREFETCH << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1D], NULL, 1, 0, 0, NULL, NULL, NULL
     },
 
     {
         EV_ID_L1I_READ_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_L1I) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_L1I_READ_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_L1I) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     },
 
     {
         EV_ID_LL_READ_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_LL) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_LL_READ_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_LL) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_LL_WRITE_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_LL) | (PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_LL_WRITE_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_LL) | (PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     },
 
     {
         EV_ID_DTLB_READ_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_DTLB_READ_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_DTLB_WRITE_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_L1I_LL_DTLB], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_DTLB_WRITE_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_DTLB) | (PERF_COUNT_HW_CACHE_OP_WRITE << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0, NULL, NULL, NULL
     },
 
     {
         EV_ID_ITLB_READ_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0, NULL, NULL, NULL
     }, {
         EV_ID_ITLB_READ_MISS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_ITLB) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_MISS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0, NULL, NULL, NULL
     },
 
     {
         EV_ID_PBU_READ_ACCESS, PERF_TYPE_HW_CACHE,
         (PERF_COUNT_HW_CACHE_BPU) | (PERF_COUNT_HW_CACHE_OP_READ << 8) | (PERF_COUNT_HW_CACHE_RESULT_ACCESS << 16),
-        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0
+        &group_leader_fds[EV_GROUP_CACHE_ITLB_BPU], NULL, 1, 0, 0, NULL, NULL, NULL
     },
 
-    {EV_ID_END, 0, 0, NULL, NULL, 0, 0, 0}
+    {EV_ID_END, 0, 0, NULL, NULL, 0, 0, 0, NULL, NULL, NULL}
 };
 
 static int perf_init() {
@@ -277,11 +281,20 @@ static int perf_init() {
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
         current_event->fd = mallocz(number_of_cpus * sizeof(int));
         memset(current_event->fd, NO_FD, number_of_cpus * sizeof(int));
+
+        current_event->prev_value = mallocz(number_of_cpus * sizeof(uint64_t));
+        memset(current_event->prev_value, 0, number_of_cpus * sizeof(uint64_t));
+
+        current_event->prev_time_enabled = mallocz(number_of_cpus * sizeof(uint64_t));
+        memset(current_event->prev_time_enabled, 0, number_of_cpus * sizeof(uint64_t));
+
+        current_event->prev_time_running = mallocz(number_of_cpus * sizeof(uint64_t));
+        memset(current_event->prev_time_running, 0, number_of_cpus * sizeof(uint64_t));
     }
 
     for(group = 0; group < EV_GROUP_NUM; group++) {
-        group_leader_fds[group] = mallocz(number_of_cpus * sizeof(int));
-        memset(group_leader_fds[group], NO_FD, number_of_cpus * sizeof(int));
+        group_leader_fds[group] = mallocz(number_of_cpus * sizeof(uint64_t));
+        memset(group_leader_fds[group], NO_FD, number_of_cpus * sizeof(uint64_t));
     }
 
     memset(&perf_event_attr, 0, sizeof(perf_event_attr));
@@ -292,6 +305,7 @@ static int perf_init() {
 
             perf_event_attr.type = current_event->type;
             perf_event_attr.config = current_event->config;
+            perf_event_attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED | PERF_FORMAT_TOTAL_TIME_RUNNING;
 
             int fd, group_leader_fd = *(*current_event->group_leader_fd + cpu);
 
@@ -340,6 +354,9 @@ static void perf_free(void) {
             if(*(current_event->fd + cpu) != NO_FD) close(*(current_event->fd + cpu));
 
         free(current_event->fd);
+        free(current_event->prev_value);
+        free(current_event->prev_time_enabled);
+        free(current_event->prev_time_running);
     }
 
     for(group = 0; group < EV_GROUP_NUM; group++)
@@ -349,8 +366,12 @@ static void perf_free(void) {
 static int perf_collect() {
     int cpu;
     struct perf_event *current_event = NULL;
-    uint64_t value;
     static uint64_t prev_cpu_cycles_value = 0;
+    struct {
+        uint64_t value;
+        uint64_t time_enabled;
+        uint64_t time_running;
+    } read_result;
 
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
         current_event->updated = 0;
@@ -360,10 +381,19 @@ static int perf_collect() {
 
         for(cpu = 0; cpu < number_of_cpus; cpu++) {
 
-            ssize_t read_size = read(current_event->fd[cpu], &value, UINT64_SIZE);
+            ssize_t read_size = read(current_event->fd[cpu], &read_result, sizeof(read_result));
 
-            if(likely(read_size == UINT64_SIZE)) {
-                current_event->value += value;
+            if(likely(read_size == sizeof(read_result))) {
+                if (likely(read_result.time_running && (read_result.time_enabled / read_result.time_running < RUNNING_THRESHOLD))) {
+                    current_event->value += (read_result.value - *(current_event->prev_value + cpu)) \
+                                             * (read_result.time_enabled - *(current_event->prev_time_enabled + cpu)) \
+                                             / (read_result.time_running - *(current_event->prev_time_running + cpu));
+                }
+
+                *(current_event->prev_value + cpu) = read_result.value;
+                *(current_event->prev_time_enabled + cpu) = read_result.time_enabled;
+                *(current_event->prev_time_running + cpu) = read_result.time_running;
+
                 current_event->updated = 1;
             }
             else {
@@ -415,8 +445,8 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "cpu");
-            printf("DIMENSION %s '' incremental 1 1\n", "ref_cpu");
+            printf("DIMENSION %s '' absolute 1 1\n", "cpu");
+            printf("DIMENSION %s '' absolute 1 1\n", "ref_cpu");
         }
 
         printf(
@@ -455,7 +485,7 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "instructions");
+            printf("DIMENSION %s '' absolute 1 1\n", "instructions");
         }
 
         printf(
@@ -485,8 +515,8 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "instructions");
-            printf("DIMENSION %s '' incremental 1 1\n", "misses");
+            printf("DIMENSION %s '' absolute 1 1\n", "instructions");
+            printf("DIMENSION %s '' absolute 1 1\n", "misses");
         }
 
         printf(
@@ -525,8 +555,8 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "references");
-            printf("DIMENSION %s '' incremental 1 1\n", "misses");
+            printf("DIMENSION %s '' absolute 1 1\n", "references");
+            printf("DIMENSION %s '' absolute 1 1\n", "misses");
         }
 
         printf(
@@ -565,7 +595,7 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "bus");
+            printf("DIMENSION %s '' absolute 1 1\n", "bus");
         }
 
         printf(
@@ -595,8 +625,8 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "frontend");
-            printf("DIMENSION %s '' incremental 1 1\n", "backend");
+            printf("DIMENSION %s '' absolute 1 1\n", "frontend");
+            printf("DIMENSION %s '' absolute 1 1\n", "backend");
         }
 
         printf(
@@ -635,7 +665,7 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "migrations");
+            printf("DIMENSION %s '' absolute 1 1\n", "migrations");
         }
 
         printf(
@@ -665,7 +695,7 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "faults");
+            printf("DIMENSION %s '' absolute 1 1\n", "faults");
         }
 
         printf(
@@ -695,7 +725,7 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "faults");
+            printf("DIMENSION %s '' absolute 1 1\n", "faults");
         }
 
         printf(
@@ -726,10 +756,10 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
-            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
-            printf("DIMENSION %s '' incremental -1 1\n", "write_access");
-            printf("DIMENSION %s '' incremental -1 1\n", "write_misses");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_access");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
+            printf("DIMENSION %s '' absolute -1 1\n", "write_access");
+            printf("DIMENSION %s '' absolute -1 1\n", "write_misses");
         }
 
         printf(
@@ -782,7 +812,7 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "prefetches");
+            printf("DIMENSION %s '' absolute 1 1\n", "prefetches");
         }
 
         printf(
@@ -812,8 +842,8 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
-            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_access");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
         }
 
         printf(
@@ -853,10 +883,10 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
-            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
-            printf("DIMENSION %s '' incremental -1 1\n", "write_access");
-            printf("DIMENSION %s '' incremental -1 1\n", "write_misses");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_access");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
+            printf("DIMENSION %s '' absolute -1 1\n", "write_access");
+            printf("DIMENSION %s '' absolute -1 1\n", "write_misses");
         }
 
         printf(
@@ -910,10 +940,10 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
-            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
-            printf("DIMENSION %s '' incremental -1 1\n", "write_access");
-            printf("DIMENSION %s '' incremental -1 1\n", "write_misses");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_access");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
+            printf("DIMENSION %s '' absolute -1 1\n", "write_access");
+            printf("DIMENSION %s '' absolute -1 1\n", "write_misses");
         }
 
         printf(
@@ -966,8 +996,8 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
-            printf("DIMENSION %s '' incremental 1 1\n", "read_misses");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_access");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_misses");
         }
 
         printf(
@@ -1006,7 +1036,7 @@ static void perf_send_metrics() {
                    , update_every
                    , PLUGIN_PERF_NAME
             );
-            printf("DIMENSION %s '' incremental 1 1\n", "read_access");
+            printf("DIMENSION %s '' absolute 1 1\n", "read_access");
         }
 
         printf(
