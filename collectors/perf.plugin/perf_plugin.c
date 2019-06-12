@@ -266,7 +266,7 @@ static struct perf_event {
 };
 
 static int perf_init() {
-    int cpu;
+    int cpu, group;
     struct perf_event_attr perf_event_attr;
     struct perf_event *current_event = NULL;
     unsigned long flags = 0;
@@ -277,9 +277,11 @@ static int perf_init() {
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
         current_event->fd = mallocz(number_of_cpus * sizeof(int));
         memset(current_event->fd, NO_FD, number_of_cpus * sizeof(int));
+    }
 
-        *current_event->group_leader_fd = mallocz(number_of_cpus * sizeof(int));
-        memset(*current_event->group_leader_fd, NO_FD, number_of_cpus * sizeof(int));
+    for(group = 0; group < EV_GROUP_NUM; group++) {
+        group_leader_fds[group] = mallocz(number_of_cpus * sizeof(int));
+        memset(group_leader_fds[group], NO_FD, number_of_cpus * sizeof(int));
     }
 
     memset(&perf_event_attr, 0, sizeof(perf_event_attr));
@@ -330,17 +332,18 @@ static int perf_init() {
 }
 
 static void perf_free(void) {
-    int cpu;
+    int cpu, group;
     struct perf_event *current_event = NULL;
 
     for(current_event = &perf_events[0]; current_event->id != EV_ID_END; current_event++) {
-        for(cpu = 0; cpu < number_of_cpus; cpu++) {
-            close(*(current_event->fd + cpu));
-        }
+        for(cpu = 0; cpu < number_of_cpus; cpu++)
+            if(*(current_event->fd + cpu) != NO_FD) close(*(current_event->fd + cpu));
 
         free(current_event->fd);
-        free(*current_event->group_leader_fd);
     }
+
+    for(group = 0; group < EV_GROUP_NUM; group++)
+        free(group_leader_fds[group]);
 }
 
 static int perf_collect() {
