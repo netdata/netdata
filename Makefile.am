@@ -161,10 +161,10 @@ LIBNETDATA_FILES = \
     libnetdata/threads/threads.h \
 	libnetdata/url/url.c \
 	libnetdata/url/url.h \
-	libnetdata/json/json.h \
-	libnetdata/json/json.c \
 	libnetdata/json/jsmn.h \
 	libnetdata/json/jsmn.c \
+	libnetdata/json/json.h \
+	libnetdata/json/json.c \
     $(NULL)
 
 APPS_PLUGIN_FILES = \

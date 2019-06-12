@@ -94,7 +94,7 @@ void health_silencers2file(BUFFER *wb) {
 
     FILE *fd = fopen(silencers_filename, "wb");
     if(fd) {
-        int written = fprintf(fd, "%s", wb->buffer) ;
+        size_t written = (size_t)fprintf(fd, "%s", wb->buffer) ;
         if (written == wb->len ) {
             info("Silencer changes written to %s", silencers_filename);
         }

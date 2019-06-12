@@ -1,304 +1,281 @@
+#include <stdlib.h>
+
 #include "jsmn.h"
-#include "../libnetdata.h"
 
-#define JSON_TOKENS 1024
-
-int json_tokens = JSON_TOKENS;
-
-jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
-{
-    int n = json_tokens;
-    if(!js || !len) {
-        error("JSON: json string is empty.");
+/**
+ * Allocates a fresh unused token from the token pull.
+ */
+static jsmntok_t *jsmn_alloc_token(jsmn_parser *parser,
+                                   jsmntok_t *tokens, size_t num_tokens) {
+    jsmntok_t *tok;
+    if (parser->toknext >= num_tokens) {
         return NULL;
     }
-
-    jsmn_parser parser;
-    jsmn_init(&parser);
-
-    jsmntok_t *tokens = mallocz(sizeof(jsmntok_t) * n);
-    if(!tokens) return NULL;
-
-    int ret = jsmn_parse(&parser, js, len, tokens, n);
-    while (ret == JSMN_ERROR_NOMEM) {
-        n *= 2;
-        jsmntok_t *new = reallocz(tokens, sizeof(jsmntok_t) * n);
-        if(!new) {
-            freez(tokens);
-            return NULL;
-        }
-        tokens = new;
-        ret = jsmn_parse(&parser, js, len, tokens, n);
-    }
-
-    if (ret == JSMN_ERROR_INVAL) {
-        error("JSON: Invalid json string.");
-        freez(tokens);
-        return NULL;
-    }
-    else if (ret == JSMN_ERROR_PART) {
-        error("JSON: Truncated JSON string.");
-        freez(tokens);
-        return NULL;
-    }
-
-    if(count) *count = (size_t)ret;
-
-    if(json_tokens < n) json_tokens = n;
-    return tokens;
+    tok = &tokens[parser->toknext++];
+    tok->start = tok->end = -1;
+    tok->size = 0;
+#ifdef JSMN_PARENT_LINKS
+    tok->parent = -1;
+#endif
+    return tok;
 }
 
-int json_callback_print(JSON_ENTRY *e)
-{
-    BUFFER *wb=buffer_create(300);
+/**
+ * Fills token type and boundaries.
+ */
+static void jsmn_fill_token(jsmntok_t *token, jsmntype_t type,
+                            int start, int end) {
+    token->type = type;
+    token->start = start;
+    token->end = end;
+    token->size = 0;
+}
 
-    buffer_sprintf(wb,"%s = ", e->name);
-    char txt[50];
-    switch(e->type) {
-        case JSON_OBJECT:
-            e->callback_function = json_callback_print;
-            buffer_strcat(wb,"OBJECT");
-            break;
+/**
+ * Fills next available token with JSON primitive.
+ */
+static jsmnerr_t jsmn_parse_primitive(jsmn_parser *parser, const char *js,
+                                      size_t len, jsmntok_t *tokens, size_t num_tokens) {
+    jsmntok_t *token;
+    int start;
 
-        case JSON_ARRAY:
-            e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", e->data.items);
-            buffer_strcat(wb, txt);
-            break;
+    start = parser->pos;
 
-        case JSON_STRING:
-            buffer_strcat(wb, e->data.string);
-            break;
-
-        case JSON_NUMBER:
-            sprintf(txt,"%Lf", e->data.number);
-            buffer_strcat(wb,txt);
-
-            break;
-
-        case JSON_BOOLEAN:
-            buffer_strcat(wb, e->data.boolean?"TRUE":"FALSE");
-            break;
-
-        case JSON_NULL:
-            buffer_strcat(wb,"NULL");
-            break;
+    for (; parser->pos < len && js[parser->pos] != '\0'; parser->pos++) {
+        switch (js[parser->pos]) {
+#ifndef JSMN_STRICT
+            /* In strict mode primitive must be followed by "," or "}" or "]" */
+            case ':':
+#endif
+            case '\t' : case '\r' : case '\n' : case ' ' :
+            case ','  : case ']'  : case '}' :
+                goto found;
+        }
+        if (js[parser->pos] < 32 || js[parser->pos] >= 127) {
+            parser->pos = start;
+            return JSMN_ERROR_INVAL;
+        }
     }
-    info("JSON: %s", buffer_tostring(wb));
-    buffer_free(wb);
+#ifdef JSMN_STRICT
+    /* In strict mode primitive must be followed by a comma/object/array */
+	parser->pos = start;
+	return JSMN_ERROR_PART;
+#endif
+
+    found:
+    if (tokens == NULL) {
+        parser->pos--;
+        return 0;
+    }
+    token = jsmn_alloc_token(parser, tokens, num_tokens);
+    if (token == NULL) {
+        parser->pos = start;
+        return JSMN_ERROR_NOMEM;
+    }
+    jsmn_fill_token(token, JSMN_PRIMITIVE, start, parser->pos);
+#ifdef JSMN_PARENT_LINKS
+    token->parent = parser->toksuper;
+#endif
+    parser->pos--;
     return 0;
 }
 
-size_t json_walk_string(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
-{
-    char old = js[t[start].end];
-    js[t[start].end] = '\0';
-    e->original_string = &js[t[start].start];
+/**
+ * Filsl next token with JSON string.
+ */
+static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
+                                   size_t len, jsmntok_t *tokens, size_t num_tokens) {
+    jsmntok_t *token;
 
-    e->type = JSON_STRING;
-    e->data.string = e->original_string;
-    if(e->callback_function) e->callback_function(e);
-    js[t[start].end] = old;
-    return 1;
-}
+    int start = parser->pos;
 
-size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
-{
-    char old = js[t[start].end];
-    js[t[start].end] = '\0';
-    e->original_string = &js[t[start].start];
+    parser->pos++;
 
-    switch(e->original_string[0]) {
-        case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7':
-        case '8': case '9': case '-': case '.':
-            e->type = JSON_NUMBER;
-            e->data.number = strtold(e->original_string, NULL);
-            break;
+    /* Skip starting quote */
+    for (; parser->pos < len && js[parser->pos] != '\0'; parser->pos++) {
+        char c = js[parser->pos];
 
-        case 't': case 'T':
-            e->type = JSON_BOOLEAN;
-            e->data.boolean = 1;
-            break;
-
-        case 'f': case 'F':
-            e->type = JSON_BOOLEAN;
-            e->data.boolean = 0;
-            break;
-
-        case 'n': case 'N':
-        default:
-            e->type = JSON_NULL;
-            break;
-    }
-    if(e->callback_function) e->callback_function(e);
-    js[t[start].end] = old;
-    return 1;
-}
-
-size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
-{
-    JSON_ENTRY ne = {
-            .name = "",
-            .fullname = "",
-            .callback_data = NULL,
-            .callback_function = NULL
-    };
-
-    char old = js[t[start].end];
-    js[t[start].end] = '\0';
-    ne.original_string = &js[t[start].start];
-
-    memcpy(&ne, e, sizeof(JSON_ENTRY));
-    ne.type = JSON_ARRAY;
-    ne.data.items = t[start].size;
-    ne.callback_function = NULL;
-    ne.name[0]='\0';
-    ne.fullname[0]='\0';
-    if(e->callback_function) e->callback_function(&ne);
-    js[t[start].end] = old;
-
-    size_t i, init = start, size = t[start].size;
-
-    start++;
-    for(i = 0; i < size ; i++) {
-        ne.pos = i;
-        if (!e->name || !e->fullname || strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
-            info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
-            continue;
+        /* Quote: end of string */
+        if (c == '\"') {
+            if (tokens == NULL) {
+                return 0;
+            }
+            token = jsmn_alloc_token(parser, tokens, num_tokens);
+            if (token == NULL) {
+                parser->pos = start;
+                return JSMN_ERROR_NOMEM;
+            }
+            jsmn_fill_token(token, JSMN_STRING, start+1, parser->pos);
+#ifdef JSMN_PARENT_LINKS
+            token->parent = parser->toksuper;
+#endif
+            return 0;
         }
-        sprintf(ne.name, "%s[%lu]", e->name, i);
-        sprintf(ne.fullname, "%s[%lu]", e->fullname, i);
 
-        switch(t[start].type) {
-            case JSMN_PRIMITIVE:
-                start += json_walk_primitive(js, t, start, &ne);
-                break;
-
-            case JSMN_OBJECT:
-                start += json_walk_object(js, t, nest + 1, start, &ne);
-                break;
-
-            case JSMN_ARRAY:
-                start += json_walk_array(js, t, nest + 1, start, &ne);
-                break;
-
-            case JSMN_STRING:
-                start += json_walk_string(js, t, start, &ne);
-                break;
+        /* Backslash: Quoted symbol expected */
+        if (c == '\\') {
+            parser->pos++;
+            switch (js[parser->pos]) {
+                /* Allowed escaped symbols */
+                case '\"': case '/' : case '\\' : case 'b' :
+                case 'f' : case 'r' : case 'n'  : case 't' :
+                    break;
+                    /* Allows escaped symbol \uXXXX */
+                case 'u':
+                    parser->pos++;
+                    int i = 0;
+                    for(; i < 4 && js[parser->pos] != '\0'; i++) {
+                        /* If it isn't a hex character we have an error */
+                        if(!((js[parser->pos] >= 48 && js[parser->pos] <= 57) || /* 0-9 */
+                             (js[parser->pos] >= 65 && js[parser->pos] <= 70) || /* A-F */
+                             (js[parser->pos] >= 97 && js[parser->pos] <= 102))) { /* a-f */
+                            parser->pos = start;
+                            return JSMN_ERROR_INVAL;
+                        }
+                        parser->pos++;
+                    }
+                    parser->pos--;
+                    break;
+                    /* Unexpected symbol */
+                default:
+                    parser->pos = start;
+                    return JSMN_ERROR_INVAL;
+            }
         }
     }
-    return start - init;
+    parser->pos = start;
+    return JSMN_ERROR_PART;
 }
 
-size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
-{
-    JSON_ENTRY ne = {
-            .name = "",
-            .fullname = "",
-            .callback_data = NULL,
-            .callback_function = NULL
-    };
+/**
+ * Parse JSON string and fill tokens.
+ */
+jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
+                     jsmntok_t *tokens, unsigned int num_tokens) {
+    jsmnerr_t r;
+    int i;
+    jsmntok_t *token;
+    int count = 0;
 
-    char old = js[t[start].end];
-    js[t[start].end] = '\0';
-    ne.original_string = &js[t[start].start];
-    memcpy(&ne, e, sizeof(JSON_ENTRY));
-    ne.type = JSON_OBJECT;
-    ne.callback_function = NULL;
-    if(e->callback_function) e->callback_function(&ne);
-    js[t[start].end] = old;
+    for (; parser->pos < len && js[parser->pos] != '\0'; parser->pos++) {
+        char c;
+        jsmntype_t type;
 
-    int key = 1;
-    size_t i, init = start, size = t[start].size;
-
-    start++;
-    for(i = 0; i < size ; i++) {
-        switch(t[start].type) {
-            case JSMN_PRIMITIVE:
-                start += json_walk_primitive(js, t, start, &ne);
-                key = 1;
+        c = js[parser->pos];
+        switch (c) {
+            case '{': case '[':
+                count++;
+                if (tokens == NULL) {
+                    break;
+                }
+                token = jsmn_alloc_token(parser, tokens, num_tokens);
+                if (token == NULL)
+                    return JSMN_ERROR_NOMEM;
+                if (parser->toksuper != -1) {
+                    tokens[parser->toksuper].size++;
+#ifdef JSMN_PARENT_LINKS
+                    token->parent = parser->toksuper;
+#endif
+                }
+                token->type = (c == '{' ? JSMN_OBJECT : JSMN_ARRAY);
+                token->start = parser->pos;
+                parser->toksuper = parser->toknext - 1;
                 break;
-
-            case JSMN_OBJECT:
-                start += json_walk_object(js, t, nest + 1, start, &ne);
-                key = 1;
+            case '}': case ']':
+                if (tokens == NULL)
+                    break;
+                type = (c == '}' ? JSMN_OBJECT : JSMN_ARRAY);
+#ifdef JSMN_PARENT_LINKS
+            if (parser->toknext < 1) {
+					return JSMN_ERROR_INVAL;
+				}
+				token = &tokens[parser->toknext - 1];
+				for (;;) {
+					if (token->start != -1 && token->end == -1) {
+						if (token->type != type) {
+							return JSMN_ERROR_INVAL;
+						}
+						token->end = parser->pos + 1;
+						parser->toksuper = token->parent;
+						break;
+					}
+					if (token->parent == -1) {
+						break;
+					}
+					token = &tokens[token->parent];
+				}
+#else
+                for (i = parser->toknext - 1; i >= 0; i--) {
+                    token = &tokens[i];
+                    if (token->start != -1 && token->end == -1) {
+                        if (token->type != type) {
+                            return JSMN_ERROR_INVAL;
+                        }
+                        parser->toksuper = -1;
+                        token->end = parser->pos + 1;
+                        break;
+                    }
+                }
+                /* Error if unmatched closing bracket */
+                if (i == -1) return JSMN_ERROR_INVAL;
+                for (; i >= 0; i--) {
+                    token = &tokens[i];
+                    if (token->start != -1 && token->end == -1) {
+                        parser->toksuper = i;
+                        break;
+                    }
+                }
+#endif
                 break;
-
-            case JSMN_ARRAY:
-                start += json_walk_array(js, t, nest + 1, start, &ne);
-                key = 1;
+            case '\"':
+                r = jsmn_parse_string(parser, js, len, tokens, num_tokens);
+                if (r < 0) return r;
+                count++;
+                if (parser->toksuper != -1 && tokens != NULL)
+                    tokens[parser->toksuper].size++;
                 break;
-
-            case JSMN_STRING:
+            case '\t' : case '\r' : case '\n' : case ':' : case ',': case ' ':
+                break;
+#ifdef JSMN_STRICT
+            /* In strict mode primitives are: numbers and booleans */
+			case '-': case '0': case '1' : case '2': case '3' : case '4':
+			case '5': case '6': case '7' : case '8': case '9':
+			case 't': case 'f': case 'n' :
+#else
+                /* In non-strict mode every unquoted value is a primitive */
             default:
-                if(key) {
-                    int len = t[start].end - t[start].start;
-                    if (unlikely(len>JSON_NAME_LEN)) len=JSON_NAME_LEN;
-                    strncpy(ne.name, &js[t[start].start], len);
-                    ne.name[len] = '\0';
-                    len=strlen(e->fullname) + strlen(e->fullname[0]?".":"") + strlen(ne.name);
-                    char *c = mallocz((len+1)*sizeof(char));
-                    sprintf(c,"%s%s%s", e->fullname, e->fullname[0]?".":"", ne.name);
-                    if (unlikely(len>JSON_FULLNAME_LEN)) len=JSON_FULLNAME_LEN;
-                    strncpy(ne.fullname, c, len);
-                    freez(c);
-                    start++;
-                    key = 0;
-                }
-                else {
-                    start += json_walk_string(js, t, start, &ne);
-                    key = 1;
-                }
+#endif
+                r = jsmn_parse_primitive(parser, js, len, tokens, num_tokens);
+                if (r < 0) return r;
+                count++;
+                if (parser->toksuper != -1 && tokens != NULL)
+                    tokens[parser->toksuper].size++;
                 break;
+
+#ifdef JSMN_STRICT
+            /* Unexpected char in strict mode */
+			default:
+				return JSMN_ERROR_INVAL;
+#endif
         }
     }
-    return start - init;
-}
 
-size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callback_function)(struct json_entry *))
-{
-    JSON_ENTRY e = {
-            .name = "",
-            .fullname = "",
-            .callback_data = callback_data,
-            .callback_function = callback_function
-    };
-
-    switch (t[0].type) {
-        case JSMN_OBJECT:
-            e.type = JSON_OBJECT;
-            json_walk_object(js, t, 0, 0, &e);
-            break;
-
-        case JSMN_ARRAY:
-            e.type = JSON_ARRAY;
-            json_walk_array(js, t, 0, 0, &e);
-            break;
-
-        case JSMN_PRIMITIVE:
-        case JSMN_STRING:
-            break;
-    }
-    return 1;
-}
-
-int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTRY *))
-{
-    size_t count;
-    if(js) {
-        jsmntok_t *tokens = json_tokenise(js, strlen(js), &count);
-        if(tokens) {
-            json_walk_tree(js, tokens, callback_data, callback_function);
-            freez(tokens);
-            return JSON_OK;
+    for (i = parser->toknext - 1; i >= 0; i--) {
+        /* Unmatched opened object or array */
+        if (tokens[i].start != -1 && tokens[i].end == -1) {
+            return JSMN_ERROR_PART;
         }
-
-        return JSON_CANNOT_PARSE;
     }
-    return JSON_CANNOT_DOWNLOAD;
+
+    return count;
 }
 
-int json_test(char *str)
-{
-    return json_parse(str, NULL, json_callback_print);
+/**
+ * Creates a new parser based over a given  buffer with an array of tokens
+ * available.
+ */
+void jsmn_init(jsmn_parser *parser) {
+    parser->pos = 0;
+    parser->toknext = 0;
+    parser->toksuper = -1;
 }
