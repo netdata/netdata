@@ -105,7 +105,7 @@ stages:
     - sudo apt-get install -y wget lxc lxc-templates
     - source tests/installer/slack.sh
     before_script:
-    - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
+    - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "automation"
     - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
     - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
     script:
@@ -155,7 +155,7 @@ stages:
     - sudo apt-get install -y wget lxc lxc-templates
     - source tests/installer/slack.sh
     before_script:
-    - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}"
+    - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "automation"
     - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
     - export BUILD_VERSION=$(cat packaging/version | cut -d'-' -f1) # We always build on the latest release
     script:
@@ -351,7 +351,7 @@ jobs:
   - stage: Packaging for release
 
     name: Generate changelog and TAG the release (only on special commit msg)
-    before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated"
+    before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated" "automation"
     script:
     - echo "GIT Branch:" && git branch
     - echo "Last commit:" && git log -1
@@ -537,7 +537,7 @@ jobs:
   - stage: Publish for release
 
     name: Build & Publish docker images
-    before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images"
+    before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images" "automation"
     script:
     - echo "GIT Branch:" && git branch
     - echo "Last commit:" && git log -1
@@ -554,7 +554,7 @@ jobs:
     if: tag !~ /(-rc)/
 
   - name: Create release draft
-    before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github"
+    before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github" "automation"
     script:
     - echo "GIT Branch:" && git branch
     - echo "Last commit:" && git log -1
@@ -575,7 +575,7 @@ jobs:
 
     name: Run coverity scan
     # Just notify people that Nightly ops triggered, use the first step as a hook to do that
-    before_script: post_message "TRAVIS_MESSAGE" "Starting nightly operations"
+    before_script: post_message "TRAVIS_MESSAGE" "Starting nightly operations" "automation"
     script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
 
   - name: Kickstart files integrity testing (extended)
@@ -586,7 +586,7 @@ jobs:
 
     # This is generating the changelog for nightly release and publish it
   - name: Generate nightly changelog
-    before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation for nightlies"
+    before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation for nightlies" "automation"
     script: ".travis/nightlies.sh"
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly changelog generation failed"
     git:
@@ -599,7 +599,7 @@ jobs:
   - stage: Nightly release
 
     name: Build & Publish docker images
-    before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies"
+    before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "automation"
     script:
     - echo "GIT Branch:" && git branch
     - echo "Last commit:" && git log -1
@@ -615,7 +615,7 @@ jobs:
     env: ALLOW_SOFT_FAILURE_HERE=true
 
   - name: Create nightly release artifacts, publish to GCS
-    before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies"
+    before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies" "automation"
     script:
     - echo "GIT Branch:" && git branch
     - echo "Last commit:" && git log -1
