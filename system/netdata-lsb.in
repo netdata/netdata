@@ -1,10 +1,18 @@
-#!/bin/bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+#!/usr/bin/env bash
 #
+# Netdata LSB start script
+#
+# Copyright:
+#         SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author:
+#         Costa Tsaousis  <costa@netdata.cloud>
+#         Pavlos Emm. Katsoulakis <paul@netdata.cloud>
+
 ### BEGIN INIT INFO
 # Provides:          netdata
-# Required-Start:    $local_fs $remote_fs $network $named $time apache2 httpd squid nginx mysql named opensips upsd hostapd postfix lm_sensors
-# Required-Stop:     $local_fs $remote_fs $network $named $time apache2 httpd squid nginx mysql named opensips upsd hostapd postfix lm_sensors
+# Required-Start:    $local_fs $remote_fs $network $named $time
+# Required-Stop:     $local_fs $remote_fs $network $named $time
 # Should-Start:      $local_fs $network $named $remote_fs $time $all
 # Should-Stop:       $local_fs $network $named $remote_fs $time $all
 # Default-Start:     2 3 4 5
