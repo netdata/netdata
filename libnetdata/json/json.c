@@ -5,6 +5,17 @@
 
 int json_tokens = JSON_TOKENS;
 
+/**
+ * Json Tokenise
+ *
+ * Map the string given inside tokens.
+ *
+ * @param js is the string used to create the tokens
+ * @param len is the string length
+ * @param count the number of tokens present in the string
+ *
+ * @return
+ */
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
     int n = json_tokens;
@@ -48,6 +59,15 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
     return tokens;
 }
 
+/**
+ * Callback Print
+ *
+ * Set callback print case necesary and wrinte an information inside a buffer to write in the log.
+ *
+ * @param e a pointer for a structure that has the complete information about json structure.
+ *
+ * @return It always return 0
+ */
 int json_callback_print(JSON_ENTRY *e)
 {
     BUFFER *wb=buffer_create(300);
@@ -89,6 +109,18 @@ int json_callback_print(JSON_ENTRY *e)
     return 0;
 }
 
+/**
+ * Walk string
+ *
+ * Set JSON_ENTRY to string and map the values from jsmntok_t.
+ *
+ * @param js the original string
+ * @param t the tokens
+ * @param start the first position
+ * @param e the output structure.
+ *
+ * @return It always return 1
+ */
 size_t json_walk_string(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
 {
     char old = js[t[start].end];
@@ -102,6 +134,18 @@ size_t json_walk_string(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
     return 1;
 }
 
+/**
+ * Walk Primitive
+ *
+ * Define the data type of the string
+ *
+ * @param js the original string
+ * @param t the tokens
+ * @param start the first position
+ * @param e the output structure.
+ *
+ * @return It always return 1
+ */
 size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
 {
     char old = js[t[start].end];
@@ -135,6 +179,19 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
     return 1;
 }
 
+/**
+ * Array
+ *
+ * Measure the array length
+ *
+ * @param js the original string
+ * @param t the tokens
+ * @param nest the length of structure t
+ * @param start the first position
+ * @param e the output structure.
+ *
+ * @return It returns the array length
+ */
 size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
 {
     JSON_ENTRY ne = {
@@ -190,6 +247,20 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
     return start - init;
 }
 
+/**
+ * Object
+ *
+ * Measure the Object length
+ *
+ * @param js the original string
+ * @param t the tokens
+ * @param nest the length of structure t
+ * @param start the first position
+ * @param e the output structure.
+ *
+ * @return It returns the Object length
+ *
+ */
 size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
 {
     JSON_ENTRY ne = {
@@ -255,6 +326,18 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
     return start - init;
 }
 
+/**
+ * Tree
+ *
+ * Call the correct walk function according its type.
+ *
+ * @param js the original string
+ * @param t the tokens
+ * @param callback_data
+ * @param callback_function
+ *
+ * @return It always return 1
+ */
 size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callback_function)(struct json_entry *))
 {
     JSON_ENTRY e = {
@@ -282,6 +365,18 @@ size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callbac
     return 1;
 }
 
+/**
+ * JSON Parse
+ *
+ * Parse the json message with the callback function
+ *
+ * @param js the string that the callback function will parse
+ * @param callback_data
+ * @param callback_function
+ *
+ * @return JSON_OK  case everything happend as expected, JSON_CANNOT_PARSE case there were errors in the
+ * parsing procces and JSON_CANNOT_DOWNLOAD case the string given(js) is NULL.
+ */
 int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTRY *))
 {
     size_t count;
@@ -295,6 +390,7 @@ int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTR
 
         return JSON_CANNOT_PARSE;
     }
+
     return JSON_CANNOT_DOWNLOAD;
 }
 

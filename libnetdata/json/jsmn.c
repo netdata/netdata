@@ -3,7 +3,15 @@
 #include "jsmn.h"
 
 /**
+ * Alloc token
+ *
  * Allocates a fresh unused token from the token pull.
+ *
+ * @param parser the controller
+ * @param tokens the tokens I am working
+ * @param num_tokens the number total of tokens.
+ *
+ * @return it returns the next token to work.
  */
 static jsmntok_t *jsmn_alloc_token(jsmn_parser *parser,
                                    jsmntok_t *tokens, size_t num_tokens) {
@@ -21,7 +29,14 @@ static jsmntok_t *jsmn_alloc_token(jsmn_parser *parser,
 }
 
 /**
+ * Fill Token
+ *
  * Fills token type and boundaries.
+ *
+ * @param token the structure to set the values
+ * @param type is the token type
+ * @param start is the first position of the value
+ * @param end is the end of the value
  */
 static void jsmn_fill_token(jsmntok_t *token, jsmntype_t type,
                             int start, int end) {
@@ -32,7 +47,13 @@ static void jsmn_fill_token(jsmntok_t *token, jsmntype_t type,
 }
 
 /**
+ * Parse primitive
+ *
  * Fills next available token with JSON primitive.
+ *
+ * @param parser is the control structure
+ * @param js is the json string
+ * @param type is the token type
  */
 static jsmnerr_t jsmn_parse_primitive(jsmn_parser *parser, const char *js,
                                       size_t len, jsmntok_t *tokens, size_t num_tokens) {
@@ -81,7 +102,17 @@ static jsmnerr_t jsmn_parse_primitive(jsmn_parser *parser, const char *js,
 }
 
 /**
- * Filsl next token with JSON string.
+ * Parse string
+ *
+ * Fills next token with JSON string.
+ *
+ * @param parser is the control structure
+ * @param js is the json string
+ * @param len is the js length
+ * @param tokens is structure with the tokens mapped.
+ * @param num_tokens is the total number of tokens
+ *
+ * @return It returns 0 on success and another integer otherwise
  */
 static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
                                    size_t len, jsmntok_t *tokens, size_t num_tokens) {
@@ -148,7 +179,17 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
 }
 
 /**
+ * JSMN Parse
+ *
  * Parse JSON string and fill tokens.
+ *
+ * @param parser the auxiliar vector used to parser
+ * @param js the string to parse
+ * @param len the string length
+ * @param tokens the place to map the tokens
+ * @param num_tokens the number of tokens present in the tokens structure.
+ *
+ * @return
  */
 jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
                      jsmntok_t *tokens, unsigned int num_tokens) {
@@ -271,8 +312,12 @@ jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
 }
 
 /**
+ * JSMN Init
+ *
  * Creates a new parser based over a given  buffer with an array of tokens
  * available.
+ *
+ * @param parser is the structure with values to reset
  */
 void jsmn_init(jsmn_parser *parser) {
     parser->pos = 0;

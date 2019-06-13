@@ -31,6 +31,7 @@ typedef enum {
 
 /**
  * JSON token description.
+ *
  * @param		type	type (object, array, string etc.)
  * @param		start	start position in JSON data string
  * @param		end		end position in JSON data string
