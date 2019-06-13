@@ -835,12 +835,12 @@ int main(int argc, char **argv) {
         error("update frequency %d seconds is too small for NFACCT. Using %d.", freq, netdata_update_every);
 
 #ifdef DO_NFACCT
-    if(debug) fprintf(stderr, "freeipmi.plugin: calling nfacct_init()\n");
+    if(debug) fprintf(stderr, "nfacct.plugin: calling nfacct_init()\n");
     int nfacct = !nfacct_init(netdata_update_every);
 #endif
 
 #ifdef DO_NFSTAT
-    if(debug) fprintf(stderr, "freeipmi.plugin: calling nfstat_init()\n");
+    if(debug) fprintf(stderr, "nfacct.plugin: calling nfstat_init()\n");
     int nfstat = !nfstat_init(netdata_update_every);
 #endif
 
