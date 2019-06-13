@@ -394,6 +394,7 @@ run ./configure \
 	--prefix="${NETDATA_PREFIX}/usr" \
 	--sysconfdir="${NETDATA_PREFIX}/etc" \
 	--localstatedir="${NETDATA_PREFIX}/var" \
+	--libexecdir="${NETDATA_PREFIX}/usr/libexec" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
