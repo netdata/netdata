@@ -220,12 +220,12 @@ static inline int _collect_zram_metrics(char *name, void *entry, int advance) {
 
 static int collect_first_zram_metrics(char *name, void *entry, void *data) {
     // collect without calling rrdset_next (init only)
-    _collect_zram_metrics(name, entry, 0);
+    return _collect_zram_metrics(name, entry, 0);
 }
 
 static int collect_zram_metrics(char *name, void *entry, void *data) {
     // collect with calling rrdset_next
-    _collect_zram_metrics(name, entry, 1);
+    return _collect_zram_metrics(name, entry, 1);
 }
 
     // --------------------------------------------------------------------
