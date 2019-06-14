@@ -342,6 +342,10 @@ If you used many API keys, you can add one such section for each API key.
 
 When done, restart netdata on the `master` node. It is now ready to receive metrics.
 
+Note that `health enabled by default = auto` will still trigger `last_collected` alarms, if a connected slave does not exit gracefully. If the netdata running on the slave is 
+stopped, it will close the connection to the master, ensuring that no `last_collected` alarms are triggered. For example, a proper container restart would first terminate 
+the netdata process, but a system power issue would leave the connection open on the master side. In the second case, you will still receive alarms. 
+
 #### Configuring the `slaves`
 
 On each of the slaves, edit `/etc/netdata/stream.conf` (to edit it on your system run `/etc/netdata/edit-config stream.conf`) and set these:
