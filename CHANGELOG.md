@@ -4,11 +4,14 @@
 
 **Fixed bugs:**
 
+- RFE: Minor change to the spec.in file in order to help with building rpms on RHEL [\#6256](https://github.com/netdata/netdata/issues/6256)
 - addgroup: gid '999' in use [\#6253](https://github.com/netdata/netdata/issues/6253)
+- Starting netdata official container fails with `addgroup: gid '999' in use` [\#6251](https://github.com/netdata/netdata/issues/6251)
 - Elasticsearch plugin error - 'module' object has no attribute 'Retry' [\#6248](https://github.com/netdata/netdata/issues/6248)
 - "Missing charts" on v1.15.0-70-nightly  \(\*\*solved\*\*\) [\#6244](https://github.com/netdata/netdata/issues/6244)
 - netdata daemon collectors stuck [\#6239](https://github.com/netdata/netdata/issues/6239)
 - URL Parser changes, correct health cmd api conditions to create silencer [\#6238](https://github.com/netdata/netdata/issues/6238)
+- Error during installation in devuan [\#6230](https://github.com/netdata/netdata/issues/6230)
 -  kickstart.sh: Getting Nightly SHA256 sums from storage.googleapis.com times out [\#6227](https://github.com/netdata/netdata/issues/6227)
 - Use major/minor from sys/types.h [\#6218](https://github.com/netdata/netdata/issues/6218)
 - Update fails because of new system dependencies \(\*\*Resolved\*\*\) [\#6200](https://github.com/netdata/netdata/issues/6200)
@@ -21,6 +24,7 @@
 - Why is auto-update not working? V1.14.0 [\#6170](https://github.com/netdata/netdata/issues/6170)
 - \[solved\] ZFS database \(was: netdata FATAL : MAIN :uv\_fs\_fsopen: invalid argument \# : Invalid argument\) [\#6161](https://github.com/netdata/netdata/issues/6161)
 - httpcheck does not export some metrics in version 1.15 [\#6157](https://github.com/netdata/netdata/issues/6157)
+- opensuse - installation by hand issues due to hardcoded libexec in netdata-installer.sh [\#6153](https://github.com/netdata/netdata/issues/6153)
 - httpcheck causes lots of SYN\_SENT dangling sockets [\#6152](https://github.com/netdata/netdata/issues/6152)
 - varnish plugin not showing \(varnish version 4\) [\#6149](https://github.com/netdata/netdata/issues/6149)
 - Reduce number of codacy issues [\#6131](https://github.com/netdata/netdata/issues/6131)
@@ -38,9 +42,12 @@
 - install on debian jessie [\#6083](https://github.com/netdata/netdata/issues/6083)
 - error "cgroup-network-helper.sh: DEBUG: virsh command is not available" with the lastest docker image [\#6073](https://github.com/netdata/netdata/issues/6073)
 - Kickstart script verification md5sum is out of date, verification fails [\#6049](https://github.com/netdata/netdata/issues/6049)
+- AWS Kinesis dependency [\#6002](https://github.com/netdata/netdata/issues/6002)
 - HTTP requests are classified as AF\_UNIX [\#5987](https://github.com/netdata/netdata/issues/5987)
 - Netdata behind caddy reverse proxy wont login. [\#5794](https://github.com/netdata/netdata/issues/5794)
 - netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
+- cgroups name resolution doesn't work \(on Raspbian\) [\#5314](https://github.com/netdata/netdata/issues/5314)
+- Fix devuan support for initd [\#6275](https://github.com/netdata/netdata/pull/6275) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/docker: Fix docker socket utilization, first pass [\#6233](https://github.com/netdata/netdata/pull/6233) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/daemon: Eliminate a couple of warnings, plus tabs removal [\#6222](https://github.com/netdata/netdata/pull/6222) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/ci: Add lifecycle checks to bare operating system installations [\#6209](https://github.com/netdata/netdata/pull/6209) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -52,6 +59,7 @@
 **Closed issues:**
 
 - Documentation improvements [\#6214](https://github.com/netdata/netdata/issues/6214)
+- monitor dnsmasq dhcp server leases [\#6206](https://github.com/netdata/netdata/issues/6206)
 - Scope of 1.16-rc1 [\#6159](https://github.com/netdata/netdata/issues/6159)
 - Netdata variable granularity Research [\#6148](https://github.com/netdata/netdata/issues/6148)
 - SN\_EMPTY\_SLOT RRDDIMM value detection inside DB engine [\#6105](https://github.com/netdata/netdata/issues/6105)
@@ -62,13 +70,24 @@
 - Secure streaming via SSL [\#6004](https://github.com/netdata/netdata/issues/6004)
 - \[Binary releases\] Create a script to containerise the RPM build process [\#5967](https://github.com/netdata/netdata/issues/5967)
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
+- notify package maintainers of the new netdata releases [\#5682](https://github.com/netdata/netdata/issues/5682)
 - \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
 - Feature: add VictoriaMetrics backend for long-term archiving [\#5619](https://github.com/netdata/netdata/issues/5619)
+- Hide: timestamps, memory values left, background and use graph as a gif [\#5186](https://github.com/netdata/netdata/issues/5186)
 - Cookie consent for the Netdata sites [\#4798](https://github.com/netdata/netdata/issues/4798)
+- RFC: registry v2 [\#3990](https://github.com/netdata/netdata/issues/3990)
 - alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
 
 **Merged pull requests:**
 
+- Add comments about AWS SDK for C++ installation [\#6277](https://github.com/netdata/netdata/pull/6277) ([vlvkobal](https://github.com/vlvkobal))
+- netdata/packaging: During install,  many file not found were raised [\#6272](https://github.com/netdata/netdata/pull/6272) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/documentation: Its Redhat, then came the others [\#6271](https://github.com/netdata/netdata/pull/6271) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging: Adjust CI notification logic [\#6268](https://github.com/netdata/netdata/pull/6268) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- UrlService: add min required version check [\#6263](https://github.com/netdata/netdata/pull/6263) ([ilyam8](https://github.com/ilyam8))
+- Fix variable namespace in memory health check [\#6261](https://github.com/netdata/netdata/pull/6261) ([octomike](https://github.com/octomike))
+- Fix typo in nfacct.plugin [\#6260](https://github.com/netdata/netdata/pull/6260) ([vlvkobal](https://github.com/vlvkobal))
+- netdata/packaging: Fix netdata/netdata docker image failure, when users passing PGID that already exists on the system [\#6259](https://github.com/netdata/netdata/pull/6259) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - PR to fix issue \#6238 [\#6242](https://github.com/netdata/netdata/pull/6242) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update CODEOWNERS [\#6241](https://github.com/netdata/netdata/pull/6241) ([cakrit](https://github.com/cakrit))
 - Force page alignment per dimension of chart. [\#6240](https://github.com/netdata/netdata/pull/6240) ([mfundul](https://github.com/mfundul))
