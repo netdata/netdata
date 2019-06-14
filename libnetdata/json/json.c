@@ -14,8 +14,24 @@ int json_tokens = JSON_TOKENS;
  * @param len is the string length
  * @param count the number of tokens present in the string
  *
- * @return
+ * @return it returns the json parsed in tokens
  */
+#ifdef ENABLE_JSONC
+json_object *json_tokenise(char *js) {
+    if(!js) {
+        error("JSON: json string is empty.");
+        return NULL;
+    }
+
+    json_object *token = json_tokener_parse(js);
+    if(!token) {
+        error("JSON: Invalid json string.");
+        return NULL;
+    }
+
+    return token;
+}
+#else
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 {
     int n = json_tokens;
@@ -58,6 +74,7 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
     if(json_tokens < n) json_tokens = n;
     return tokens;
 }
+#endif
 
 /**
  * Callback Print
@@ -259,7 +276,6 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
  * @param e the output structure.
  *
  * @return It returns the Object length
- *
  */
 size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
 {
@@ -338,6 +354,28 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
  *
  * @return It always return 1
  */
+#ifdef ENABLE_JSONC
+size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *)) {
+    JSON_ENTRY e = {
+            .name = "",
+            .fullname = "",
+            .callback_data = callback_data,
+            .callback_function = callback_function
+    };
+
+    enum json_type type;
+    json_object_object_foreach(t, key, val) {
+        type = json_object_get_type(val);
+        if (type == json_type_array) {
+            e.type = JSON_ARRAY;
+        } else if (type == json_type_object) {
+            e.type = JSON_OBJECT;
+        }
+    }
+
+    return 1;
+}
+#else
 size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callback_function)(struct json_entry *))
 {
     JSON_ENTRY e = {
@@ -362,8 +400,10 @@ size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callbac
         case JSMN_STRING:
             break;
     }
+
     return 1;
 }
+#endif
 
 /**
  * JSON Parse
@@ -371,8 +411,8 @@ size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callbac
  * Parse the json message with the callback function
  *
  * @param js the string that the callback function will parse
- * @param callback_data
- * @param callback_function
+ * @param callback_data additional data to be used together the callback function
+ * @param callback_function function used to create a silencer.
  *
  * @return JSON_OK  case everything happend as expected, JSON_CANNOT_PARSE case there were errors in the
  * parsing procces and JSON_CANNOT_DOWNLOAD case the string given(js) is NULL.
@@ -381,10 +421,19 @@ int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTR
 {
     size_t count;
     if(js) {
+#ifdef ENABLE_JSONC
+        json_object *tokens = json_tokenise(js);
+#else
         jsmntok_t *tokens = json_tokenise(js, strlen(js), &count);
+#endif
         if(tokens) {
+#ifdef ENABLE_JSONC
+            json_walk(tokens, callback_data, callback_function);
+            json_object_put(tokens);
+#else
             json_walk_tree(js, tokens, callback_data, callback_function);
             freez(tokens);
+#endif
             return JSON_OK;
         }
 
@@ -394,7 +443,9 @@ int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTR
     return JSON_CANNOT_DOWNLOAD;
 }
 
+/*
 int json_test(char *str)
 {
     return json_parse(str, NULL, json_callback_print);
 }
+ */

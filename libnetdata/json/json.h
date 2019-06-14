@@ -2,6 +2,10 @@
 #define CHECKIN_JSON_H 1
 
 
+#if ENABLE_JSONC
+# include <json-c/json.h>
+#endif
+
 #include "jsmn.h"
 
 #define JSON_NAME_LEN 200
@@ -50,9 +54,14 @@ int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTR
 // ----------------------------------------------------------------------------
 // private functions
 
+#ifdef ENABLE_JSONC
+json_object *json_tokenise(char *js);
+size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *));
+#else
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count);
-
 size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callback_function)(struct json_entry *));
+#endif
+
 size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e);
 size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e);
 size_t json_walk_string(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e);

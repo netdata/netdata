@@ -189,7 +189,7 @@ static jsmnerr_t jsmn_parse_string(jsmn_parser *parser, const char *js,
  * @param tokens the place to map the tokens
  * @param num_tokens the number of tokens present in the tokens structure.
  *
- * @return
+ * @return It returns the number of tokens present in the string on success or a negative number otherwise
  */
 jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
                      jsmntok_t *tokens, unsigned int num_tokens) {

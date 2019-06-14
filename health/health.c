@@ -69,6 +69,17 @@ void health_silencers_add(SILENCER *silencer) {
     );
 }
 
+/**
+ * Silencers Add Parameter
+ *
+ * Create a new silencer and adjust the variables
+ *
+ * @param silencer a pointer to the silencer that will be adjusted
+ * @param key the key value sent by client
+ * @param value the value sent to the key
+ *
+ * @return It returns the silencer configured on success and NULL otherwise
+ */
 SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) {
     static uint32_t
             hash_alarm = 0,
@@ -98,6 +109,10 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
                 (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY))
                 ) {
             silencer = create_silencer();
+            if(!silencer) {
+                error("Cannot add a new silencer to Netdata");
+                return NULL;
+            }
         }
     }
 
@@ -117,9 +132,19 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
         silencer->families = strdupz(value);
         silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT);
     }
+
     return silencer;
 }
 
+/**
+ * JSON Read Callbacko
+ *
+ * Callback called by netdata to create the silencer.
+ *
+ * @param e the main json structure
+ *
+ * @return It always return 0.
+ */
 int health_silencers_json_read_callback(JSON_ENTRY *e)
 {
     switch(e->type) {
@@ -129,7 +154,9 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
                 // init silencer
                 debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
                 e->callback_data=create_silencer();
-                health_silencers_add(e->callback_data);
+                if(e->callback_data) {
+                    health_silencers_add(e->callback_data);
+                }
             }
             break;
 
@@ -157,9 +184,15 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
         case JSON_NULL:
             break;
     }
+
     return 0;
 }
 
+/**
+ * Silencers init
+ *
+ * Function used to initialize the silencer structure.
+ */
 void health_silencers_init(void) {
     silencers = mallocz(sizeof(SILENCERS));
     silencers->all_alarms=0;
@@ -200,6 +233,11 @@ void health_silencers_init(void) {
     }
 }
 
+/**
+ * Health Init
+ *
+ * Initialize the health thread.
+ */
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
@@ -214,6 +252,13 @@ void health_init(void) {
 // ----------------------------------------------------------------------------
 // re-load health configuration
 
+/**
+ * Reload host
+ *
+ * Reload configuration for a specific host.
+ *
+ * @param host the structure of the host that the function will reload the configuration.
+ */
 void health_reload_host(RRDHOST *host) {
     if(unlikely(!host->health_enabled))
         return;
@@ -261,6 +306,11 @@ void health_reload_host(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+/**
+ * Reload
+ *
+ * Reload the host configuration for all hosts.
+ */
 void health_reload(void) {
 
     rrd_rdlock();
