@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- How to remove/unregister a streaming node to prevent the health alarms from triggering [\#6266](https://github.com/netdata/netdata/issues/6266)
 - RFE: Minor change to the spec.in file in order to help with building rpms on RHEL [\#6256](https://github.com/netdata/netdata/issues/6256)
 - addgroup: gid '999' in use [\#6253](https://github.com/netdata/netdata/issues/6253)
 - Starting netdata official container fails with `addgroup: gid '999' in use` [\#6251](https://github.com/netdata/netdata/issues/6251)
@@ -20,6 +21,7 @@
 - kickstart.sh: Getting Nightly SHA256 sums from storage.googleapis.com times out [\#6191](https://github.com/netdata/netdata/issues/6191)
 - tv.html errors on https [\#6188](https://github.com/netdata/netdata/issues/6188)
 - Error messages on old database files [\#6186](https://github.com/netdata/netdata/issues/6186)
+- netdata/packaging: Sporadic job failures in Travis CI [\#6185](https://github.com/netdata/netdata/issues/6185)
 - Fix date in pushbullet alarm notifications [\#6178](https://github.com/netdata/netdata/issues/6178)
 - Why is auto-update not working? V1.14.0 [\#6170](https://github.com/netdata/netdata/issues/6170)
 - \[solved\] ZFS database \(was: netdata FATAL : MAIN :uv\_fs\_fsopen: invalid argument \# : Invalid argument\) [\#6161](https://github.com/netdata/netdata/issues/6161)
@@ -58,6 +60,7 @@
 
 **Closed issues:**
 
+- FreeIPMI - option to remove the ID added to the label [\#6283](https://github.com/netdata/netdata/issues/6283)
 - Documentation improvements [\#6214](https://github.com/netdata/netdata/issues/6214)
 - monitor dnsmasq dhcp server leases [\#6206](https://github.com/netdata/netdata/issues/6206)
 - Scope of 1.16-rc1 [\#6159](https://github.com/netdata/netdata/issues/6159)
@@ -80,6 +83,8 @@
 
 **Merged pull requests:**
 
+- netdata/packaging: Separate beta messages from production messages [\#6282](https://github.com/netdata/netdata/pull/6282) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Add more info on the stream.conf health enabled by default = auto option [\#6281](https://github.com/netdata/netdata/pull/6281) ([cakrit](https://github.com/cakrit))
 - Add comments about AWS SDK for C++ installation [\#6277](https://github.com/netdata/netdata/pull/6277) ([vlvkobal](https://github.com/vlvkobal))
 - netdata/packaging: During install,  many file not found were raised [\#6272](https://github.com/netdata/netdata/pull/6272) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/documentation: Its Redhat, then came the others [\#6271](https://github.com/netdata/netdata/pull/6271) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
