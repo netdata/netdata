@@ -9,8 +9,6 @@
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
-%bcond_with     nfacct   # build with nfacct plugin
-%bcond_with     freeipmi # build with freeipmi plugin
 %bcond_with     netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
@@ -65,7 +63,6 @@ fi \
 
 %if 0%{?_fedora}
 %global netdata_recommends \
-Recommends:	curl \
 Recommends:	iproute-tc \
 Recommends:	lm_sensors \
 Recommends:	nmap-ncat \
@@ -76,10 +73,12 @@ Recommends:	python2-PyMySQL \
 Recommends:	python2-psycopg2 \
 %{nil}
 %else
-%global netdata_recommends %{nil}
+%global netdata_recommends \
+                sensors \
+%{nil}
 %endif
 
-Summary:	Real-time performance monitoring, done right
+Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	@PACKAGE_VERSION@
 Release:	1%{?dist}
@@ -87,27 +86,74 @@ License:	GPLv3+
 Group:		Applications/System
 Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
 URL:		http://my-netdata.io
-BuildRequires:	pkgconfig
-BuildRequires:	xz
-BuildRequires:	zlib-devel
-BuildRequires:	libuuid-devel
-BuildRequires:	autoconf
-BuildRequires:	automake
-Requires:	zlib
-Requires:	libuuid
 
-# Packages can be found in the EPEL repo
-%if %{with nfacct}
+# #####################################################################
+# Core build/install/runtime dependencies
+# #####################################################################
+
+# Build dependencies
+#
+BuildRequires: gcc
+BuildRequires: make
+BuildRequires: git
+BuildRequires: autoconf
+BuildRequires: autoconf-archive
+BuildRequires: autogen
+BuildRequires: automake
+BuildRequires: pkgconfig
+BuildRequires: curl
+BuildRequires: findutils
+BuildRequires: zlib-devel
+BuildRequires: libuuid-devel
+BuildRequires: libuv-devel
+BuildRequires: openssl-devel
+%if 0%{?suse_version}
+BuildRequires: judy-devel
+BuildRequires: liblz4-devel
+BuildRequires: netcat-openbsd
+%else
+BuildRequires: Judy-devel
+BuildRequires: lz4-devel
+BuildRequires: nc
+%endif
+
+# Runtime dependencies
+#
+Requires:      zlib
+Requires:      libuuid
+%if 0%{?suse_version}
+# for libuv, Requires version >= 1
+Requires:      libuv1
+Requires:      libJudy1
+%else
+# for libuv, Requires version >= 1
+Requires:      libuv >= 1
+Requires:      Judy
+%endif
+Requires:      openssl
+Requires:      lz4
+
+# #####################################################################
+# Functionality-dependent package dependencies
+# #####################################################################
+# Note: Some or all of the Packages may be found in the EPEL repo, 
+# rather than the standard ones
+
+# nfacct plugin dependencies
 BuildRequires:	libmnl-devel
 BuildRequires:	libnetfilter_acct-devel
+%if 0%{?suse_version}
+Requires: libmnl0
+%else
 Requires: libmnl
-Requires: libnetfilter_acct
 %endif
+Requires: libnetfilter_acct
+# end nfacct plugin dependencies
 
-%if %{with freeipmi}
+# freeipmi plugin dependencies
 BuildRequires:	freeipmi-devel
 Requires: freeipmi
-%endif
+# end - freeipmi plugin dependencies
 
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
@@ -116,14 +162,16 @@ Requires(post): libcap
 %{netdata_initd_buildrequires}
 %{netdata_recommends}
 %{netdata_initd_requires}
+# #####################################################################
+# End of dependency management configuration
+# #####################################################################
 
 %description
-netdata is the fastest way to visualize metrics. It is a resource
+  netdata is the fastest way to visualize metrics. It is a resource
 efficient, highly optimized system for collecting and visualizing any
 type of realtime timeseries data, from CPU usage, disk activity, SQL
 queries, API calls, web site visitors, etc.
-
-netdata tries to visualize the truth of now, in its greatest detail,
+  netdata tries to visualize the truth of now, in its greatest detail,
 so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
@@ -131,13 +179,14 @@ happened, on your systems and applications.
 %setup -q -n %{name}-%{version}
 
 %build
-autoreconf -i
+# Conf step
+autoreconf -ivf
 %configure \
 	--with-zlib \
 	--with-math \
-	%{?with_nfacct:--enable-plugin-nfacct} \
-	%{?with_freeipmi:--enable-plugin-freeipmi} \
 	--with-user=netdata
+
+# Build step
 %{__make} %{?_smp_mflags}
 
 %install
@@ -161,6 +210,8 @@ install -m 755 system/netdata-init-d \
 %endif
 
 %pre
+
+# User/Group creations, as needed
 getent group netdata >/dev/null || groupadd -r netdata
 getent group docker >/dev/null || groupadd -r docker
 getent passwd netdata >/dev/null || \
@@ -209,9 +260,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0550,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
-%if %{with freeipmi}
+# freeipmi files
 %caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
-%endif
 
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
 %attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
@@ -243,6 +293,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_datadir}/%{name}/web
 
 %changelog
+* Sun Jun 16 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud - 0.0.0-4
+First draft refactor on package dependencies section
+- Remove freeipmi/nfacct plugin flags. We auto-detect all plugins by decision
+- Start refactor of package dependencies
+- Add missing dependencies, with respect to distro peculiarities
+- Adjust existing dependencies, so that distro-specific package names is applied
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
 - Temporary set version statically
 - Fix changelog ordering
