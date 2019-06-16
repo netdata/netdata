@@ -8,7 +8,8 @@
 
 #include "jsmn.h"
 
-#define JSON_NAME_LEN 200
+//https://www.ibm.com/support/knowledgecenter/en/SS9H2Y_7.6.0/com.ibm.dp.doc/json_parserlimits.html
+#define JSON_NAME_LEN 256
 #define JSON_FULLNAME_LEN 1024
 
 typedef enum {
@@ -34,9 +35,6 @@ typedef struct json_entry {
 
     char *original_string;
 
-    // callbacks are only used when type is
-    // JSON_ARRAY to define the callback for each item in the array
-    // JSON_OBJECT to define the callback for each item in the object
     void *callback_data;
     int (*callback_function)(struct json_entry *);
 } JSON_ENTRY;

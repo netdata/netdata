@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <libnetdata/json/json.h>
 #include "health.h"
 
 struct health_cmdapi_thread_status {
@@ -153,7 +154,7 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
             if(e->name && strcmp(e->name,"")) {
                 // init silencer
                 debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
-                e->callback_data=create_silencer();
+                e->callback_data = create_silencer();
                 if(e->callback_data) {
                     health_silencers_add(e->callback_data);
                 }
@@ -171,7 +172,10 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
                 else if (!strcmp(e->data.string,"DISABLE")) silencers->stype = STYPE_DISABLE_ALARMS;
             } else {
                 debug(D_HEALTH, "JSON: Adding %s=%s", e->name, e->data.string);
-                health_silencers_addparam(e->callback_data, e->name, e->data.string);
+                SILENCER *s = health_silencers_addparam(e->callback_data, e->name, e->data.string);
+                if (s) {
+                    health_silencers_add(s);
+                }
             }
             break;
 
@@ -203,33 +207,29 @@ void health_silencers_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
     silencers_filename = config_get(CONFIG_SECTION_HEALTH, "silencers file", filename);
 
-    FILE *fd = fopen(silencers_filename, "r");
-    if (fd) {
-        char *str;
-        long  numbytes;
-        info("Parsing health silencers file %s", silencers_filename);
-        /* Get the number of bytes */
-        fseek(fd, 0L, SEEK_END);
-        numbytes = ftell(fd);
-
-        if (numbytes > HEALTH_SILENCERS_MAX_FILE_LEN) {
-            error("Health silencers file %s exceeds max size %d. Aborting read.", silencers_filename, HEALTH_SILENCERS_MAX_FILE_LEN);
-            fclose(fd);
-            return;
+    struct stat statbuf;
+    if (!stat(silencers_filename,&statbuf)) {
+        off_t length = statbuf.st_size;
+        if (length && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
+            FILE *fd = fopen(silencers_filename, "r");
+            if (fd) {
+                char *str = mallocz((length+1)* sizeof(char));
+                if(str) {
+                    fread(str, sizeof(char), length, fd);
+                    str[length] = 0x00;
+                    json_parse(str, NULL, health_silencers_json_read_callback);
+                    freez(str);
+                    info("Parsed health silencers file %s", silencers_filename);
+                }
+                fclose(fd);
+            } else {
+                error("Cannot open the file %s",silencers_filename);
+            }
+        } else {
+            error("Health silencers file %s has the size %ld that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, length, HEALTH_SILENCERS_MAX_FILE_LEN);
         }
-        /* reset the file position indicator to the beginning of the file */
-        fseek(fd, 0L, SEEK_SET);
-
-        /* grab sufficient memory for the str to hold the text */
-        str = (char*)mallocz((numbytes+1) * sizeof(char));
-
-        /* copy all the text into the str */
-        fread(str, sizeof(char), numbytes, fd);
-        str[numbytes]='\0';
-        json_parse(str, NULL, health_silencers_json_read_callback);
-        freez(str);
-        fclose(fd);
-        info("Parsed health silencers file %s", silencers_filename);
+    } else {
+        error("Cannot open the file %s",silencers_filename);
     }
 }
 

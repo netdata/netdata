@@ -1,5 +1,8 @@
 #include "jsmn.h"
 #include "../libnetdata.h"
+#include "json.h"
+#include "libnetdata/libnetdata.h"
+#include "health/health.h"
 
 #define JSON_TOKENS 1024
 
@@ -30,6 +33,49 @@ json_object *json_tokenise(char *js) {
     }
 
     return token;
+}
+
+jsmntok_t *json_tokenise2(char *js, size_t len, size_t *count)
+{
+    int n = json_tokens;
+    if(!js || !len) {
+        error("JSON: json string is empty.");
+        return NULL;
+    }
+
+    jsmn_parser parser;
+    jsmn_init(&parser);
+
+    jsmntok_t *tokens = mallocz(sizeof(jsmntok_t) * n);
+    if(!tokens) return NULL;
+
+    int ret = jsmn_parse(&parser, js, len, tokens, n);
+    while (ret == JSMN_ERROR_NOMEM) {
+        n *= 2;
+        jsmntok_t *new = reallocz(tokens, sizeof(jsmntok_t) * n);
+        if(!new) {
+            freez(tokens);
+            return NULL;
+        }
+        tokens = new;
+        ret = jsmn_parse(&parser, js, len, tokens, n);
+    }
+
+    if (ret == JSMN_ERROR_INVAL) {
+        error("JSON: Invalid json string.");
+        freez(tokens);
+        return NULL;
+    }
+    else if (ret == JSMN_ERROR_PART) {
+        error("JSON: Truncated JSON string.");
+        freez(tokens);
+        return NULL;
+    }
+
+    if(count) *count = (size_t)ret;
+
+    if(json_tokens < n) json_tokens = n;
+    return tokens;
 }
 #else
 jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
@@ -125,6 +171,81 @@ int json_callback_print(JSON_ENTRY *e)
     buffer_free(wb);
     return 0;
 }
+
+/**
+ * JSONC Set String
+ *
+ * Set the string value of the structure JSON_ENTRY.
+ *
+ * @param e the output structure
+ */
+static inline void json_jsonc_set_string(JSON_ENTRY *e,char *key,const char *value) {
+    size_t length = strlen(key);
+    e->type = JSON_STRING;
+    memcpy(e->name,key,length);
+    e->name[length] = 0x00;
+    e->data.string = (char *) value;
+}
+
+
+#ifdef ENABLE_JSONC
+/**
+ * JSONC set Boolean
+ *
+ * Set the boolean value of the structure JSON_ENTRY
+ *
+ * @param e the output structure
+ * @param value the input value
+ */
+static inline void json_jsonc_set_boolean(JSON_ENTRY *e,int value) {
+    e->type = JSON_BOOLEAN;
+    e->data.boolean = value;
+}
+
+/**
+ * Parse Array
+ *
+ * Parse the array object.
+ *
+ * @param ptr the pointer for the object that we will parse.
+ * @param callback_data additional data to be used together the callback function
+ * @param callback_function function used to create a silencer.
+ */
+static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
+    int end = json_object_array_length(ptr);
+    JSON_ENTRY e;
+
+    e.callback_data = callback_data;
+    if(end) {
+        int i;
+        i = 0;
+
+        enum json_type type;
+        do {
+            json_object *jvalue =  json_object_array_get_idx(ptr, i);
+            if(jvalue) {
+                json_object_object_foreach(jvalue, key, val) {
+                    type = json_object_get_type(val);
+                    if (type == json_type_array) {
+                        e.type = JSON_ARRAY;
+                        json_jsonc_parse_array(val, callback_data, callback_function);
+                    } else if (type == json_type_object) {
+                        e.type = JSON_OBJECT;
+                        json_walk(val,callback_data,callback_function);
+                    } else if (type == json_type_string) {
+                        json_jsonc_set_string(&e,key,json_object_get_string(val));
+                        callback_function(&e);
+                    } else if (type == json_type_boolean) {
+                        json_jsonc_set_boolean(&e,json_object_get_boolean(val));
+                        callback_function(&e);
+                    }
+                }
+            }
+
+        } while (++i < end);
+    }
+}
+#else
 
 /**
  * Walk string
@@ -341,7 +462,44 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
     }
     return start - init;
 }
+#endif
 
+/**
+ * Tree
+ *
+ * Call the correct walk function according its type.
+ *
+ * @param t the json object to work
+ * @param callback_data additional data to be used together the callback function
+ * @param callback_function function used to create a silencer.
+ *
+ * @return It always return 1
+ */
+#ifdef ENABLE_JSONC
+size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *)) {
+    JSON_ENTRY e;
+
+    e.callback_data = callback_data;
+    enum json_type type;
+    json_object_object_foreach(t, key, val) {
+        type = json_object_get_type(val);
+        if (type == json_type_array) {
+            e.type = JSON_ARRAY;
+            json_jsonc_parse_array(val,NULL,health_silencers_json_read_callback);
+        } else if (type == json_type_object) {
+            e.type = JSON_OBJECT;
+        } else if (type == json_type_string) {
+            json_jsonc_set_string(&e,key,json_object_get_string(val));
+            callback_function(&e);
+        } else if (type == json_type_boolean) {
+            json_jsonc_set_boolean(&e,json_object_get_boolean(val));
+            callback_function(&e);
+        }
+    }
+
+    return 1;
+}
+#else
 /**
  * Tree
  *
@@ -349,33 +507,11 @@ size_t json_walk_object(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_
  *
  * @param js the original string
  * @param t the tokens
- * @param callback_data
- * @param callback_function
+ * @param callback_data additional data to be used together the callback function
+ * @param callback_function function used to create a silencer.
  *
  * @return It always return 1
  */
-#ifdef ENABLE_JSONC
-size_t json_walk(json_object *t, void *callback_data, int (*callback_function)(struct json_entry *)) {
-    JSON_ENTRY e = {
-            .name = "",
-            .fullname = "",
-            .callback_data = callback_data,
-            .callback_function = callback_function
-    };
-
-    enum json_type type;
-    json_object_object_foreach(t, key, val) {
-        type = json_object_get_type(val);
-        if (type == json_type_array) {
-            e.type = JSON_ARRAY;
-        } else if (type == json_type_object) {
-            e.type = JSON_OBJECT;
-        }
-    }
-
-    return 1;
-}
-#else
 size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callback_function)(struct json_entry *))
 {
     JSON_ENTRY e = {
@@ -419,13 +555,14 @@ size_t json_walk_tree(char *js, jsmntok_t *t, void *callback_data, int (*callbac
  */
 int json_parse(char *js, void *callback_data, int (*callback_function)(JSON_ENTRY *))
 {
-    size_t count;
     if(js) {
 #ifdef ENABLE_JSONC
         json_object *tokens = json_tokenise(js);
 #else
+        size_t count;
         jsmntok_t *tokens = json_tokenise(js, strlen(js), &count);
 #endif
+
         if(tokens) {
 #ifdef ENABLE_JSONC
             json_walk(tokens, callback_data, callback_function);
