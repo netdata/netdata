@@ -73,7 +73,6 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
             ret = 403;
         } else {
-<<<<<<< HEAD
             while (url) {
                 char *value = mystrsep(&url, "&");
                 if (!value || !*value) continue;
@@ -119,79 +118,6 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                                 (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY))
                                 ) {
                             silencer = create_silencer();
-=======
-            uint32_t end = w->total_params;
-            if (end) {
-                uint32_t i = 0;
-                do {
-                    char *key = w->param_name[i].body;
-                    size_t lkey = w->param_name[i].length;
-                    char ksave = key[lkey];
-                    key[lkey] = 0x00;
-
-                    char *value = w->param_values[i].body;
-                    size_t lvalue = w->param_values[i].length;
-                    char vsave = value[lvalue];
-                    value[lvalue] = 0x00;
-
-                    debug(D_WEB_CLIENT, "%llu: API v1 health query param '%s' with value '%s'", w->id, key, value);
-
-                    // name and value are now the parameters
-                    if (!strcmp(key, "cmd")) {
-                        if (!strcmp(value, HEALTH_CMDAPI_CMD_SILENCEALL)) {
-                            silencers->all_alarms = 1;
-                            silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
-                            buffer_strcat(wb, HEALTH_CMDAPI_MSG_SILENCEALL);
-                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_DISABLEALL)) {
-                            silencers->all_alarms = 1;
-                            silencers->stype = STYPE_DISABLE_ALARMS;
-                            buffer_strcat(wb, HEALTH_CMDAPI_MSG_DISABLEALL);
-                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_SILENCE)) {
-                            silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
-                            buffer_strcat(wb, HEALTH_CMDAPI_MSG_SILENCE);
-                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_DISABLE)) {
-                            silencers->stype = STYPE_DISABLE_ALARMS;
-                            buffer_strcat(wb, HEALTH_CMDAPI_MSG_DISABLE);
-                        } else if (!strcmp(value, HEALTH_CMDAPI_CMD_RESET)) {
-                            silencers->all_alarms = 0;
-                            silencers->stype = STYPE_NONE;
-                            free_silencers(silencers->silencers);
-                            silencers->silencers = NULL;
-                            buffer_strcat(wb, HEALTH_CMDAPI_MSG_RESET);
-                        }
-                    } else {
-                        uint32_t hash = simple_uhash(key);
-                        if (unlikely(silencer == NULL)) {
-                            if (
-                                    (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) ||
-                                    (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) ||
-                                    (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) ||
-                                    (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) ||
-                                    (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) ||
-                                    (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY))
-                                    ) {
-                                silencer = create_silencer();
-                            }
-                        }
-
-                        if (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
-                            silencer->alarms = strdupz(value);
-                            silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) {
-                            silencer->charts = strdupz(value);
-                            silencer->charts_pattern = simple_pattern_create(silencer->charts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) {
-                            silencer->contexts = strdupz(value);
-                            silencer->contexts_pattern = simple_pattern_create(silencer->contexts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
-                            silencer->hosts = strdupz(value);
-                            silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT);
-                        } else if (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
-                            silencer->families = strdupz(value);
-                            silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT);
-                        } else {
-                            buffer_strcat(wb, HEALTH_CMDAPI_MSG_INVALID_KEY);
->>>>>>> 08337820... MGMT_fixes change functions (#6242)
                         }
                     }
 
