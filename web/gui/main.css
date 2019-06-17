@@ -322,6 +322,7 @@ body.modal-open {
 .sidebar-body {
     position: absolute;
     display: none;
+    height: 100vh;
 }
 
 .dashboard-section-container {
