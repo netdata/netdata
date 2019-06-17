@@ -8,10 +8,10 @@ from json import loads
 
 from bases.FrameworkServices.UrlService import UrlService
 
-# default module values (can be overridden per job in `config`)
+# Riak updates the metrics at the /stats endpoint every 1 second.
+# If we use `update_every = 1` here, that means we might get weird jitter in the graph,
+# so the default is set to 2 seconds to prevent it.
 update_every = 2
-priority = 60000
-retries = 60
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
