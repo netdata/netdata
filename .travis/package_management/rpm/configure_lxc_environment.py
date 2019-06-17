@@ -76,10 +76,20 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" +
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild"])
 
 # Download the source
-dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
-release_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
-print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (release_url, dest_archive))
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, release_url])
+dest_archive=""
+download_url=""
+# TODO: Checksum validations
+if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
+    print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
+    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
+    download_url="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+else:
+    print ("Building latest stable version of netdata.. (%s)" % os.environ['BUILD_VERSION'])
+    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-latest.tar.gz" % (os.environ['BUILDER_NAME'])
+    download_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
+
+print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (download_url, dest_archive))
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, download_url])
 
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
