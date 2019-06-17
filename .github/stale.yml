@@ -12,7 +12,7 @@ exemptMilestones: true
 staleLabel: stale
 markComment: >
   This issue has been inactive for 30 days.
-  It will be closed in one week, unless it is updated
+  It will be closed in one week, unless it is updated.
 closeComment: >
   This issue has been automatically closed due to extended period of inactivity.
   Please reopen if it is still valid. Thank you for your contributions.
