@@ -268,7 +268,7 @@ netdataDashboard.menu = {
     },
 
     'riak': {
-        title: 'Riak',
+        title: 'Riak KV',
         icon: '<i class="fas fa-database"></i>',
         info: 'Metrics for <b>Riak KV</b>, the distributed key-value store.'
     },
