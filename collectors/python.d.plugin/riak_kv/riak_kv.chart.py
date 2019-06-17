@@ -308,5 +308,7 @@ class Service(UrlService):
         if not raw:
             return None
 
-        stats = loads(raw)
-        return stats or None
+        try:
+            return loads(raw)
+        except (TypeError, ValueError):
+            return None
