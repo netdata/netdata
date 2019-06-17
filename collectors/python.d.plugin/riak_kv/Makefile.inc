@@ -5,9 +5,9 @@
 # IT IS REQUIRED TO REFERENCE ALL FILES RELATIVE TO THE PARENT
 
 # install these files
-dist_python_DATA       += riak/riak.chart.py
-dist_pythonconfig_DATA += riak/riak.conf
+dist_python_DATA       += riak_kv/riak_kv.chart.py
+dist_pythonconfig_DATA += riak_kv/riak_kv.conf
 
 # do not install these files, but include them in the distribution
-dist_noinst_DATA       += riak/README.md riak/Makefile.inc
+dist_noinst_DATA       += riak_kv/README.md riak_kv/Makefile.inc
 

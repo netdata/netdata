@@ -1,6 +1,6 @@
-# riak
+# riak_kv
 
-Monitors one or more Riak servers.
+Monitors one or more Riak KV servers.
 
 **Requirements:**
 
