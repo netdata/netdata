@@ -310,5 +310,6 @@ class Service(UrlService):
 
         try:
             return loads(raw)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as err:
+            self.error(err)
             return None
