@@ -23,7 +23,9 @@ install:
 - source tests/installer/slack.sh
 - export NOTIF_CHANNEL="automation-beta"
 - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
-- if [ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; else export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)" fi;
+- export BUILD_VERSION="$(cat packaging    /version | cut -d'-' -f1)"
+- if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; fi;
+
 
 
 # Setup notification system
