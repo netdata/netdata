@@ -434,6 +434,13 @@ inline void health_alarm_log(
     health_alarm_log_save(host, ae);
 }
 
+/**
+ * Free one no ckecks noun link
+ *
+ * Free the memory associated with a specific alarm
+ *
+ * @param ae the alarm entry structure to clean
+ */
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->name);
     freez(ae->chart);
