@@ -24,7 +24,7 @@ and distribute his contributions and such derivative works.
 
 ## copyright transfer
 
-The Contributor (*you*) hereby assigns netdata Inc. copyright in his
+The Contributor (*you*) hereby assigns Netdata Inc. copyright in his
 contributions, to be licensed under the same terms as the rest of the code.
 
 > *Note: this means we may re-license netdata (your contributions included)
