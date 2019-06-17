@@ -363,6 +363,24 @@ static void perf_free(void) {
         free(group_leader_fds[group]);
 }
 
+static void reenable_events() {
+    int group, cpu;
+
+    for(group = 0; group < EV_GROUP_NUM; group++) {
+        for(cpu = 0; cpu < number_of_cpus; cpu++) {
+            int current_fd = *(group_leader_fds[group] + cpu);
+
+            if(unlikely(current_fd == NO_FD)) continue;
+
+            if(ioctl(current_fd, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
+               || ioctl(current_fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)
+            {
+                error("Cannot reenable event group");
+            }
+        }
+    }
+}
+
 static int perf_collect() {
     int cpu;
     struct perf_event *current_event = NULL;
@@ -384,7 +402,9 @@ static int perf_collect() {
             ssize_t read_size = read(current_event->fd[cpu], &read_result, sizeof(read_result));
 
             if(likely(read_size == sizeof(read_result))) {
-                if (likely(read_result.time_running && (read_result.time_enabled / read_result.time_running < RUNNING_THRESHOLD))) {
+                if (likely(read_result.time_running
+                           && read_result.time_running != *(current_event->prev_time_running + cpu)
+                           && (read_result.time_enabled / read_result.time_running < RUNNING_THRESHOLD))) {
                     current_event->value += (read_result.value - *(current_event->prev_value + cpu)) \
                                              * (read_result.time_enabled - *(current_event->prev_time_enabled + cpu)) \
                                              / (read_result.time_running - *(current_event->prev_time_running + cpu));
@@ -405,31 +425,35 @@ static int perf_collect() {
         if(unlikely(debug)) fprintf(stderr, "perf.plugin: successfully read event id = %u, value = %lu\n", current_event->id, current_event->value);
     }
 
-    if(unlikely(!(perf_events[EV_ID_CPU_CYCLES].value - prev_cpu_cycles_value))) {
-        int group;
-
-        for(group = 0; group < EV_GROUP_NUM; group++) {
-            for(cpu = 0; cpu < number_of_cpus; cpu++) {
-                if(unlikely(*(group_leader_fds[group] + cpu) != NO_FD
-                            && (ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
-                                || ioctl(*(group_leader_fds[group] + cpu), PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)))
-                {
-                    error("Cannot reenable event group");
-                }
-            }
-        }
-    }
+    if(unlikely(perf_events[EV_ID_CPU_CYCLES].value == prev_cpu_cycles_value))
+        reenable_events();
     prev_cpu_cycles_value = perf_events[EV_ID_CPU_CYCLES].value;
 
     return 0;
 }
 
 static void perf_send_metrics() {
-    static int cpu_cycles_chart_generated = 0, instructions_chart_generated = 0, branch_chart_generated = 0,
-               cache_chart_generated = 0, bus_cycles_chart_generated = 0, stalled_cycles_chart_generated = 0;
-    static int migrations_chart_generated = 0, alighnment_chart_generated = 0, emulation_chart_generated = 0;
-    static int L1D_chart_generated = 0, L1D_prefetch_chart_generated = 0, L1I_chart_generated = 0, LL_chart_generated = 0,
-               DTLB_chart_generated = 0, ITLB_chart_generated = 0, PBU_chart_generated = 0;
+    static int // Hardware counters
+               cpu_cycles_chart_generated = 0,
+               instructions_chart_generated = 0,
+               branch_chart_generated = 0,
+               cache_chart_generated = 0,
+               bus_cycles_chart_generated = 0,
+               stalled_cycles_chart_generated = 0,
+
+               // Software counters
+               migrations_chart_generated = 0,
+               alighnment_chart_generated = 0,
+               emulation_chart_generated = 0,
+
+               // Hardware cache counters
+               L1D_chart_generated = 0,
+               L1D_prefetch_chart_generated = 0,
+               L1I_chart_generated = 0,
+               LL_chart_generated = 0,
+               DTLB_chart_generated = 0,
+               ITLB_chart_generated = 0,
+               PBU_chart_generated = 0;
 
     // ------------------------------------------------------------------------
 
