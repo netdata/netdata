@@ -53,8 +53,8 @@ ORDER = [
     "search.vnodeq_size",  # Number of unprocessed messages in the vnode message queues (Search).
     # The following are calculated in total, or as gauges:
     "search.index_errors",  # Errors of the search subsystem while indexing documents.
-    "core.pbc_active",  # Number of currently active protocol buffer connections.
-    "core.read_repairs",  # Total read repair operations coordinated by this node.
+    "core.pbc",  # Number of currently active protocol buffer connections.
+    "core.repairs",  # Total read repair operations coordinated by this node.
     "core.fsm_active",  # Active finite state machines by kind.
     "core.fsm_rejected",  # Rejected finite state machines by kind.
 
@@ -249,15 +249,15 @@ CHARTS = {
             ["search_index_fail_count", "errors", "absolute"]
         ]
     },
-    "core.pbc_active": {
-        "options": [None, "Number of currently active protocol buffer connections", "connections", "load", "riak.core.protobuf_connections", "line"],
+    "core.pbc": {
+        "options": [None, "Protocol buffer connections by status", "connections", "load", "riak.core.protobuf_connections", "line"],
         "lines": [
             ["pbc_active", "active", "absolute"],
             # ["pbc_connects", "established_pastmin", "absolute"]
         ]
     },
-    "core.read_repairs": {
-        "options": [None, "Number of read repair operations this node has coordinated", "repairs", "load", "riak.core.repairs", "line"],
+    "core.repairs": {
+        "options": [None, "Number of repair operations this node has coordinated", "repairs", "load", "riak.core.repairs", "line"],
         "lines": [
             ["read_repairs", "read", "absolute"]
         ]
