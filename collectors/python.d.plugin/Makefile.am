@@ -87,6 +87,7 @@ include rabbitmq/Makefile.inc
 include redis/Makefile.inc
 include rethinkdbs/Makefile.inc
 include retroshare/Makefile.inc
+include riakkv/Makefile.inc
 include samba/Makefile.inc
 include sensors/Makefile.inc
 include smartd_log/Makefile.inc
