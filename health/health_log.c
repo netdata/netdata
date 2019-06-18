@@ -79,6 +79,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
                         "\t%d\t%d\t%d\t%d"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
+                        "\t%016lx"
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
                             , host->hostname
@@ -112,6 +113,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
                             , ae->new_value
                             , ae->old_value
+                            , (uint64_t)ae->last_repeat
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -174,6 +176,27 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 continue;
             }
 
+            // Check if we got last_repeat field
+            time_t last_repeat = 0;
+            if(entries > 27) {
+                char* alarm_name = pointers[13];
+                last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
+
+                RRDCALC *rc = NULL;
+                for(rc = host->alarms; rc; rc = rc->next) {
+                    if(unlikely(!strcmp(rc->name, alarm_name) && rrdcalc_isrepeating(rc))) {
+                        break;
+                    }
+                }
+                if(unlikely(rc)) {
+                    rc->last_repeat = last_repeat;
+                    // We iterate through repeating alarm entries only to
+                    // find the latest last_repeat timestamp. Otherwise,
+                    // there is no need to keep them in memory.
+                    continue;
+                }
+            }
+
             if(unlikely(*pointers[0] == 'A')) {
                 // make sure it is properly numbered
                 if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
@@ -185,23 +208,27 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 ae = callocz(1, sizeof(ALARM_ENTRY));
             }
             else if(unlikely(*pointers[0] == 'U')) {
-                // find the original
-                for(ae = host->health_log.alarms; ae; ae = ae->next) {
-                    if(unlikely(unique_id == ae->unique_id)) {
-                        if(unlikely(*pointers[0] == 'A')) {
-                            error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
-                                  , host->hostname, line, filename, unique_id);
-                            *pointers[0] = 'U';
-                            duplicate++;
+                if(likely(!alarm_isrepeating(host, alarm_id))) {
+                    // find the original
+                    for(ae = host->health_log.alarms; ae; ae = ae->next) {
+                        if(unlikely(unique_id == ae->unique_id)) {
+                            if(unlikely(*pointers[0] == 'A')) {
+                                error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
+                                , host->hostname, line, filename, unique_id);
+                                *pointers[0] = 'U';
+                                duplicate++;
+                            }
+                            break;
                         }
-                        break;
+                        else if(unlikely(unique_id > ae->unique_id)) {
+                            // no need to continue
+                            // the linked list is sorted
+                            ae = NULL;
+                            break;
+                        }
                     }
-                    else if(unlikely(unique_id > ae->unique_id)) {
-                        // no need to continue
-                        // the linked list is sorted
-                        ae = NULL;
-                        break;
-                    }
+                } else {
+                    error("No alarm entry for a repeating alarm should be seen at this point. Alarm id: %u", ae->alarm_id);
                 }
             }
 
@@ -269,6 +296,8 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
 
             ae->new_value   = str2l(pointers[25]);
             ae->old_value   = str2l(pointers[26]);
+
+            ae->last_repeat = last_repeat;
 
             char value_string[100 + 1];
             freez(ae->old_value_string);
@@ -339,7 +368,7 @@ inline void health_alarm_log_load(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // health alarm log management
 
-inline void health_alarm_log(
+inline ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
@@ -398,9 +427,24 @@ inline void health_alarm_log(
     ae->delay_up_to_timestamp = when + delay;
     ae->flags |= flags;
 
+    ae->last_repeat = 0;
+
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
 
+    return ae;
+}
+
+inline void health_alarm_log(
+        RRDHOST *host,
+        ALARM_ENTRY *ae
+) {
+    debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
+
+    if(unlikely(alarm_entry_isrepeating(host, ae))) {
+        error("Repeating alarms cannot be added to host's alarm log entries. It seems somewhere in the logic, API is being misused. Alarm id: %u", ae->alarm_id);
+        return;
+    }
     // link it
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
     ae->next = host->health_log.alarms;

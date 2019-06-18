@@ -179,6 +179,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
+    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -274,12 +276,12 @@ RRDHOST *rrdhost_create(const char *hostname,
     // load health configuration
 
     if(host->health_enabled) {
-        health_alarm_log_load(host);
-        health_alarm_log_open(host);
-
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
+
+        health_alarm_log_load(host);
+        health_alarm_log_open(host);
     }
 
 
