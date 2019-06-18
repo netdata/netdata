@@ -55,6 +55,8 @@ void rrdeng_store_metric_init(RRDDIM *rd)
         PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, &temp_id, sizeof(uuid_t), PJE0);
         assert(NULL == *PValue); /* TODO: figure out concurrency model */
         *PValue = page_index = create_page_index(&temp_id);
+        page_index->prev = pg_cache->metrics_index.last_page_index;
+        pg_cache->metrics_index.last_page_index = page_index;
         uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
     }
     rd->state->rrdeng_uuid = &page_index->id;
@@ -119,9 +121,9 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
             handle->prev_descr = descr;
         }
     } else {
-        free(descr->pg_cache_descr->page);
+        freez(descr->pg_cache_descr->page);
         rrdeng_destroy_pg_cache_descr(ctx, descr->pg_cache_descr);
-        free(descr);
+        freez(descr);
     }
     handle->descr = NULL;
 }
@@ -434,7 +436,7 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
     return pg_cache_descr->page;
 }
 
-void rrdeng_get_28_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
+void rrdeng_get_32_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
@@ -466,7 +468,11 @@ void rrdeng_get_28_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[25] = (uint64_t)ctx->stats.journalfile_creations;
     array[26] = (uint64_t)ctx->stats.journalfile_deletions;
     array[27] = (uint64_t)ctx->stats.page_cache_descriptors;
-    assert(RRDENG_NR_STATS == 28);
+    array[28] = (uint64_t)ctx->stats.io_errors;
+    array[29] = (uint64_t)ctx->stats.fs_errors;
+    array[30] = (uint64_t)global_io_errors;
+    array[31] = (uint64_t)global_fs_errors;
+    assert(RRDENG_NR_STATS == 32);
 }
 
 /* Releases reference to page */
@@ -492,10 +498,6 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     } else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
     }
-    if (ctx->rrdengine_state != RRDENGINE_STATUS_UNINITIALIZED) {
-        return 1;
-    }
-    ctx->rrdengine_state = RRDENGINE_STATUS_INITIALIZING;
     ctx->global_compress_alg = RRD_LZ4;
     if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
@@ -514,11 +516,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     init_commit_log(ctx);
     error = init_rrd_files(ctx);
     if (error) {
-        ctx->rrdengine_state = RRDENGINE_STATUS_UNINITIALIZED;
-        if (ctx != &default_global_ctx) {
-            freez(ctx);
-        }
-        return 1;
+        goto error_after_init_rrd_files;
     }
 
     init_completion(&ctx->rrdengine_completion);
@@ -526,9 +524,20 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     /* wait for worker thread to initialize */
     wait_for_completion(&ctx->rrdengine_completion);
     destroy_completion(&ctx->rrdengine_completion);
-
-    ctx->rrdengine_state = RRDENGINE_STATUS_INITIALIZED;
+    if (ctx->worker_config.error) {
+        goto error_after_rrdeng_worker;
+    }
     return 0;
+
+error_after_rrdeng_worker:
+    finalize_rrd_files(ctx);
+error_after_init_rrd_files:
+    free_page_cache(ctx);
+    if (ctx != &default_global_ctx) {
+        freez(ctx);
+        *ctxp = NULL;
+    }
+    return 1;
 }
 
 /*
@@ -539,10 +548,6 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     struct rrdeng_cmd cmd;
 
     if (NULL == ctx) {
-        /* TODO: move to per host basis */
-        ctx = &default_global_ctx;
-    }
-    if (ctx->rrdengine_state != RRDENGINE_STATUS_INITIALIZED) {
         return 1;
     }
 
@@ -551,6 +556,9 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
     assert(0 == uv_thread_join(&ctx->worker_config.thread));
+
+    finalize_rrd_files(ctx);
+    free_page_cache(ctx);
 
     if (ctx != &default_global_ctx) {
         freez(ctx);

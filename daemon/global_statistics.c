@@ -538,7 +538,7 @@ void global_statistics_charts(void) {
         unsigned long long stats_array[RRDENG_NR_STATS];
 
         /* get localhost's DB engine's statistics */
-        rrdeng_get_28_statistics(localhost->rrdeng_ctx, stats_array);
+        rrdeng_get_32_statistics(localhost->rrdeng_ctx, stats_array);
 
         // ----------------------------------------------------------------
 
@@ -748,6 +748,40 @@ void global_statistics_charts(void) {
             rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[18]);
             rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[16]);
             rrdset_done(st_io_stats);
+        }
+
+        // ----------------------------------------------------------------
+
+        {
+            static RRDSET *st_errors = NULL;
+            static RRDDIM *rd_fs_errors = NULL;
+            static RRDDIM *rd_io_errors = NULL;
+
+            if (unlikely(!st_errors)) {
+                st_errors = rrdset_create_localhost(
+                        "netdata"
+                        , "dbengine_errors"
+                        , NULL
+                        , "dbengine"
+                        , NULL
+                        , "NetData DB engine errors"
+                        , "errors/s"
+                        , "netdata"
+                        , "stats"
+                        , 130507
+                        , localhost->rrd_update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rd_io_errors = rrddim_add(st_errors, "I/O errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fs_errors = rrddim_add(st_errors, "FS errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else
+                rrdset_next(st_errors);
+
+            rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
+            rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
+            rrdset_done(st_errors);
         }
     }
 #endif

@@ -103,7 +103,7 @@ int open_file_direct_io(char *path, int flags, uv_file *file)
                 error("File \"%s\" does not support direct I/O, falling back to buffered I/O.", path);
             } else {
                 error("Failed to open file \"%s\".", path);
-                return fd;
+                --direct; /* break the loop */
             }
         } else {
             assert(req.result >= 0);
