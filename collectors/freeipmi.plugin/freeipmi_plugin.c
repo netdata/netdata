@@ -42,13 +42,6 @@
 #define IPMI_PARSE_DEVICE_SUNBMC_STR2   "bmc"
 #define IPMI_PARSE_DEVICE_INTELDCMI_STR "inteldcmi"
 
-// From libipmimonitoring/ipmi_monitoring_defs.h
-#define IPMI_MONITORING_MAX_SENSOR_NAME_LENGTH      32
-
-// From toolcommon/tool-sensor-common.h
-#define MAX_SENSOR_RECORD_IDS               4096
-
-
 // ----------------------------------------------------------------------------
 
 // callback required by fatal()
@@ -121,9 +114,6 @@ unsigned int record_ids_length = 0;
  */
 unsigned int sensor_types[] = {0};
 unsigned int sensor_types_length = 0;
-
-char        *sensor_names[MAX_SENSOR_RECORD_IDS];
-unsigned int sensor_names_length = 0;
 
 /* Set to an appropriate alternate if desired */
 char *sdr_cache_directory = "/tmp";
@@ -348,8 +338,8 @@ static void netdata_mark_as_not_updated() {
 }
 
 static void send_chart_to_netdata_for_units(int units) {
-    struct sensor *sn;
-    int i, multiplier;
+    struct sensor *sn, *sn_stored;
+    int dupfound, multiplier;
 
     switch(units) {
         case IPMI_MONITORING_SENSOR_UNITS_CELSIUS:
@@ -409,6 +399,7 @@ static void send_chart_to_netdata_for_units(int units) {
     }
 
     for(sn = sensors_root; sn; sn = sn->next) {
+        dupfound = 0;
         if(sn->sensor_units == units && sn->updated && !sn->ignore) {
             sn->exposed = 1;
             multiplier = 1;
@@ -418,10 +409,11 @@ static void send_chart_to_netdata_for_units(int units) {
                     multiplier = 1000;
                 case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
                 case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
-                    for (i=0; i<sensor_names_length; i++) {
-                        // If the name is already used, append the sensor number
-                        if ( !strcmp(sensor_names[i], sn->sensor_name) ) {
-                            i=-1;
+                    for (sn_stored = sensors_root; sn_stored; sn_stored = sn_stored->next) {
+                        if (sn_stored == sn) continue;
+                        // If the name is a duplicate, append the sensor number
+                        if ( !strcmp(sn_stored->sensor_name, sn->sensor_name) ) {
+                            dupfound = 1;
                             printf("DIMENSION i%d_n%d_r%d '%s i%d' absolute 1 %d\n"
                                    , sn->sensor_number
                                    , sn->record_id
@@ -433,14 +425,8 @@ static void send_chart_to_netdata_for_units(int units) {
                             break;
                         }
                     }
-                    // Name was not already used, allocate a new one
-                    if (i >= 0) {
-                        sensor_names[sensor_names_length] = calloc(1, sizeof(unsigned char) * (IPMI_MONITORING_MAX_SENSOR_NAME_LENGTH + 1));
-                        if (!sensor_names[sensor_names_length])
-                            fatal("cannot allocate %zu bytes of memory for sensor name uniqueness", IPMI_MONITORING_MAX_SENSOR_NAME_LENGTH + 1);
-                        strncpy(sensor_names[sensor_names_length], sn->sensor_name, IPMI_MONITORING_MAX_SENSOR_NAME_LENGTH);
-                        sensor_names_length++;
-
+                    // No duplicate name was found, display it just with Name
+                    if (!dupfound) {
                         // display without ID
                         printf("DIMENSION i%d_n%d_r%d '%s' absolute 1 %d\n"
                                , sn->sensor_number
@@ -449,7 +435,6 @@ static void send_chart_to_netdata_for_units(int units) {
                                , sn->sensor_name
                                , multiplier
                         );
-
                     }
                     break;
 
