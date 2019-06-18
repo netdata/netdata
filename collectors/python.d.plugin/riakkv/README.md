@@ -1,4 +1,4 @@
-# riak_kv
+# riakkv
 
 Monitors one or more Riak KV servers.
 

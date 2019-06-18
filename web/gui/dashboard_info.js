@@ -267,7 +267,7 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>RetroShare</b>. RetroShare is open source software for encrypted filesharing, serverless email, instant messaging, online chat, and BBS, based on a friend-to-friend network built on GNU Privacy Guard (GPG).'
     },
 
-    'riak': {
+    'riakkv': {
         title: 'Riak KV',
         icon: '<i class="fas fa-database"></i>',
         info: 'Metrics for <b>Riak KV</b>, the distributed key-value store.'
