@@ -132,7 +132,6 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
     }
 }
 
-
 // ----------------------------------------------------------------------------
 // RRD - cache directory
 
@@ -155,6 +154,18 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id, const char *config_section
     return ret;
 }
 
+// ----------------------------------------------------------------------------
+// Alarm
+int alarm_compare(void *a, void *b) {
+    register uint32_t hash1 = ((RRDCALC *)a)->id;
+    register uint32_t hash2 = ((RRDCALC *)b)->id;
+
+    if(hash1 < hash2) return -1;
+    else if(hash1 > hash2) return 1;
+
+    return 0;
+}
+
 int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
     RRDCALC *rc = NULL;
     for(rc = host->alarms; rc; rc = rc->next) {
@@ -162,8 +173,9 @@ int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
             break;
         }
     }
+
     if (!rc) {
-        error("No alarm found for the alarm id %u", alarm_id);
+        info("No alarm found for the alarm id %u", alarm_id);
         return 0;
     }
     return rrdcalc_isrepeating(rc);
