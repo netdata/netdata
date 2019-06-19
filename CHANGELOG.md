@@ -25,6 +25,7 @@
 - Error messages on old database files [\#6186](https://github.com/netdata/netdata/issues/6186)
 - netdata/packaging: Sporadic job failures in Travis CI [\#6185](https://github.com/netdata/netdata/issues/6185)
 - Fix date in pushbullet alarm notifications [\#6178](https://github.com/netdata/netdata/issues/6178)
+- Chart's "name" not streamed [\#6177](https://github.com/netdata/netdata/issues/6177)
 - Why is auto-update not working? V1.14.0 [\#6170](https://github.com/netdata/netdata/issues/6170)
 - \[solved\] ZFS database \(was: netdata FATAL : MAIN :uv\_fs\_fsopen: invalid argument \# : Invalid argument\) [\#6161](https://github.com/netdata/netdata/issues/6161)
 - httpcheck does not export some metrics in version 1.15 [\#6157](https://github.com/netdata/netdata/issues/6157)
@@ -88,6 +89,7 @@
 
 **Merged pull requests:**
 
+- Chart name streaming [\#6304](https://github.com/netdata/netdata/pull/6304) ([vlvkobal](https://github.com/vlvkobal))
 - Add note regarding libexecdir [\#6301](https://github.com/netdata/netdata/pull/6301) ([cakrit](https://github.com/cakrit))
 - stale bot limits update [\#6297](https://github.com/netdata/netdata/pull/6297) ([ilyam8](https://github.com/ilyam8))
 - Web [\#6294](https://github.com/netdata/netdata/pull/6294) ([thiagoftsm](https://github.com/thiagoftsm))
