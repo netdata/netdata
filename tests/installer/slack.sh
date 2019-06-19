@@ -13,6 +13,7 @@
 post_message() {
 	TYPE="$1"
 	MESSAGE="$2"
+	CUSTOM_CHANNEL="$3"
 
 	case "$TYPE" in
 		"PLAIN_MESSAGE")
@@ -24,7 +25,13 @@ post_message() {
 				EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}' #${TRAVIS_PULL_REQUEST}, on '${TRAVIS_OS_NAME}' "
 			fi
 
+			if [ -n "${CUSTOM_CHANNEL}" ]; then
+				echo "Sending travis message to custom channel ${CUSTOM_CHANNEL}"
+				OPTIONAL_CHANNEL_INFO="\"channel\": \"${CUSTOM_CHANNEL}\","
+			fi
+
 			POST_MESSAGE="{
+				${OPTIONAL_CHANNEL_INFO}
 				\"text\": \"${TRAVIS_REPO_SLUG}, ${MESSAGE}\",
 				\"attachments\": [{
 				    \"text\": \"${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}', on '${TRAVIS_OS_NAME}' \",

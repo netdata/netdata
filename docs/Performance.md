@@ -179,11 +179,7 @@ Setting the memory mode to `ram` will disable loading and saving the round robin
 	memory mode = ram
 ```
 
-### 6. Use the single threaded web server
-
-Normally, Netdata spawns a thread for each web client. This allows Netdata to utilize all the available cores for servicing chart refreshes. You can however disable this feature and serve all charts one after another, using a single thread / core. This will might lower the CPU pressure on the embedded device. To enable the single threaded web server, edit `/etc/netdata/netdata.conf` and set `mode = single-threaded` in the `[web]` section.
-
-### 7. Lower memory requirements
+### 6. Lower memory requirements
 
 You can set the default size of the round robin database for all charts, using:
 
@@ -197,7 +193,7 @@ The units for history is `[global].update every` seconds. So if `[global].update
 Check also [Database](../database) for directions on calculating the size of the round robin database.
 
 
-### 8. Disable gzip compression of responses
+### 7. Disable gzip compression of responses
 
 Gzip compression of the web responses is using more CPU that the rest of Netdata. You can lower the compression level or disable gzip compression completely. You can disable it, like this:
 

@@ -62,6 +62,10 @@ perf.plugin
 cgroup-network
 !cgroup-network/
 
+# protoc generated files
+*.pb.cc
+*.pb.h
+
 # installation artifacts
 packaging/installer/.environment.sh
 *.tar.*

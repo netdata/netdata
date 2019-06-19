@@ -7,40 +7,40 @@
 # Ownership by directory structure
 .travis/ @paulkatsoulakis @cakrit
 .github/ @paulkatsoulakis @cakrit
-backends/ @ktsaou @vlvkobal
-backends/graphite/ @ktsaou @vlvkobal
-backends/json/ @ktsaou @vlvkobal
-backends/opentsdb/ @ktsaou @vlvkobal
-backends/prometheus/ @ktsaou @vlvkobal @paulkatsoulakis
+backends/ @thiagoftsm @vlvkobal
+backends/graphite/ @thiagoftsm @vlvkobal
+backends/json/ @thiagoftsm @vlvkobal
+backends/opentsdb/ @thiagoftsm @vlvkobal
+backends/prometheus/ @vlvkobal @paulkatsoulakis @thiagoftsm
 build/ @paulkatsoulakis @cakrit
-collectors/ @ktsaou @vlvkobal @cakrit
-collectors/charts.d.plugin/ @ktsaou @paulkatsoulakis @cakrit
+collectors/ @vlvkobal @cakrit
+collectors/charts.d.plugin/ @paulkatsoulakis @cakrit
 collectors/freebsd.plugin/ @vlvkobal @cakrit
 collectors/macos.plugin/ @vlvkobal @cakrit
-collectors/node.d.plugin/ @ktsaou @gmosx @cakrit
-collectors/node.d.plugin/fronius/ @ktsaou @gmosx @ccremer @cakrit
-collectors/node.d.plugin/snmp/ @ktsaou @gmosx @cakrit
-collectors/node.d.plugin/stiebeleltron/ @ktsaou @gmosx @ccremer @cakrit
+collectors/node.d.plugin/ @gmosx @cakrit
+collectors/node.d.plugin/fronius/ @ccremer @cakrit
+collectors/node.d.plugin/snmp/ @gmosx @cakrit
+collectors/node.d.plugin/stiebeleltron/ @ccremer @cakrit
 collectors/python.d.plugin/ @ilyam8
-collectors/cups.plugin/ @simonnagl @ktsaou @vlvkobal @cakrit
-daemon/ @ktsaou @mfundul @cakrit
-database/ @ktsaou @mfundul
+collectors/cups.plugin/ @simonnagl @vlvkobal @cakrit
+daemon/ @thiagoftsm @mfundul @cakrit
+database/ @cakrit @mfundul
 docs/ @cakrit
-health/ @ktsaou @cakrit
-health/health.d/ @ktsaou @cakrit
-health/notifications/ @ktsaou @Ferroin @cakrit
-libnetdata/ @ktsaou @cakrit
+health/ @thiagoftsm @cakrit
+health/health.d/ @thiagoftsm @cakrit
+health/notifications/ @Ferroin @cakrit
+libnetdata/ @thiagofsm @cakrit
 packaging/ @paulkatsoulakis @cakrit
-packaging/installer/ @ktsaou @paulkatsoulakis @cakrit
-packaging/makeself/ @ktsaou @paulkatsoulakis @cakrit
-registry/ @ktsaou @gmosx @cakrit
-streaming/ @ktsaou @mfundul
-web/ @ktsaou @cakrit
-web/gui/ @ktsaou @gmosx @cakrit
+packaging/installer/ @paulkatsoulakis @cakrit
+packaging/makeself/ @paulkatsoulakis @cakrit
+registry/ @gmosx @cakrit
+streaming/ @cakrit @thiagoftsm
+web/ @thiagoftsm @cakrit
+web/gui/ @gmosx @cakrit
 
 # Ownership by filetype (overwrites ownership by directory)
-*.md @ktsaou @cakrit
-*.am @paulkatsoulakis @ktsaou
+*.md @cakrit
+*.am @paulkatsoulakis
 
 # Ownership of specific files
 .gitignore @paulkatsoulakis @cakrit
@@ -52,10 +52,10 @@ web/gui/ @ktsaou @gmosx @cakrit
 .codeclimate.yml @paulkatsoulakis
 .codacy.yml @paulkatsoulakis
 netdata.spec.in @paulkatsoulakis
-netdata-installer.sh @ktsaou @paulkatsoulakis @cakrit
+netdata-installer.sh @paulkatsoulakis @cakrit
 netlify.toml @cakrit
 package.json @gmosx
 packaging/version @netdatabot
 
-LICENSE.md @ktsaou
+LICENSE.md @cakrit
 CHANGELOG.md @netdatabot

@@ -169,7 +169,7 @@ Try our experimental automatic requirements installer (no need to be root). This
 - **Arch** Linux and its derivatives
 - **Gentoo** Linux and its derivatives
 - **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
-- **Fedora** and its derivatives (including **Red Hat Enterprise Linux**, **CentOS**, **Amazon Machine Image**)
+- **Redhat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
 - **SuSe** Linux and its derivatives (including **openSuSe**)
 - **SLE12** Must have your system registered with Suse Customer Center or have the DVD. See [#1162](https://github.com/netdata/netdata/issues/1162)
 

@@ -301,13 +301,13 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
     sockets->failed = 0;
 }
 
-WEB_CLIENT_ACL socket_ssl_acl(char *ssl){
+WEB_CLIENT_ACL socket_ssl_acl(char *ssl) {
 #ifdef ENABLE_HTTPS
-    if (!strcmp(ssl,"optional")){
+    if (!strcmp(ssl,"optional")) {
         netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
         return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
     }
-    else if (!strcmp(ssl,"force")){
+    else if (!strcmp(ssl,"force")) {
         netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
         return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
     }
@@ -318,9 +318,9 @@ WEB_CLIENT_ACL socket_ssl_acl(char *ssl){
 
 WEB_CLIENT_ACL read_acl(char *st) {
     char *ssl = strchr(st,'^');
-    if (ssl){
+    if (ssl) {
         ssl++;
-        if ( !strncmp("SSL=",ssl,4)){
+        if (!strncmp("SSL=",ssl,4)) {
             ssl += 4;
         }
         socket_ssl_acl(ssl);
@@ -819,11 +819,15 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
     while(*s) {
         const char *e = s;
 
+        // skip path, moving both s(tart) and e(nd)
+        if(*e == '/')
+            while(!isspace(*e) && *e != ',') s = ++e;
+
         // skip separators, moving both s(tart) and e(nd)
         while(isspace(*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
+        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
 
         // is there anything?
         if(!*s || s == e) break;
@@ -883,8 +887,8 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 
 #ifdef ENABLE_HTTPS
-    if (ssl->conn){
-        if (!ssl->flags){
+    if (ssl->conn) {
+        if (!ssl->flags) {
             return SSL_read(ssl->conn,buf,len);
         }
     }
@@ -926,8 +930,8 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
     }
 
 #ifdef ENABLE_HTTPS
-    if(ssl->conn){
-        if (!ssl->flags){
+    if(ssl->conn) {
+        if (!ssl->flags) {
             return SSL_write(ssl->conn, buf, len);
         }
     }

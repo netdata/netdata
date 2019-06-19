@@ -32,6 +32,12 @@ X seconds (though, it can send them per second if you need it to).
 
    - **prometheus** is described at [prometheus page](prometheus/) since it pulls data from netdata.
 
+   - **prometheus remote write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
+     a lot of [storage providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage))
+
+     metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus protocol](prometheus/).
+     Notes on using the remote write backend are [here](prometheus/remote_write/).
+
    - **AWS Kinesis Data Streams**
 
      metrics are sent to the service in `JSON` format.
@@ -70,7 +76,7 @@ of `netdata.conf` from your netdata):
 ```
 [backend]
     enabled = yes | no
-    type = graphite | opentsdb | json | kinesis
+    type = graphite | opentsdb | json | prometheus_remote_write | kinesis
     host tags = list of TAG=VALUE
     destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used, or a region for kinesis
     data source = average | sum | as collected
