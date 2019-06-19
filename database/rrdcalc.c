@@ -386,21 +386,18 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             rc->crit_repeat_every
     );
 
-    fprintf(stderr,"KILLME APPENDING %lu\n",rc);
-
-    /*
-    rrdcalc_add_to_host(host, rc);
-    RRDHOST *rdcmp  = (RRDHOST *) avl_insert_lock(&(host)->alarms_idx,(avl *)rc);
-    if (!rdcmp) {
+    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx,(avl *)rc);
+    if (rdcmp != rc) {
         error("Cannot insert the alarm index");
-    }*/
+    }
+
+    rrdcalc_add_to_host(host, rc);
     return rc;
 }
 
 void rrdcalc_free(RRDCALC *rc) {
     if(unlikely(!rc)) return;
 
-    fprintf(stderr,"KILLME REMOVING %lu\n",rc);
 
     expression_free(rc->calculation);
     expression_free(rc->warning);
@@ -444,7 +441,7 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     if (rc) {
         RRDHOST *rdcmp = (RRDHOST *) avl_remove_lock(&(host)->alarms_idx,(avl *)rc);
         if (!rdcmp) {
-            error("Cannot insert the alarm index");
+            error("Cannot remove the alarm index");
         }
     }
 

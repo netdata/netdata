@@ -29,7 +29,9 @@
 #define RRDCALC_FLAG_SILENCED              0x00000100
 #define RRDCALC_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
 
+
 struct rrdcalc {
+    avl avl;                        // the index, with key the id - this has to be first!
     uint32_t id;                    // the unique id of this alarm
     uint32_t next_event_id;         // the next event id that will be used for this alarm
 

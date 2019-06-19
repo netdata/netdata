@@ -167,15 +167,11 @@ int alarm_compare(void *a, void *b) {
 }
 
 int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
-    RRDCALC *rc = NULL;
-    for(rc = host->alarms; rc; rc = rc->next) {
-        if(alarm_id == rc->id) {
-            break;
-        }
-    }
-
+    RRDCALC findme;
+    findme.id = alarm_id;
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx,(avl *)&findme);
     if (!rc) {
-        info("No alarm found for the alarm id %u", alarm_id);
+        //info("No alarm found for the alarm id %u", alarm_id);
         return 0;
     }
     return rrdcalc_isrepeating(rc);
