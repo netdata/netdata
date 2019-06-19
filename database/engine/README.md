@@ -112,5 +112,34 @@ The Database Engine may keep a **significant** amount of files open per instance
 slave or master server). When configuring your system you should make sure there are at least 60
 file descriptors available per `dbengine` instance.
 
+Netdata allocates 50% of available file descriptors to its web server sockets, 25% to its statsd sockets
+and the rest is available to the daemon and the dbengine. This means that only 25% of the allocated file
+descriptors are accessible by the dbengine. You should take that into account when configuring your service
+or global file descriptor limits.
+
+If for example one wants to allocate 65536 file descriptors to the netdata service on a systemd system
+she needs to edit the netdata systemd file `/etc/systemd/system/multi-user.target.wants/netdata.service`
+and add the line:
+
+```
+LimitNOFILE=65536
+```
+
+in the `[Service]` section.
+
+For other types of services one can add the line:
+```
+ulimit -n 65536
+```
+at the beginning of the service file. Alternatively you can change the system-wide limits of the kernel by changing `/etc/sysctl.conf`. For linux that would be:
+```
+fs.file-max = 65536
+```
+In FreeBSD and OS X you change the lines like this:
+```
+kern.maxfilesperproc=65536
+kern.maxfiles=65536
+```
+You can apply the settings by running `sysctl -p` or by rebooting.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdatabase%2Fengine%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
