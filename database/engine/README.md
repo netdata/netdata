@@ -119,7 +119,7 @@ or global file descriptor limits. You can roughly estimate that the netdata serv
 descriptors for every 10 streaming slave hosts when streaming is configured to use `memory mode = dbengine`.
 
 If for example one wants to allocate 65536 file descriptors to the netdata service on a systemd system
-she needs to edit the netdata systemd file `/etc/systemd/system/multi-user.target.wants/netdata.service`
+one needs to edit the netdata systemd file `/etc/systemd/system/multi-user.target.wants/netdata.service`
 and add the line:
 
 ```
