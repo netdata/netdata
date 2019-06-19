@@ -18,7 +18,7 @@ a netdata performs:
 Local netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
 another netdata (`master`).
 
-The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/. 
+The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/.
 
 Alarms for the `slave` are served by the `master`.
 
@@ -40,6 +40,8 @@ The `slave` and the `master` may have different data retention policies for the 
 
 Alarms for the `slave` are triggered by **both** the `slave` and the `master` (and actually
 each can have different alarms configurations or have alarms disabled).
+
+Take a note, that custom chart names, configured on the `slave`, should be in the form `type.name` to work correctly. The `master` will truncate the `type` part and substitute the original chart `type` to store the name in the database.
 
 ### netdata proxies
 
@@ -81,14 +83,14 @@ monitoring (there cannot be health monitoring without a database).
 
 ```
 [web]
-    mode = none | static-threaded 
-    accept a streaming request every seconds = 0 
+    mode = none | static-threaded
+    accept a streaming request every seconds = 0
 ```
 
 `[web].mode = none` disables the API (netdata will not listen to any ports).
 This also disables the registry (there cannot be a registry without an API).
 
-`accept a streaming request every seconds` can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log entries "... too busy to accept new streaming request. Will be allowed in X secs". 
+`accept a streaming request every seconds` can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log entries "... too busy to accept new streaming request. Will be allowed in X secs".
 
 ```
 [backend]
@@ -326,13 +328,13 @@ On the master, edit `/etc/netdata/stream.conf` (to edit it on your system run `/
 [11111111-2222-3333-4444-555555555555]
 	# enable/disable this API key
     enabled = yes
-    
+
     # one hour of data for each of the slaves
     default history = 3600
-    
+
     # do not save slave metrics on disk
     default memory = ram
-    
+
     # alarms checks, only while the slave is connected
     health enabled by default = auto
 ```
@@ -342,9 +344,9 @@ If you used many API keys, you can add one such section for each API key.
 
 When done, restart netdata on the `master` node. It is now ready to receive metrics.
 
-Note that `health enabled by default = auto` will still trigger `last_collected` alarms, if a connected slave does not exit gracefully. If the netdata running on the slave is 
-stopped, it will close the connection to the master, ensuring that no `last_collected` alarms are triggered. For example, a proper container restart would first terminate 
-the netdata process, but a system power issue would leave the connection open on the master side. In the second case, you will still receive alarms. 
+Note that `health enabled by default = auto` will still trigger `last_collected` alarms, if a connected slave does not exit gracefully. If the netdata running on the slave is
+stopped, it will close the connection to the master, ensuring that no `last_collected` alarms are triggered. For example, a proper container restart would first terminate
+the netdata process, but a system power issue would leave the connection open on the master side. In the second case, you will still receive alarms.
 
 #### Configuring the `slaves`
 
@@ -354,10 +356,10 @@ On each of the slaves, edit `/etc/netdata/stream.conf` (to edit it on your syste
 [stream]
     # stream metrics to another netdata
     enabled = yes
-    
+
     # the IP and PORT of the master
     destination = 10.11.12.13:19999
-	
+
 	# the API key to use
     api key = 11111111-2222-3333-4444-555555555555
 ```
