@@ -109,13 +109,14 @@ An important observation is that RAM usage depends on both the `page cache size`
 ## File descriptor requirements
 
 The Database Engine may keep a **significant** amount of files open per instance (e.g. per streaming
-slave or master server). When configuring your system you should make sure there are at least 60
+slave or master server). When configuring your system you should make sure there are at least 50
 file descriptors available per `dbengine` instance.
 
 Netdata allocates 50% of available file descriptors to its web server sockets, 25% to its statsd sockets
 and the rest is available to the daemon and the dbengine. This means that only 25% of the allocated file
 descriptors are accessible by the dbengine. You should take that into account when configuring your service
-or global file descriptor limits.
+or global file descriptor limits. You can roughly estimate that the netdata service needs 2048 file
+descriptors for every 10 streaming slave hosts when streaming is configured to use `memory mode = dbengine`.
 
 If for example one wants to allocate 65536 file descriptors to the netdata service on a systemd system
 she needs to edit the netdata systemd file `/etc/systemd/system/multi-user.target.wants/netdata.service`
