@@ -407,6 +407,7 @@ static void send_chart_to_netdata_for_units(int units) {
             switch(sn->sensor_reading_type) {
                 case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
                     multiplier = 1000;
+                    // fallthrough
                 case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
                 case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
                     for (sn_stored = sensors_root; sn_stored; sn_stored = sn_stored->next) {
