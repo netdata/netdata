@@ -107,7 +107,7 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
 
 ```
 [plugin:cgroups]
-	enable memory (used mem including cache) = auto
+	enable memory (used mem including cache) = yes
 ```
 
 ### alarms
