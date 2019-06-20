@@ -59,6 +59,20 @@ cmd () {
 	fi
 }
 
+check_list() {
+    RESPONSE=$(curl -s "http://$URL/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: $TOKEN" 2>&1)
+    SERVER=$( echo "${RESPONSE}" | python3 -c "import sys,json; import netdata_json as nj; e=json.load(sys.stdin); d=nj.orderme(e); print(d)" 2>&1)
+
+    FDNAME="${NETDATA_VARLIB_DIR}/health.silencers.json"
+    FD=$(cat $FD)
+    CLIENT=$( echo "${FD}" | python3 -c "import sys,json; import netdata_json as nj; e=json.load(sys.stdin); d=nj.orderme(e); print(d)" 2>&1)
+    if [ "${CLIENT}" == "${SERVER}" ]; then
+        echo -e "${GREEN}Success to check the list"
+    else
+        echo -e "${RED}ERROR: Response '${RESP}' does not match the original file '${ORIGINAL}'."
+    fi
+}
+
 WHITE='\033[0;37m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -147,6 +161,9 @@ if [ $TEST -eq 1 ] ; then
 	fi
 	# Set correct token
 	TOKEN="${CORRECT_TOKEN}"
+
+	#Check the list command before the tests change it
+    check_list
 
 	# Test default state
 	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"

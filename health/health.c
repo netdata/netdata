@@ -150,15 +150,19 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
 {
     switch(e->type) {
         case JSON_OBJECT:
+#ifndef ENABLE_JSONC
             e->callback_function = health_silencers_json_read_callback;
             if(e->name && strcmp(e->name,"")) {
                 // init silencer
                 debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
+#endif
                 e->callback_data = create_silencer();
                 if(e->callback_data) {
                     health_silencers_add(e->callback_data);
                 }
+#ifndef ENABLE_JSONC
             }
+#endif
             break;
 
         case JSON_ARRAY:
@@ -172,10 +176,7 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
                 else if (!strcmp(e->data.string,"DISABLE")) silencers->stype = STYPE_DISABLE_ALARMS;
             } else {
                 debug(D_HEALTH, "JSON: Adding %s=%s", e->name, e->data.string);
-                SILENCER *s = health_silencers_addparam(e->callback_data, e->name, e->data.string);
-                if (s) {
-                    health_silencers_add(s);
-                }
+                health_silencers_addparam(e->callback_data, e->name, e->data.string);
             }
             break;
 
