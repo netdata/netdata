@@ -7,7 +7,7 @@ the `perf_event_open()` system call.
 
 Accessing hardware PMUs requires root permissions, so the plugin is setuid to root.
 
-Keep in mind that the the number of PMUs in a system is usually quite limited and every hardware monitoring
+Keep in mind that the number of PMUs in a system is usually quite limited and every hardware monitoring
 event for every CPU core needs a separate file descriptor to be opened.
 
 ## Charts
@@ -39,8 +39,8 @@ Hardware cache events:
 ## Configuration
 
 The plugin is disabled by default because the number of PMUs is usually quite limited and it is not desired to
-allow Netdata silently struggle for PMUs, interfering with other performance monitoring software. If you need to
-enable perf plugin, edit /etc/netdata/netdata.conf and set:
+allow Netdata to struggle silently for PMUs, interfering with other performance monitoring software. If you need to
+enable the perf plugin, edit /etc/netdata/netdata.conf and set:
 
 ```raw
 [plugins]
