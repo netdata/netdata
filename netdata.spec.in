@@ -105,7 +105,7 @@ BuildRequires: curl
 BuildRequires: findutils
 BuildRequires: zlib-devel
 BuildRequires: libuuid-devel
-BuildRequires: libuv-devel
+BuildRequires: libuv-devel >= 1
 BuildRequires: openssl-devel
 %if 0%{?suse_version}
 BuildRequires: judy-devel
