@@ -12,8 +12,8 @@ Group=netdata
 RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
 PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
-Environment=DAEMONOPTS="-P @localstatedir_POST@/run/netdata/netdata.pid"
-EnvironmentFile=-/etc/sysconfig/netdata
+Environment="DAEMONOPTS=-P @localstatedir_POST@/run/netdata/netdata.pid"
+EnvironmentFile=-@configdir_POST@/netdata
 ExecStart=@sbindir_POST@/netdata ${DAEMONOPTS} -D -W set global 'process scheduling policy' 'keep' -W set global 'OOM score' 'keep'
 ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
 ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/cache/netdata
