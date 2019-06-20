@@ -112,10 +112,10 @@ The Database Engine may keep a **significant** amount of files open per instance
 slave or master server). When configuring your system you should make sure there are at least 50
 file descriptors available per `dbengine` instance.
 
-Netdata allocates 50% of available file descriptors to its web server sockets, 25% to its statsd sockets
-and the rest is available to the daemon and the dbengine. This means that only 25% of the allocated file
-descriptors are accessible by the dbengine. You should take that into account when configuring your service
-or global file descriptor limits. You can roughly estimate that the netdata service needs 2048 file
+Netdata allocates 25% of the available file descriptors to its Database Engine instances. This means that only 25%
+of the file descriptors that are available to the Netdata service are accessible by dbengine instances.
+You should take that into account when configuring your service
+or system-wide file descriptor limits. You can roughly estimate that the netdata service needs 2048 file
 descriptors for every 10 streaming slave hosts when streaming is configured to use `memory mode = dbengine`.
 
 If for example one wants to allocate 65536 file descriptors to the netdata service on a systemd system
