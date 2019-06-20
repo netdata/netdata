@@ -175,7 +175,7 @@ Try our experimental automatic requirements installer (no need to be root). This
 
 * **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
 
-* **Fedora** and its derivatives (including **Red Hat Enterprise Linux**, **CentOS**, **Amazon Machine Image**)
+* **Redhat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
   * Please note that for RHEL/CentOS you need
     [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
     In addition, RHEL/CentOS version 6 also need

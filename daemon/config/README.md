@@ -105,7 +105,7 @@ setting | default | info
 :------:|:-------:|:----
 enabled | `yes` | Set to `no` to disable all alarms and notifications
 in memory max health log entries | 1000 | Size of the alarm history held in RAM
-script to execute on alarm | `/usr/libexec/netdata/plugins.d/alarm-notify.sh` | The script that sends alarm notifications.
+script to execute on alarm | `/usr/libexec/netdata/plugins.d/alarm-notify.sh` | The script that sends alarm notifications. Note that in versions before 1.16, the plugins.d directory may be installed in a different location in certain OSs (e.g. under `/usr/lib/netdata`).
 stock health configuration directory | `/usr/lib/netdata/conf.d/health.d` | Contains the stock alarm configuration files for each collector
 health configuration directory | `/etc/netdata/health.d` | The directory containing the user alarm configuration files, to override the stock configurations
 run at least every seconds | `10` | Controls how often all alarm conditions should be evaluated.
