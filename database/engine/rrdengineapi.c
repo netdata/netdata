@@ -436,7 +436,13 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
     return pg_cache_descr->page;
 }
 
-void rrdeng_get_32_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
+/*
+ * Gathers Database Engine statistics.
+ * Careful when modifying this function.
+ * You must not change the indices of the statistics or user code will break.
+ * You must not exceed RRDENG_NR_STATS or it will crash.
+ */
+void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
@@ -472,7 +478,8 @@ void rrdeng_get_32_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[29] = (uint64_t)ctx->stats.fs_errors;
     array[30] = (uint64_t)global_io_errors;
     array[31] = (uint64_t)global_fs_errors;
-    assert(RRDENG_NR_STATS == 32);
+    array[32] = (uint64_t)rrdeng_reserved_file_descriptors;
+    assert(RRDENG_NR_STATS == 33);
 }
 
 /* Releases reference to page */
@@ -483,14 +490,29 @@ void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle)
 }
 
 /*
- * Returns 0 on success, 1 on error
+ * Returns 0 on success, negative on error
  */
 int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb, unsigned disk_space_mb)
 {
     struct rrdengine_instance *ctx;
     int error;
+    uint32_t max_open_files;
 
     sanity_check();
+
+    max_open_files = rlimit_nofile.rlim_cur / 4;
+
+    /* reserve RRDENG_FD_BUDGET_PER_INSTANCE file descriptors for this instance */
+    rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, RRDENG_FD_BUDGET_PER_INSTANCE);
+    if (rrdeng_reserved_file_descriptors > max_open_files) {
+        error("Exceeded the budget of available file descriptors (%u/%u), cannot create new dbengine instance.",
+              (unsigned)rrdeng_reserved_file_descriptors, (unsigned)max_open_files);
+
+        rrd_stat_atomic_add(&global_fs_errors, 1);
+        rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
+        return UV_EMFILE;
+    }
+
     if (NULL == ctxp) {
         /* for testing */
         ctx = &default_global_ctx;
@@ -537,7 +559,8 @@ error_after_init_rrd_files:
         freez(ctx);
         *ctxp = NULL;
     }
-    return 1;
+    rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
+    return UV_EIO;
 }
 
 /*
@@ -563,5 +586,6 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     if (ctx != &default_global_ctx) {
         freez(ctx);
     }
+    rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return 0;
 }

@@ -150,10 +150,12 @@ struct rrdengine_statistics {
     rrdeng_stats_t fs_errors;
 };
 
-/* Global statistics */
+/* I/O errors global counter */
 extern rrdeng_stats_t global_io_errors;
+/* File-System errors global counter */
 extern rrdeng_stats_t global_fs_errors;
-
+/* number of File-Descriptors that have been reserved by dbengine */
+extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
 
 struct rrdengine_instance {
     struct rrdengine_worker_config worker_config;
