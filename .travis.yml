@@ -23,8 +23,9 @@ install:
 - source tests/installer/slack.sh
 - export NOTIF_CHANNEL="automation-beta"
 - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
-- export BUILD_VERSION="$(cat packaging    /version | cut -d'-' -f1)"
+- export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; fi;
+- export DEPLOY_REPO="netdata" # Default production packaging repository
 
 
 
@@ -117,9 +118,9 @@ stages:
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
     - sudo chmod -R 755 "/var/lib/lxc"
     - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
-    - if [[ ls -ltr "${PACKAGES_DIRECTORY}" | grep "\.latest" > /dev/null 2>&1 ]]; then export DEPLOY_REPO="netdata-edge"; else export DEPLOY_REPO="netdata"; fi;
-
+    - if [[ ls -ltr "${PACKAGES_DIRECTORY}" | grep "\.latest" > /dev/null 2>&1 ]]; then export DEPLOY_REPO="netdata-edge"; fi;
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
+
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
     deploy:
@@ -154,7 +155,7 @@ stages:
       - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
 
-
+  # TODO: This section is stale, will be aligned with the RPM implementation when we get to DEB packaging
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish DEB package"
     before_install:
