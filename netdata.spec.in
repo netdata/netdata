@@ -117,6 +117,9 @@ BuildRequires: lz4-devel
 BuildRequires: nc
 %endif
 
+# Core build requirements for service install
+%{netdata_initd_buildrequires}
+
 # Runtime dependencies
 #
 Requires:      zlib
@@ -132,6 +135,13 @@ Requires:      Judy
 %endif
 Requires:      openssl
 Requires:      lz4
+
+# Core requirements for the install to succeed
+Requires(pre): /usr/sbin/groupadd
+Requires(pre): /usr/sbin/useradd
+Requires(post): libcap
+
+%{netdata_initd_requires}
 
 # #####################################################################
 # Functionality-dependent package dependencies
@@ -155,13 +165,7 @@ BuildRequires:	freeipmi-devel
 Requires: freeipmi
 # end - freeipmi plugin dependencies
 
-Requires(pre): /usr/sbin/groupadd
-Requires(pre): /usr/sbin/useradd
-Requires(post): libcap
-
-%{netdata_initd_buildrequires}
 %{netdata_recommends}
-%{netdata_initd_requires}
 # #####################################################################
 # End of dependency management configuration
 # #####################################################################
