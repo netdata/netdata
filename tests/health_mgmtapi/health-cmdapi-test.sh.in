@@ -69,7 +69,7 @@ check_list() {
     if [ "${CLIENT}" == "${SERVER}" ]; then
         echo -e "${GREEN}Success to check the list"
     else
-        echo -e "${RED}ERROR: Response '${RESP}' does not match the original file '${ORIGINAL}'."
+        echo -e "${RED}ERROR: Response '${SERVER}' does not match the original file '${CLIENT}'."
     fi
 }
 
