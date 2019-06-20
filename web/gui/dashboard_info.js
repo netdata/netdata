@@ -473,6 +473,12 @@ netdataDashboard.menu = {
         title: 'wmi',
         icon: '<i class="fas fa-server"></i>',
         info: undefined
+    },
+
+    'perf': {
+        title: 'Perf Counters',
+        icon: '<i class="fas fa-tachometer-alt"></i>',
+        info: 'Performance Monitoring Counters (PMC). Data collected using <b>perf_event_open()</b> system call which utilises Hardware Performance Monitoring Units (PMU).'
     }
 };
 

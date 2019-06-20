@@ -234,6 +234,11 @@ XENSTAT_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+PERF_PLUGIN_FILES = \
+    collectors/perf.plugin/perf_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
 PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/ipc.c \
 	collectors/proc.plugin/plugin_proc.c \
@@ -570,6 +575,14 @@ if ENABLE_PLUGIN_XENSTAT
     xenstat_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_XENSTAT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_PERF
+    plugins_PROGRAMS += perf.plugin
+    perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
+    perf_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 
