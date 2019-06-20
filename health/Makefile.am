@@ -70,6 +70,7 @@ dist_healthconfig_DATA = \
     health.d/ram.conf \
     health.d/redis.conf \
     health.d/retroshare.conf \
+    health.d/riakkv.conf \
     health.d/softnet.conf \
     health.d/squid.conf \
     health.d/stiebeleltron.conf \

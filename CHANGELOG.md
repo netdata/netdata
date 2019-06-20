@@ -4,6 +4,8 @@
 
 **Fixed bugs:**
 
+- Redirect cannot overwrite netdata. [\#6288](https://github.com/netdata/netdata/issues/6288)
+- Netdata lateral menu hidden [\#6287](https://github.com/netdata/netdata/issues/6287)
 - How to remove/unregister a streaming node to prevent the health alarms from triggering [\#6266](https://github.com/netdata/netdata/issues/6266)
 - RFE: Minor change to the spec.in file in order to help with building rpms on RHEL [\#6256](https://github.com/netdata/netdata/issues/6256)
 - addgroup: gid '999' in use [\#6253](https://github.com/netdata/netdata/issues/6253)
@@ -23,6 +25,7 @@
 - Error messages on old database files [\#6186](https://github.com/netdata/netdata/issues/6186)
 - netdata/packaging: Sporadic job failures in Travis CI [\#6185](https://github.com/netdata/netdata/issues/6185)
 - Fix date in pushbullet alarm notifications [\#6178](https://github.com/netdata/netdata/issues/6178)
+- Chart's "name" not streamed [\#6177](https://github.com/netdata/netdata/issues/6177)
 - Why is auto-update not working? V1.14.0 [\#6170](https://github.com/netdata/netdata/issues/6170)
 - \[solved\] ZFS database \(was: netdata FATAL : MAIN :uv\_fs\_fsopen: invalid argument \# : Invalid argument\) [\#6161](https://github.com/netdata/netdata/issues/6161)
 - httpcheck does not export some metrics in version 1.15 [\#6157](https://github.com/netdata/netdata/issues/6157)
@@ -78,11 +81,20 @@
 - Feature: add VictoriaMetrics backend for long-term archiving [\#5619](https://github.com/netdata/netdata/issues/5619)
 - Hide: timestamps, memory values left, background and use graph as a gif [\#5186](https://github.com/netdata/netdata/issues/5186)
 - Cookie consent for the Netdata sites [\#4798](https://github.com/netdata/netdata/issues/4798)
+- netdata startup order on boot \(systemd\) [\#4266](https://github.com/netdata/netdata/issues/4266)
 - RFC: registry v2 [\#3990](https://github.com/netdata/netdata/issues/3990)
+- mail notifications wiki points to a non-existing file [\#3433](https://github.com/netdata/netdata/issues/3433)
+- riak-rv support [\#2413](https://github.com/netdata/netdata/issues/2413)
 - alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
 
 **Merged pull requests:**
 
+- Chart name streaming [\#6304](https://github.com/netdata/netdata/pull/6304) ([vlvkobal](https://github.com/vlvkobal))
+- Add note regarding libexecdir [\#6301](https://github.com/netdata/netdata/pull/6301) ([cakrit](https://github.com/cakrit))
+- stale bot limits update [\#6297](https://github.com/netdata/netdata/pull/6297) ([ilyam8](https://github.com/ilyam8))
+- Web [\#6294](https://github.com/netdata/netdata/pull/6294) ([thiagoftsm](https://github.com/thiagoftsm))
+- doc: remove single/multi-threaded web server configuration [\#6291](https://github.com/netdata/netdata/pull/6291) ([nodiscc](https://github.com/nodiscc))
+- Add a riak plugin [\#6286](https://github.com/netdata/netdata/pull/6286) ([jchristgit](https://github.com/jchristgit))
 - netdata/packaging: Separate beta messages from production messages [\#6282](https://github.com/netdata/netdata/pull/6282) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add more info on the stream.conf health enabled by default = auto option [\#6281](https://github.com/netdata/netdata/pull/6281) ([cakrit](https://github.com/cakrit))
 - Add comments about AWS SDK for C++ installation [\#6277](https://github.com/netdata/netdata/pull/6277) ([vlvkobal](https://github.com/vlvkobal))
