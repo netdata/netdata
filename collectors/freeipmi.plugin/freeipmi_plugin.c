@@ -338,7 +338,8 @@ static void netdata_mark_as_not_updated() {
 }
 
 static void send_chart_to_netdata_for_units(int units) {
-    struct sensor *sn;
+    struct sensor *sn, *sn_stored;
+    int dupfound, multiplier;
 
     switch(units) {
         case IPMI_MONITORING_SENSOR_UNITS_CELSIUS:
@@ -398,29 +399,44 @@ static void send_chart_to_netdata_for_units(int units) {
     }
 
     for(sn = sensors_root; sn; sn = sn->next) {
+        dupfound = 0;
         if(sn->sensor_units == units && sn->updated && !sn->ignore) {
             sn->exposed = 1;
+            multiplier = 1;
 
             switch(sn->sensor_reading_type) {
+                case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
+                    multiplier = 1000;
+                    // fallthrough
                 case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER8_BOOL:
                 case IPMI_MONITORING_SENSOR_READING_TYPE_UNSIGNED_INTEGER32:
-                    printf("DIMENSION i%d_n%d_r%d '%s i%d' absolute 1 1\n"
-                           , sn->sensor_number
-                           , sn->record_id
-                           , sn->sensor_reading_type
-                           , sn->sensor_name
-                           , sn->sensor_number
-                    );
-                    break;
-
-                case IPMI_MONITORING_SENSOR_READING_TYPE_DOUBLE:
-                    printf("DIMENSION i%d_n%d_r%d '%s i%d' absolute 1 1000\n"
-                           , sn->sensor_number
-                           , sn->record_id
-                           , sn->sensor_reading_type
-                           , sn->sensor_name
-                           , sn->sensor_number
-                    );
+                    for (sn_stored = sensors_root; sn_stored; sn_stored = sn_stored->next) {
+                        if (sn_stored == sn) continue;
+                        // If the name is a duplicate, append the sensor number
+                        if ( !strcmp(sn_stored->sensor_name, sn->sensor_name) ) {
+                            dupfound = 1;
+                            printf("DIMENSION i%d_n%d_r%d '%s i%d' absolute 1 %d\n"
+                                   , sn->sensor_number
+                                   , sn->record_id
+                                   , sn->sensor_reading_type
+                                   , sn->sensor_name
+                                   , sn->sensor_number
+                                   , multiplier
+                            );
+                            break;
+                        }
+                    }
+                    // No duplicate name was found, display it just with Name
+                    if (!dupfound) {
+                        // display without ID
+                        printf("DIMENSION i%d_n%d_r%d '%s' absolute 1 %d\n"
+                               , sn->sensor_number
+                               , sn->record_id
+                               , sn->sensor_reading_type
+                               , sn->sensor_name
+                               , multiplier
+                        );
+                    }
                     break;
 
                 default:
