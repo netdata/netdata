@@ -11,6 +11,10 @@
 # define NETDATA_SSL_INVALID_CERTIFICATE 64  //Accepts invalid certificate
 # define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts invalid certificate
 
+#define NETDATA_SSL_CONTEXT_SERVER 0
+#define NETDATA_SSL_CONTEXT_STREAMING 1
+#define NETDATA_SSL_CONTEXT_OPENTSDB 2
+
 # ifdef ENABLE_HTTPS
 
 #  include <openssl/ssl.h>

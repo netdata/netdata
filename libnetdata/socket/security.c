@@ -128,9 +128,9 @@ void security_start_ssl(int type) {
         netdata_srv_ctx =  security_initialize_openssl_server();
     }
     else {
-        if(type == 1) {
+        if(type == NETDATA_SSL_CONTEXT_STREAMING) {
             netdata_cli_ctx = security_initialize_openssl_client();
-        } else if (type == 2) {
+        } else if (type == NETDATA_SSL_CONTEXT_OPENTSDB) {
             netdata_opentsdb_ctx = security_initialize_openssl_client();
         }
     }
