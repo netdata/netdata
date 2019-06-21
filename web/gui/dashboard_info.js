@@ -267,6 +267,12 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>RetroShare</b>. RetroShare is open source software for encrypted filesharing, serverless email, instant messaging, online chat, and BBS, based on a friend-to-friend network built on GNU Privacy Guard (GPG).'
     },
 
+    'riakkv': {
+        title: 'Riak KV',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Metrics for <b>Riak KV</b>, the distributed key-value store.'
+    },
+
     'ipfs': {
         title: 'IPFS',
         icon: '<i class="fas fa-folder-open"></i>',
@@ -467,6 +473,12 @@ netdataDashboard.menu = {
         title: 'wmi',
         icon: '<i class="fas fa-server"></i>',
         info: undefined
+    },
+
+    'perf': {
+        title: 'Perf Counters',
+        icon: '<i class="fas fa-tachometer-alt"></i>',
+        info: 'Performance Monitoring Counters (PMC). Data collected using <b>perf_event_open()</b> system call which utilises Hardware Performance Monitoring Units (PMU).'
     }
 };
 

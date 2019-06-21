@@ -57,6 +57,10 @@ Entire plugins can be turned off from the [netdata.conf [plugins]](../daemon/con
 - `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin)
 - `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
 
+##### Show charts with zero metrics
+
+By default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently.
+
 ### Modify alarms and notifications
 
 ##### Add a new alarm

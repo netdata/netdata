@@ -69,6 +69,7 @@ To control which plugins Netdata run, edit `netdata.conf` and check the `[plugin
 	# charts.d = yes
 	# apps = yes
 	# xenstat = yes
+	# perf = no
 ```
 
 The default for all plugins is the option `enable running new plugins`. So, setting this to `no` will disable all the plugins, except the ones specifically enabled.
@@ -95,7 +96,7 @@ sudo su -s /bin/bash netdata
 ```
 
 Similarly, you can use `charts.d.plugin` for BASH plugins and `node.d.plugin` for node.js plugins.
-Other plugins (like `apps.plugin`, `freeipmi.plugin`, `fping.plugin`, `ioping.plugin`) use the native Netdata plugin API and can be run directly.
+Other plugins (like `apps.plugin`, `freeipmi.plugin`, `fping.plugin`, `ioping.plugin`, `nfacct.plugin`, `xenstat.plugin`, `perf.plugin`) use the native Netdata plugin API and can be run directly.
 
 If you need to configure a Netdata plugin or module, all user supplied configuration is kept at `/etc/netdata` while the stock versions of all files is at `/usr/lib/netdata/conf.d`.
 To copy a stock file and edit it, run `/etc/netdata/edit-config`. Running this command without an argument, will list the available stock files.
@@ -116,6 +117,9 @@ plugin | language | plugin<br/>configuration | modules<br/>configuration |
 `fping.plugin`<br/>(external plugin for collecting network latencies)|`C`|`fping.conf`|This plugin is a wrapper for the `fping` command.
 `ioping.plugin`<br/>(external plugin for collecting disk latencies)|`C`|`ioping.conf`|This plugin is a wrapper for the `ioping` command.
 `freeipmi.plugin`<br/>(external plugin for collecting IPMI h/w sensors)|`C`|`netdata.conf` section `[plugin:freeipmi]`
+`nfacct.plugin`<br/>(external plugin for monitoring netfilter firewall and connection tracker)|`C`|`netdata.conf` section `[plugin:nfacct]`|N/A
+`xenstat.plugin`<br/>(external plugin for monitoring XCP-ng and XenServer)|`C`|`netdata.conf` section `[plugin:xenstat]`|N/A
+`perf.plugin`<br/>(external plugin for monitoring CPU performance on Linux)|`C`|`netdata.conf` section `[plugin:perf]`|N/A
 `idlejitter.plugin`<br/>(internal plugin for monitoring CPU jitter)|`C`|N/A|N/A
 `macos.plugin`<br/>(internal plugin for monitoring MacOS system resources)|`C`|`netdata.conf` section `[plugin:macos]`|one section for each module `[plugin:macos:MODULE]`. Each module may provide additional sections in the form of `[plugin:macos:MODULE:SUBSECTION]`.
 `node.d.plugin`<br/>(external plugin orchestrator of node.js modules)|`node.js`|`node.d.conf`|a file for each module in `/etc/netdata/node.d/`.
@@ -321,6 +325,7 @@ application|language|notes|
 :---------:|:------:|:----|
 apps|C|`apps.plugin` collects resource usage statistics for all processes running in the system. It groups the entire process tree and reports dozens of metrics for CPU utilization, memory footprint, disk I/O, swap memory, network connections, open files and sockets, etc. It reports metrics for application groups, users and user groups.<br/>&nbsp;<br/>[Documentation of `apps.plugin`](../collectors/apps.plugin/).<br/>&nbsp;<br/>Netdata plugin: [`apps_plugin.c`](../collectors/apps.plugin)<br/>configuration file: [`apps_groups.conf`](../collectors/apps.plugin)|
 ioping|C|Charts disk latency statistics for a directory/file/device, using the `ioping` command. A recent (probably unreleased) version of ioping is required. The plugin supplied can install it in `/usr/local`.<br/>&nbsp;<br/>Netdata plugin: [ioping.plugin](../collectors/ioping.plugin) (this is a shell wrapper to start ioping - once ioping is started, Netdata and ioping communicate directly - it can also install the right version of ioping)<br/>configuration file: [ioping.conf](../collectors/ioping.plugin)|
+perf|C|`perf.plugin` collects CPU performance metrics using hardware performance monitoring units (PMU).<br/>&nbsp;<br/>[Documentation of `perf.plugin`](../collectors/perf.plugin/).<br/>&nbsp;<br/>Netdata plugin: [`perf_plugin.c`](../collectors/perf.plugin)|
 cpu_apps|BASH<br/>Shell Script|Collects the CPU utilization of select apps.<br/><br/>DEPRECATED IN FAVOR OF `apps.plugin`. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>Netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [cpu_apps.chart.sh](../collectors/charts.d.plugin/cpu_apps)<br/>configuration file: [charts.d/cpu_apps.conf](../collectors/charts.d.plugin/cpu_apps)|
 load_average|BASH<br/>Shell Script|Collects the current system load average.<br/><br/>DEPRECATED IN FAVOR OF THE NETDATA INTERNAL ONE. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>Netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [load_average.chart.sh](../collectors/charts.d.plugin/load_average)<br/>configuration file: [charts.d/load_average.conf](../collectors/charts.d.plugin/load_average)|
 mem_apps|BASH<br/>Shell Script|Collects the memory footprint of select applications.<br/><br/>DEPRECATED IN FAVOR OF `apps.plugin`. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>Netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [mem_apps.chart.sh](../collectors/charts.d.plugin/mem_apps)<br/>configuration file: [charts.d/mem_apps.conf](../collectors/charts.d.plugin/mem_apps)|

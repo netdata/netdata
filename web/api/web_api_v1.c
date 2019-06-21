@@ -195,18 +195,14 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 
 
 inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     int all = 0;
 
-    uint32_t end = w->total_params;
-    if(end) {
-        uint32_t  i = 0;
-        do {
-            char *value = w->param_values[i].body;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
 
-            if(!strncmp(value, "all",3)) all = 1;
-            else if(!strncmp(value, "active",6)) all = 0;
-        } while(++i < end);
+        if(!strcmp(value, "all")) all = 1;
+        else if(!strcmp(value, "active")) all = 0;
     }
 
     buffer_flush(w->response.data);
@@ -217,24 +213,17 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
 }
 
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     uint32_t after = 0;
 
-    uint32_t end = w->total_params;
-    if(end) {
-        uint32_t  i = 0;
-        do {
-            char *value = w->param_values[i].body;
-            size_t lvalue = w->param_values[i].length;
-            char save = value[lvalue];
-            value[lvalue] = 0x00;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
 
-            char *name = w->param_name[i].body;
-            size_t lname = w->param_name[i].length;
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
-            if(!strncmp(name, "after",lname)) after = (uint32_t)strtoul(value, NULL, 0);
-            value[lvalue] = save;
-        } while (++i < end);
+        if(!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
     }
 
     buffer_flush(w->response.data);
@@ -244,29 +233,27 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
 }
 
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
-    (void)url;
     int ret = 400;
     char *chart = NULL;
 
     buffer_flush(w->response.data);
 
-    uint32_t  i = 0;
-    uint32_t end = w->total_params;
-    if(end) {
-        do {
-            char *name = w->param_name[i].body;
-            size_t nlength  = w->param_name[i].length;
-            char *value = w->param_values[i].body;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
 
-            // name and value are now the parameters
-            // they are not null and not empty
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
-            if(!strncmp(name, "chart",nlength)) chart = value;
-            //else {
-            /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
-            //  goto cleanup;
-            //}
-        } while (++i < end);
+        // name and value are now the parameters
+        // they are not null and not empty
+
+        if(!strcmp(name, "chart")) chart = value;
+        //else {
+        /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
+        //  goto cleanup;
+        //}
     }
 
     if(!chart || !*chart) {
@@ -320,7 +307,6 @@ void fix_google_param(char *s) {
 
 // returns the HTTP code
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = 400;
@@ -347,82 +333,75 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     uint32_t format = DATASOURCE_JSON;
     uint32_t options = 0x00000000;
 
-    uint32_t end = w->total_params;
-    char save[WEB_FIELDS_MAX];
-    char *value ;
-    size_t lvalue;
-    if(end) {
-        uint32_t i = 0;
-        do {
-            char *name = w->param_name[i].body;
-            size_t lname = w->param_name[i].length;
-            value = w->param_values[i].body;
-            lvalue = w->param_values[i].length;
-            save[i] = value[lvalue];
-            value[lvalue] = 0x00;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
 
-            debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
-            // name and value are now the parameters
-            // they are not null and not empty
+        debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
-            if(!strncmp(name, "chart",lname)) chart = value;
-            else if(!strncmp(name, "dimension",lname) || !strncmp(name, "dim",lname) || !strncmp(name, "dimensions",lname) || !strncmp(name, "dims",lname)) {
-                if(!dimensions) dimensions = buffer_create(100);
-                buffer_strcat(dimensions, "|");
-                buffer_strcat(dimensions, value);
-            }
-            else if(!strncmp(name, "after",lname)) after_str = value;
-            else if(!strncmp(name, "before",lname)) before_str = value;
-            else if(!strncmp(name, "points",lname)) points_str = value;
-            else if(!strncmp(name, "gtime",lname)) group_time_str = value;
-            else if(!strncmp(name, "group",lname)) {
-                group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
-            }
-            else if(!strncmp(name, "format",lname)) {
-                format = web_client_api_request_v1_data_format(value);
-            }
-            else if(!strncmp(name, "options",lname)) {
-                options |= web_client_api_request_v1_data_options(value);
-            }
-            else if(!strncmp(name, "callback",lname)) {
-                responseHandler = value;
-            }
-            else if(!strncmp(name, "filename",lname)) {
-                outFileName = value;
-            }
-            else if(!strncmp(name, "tqx",lname)) {
-                // parse Google Visualization API options
-                // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
-                char *tqx_name, *tqx_value;
+        // name and value are now the parameters
+        // they are not null and not empty
 
-                while(value) {
-                    tqx_value = mystrsep(&value, ";");
-                    if(!tqx_value || !*tqx_value) continue;
+        if(!strcmp(name, "chart")) chart = value;
+        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
+            if(!dimensions) dimensions = buffer_create(100);
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
+        }
+        else if(!strcmp(name, "after")) after_str = value;
+        else if(!strcmp(name, "before")) before_str = value;
+        else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "gtime")) group_time_str = value;
+        else if(!strcmp(name, "group")) {
+            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+        }
+        else if(!strcmp(name, "format")) {
+            format = web_client_api_request_v1_data_format(value);
+        }
+        else if(!strcmp(name, "options")) {
+            options |= web_client_api_request_v1_data_options(value);
+        }
+        else if(!strcmp(name, "callback")) {
+            responseHandler = value;
+        }
+        else if(!strcmp(name, "filename")) {
+            outFileName = value;
+        }
+        else if(!strcmp(name, "tqx")) {
+            // parse Google Visualization API options
+            // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
+            char *tqx_name, *tqx_value;
 
-                    tqx_name = mystrsep(&tqx_value, ":");
-                    if(!tqx_name || !*tqx_name) continue;
-                    if(!tqx_value || !*tqx_value) continue;
+            while(value) {
+                tqx_value = mystrsep(&value, ";");
+                if(!tqx_value || !*tqx_value) continue;
 
-                    if(!strcmp(tqx_name, "version"))
-                        google_version = tqx_value;
-                    else if(!strcmp(tqx_name, "reqId"))
-                        google_reqId = tqx_value;
-                    else if(!strcmp(tqx_name, "sig")) {
-                        google_sig = tqx_value;
-                        google_timestamp = strtoul(google_sig, NULL, 0);
-                    }
-                    else if(!strcmp(tqx_name, "out")) {
-                        google_out = tqx_value;
-                        format = web_client_api_request_v1_data_google_format(google_out);
-                    }
-                    else if(!strcmp(tqx_name, "responseHandler"))
-                        responseHandler = tqx_value;
-                    else if(!strcmp(tqx_name, "outFileName"))
-                        outFileName = tqx_value;
+                tqx_name = mystrsep(&tqx_value, ":");
+                if(!tqx_name || !*tqx_name) continue;
+                if(!tqx_value || !*tqx_value) continue;
+
+                if(!strcmp(tqx_name, "version"))
+                    google_version = tqx_value;
+                else if(!strcmp(tqx_name, "reqId"))
+                    google_reqId = tqx_value;
+                else if(!strcmp(tqx_name, "sig")) {
+                    google_sig = tqx_value;
+                    google_timestamp = strtoul(google_sig, NULL, 0);
                 }
+                else if(!strcmp(tqx_name, "out")) {
+                    google_out = tqx_value;
+                    format = web_client_api_request_v1_data_google_format(google_out);
+                }
+                else if(!strcmp(tqx_name, "responseHandler"))
+                    responseHandler = tqx_value;
+                else if(!strcmp(tqx_name, "outFileName"))
+                    outFileName = tqx_value;
             }
-        } while (++i < end);
+        }
     }
 
     // validate the google parameters given
@@ -509,14 +488,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
     cleanup:
-    if(end) {
-        uint32_t i = 0;
-        do {
-            value = w->param_values[i].body;
-            lvalue = w->param_values[i].length;
-            value[lvalue] = save[i];
-        } while ( ++i < end );
-    }
     buffer_free(dimensions);
     return ret;
 }
@@ -580,33 +551,26 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     int redirects = 0;
 */
 
-    uint32_t i = 0;
-    uint32_t end = w->total_params;
-    if (!end) {
-        goto nothing;
-    }
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
 
-    do {
-        char *name = w->param_name[i].body;
-        size_t nlength = w->param_name[i].length;
-        char *value = w->param_values[i].body;
-        size_t vlength = w->param_values[i].length;
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name) continue;
+        if (!value || !*value) continue;
 
         debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
 
-        //uint32_t hash = simple_hash(name);
-        uint32_t hash = simple_nhash(name,nlength);
+        uint32_t hash = simple_hash(name);
 
-        //if(hash == hash_action && !strcmp(name, "action")) {
-        if(hash == hash_action && !strncmp(name, "action",nlength)) {
-            //uint32_t vhash = simple_hash(value);
-            uint32_t vhash = simple_nhash(value,vlength);
+        if(hash == hash_action && !strcmp(name, "action")) {
+            uint32_t vhash = simple_hash(value);
 
-            if(vhash == hash_access && !strncmp(value, "access",vlength)) action = 'A';
-            else if(vhash == hash_hello && !strncmp(value, "hello",vlength)) action = 'H';
-            else if(vhash == hash_delete && !strncmp(value, "delete",vlength)) action = 'D';
-            else if(vhash == hash_search && !strncmp(value, "search",vlength)) action = 'S';
-            else if(vhash == hash_switch && !strncmp(value, "switch",vlength)) action = 'W';
+            if(vhash == hash_access && !strcmp(value, "access")) action = 'A';
+            else if(vhash == hash_hello && !strcmp(value, "hello")) action = 'H';
+            else if(vhash == hash_delete && !strcmp(value, "delete")) action = 'D';
+            else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
+            else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
 #ifdef NETDATA_INTERNAL_CHECKS
             else error("unknown registry action '%s'", value);
 #endif /* NETDATA_INTERNAL_CHECKS */
@@ -615,34 +579,33 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         else if(hash == hash_redirects && !strcmp(name, "redirects"))
             redirects = atoi(value);
 */
-        else if(hash == hash_machine && !strncmp(name, "machine",nlength))
+        else if(hash == hash_machine && !strcmp(name, "machine"))
             machine_guid = value;
 
-        else if(hash == hash_url && !strncmp(name, "url",nlength))
+        else if(hash == hash_url && !strcmp(name, "url"))
             machine_url = value;
 
         else if(action == 'A') {
-            if(hash == hash_name && !strncmp(name, "name",nlength))
+            if(hash == hash_name && !strcmp(name, "name"))
                 url_name = value;
         }
         else if(action == 'D') {
-            if(hash == hash_delete_url && !strncmp(name, "delete_url",nlength))
+            if(hash == hash_delete_url && !strcmp(name, "delete_url"))
                 delete_url = value;
         }
         else if(action == 'S') {
-            if(hash == hash_for && !strncmp(name, "for",nlength))
+            if(hash == hash_for && !strcmp(name, "for"))
                 search_machine_guid = value;
         }
         else if(action == 'W') {
-            if(hash == hash_to && !strncmp(name, "to",nlength))
+            if(hash == hash_to && !strcmp(name, "to"))
                 to_person_guid = value;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         else error("unused registry URL parameter '%s' with value '%s'", name, value);
 #endif /* NETDATA_INTERNAL_CHECKS */
-    } while (++i < end );
+    }
 
-nothing:
     if(unlikely(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w))) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
@@ -834,27 +797,28 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
     }
 
     // get the command
+    char *tok = mystrsep(&url, "?");
+    if(tok && *tok) {
+        debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
+        uint32_t hash = simple_hash(tok);
 
-    char *cmd = w->command.body;
-    size_t length = w->command.length;
-    uint32_t hash = simple_nhash(cmd,length);
+        for(i = 0; api_commands[i].command ;i++) {
+            if(unlikely(hash == api_commands[i].hash && !strcmp(tok, api_commands[i].command))) {
+                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
+                    return web_client_permission_denied(w);
 
-    for(i = 0; api_commands[i].command ;i++) {
-        if(unlikely(hash == api_commands[i].hash && !strncmp(cmd, api_commands[i].command,length))) {
-            if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
-                return web_client_permission_denied(w);
-
-            return api_commands[i].callback(host, w, url);
+                return api_commands[i].callback(host, w, url);
+            }
         }
+
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Unsupported v1 API command: ");
+        buffer_strcat_htmlescape(w->response.data, tok);
+        return 404;
     }
-
-    char copyme[256];
-    length = w->path.length;
-    memcpy(copyme,w->path.body,length);
-    copyme[length] = 0x00;
-
-    buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "Unsupported v1 API command: ");
-    buffer_strcat_htmlescape(w->response.data, copyme);
-    return 404;
+    else {
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Which API v1 command?");
+        return 400;
+    }
 }

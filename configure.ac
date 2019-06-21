@@ -686,6 +686,19 @@ AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"
 
 
 # -----------------------------------------------------------------------------
+# perf.plugin
+
+AC_MSG_CHECKING([if perf.plugin should be enabled])
+if test "${build_target}" == "linux" ; then
+    enable_plugin_perf="yes"
+else
+    enable_plugin_perf="no"
+fi
+AC_MSG_RESULT([${enable_plugin_perf}])
+AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # AWS Kinesis backend - libaws-cpp-sdk-kinesis, libaws-cpp-sdk-core, libssl, libcrypto, libcurl
 
 PKG_CHECK_MODULES(
@@ -999,6 +1012,7 @@ AC_CONFIG_FILES([
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
+    collectors/perf.plugin/Makefile
     daemon/Makefile
     database/Makefile
     database/engine/Makefile

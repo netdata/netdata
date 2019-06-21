@@ -87,7 +87,9 @@ server that will maintain the entire database for all nodes, and will also run h
 for all nodes.
 
 For this central netdata, memory size can be a problem. Fortunately, netdata supports several
-memory modes. One interesting option for this setup is `memory mode = map`.
+memory modes. **One interesting option** for this setup is `memory mode = map`.
+
+### map
 
 In this mode, the database of netdata is stored in memory mapped files. netdata continues to read
 and write the database in memory, but the kernel automatically loads and saves memory pages from/to
@@ -162,8 +164,10 @@ vm.dirty_ratio = 90
 vm.dirty_writeback_centisecs = 0
 ```
 
-There is another memory mode to help overcome the memory size problem. What is most interesting
-for this setup is `memory mode = dbengine`.
+There is another memory mode to help overcome the memory size problem. What is **most interesting
+for this setup** is `memory mode = dbengine`.
+
+### dbengine
 
 In this mode, the database of netdata is stored in database files. The [Database Engine](engine/)
 works like a traditional database. There is some amount of RAM dedicated to data caching and

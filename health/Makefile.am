@@ -70,6 +70,7 @@ dist_healthconfig_DATA = \
     health.d/ram.conf \
     health.d/redis.conf \
     health.d/retroshare.conf \
+    health.d/riakkv.conf \
     health.d/softnet.conf \
     health.d/squid.conf \
     health.d/stiebeleltron.conf \
@@ -85,4 +86,5 @@ dist_healthconfig_DATA = \
     health.d/wmi.conf \
     health.d/x509check.conf \
     health.d/zfs.conf \
+    health.d/dbengine.conf \
     $(NULL)

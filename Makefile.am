@@ -20,13 +20,9 @@ CLEANFILES= \
 
 EXTRA_DIST = \
 	.gitignore \
-	.codacy.yml \
-	.codeclimate.yml \
 	.csslintrc \
 	.eslintignore \
 	.eslintrc \
-	.lgtm.yml \
-	.travis \
 	.github/CODEOWNERS \
 	build/m4/jemalloc.m4 \
 	build/m4/ax_c___atomic.m4 \
@@ -55,6 +51,7 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA= \
+	CHANGELOG.md \
 	cppcheck.sh \
 	configs.signatures \
 	contrib \
@@ -234,6 +231,11 @@ NFACCT_PLUGIN_FILES = \
 
 XENSTAT_PLUGIN_FILES = \
     collectors/xenstat.plugin/xenstat_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+PERF_PLUGIN_FILES = \
+    collectors/perf.plugin/perf_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -573,6 +575,14 @@ if ENABLE_PLUGIN_XENSTAT
     xenstat_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_XENSTAT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_PERF
+    plugins_PROGRAMS += perf.plugin
+    perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
+    perf_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 

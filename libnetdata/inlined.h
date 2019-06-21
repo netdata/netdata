@@ -31,19 +31,6 @@ static inline uint32_t simple_hash(const char *name) {
     return hval;
 }
 
-static inline uint32_t simple_nhash(const char *name,size_t len) {
-    unsigned char *s = (unsigned char *) name;
-    size_t i;
-    uint32_t hval = 0x811c9dc5;
-    i = 0;
-    do {
-        hval *= 16777619;
-        hval ^= (uint32_t) *s++;
-    } while (++i < len);
-
-    return hval;
-}
-
 static inline uint32_t simple_uhash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5, c;
@@ -52,21 +39,6 @@ static inline uint32_t simple_uhash(const char *name) {
         hval *= 16777619;
         hval ^= c;
     }
-    return hval;
-}
-
-static inline uint32_t simple_nuhash(const char *name,size_t len) {
-    unsigned char *s = (unsigned char *) name;
-    size_t i;
-    uint32_t hval = 0x811c9dc5, c;
-
-    i = 0;
-    do {
-        c = *s++;
-        if (unlikely(c >= 'A' && c <= 'Z')) c += 'a' - 'A';
-        hval *= 16777619;
-        hval ^= c;
-    } while ( ++i < len);
     return hval;
 }
 
