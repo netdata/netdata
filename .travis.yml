@@ -135,7 +135,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: master
+          branch: binary-packages-specfile-cleanup
           condition: -d "${PACKAGES_DIRECTORY}"
       # Production release packages deployment
       - provider: packagecloud
@@ -148,7 +148,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: "${TRAVIS_REPO_SLUG}"
-          branch: master
+          branch: binary-packages-specfile-cleanup
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
       - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
