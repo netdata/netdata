@@ -186,9 +186,14 @@ happened, on your systems and applications.
 # Conf step
 autoreconf -ivf
 %configure \
+	--prefix="/etc" \
+	--sysconfdir="/etc" \
+	--localstatedir="/var" \
+	--libexecdir="/usr/libexec" \
 	--with-zlib \
 	--with-math \
-	--with-user=netdata
+	--with-user=netdata \
+	CFLAGS="-O2"
 
 # Build step
 %{__make} %{?_smp_mflags}
