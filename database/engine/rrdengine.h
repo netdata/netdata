@@ -112,6 +112,8 @@ struct rrdengine_worker_config {
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct rrdeng_cmdqueue cmd_queue;
+
+    int error;
 };
 
 /*
@@ -144,10 +146,18 @@ struct rrdengine_statistics {
     rrdeng_stats_t journalfile_creations;
     rrdeng_stats_t journalfile_deletions;
     rrdeng_stats_t page_cache_descriptors;
+    rrdeng_stats_t io_errors;
+    rrdeng_stats_t fs_errors;
 };
 
+/* I/O errors global counter */
+extern rrdeng_stats_t global_io_errors;
+/* File-System errors global counter */
+extern rrdeng_stats_t global_fs_errors;
+/* number of File-Descriptors that have been reserved by dbengine */
+extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
+
 struct rrdengine_instance {
-    rrdengine_state_t rrdengine_state;
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
     struct page_cache pg_cache;
@@ -157,6 +167,7 @@ struct rrdengine_instance {
     char dbfiles_path[FILENAME_MAX+1];
     uint64_t disk_space;
     uint64_t max_disk_space;
+    unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
     unsigned long cache_pages_low_watermark;
 
@@ -165,6 +176,7 @@ struct rrdengine_instance {
 
 extern void sanity_check(void);
 extern int init_rrd_files(struct rrdengine_instance *ctx);
+extern void finalize_rrd_files(struct rrdengine_instance *ctx);
 extern void rrdeng_test_quota(struct rrdengine_worker_config* wc);
 extern void rrdeng_worker(void* arg);
 extern void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd);

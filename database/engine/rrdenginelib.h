@@ -31,6 +31,8 @@ typedef uintptr_t rrdeng_stats_t;
 #define rrd_stat_atomic_add(p, n) do {(void) __sync_fetch_and_add(p, n);} while(0)
 #endif
 
+#define RRDENG_PATH_MAX (4096)
+
 /* returns old *ptr value */
 static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,
                                                    unsigned long oldval, unsigned long newval)

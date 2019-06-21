@@ -474,7 +474,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
 
             if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 
-            size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 2));
+            size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
 
             static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
 

@@ -86,4 +86,5 @@ dist_healthconfig_DATA = \
     health.d/wmi.conf \
     health.d/x509check.conf \
     health.d/zfs.conf \
+    health.d/dbengine.conf \
     $(NULL)
