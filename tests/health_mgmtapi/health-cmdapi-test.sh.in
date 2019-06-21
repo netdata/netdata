@@ -58,12 +58,14 @@ check_list() {
     SERVER=$( echo "${RESPONSE}" | python3 -c "import sys,json; import netdata_json as nj; e=json.load(sys.stdin); d=nj.orderme(e); print(d)" 2>&1)
 
     FDNAME="${NETDATA_VARLIB_DIR}/health.silencers.json"
-    FD=$(cat $FDNAME)
-    CLIENT=$( echo "${FD}" | python3 -c "import sys,json; import netdata_json as nj; e=json.load(sys.stdin); d=nj.orderme(e); print(d)" 2>&1)
-    if [ "${CLIENT}" == "${SERVER}" ]; then
-        echo -e "${GREEN}Success to check the list"
-    else
-        echo -e "${RED}ERROR: Response '${SERVER}' does not match the original file '${CLIENT}'."
+    if [ -f "$FDNAME" ]; then
+        FD=$(cat $FDNAME)
+        CLIENT=$( echo "${FD}" | python3 -c "import sys,json; import netdata_json as nj; e=json.load(sys.stdin); d=nj.orderme(e); print(d)" 2>&1)
+        if [ "${CLIENT}" == "${SERVER}" ]; then
+            echo -e "${GREEN}Success to check the list"
+        else
+            echo -e "${RED}ERROR: Response '${SERVER}' does not match the original file '${CLIENT}'."
+        fi
     fi
 }
 
@@ -137,6 +139,9 @@ err=0
 	cmd "cmd=SILENCE&alarm=*10min_cpu_usage *load_trigger" "${resp}"
 	check "Silence notifications for alarm1 and load_trigger" "False True False False False True"
 
+	#Compare the file present in the file system with the configuration running by the server
+    check_list
+
 	# Convert to disable health checks
 	cmd "cmd=DISABLE" "$HEALTH_CMDAPI_MSG_DISABLE"
 	check "Disable notifications for alarm1 and load_trigger" "True False False False True False"
@@ -148,6 +153,9 @@ err=0
 	# Add second silencer by name
 	cmd "alarm=*10min_cpu_iowait" "$HEALTH_CMDAPI_MSG_ADDED"
 	check "Silence notifications for alarm1,alarm2 and load_trigger" "False True False True False True"
+
+	#Compare the file present in the file system with the configuration running by the server
+    check_list
 
 	# Reset
 	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
@@ -169,9 +177,15 @@ err=0
 	cmd "cmd=SILENCE&alarm=*10min_cpu_usage *load_trigger&chart=system.load" "${resp}"
 	check "Silence notifications load_trigger" "False False False False False True"
 
+	#Compare the file present in the file system with the configuration running by the server
+    check_list
+
 	# Add second selector with two conditions
 	cmd "alarm=*10min_cpu_usage *load_trigger&context=system.cpu" "$HEALTH_CMDAPI_MSG_ADDED"
 	check "Silence notifications load_trigger" "False True False False False True"
+
+	#Compare the file present in the file system with the configuration running by the server
+    check_list
 
 	# Reset
 	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
@@ -199,7 +213,6 @@ err=0
 
 	# Reset
 	cmd "cmd=RESET" "$HEALTH_CMDAPI_MSG_RESET"
-
 
 if [ $err -gt 0 ] ; then
 	echo "$err error(s) found"
