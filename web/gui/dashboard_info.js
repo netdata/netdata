@@ -288,7 +288,7 @@ netdataDashboard.menu = {
     'pihole': {
         title: 'Pi-hole',
         icon: '<i class="fas fa-ban"></i>',
-        info: 'Metrics for <a href="https://pi-hole.net/" target="_blank">Pi-hole</a>, A black hole for Internet advertisements.' +
+        info: 'Metrics for <a href="https://pi-hole.net/" target="_blank">Pi-hole</a>, a black hole for Internet advertisements.' +
             ' The metrics returned by Pi-Hole API is all from the last 24 hours.'
     },
 
