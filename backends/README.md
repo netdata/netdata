@@ -76,7 +76,7 @@ of `netdata.conf` from your netdata):
 ```
 [backend]
     enabled = yes | no
-    type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis
+    type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | prometheus_remote_write | json | kinesis
     host tags = list of TAG=VALUE
     destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used, or a region for kinesis
     data source = average | sum | as collected

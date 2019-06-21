@@ -302,7 +302,7 @@ void *backends_main(void *ptr) {
     global_backend_options = backend_parse_data_source(source, global_backend_options);
 
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl opentsdb_ssl = { NULL , NETDATA_SSL_START};
+    struct netdata_ssl opentsdb_ssl = {NULL , NETDATA_SSL_START};
 #endif
 
     if(timeoutms < 1) {
@@ -329,7 +329,7 @@ void *backends_main(void *ptr) {
             backend_request_formatter = format_dimension_stored_graphite_plaintext;
 
     }
-    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet") ) {
+    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
 
         default_port = 4242;
         backend_response_checker = process_opentsdb_response;
@@ -345,7 +345,7 @@ void *backends_main(void *ptr) {
         backend_response_checker = process_opentsdb_response;
 
 #ifdef ENABLE_HTTPS
-        if (!strcmp(type+12,"ps")) {
+        if ( *(type+13) == 's') {
             security_start_ssl(2);
         }
 #endif
@@ -691,7 +691,7 @@ void *backends_main(void *ptr) {
 #ifdef ENABLE_HTTPS
                     if(opentsdb_ssl.conn) {
                         if(!opentsdb_ssl.flags) {
-                            r = SSL_read(opentsdb_ssl.conn,&response->buffer[response->len], response->size - response->len);
+                            r = SSL_read(opentsdb_ssl.conn, &response->buffer[response->len], response->size - response->len);
                         } else {
                             r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
                         }

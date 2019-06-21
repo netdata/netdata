@@ -13,7 +13,7 @@ it is necessary to set the following options in your netdata.conf
 
 ## HTTPS
 
-Netdata also supports to send the metrics using SSL/TLS, this is the preferred option, because it is the safest, but OpenTDSB
+Netdata also supports sending the metrics using SSL/TLS, this is the preferred option, because it is the safest, but OpenTDSB
 does not have support to safety connections, so it will be necessary to configure a reverse-proxy to enable the HTTPS communication.
  In our tests we used Nginx as reverse-proxy, we followed the instructions in the link (https://gist.github.com/torkelo/901f534b8b29b5920ea9 ),
 we configured our nginx with the following lines

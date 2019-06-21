@@ -130,8 +130,8 @@ int format_dimension_collected_opentsdb_http(
                             "\"timestamp\": %llu,"
                             "\"value\": "COLLECTED_NUMBER_FORMAT ","
                             "\"tags\": {"
-                            "    \"host\": \"%s%s%s\""
-                            "  }"
+                            "        \"host\": \"%s%s%s\""
+                            "    }"
                             "}"
                            , prefix
                            , chart_name
@@ -180,8 +180,8 @@ int format_dimension_stored_opentsdb_http(
                  "\"timestamp\": %llu,"
                  "\"value\": "CALCULATED_NUMBER_FORMAT ","
                  "\"tags\": {"
-                 "    \"host\": \"%s%s%s\""
-                 "   }"
+                 "        \"host\": \"%s%s%s\""
+                 "    }"
                  "}"
                 , prefix
                 , chart_name
@@ -194,7 +194,7 @@ int format_dimension_stored_opentsdb_http(
         );
 
         if(length > 0) {
-            opentsdb_build_message(b, message, hostname,length);
+            opentsdb_build_message(b, message, hostname, length);
         }
 
         return 1;
