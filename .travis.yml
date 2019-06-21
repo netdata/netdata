@@ -113,7 +113,7 @@ stages:
     - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
     - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
     script:
-    - echo "Build Version: ${BUILD_VERSION}"
+    - bash -c echo "Build Version: ${BUILD_VERSION}"
     - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
     - sudo chmod -R 755 "/var/lib/lxc"
