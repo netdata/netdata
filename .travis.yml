@@ -117,7 +117,7 @@ stages:
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
     - sudo chmod -R 755 "/var/lib/lxc"
     - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
-    - if [[ ls -ltr "${PACKAGES_DIRECTORY}" | grep "\.latest" > /dev/null 2>&1 ]]; then export DEPLOY_REPO="netdata-edge"; fi;
+    - if ls -ltr "${PACKAGES_DIRECTORY}" | grep "\.latest" > /dev/null 2>&1; then export DEPLOY_REPO="netdata-edge"; fi;
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
 
     before_deploy:
