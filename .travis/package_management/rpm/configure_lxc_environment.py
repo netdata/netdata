@@ -61,8 +61,8 @@ else:
 run_command([os.environ["REPO_TOOL"], "install", "-y", "sudo"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "wget"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
-run_command(["wget", "-T", "15", "-O", "~/.install-required-packages.sh", "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
-run_command(["bash", "~/.install-required-packages.sh", "netdata", "--dont-wait", "--non-interactive"])
+run_command(["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+run_command(["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
 
 print ("3. Setting up macros")
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "/bin/echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])
