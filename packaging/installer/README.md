@@ -165,13 +165,25 @@ To install the latest git version of Netdata, please follow these 2 steps:
 
 Try our experimental automatic requirements installer (no need to be root). This will try to find the packages that should be installed on your system to build and run Netdata. It supports most major Linux distributions released after 2010:
 
-- **Alpine** Linux and its derivatives (you have to install `bash` yourself, before using the installer)
-- **Arch** Linux and its derivatives
-- **Gentoo** Linux and its derivatives
-- **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
-- **Redhat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
-- **SuSe** Linux and its derivatives (including **openSuSe**)
-- **SLE12** Must have your system registered with Suse Customer Center or have the DVD. See [#1162](https://github.com/netdata/netdata/issues/1162)
+* **Alpine** Linux and its derivatives
+  * You have to install `bash` yourself, before using the installer.
+
+* **Arch** Linux and its derivatives
+  * You need arch/aur for package Judy.
+
+* **Gentoo** Linux and its derivatives
+
+* **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
+
+* **Redhat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
+  * Please note that for RHEL/CentOS you need
+    [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
+    In addition, RHEL/CentOS version 6 also need
+    [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1.
+
+* **SuSe** Linux and its derivatives (including **openSuSe**)
+
+* **SLE12** Must have your system registered with Suse Customer Center or have the DVD. See [#1162](https://github.com/netdata/netdata/issues/1162)
 
 Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
 
@@ -202,11 +214,9 @@ dnf install zlib-devel libuuid-devel libuv-devel lz4-devel Judy-devel openssl-de
 yum install autoconf automake curl gcc git libmnl-devel libuuid-devel openssl-devel libuv-devel lz4-devel Judy-devel lm_sensors make MySQL-python nc pkgconfig python python-psycopg2 PyYAML zlib-devel
 
 # openSUSE
-zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel openssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils
+zypper install zlib-devel libuuid-devel libuv-devel liblz4-devel judy-devel libopenssl-devel libmnl-devel gcc make git autoconf autoconf-archive autogen automake pkgconfig curl findutils
 
 ```
-
-Please note that for RHEL/CentOS you might need [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
 
 Once Netdata is compiled, to run it the following packages are required (already installed using the above commands):
 
