@@ -960,8 +960,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         goto cleanup;
     }
 
-    fprintf(stderr,"KILLME CHART %s\n",chart);
-
     int scale = (scale_str && *scale_str)?str2i(scale_str):100;
 
     RRDSET *st = rrdset_find(host, chart);
@@ -976,7 +974,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
     RRDCALC *rc = NULL;
     if(alarm) {
-        fprintf(stderr,"KILLME I HAVE ALARM TO %s\n",chart);
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
             buffer_no_cacheable(w->response.data);
@@ -985,7 +982,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
             goto cleanup;
         }
     }
-    fprintf(stderr,"KILLME I HAVE A RRDCALC TO %s\n",chart);
 
     long long multiply  = (multiply_str  && *multiply_str )?str2l(multiply_str):1;
     long long divide    = (divide_str    && *divide_str   )?str2l(divide_str):1;
@@ -1057,7 +1053,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     );
 
     if(rc) {
-        fprintf(stderr,"KILLME I AM ADJUSTING VALUE WITH FOR RC %s\n",chart);
         if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);
             w->response.data->expires = now_realtime_sec() + refresh;
@@ -1105,7 +1100,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = 200;
     }
     else {
-        fprintf(stderr,"KILLME I DO NOT HAVE RC SO I AM WORKING WITH CACHE FOR %s\n",chart);
         time_t latest_timestamp = 0;
         int value_is_null = 1;
         calculated_number n = NAN;
@@ -1118,7 +1112,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
 
         // if the value cannot be calculated, show empty badge
         if (ret != 200) {
-            fprintf(stderr,"KILLME VALUE TOO OLD FOR %s\n",chart);
             buffer_no_cacheable(w->response.data);
             value_is_null = 1;
             n = 0;
