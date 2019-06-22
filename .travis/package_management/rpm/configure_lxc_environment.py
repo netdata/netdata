@@ -113,16 +113,24 @@ else:
     download_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
 
 print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (download_url, dest_archive))
+
+new_tar_dir="%s/netdata-%s" % (os.path.dirname(dest_archive), rpm_friendly_version)
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, download_url])
+
+print ("5.1 Rename tarball directory structure to an appropriate version formatting")
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", new_tar_dir])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*/*" % os.path.dirname(dest_archive), new_tar_dir])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "Cjvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
 
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
 
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec.in"])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", new_tar_dir, "netdata-*/netdata.spec.in"])
 
 print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
 replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
-replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, download_url)
+replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, new_tar_dir)
 
 print ('Done!')
