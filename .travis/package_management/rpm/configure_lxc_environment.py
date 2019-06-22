@@ -100,5 +100,8 @@ spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec.in"])
 
 print ("7. Temporary hack: Adjust version string on the spec file")
+original_source_path="https:\/\/github.com\/netdata\/%{name}\/releases\/download\/%{version}\/%{name}-%{version}.tar.gz"
+
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "sed", "--in-place", "-e", "s/@PACKAGE_VERSION@/%s/g" % rpm_friendly_version, spec_file])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "sed", "--in-place", "-e", "s/%s/%s/g" % (original_source_path, dest_archive), spec_file])
 print ('Done!')
