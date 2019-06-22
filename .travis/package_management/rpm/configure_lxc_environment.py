@@ -14,6 +14,7 @@
 import os
 import sys
 import lxc
+import tarfile
 
 def replace_tag(tag_name, spec, new_tag_content):
     print ("Fixing tag %s in %s" % (tag_name, spec))
@@ -119,9 +120,21 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--ou
 
 print ("5.1 Rename tarball directory structure to an appropriate version formatting")
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", new_tar_dir])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive, "-C", os.path.dirname(dest_archive)])
+
+print ("extracting %s to %s " % (os.environ['LXC_CONTAINER_ROOT'] + dest_archive, os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive)))
+tar_object = tarfile.open(os.environ['LXC_CONTAINER_ROOT'] + dest_archive, 'r')
+tar_object.extractall(os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))
+tar_object.close()
+
+for root, dirs, files in os.walk(os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive)):
+    for adir in dirs:
+        os.chmod(os.path.join(root, adir), 0664)
+    for afile in files:
+        os.chmod(os.path.join(root, afile), 0664)
+print ('Fixed ownership to %s ' % os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))
+
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*/*" % os.path.dirname(dest_archive), new_tar_dir])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "Cjvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "cjvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
 
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
