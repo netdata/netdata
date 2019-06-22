@@ -22,10 +22,11 @@ def replace_tag(tag_name, spec, new_tag_content):
     config = ifp.readlines()
     config_str = ''.join(config)
     ifp.close()
+
     source_line = ""
     for line in config:
         if str(line).count(tag_name) > 0:
-            source_line = line
+            source_line = line.replace('\n','')
             print ("Found line: %s" % source_line)
             break
 
@@ -121,8 +122,8 @@ print ("6. Extract spec file from the source")
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec.in"])
 
-print ("7. Temporary hack: Adjust version string on the spec file to %s and Source to %s" % (rpm_friendly_version, download_url))
+print ("7. Temporary hack: Adjust version string on the spec file to %s and Source0 to %s" % (rpm_friendly_version, download_url))
 replace_tag("Version", spec_file, rpm_friendly_version)
-replace_tag("Source", spec_file, download_url)
+replace_tag("Source0", spec_file, download_url)
 
 print ('Done!')
