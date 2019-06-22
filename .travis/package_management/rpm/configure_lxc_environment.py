@@ -131,7 +131,8 @@ for root, dirs, files in os.walk(os.environ['LXC_CONTAINER_ROOT'] + os.path.dirn
         os.chmod(os.path.join(root, adir), 0o664)
     for afile in files:
         os.chmod(os.path.join(root, afile), 0o664)
-print ('Fixed ownership to %s ' % os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))
+print ('Fixed ownership to %s ' % (os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive)))
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild"])
 
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*/*" % os.path.dirname(dest_archive), new_tar_dir])
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "cjvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
