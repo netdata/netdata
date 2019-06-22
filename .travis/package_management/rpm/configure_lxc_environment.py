@@ -93,7 +93,12 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--ou
 
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
-spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec"])
+version_list=str(os.environ['BUILD_VERSION']).split('-')
+rpm_friendly_version=version_list[0] + '.' + version_list[1]
 
+spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec.in"])
+
+print ("7. Temporary hack: Adjust version string on the spec file")
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "sed", "--in-place", "-e", "'s/@PACKAGE_VERSION@/%s/g'" % rpm_friendly_version, spec_file])
 print ('Done!')
