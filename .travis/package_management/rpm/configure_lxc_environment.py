@@ -15,23 +15,24 @@ import os
 import sys
 import lxc
 
-def fix_source_path(spec, source_path):
-    print ("Fixing source path definition in %s" % spec)
+def replace_tag(tag_name, spec, new_tag_content):
+    print ("Fixing tag %s in %s" % (tag_name, spec))
+
     ifp = open(os.environ['LXC_CONTAINER_ROOT'] + spec, "r")
     config = ifp.readlines()
     config_str = ''.join(config)
     ifp.close()
     source_line = ""
     for line in config:
-        if str(line).count('Source') > 0:
+        if str(line).count(tag_name) > 0:
             source_line = line
-            print ("Found source line: %s" % source_line)
+            print ("Found line: %s" % source_line)
             break
 
     if len(source_line) > 0:
-        print ("Replacing line %s with %s in spec file" %(source_line, source_path))
+        print ("Replacing line %s with %s in spec file" %(source_line, new_tag_content))
 
-        config_str.replace(source_line, "Source0:\t%s" % source_path)
+        config_str.replace(source_line, "%s:\t%s" % (tag_name, new_tag_content))
         ofp = open(os.environ['LXC_CONTAINER_ROOT'] + spec, 'w')
         ofp.write(config_str)
         ofp.close()
@@ -97,12 +98,14 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", "-p", "/home/" +
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", "/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild"])
 
 # Download the source
+version_list=str(os.environ['BUILD_VERSION']).split('.')
+rpm_friendly_version='.'.join(version_list[0:3]) + version_list[3]
 dest_archive=""
 download_url=""
 # TODO: Checksum validations
 if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
-    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-latest.tar.gz" % (os.environ['BUILDER_NAME'])
+    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
     download_url="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
 else:
     print ("Building latest stable version of netdata.. (%s)" % os.environ['BUILD_VERSION'])
@@ -114,14 +117,12 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--ou
 
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
-version_list=str(os.environ['BUILD_VERSION']).split('.')
-rpm_friendly_version='.'.join(version_list[0:3])
 
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec.in"])
 
-print ("7. Temporary hack: Adjust version string on the spec file")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "sed", "--in-place", "-e", "s/@PACKAGE_VERSION@/%s/g" % rpm_friendly_version, spec_file])
-fix_source_path(spec_file, download_url)
+print ("7. Temporary hack: Adjust version string on the spec file to %s and Source to %s" % (rpm_friendly_version, download_url))
+replace_tag("Version", spec_file, rpm_friendly_version)
+replace_tag("Source", spec_file, download_url)
 
 print ('Done!')
