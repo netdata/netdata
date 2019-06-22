@@ -119,7 +119,7 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--ou
 
 print ("5.1 Rename tarball directory structure to an appropriate version formatting")
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", new_tar_dir])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive, "-C", os.path.dirname(dest_archive)])
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*/*" % os.path.dirname(dest_archive), new_tar_dir])
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "Cjvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
 
