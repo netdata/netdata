@@ -128,9 +128,9 @@ tar_object.close()
 
 for root, dirs, files in os.walk(os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive)):
     for adir in dirs:
-        os.chmod(os.path.join(root, adir), 0664)
+        os.chmod(os.path.join(root, adir), 0o664)
     for afile in files:
-        os.chmod(os.path.join(root, afile), 0664)
+        os.chmod(os.path.join(root, afile), 0o664)
 print ('Fixed ownership to %s ' % os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))
 
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*/*" % os.path.dirname(dest_archive), new_tar_dir])
