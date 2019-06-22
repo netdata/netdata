@@ -18,7 +18,7 @@ import lxc
 def replace_tag(tag_name, spec, new_tag_content):
     print ("Fixing tag %s in %s" % (tag_name, spec))
 
-    ifp = open(os.environ['LXC_CONTAINER_ROOT'] + spec, "r")
+    ifp = open(spec, "r")
     config = ifp.readlines()
     config_str = ''.join(config)
     ifp.close()
@@ -34,7 +34,7 @@ def replace_tag(tag_name, spec, new_tag_content):
         print ("Replacing line %s with %s in spec file" %(source_line, new_tag_content))
 
         config_str.replace(source_line, "%s:\t%s" % (tag_name, new_tag_content))
-        ofp = open(os.environ['LXC_CONTAINER_ROOT'] + spec, 'w')
+        ofp = open(spec, 'w')
         ofp.write(config_str)
         ofp.close()
 
@@ -122,8 +122,8 @@ print ("6. Extract spec file from the source")
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec.in"])
 
-print ("7. Temporary hack: Adjust version string on the spec file to %s and Source0 to %s" % (rpm_friendly_version, download_url))
-replace_tag("Version", spec_file, rpm_friendly_version)
-replace_tag("Source0", spec_file, download_url)
+print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
+replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
+replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, download_url)
 
 print ('Done!')
