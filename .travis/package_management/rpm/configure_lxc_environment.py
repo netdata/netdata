@@ -20,20 +20,19 @@ def replace_tag(tag_name, spec, new_tag_content):
 
     ifp = open(spec, "r")
     config = ifp.readlines()
-    config_str = ''.join(config)
     ifp.close()
 
-    source_line = ""
+    source_line = -1
     for line in config:
-        if str(line).count(tag_name) > 0:
-            source_line = line.replace('\n','')
-            print ("Found line: %s" % source_line)
+        if str(line).count(tag_name + ":") > 0:
+            source_line = config.index(line)
+            print ("Found line: %s in item %d" % (line, source_line))
             break
 
-    if len(source_line) > 0:
-        print ("Replacing line %s with %s in spec file" %(source_line, new_tag_content))
-
-        config_str.replace(source_line, "%s:\t%s" % (tag_name, new_tag_content))
+    if source_line >= 0:
+        print ("Replacing line %s with %s in spec file" %(config[source_line], new_tag_content))
+        config[source_line] = "%s: %s\n" % (tag_name, new_tag_content)
+        config_str = ''.join(config)
         ofp = open(spec, 'w')
         ofp.write(config_str)
         ofp.close()
@@ -106,7 +105,7 @@ download_url=""
 # TODO: Checksum validations
 if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
-    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
+    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-latest.tar.gz" % (os.environ['BUILDER_NAME'])
     download_url="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
 else:
     print ("Building latest stable version of netdata.. (%s)" % os.environ['BUILD_VERSION'])
