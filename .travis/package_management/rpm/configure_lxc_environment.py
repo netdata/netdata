@@ -15,6 +15,27 @@ import os
 import sys
 import lxc
 
+def fix_source_path(spec, source_path):
+    print ("Fixing source path definition in %s" % spec)
+    ifp = open(os.environ['LXC_CONTAINER_ROOT'] + spec, "r")
+    config = ifp.readlines()
+    config_str = ''.join(config)
+    ifp.close()
+    source_line = ""
+    for line in config:
+        if str(line).count('Source') > 0:
+            source_line = line
+            print ("Found source line: %s" % source_line)
+            break
+
+    if len(source_line) > 0:
+        print ("Replacing line %s with %s in spec file" %(source_line, source_path))
+
+        config_str.replace(source_line, "Source0:\t%s" % source_path)
+        ofp = open(os.environ['LXC_CONTAINER_ROOT'] + spec, 'w')
+        ofp.write(config_str)
+        ofp.close()
+
 def run_command(command):
     print ("Running command: %s" % command)
     command_result = container.attach_wait(lxc.attach_run_command, command)
@@ -100,8 +121,7 @@ spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-*/netdata.spec.in"])
 
 print ("7. Temporary hack: Adjust version string on the spec file")
-original_source_path="https:\/\/github.com\/netdata\/%{name}\/releases\/download\/%{version}\/%{name}-%{version}.tar.gz"
-
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "sed", "--in-place", "-e", "s/@PACKAGE_VERSION@/%s/g" % rpm_friendly_version, spec_file])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "sed", "--in-place", "-e", "s/%s/%s/g" % (original_source_path, dest_archive), spec_file])
+fix_source_path(spec_file, download_url)
+
 print ('Done!')
