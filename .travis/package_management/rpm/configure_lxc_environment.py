@@ -14,6 +14,7 @@
 import os
 import sys
 import lxc
+import subprocess
 import tarfile
 
 def replace_tag(tag_name, spec, new_tag_content):
@@ -126,7 +127,13 @@ tar_object = tarfile.open(os.environ['LXC_CONTAINER_ROOT'] + dest_archive, 'r')
 tar_object.extractall(os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))
 tar_object.close()
 
-run_command(["sudo", "chown", "-R", "builder:builder", "%s/netdata-*" % (os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))])
+cmd = ['sudo', 'chmod', '-R', '777', '%s' % (os.environ['LXC_CONTAINER_ROOT'] + dest_archive)]
+proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+o, e = proc.communicate()
+print('Output: ' + o.decode('ascii'))
+print('Error: '  + e.decode('ascii'))
+print('code: ' + str(proc.returncode))
+
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", ("/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild")])
 
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*/*" % os.path.dirname(dest_archive), new_tar_dir])
