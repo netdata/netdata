@@ -252,16 +252,19 @@ static void backends_main_cleanup(void *ptr) {
  * Set the variables necessaries to work with this specific backend.
  *
  * @param default_port  the default port of the backend
- * @param backend_response_checker function called to check the result.
- * @param backend_request_formatter function called to format the msessage to the backend
+ * @param brc function called to check the result.
+ * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
 void backend_set_kinesis_variables(int *default_port
-        ,int (**backend_response_checker)(BUFFER *)
-        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
-        ,const char *type) {
+        ,backend_response_checker_t brc
+        ,backend_request_formatter_t brf
+        ) {
     (void)default_port;
-    (void)type;
+#ifndef HAVE_KINESIS
+    (void)brc;
+    (void)brf;
+#endif
 
 #if HAVE_KINESIS
     *backend_response_checker = process_json_response;
@@ -278,20 +281,22 @@ void backend_set_kinesis_variables(int *default_port
  * Set the variables necessaries to work with this specific backend.
  *
  * @param default_port  the default port of the backend
- * @param backend_response_checker function called to check the result.
- * @param backend_request_formatter function called to format the msessage to the backend
+ * @param brc function called to check the result.
+ * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
 void backend_set_prometheus_variables(int *default_port
-        ,int (**backend_response_checker)(BUFFER *)
-        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
-        ,const char *type) {
+        ,backend_response_checker_t brc
+        ,backend_request_formatter_t brf
+        ) {
     (void)default_port;
-    (void)type;
-    (void)backend_request_formatter;
+    (void)brf;
+#ifndef ENABLE_PROMETHEUS_REMOTE_WRITE
+    (void)brc;
+#endif
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-    *backend_response_checker = process_prometheus_remote_write_response;
+    *brc = process_prometheus_remote_write_response;
 #endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 }
 
@@ -301,22 +306,21 @@ void backend_set_prometheus_variables(int *default_port
  * Set the variables necessaries to work with this specific backend.
  *
  * @param default_port  the default port of the backend
- * @param backend_response_checker function called to check the result.
- * @param backend_request_formatter function called to format the msessage to the backend
+ * @param brc function called to check the result.
+ * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
 void backend_set_json_variables(int *default_port
-        ,int (**backend_response_checker)(BUFFER *)
-        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
-        ,const char *type) {
-    (void)type;
+        ,backend_response_checker_t brc
+        ,backend_request_formatter_t brf
+        ) {
     *default_port = 5448;
-    *backend_response_checker = process_json_response;
+    *brc = process_json_response;
 
     if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *backend_request_formatter = format_dimension_collected_json_plaintext;
+        *brf = format_dimension_collected_json_plaintext;
     else
-        *backend_request_formatter = format_dimension_stored_json_plaintext;
+        *brf = format_dimension_stored_json_plaintext;
 }
 
 /**
@@ -325,27 +329,21 @@ void backend_set_json_variables(int *default_port
  * Set the variables necessaries to work with this specific backend.
  *
  * @param default_port  the default port of the backend
- * @param backend_response_checker function called to check the result.
- * @param backend_request_formatter function called to format the msessage to the backend
+ * @param brc function called to check the result.
+ * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
 void backend_set_opentsdb_http_variables(int *default_port
-        ,int (**backend_response_checker)(BUFFER *)
-        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
-        ,const char *type) {
+        ,backend_response_checker_t brc
+        ,backend_request_formatter_t brf
+        ) {
     *default_port = 4242;
-    *backend_response_checker = process_opentsdb_response;
-
-#ifdef ENABLE_HTTPS
-    if ( *(type+13) == 's') {
-        security_start_ssl(2);
-    }
-#endif
+    *brc = process_opentsdb_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *backend_request_formatter = format_dimension_collected_opentsdb_http;
+        *brf = format_dimension_collected_opentsdb_http;
     else
-        *backend_request_formatter = format_dimension_stored_opentsdb_http;
+        *brf = format_dimension_stored_opentsdb_http;
 
 }
 
@@ -355,22 +353,21 @@ void backend_set_opentsdb_http_variables(int *default_port
  * Set the variables necessaries to work with this specific backend.
  *
  * @param default_port  the default port of the backend
- * @param backend_response_checker function called to check the result.
- * @param backend_request_formatter function called to format the msessage to the backend
+ * @param brc function called to check the result.
+ * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
 void backend_set_opentsdb_telnet_variables(int *default_port
-        ,int (**backend_response_checker)(BUFFER *)
-        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
-        ,const char *type) {
-    (void)type;
+        ,backend_response_checker_t brc
+        ,backend_request_formatter_t brf
+        ) {
     *default_port = 4242;
-    *backend_response_checker = process_opentsdb_response;
+    *brc = process_opentsdb_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *backend_request_formatter = format_dimension_collected_opentsdb_telnet;
+        *brf = format_dimension_collected_opentsdb_telnet;
     else
-        *backend_request_formatter = format_dimension_stored_opentsdb_telnet;
+        *brf = format_dimension_stored_opentsdb_telnet;
 }
 
 /**
@@ -379,22 +376,21 @@ void backend_set_opentsdb_telnet_variables(int *default_port
  * Set the variables necessaries to work with this specific backend.
  *
  * @param default_port  the default port of the backend
- * @param backend_response_checker function called to check the result.
- * @param backend_request_formatter function called to format the msessage to the backend
+ * @param brc function called to check the result.
+ * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
 void backend_set_graphite_variables(int *default_port
-        ,int (**backend_response_checker)(BUFFER *)
-        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
-        ,const char *type) {
-    (void)type;
+        ,backend_response_checker_t brc
+        ,backend_request_formatter_t brf
+        ) {
     *default_port = 2003;
-    *backend_response_checker = process_graphite_response;
+    *brc = process_graphite_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *backend_request_formatter = format_dimension_collected_graphite_plaintext;
+        *brf = format_dimension_collected_graphite_plaintext;
     else
-        *backend_request_formatter = format_dimension_stored_graphite_plaintext;
+        *brf = format_dimension_stored_graphite_plaintext;
 }
 
 /**
@@ -515,7 +511,7 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
-    void (*backend_fp[]) (int *,int (**brc)(BUFFER *),int (**bqf)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS),const char *) = {
+    void (*backend_fp[]) (int *,int (**brc)(BUFFER *),int (**bqf)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)) = {
             backend_set_graphite_variables
             ,backend_set_opentsdb_telnet_variables
             ,backend_set_opentsdb_http_variables
@@ -523,9 +519,16 @@ void *backends_main(void *ptr) {
             ,backend_set_prometheus_variables
             ,backend_set_kinesis_variables
     };
-    backend_fp[work_type](&default_port,&backend_response_checker,&backend_request_formatter,type);
+    backend_fp[work_type](&default_port,&backend_response_checker,&backend_request_formatter);
 
-    if (work_type == BACKEND_TYPE_PROMETEUS) {
+    if (work_type == BACKEND_TYPE_OPENTSDB_HTTP) {
+#ifdef ENABLE_HTTPS
+        if (*(type + 13) == 's') {
+            security_start_ssl(2);
+        }
+#endif
+    }
+    else if (work_type == BACKEND_TYPE_PROMETEUS) {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     do_prometheus_remote_write = 1;
 
