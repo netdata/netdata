@@ -134,10 +134,14 @@ print('Output: ' + o.decode('ascii'))
 print('Error: '  + e.decode('ascii'))
 print('code: ' + str(proc.returncode))
 
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", ("/home/" + os.environ['BUILDER_NAME'] + "/rpmbuild")])
+cmd = ['sudo', 'mv', "%s/netdata-*/*" % (os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive)), (os.environ['LXC_CONTAINER_ROOT'] + new_tar_dir)]
+proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+o, e = proc.communicate()
+print('Output: ' + o.decode('ascii'))
+print('Error: '  + e.decode('ascii'))
+print('code: ' + str(proc.returncode))
 
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*/*" % os.path.dirname(dest_archive), new_tar_dir])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "cjvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
+run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "cvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
 
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
