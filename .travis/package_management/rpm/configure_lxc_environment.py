@@ -134,7 +134,7 @@ print('Output: ' + o.decode('ascii'))
 print('Error: '  + e.decode('ascii'))
 print('code: ' + str(proc.returncode))
 
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mv", "%s/netdata-*.*.*-*-*/*" % os.path.dirname(dest_archive), new_tar_dir])
+run_command(["sudo", "mv", "%s/netdata-*.*.*-*-*/*" % os.path.dirname(dest_archive), new_tar_dir])
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "cvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
 
 # Extract the spec file in place
