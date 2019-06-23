@@ -247,102 +247,187 @@ static void backends_main_cleanup(void *ptr) {
 }
 
 /**
- * Set type
+ * Set Kinesis variables
  *
- * Set the variables necessaries to work with a specific backend.
+ * Set the variables necessaries to work with this specific backend.
  *
  * @param default_port  the default port of the backend
  * @param backend_response_checker function called to check the result.
  * @param backend_request_formatter function called to format the msessage to the backend
  * @param type the backend string selector.
- *
- * @return It returns 0 case there is not necessity to set additional variables, 1 case it is necessary to adjust prometheus
- *          2 case it is necessary to adjust kinesis and -1 on error
  */
-int backend_set_type(int *default_port
-                     ,int (**backend_response_checker)(BUFFER *)
-                     ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
-                     ,const char *type) {
-    int ret;
-    if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
+void backend_set_kinesis_variables(int *default_port
+        ,int (**backend_response_checker)(BUFFER *)
+        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
+        ,const char *type) {
+    (void)default_port;
+    (void)type;
 
-        *default_port = 2003;
-        *backend_response_checker = process_graphite_response;
+#if HAVE_KINESIS
+    *backend_response_checker = process_json_response;
+    if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        *backend_request_formatter = format_dimension_collected_json_plaintext;
+    else
+        *backend_request_formatter = format_dimension_stored_json_plaintext;
+#endif
+}
 
-        if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-            *backend_request_formatter = format_dimension_collected_graphite_plaintext;
-        else
-            *backend_request_formatter = format_dimension_stored_graphite_plaintext;
+/**
+ * Set Prometheus variables
+ *
+ * Set the variables necessaries to work with this specific backend.
+ *
+ * @param default_port  the default port of the backend
+ * @param backend_response_checker function called to check the result.
+ * @param backend_request_formatter function called to format the msessage to the backend
+ * @param type the backend string selector.
+ */
+void backend_set_prometheus_variables(int *default_port
+        ,int (**backend_response_checker)(BUFFER *)
+        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
+        ,const char *type) {
+    (void)default_port;
+    (void)type;
+    (void)backend_request_formatter;
 
-        ret = 0;
-    }
-    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    *backend_response_checker = process_prometheus_remote_write_response;
+#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
+}
 
-        *default_port = 4242;
-        *backend_response_checker = process_opentsdb_response;
+/**
+ * Set JSON variables
+ *
+ * Set the variables necessaries to work with this specific backend.
+ *
+ * @param default_port  the default port of the backend
+ * @param backend_response_checker function called to check the result.
+ * @param backend_request_formatter function called to format the msessage to the backend
+ * @param type the backend string selector.
+ */
+void backend_set_json_variables(int *default_port
+        ,int (**backend_response_checker)(BUFFER *)
+        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
+        ,const char *type) {
+    (void)type;
+    *default_port = 5448;
+    *backend_response_checker = process_json_response;
 
-        if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-            *backend_request_formatter = format_dimension_collected_opentsdb_telnet;
-        else
-            *backend_request_formatter = format_dimension_stored_opentsdb_telnet;
+    if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        *backend_request_formatter = format_dimension_collected_json_plaintext;
+    else
+        *backend_request_formatter = format_dimension_stored_json_plaintext;
+}
 
-        ret = 0;
-    }
-    else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
-
-        *default_port = 4242;
-        *backend_response_checker = process_opentsdb_response;
+/**
+ * Set OpenTSDB HTTP variables
+ *
+ * Set the variables necessaries to work with this specific backend.
+ *
+ * @param default_port  the default port of the backend
+ * @param backend_response_checker function called to check the result.
+ * @param backend_request_formatter function called to format the msessage to the backend
+ * @param type the backend string selector.
+ */
+void backend_set_opentsdb_http_variables(int *default_port
+        ,int (**backend_response_checker)(BUFFER *)
+        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
+        ,const char *type) {
+    *default_port = 4242;
+    *backend_response_checker = process_opentsdb_response;
 
 #ifdef ENABLE_HTTPS
-        if ( *(type+13) == 's') {
-            security_start_ssl(2);
-        }
+    if ( *(type+13) == 's') {
+        security_start_ssl(2);
+    }
 #endif
 
-        if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-            *backend_request_formatter = format_dimension_collected_opentsdb_http;
-        else
-            *backend_request_formatter = format_dimension_stored_opentsdb_http;
+    if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        *backend_request_formatter = format_dimension_collected_opentsdb_http;
+    else
+        *backend_request_formatter = format_dimension_stored_opentsdb_http;
 
-        ret = 0;
+}
+
+/**
+ * Set OpenTSDB Telnet variables
+ *
+ * Set the variables necessaries to work with this specific backend.
+ *
+ * @param default_port  the default port of the backend
+ * @param backend_response_checker function called to check the result.
+ * @param backend_request_formatter function called to format the msessage to the backend
+ * @param type the backend string selector.
+ */
+void backend_set_opentsdb_telnet_variables(int *default_port
+        ,int (**backend_response_checker)(BUFFER *)
+        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
+        ,const char *type) {
+    (void)type;
+    *default_port = 4242;
+    *backend_response_checker = process_opentsdb_response;
+
+    if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        *backend_request_formatter = format_dimension_collected_opentsdb_telnet;
+    else
+        *backend_request_formatter = format_dimension_stored_opentsdb_telnet;
+}
+
+/**
+ * Set Graphite variables
+ *
+ * Set the variables necessaries to work with this specific backend.
+ *
+ * @param default_port  the default port of the backend
+ * @param backend_response_checker function called to check the result.
+ * @param backend_request_formatter function called to format the msessage to the backend
+ * @param type the backend string selector.
+ */
+void backend_set_graphite_variables(int *default_port
+        ,int (**backend_response_checker)(BUFFER *)
+        ,int (**backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)
+        ,const char *type) {
+    (void)type;
+    *default_port = 2003;
+    *backend_response_checker = process_graphite_response;
+
+    if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        *backend_request_formatter = format_dimension_collected_graphite_plaintext;
+    else
+        *backend_request_formatter = format_dimension_stored_graphite_plaintext;
+}
+
+/**
+ * Select Type
+ *
+ * Select the backedn type based in the user input
+ *
+ * @param type is the string that defines the backend type
+ *
+ * @return It returns the backend id.
+ */
+BACKEND_TYPE backends_select_type(const char *type) {
+    if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
+        return BACKEND_TYPE_GRAPHITE;
+    }
+    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+        return BACKEND_TYPE_OPENTSDB_TELNET;
+    }
+    else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+        return BACKEND_TYPE_OPENTSDB_HTTP;
     }
     else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
-
-        *default_port = 5448;
-        *backend_response_checker = process_json_response;
-
-        if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-            *backend_request_formatter = format_dimension_collected_json_plaintext;
-        else
-            *backend_request_formatter = format_dimension_stored_json_plaintext;
-
-        ret = 0;
+        return BACKEND_TYPE_JSON;
     }
     else if (!strcmp(type, "prometheus_remote_write")) {
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-        *backend_response_checker = process_prometheus_remote_write_response;
-#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
-
-        ret = 1;
+        return  BACKEND_TYPE_PROMETEUS;
     }
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
-#if HAVE_KINESIS
-        *backend_response_checker = process_json_response;
-        if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-            *backend_request_formatter = format_dimension_collected_json_plaintext;
-        else
-            *backend_request_formatter = format_dimension_stored_json_plaintext;
-#endif /* HAVE_KINESIS */
-
-        ret = 2;
-    }
-    else {
-        error("BACKEND: Unknown backend type '%s'", type);
-
-        ret = -1;
+        return BACKEND_TYPE_KINESIS;
     }
 
-    return ret;
+    error("BACKEND: Unknown backend type '%s'", type);
+    return BACKEND_TYPE_UNKNOWN;
 }
 
 /**
@@ -425,32 +510,43 @@ void *backends_main(void *ptr) {
 
     // ------------------------------------------------------------------------
     // select the backend type
-    int adjust_type = backend_set_type(&default_port,&backend_response_checker,&backend_request_formatter,type);
-    if (adjust_type < 0) {
+    BACKEND_TYPE work_type = backends_select_type(type);
+    if (work_type == BACKEND_TYPE_UNKNOWN) {
         goto cleanup;
-    } else if (adjust_type) {
-        if (adjust_type == 1) {
+    }
+
+    void (*backend_fp[]) (int *,int (**brc)(BUFFER *),int (**bqf)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS),const char *) = {
+            backend_set_graphite_variables
+            ,backend_set_opentsdb_telnet_variables
+            ,backend_set_opentsdb_http_variables
+            ,backend_set_json_variables
+            ,backend_set_prometheus_variables
+            ,backend_set_kinesis_variables
+    };
+    backend_fp[work_type](&default_port,&backend_response_checker,&backend_request_formatter,type);
+
+    if (work_type == BACKEND_TYPE_PROMETEUS) {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-        do_prometheus_remote_write = 1;
+    do_prometheus_remote_write = 1;
 
-        init_write_request();
+    init_write_request();
 #else
-        error("Prometheus remote write support isn't compiled");
+    error("Prometheus remote write support isn't compiled");
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
-        } else {
+    } else if (work_type == BACKEND_TYPE_KINESIS) {
 #if HAVE_KINESIS
-        do_kinesis = 1;
+    do_kinesis = 1;
 
-        if(unlikely(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name))) {
-            error("BACKEND: kinesis backend type is set but cannot read its configuration from %s/aws_kinesis.conf", netdata_configured_user_config_dir);
-            goto cleanup;
-        }
+    if(unlikely(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name))) {
+        error("BACKEND: kinesis backend type is set but cannot read its configuration from %s/aws_kinesis.conf", netdata_configured_user_config_dir);
+        goto cleanup;
 
-        kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
+    }
+
+    kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
 #else
-        error("AWS Kinesis support isn't compiled");
+    error("AWS Kinesis support isn't compiled");
 #endif // HAVE_KINESIS
-        }
     }
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
@@ -463,25 +559,25 @@ void *backends_main(void *ptr) {
     }
 
 
-    // ------------------------------------------------------------------------
-    // prepare the charts for monitoring the backend operation
+// ------------------------------------------------------------------------
+// prepare the charts for monitoring the backend operation
 
     struct rusage thread;
 
     collected_number
-            chart_buffered_metrics = 0,
-            chart_lost_metrics = 0,
-            chart_sent_metrics = 0,
-            chart_buffered_bytes = 0,
-            chart_received_bytes = 0,
-            chart_sent_bytes = 0,
-            chart_receptions = 0,
-            chart_transmission_successes = 0,
-            chart_transmission_failures = 0,
-            chart_data_lost_events = 0,
-            chart_lost_bytes = 0,
-            chart_backend_reconnects = 0;
-            // chart_backend_latency = 0;
+        chart_buffered_metrics = 0,
+        chart_lost_metrics = 0,
+        chart_sent_metrics = 0,
+        chart_buffered_bytes = 0,
+        chart_received_bytes = 0,
+        chart_sent_bytes = 0,
+        chart_receptions = 0,
+        chart_transmission_successes = 0,
+        chart_transmission_failures = 0,
+        chart_data_lost_events = 0,
+        chart_lost_bytes = 0,
+        chart_backend_reconnects = 0;
+        // chart_backend_latency = 0;
 
     RRDSET *chart_metrics = rrdset_create_localhost("netdata", "backend_metrics", NULL, "backend", NULL, "Netdata Buffered Metrics", "metrics", "backends", NULL, 130600, global_backend_update_every, RRDSET_TYPE_LINE);
     rrddim_add(chart_metrics, "buffered", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -502,12 +598,12 @@ void *backends_main(void *ptr) {
     rrddim_add(chart_ops, "read",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
     /*
-     * this is misleading - we can only measure the time we need to send data
-     * this time is not related to the time required for the data to travel to
-     * the backend database and the time that server needed to process them
-     *
-     * issue #1432 and https://www.softlab.ntua.gr/facilities/documentation/unix/unix-socket-faq/unix-socket-faq-2.html
-     *
+    * this is misleading - we can only measure the time we need to send data
+    * this time is not related to the time required for the data to travel to
+    * the backend database and the time that server needed to process them
+    *
+    * issue #1432 and https://www.softlab.ntua.gr/facilities/documentation/unix/unix-socket-faq/unix-socket-faq-2.html
+    *
     RRDSET *chart_latency = rrdset_create_localhost("netdata", "backend_latency", NULL, "backend", NULL, "Netdata Backend Latency", "ms", "backends", NULL, 130620, global_backend_update_every, RRDSET_TYPE_AREA);
     rrddim_add(chart_latency, "latency",   NULL,  1, 1000, RRD_ALGORITHM_ABSOLUTE);
     */
