@@ -426,6 +426,18 @@ BACKEND_TYPE backends_select_type(const char *type) {
     return BACKEND_TYPE_UNKNOWN;
 }
 
+static struct backend_command {
+    backend_fp fp;
+    BACKEND_TYPE type;
+} backend_commands[]  = {
+        backend_set_graphite_variables, 0
+        ,backend_set_opentsdb_telnet_variables, 1
+        ,backend_set_opentsdb_http_variables, 2
+        ,backend_set_json_variables, 3
+        ,backend_set_prometheus_variables, 4
+        ,backend_set_kinesis_variables, 5
+};
+
 /**
  * Backend main
  *
@@ -511,45 +523,46 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
-    void (*backend_fp[]) (int *,int (**brc)(BUFFER *),int (**bqf)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS)) = {
-            backend_set_graphite_variables
-            ,backend_set_opentsdb_telnet_variables
-            ,backend_set_opentsdb_http_variables
-            ,backend_set_json_variables
-            ,backend_set_prometheus_variables
-            ,backend_set_kinesis_variables
-    };
-    backend_fp[work_type](&default_port,&backend_response_checker,&backend_request_formatter);
-
-    if (work_type == BACKEND_TYPE_OPENTSDB_HTTP) {
-#ifdef ENABLE_HTTPS
-        if (*(type + 13) == 's') {
-            security_start_ssl(2);
-        }
-#endif
-    }
-    else if (work_type == BACKEND_TYPE_PROMETEUS) {
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-    do_prometheus_remote_write = 1;
-
-    init_write_request();
-#else
-    error("Prometheus remote write support isn't compiled");
-#endif // ENABLE_PROMETHEUS_REMOTE_WRITE
-    } else if (work_type == BACKEND_TYPE_KINESIS) {
-#if HAVE_KINESIS
-    do_kinesis = 1;
-
-    if(unlikely(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name))) {
-        error("BACKEND: kinesis backend type is set but cannot read its configuration from %s/aws_kinesis.conf", netdata_configured_user_config_dir);
+    if (work_type == backend_commands[work_type].type) {
+        backend_commands[work_type].fp(&default_port,&backend_response_checker,&backend_request_formatter);
+    } else {
         goto cleanup;
-
     }
 
-    kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
+    switch (work_type) {
+        case BACKEND_TYPE_OPENTSDB_HTTP: {
+#ifdef ENABLE_HTTPS
+            if (*(type + 13) == 's') {
+                security_start_ssl(2);
+            }
+#endif
+            break;
+        }
+        case BACKEND_TYPE_PROMETEUS: {
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+            do_prometheus_remote_write = 1;
+
+            init_write_request();
 #else
-    error("AWS Kinesis support isn't compiled");
+            error("Prometheus remote write support isn't compiled");
+#endif // ENABLE_PROMETHEUS_REMOTE_WRITE
+            break;
+        }
+        case BACKEND_TYPE_KINESIS: {
+#if HAVE_KINESIS
+            do_kinesis = 1;
+
+            if(unlikely(read_kinesis_conf(netdata_configured_user_config_dir, &kinesis_auth_key_id, &kinesis_secure_key, &kinesis_stream_name))) {
+                error("BACKEND: kinesis backend type is set but cannot read its configuration from %s/aws_kinesis.conf", netdata_configured_user_config_dir);
+                goto cleanup;
+            }
+
+            kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
+#else
+            error("AWS Kinesis support isn't compiled");
 #endif // HAVE_KINESIS
+            break;
+        }
     }
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE

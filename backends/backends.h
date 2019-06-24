@@ -25,8 +25,11 @@ typedef enum backend_types {
     BACKEND_TYPE_KINESIS = 5
 } BACKEND_TYPE;
 
+
 typedef int (**backend_response_checker_t)(BUFFER *);
 typedef int (**backend_request_formatter_t)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS);
+
+typedef void (*backend_fp)(int *,backend_response_checker_t ,backend_request_formatter_t);
 
 #define BACKEND_OPTIONS_SOURCE_BITS (BACKEND_SOURCE_DATA_AS_COLLECTED|BACKEND_SOURCE_DATA_AVERAGE|BACKEND_SOURCE_DATA_SUM)
 #define BACKEND_OPTIONS_DATA_SOURCE(backend_options) (backend_options & BACKEND_OPTIONS_SOURCE_BITS)
