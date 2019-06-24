@@ -61,23 +61,6 @@ fi \
 %{nil}
 %endif
 
-%if 0%{?_fedora}
-%global netdata_recommends \
-Recommends:	iproute-tc \
-Recommends:	lm_sensors \
-Recommends:	nmap-ncat \
-Recommends:	nodejs \
-Recommends:	python \
-Recommends:	PyYAML \
-Recommends:	python2-PyMySQL \
-Recommends:	python2-psycopg2 \
-%{nil}
-%else
-%global netdata_recommends \
-Recommends:     sensors \
-%{nil}
-%endif
-
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	@PACKAGE_VERSION@
@@ -122,6 +105,7 @@ BuildRequires: nc
 
 # Runtime dependencies
 #
+Requires:      python
 Requires:      zlib
 Requires:      libuuid
 %if 0%{?suse_version}
@@ -150,8 +134,9 @@ Requires(post): libcap
 # rather than the standard ones
 
 # nfacct plugin dependencies
-BuildRequires:	libmnl-devel
-BuildRequires:	libnetfilter_acct-devel
+BuildRequires:  libmnl-devel
+BuildRequires:  libnetfilter_acct-devel
+
 %if 0%{?suse_version}
 Requires: libmnl0
 %else
@@ -161,11 +146,10 @@ Requires: libnetfilter_acct
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
-BuildRequires:	freeipmi-devel
+BuildRequires:  freeipmi-devel
 Requires: freeipmi
 # end - freeipmi plugin dependencies
 
-%{netdata_recommends}
 # #####################################################################
 # End of dependency management configuration
 # #####################################################################
