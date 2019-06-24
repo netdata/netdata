@@ -268,9 +268,14 @@ rm -rf "${RPM_BUILD_ROOT}"
 %config %{_sysconfdir}/logrotate.d/%{name}
 
 %{_libdir}/%{name}
+
+%defattr(0755,netdata,netdata)
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 %{_sysconfdir}/%{name}/edit-config
+
+%defattr(4750,root,netdata)
+%{_libexecdir}/%{name}/plugins.d
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
@@ -284,23 +289,19 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 # freeipmi files
 %caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
-
-%attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
-%attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
-%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
-
 %dir %{_datadir}/%{name}
+
+%defattr(0755,netdata,netdata,-)
 
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
 %dir %{_sysconfdir}/%{name}/charts.d
 %dir %{_sysconfdir}/%{name}/node.d
 %dir %{_sysconfdir}/%{name}/statsd.d
-
 %dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_libdir}/%{name}/conf.d/charts.d
-#%dir %{_libdir}/%{name}/conf.d/node.d
+%dir %{_libdir}/%{name}/conf.d/node.d
 %dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
@@ -314,8 +315,19 @@ rm -rf "${RPM_BUILD_ROOT}"
 %defattr(0644,root,netdata,0755)
 %{_datadir}/%{name}/web
 
+# Enforce 0660 for files and 0770 for directories
+# for the netdata lib, cache and log dirs
+%defattr(0660,root,netdata,0770)
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
+%attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
+
+
 %changelog
-* Sun Jun 16 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud - 0.0.0-4
+* Sun Jun 24 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-5
+Another pass on cleaning up pre/post installation steps
+- Sync permission and ownership on files and directories
+* Sun Jun 16 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-4
 First draft refactor on package dependencies section
 - Remove freeipmi/nfacct plugin flags. We auto-detect all plugins by decision
 - Start refactor of package dependencies
