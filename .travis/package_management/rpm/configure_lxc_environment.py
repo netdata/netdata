@@ -121,11 +121,15 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
 
     print ("5. Preparing local latest implementation tarball for version %s" % rpm_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
-    run_command_in_host(['autoreconf', '-ivf'])
     run_command_in_host(['git', 'tag', '-a', rpm_friendly_version])
+    run_command_in_host(['autoreconf', '-ivf'])
     run_command_in_host(['./configure', '--with-math', '--with-zlib', '--with-user=netdata'])
     run_command_in_host(['make', 'dist'])
-    run_command_in_host(['cp', 'netdata-%s.tar.gz' % rpm_friendly_version, tar_file])
+    if os.path.exists('netdata-%s.tar.gz' % rpm_friendly_version):
+        run_command_in_host(['cp', 'netdata-%s.tar.gz' % rpm_friendly_version, tar_file])
+    else:
+        print ("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % 'netdata-%s.tar.gz' % rpm_friendly_version)
+        sys.exit(1)
 
     # Extract the spec file in place
     print ("6. Extract spec file from the source")
