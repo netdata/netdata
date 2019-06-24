@@ -112,23 +112,22 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     download_url="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
 else:
     rpm_friendly_version = os.environ['BUILD_VERSION']
+
     print ("Building latest stable version of netdata.. (%s)" % os.environ['BUILD_VERSION'])
     dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
     download_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
 
-print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (download_url, dest_archive))
+    print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (download_url, dest_archive))
+    tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), rpm_friendly_version)
+    run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, download_url])
 
-new_tar_dir="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), rpm_friendly_version)
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, download_url])
+    # Extract the spec file in place
+    print ("6. Extract spec file from the source")
+    spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
+    run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", tar_file, "netdata-*/netdata.spec.in"])
 
-# Extract the spec file in place
-print ("6. Extract spec file from the source")
-
-spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", new_tar_dir, "netdata-*/netdata.spec.in"])
-
-print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
-replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
-replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, new_tar_dir)
+    print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
+    replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
+    replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
 
 print ('Done!')
