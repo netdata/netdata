@@ -15,7 +15,6 @@ import os
 import sys
 import lxc
 import subprocess
-import tarfile
 
 def replace_tag(tag_name, spec, new_tag_content):
     print ("Fixing tag %s in %s" % (tag_name, spec))
@@ -45,6 +44,15 @@ def run_command(command):
 
     if command_result != 0:
         raise Exception("Command failed with exit code %d" % command_result)
+
+def run_command_in_host(cmd):
+    print ("Issue command in host: %s" % str(cmd))
+
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    o, e = proc.communicate()
+    print('Output: ' + o.decode('ascii'))
+    print('Error: '  + e.decode('ascii'))
+    print('code: ' + str(proc.returncode))
 
 if len(sys.argv) != 2:
     print ('You need to provide a container name to get things started')
@@ -108,8 +116,25 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     version_list=str(os.environ['BUILD_VERSION']).split('.')
     rpm_friendly_version='.'.join(version_list[0:3]) + version_list[3]
     print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
-    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-latest.tar.gz" % (os.environ['BUILDER_NAME'])
+    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
     download_url="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+
+    print ("5. Preparing local latest implementation tarball for version %s" % rpm_friendly_version)
+    tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
+    run_command_in_host(['autoreconf', '-ivf'])
+    run_command_in_host(['git', 'tag', '-a', rpm_friendly_version])
+    run_command_in_host(['./configure', '--with-math', '--with-zlib', '--with-user=netdata'])
+    run_command_in_host(['make', 'dist'])
+    run_command_in_host(['cp', 'netdata-%s.tar.gz' % rpm_friendly_version, tar_file])
+
+    # Extract the spec file in place
+    print ("6. Extract spec file from the source")
+    spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
+    run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", tar_file, "netdata-*/netdata.spec.in"])
+
+    print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
+    replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
+    replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
 else:
     rpm_friendly_version = os.environ['BUILD_VERSION']
 
@@ -120,11 +145,6 @@ else:
     print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (download_url, dest_archive))
     tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), rpm_friendly_version)
     run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, download_url])
-
-    # Extract the spec file in place
-    print ("6. Extract spec file from the source")
-    spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-    run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", tar_file, "netdata-*/netdata.spec.in"])
 
     print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
     replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
