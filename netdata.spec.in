@@ -308,7 +308,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 
 %changelog
-* Sun Jun 24 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-5
+* Mon Jun 24 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-5
 Another pass on cleaning up pre/post installation steps
 - Sync permission and ownership on files and directories
 * Sun Jun 16 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-4
