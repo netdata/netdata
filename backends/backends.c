@@ -286,8 +286,8 @@ void backend_set_kinesis_variables(int *default_port,
  * @param type the backend string selector.
  */
 void backend_set_prometheus_variables(int *default_port,
-                                      backend_response_checker_t brc,
-                                      backend_request_formatter_t brf)
+                                        backend_response_checker_t brc,
+                                        backend_request_formatter_t brf)
 {
     (void)default_port;
     (void)brf;
@@ -334,8 +334,8 @@ void backend_set_json_variables(int *default_port,
  * @param type the backend string selector.
  */
 void backend_set_opentsdb_http_variables(int *default_port,
-                                         backend_response_checker_t brc,
-                                         backend_request_formatter_t brf)
+                                            backend_response_checker_t brc,
+                                            backend_request_formatter_t brf)
 {
     *default_port = 4242;
     *brc = process_opentsdb_response;
