@@ -80,6 +80,7 @@ int format_dimension_stored_opentsdb_telnet(
 
         return 1;
     }
+
     return 0;
 }
 

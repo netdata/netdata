@@ -256,10 +256,10 @@ static void backends_main_cleanup(void *ptr) {
  * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
-void backend_set_kinesis_variables(int *default_port
-        ,backend_response_checker_t brc
-        ,backend_request_formatter_t brf
-        ) {
+void backend_set_kinesis_variables(int *default_port,
+                                   backend_response_checker_t brc,
+                                   backend_request_formatter_t brf)
+{
     (void)default_port;
 #ifndef HAVE_KINESIS
     (void)brc;
@@ -285,10 +285,10 @@ void backend_set_kinesis_variables(int *default_port
  * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
-void backend_set_prometheus_variables(int *default_port
-        ,backend_response_checker_t brc
-        ,backend_request_formatter_t brf
-        ) {
+void backend_set_prometheus_variables(int *default_port,
+                                      backend_response_checker_t brc,
+                                      backend_request_formatter_t brf)
+{
     (void)default_port;
     (void)brf;
 #ifndef ENABLE_PROMETHEUS_REMOTE_WRITE
@@ -310,10 +310,10 @@ void backend_set_prometheus_variables(int *default_port
  * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
-void backend_set_json_variables(int *default_port
-        ,backend_response_checker_t brc
-        ,backend_request_formatter_t brf
-        ) {
+void backend_set_json_variables(int *default_port,
+                                backend_response_checker_t brc,
+                                backend_request_formatter_t brf)
+{
     *default_port = 5448;
     *brc = process_json_response;
 
@@ -333,10 +333,10 @@ void backend_set_json_variables(int *default_port
  * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
-void backend_set_opentsdb_http_variables(int *default_port
-        ,backend_response_checker_t brc
-        ,backend_request_formatter_t brf
-        ) {
+void backend_set_opentsdb_http_variables(int *default_port,
+                                         backend_response_checker_t brc,
+                                         backend_request_formatter_t brf)
+{
     *default_port = 4242;
     *brc = process_opentsdb_response;
 
@@ -357,10 +357,10 @@ void backend_set_opentsdb_http_variables(int *default_port
  * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
-void backend_set_opentsdb_telnet_variables(int *default_port
-        ,backend_response_checker_t brc
-        ,backend_request_formatter_t brf
-        ) {
+void backend_set_opentsdb_telnet_variables(int *default_port,
+                                           backend_response_checker_t brc,
+                                           backend_request_formatter_t brf)
+{
     *default_port = 4242;
     *brc = process_opentsdb_response;
 
@@ -380,10 +380,10 @@ void backend_set_opentsdb_telnet_variables(int *default_port
  * @param brf function called to format the msessage to the backend
  * @param type the backend string selector.
  */
-void backend_set_graphite_variables(int *default_port
-        ,backend_response_checker_t brc
-        ,backend_request_formatter_t brf
-        ) {
+void backend_set_graphite_variables(int *default_port,
+                                    backend_response_checker_t brc,
+                                    backend_request_formatter_t brf)
+{
     *default_port = 2003;
     *brc = process_graphite_response;
 
@@ -466,6 +466,9 @@ void *backends_main(void *ptr) {
     BUFFER *http_request_header = buffer_create(1);
 #endif
 
+#ifdef ENABLE_HTTPS
+            struct netdata_ssl opentsdb_ssl = {NULL , NETDATA_SSL_START};
+#endif
 
     // ------------------------------------------------------------------------
     // collect configuration options
@@ -501,10 +504,6 @@ void *backends_main(void *ptr) {
     // and prepare for sending data to our backend
 
     global_backend_options = backend_parse_data_source(source, global_backend_options);
-
-#ifdef ENABLE_HTTPS
-    struct netdata_ssl opentsdb_ssl = {NULL , NETDATA_SSL_START};
-#endif
 
     if(timeoutms < 1) {
         error("BACKEND: invalid timeout %ld ms given. Assuming %d ms.", timeoutms, global_backend_update_every * 2 * 1000);
