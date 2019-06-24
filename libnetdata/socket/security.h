@@ -24,7 +24,7 @@ struct netdata_ssl{
     int flags;
 };
 
-extern SSL_CTX *netdata_cli_ctx;
+extern SSL_CTX *netdata_client_ctx;
 extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
 extern const char *security_cert;
