@@ -151,8 +151,7 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     run_command_in_host(['sudo', 'cp', 'netdata.spec', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
     run_command_in_host(['sudo', 'chmod', '777', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
 
-    print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
-    replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
+    print ("7. Temporary hack: Change Source0 to %s on spec file %s" % (download_url, spec_file))
     replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
 else:
     rpm_friendly_version = os.environ['BUILD_VERSION']
