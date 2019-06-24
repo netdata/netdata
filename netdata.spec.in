@@ -74,7 +74,7 @@ Recommends:	python2-psycopg2 \
 %{nil}
 %else
 %global netdata_recommends \
-                sensors \
+Recommends:     sensors \
 %{nil}
 %endif
 
