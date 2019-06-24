@@ -28,8 +28,8 @@ struct netdata_ssl{
     int flags;
 };
 
-extern SSL_CTX *netdata_cli_ctx;
 extern SSL_CTX *netdata_opentsdb_ctx;
+extern SSL_CTX *netdata_client_ctx;
 extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
 extern const char *security_cert;
@@ -39,7 +39,7 @@ extern int netdata_validate_server;
 
 void security_openssl_library();
 void security_clean_openssl();
-void security_start_ssl(int type);
+void security_start_ssl(int selector);
 int security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);
 

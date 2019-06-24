@@ -532,7 +532,7 @@ void *backends_main(void *ptr) {
         case BACKEND_TYPE_OPENTSDB_HTTP: {
 #ifdef ENABLE_HTTPS
             if (*(type + 13) == 's') {
-                security_start_ssl(2);
+                security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
             }
 #endif
             break;
