@@ -124,7 +124,7 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
 
     print ("5.1 Tagging the code with latest version: %s" % rpm_friendly_version)
-    run_command_in_host(['git', 'tag', '-a', rpm_friendly_version])
+    run_command_in_host(['git', 'tag', '-a', rpm_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
 
     print ("5.2 Run autoreconf -ivf")
     run_command_in_host(['autoreconf', '-ivf'])
