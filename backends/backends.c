@@ -358,8 +358,8 @@ void backend_set_opentsdb_http_variables(int *default_port,
  * @param type the backend string selector.
  */
 void backend_set_opentsdb_telnet_variables(int *default_port,
-                                           backend_response_checker_t brc,
-                                           backend_request_formatter_t brf)
+                                            backend_response_checker_t brc,
+                                            backend_request_formatter_t brf)
 {
     *default_port = 4242;
     *brc = process_opentsdb_response;
