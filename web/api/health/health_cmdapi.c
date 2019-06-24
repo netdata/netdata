@@ -127,7 +127,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
 
     //Local instance of the silencer
     SILENCER *silencer = NULL;
-    int config_changed = 0;
+    int config_changed = 1;
 
     if (!w->auth_bearer_token) {
         buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
@@ -174,6 +174,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     } else if (!strcmp(value, HEALTH_CMDAPI_CMD_LIST)) {
                         w->response.data->contenttype = CT_APPLICATION_JSON;
                         health_silencers2json(wb);
+                        config_changed=0;
                     }
                 } else {
                     //In this else we work with local silencer
@@ -187,7 +188,6 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                 if (silencers->stype == STYPE_NONE) {
                     buffer_strcat(wb, HEALTH_CMDAPI_MSG_STYPEWARNING);
                 }
-                config_changed=1;
             }
             if (unlikely(silencers->stype != STYPE_NONE && !silencers->all_alarms && !silencers->silencers)) {
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_NOSELECTORWARNING);
