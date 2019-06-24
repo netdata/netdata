@@ -119,24 +119,6 @@ print ("5. Fetch netdata source into the repo structure(%s -> %s)" % (download_u
 new_tar_dir="%s/netdata-%s" % (os.path.dirname(dest_archive), rpm_friendly_version)
 run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, download_url])
 
-print ("5.1 Rename tarball directory structure to an appropriate version formatting")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "mkdir", new_tar_dir])
-
-print ("extracting %s to %s " % (os.environ['LXC_CONTAINER_ROOT'] + dest_archive, os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive)))
-tar_object = tarfile.open(os.environ['LXC_CONTAINER_ROOT'] + dest_archive, 'r')
-tar_object.extractall(os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))
-tar_object.close()
-
-cmd = ['sudo', 'chmod', '-R', '777', '%s' % (os.environ['LXC_CONTAINER_ROOT'] + os.path.dirname(dest_archive))]
-proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-o, e = proc.communicate()
-print('Output: ' + o.decode('ascii'))
-print('Error: '  + e.decode('ascii'))
-print('code: ' + str(proc.returncode))
-
-run_command(["mv", "%s/netdata-*.*.*-*-*/*" % os.path.dirname(dest_archive), new_tar_dir])
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--remove-files", "cvf", "%s.tar.gz" % new_tar_dir, new_tar_dir])
-
 # Extract the spec file in place
 print ("6. Extract spec file from the source")
 
