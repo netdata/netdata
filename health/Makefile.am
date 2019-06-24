@@ -63,6 +63,7 @@ dist_healthconfig_DATA = \
     health.d/netfilter.conf \
     health.d/nginx.conf \
     health.d/nginx_plus.conf \
+    health.d/pihole.conf \
     health.d/phpfpm.conf \
     health.d/portcheck.conf \
     health.d/postgres.conf \
