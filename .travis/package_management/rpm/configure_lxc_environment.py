@@ -87,6 +87,10 @@ print ("2. Installing package dependencies within LXC container")
 if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
     run_command([os.environ["REPO_TOOL"], "clean", "-a"])
     run_command([os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
+elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
+    run_command([os.environ["REPO_TOOL"], "clean", "all"])
+    run_command([os.environ["REPO_TOOL"], "update", "-y"])
+    run_command([os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
 else:
     run_command([os.environ["REPO_TOOL"], "update", "-y"])
 
