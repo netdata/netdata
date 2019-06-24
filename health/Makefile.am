@@ -35,6 +35,7 @@ dist_healthconfig_DATA = \
     health.d/cpu.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \
+    health.d/dnsmasq_dhcp.conf \
     health.d/dockerd.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
