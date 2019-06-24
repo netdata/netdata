@@ -140,7 +140,7 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
         run_command_in_host(['sudo', 'cp', 'netdata-%s.tar.gz' % rpm_friendly_version, tar_file])
 
         print ("5.6 Fixing permissions on tarball")
-        run_command_in_host(['sudo', 'chmod', '+rwx', tar_file])
+        run_command_in_host(['sudo', 'chmod', '777', tar_file])
     else:
         print ("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % 'netdata-%s.tar.gz' % rpm_friendly_version)
         sys.exit(1)
@@ -148,7 +148,8 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     # Extract the spec file in place
     print ("6. Extract spec file from the source")
     spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-    run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", tar_file, "netdata-*/netdata.spec.in"])
+    run_command_in_host(['sudo', 'cp', 'netdata.spec', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
+    run_command_in_host(['sudo', 'chmod', '777', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
 
     print ("7. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
     replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
