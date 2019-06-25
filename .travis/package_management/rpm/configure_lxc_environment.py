@@ -97,10 +97,16 @@ else:
 run_command([os.environ["REPO_TOOL"], "install", "-y", "sudo"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "wget"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
-
-run_command([os.environ["REPO_TOOL"], "install", "-y", "libnetfilter_acct-devel"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
-# Not available on version 6
+
+# Exceptional cases, not available everywhere
+#
+
+# Not on Centos-7
+if os.environ["BUILD_STRING"].count("el/7") <= 0:
+    run_command([os.environ["REPO_TOOL"], "install", "-y", "libnetfilter_acct-devel"])
+
+# Not on Centos-6
 if os.environ["BUILD_STRING"].count("el/6") <= 0:
     run_command([os.environ["REPO_TOOL"], "install", "-y", "autoconf-archive"])
 
