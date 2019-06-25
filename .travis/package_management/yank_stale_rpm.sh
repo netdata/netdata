@@ -22,6 +22,7 @@ fi
 PACKAGES_DIR="$1"
 DISTRO="$2"
 PACKAGES_LIST="$(ls -AR "${PACKAGES_DIR}" | grep '\.rpm')"
+PACKAGING_USER="$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
 
 if [ ! -d "${PACKAGES_DIR}" ] || [ -z "${PACKAGES_LIST}" ]; then
 	echo "Folder ${PACKAGES_DIR} does not seem to be a valid directory or is empty. No packages to check for yanking"
@@ -30,6 +31,6 @@ fi
 
 for pkg in ${PACKAGES_LIST[@]}; do
 	echo "Attempting yank on ${pkg}.."
-	.travis/package_management/package_cloud_wrapper.sh yank "${TRAVIS_REPO_SLUG}/${DISTRO}" "${pkg}" || echo "Nothing to yank or error on ${pkg}"
+	.travis/package_management/package_cloud_wrapper.sh yank "${PACKAGING_USER}/${DEPLOY_REPO}/${DISTRO}" "${pkg}" || echo "Nothing to yank or error on ${pkg}"
 done
 
