@@ -879,3 +879,23 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
 
     return res;
 }
+
+/**
+ * Alarm Compare
+ *
+ * Callback function used with the binary trees.
+ *
+ * @param a a pointer to the RRDCAL item to insert,compare or update the binary tree
+ * @param b the pointer to the binary tree.
+ *
+ * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
+ */
+int alarm_compare(void *a, void *b) {
+    register uint32_t hash1 = ((RRDCALC *)a)->id;
+    register uint32_t hash2 = ((RRDCALC *)b)->id;
+
+    if(hash1 < hash2) return -1;
+    else if(hash1 > hash2) return 1;
+
+    return 0;
+}

@@ -1030,8 +1030,6 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-extern int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);
-extern int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae);
 extern int alarm_compare(void *a,void *b);
 
 // ----------------------------------------------------------------------------

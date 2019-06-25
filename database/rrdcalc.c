@@ -447,3 +447,42 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
 
     rrdcalc_free(rc);
 }
+
+// ----------------------------------------------------------------------------
+// Alarm
+
+
+/**
+ * Alarm is repeating
+ *
+ * Is this alarm repeating ?
+ *
+ * @param host The structure that has the binary tree
+ * @param alarm_id the id of the alarm to search
+ *
+ * @return It returns 1 case it is repeating and 0 otherwise
+ */
+int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
+    RRDCALC findme;
+    findme.id = alarm_id;
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx,(avl *)&findme);
+    if (!rc) {
+        //info("No alarm found for the alarm id %u", alarm_id);
+        return 0;
+    }
+    return rrdcalc_isrepeating(rc);
+}
+
+/**
+ * Entry is repeating
+ *
+ * Check whether the id of alarm entry is yet present in the host structure
+ *
+ * @param host The structure that has the binary tree
+ * @param ae the alarm entry
+ *
+ * @return It returns 1 case it is repeating and 0 otherwise
+ */
+int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
+    return alarm_isrepeating(host, ae->alarm_id);
+}

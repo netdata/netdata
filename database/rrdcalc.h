@@ -129,6 +129,9 @@ struct rrdcalc {
     struct rrdcalc *next;
 };
 
+extern int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);
+extern int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae);
+
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
 extern void rrdsetcalc_link_matching(RRDSET *st);
