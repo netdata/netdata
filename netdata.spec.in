@@ -137,7 +137,7 @@ Requires(post): libcap
 
 # nfacct plugin dependencies
 BuildRequires:  libmnl-devel
-%if 0%{?rhel} < 7
+%if 0%{?fedora} || 0%{?suse_version} >= 1140
 BuildRequires:  libnetfilter_acct-devel
 %endif
 
@@ -147,7 +147,7 @@ Requires: libmnl0
 Requires: libmnl
 %endif
 
-%if 0%{?rhel} < 7
+%if 0%{?fedora} || 0%{?suse_version} >= 1140
 Requires: libnetfilter_acct
 %endif
 # end nfacct plugin dependencies
@@ -262,11 +262,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}
 
 %config %{_sysconfdir}/%{name}/*.conf
-#%config %{_sysconfdir}/%{name}/charts.d/*.conf
-#%config %{_sysconfdir}/%{name}/health.d/*.conf
-#%config %{_sysconfdir}/%{name}/node.d/*.conf
-#%config %{_sysconfdir}/%{name}/python.d/*.conf
-#%config %{_sysconfdir}/%{name}/statsd.d/*.conf
 %config %{_sysconfdir}/logrotate.d/%{name}
 
 %{_libdir}/%{name}
@@ -303,7 +298,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}/conf.d/health.d
 %dir %{_libdir}/%{name}/conf.d/python.d
 %dir %{_libdir}/%{name}/conf.d/charts.d
-#%dir %{_libdir}/%{name}/conf.d/node.d
 %dir %{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
