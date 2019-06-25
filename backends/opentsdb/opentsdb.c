@@ -127,12 +127,12 @@ int format_dimension_collected_opentsdb_http(
     int length =  snprintfz(message
                            , sizeof(message)
                            ,"{"
-                            "\"metric\": \"%s.%s.%s\","
-                            "\"timestamp\": %llu,"
-                            "\"value\": "COLLECTED_NUMBER_FORMAT ","
-                            "\"tags\": {"
-                            "        \"host\": \"%s%s%s\""
-                            "    }"
+                            "  \"metric\": \"%s.%s.%s\","
+                            "  \"timestamp\": %llu,"
+                            "  \"value\": "COLLECTED_NUMBER_FORMAT ","
+                            "  \"tags\": {"
+                            "    \"host\": \"%s%s%s\""
+                            "  }"
                             "}"
                            , prefix
                            , chart_name
@@ -177,12 +177,12 @@ int format_dimension_stored_opentsdb_http(
         int length =  snprintfz(message
                 , sizeof(message)
                 ,"{"
-                 "\"metric\": \"%s.%s.%s\","
-                 "\"timestamp\": %llu,"
-                 "\"value\": "CALCULATED_NUMBER_FORMAT ","
-                 "\"tags\": {"
-                 "        \"host\": \"%s%s%s\""
-                 "    }"
+                 "  \"metric\": \"%s.%s.%s\","
+                 "  \"timestamp\": %llu,"
+                 "  \"value\": "CALCULATED_NUMBER_FORMAT ","
+                 "  \"tags\": {"
+                 "    \"host\": \"%s%s%s\""
+                 "  }"
                  "}"
                 , prefix
                 , chart_name

@@ -267,11 +267,11 @@ void backend_set_kinesis_variables(int *default_port,
 #endif
 
 #if HAVE_KINESIS
-    *backend_response_checker = process_json_response;
+    *brc = process_json_response;
     if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *backend_request_formatter = format_dimension_collected_json_plaintext;
+        *brf = format_dimension_collected_json_plaintext;
     else
-        *backend_request_formatter = format_dimension_stored_json_plaintext;
+        *brf = format_dimension_stored_json_plaintext;
 #endif
 }
 
@@ -286,8 +286,8 @@ void backend_set_kinesis_variables(int *default_port,
  * @param type the backend string selector.
  */
 void backend_set_prometheus_variables(int *default_port,
-                                        backend_response_checker_t brc,
-                                        backend_request_formatter_t brf)
+                                      backend_response_checker_t brc,
+                                      backend_request_formatter_t brf)
 {
     (void)default_port;
     (void)brf;
@@ -334,8 +334,8 @@ void backend_set_json_variables(int *default_port,
  * @param type the backend string selector.
  */
 void backend_set_opentsdb_http_variables(int *default_port,
-                                            backend_response_checker_t brc,
-                                            backend_request_formatter_t brf)
+                                         backend_response_checker_t brc,
+                                         backend_request_formatter_t brf)
 {
     *default_port = 4242;
     *brc = process_opentsdb_response;
@@ -358,8 +358,8 @@ void backend_set_opentsdb_http_variables(int *default_port,
  * @param type the backend string selector.
  */
 void backend_set_opentsdb_telnet_variables(int *default_port,
-                                            backend_response_checker_t brc,
-                                            backend_request_formatter_t brf)
+                                           backend_response_checker_t brc,
+                                           backend_request_formatter_t brf)
 {
     *default_port = 4242;
     *brc = process_opentsdb_response;
@@ -425,18 +425,6 @@ BACKEND_TYPE backends_select_type(const char *type) {
     error("BACKEND: Unknown backend type '%s'", type);
     return BACKEND_TYPE_UNKNOWN;
 }
-
-static struct backend_command {
-    backend_fp fp;
-    BACKEND_TYPE type;
-} backend_commands[]  = {
-        backend_set_graphite_variables, 0
-        ,backend_set_opentsdb_telnet_variables, 1
-        ,backend_set_opentsdb_http_variables, 2
-        ,backend_set_json_variables, 3
-        ,backend_set_prometheus_variables, 4
-        ,backend_set_kinesis_variables, 5
-};
 
 /**
  * Backend main
@@ -522,12 +510,6 @@ void *backends_main(void *ptr) {
         goto cleanup;
     }
 
-    if (work_type == backend_commands[work_type].type) {
-        backend_commands[work_type].fp(&default_port,&backend_response_checker,&backend_request_formatter);
-    } else {
-        goto cleanup;
-    }
-
     switch (work_type) {
         case BACKEND_TYPE_OPENTSDB_HTTP: {
 #ifdef ENABLE_HTTPS
@@ -535,6 +517,7 @@ void *backends_main(void *ptr) {
                 security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
             }
 #endif
+            backend_set_opentsdb_http_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
         case BACKEND_TYPE_PROMETEUS: {
@@ -545,6 +528,7 @@ void *backends_main(void *ptr) {
 #else
             error("Prometheus remote write support isn't compiled");
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
+            backend_set_prometheus_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
         case BACKEND_TYPE_KINESIS: {
@@ -560,6 +544,22 @@ void *backends_main(void *ptr) {
 #else
             error("AWS Kinesis support isn't compiled");
 #endif // HAVE_KINESIS
+            backend_set_kinesis_variables(&default_port,&backend_response_checker,&backend_request_formatter);
+            break;
+        }
+        case BACKEND_TYPE_GRAPHITE: {
+            backend_set_graphite_variables(&default_port,&backend_response_checker,&backend_request_formatter);
+            break;
+        }
+        case BACKEND_TYPE_OPENTSDB_TELNET: {
+            backend_set_opentsdb_telnet_variables(&default_port,&backend_response_checker,&backend_request_formatter);
+            break;
+        }
+        case BACKEND_TYPE_JSON: {
+            backend_set_json_variables(&default_port,&backend_response_checker,&backend_request_formatter);
+            break;
+        }
+        case BACKEND_TYPE_UNKNOWN: {
             break;
         }
     }
@@ -851,17 +851,13 @@ void *backends_main(void *ptr) {
 
                     ssize_t r;
 #ifdef ENABLE_HTTPS
-                    if(opentsdb_ssl.conn) {
-                        if(!opentsdb_ssl.flags) {
-                            r = SSL_read(opentsdb_ssl.conn, &response->buffer[response->len], response->size - response->len);
-                        } else {
-                            r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
-                        }
+                    if(opentsdb_ssl.conn && !opentsdb_ssl.flags) {
+                        r = SSL_read(opentsdb_ssl.conn, &response->buffer[response->len], response->size - response->len);
                     } else {
                         r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
                     }
 #else
-                    ssize_t r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
+                    r = recv(sock, &response->buffer[response->len], response->size - response->len, MSG_DONTWAIT);
 #endif
                     if(likely(r > 0)) {
                         // we received some data
