@@ -177,7 +177,7 @@ happened, on your systems and applications.
 # Conf step
 autoreconf -ivf
 %configure \
-	--prefix="/etc" \
+	--prefix="/usr" \
 	--sysconfdir="/etc" \
 	--localstatedir="/var" \
 	--libexecdir="/usr/libexec" \
