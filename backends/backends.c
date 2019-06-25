@@ -402,15 +402,15 @@ void backend_set_graphite_variables(int *default_port,
  *
  * @return It returns the backend id.
  */
-BACKEND_TYPE backends_select_type(const char *type) {
+BACKEND_TYPE backend_select_type(const char *type) {
     if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         return BACKEND_TYPE_GRAPHITE;
     }
     else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
-        return BACKEND_TYPE_OPENTSDB_TELNET;
+        return BACKEND_TYPE_OPENTSDB_USING_TELNET;
     }
     else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
-        return BACKEND_TYPE_OPENTSDB_HTTP;
+        return BACKEND_TYPE_OPENTSDB_USING_HTTP;
     }
     else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return BACKEND_TYPE_JSON;
@@ -422,7 +422,6 @@ BACKEND_TYPE backends_select_type(const char *type) {
         return BACKEND_TYPE_KINESIS;
     }
 
-    error("BACKEND: Unknown backend type '%s'", type);
     return BACKEND_TYPE_UNKNOWN;
 }
 
@@ -505,13 +504,14 @@ void *backends_main(void *ptr) {
 
     // ------------------------------------------------------------------------
     // select the backend type
-    BACKEND_TYPE work_type = backends_select_type(type);
+    BACKEND_TYPE work_type = backend_select_type(type);
     if (work_type == BACKEND_TYPE_UNKNOWN) {
+        error("BACKEND: Unknown backend type '%s'", type);
         goto cleanup;
     }
 
     switch (work_type) {
-        case BACKEND_TYPE_OPENTSDB_HTTP: {
+        case BACKEND_TYPE_OPENTSDB_USING_HTTP: {
 #ifdef ENABLE_HTTPS
             if (*(type + 13) == 's') {
                 security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
@@ -526,7 +526,7 @@ void *backends_main(void *ptr) {
 
             init_write_request();
 #else
-            error("Prometheus remote write support isn't compiled");
+            error("BACKEND: Prometheus remote write support isn't compiled");
 #endif // ENABLE_PROMETHEUS_REMOTE_WRITE
             backend_set_prometheus_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
@@ -542,7 +542,7 @@ void *backends_main(void *ptr) {
 
             kinesis_init(destination, kinesis_auth_key_id, kinesis_secure_key, timeout.tv_sec * 1000 + timeout.tv_usec / 1000);
 #else
-            error("AWS Kinesis support isn't compiled");
+            error("BACKEND: AWS Kinesis support isn't compiled");
 #endif // HAVE_KINESIS
             backend_set_kinesis_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
@@ -551,7 +551,7 @@ void *backends_main(void *ptr) {
             backend_set_graphite_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
-        case BACKEND_TYPE_OPENTSDB_TELNET: {
+        case BACKEND_TYPE_OPENTSDB_USING_TELNET: {
             backend_set_opentsdb_telnet_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
