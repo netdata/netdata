@@ -42,7 +42,7 @@ if [ -S "${DOCKER_SOCKET}" ] && [ -n "${PGID}" ]; then
 	GRP=$(create_group_and_assign_to_user "${DOCKER_GROUP}" "${PGID}" "${DOCKER_USR}")
 	if [ -n "${GRP}" ]; then
 		echo "Adjusting ownership of mapped docker socket '${DOCKER_SOCKET}' to root:${GRP}"
-		chown "root:${GRP}" "${DOCKER_SOCKET}"
+		chown "root:${GRP}" "${DOCKER_SOCKET}" || echo "Failed to change ownership on docker socket, container name resolution might not work"
 	fi
 fi
 
