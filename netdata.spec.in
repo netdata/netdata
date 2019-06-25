@@ -80,8 +80,10 @@ BuildRequires: gcc
 BuildRequires: make
 BuildRequires: git
 BuildRequires: autoconf
+%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
 BuildRequires: autogen
+%endif
 BuildRequires: automake
 BuildRequires: pkgconfig
 BuildRequires: curl
@@ -182,7 +184,6 @@ autoreconf -ivf
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
-	CFLAGS="-O2"
 
 # Build step
 %{__make} %{?_smp_mflags}
@@ -308,6 +309,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 
 %changelog
+* Tue Jun 25 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-6
+- Adjust dependency list: Some packages are missing on some distros, adopt to build successfully
 * Mon Jun 24 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-5
 Another pass on cleaning up pre/post installation steps
 - Sync permission and ownership on files and directories
