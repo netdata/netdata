@@ -208,6 +208,10 @@ install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logr
 # Set up the libexec and plugins.d directory
 install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/python.d/"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/charts.d/"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/node.d/"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/health.d/"
 
 # ###########################################################
 # Install freeipmi
