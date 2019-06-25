@@ -182,14 +182,11 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 char* alarm_name = pointers[13];
                 last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
 
-                RRDCALC *rc = NULL;
-                for(rc = host->alarms; rc; rc = rc->next) {
-                    if(unlikely(!strcmp(rc->name, alarm_name) && rrdcalc_isrepeating(rc))) {
-                        break;
-                    }
-                }
+                RRDCALC *rc = alarm_max_last_repeat(host, alarm_name);
                 if(unlikely(rc)) {
-                    rc->last_repeat = last_repeat;
+                    if (rrdcalc_isrepeating(rc)) {
+                        rc->last_repeat = last_repeat;
+                    }
                     // We iterate through repeating alarm entries only to
                     // find the latest last_repeat timestamp. Otherwise,
                     // there is no need to keep them in memory.

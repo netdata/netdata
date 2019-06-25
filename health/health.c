@@ -256,15 +256,15 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
-        if (likely(!alarm_entry_isrepeating(host, ae))){
-            if (unlikely(
+        if(likely(!alarm_entry_isrepeating(host, ae))) {
+            if(unlikely(
                     !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
                     !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
-            )){
-                if (unlikely(ae->unique_id < first_waiting))
+            )) {
+                if(unlikely(ae->unique_id < first_waiting))
                     first_waiting = ae->unique_id;
 
-                if (likely(now >= ae->delay_up_to_timestamp))
+                if(likely(now >= ae->delay_up_to_timestamp))
                     health_process_notifications(host, ae);
             }
         }
