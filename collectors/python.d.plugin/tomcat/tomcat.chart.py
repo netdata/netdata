@@ -107,7 +107,7 @@ class Service(UrlService):
             try:
                 xml = ET.fromstring(raw_data)
             except ET.ParseError:
-                self.debug('%s is not a vaild XML page. Please add "?XML=true" to tomcat status page.' % self.url)
+                self.debug('%s is not a valid XML page. Please add "?XML=true" to tomcat status page.' % self.url)
                 return None
             data = {}
 
