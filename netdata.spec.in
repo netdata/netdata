@@ -202,11 +202,6 @@ install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 # logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
 install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
-# Install logrotate on our path, then link to the actual system directory
-if [ -d /etc/logrotate.d -a ! -f "/etc/logrotate.d/${name}" ]; then
-	ln -sf "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}" "/etc/logrotate.d/${name}"
-fi
-
 
 # ###########################################################
 # Install netdata service
