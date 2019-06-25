@@ -205,6 +205,23 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
 install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
 # ###########################################################
+# Set up the libexec and plugins.d directory
+install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/"
+
+# ###########################################################
+# Install freeipmi
+install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
+
+# ###########################################################
+# Install apps.plugin
+install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/apps.plugin"
+
+# ###########################################################
+# Install perf.plugin
+install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
+
+# ###########################################################
 # Install netdata service
 %if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
