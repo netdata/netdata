@@ -97,6 +97,13 @@ else:
 run_command([os.environ["REPO_TOOL"], "install", "-y", "sudo"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "wget"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
+
+run_command([os.environ["REPO_TOOL"], "install", "-y", "libnetfilter_acct-devel"])
+run_command([os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
+# Not available on version 6
+if os.environ["BUILD_STRING"].count("el/6") <= 0:
+    run_command([os.environ["REPO_TOOL"], "install", "-y", "autoconf-archive"])
+
 run_command(["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
 run_command(["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
 
