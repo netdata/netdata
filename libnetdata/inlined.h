@@ -21,6 +21,15 @@ typedef uint64_t kernel_uint_t;
 // for faster execution, allow the compiler to inline
 // these functions that are called thousands of times per second
 
+/**
+ * Simple N hash
+ *
+ * Calculate the hash for name.
+ *
+ * @param name the input to the hash
+ *
+ * @return It returns the hash calculated.
+ */
 static inline uint32_t simple_hash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5;
@@ -41,19 +50,27 @@ static inline uint32_t simple_hash(const char *name) {
  *
  * @return It returns the hash calculated.
  */
-static inline uint32_t simple_nhash(const char *name,size_t len) {
+static inline uint32_t simple_nhash(const char *name, size_t len) {
     unsigned char *s = (unsigned char *) name;
     size_t i;
     uint32_t hval = 0x811c9dc5;
-    i = 0;
-    do {
+    for (i=0 ; i < len ; ++i) {
         hval *= 16777619;
         hval ^= (uint32_t) *s++;
-    } while (++i < len);
+    }
 
     return hval;
 }
 
+/**
+ * Simple uhash
+ *
+ * Calculate the hash for name .
+ *
+ * @param name the input to the hash
+ *
+ * @return It returns the hash calculated.
+ */
 static inline uint32_t simple_uhash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5, c;
@@ -65,18 +82,28 @@ static inline uint32_t simple_uhash(const char *name) {
     return hval;
 }
 
-static inline uint32_t simple_nuhash(const char *name,size_t len) {
+/**
+ * Simple N uhash
+ *
+ * Calculate the hash for name that has the length len.
+ *
+ * @param name the input to the hash
+ * @param len the length of the input
+ *
+ * @return It returns the hash calculated.
+ */
+static inline uint32_t simple_nuhash(const char *name, size_t len) {
     unsigned char *s = (unsigned char *) name;
     size_t i;
     uint32_t hval = 0x811c9dc5, c;
 
-    i = 0;
-    do {
+    for (i=0 ; i < len ; ++i) {
         c = *s++;
         if (unlikely(c >= 'A' && c <= 'Z')) c += 'a' - 'A';
         hval *= 16777619;
         hval ^= c;
-    } while ( ++i < len);
+    }
+
     return hval;
 }
 

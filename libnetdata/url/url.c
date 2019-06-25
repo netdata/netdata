@@ -238,7 +238,7 @@ inline HTTP_VALIDATION url_is_request_complete(char *begin,char *end,size_t leng
 
     //We always set as begin the first character of the message, but we wanna check
     //the last characters, so I am adjusting it case it is possible.
-    if ( length > 3  ) {
+    if (length >= 4) {
         begin = end - 4;
     }
 

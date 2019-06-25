@@ -40,54 +40,51 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     uint32_t i;
     char sname[WEB_FIELDS_MAX];
     char svalue[WEB_FIELDS_MAX];
-    if (end) {
-        i = 0;
-        do {
-            char *name = w->param_name[i].body;
-            size_t lname = w->param_name[i].length;
-            sname[i] = name[lname];
-            name[lname] = 0x00;
+    for (i = 0; i < end ; ++i ) {
+        char *name = w->param_name[i].body;
+        size_t lname = w->param_name[i].length;
+        sname[i] = name[lname];
+        name[lname] = 0x00;
 
-            char *value = w->param_values[i].body;
-            size_t lvalue = w->param_values[i].length;
-            svalue[i] = value[lvalue];
-            value[lvalue] = 0x00;
+        char *value = w->param_values[i].body;
+        size_t lvalue = w->param_values[i].length;
+        svalue[i] = value[lvalue];
+        value[lvalue] = 0x00;
 
-            if(!strncmp(name, "format",lname)) {
-                if(!strncmp(value, ALLMETRICS_FORMAT_SHELL,lvalue))
-                    format = ALLMETRICS_SHELL;
-                else if(!strncmp(value, ALLMETRICS_FORMAT_PROMETHEUS,lvalue))
-                    format = ALLMETRICS_PROMETHEUS;
-                else if(!strncmp(value, ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS,lvalue))
-                    format = ALLMETRICS_PROMETHEUS_ALL_HOSTS;
-                else if(!strncmp(value, ALLMETRICS_FORMAT_JSON,lvalue))
-                    format = ALLMETRICS_JSON;
-                else
-                    format = 0;
-            }
-            else if(!strncmp(name, "server",lname)) {
-                prometheus_server = value;
-            }
-            else if(!strncmp(name, "prefix",lname)) {
-                prometheus_prefix = value;
-            }
-            else if(!strncmp(name, "data",lname) || !strncmp(name, "source",lname) || !strncmp(name, "data source",lname) || !strncmp(name, "data-source",lname) || !strncmp(name, "data_source",lname) || !strncmp(name, "datasource",lname)) {
-                prometheus_backend_options = backend_parse_data_source(value, prometheus_backend_options);
-            }
-            else {
-                int i;
-                for(i = 0; prometheus_output_flags_root[i].name ; i++) {
-                    if(!strncmp(name, prometheus_output_flags_root[i].name,lname)) {
-                        if(!strncmp(value, "yes",lvalue) || !strncmp(value, "1",lvalue) || !strncmp(value, "true",lvalue))
-                            prometheus_output_options |= prometheus_output_flags_root[i].flag;
-                        else
-                            prometheus_output_options &= ~prometheus_output_flags_root[i].flag;
+        if(!strncmp(name, "format",lname)) {
+            if(!strncmp(value, ALLMETRICS_FORMAT_SHELL,lvalue))
+                format = ALLMETRICS_SHELL;
+            else if(!strncmp(value, ALLMETRICS_FORMAT_PROMETHEUS,lvalue))
+                format = ALLMETRICS_PROMETHEUS;
+            else if(!strncmp(value, ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS,lvalue))
+                format = ALLMETRICS_PROMETHEUS_ALL_HOSTS;
+            else if(!strncmp(value, ALLMETRICS_FORMAT_JSON,lvalue))
+                format = ALLMETRICS_JSON;
+            else
+                format = 0;
+        }
+        else if(!strncmp(name, "server",lname)) {
+            prometheus_server = value;
+        }
+        else if(!strncmp(name, "prefix",lname)) {
+            prometheus_prefix = value;
+        }
+        else if(!strncmp(name, "data",lname) || !strncmp(name, "source",lname) || !strncmp(name, "data source",lname) || !strncmp(name, "data-source",lname) || !strncmp(name, "data_source",lname) || !strncmp(name, "datasource",lname)) {
+            prometheus_backend_options = backend_parse_data_source(value, prometheus_backend_options);
+        }
+        else {
+            int i;
+            for(i = 0; prometheus_output_flags_root[i].name ; i++) {
+                if(!strncmp(name, prometheus_output_flags_root[i].name,lname)) {
+                    if(!strncmp(value, "yes",lvalue) || !strncmp(value, "1",lvalue) || !strncmp(value, "true",lvalue))
+                        prometheus_output_options |= prometheus_output_flags_root[i].flag;
+                    else
+                        prometheus_output_options &= ~prometheus_output_flags_root[i].flag;
 
-                        break;
-                    }
+                    break;
                 }
             }
-        } while( ++i < end);
+        }
     }
 
     buffer_flush(w->response.data);

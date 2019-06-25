@@ -829,49 +829,46 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     char save[WEB_FIELDS_MAX];
     char *value;
     size_t lvalue;
-    if(end) {
-        do {
-            value = w->param_values[i].body;
-            lvalue = w->param_values[i].length;
-            save[i] = value[lvalue];
-            value[lvalue] = 0x00;
+    for (i=0 ; i < end ; ++i) {
+        value = w->param_values[i].body;
+        lvalue = w->param_values[i].length;
+        save[i] = value[lvalue];
+        value[lvalue] = 0x00;
 
-            char *name = w->param_name[i].body;
-            size_t lname = w->param_name[i].length;
+        char *name = w->param_name[i].body;
+        size_t lname = w->param_name[i].length;
 
-            debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
+        debug(D_WEB_CLIENT, "%llu: API v1 badge.svg query param '%s' with value '%s'", w->id, name, value);
 
-            // name and value are now the parameters
-            // they are not null and not empty
-            if(!strncmp(name, "chart",lname)) chart = value;
-            else if(!strncmp(name, "dimension",lname) || !strncmp(name, "dim",lname) || !strncmp(name, "dimensions",lname) || !strncmp(name, "dims",lname)) {
-                if(!dimensions)
-                    dimensions = buffer_create(100);
+        // name and value are now the parameters
+        // they are not null and not empty
+        if(!strncmp(name, "chart",lname)) chart = value;
+        else if(!strncmp(name, "dimension",lname) || !strncmp(name, "dim",lname) || !strncmp(name, "dimensions",lname) || !strncmp(name, "dims",lname)) {
+            if(!dimensions)
+                dimensions = buffer_create(100);
 
-                buffer_strcat(dimensions, "|");
-                buffer_strcat(dimensions, value);
-            }
-            else if(!strncmp(name, "after",lname)) after_str = value;
-            else if(!strncmp(name, "before",lname)) before_str = value;
-            else if(!strncmp(name, "points",lname)) points_str = value;
-            else if(!strncmp(name, "group",lname)) {
-                group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
-            }
-            else if(!strncmp(name, "options",lname)) {
-                options |= web_client_api_request_v1_data_options(value);
-            }
-            else if(!strncmp(name, "label",lname)) label = value;
-            else if(!strncmp(name, "units",lname)) units = value;
-            else if(!strncmp(name, "label_color",lname)) label_color = value;
-            else if(!strncmp(name, "value_color",lname)) value_color = value;
-            else if(!strncmp(name, "multiply",lname)) multiply_str = value;
-            else if(!strncmp(name, "divide",lname)) divide_str = value;
-            else if(!strncmp(name, "refresh",lname)) refresh_str = value;
-            else if(!strncmp(name, "precision",lname)) precision_str = value;
-            else if(!strncmp(name, "scale",lname)) scale_str = value;
-            else if(!strncmp(name, "alarm",lname)) alarm = value;
-
-        } while (++i < end );
+            buffer_strcat(dimensions, "|");
+            buffer_strcat(dimensions, value);
+        }
+        else if(!strncmp(name, "after",lname)) after_str = value;
+        else if(!strncmp(name, "before",lname)) before_str = value;
+        else if(!strncmp(name, "points",lname)) points_str = value;
+        else if(!strncmp(name, "group",lname)) {
+            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+        }
+        else if(!strncmp(name, "options",lname)) {
+            options |= web_client_api_request_v1_data_options(value);
+        }
+        else if(!strncmp(name, "label",lname)) label = value;
+        else if(!strncmp(name, "units",lname)) units = value;
+        else if(!strncmp(name, "label_color",lname)) label_color = value;
+        else if(!strncmp(name, "value_color",lname)) value_color = value;
+        else if(!strncmp(name, "multiply",lname)) multiply_str = value;
+        else if(!strncmp(name, "divide",lname)) divide_str = value;
+        else if(!strncmp(name, "refresh",lname)) refresh_str = value;
+        else if(!strncmp(name, "precision",lname)) precision_str = value;
+        else if(!strncmp(name, "scale",lname)) scale_str = value;
+        else if(!strncmp(name, "alarm",lname)) alarm = value;
     }
 
     if(!chart || !*chart) {
@@ -1057,14 +1054,12 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     }
 
     cleanup:
-    if(end) {
-        i = 0;
-        do {
-            value = w->param_values[i].body;
-            lvalue = w->param_values[i].length;
-            value[lvalue] = save[i];
-        } while(++i < end);
+    for (i = 0; i < end ; ++i ) {
+        value = w->param_values[i].body;
+        lvalue = w->param_values[i].length;
+        value[lvalue] = save[i];
     }
     buffer_free(dimensions);
+
     return ret;
 }
