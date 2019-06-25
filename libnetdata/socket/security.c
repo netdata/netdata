@@ -2,7 +2,7 @@
 
 #ifdef ENABLE_HTTPS
 
-SSL_CTX *netdata_cli_ctx=NULL;
+SSL_CTX *netdata_client_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
@@ -127,7 +127,7 @@ void security_start_ssl(int type) {
         netdata_srv_ctx =  security_initialize_openssl_server();
     }
     else {
-        netdata_cli_ctx =  security_initialize_openssl_client();
+        netdata_client_ctx =  security_initialize_openssl_client();
     }
 }
 
@@ -137,9 +137,9 @@ void security_clean_openssl() {
 		SSL_CTX_free(netdata_srv_ctx);
 	}
 
-    if (netdata_cli_ctx)
+    if (netdata_client_ctx)
     {
-        SSL_CTX_free(netdata_cli_ctx);
+        SSL_CTX_free(netdata_client_ctx);
     }
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
