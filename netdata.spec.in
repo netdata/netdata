@@ -290,6 +290,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %defattr(0755,netdata,netdata,0755)
 
+%dir %{_libexecdir}/%{name}/python.d
+%dir %{_libexecdir}/%{name}/charts.d
+%dir %{_libexecdir}/%{name}/plugins.d
+%dir %{_libexecdir}/%{name}/node.d
+%dir %{_libexecdir}/%{name}/health.d
+
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
 %dir %{_sysconfdir}/%{name}/charts.d
