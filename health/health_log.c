@@ -132,6 +132,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
+    int health_from_file = 0;
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
         line++;
@@ -181,12 +182,22 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             if(entries > 27) {
                 char* alarm_name = pointers[13];
                 last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
-
-                RRDCALC *rc = alarm_max_last_repeat(host, alarm_name);
-                if(unlikely(rc)) {
-                    if (rrdcalc_isrepeating(rc)) {
-                        rc->last_repeat = last_repeat;
+                RRDCALC *rc = alarm_max_last_repeat(host, alarm_id);
+                if (!rc && !health_from_file) {
+                    health_from_file = 1;
+                    //This function is called before I add any new RRDCALC, so case I cannot
+                    //find the string that I want, I must load it
+                    for(rc = host->alarms; rc; rc = rc->next) {
+                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
+                        if (rdcmp != rc) {
+                            error("Cannot insert the alarm index ID using log %s",rc->name);
+                        }
                     }
+                    rc = alarm_max_last_repeat(host, alarm_id);
+                }
+
+                if(unlikely(rc)) {
+                    rc->last_repeat = last_repeat;
                     // We iterate through repeating alarm entries only to
                     // find the latest last_repeat timestamp. Otherwise,
                     // there is no need to keep them in memory.
@@ -205,27 +216,23 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                 ae = callocz(1, sizeof(ALARM_ENTRY));
             }
             else if(unlikely(*pointers[0] == 'U')) {
-                if(likely(!alarm_isrepeating(host, alarm_id))) {
-                    // find the original
-                    for(ae = host->health_log.alarms; ae; ae = ae->next) {
-                        if(unlikely(unique_id == ae->unique_id)) {
-                            if(unlikely(*pointers[0] == 'A')) {
-                                error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
-                                , host->hostname, line, filename, unique_id);
-                                *pointers[0] = 'U';
-                                duplicate++;
-                            }
-                            break;
+                // find the original
+                for(ae = host->health_log.alarms; ae; ae = ae->next) {
+                    if(unlikely(unique_id == ae->unique_id)) {
+                        if(unlikely(*pointers[0] == 'A')) {
+                            error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
+                            , host->hostname, line, filename, unique_id);
+                            *pointers[0] = 'U';
+                            duplicate++;
                         }
-                        else if(unlikely(unique_id > ae->unique_id)) {
-                            // no need to continue
-                            // the linked list is sorted
-                            ae = NULL;
-                            break;
-                        }
+                        break;
                     }
-                } else {
-                    error("No alarm entry for a repeating alarm should be seen at this point. Alarm id: %u", ae->alarm_id);
+                    else if(unlikely(unique_id > ae->unique_id)) {
+                        // no need to continue
+                        // the linked list is sorted
+                        ae = NULL;
+                        break;
+                    }
                 }
             }
 

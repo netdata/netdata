@@ -181,8 +181,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
     host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
-    avl_init_lock(&(host->alarms_idx_id), alarm_compare_id);
-    avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
+    avl_init_lock(&(host->alarms_idx_health_log), alarm_compare_id);
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -912,8 +911,8 @@ int alarm_compare_id(void *a, void *b) {
  * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
  */
 int alarm_compare_name(void *a, void *b) {
-    RRDCALC *in1 = ((RRDCALC *)a);
-    RRDCALC *in2 = ((RRDCALC *)b);
+    RRDCALC *in1 = (RRDCALC *)a;
+    RRDCALC *in2 = (RRDCALC *)b;
 
     if(in1->hash < in2->hash) return -1;
     else if(in1->hash > in2->hash) return 1;

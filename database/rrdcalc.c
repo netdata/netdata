@@ -386,17 +386,12 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             rc->crit_repeat_every
     );
 
-    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_id,(avl *)rc);
-    if (rdcmp != rc) {
-        error("Cannot insert the alarm index");
-    }
-
-    rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name,(avl *)rc);
-    if (rdcmp != rc) {
-        error("Cannot insert the alarm index");
-    }
-
     rrdcalc_add_to_host(host, rc);
+    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
+    if (rdcmp != rc) {
+        error("Cannot insert the alarm index ID %s",rc->name);
+    }
+
     return rc;
 }
 
@@ -444,12 +439,7 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     }
 
     if (rc) {
-        RRDHOST *rdcmp = (RRDHOST *) avl_remove_lock(&(host)->alarms_idx_id,(avl *)rc);
-        if (!rdcmp) {
-            error("Cannot remove the alarm index");
-        }
-
-        rdcmp = (RRDHOST *) avl_remove_lock(&(host)->alarms_idx_name,(avl *)rc);
+        RRDCALC *rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log,(avl *)rc);
         if (!rdcmp) {
             error("Cannot remove the alarm index");
         }
@@ -475,9 +465,8 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
 int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
     RRDCALC findme;
     findme.id = alarm_id;
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_id,(avl *)&findme);
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log,(avl *)&findme);
     if (!rc) {
-        //info("No alarm found for the alarm id %u", alarm_id);
         return 0;
     }
     return rrdcalc_isrepeating(rc);
@@ -507,11 +496,10 @@ int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
  *
  * @return It returns 1 case it is repeating and 0 otherwise
  */
-RRDCALC *alarm_max_last_repeat(RRDHOST *host,const char *name) {
+RRDCALC *alarm_max_last_repeat(RRDHOST *host,uint32_t alarm_id) {
     RRDCALC findme;
-    findme.name = (char *) name;
-    findme.hash = simple_hash(name);
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_name,(avl *)&findme);
+    findme.id = alarm_id;
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log,(avl *)&findme);
 
     return rc;
 }
