@@ -135,14 +135,19 @@ Requires(post): libcap
 
 # nfacct plugin dependencies
 BuildRequires:  libmnl-devel
+%if 0%{?rhel} < 7
 BuildRequires:  libnetfilter_acct-devel
+%endif
 
 %if 0%{?suse_version}
 Requires: libmnl0
 %else
 Requires: libmnl
 %endif
+
+%if 0%{?rhel} < 7
 Requires: libnetfilter_acct
+%endif
 # end nfacct plugin dependencies
 
 # freeipmi plugin dependencies
