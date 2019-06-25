@@ -123,9 +123,12 @@ markdown_extensions:
  - pymdownx.extrarawhtml
 nav:'
 
-navpart 1 . README "About"
+navpart 1 . "README" ""
 
-echo -ne "    - 'docs/Demo-Sites.md'
+navpart 1 . . "About Netdata"
+
+echo -ne "    - 'what-is-netdata.md'
+    - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
     - 'docs/anonymous-statistics.md'
     - 'docs/Donations-netdata-has-received.md'
