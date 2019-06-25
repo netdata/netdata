@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import xml.etree.ElementTree as ET
+import re
 
 from bases.FrameworkServices.UrlService import UrlService
 
@@ -104,6 +105,8 @@ class Service(UrlService):
         data = None
         raw_data = self._get_raw_data()
         if raw_data:
+            # Fix attributes ending with single quote content
+            raw_data = re.sub(r"='([^']+)'([^']+)''", r"='\g<1>\g<2>'", raw_data)
             try:
                 xml = ET.fromstring(raw_data)
             except ET.ParseError:
