@@ -309,7 +309,7 @@ inline char *url_find_protocol(char *s) {
  */
 int url_parse_query_string(struct web_fields *names,struct web_fields *values,char *moveme,char *divisor) {
     uint32_t i = 0;
-    uint32_t max = WEB_FIELDS_MAX;
+    uint32_t max = WEB_FIELDS_MAX-1;
 
     do {
         if ( i == max) {

@@ -848,42 +848,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     return ve;
 }
 
-static inline HTTP_VALIDATION web_client_is_complete(char *begin,char *end,size_t length){
-    if ( begin == end){
-        return HTTP_VALIDATION_INCOMPLETE;
-    }
-
-    if ( length > 3  ){
-        begin = end - 4;
-    }
-
-    uint32_t counter = 0;
-    do{
-        if (*begin == '\r'){
-            begin++;
-            if ( begin == end )
-            {
-                break;
-            }
-
-            if (*begin == '\n')
-            {
-                counter++;
-            }
-        } else if (*begin == '\n') {
-            begin++;
-            counter++;
-        }
-
-        if ( counter == 2){
-            break;
-        }
-    }
-    while(begin != end);
-
-    return (counter == 2)?HTTP_VALIDATION_OK:HTTP_VALIDATION_INCOMPLETE;
-}
-
 /**
  *  Client parse method
  *
@@ -1066,7 +1030,7 @@ static inline void web_client_set_without_query_string(struct web_client *w) {
     if (!strncmp(test,"api/v1/",7) ) {
         test += 7;
         char *endofcommand=strchr(test,' ');
-        w->command.length=(endofcommand)?(size_t)endofcommand-(size_t)test:strlen(test);
+        w->command.length=(endofcommand)?(size_t)(endofcommand-test):strlen(test);
     } else {
         w->command.length = w->path.length;
     }
@@ -1095,19 +1059,21 @@ static inline void web_client_split_path_query(struct web_client *w) {
         w->query_string.length = w->decoded_length - w->path.length;
 
         enddir = strchr(w->path.body+1,'/');
-        char *begin = w->path.body+1;
-        web_client_set_directory(w,begin,enddir,moveme);
-        if (w->query_string.body) {
-            enddir = strchr(moveme,'=');
-            if (!web_client_parse_request(w,enddir) ) {
-                moveme++;
-                size_t length = strlen(moveme);
-                w->param_name[0].body = moveme;
-                w->param_name[0].length = length;
-                w->param_values[0].body = moveme;
-                w->param_values[0].length = length;
+        if(enddir) {
+            char *begin = w->path.body+1;
+            web_client_set_directory(w,begin,enddir,moveme);
+            if (w->query_string.body) {
+                enddir = strchr(moveme,'=');
+                if (!web_client_parse_request(w,enddir) ) {
+                    moveme++;
+                    size_t length = strlen(moveme);
+                    w->param_name[0].body = moveme;
+                    w->param_name[0].length = length;
+                    w->param_values[0].body = moveme;
+                    w->param_values[0].length = length;
 
-                w->total_params = 1;
+                    w->total_params = 1;
+                }
             }
         }
     } else { //I do not have query string
