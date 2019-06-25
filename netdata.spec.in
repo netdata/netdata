@@ -253,12 +253,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %{_libdir}/%{name}
 
-%defattr(0755,netdata,netdata)
+%defattr(0755,netdata,netdata,0755)
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 %{_sysconfdir}/%{name}/edit-config
 
-%defattr(4750,root,netdata)
+%defattr(4750,root,netdata,0755)
 %{_libexecdir}/%{name}/plugins.d
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
@@ -275,7 +275,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %dir %{_datadir}/%{name}
 
-%defattr(0755,netdata,netdata,-)
+%defattr(0755,netdata,netdata,0755)
 
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
