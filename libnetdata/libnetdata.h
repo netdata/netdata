@@ -311,5 +311,6 @@ extern char *netdata_configured_host_prefix;
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
 #include "url/url.h"
 #include "json/json.h"
+#include "health/health.h"
 
 #endif // NETDATA_LIB_H

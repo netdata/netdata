@@ -165,6 +165,8 @@ LIBNETDATA_FILES = \
     libnetdata/json/jsmn.c \
     libnetdata/json/json.h \
     libnetdata/json/json.c \
+    libnetdata/health/health.c \
+    libnetdata/health/health.h \
     $(NULL)
 
 APPS_PLUGIN_FILES = \

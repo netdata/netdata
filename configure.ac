@@ -1064,6 +1064,8 @@ AC_CONFIG_FILES([
     libnetdata/config/Makefile
     libnetdata/dictionary/Makefile
     libnetdata/eval/Makefile
+    libnetdata/json/Makefile
+    libnetdata/health/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/popen/Makefile
@@ -1074,7 +1076,6 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
-    libnetdata/json/Makefile
     registry/Makefile
     streaming/Makefile
     system/Makefile

@@ -67,6 +67,6 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e);
 
 int json_callback_print(JSON_ENTRY *e);
 
-extern int health_silencers_json_read_callback(JSON_ENTRY *e);
+
 
 #endif

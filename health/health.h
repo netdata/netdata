@@ -57,6 +57,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
 
+/*
 typedef struct silencer {
     char *alarms;
     SIMPLE_PATTERN *alarms_pattern;
@@ -75,6 +76,7 @@ typedef struct silencer {
 
     struct silencer *next;
 } SILENCER;
+*/
 
 typedef enum silence_type {
     STYPE_NONE,
@@ -142,6 +144,7 @@ extern void health_alarm_log_free(RRDHOST *host);
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
 extern int health_silencers_json_read_callback(JSON_ENTRY *e);
+extern SILENCER *create_silencer(void);
 
 extern void *health_cmdapi_thread(void *ptr);
 

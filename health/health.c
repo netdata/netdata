@@ -41,20 +41,6 @@ inline char *health_stock_config_dir(void) {
 }
 
 /**
- * Create Silencer
- *
- * Allocate a new silencer to Netdata.
- *
- * @return It returns the address off the silencer on success and NULL otherwise
- */
-static SILENCER *create_silencer(void) {
-    SILENCER *t = callocz(1, sizeof(SILENCER));
-    debug(D_HEALTH, "HEALTH command API: Created empty silencer");
-
-    return t;
-}
-
-/**
  * Health Silencers add
  *
  * Add more one silencer to the list of silenecers.
@@ -138,7 +124,22 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
 }
 
 /**
- * JSON Read Callbacko
+ * Create Silencer
+ *
+ * Allocate a new silencer to Netdata.
+ *
+ * @return It returns the address off the silencer on success and NULL otherwise
+ */
+SILENCER *create_silencer(void) {
+    SILENCER *t = callocz(1, sizeof(SILENCER));
+    debug(D_HEALTH, "HEALTH command API: Created empty silencer");
+
+    return t;
+}
+
+
+/**
+ * JSON Read Callback
  *
  * Callback called by netdata to create the silencer.
  *
