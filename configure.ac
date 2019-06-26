@@ -354,7 +354,7 @@ OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
 OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 
 # -----------------------------------------------------------------------------
-#
+# JSON-C library
 
 AC_CHECK_LIB(
     [json-c],
