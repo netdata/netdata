@@ -41,7 +41,6 @@ inline char *health_stock_config_dir(void) {
 }
 
 
-
 /**
  * Silencers init
  *

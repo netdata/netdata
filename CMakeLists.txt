@@ -313,6 +313,8 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
+        libnetdata/health/health.c
+        libnetdata/health/health.h
         libnetdata/socket/security.c
         libnetdata/socket/security.h
         libnetdata/json/json.c
