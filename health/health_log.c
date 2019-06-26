@@ -180,7 +180,6 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             // Check if we got last_repeat field
             time_t last_repeat = 0;
             if(entries > 27) {
-                char* alarm_name = pointers[13];
                 last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
                 RRDCALC *rc = alarm_max_last_repeat(host, alarm_id);
                 if (!rc && !health_from_file) {
