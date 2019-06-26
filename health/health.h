@@ -141,7 +141,7 @@ extern void health_alarm_log_free(RRDHOST *host);
 
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
-int health_silencers_json_read_callback(JSON_ENTRY *e);
+extern int health_silencers_json_read_callback(JSON_ENTRY *e);
 
 extern void *health_cmdapi_thread(void *ptr);
 
