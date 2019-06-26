@@ -11,6 +11,9 @@ from bases.FrameworkServices.UrlService import UrlService
 
 MiB = 1 << 20
 
+# Regex fix for Tomcat single quote XML attributes
+single_quote_regex = re.compile(r"='([^']+)'([^']+)''")
+
 ORDER = [
     'accesses',
     'bandwidth',
@@ -96,7 +99,6 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.url = self.configuration.get('url', 'http://127.0.0.1:8080/manager/status?XML=true')
         self.connector_name = self.configuration.get('connector_name', None)
-        self.single_quote_regex = re.compile(r"='([^']+)'([^']+)''")
 
     def _get_data(self):
         """
@@ -108,7 +110,7 @@ class Service(UrlService):
         if raw_data:
             # Fix XML attributes ending with single quote content, ie. <memorypool name='CodeHeap 'non-nmethods'' ... />
             # Cf. Issue https://github.com/netdata/netdata/issues/6343
-            raw_data = self.single_quote_regex.sub(r"='\g<1>\g<2>'", raw_data)
+            raw_data = single_quote_regex.sub(r"='\g<1>\g<2>'", raw_data)
 
             try:
                 xml = ET.fromstring(raw_data)
