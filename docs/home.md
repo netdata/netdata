@@ -9,7 +9,10 @@ Welcome! You've arrived at the documentation for Netdata. Use the links below to
 
 Or, use the navigation menu on the left-hand side to find other information, like adding more charts to Netdata or the fundamentals of a collector plugin.
 
+
 ## Learn about the fundamentals of Netdata
+
+[Home](../)
 
 [What is Netdata?]()
 
@@ -18,7 +21,7 @@ Or, use the navigation menu on the left-hand side to find other information, lik
 
 ## Geting started with Netdata
 
-[Gutting started guide]()
+[Getting started guide]()
 
 [Configuration guide]()
 
@@ -27,6 +30,9 @@ Or, use the navigation menu on the left-hand side to find other information, lik
 
 [Adding more charts to the Netdata dashboard]()
 
+[alarm notifications](../health/notifications/#netdata-alarm-notifications)
+
+[Netdata registry](../registry/#registry)
 
 ## Contributing
 
