@@ -205,15 +205,6 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
 install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
 # ###########################################################
-# Set up the libexec and plugins.d directory
-install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/python.d/"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/charts.d/"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/node.d/"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/health.d/"
-
-# ###########################################################
 # Install freeipmi
 install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
 
@@ -276,7 +267,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sysconfdir}/%{name}/edit-config
 
 %defattr(4750,root,netdata,0755)
-%{_libexecdir}/%{name}/plugins.d
+
+%dir %{_libexecdir}/%{name}/python.d
+%dir %{_libexecdir}/%{name}/charts.d
+%dir %{_libexecdir}/%{name}/plugins.d
+%dir %{_libexecdir}/%{name}/node.d
+%dir %{_libexecdir}/%{name}/health.d
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
@@ -293,12 +289,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_datadir}/%{name}
 
 %defattr(0755,netdata,netdata,0755)
-
-%dir %{_libexecdir}/%{name}/python.d
-%dir %{_libexecdir}/%{name}/charts.d
-%dir %{_libexecdir}/%{name}/plugins.d
-%dir %{_libexecdir}/%{name}/node.d
-%dir %{_libexecdir}/%{name}/health.d
 
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
