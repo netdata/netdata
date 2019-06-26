@@ -145,7 +145,7 @@ http://localhost/api/v1/manage/health?families=cpu1 cpu2
 
 ### List silencers
 
-The command `LIST` was added in netdata v1.13.1 and returns a JSON with the current status of the silencers.
+The command `LIST` was added in netdata v1.16 and returns a JSON with the current status of the silencers.
 
 ```
  curl "http://myserver/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken"
