@@ -513,7 +513,7 @@ void *backends_main(void *ptr) {
     switch (work_type) {
         case BACKEND_TYPE_OPENTSDB_USING_HTTP: {
 #ifdef ENABLE_HTTPS
-            if (!strcmp(type,"opentsdb:https")) {
+            if (!strcmp(type, "opentsdb:https")) {
                 security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
             }
 #endif
