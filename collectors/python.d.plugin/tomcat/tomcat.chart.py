@@ -5,10 +5,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import xml.etree.ElementTree as ET
+import re
 
 from bases.FrameworkServices.UrlService import UrlService
 
 MiB = 1 << 20
+
+# Regex fix for Tomcat single quote XML attributes
+# affecting Tomcat < 8.5.24 & 9.0.2 running with Java > 9
+# cf. https://bz.apache.org/bugzilla/show_bug.cgi?id=61603
+single_quote_regex = re.compile(r"='([^']+)'([^']+)''")
 
 ORDER = [
     'accesses',
@@ -95,6 +101,32 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.url = self.configuration.get('url', 'http://127.0.0.1:8080/manager/status?XML=true')
         self.connector_name = self.configuration.get('connector_name', None)
+        self.parse = self.xml_parse
+
+    def xml_parse(self, data):
+        try:
+            return ET.fromstring(data)
+        except ET.ParseError:
+            self.debug('%s is not a valid XML page. Please add "?XML=true" to tomcat status page.' % self.url)
+            return None
+
+    def xml_single_quote_fix_parse(self, data):
+        data = single_quote_regex.sub(r"='\g<1>\g<2>'", data)
+        return self.xml_parse(data)
+
+    def check(self):
+        self._manager = self._build_manager()
+
+        raw_data = self._get_raw_data()
+        if not raw_data:
+            return False
+
+        if single_quote_regex.search(raw_data):
+            self.warning('Tomcat status page is returning invalid single quote XML, please consider upgrading '
+                         'your Tomcat installation. See https://bz.apache.org/bugzilla/show_bug.cgi?id=61603')
+            self.parse = self.xml_single_quote_fix_parse
+
+        return self.parse(raw_data) is not None
 
     def _get_data(self):
         """
@@ -104,11 +136,10 @@ class Service(UrlService):
         data = None
         raw_data = self._get_raw_data()
         if raw_data:
-            try:
-                xml = ET.fromstring(raw_data)
-            except ET.ParseError:
-                self.debug('%s is not a vaild XML page. Please add "?XML=true" to tomcat status page.' % self.url)
+            xml = self.parse(raw_data)
+            if xml is None:
                 return None
+
             data = {}
 
             jvm = xml.find('jvm')
@@ -153,7 +184,7 @@ class Service(UrlService):
                     data['metaspace_committed'] = pool.get('usageCommitted')
                     data['metaspace_max'] = pool.get('usageMax')
 
-            if connector:
+            if connector is not None:
                 thread_info = connector.find('threadInfo')
                 data['currentThreadsBusy'] = thread_info.get('currentThreadsBusy')
                 data['currentThreadCount'] = thread_info.get('currentThreadCount')
