@@ -161,7 +161,7 @@ class Service(UrlService):
                     data['metaspace_committed'] = pool.get('usageCommitted')
                     data['metaspace_max'] = pool.get('usageMax')
 
-            if connector:
+            if connector is not None:
                 thread_info = connector.find('threadInfo')
                 data['currentThreadsBusy'] = thread_info.get('currentThreadsBusy')
                 data['currentThreadCount'] = thread_info.get('currentThreadCount')
