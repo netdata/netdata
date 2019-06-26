@@ -1,6 +1,6 @@
 # OpenTSDB with HTTP
 
-Since version 1.16 the Netdata has the feature to communicate with OpenTSDB using HTTP API, to enable this channel
+Since version 1.16 the Netdata has the feature to communicate with OpenTSDB using HTTP API. To enable this channel
 it is necessary to set the following options in your netdata.conf
 
 ```

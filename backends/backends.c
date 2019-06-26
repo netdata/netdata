@@ -513,7 +513,7 @@ void *backends_main(void *ptr) {
     switch (work_type) {
         case BACKEND_TYPE_OPENTSDB_USING_HTTP: {
 #ifdef ENABLE_HTTPS
-            if (*(type + 13) == 's') {
+            if (!strcmp(type,"opentsdb:https")) {
                 security_start_ssl(NETDATA_SSL_CONTEXT_OPENTSDB);
             }
 #endif
@@ -915,7 +915,7 @@ void *backends_main(void *ptr) {
                             int err = SSL_connect(opentsdb_ssl.conn);
                             if (err != 1) {
                                 err = SSL_get_error(opentsdb_ssl.conn, err);
-                                error("SSL cannot connect with the server:  %s ", ERR_error_string((long)SSL_get_error(opentsdb_ssl.conn,err),NULL));
+                                error("SSL cannot connect with the server:  %s ", ERR_error_string((long)SSL_get_error(opentsdb_ssl.conn, err), NULL));
                                 opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
                             } //TODO: check certificate here
                         }
