@@ -126,7 +126,7 @@ class Service(UrlService):
                          'your Tomcat installation. See https://bz.apache.org/bugzilla/show_bug.cgi?id=61603')
             self.parse = self.xml_single_quote_fix_parse
 
-        return bool(self.parse(raw_data))
+        return self.parse(raw_data) is not None
 
     def _get_data(self):
         """
