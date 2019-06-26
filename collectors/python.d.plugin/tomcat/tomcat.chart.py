@@ -105,8 +105,11 @@ class Service(UrlService):
         data = None
         raw_data = self._get_raw_data()
         if raw_data:
-            # Fix attributes ending with single quote content
-            raw_data = re.sub(r"='([^']+)'([^']+)''", r"='\g<1>\g<2>'", raw_data)
+            # Fix XML attributes ending with single quote content, ie. <memorypool name='CodeHeap 'non-nmethods'' ... />
+            # Cf. Issue https://github.com/netdata/netdata/issues/6343
+            pattern = re.compile(r"='([^']+)'([^']+)''")
+            raw_data = pattern.sub(r"='\g<1>\g<2>'", raw_data)
+
             try:
                 xml = ET.fromstring(raw_data)
             except ET.ParseError:
