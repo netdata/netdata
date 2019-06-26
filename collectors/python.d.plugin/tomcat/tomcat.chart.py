@@ -95,22 +95,6 @@ CHARTS = {
 }
 
 
-class XMLParser:
-    @staticmethod
-    def parse(data):
-        try:
-            return ET.fromstring(data)
-        except ET.ParseError:
-            return None
-
-
-class XMLSingleQuoteFixParser(XMLParser):
-    @staticmethod
-    def parse(data):
-        data = single_quote_regex.sub(r"='\g<1>\g<2>'", data)
-        return XMLParser.parse(data)
-
-
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
@@ -118,6 +102,32 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.url = self.configuration.get('url', 'http://127.0.0.1:8080/manager/status?XML=true')
         self.connector_name = self.configuration.get('connector_name', None)
+        self.parse = self.xml_parse
+
+    def xml_parse(self, data):
+        try:
+            return ET.fromstring(data)
+        except ET.ParseError:
+            self.debug('%s is not a valid XML page. Please add "?XML=true" to tomcat status page.' % self.url)
+            return None
+
+    def xml_single_quote_fix_parse(self, data):
+        data = single_quote_regex.sub(r"='\g<1>\g<2>'", data)
+        return self.xml_parse(data)
+
+    def check(self):
+        self._manager = self._build_manager()
+
+        raw_data = self._get_raw_data()
+        if not raw_data:
+            return False
+
+        if fix_tomcat_single_quote and single_quote_regex.search(raw_data):
+            self.warning('Tomcat status page is returning invalid single quote XML, please consider upgrading '
+                         'your Tomcat installation. See https://bz.apache.org/bugzilla/show_bug.cgi?id=61603')
+            self.parse = self.xml_single_quote_fix_parse
+
+        return True
 
     def _get_data(self):
         """
@@ -127,16 +137,8 @@ class Service(UrlService):
         data = None
         raw_data = self._get_raw_data()
         if raw_data:
-            if fix_tomcat_single_quote and single_quote_regex.search(raw_data):
-                self.warning('Tomcat status page is returning invalid single quote XML, please consider upgrading '
-                             'your Tomcat installation. See https://bz.apache.org/bugzilla/show_bug.cgi?id=61603')
-
-                xml = XMLSingleQuoteFixParser.parse(raw_data)
-            else:
-                xml = XMLParser.parse(raw_data)
-
+            xml = self.parse(raw_data)
             if xml is None:
-                self.debug('%s is not a valid XML page. Please add "?XML=true" to tomcat status page.' % self.url)
                 return None
 
             data = {}
