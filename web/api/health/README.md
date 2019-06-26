@@ -45,7 +45,7 @@ The following will return an SVG badge of the alarm named `NAME`, attached to th
 ## Health Management API
 
 Netdata v1.12 and beyond provides a command API to control health checks and notifications at runtime. The feature is especially useful for maintenance periods, during which you receive meaningless alarms.
-From Netdata v1.13.1 and beyond, the configuration controlled via the API commands is [persisted across netdata restarts](#persistence).
+From Netdata v1.16.0 and beyond, the configuration controlled via the API commands is [persisted across netdata restarts](#persistence).
 
 Specifically, the API allows you to:
  - Disable health checks completely. Alarm conditions will not be evaluated at all and no entries will be added to the alarm log.
@@ -145,7 +145,7 @@ http://localhost/api/v1/manage/health?families=cpu1 cpu2
 
 ### List silencers
 
-The command `LIST` was added in netdata v1.16 and returns a JSON with the current status of the silencers.
+The command `LIST` was added in netdata v1.16.0 and returns a JSON with the current status of the silencers.
 
 ```
  curl "http://myserver/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken"
