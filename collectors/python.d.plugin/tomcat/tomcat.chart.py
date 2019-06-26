@@ -14,7 +14,6 @@ MiB = 1 << 20
 # Regex fix for Tomcat single quote XML attributes
 # affecting Tomcat < 8.5.24 & 9.0.2 running with Java > 9
 # cf. https://bz.apache.org/bugzilla/show_bug.cgi?id=61603
-fix_tomcat_single_quote = True
 single_quote_regex = re.compile(r"='([^']+)'([^']+)''")
 
 ORDER = [
@@ -122,12 +121,12 @@ class Service(UrlService):
         if not raw_data:
             return False
 
-        if fix_tomcat_single_quote and single_quote_regex.search(raw_data):
+        if single_quote_regex.search(raw_data):
             self.warning('Tomcat status page is returning invalid single quote XML, please consider upgrading '
                          'your Tomcat installation. See https://bz.apache.org/bugzilla/show_bug.cgi?id=61603')
             self.parse = self.xml_single_quote_fix_parse
 
-        return True
+        return self.parse(raw_data)
 
     def _get_data(self):
         """
