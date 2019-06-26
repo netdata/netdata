@@ -12,6 +12,9 @@ from bases.FrameworkServices.UrlService import UrlService
 MiB = 1 << 20
 
 # Regex fix for Tomcat single quote XML attributes
+# affecting Tomcat < 8.5.24 & 9.0.2 running with Java > 9
+# cf. https://bz.apache.org/bugzilla/show_bug.cgi?id=61603
+fix_tomcat_single_quote = True
 single_quote_regex = re.compile(r"='([^']+)'([^']+)''")
 
 ORDER = [
@@ -92,6 +95,22 @@ CHARTS = {
 }
 
 
+class XMLParser:
+    @staticmethod
+    def parse(data):
+        try:
+            return ET.fromstring(data)
+        except ET.ParseError:
+            return None
+
+
+class XMLSingleQuoteFixParser(XMLParser):
+    @staticmethod
+    def parse(data):
+        data = single_quote_regex.sub(r"='\g<1>\g<2>'", data)
+        return XMLParser.parse(data)
+
+
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
@@ -108,15 +127,18 @@ class Service(UrlService):
         data = None
         raw_data = self._get_raw_data()
         if raw_data:
-            # Fix XML attributes ending with single quote content, ie. <memorypool name='CodeHeap 'non-nmethods'' ... />
-            # Cf. Issue https://github.com/netdata/netdata/issues/6343
-            raw_data = single_quote_regex.sub(r"='\g<1>\g<2>'", raw_data)
+            if fix_tomcat_single_quote and single_quote_regex.search(raw_data):
+                self.warning('Tomcat status page is returning invalid single quote XML, please consider upgrading '
+                             'your Tomcat installation. See https://bz.apache.org/bugzilla/show_bug.cgi?id=61603')
 
-            try:
-                xml = ET.fromstring(raw_data)
-            except ET.ParseError:
+                xml = XMLSingleQuoteFixParser.parse(raw_data)
+            else:
+                xml = XMLParser.parse(raw_data)
+
+            if xml is None:
                 self.debug('%s is not a valid XML page. Please add "?XML=true" to tomcat status page.' % self.url)
                 return None
+
             data = {}
 
             jvm = xml.find('jvm')
