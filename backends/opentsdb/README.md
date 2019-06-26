@@ -1,6 +1,6 @@
 # OpenTSDB with HTTP
 
-Since the version 1.16 the Netdata has the feature to communicate with OpenTSDB using HTTP API, to enable this channel
+Since version 1.16 the Netdata has the feature to communicate with OpenTSDB using HTTP API, to enable this channel
 it is necessary to set the following options in your netdata.conf
 
 ```
@@ -9,7 +9,7 @@ it is necessary to set the following options in your netdata.conf
     destination = localhost:4242
 ```
 
-, in this example we are considering that OpenTSDB is running with its default port(4242).
+, in this example we are considering that OpenTSDB is running with its default port (4242).
 
 ## HTTPS
 

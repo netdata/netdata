@@ -897,7 +897,7 @@ void *backends_main(void *ptr) {
                         if(!opentsdb_ssl.conn) {
                             opentsdb_ssl.conn = SSL_new(netdata_opentsdb_ctx);
                             if(!opentsdb_ssl.conn) {
-                                error("Failed to allocate SSL structure %d.",sock);
+                                error("Failed to allocate SSL structure %d.", sock);
                                 opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
                             }
                         } else {
@@ -915,7 +915,7 @@ void *backends_main(void *ptr) {
                             int err = SSL_connect(opentsdb_ssl.conn);
                             if (err != 1) {
                                 err = SSL_get_error(opentsdb_ssl.conn, err);
-                                error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(opentsdb_ssl.conn,err),NULL));
+                                error("SSL cannot connect with the server:  %s ", ERR_error_string((long)SSL_get_error(opentsdb_ssl.conn,err),NULL));
                                 opentsdb_ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
                             } //TODO: check certificate here
                         }
@@ -938,21 +938,6 @@ void *backends_main(void *ptr) {
     #ifdef MSG_NOSIGNAL
                 flags += MSG_NOSIGNAL;
     #endif
-
-                ssize_t written;
-#ifdef ENABLE_HTTPS
-                if(opentsdb_ssl.conn) {
-                    if(!opentsdb_ssl.flags) {
-                        written = SSL_write(opentsdb_ssl.conn,buffer_tostring(b), len);
-                    } else {
-                        written = send(sock, buffer_tostring(b), len, flags);
-                    }
-                } else {
-                    written = send(sock, buffer_tostring(b), len, flags);
-                }
-#else
-                written = send(sock, buffer_tostring(b), len, flags);
-#endif
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
                 if(do_prometheus_remote_write) {
@@ -989,6 +974,17 @@ void *backends_main(void *ptr) {
 
                     len = data_size;
                 }
+#endif
+
+                ssize_t written;
+#ifdef ENABLE_HTTPS
+                if(opentsdb_ssl.conn && !opentsdb_ssl.flags) {
+                    written = SSL_write(opentsdb_ssl.conn, buffer_tostring(b), len);
+                } else {
+                    written = send(sock, buffer_tostring(b), len, flags);
+                }
+#else
+                written = send(sock, buffer_tostring(b), len, flags);
 #endif
 
                 // chart_backend_latency += now_monotonic_usec() - start_ut;
