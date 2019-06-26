@@ -356,11 +356,14 @@ OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 # -----------------------------------------------------------------------------
 # JSON-C library
 
-AC_CHECK_LIB(
+PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
     [json-c],
     [json_object_get_type],
-    [JSONC_LIBS="-ljson-c"]
-)
+    [JSONC_LIBS="-ljson-c"]),AC_CHECK_LIB(
+        [json],
+        [json_object_get_type],
+        [JSONC_LIBS="-ljson"])
+    )
 
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 

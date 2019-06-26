@@ -2,7 +2,7 @@
 #include "../libnetdata.h"
 #include "json.h"
 #include "libnetdata/libnetdata.h"
-#include "health/health.h"
+#include "../../health/health.h"
 
 #define JSON_TOKENS 1024
 
