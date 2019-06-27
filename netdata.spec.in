@@ -297,10 +297,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_sysconfdir}/%{name}/charts.d
 %dir %{_sysconfdir}/%{name}/node.d
 %dir %{_sysconfdir}/%{name}/statsd.d
-%dir %{_libdir}/%{name}/conf.d/health.d
-%dir %{_libdir}/%{name}/conf.d/python.d
-%dir %{_libdir}/%{name}/conf.d/charts.d
-%dir %{_libdir}/%{name}/conf.d/statsd.d
+%{_libdir}/%{name}/conf.d/health.d
+%{_libdir}/%{name}/conf.d/python.d
+%{_libdir}/%{name}/conf.d/charts.d
+%{_libdir}/%{name}/conf.d/statsd.d
 
 %if %{with systemd}
 %{_unitdir}/netdata.service
