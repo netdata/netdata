@@ -608,7 +608,16 @@ AM_CONDITIONAL([ENABLE_PLUGIN_CUPS], [test "${enable_plugin_cups}" = "yes"])
 # -----------------------------------------------------------------------------
 # nfacct.plugin - libmnl, libnetfilter_acct
 
-AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
+AC_CHECK_HEADER(
+    [linux/netfilter/nfnetlink_conntrack.h],
+    [AC_CHECK_DECL(
+        [CTA_STATS_MAX],
+        [have_nfnetlink_conntrack=yes],
+        [have_nfnetlink_conntrack=no],
+        [#include <linux/netfilter/nfnetlink_conntrack.h>]
+    )],
+    [have_nfnetlink_conntrack=no]
+)
 
 PKG_CHECK_MODULES(
     [NFACCT],
@@ -634,6 +643,9 @@ PKG_CHECK_MODULES(
     [have_libmnl=no]
 )
 
+test "${enable_plugin_nfacct}" = "yes" -a "${have_nfnetlink_conntrack}" != "yes" && \
+    AC_MSG_ERROR([nfnetlink_conntrack.h required but not found or too old])
+
 test "${enable_plugin_nfacct}" = "yes" -a "${have_libnetfilter_acct}" != "yes" && \
     AC_MSG_ERROR([netfilter_acct required but not found])
 
@@ -641,7 +653,9 @@ test "${enable_plugin_nfacct}" = "yes" -a "${have_libmnl}" != "yes" && \
     AC_MSG_ERROR([libmnl required but not found. Try installing 'libmnl-dev' or 'libmnl-devel'])
 
 AC_MSG_CHECKING([if nfacct.plugin should be enabled])
-if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" -a "${have_libmnl}" = "yes"; then
+if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" \
+                                          -a "${have_libmnl}" = "yes" \
+                                          -a "${have_nfnetlink_conntrack}" = "yes"; then
     enable_plugin_nfacct="yes"
     AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
     AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
