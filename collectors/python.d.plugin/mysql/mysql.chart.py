@@ -591,6 +591,7 @@ CHARTS = {
     }
 }
 
+
 def userstats_chart_template(name):
     order = [
         'userstats_rows_{0}'.format(name),
@@ -620,6 +621,7 @@ def userstats_chart_template(name):
     }
 
     return order, charts
+
 
 class Service(MySQLService):
     def __init__(self, configuration=None, name=None):
@@ -713,15 +715,17 @@ class Service(MySQLService):
         data = dict()
         userstats_vars = [e[0] for e in raw_data['user_statistics'][1]]
         for i, _ in enumerate(raw_data['user_statistics'][0]):
-            name = raw_data['user_statistics'][0][i][0]
-            userstats_raw_data = dict(zip(userstats_vars, raw_data['user_statistics'][0][i]))
+            user_name = raw_data['user_statistics'][0][i][0]
+            userstats = dict(zip(userstats_vars, raw_data['user_statistics'][0][i]))
+
             if len(self.charts) > 0:
-                if ('userstats_{0}_Cpu_time'.format(name)) not in self.charts['userstats_cpu']:
-                    self.add_userstats_dimensions(name)
-                    self.create_new_userstats_charts(name)
+                if ('userstats_{0}_Cpu_time'.format(user_name)) not in self.charts['userstats_cpu']:
+                    self.add_userstats_dimensions(user_name)
+                    self.create_new_userstats_charts(user_name)
+
             for key in USER_STATISTICS:
-                if key in userstats_raw_data:
-                    data['userstats_{0}_{1}'.format(name, key)] = userstats_raw_data[key]
+                if key in userstats:
+                    data['userstats_{0}_{1}'.format(user_name, key)] = userstats[key]
 
         return data
 
