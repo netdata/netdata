@@ -11,6 +11,7 @@ from bases.FrameworkServices.MySQLService import MySQLService
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
 QUERY_VARIABLES = 'SHOW GLOBAL VARIABLES LIKE \'max_connections\';'
+QUERY_USER_STATISTICS = 'SHOW USER_STATISTICS;'
 
 GLOBAL_STATS = [
     'Bytes_received',
@@ -150,6 +151,18 @@ SLAVE_STATS = [
     ('Slave_IO_Running', slave_running)
 ]
 
+USER_STATISTICS = [
+    'Select_commands',
+    'Update_commands',
+    'Other_commands',
+    'Cpu_time',
+    'Rows_read',
+    'Rows_sent',
+    'Rows_deleted',
+    'Rows_inserted',
+    'Rows_updated'
+]
+
 VARIABLES = [
     'max_connections'
 ]
@@ -202,7 +215,8 @@ ORDER = [
     'galera_bytes',
     'galera_queue',
     'galera_conflicts',
-    'galera_flow_control'
+    'galera_flow_control',
+    'userstats_cpu'
 ]
 
 CHARTS = {
@@ -579,8 +593,43 @@ CHARTS = {
         'lines': [
             ['wsrep_flow_control_paused_ns', 'paused', 'incremental', 1, 1000000],
         ]
+    },
+    'userstats_cpu': {
+        'options': [None, 'Users CPU time', 'percentage', 'userstats', 'mysql.userstats_cpu', 'stacked'],
+        'lines': []
     }
 }
+
+
+def userstats_chart_template(name):
+    order = [
+        'userstats_rows_{0}'.format(name),
+        'userstats_commands_{0}'.format(name)
+    ]
+    family = 'userstats {0}'.format(name)
+
+    charts = {
+        order[0]: {
+            'options': [None, 'Rows Operations', 'operations/s', family, 'mysql.userstats_rows', 'stacked'],
+            'lines': [
+                ['userstats_{0}_Rows_read'.format(name), 'read', 'incremental'],
+                ['userstats_{0}_Rows_send'.format(name), 'send', 'incremental'],
+                ['userstats_{0}_Rows_updated'.format(name), 'updated', 'incremental'],
+                ['userstats_{0}_Rows_inserted'.format(name), 'inserted', 'incremental'],
+                ['userstats_{0}_Rows_deleted'.format(name), 'deleted', 'incremental']
+            ]
+        },
+        order[1]: {
+            'options': [None, 'Commands', 'commands/s', family, 'mysql.userstats_commands', 'stacked'],
+            'lines': [
+                ['userstats_{0}_Select_commands'.format(name), 'select', 'incremental'],
+                ['userstats_{0}_Update_commands'.format(name), 'update', 'incremental'],
+                ['userstats_{0}_Other_commands'.format(name), 'other', 'incremental']
+            ]
+        }
+    }
+
+    return order, charts
 
 
 class Service(MySQLService):
@@ -592,6 +641,7 @@ class Service(MySQLService):
             global_status=QUERY_GLOBAL,
             slave_status=QUERY_SLAVE,
             variables=QUERY_VARIABLES,
+            user_statistics=QUERY_USER_STATISTICS,
         )
 
     def _get_data(self):
@@ -621,6 +671,12 @@ class Service(MySQLService):
             else:
                 self.queries.pop('slave_status')
 
+        if 'user_statistics' in raw_data:
+            if raw_data['user_statistics'][0]:
+                to_netdata.update(self.get_userstats(raw_data))
+            else:
+                self.queries.pop('user_statistics')
+
         if 'variables' in raw_data:
             variables = dict(raw_data['variables'][0])
             for key in VARIABLES:
@@ -628,3 +684,70 @@ class Service(MySQLService):
                     to_netdata[key] = variables[key]
 
         return to_netdata or None
+
+    # raw_data['user_statistics'] contains the following data structure:
+    #   (
+    #       (
+    #           ('netdata', 42L, 0L, 1264L, 3.111252999999968, 2.968510299999994, 110267L, 19741424L, 0L, 0L, 1265L, 0L,
+    #           0L, 0L, 3L, 0L, 1301L, 0L, 0L, 7633L, 0L, 83L, 44L, 0L, 0L),
+    #           ('root', 60L, 0L, 184L, 0.22856499999999966, 0.1601419999999998, 11605L, 1516513L, 0L, 9L, 220L, 0L, 2L, 1L,
+    #           6L, 4L,127L, 0L, 0L, 45L, 0L, 45L, 0L, 0L, 0L)
+    #        ),
+    #    (
+    #        ('User', 253, 9, 128, 128, 0, 0),
+    #        ('Total_connections', 3, 2, 11, 11, 0, 0),
+    #        ('Concurrent_connections', 3, 1, 11, 11, 0, 0),
+    #        ('Connected_time', 3, 4, 11, 11, 0, 0),
+    #        ('Busy_time', 5, 21, 21, 21, 31, 0),
+    #        ('Cpu_time', 5, 18, 21, 21, 31, 0),
+    #        ('Bytes_received', 8, 6, 21, 21, 0, 0),
+    #        ('Bytes_sent', 8, 8, 21, 21, 0, 0),
+    #        ('Binlog_bytes_written', 8, 1, 21, 21, 0, 0),
+    #        ('Rows_read', 8, 1, 21, 21, 0, 0),
+    #        ('Rows_sent', 8, 4, 21, 21, 0, 0),
+    #        ('Rows_deleted', 8, 1, 21, 21, 0, 0),
+    #        ('Rows_inserted', 8, 1, 21, 21, 0, 0),
+    #        ('Rows_updated', 8, 1, 21, 21, 0, 0),
+    #        ('Select_commands', 8, 1, 21, 21, 0, 0),
+    #        ('Update_commands', 8, 1, 21, 21, 0, 0),
+    #        ('Other_commands', 8, 4, 21, 21, 0, 0),
+    #        ('Commit_transactions', 8, 1, 21, 21, 0, 0),
+    #        ('Rollback_transactions', 8, 1, 21, 21, 0, 0),
+    #        ('Denied_connections', 8, 4, 21, 21, 0, 0),
+    #        ('Lost_connections', 8, 1, 21, 21, 0, 0),
+    #        ('Access_denied', 8, 2, 21, 21, 0, 0),
+    #        ('Empty_queries', 8, 2, 21, 21, 0, 0),
+    #        ('Total_ssl_connections', 8, 1, 21, 21, 0, 0),
+    #        ('Max_statement_time_exceeded', 8, 1, 21, 21, 0, 0)),
+    #   )
+    def get_userstats(self, raw_data):
+        data = dict()
+        userstats_vars = [e[0] for e in raw_data['user_statistics'][1]]
+        for i, _ in enumerate(raw_data['user_statistics'][0]):
+            user_name = raw_data['user_statistics'][0][i][0]
+            userstats = dict(zip(userstats_vars, raw_data['user_statistics'][0][i]))
+
+            if len(self.charts) > 0:
+                if ('userstats_{0}_Cpu_time'.format(user_name)) not in self.charts['userstats_cpu']:
+                    self.add_userstats_dimensions(user_name)
+                    self.create_new_userstats_charts(user_name)
+
+            for key in USER_STATISTICS:
+                if key in userstats:
+                    data['userstats_{0}_{1}'.format(user_name, key)] = userstats[key]
+
+        return data
+
+    def add_userstats_dimensions(self, name):
+        self.charts['userstats_cpu'].add_dimension(['userstats_{0}_Cpu_time'.format(name), name, 'incremental', 100, 1])
+
+    def create_new_userstats_charts(self, tube):
+        order, charts = userstats_chart_template(tube)
+
+        for chart_name in order:
+            params = [chart_name] + charts[chart_name]['options']
+            dimensions = charts[chart_name]['lines']
+
+            new_chart = self.charts.add_chart(params)
+            for dimension in dimensions:
+                new_chart.add_dimension(dimension)
