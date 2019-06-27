@@ -2,6 +2,10 @@
 
 #include "health.h"
 
+typedef struct health_internal_error {
+
+};
+
 // ----------------------------------------------------------------------------
 // health alarm log load/save
 // no need for locking - only one thread is reading / writing the alarms log
