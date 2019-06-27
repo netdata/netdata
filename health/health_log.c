@@ -190,19 +190,26 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                         RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log, (avl *)rc);
                         if(rdcmp != rc) {
                             error("Cannot insert the alarm index ID using log %s", rc->name);
-                        }
+                        } else {
+                            if(rrdcalc_isrepeating(rc)) {
+                                fprintf(stderr,"KILLME FIRST %s %lu %lu %d %s\n",rc->name,(size_t)last_repeat,(size_t)rc->next_update,rc->update_every,rc->units);
+                                rc->last_repeat = last_repeat;
+                            }
 
-                    }
-
-                    rc = alarm_max_last_repeat(host, alarm_id);
-                    if(rc) {
-                        if(rrdcalc_isrepeating(rc)) {
-                            rc->last_repeat = last_repeat;
                         }
                     }
                 }
+
+                if(unlikely(rc)) {
+                    rc->last_repeat = last_repeat;
+                    // We iterate through repeating alarm entries only to
+                    // find the latest last_repeat timestamp. Otherwise,
+                    // there is no need to keep them in memory.
+                    continue;
+                }
             }
 
+            //BEGIN MOVE FROM HERE
             if(unlikely(*pointers[0] == 'A')) {
                 // make sure it is properly numbered
                 if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
@@ -326,6 +333,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             error("HEALTH [%s]: line %zu of file '%s' is invalid (unrecognized entry type '%s').", host->hostname, line, filename, pointers[0]);
             errored++;
         }
+        //FINISH MOVE FROM HERE
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
@@ -351,6 +359,7 @@ inline void health_alarm_log_load(RRDHOST *host) {
     if(!fp)
         error("HEALTH [%s]: cannot open health file: %s", host->hostname, filename);
     else {
+        fprintf(stderr,"KILLME filename %s\n",filename);
         health_alarm_log_read(host, fp, filename);
         fclose(fp);
     }
