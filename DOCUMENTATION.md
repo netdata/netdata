@@ -3,7 +3,7 @@
 **Netdata is real-time health monitoring and performance troubleshooting for systems and applications.** It helps you instantly diagnose slowdowns and anomalies in your infrastructure with thousands of metrics, interactive visualizations, and insightful health alarms.
 
 
-## Navigating the Netdata documentation
+## Getting started with Netdata
 
 Welcome! You've arrived at the documentation for Netdata. Use the links below to find answers to the most common questions about Netdata, such as how to install it, getting started guides, basic configuration, and adding more charts. Or, explore all of Netdata's documentation using the table of contents to your left.
  
@@ -31,6 +31,7 @@ Visit the [contributing](CONTRIBUTING.md) page to find guides about the Netdata 
 <script>
   hbspt.forms.create({
 <<<<<<< HEAD
+<<<<<<< HEAD
     portalId: "4567453",
     formId: "6a20deb5-a1e6-4312-9c4d-f6862f947fe0"
 });
@@ -44,3 +45,12 @@ Visit the [contributing](CONTRIBUTING.md) page to find guides about the Netdata 
 });
 </script>
 >>>>>>> Move documentation homepage and got script mostly working
+=======
+    portalId: "4567453",
+    formId: "6a20deb5-a1e6-4312-9c4d-f6862f947fe0"
+});
+</script>
+
+
+![A GIF of the standard Netdata dashboard](https://user-images.githubusercontent.com/2662304/48346998-96cf3180-e685-11e8-9f4e-059d23aa3aa5.gif)
+>>>>>>> Final changes based on C&C feedback
