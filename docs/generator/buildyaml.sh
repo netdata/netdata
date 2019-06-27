@@ -53,7 +53,7 @@ repo_url: https://github.com/netdata/netdata
 repo_name: GitHub
 edit_uri: blob/master
 site_description: Netdata Documentation
-copyright: Netdata, 2018
+copyright: Netdata, 2019
 docs_dir: '${docs_dir}'
 site_dir: '${site_dir}'
 #use_directory_urls: false
