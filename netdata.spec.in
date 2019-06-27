@@ -139,15 +139,18 @@ Requires(post): libcap
 # rather than the standard ones
 
 # nfacct plugin dependencies
-%if 0%{?fedora} || 0%{?suse_version} >= 1140
 BuildRequires:  libmnl-devel
+%if 0%{?fedora} || 0%{?suse_version} >= 1140
 BuildRequires:  libnetfilter_acct-devel
+%endif
 
 %if 0%{?suse_version}
 Requires: libmnl0
 %else
 Requires: libmnl
 %endif
+
+%if 0%{?fedora} || 0%{?suse_version} >= 1140
 Requires: libnetfilter_acct
 %endif
 # end nfacct plugin dependencies
@@ -180,7 +183,7 @@ autoreconf -ivf
 	--prefix="/usr" \
 	--sysconfdir="/etc" \
 	--localstatedir="/var" \
-	--libexecdir="${_libexecdir}" \
+	--libexecdir="%{_libexecdir}" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
@@ -203,6 +206,18 @@ install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 # logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
 install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
+
+# ###########################################################
+# Install freeipmi
+install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
+
+# ###########################################################
+# Install apps.plugin
+install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/apps.plugin"
+
+# ###########################################################
+# Install perf.plugin
+install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
 # Install netdata service
