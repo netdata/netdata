@@ -11,6 +11,10 @@
 # define NETDATA_SSL_INVALID_CERTIFICATE 64  //Accepts invalid certificate
 # define NETDATA_SSL_VALID_CERTIFICATE 128  //Accepts invalid certificate
 
+#define NETDATA_SSL_CONTEXT_SERVER 0
+#define NETDATA_SSL_CONTEXT_STREAMING 1
+#define NETDATA_SSL_CONTEXT_OPENTSDB 2
+
 # ifdef ENABLE_HTTPS
 
 #  include <openssl/ssl.h>
@@ -24,6 +28,7 @@ struct netdata_ssl{
     int flags;
 };
 
+extern SSL_CTX *netdata_opentsdb_ctx;
 extern SSL_CTX *netdata_client_ctx;
 extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
@@ -34,7 +39,7 @@ extern int netdata_validate_server;
 
 void security_openssl_library();
 void security_clean_openssl();
-void security_start_ssl(int type);
+void security_start_ssl(int selector);
 int security_process_accept(SSL *ssl,int msg);
 int security_test_certificate(SSL *ssl);
 

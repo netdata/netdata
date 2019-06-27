@@ -458,7 +458,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
                 fatal("LISTENER: no listen sockets available.");
 
 #ifdef ENABLE_HTTPS
-            security_start_ssl(0);
+            security_start_ssl(NETDATA_SSL_CONTEXT_SERVER);
 #endif
             // 6 threads is the optimal value
             // since 6 are the parallel connections browsers will do

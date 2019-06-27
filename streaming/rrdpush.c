@@ -651,7 +651,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
 #ifdef ENABLE_HTTPS
     if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
-        security_start_ssl(1);
+        security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
     }
 #endif
 

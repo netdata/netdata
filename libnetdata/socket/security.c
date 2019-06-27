@@ -2,6 +2,7 @@
 
 #ifdef ENABLE_HTTPS
 
+SSL_CTX *netdata_opentsdb_ctx=NULL;
 SSL_CTX *netdata_client_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
@@ -10,6 +11,15 @@ int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 int netdata_use_ssl_on_http = NETDATA_SSL_FORCE; //We force SSL due safety reasons
 int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
+/**
+ * Info Callback
+ *
+ * Function used as callback for the OpenSSL Library
+ *
+ * @param ssl a pointer to the SSL structure of the client
+ * @param where the variable with the flags set.
+ * @param ret the return of the caller
+ */
 static void security_info_callback(const SSL *ssl, int where, int ret) {
     (void)ssl;
     if (where & SSL_CB_ALERT) {
@@ -17,6 +27,11 @@ static void security_info_callback(const SSL *ssl, int where, int ret) {
     }
 }
 
+/**
+ * OpenSSL Library
+ *
+ * Starts the openssl library for the Netdata.
+ */
 void security_openssl_library()
 {
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -36,6 +51,13 @@ void security_openssl_library()
 #endif
 }
 
+/**
+ * OpenSSL common options
+ *
+ * Clients and SERVER have common options, this function is responsible to set them in the context.
+ *
+ * @param ctx
+ */
 void security_openssl_common_options(SSL_CTX *ctx) {
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
     static char *ciphers = {"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"};
@@ -55,10 +77,15 @@ void security_openssl_common_options(SSL_CTX *ctx) {
         error("SSL error. cannot set the cipher list");
     }
 #endif
-
-
 }
 
+/**
+ * Initialize Openssl Client
+ *
+ * Starts the client context with TLS 1.2.
+ *
+ * @return It returns the context on success or NULL otherwise
+ */
 static SSL_CTX * security_initialize_openssl_client() {
     SSL_CTX *ctx;
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
@@ -66,11 +93,20 @@ static SSL_CTX * security_initialize_openssl_client() {
 #else
     ctx = SSL_CTX_new(TLS_client_method());
 #endif
-    security_openssl_common_options(ctx);
+    if(ctx) {
+        security_openssl_common_options(ctx);
+    }
 
     return ctx;
 }
 
+/**
+ * Initialize OpenSSL server
+ *
+ * Starts the server context with TLS 1.2 and load the certificate.
+ *
+ * @return It returns the context on success or NULL otherwise
+ */
 static SSL_CTX * security_initialize_openssl_server() {
     SSL_CTX *ctx;
     char lerror[512];
@@ -116,18 +152,36 @@ static SSL_CTX * security_initialize_openssl_server() {
     return ctx;
 }
 
-void security_start_ssl(int type) {
-    if (!type) {
-        struct stat statbuf;
-        if (stat(security_key,&statbuf) || stat(security_cert,&statbuf)) {
-            info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
-            return;
-        }
+/**
+ * Start SSL
+ *
+ * Call the correct function to start the SSL context.
+ *
+ * @param selector informs the context that must be initialized, the following list has the valid values:
+ *      NETDATA_SSL_CONTEXT_SERVER - the server context
+ *      NETDATA_SSL_CONTEXT_STREAMING - Starts the streaming context.
+ *      NETDATA_SSL_CONTEXT_OPENTSDB - Starts the OpenTSDB contextv
+ */
+void security_start_ssl(int selector) {
+    switch (selector) {
+        case NETDATA_SSL_CONTEXT_SERVER: {
+            struct stat statbuf;
+            if (stat(security_key,&statbuf) || stat(security_cert,&statbuf)) {
+                info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
+                return;
+            }
 
-        netdata_srv_ctx =  security_initialize_openssl_server();
-    }
-    else {
-        netdata_client_ctx =  security_initialize_openssl_client();
+            netdata_srv_ctx =  security_initialize_openssl_server();
+            break;
+        }
+        case NETDATA_SSL_CONTEXT_STREAMING: {
+            netdata_client_ctx = security_initialize_openssl_client();
+            break;
+        }
+        case NETDATA_SSL_CONTEXT_OPENTSDB: {
+            netdata_opentsdb_ctx = security_initialize_openssl_client();
+            break;
+        }
     }
 }
 
@@ -140,6 +194,11 @@ void security_clean_openssl() {
     if (netdata_client_ctx)
     {
         SSL_CTX_free(netdata_client_ctx);
+    }
+
+    if ( netdata_opentsdb_ctx )
+    {
+        SSL_CTX_free(netdata_opentsdb_ctx);
     }
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
