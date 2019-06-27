@@ -6,6 +6,9 @@
 # error.
 %global __os_install_post %{nil}
 
+# Mitigate the cross-distro mayhem by strictly defining the libexec destination
+%define _libexecdir /usr/libexec
+
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
@@ -177,7 +180,7 @@ autoreconf -ivf
 	--prefix="/usr" \
 	--sysconfdir="/etc" \
 	--localstatedir="/var" \
-	--libexecdir="/usr/libexec" \
+	--libexecdir="${_libexecdir}" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
