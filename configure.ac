@@ -143,6 +143,12 @@ AC_ARG_ENABLE(
     [enable_https="detect"]
 )
 AC_ARG_ENABLE(
+    [jsonc],
+    [AS_HELP_STRING([--enable-jsonc], [Enable JSON-C support @<:@default autodetect@:>@])],
+    ,
+    [enable_jsonc="detect"]
+)
+AC_ARG_ENABLE(
     [dbengine],
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
@@ -348,6 +354,20 @@ OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
 OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 
 # -----------------------------------------------------------------------------
+# JSON-C library
+
+PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
+    [json-c],
+    [json_object_get_type],
+    [JSONC_LIBS="-ljson-c"]),AC_CHECK_LIB(
+        [json],
+        [json_object_get_type],
+        [JSONC_LIBS="-ljson"])
+    )
+
+OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
+
+# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
     AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
@@ -380,6 +400,22 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# JSON-C
+test "${enable_jsonc}" = "yes" -a -z "${JSONC_LIBS}" && \
+    AC_MSG_ERROR([JSON-C required but not found. Try installing 'libjson-c-dev' or 'json-c'.])
+
+AC_MSG_CHECKING([if json-c should be used])
+if test "${enable_jsonc}" != "no" -a "${JSONC_LIBS}"; then
+	enable_jsonc="yes"
+	AC_DEFINE([ENABLE_JSONC], [1], [netdata json-c usability])
+else
+	enable_jsonc="no"
+fi
+AC_MSG_RESULT([${enable_jsonc}])
+AM_CONDITIONAL([ENABLE_JSONC], [test "${enable_jsonc}" = "yes"])
+
 
 # -----------------------------------------------------------------------------
 # compiler options
@@ -961,6 +997,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
+AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
@@ -1027,6 +1064,8 @@ AC_CONFIG_FILES([
     libnetdata/config/Makefile
     libnetdata/dictionary/Makefile
     libnetdata/eval/Makefile
+    libnetdata/json/Makefile
+    libnetdata/health/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/popen/Makefile

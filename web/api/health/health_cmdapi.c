@@ -1,17 +1,16 @@
 //
-// Created by christopher on 11/12/18.
+// Created by Christopher on 11/12/18.
 //
 
 #include "health_cmdapi.h"
 
-
-static SILENCER *create_silencer(void) {
-    SILENCER *t = callocz(1, sizeof(SILENCER));
-    debug(D_HEALTH, "HEALTH command API: Created empty silencer");
-
-    return t;
-}
-
+/**
+ * Free Silencers
+ *
+ * Clean the silencer structure
+ *
+ * @param t is the structure that will be cleaned.
+ */
 void free_silencers(SILENCER *t) {
     if (!t) return;
     if (t->next) free_silencers(t->next);
@@ -31,13 +30,94 @@ void free_silencers(SILENCER *t) {
     return;
 }
 
+/**
+ * Silencers to JSON Entry
+ *
+ * Fill the buffer with the other values given.
+ *
+ * @param wb a pointer to the output buffer
+ * @param var the json variable
+ * @param val the json value
+ * @param hasprev has it a previous value?
+ *
+ * @return
+ */
+int health_silencers2json_entry(BUFFER *wb, char* var, char* val, int hasprev) {
+    if (val) {
+        buffer_sprintf(wb, "%s\n\t\t\t\"%s\": \"%s\"", (hasprev)?",":"", var, val);
+        return 1;
+    } else {
+        return hasprev;
+    }
+}
 
+/**
+ * Silencer to JSON
+ *
+ * Write the silencer values using JSON format inside a buffer.
+ *
+ * @param wb is the buffer to write the silencers.
+ */
+void health_silencers2json(BUFFER *wb) {
+    buffer_sprintf(wb, "{\n\t\"all\": %s,"
+                       "\n\t\"type\": \"%s\","
+                       "\n\t\"silencers\": [",
+                   (silencers->all_alarms)?"true":"false",
+                   (silencers->stype == STYPE_NONE)?"None":((silencers->stype == STYPE_DISABLE_ALARMS)?"DISABLE":"SILENCE"));
 
+    SILENCER *silencer;
+    int i = 0, j = 0;
+    for(silencer = silencers->silencers; silencer ; silencer = silencer->next) {
+        if(likely(i)) buffer_strcat(wb, ",");
+        buffer_strcat(wb, "\n\t\t{");
+        j=health_silencers2json_entry(wb, HEALTH_ALARM_KEY, silencer->alarms, j);
+        j=health_silencers2json_entry(wb, HEALTH_CHART_KEY, silencer->charts, j);
+        j=health_silencers2json_entry(wb, HEALTH_CONTEXT_KEY, silencer->contexts, j);
+        j=health_silencers2json_entry(wb, HEALTH_HOST_KEY, silencer->hosts, j);
+        health_silencers2json_entry(wb, HEALTH_FAMILIES_KEY, silencer->families, j);
+        j=0;
+        buffer_strcat(wb, "\n\t\t}");
+        i++;
+    }
+    if(likely(i)) buffer_strcat(wb, "\n\t");
+    buffer_strcat(wb, "]\n}\n");
+}
+
+/**
+ * Silencer to FILE
+ *
+ * Write the sliencer buffer to a file.
+ * @param wb
+ */
+void health_silencers2file(BUFFER *wb) {
+    if (wb->len == 0) return;
+
+    FILE *fd = fopen(silencers_filename, "wb");
+    if(fd) {
+        size_t written = (size_t)fprintf(fd, "%s", wb->buffer) ;
+        if (written == wb->len ) {
+            info("Silencer changes written to %s", silencers_filename);
+        }
+        fclose(fd);
+        return;
+    }
+    error("Silencer changes could not be written to %s. Error %s", silencers_filename, strerror(errno));
+}
+
+/**
+ * Request V1 MGMT Health
+ *
+ * Function called by api to management the health.
+ *
+ * @param host main structure with client information!
+ * @param w is the structure with all information of the client request.
+ * @param url is the url that netdata is working
+ *
+ * @return It returns 200 on success and another code otherwise.
+ */
 int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url) {
     int ret = 400;
     (void) host;
-
-
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -45,24 +125,9 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
 
     buffer_flush(w->response.data);
 
-    static uint32_t
-            hash_alarm = 0,
-            hash_template = 0,
-            hash_chart = 0,
-            hash_context = 0,
-            hash_host = 0,
-            hash_families = 0;
-
-    if (unlikely(!hash_alarm)) {
-        hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
-        hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
-        hash_chart = simple_uhash(HEALTH_CHART_KEY);
-        hash_context = simple_uhash(HEALTH_CONTEXT_KEY);
-        hash_host = simple_uhash(HEALTH_HOST_KEY);
-        hash_families = simple_uhash(HEALTH_FAMILIES_KEY);
-    }
-
+    //Local instance of the silencer
     SILENCER *silencer = NULL;
+    int config_changed = 1;
 
     if (!w->auth_bearer_token) {
         buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
@@ -85,6 +150,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
 
                 // name and value are now the parameters
                 if (!strcmp(key, "cmd")) {
+                    //In this "if" we are working with the global silencers.
                     if (!strcmp(value, HEALTH_CMDAPI_CMD_SILENCEALL)) {
                         silencers->all_alarms = 1;
                         silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
@@ -105,50 +171,19 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                         free_silencers(silencers->silencers);
                         silencers->silencers = NULL;
                         buffer_strcat(wb, HEALTH_CMDAPI_MSG_RESET);
+                    } else if (!strcmp(value, HEALTH_CMDAPI_CMD_LIST)) {
+                        w->response.data->contenttype = CT_APPLICATION_JSON;
+                        health_silencers2json(wb);
+                        config_changed=0;
                     }
                 } else {
-                    uint32_t hash = simple_uhash(key);
-                    if (unlikely(silencer == NULL)) {
-                        if (
-                                (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) ||
-                                (hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) ||
-                                (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) ||
-                                (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) ||
-                                (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) ||
-                                (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY))
-                                ) {
-                            silencer = create_silencer();
-                        }
-                    }
-
-                    if (hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
-                        silencer->alarms = strdupz(value);
-                        silencer->alarms_pattern = simple_pattern_create(silencer->alarms, NULL, SIMPLE_PATTERN_EXACT);
-                    } else if (hash == hash_chart && !strcasecmp(key, HEALTH_CHART_KEY)) {
-                        silencer->charts = strdupz(value);
-                        silencer->charts_pattern = simple_pattern_create(silencer->charts, NULL, SIMPLE_PATTERN_EXACT);
-                    } else if (hash == hash_context && !strcasecmp(key, HEALTH_CONTEXT_KEY)) {
-                        silencer->contexts = strdupz(value);
-                        silencer->contexts_pattern = simple_pattern_create(silencer->contexts, NULL, SIMPLE_PATTERN_EXACT);
-                    } else if (hash == hash_host && !strcasecmp(key, HEALTH_HOST_KEY)) {
-                        silencer->hosts = strdupz(value);
-                        silencer->hosts_pattern = simple_pattern_create(silencer->hosts, NULL, SIMPLE_PATTERN_EXACT);
-                    } else if (hash == hash_families && !strcasecmp(key, HEALTH_FAMILIES_KEY)) {
-                        silencer->families = strdupz(value);
-                        silencer->families_pattern = simple_pattern_create(silencer->families, NULL, SIMPLE_PATTERN_EXACT);
-                    } else {
-                        buffer_strcat(wb, HEALTH_CMDAPI_MSG_INVALID_KEY);
-                    }
+                    //In this else we work with local silencer
+                    silencer = health_silencers_addparam(silencer,key,value);
                 }
-
             }
+
             if (likely(silencer)) {
-                // Add the created instance to the linked list in silencers
-                silencer->next = silencers->silencers;
-                silencers->silencers = silencer;
-                debug(D_HEALTH, "HEALTH command API: Added silencer %s:%s:%s:%s:%s", silencer->alarms,
-                      silencer->charts, silencer->contexts, silencer->hosts, silencer->families
-                );
+                health_silencers_add(silencer);
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_ADDED);
                 if (silencers->stype == STYPE_NONE) {
                     buffer_strcat(wb, HEALTH_CMDAPI_MSG_STYPEWARNING);
@@ -162,5 +197,10 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
     }
     w->response.data = wb;
     buffer_no_cacheable(w->response.data);
+    if (ret == 200 && config_changed) {
+        BUFFER *jsonb = buffer_create(200);
+        health_silencers2json(jsonb);
+        health_silencers2file(jsonb);
+    }
     return ret;
 }

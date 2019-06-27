@@ -159,8 +159,14 @@ LIBNETDATA_FILES = \
     libnetdata/storage_number/storage_number.h \
     libnetdata/threads/threads.c \
     libnetdata/threads/threads.h \
-	libnetdata/url/url.c \
-	libnetdata/url/url.h \
+    libnetdata/url/url.c \
+    libnetdata/url/url.h \
+    libnetdata/json/jsmn.h \
+    libnetdata/json/jsmn.c \
+    libnetdata/json/json.h \
+    libnetdata/json/json.c \
+    libnetdata/health/health.c \
+    libnetdata/health/health.h \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
@@ -506,12 +512,12 @@ endif
 NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_MATH_LIBS) \
 	$(OPTIONAL_ZLIB_LIBS) \
-	$(OPTIONAL_SSL_LIBS) \
 	$(OPTIONAL_UUID_LIBS) \
 	$(OPTIONAL_UV_LIBS) \
 	$(OPTIONAL_LZ4_LIBS) \
 	$(OPTIONAL_JUDY_LIBS) \
 	$(OPTIONAL_SSL_LIBS) \
+	$(OPTIONAL_JSONC_LIBS) \
 	$(NULL)
 
 sbin_PROGRAMS += netdata
