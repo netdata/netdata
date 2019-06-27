@@ -12,27 +12,27 @@ Or, use the navigation menu on the left-hand side to find other information, lik
 
 ## Learn about the fundamentals of Netdata
 
-[Home](../)
+[What is Netdata?](README.md)
 
-[What is Netdata?]()
-
-[Why should I choose Netdata?](../docs/why-netdata/)
+[Why should I choose Netdata?](docs/why-netdata/)
 
 
 ## Geting started with Netdata
 
-[Getting started guide]()
+[Installation](packaging/installer/#installation)
 
-[Configuration guide]()
+[Getting started guide](docs/GettingStarted.md)
+
+[Configuration guide](docs/configuration-guide.md)
 
 
 ## Advanced Netdata configurations
 
-[Adding more charts to the Netdata dashboard]()
+[Adding more charts to the Netdata dashboard](docs/Add-more-charts-to-netdata.md)
 
-[alarm notifications](../health/notifications/#netdata-alarm-notifications)
+[alarm notifications](health/notifications/#netdata-alarm-notifications)
 
-[Netdata registry](../registry/#registry)
+[Netdata registry](registry/#registry)
 
 ## Contributing
 

@@ -27,7 +27,7 @@ find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o 
 # Move main README.md file to what-is-netdata.md
 echo "Replacing docs homepage"
 mv ./${SRC_DIR}/README.md ./${SRC_DIR}/what-is-netdata.md
-mv ./${SRC_DIR}/docs/home.md ./${SRC_DIR}/README.md
+mv ./${SRC_DIR}/DOCUMENTATION.md ./${SRC_DIR}/README.md
 
 # Copy Netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
@@ -77,6 +77,9 @@ prep_html() {
 
 	# Fix links (recursively, all types, executing replacements)
 	${GENERATOR_DIR}/checklinks.sh -rax
+
+	# Fix link in DOCUMENTATION.md to old README.md
+	sed -i -e 's/README.md/what-is-netdata.md/' ${DOCS_DIR}/README.md
 
 	echo "Calling mkdocs"
 
