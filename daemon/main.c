@@ -1217,7 +1217,7 @@ int main(int argc, char **argv) {
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
   
-    send_statistics("START","-", "-");
+    send_statistics("START", "-",  "-");
 
     // ------------------------------------------------------------------------
     // unblock signals

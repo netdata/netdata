@@ -249,7 +249,9 @@ static inline uint32_t health_parse_options(const char *s) {
 }
 
 static inline int health_parse_repeat(
-        size_t line, const char *file, char *string,
+        size_t line,
+        const char *file,
+        char *string,
         uint32_t *warn_repeat_every,
         uint32_t *crit_repeat_every
 ) {

@@ -1030,8 +1030,7 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
 
-extern int alarm_compare_id(void *a,void *b);
-extern int alarm_compare_name(void *a,void *b);
+extern int alarm_compare_id(void *a, void *b);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions

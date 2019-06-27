@@ -439,7 +439,7 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     }
 
     if (rc) {
-        RRDCALC *rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log,(avl *)rc);
+        RRDCALC *rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl *)rc);
         if (!rdcmp) {
             error("Cannot remove the alarm index");
         }
@@ -465,7 +465,7 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
 int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
     RRDCALC findme;
     findme.id = alarm_id;
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log,(avl *)&findme);
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log, (avl *)&findme);
     if (!rc) {
         return 0;
     }
@@ -496,10 +496,10 @@ int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
  *
  * @return It returns 1 case it is repeating and 0 otherwise
  */
-RRDCALC *alarm_max_last_repeat(RRDHOST *host,uint32_t alarm_id) {
+RRDCALC *alarm_max_last_repeat(RRDHOST *host, uint32_t alarm_id) {
     RRDCALC findme;
     findme.id = alarm_id;
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log,(avl *)&findme);
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log, (avl *)&findme);
 
     return rc;
 }

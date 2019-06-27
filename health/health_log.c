@@ -186,28 +186,28 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
                     health_from_file = 1;
                     //This function is called before I add any new RRDCALC, so case I cannot
                     //find the string that I want, I must load it
-                    for(rc = host->alarms; rc; rc = rc->next) {
-                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
-                        if (rdcmp != rc) {
-                            error("Cannot insert the alarm index ID using log %s",rc->name);
+                    for(rc = host->alarms; rc ; rc = rc->next) {
+                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log, (avl *)rc);
+                        if(rdcmp != rc) {
+                            error("Cannot insert the alarm index ID using log %s", rc->name);
+                        }
+
+                    }
+
+                    rc = alarm_max_last_repeat(host, alarm_id);
+                    if(rc) {
+                        if(rrdcalc_isrepeating(rc)) {
+                            rc->last_repeat = last_repeat;
                         }
                     }
-                    rc = alarm_max_last_repeat(host, alarm_id);
-                }
-
-                if(unlikely(rc)) {
-                    rc->last_repeat = last_repeat;
-                    // We iterate through repeating alarm entries only to
-                    // find the latest last_repeat timestamp. Otherwise,
-                    // there is no need to keep them in memory.
-                    continue;
                 }
             }
 
             if(unlikely(*pointers[0] == 'A')) {
                 // make sure it is properly numbered
                 if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
-                    error("HEALTH [%s]: line %zu of file '%s' has alarm log entry %u in wrong order. Ignoring it.", host->hostname, line, filename, unique_id);
+                    error( "HEALTH [%s]: line %zu of file '%s' has alarm log entry %u in wrong order. Ignoring it."
+                           , host->hostname, line, filename, unique_id);
                     errored++;
                     continue;
                 }
@@ -216,7 +216,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             }
             else if(unlikely(*pointers[0] == 'U')) {
                 // find the original
-                for(ae = host->health_log.alarms; ae; ae = ae->next) {
+                for(ae = host->health_log.alarms; ae ; ae = ae->next) {
                     if(unlikely(unique_id == ae->unique_id)) {
                         if(unlikely(*pointers[0] == 'A')) {
                             error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."

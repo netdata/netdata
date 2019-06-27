@@ -416,7 +416,7 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
                 debug(D_HEALTH, "Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rc->name);
             } else {
                 debug(D_HEALTH, "Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
-                        , (silencers->stype==STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
+                        , (silencers->stype == STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
                         , rc->name
                         , (rc->rrdset)?rc->rrdset->context:""
                         , rc->chart
