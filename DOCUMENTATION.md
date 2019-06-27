@@ -30,6 +30,7 @@ Visit the [contributing](CONTRIBUTING.md) page to find guides about the Netdata 
 <script charset="utf-8" type="text/javascript" src="//js.hsforms.net/forms/shell.js"></script>
 <script>
   hbspt.forms.create({
+<<<<<<< HEAD
     portalId: "4567453",
     formId: "6a20deb5-a1e6-4312-9c4d-f6862f947fe0"
 });
@@ -37,3 +38,9 @@ Visit the [contributing](CONTRIBUTING.md) page to find guides about the Netdata 
 
 
 ![A GIF of the standard Netdata dashboard](https://user-images.githubusercontent.com/2662304/48346998-96cf3180-e685-11e8-9f4e-059d23aa3aa5.gif)
+=======
+	portalId: "4567453",
+	formId: "6a20deb5-a1e6-4312-9c4d-f6862f947fe0"
+});
+</script>
+>>>>>>> Move documentation homepage and got script mostly working

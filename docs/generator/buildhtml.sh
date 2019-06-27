@@ -78,6 +78,9 @@ prep_html() {
 	# Fix links (recursively, all types, executing replacements)
 	${GENERATOR_DIR}/checklinks.sh -rax
 
+	# Fix link in DOCUMENTATION.md to old README.md
+	sed -i -e 's/README.md/what-is-netdata.md/' ${DOCS_DIR}/README.md
+
 	echo "Calling mkdocs"
 
 	# Build html docs
