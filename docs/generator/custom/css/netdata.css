@@ -22,12 +22,7 @@
 /* Add some whitespace to the bottom of each doc. */
 .md-content {
     margin-bottom: 6rem;
-}
-
-.md-nav__title {
-    display: none;
-}
-/* Make sure inline code in tables doesn't break. */
+}/* Make sure inline code in tables doesn't break. */
 .md-typeset__table code {
     word-break: normal;
 }
