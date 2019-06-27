@@ -15,12 +15,12 @@ it is necessary to set the following options in your netdata.conf
 
 Netdata also supports sending the metrics using SSL/TLS, but OpenTDSB does not have support to safety connections,
 so it will be necessary to configure a reverse-proxy to enable the HTTPS communication. After to configure your proxy the
-following changes must be done in the netdata.conf
+following changes must be done in the netdata.conf:
 
 ```
 [backend]
     type = opentsdb:https
     destination = localhost:8082
 ```
-, in this example we used the port 8082 for our reverse proxy.
 
+In this example we used the port 8082 for our reverse proxy.
