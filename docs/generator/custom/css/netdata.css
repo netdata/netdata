@@ -27,3 +27,4 @@
 /* Make sure inline code in tables doesn't break. */
 .md-typeset__table code {
     word-break: normal;
+}
