@@ -437,10 +437,10 @@ paths:
       parameters:
         - name: cmd
           in: query
-          description: 'DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors. LIST: Show active configuration.'
+          description: 'DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors.'
           required: false
           type: string
-          enum: ['DISABLE ALL', 'SILENCE ALL', 'DISABLE', 'SILENCE', 'RESET', 'LIST']
+          enum: ['DISABLE ALL', 'SILENCE ALL', 'DISABLE', 'SILENCE', 'RESET']
         - name: alarm
           in: query
           description: 'The expression provided will match both `alarm` and `template` names.'

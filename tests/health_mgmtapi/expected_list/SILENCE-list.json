@@ -1,1 +1,0 @@
-{ "all": false, "type": "SILENCE", "silencers": [ { "alarm": "*10min_cpu_usage *load_trigger" } ] }

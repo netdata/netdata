@@ -1,1 +1,0 @@
-{ "all": false, "type": "SILENCE", "silencers": [ { "hosts": "*" } ] }

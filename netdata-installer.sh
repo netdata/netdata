@@ -175,7 +175,6 @@ USAGE: ${PROGRAM} [options]
   --libs-are-really-here     If you get errors about missing zlib or libuuid but you know it is available, you might
                              have a broken pkg-config. Use this option to proceed without checking pkg-config.
   --disable-telemetry        Use this flag to opt-out from our anonymous telemetry progam.
-  --enable-json              Enable to use JSON-C library instead the internal Netdata library.
 
 Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
@@ -223,7 +222,6 @@ while [ -n "${1}" ]; do
 		"--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse";;
 		"--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1;;
 		"--disable-go") NETDATA_DISABLE_GO=1;;
-		"--enable-jsonc") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-jsonc/} --enable-jsonc";;
 		"--install")
 			NETDATA_PREFIX="${2}/netdata"
 			shift 1
