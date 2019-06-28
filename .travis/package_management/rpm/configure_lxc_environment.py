@@ -87,17 +87,24 @@ print ("2. Installing package dependencies within LXC container")
 if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
     run_command([os.environ["REPO_TOOL"], "clean", "-a"])
     run_command([os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
+    run_command([os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
+
 elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
+    run_command([os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
     run_command([os.environ["REPO_TOOL"], "clean", "all"])
     run_command([os.environ["REPO_TOOL"], "update", "-y"])
     run_command([os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
 else:
+    run_command([os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
     run_command([os.environ["REPO_TOOL"], "update", "-y"])
 
 run_command([os.environ["REPO_TOOL"], "install", "-y", "sudo"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "wget"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
+run_command([os.environ["REPO_TOOL"], "install", "-y", "xen-devel"])
+run_command([os.environ["REPO_TOOL"], "install", "-y", "yajl-devel"])
+run_command([os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
 
 # Exceptional cases, not available everywhere
 #
