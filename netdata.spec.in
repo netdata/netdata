@@ -292,8 +292,8 @@ install_go() {
 			return 1
 		fi
 
-		grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
-		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "${GO_PACKAGE_BASENAME}\$" "packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "config.tar.gz" "packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
 		if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
