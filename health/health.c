@@ -551,11 +551,6 @@ void *health_main(void *ptr) {
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
-    silencers =  mallocz(sizeof(SILENCERS));
-    silencers->all_alarms=0;
-    silencers->stype=STYPE_NONE;
-    silencers->silencers=NULL;
-
     unsigned int loop = 0;
     while(!netdata_exit) {
 		loop++;

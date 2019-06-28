@@ -1102,6 +1102,10 @@ int main(int argc, char **argv) {
 #endif
 
         // --------------------------------------------------------------------
+        // This is the safest place to start the SILENCERS structure
+        health_initialize_global_silencers();
+
+        // --------------------------------------------------------------------
         // setup process signals
 
         // block signals while initializing threads.

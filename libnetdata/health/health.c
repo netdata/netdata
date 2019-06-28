@@ -152,3 +152,19 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
 
     return 0;
 }
+
+/**
+ * Initialize Global Silencers
+ *
+ * Initialize the silencer  for the whole netdata system.
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
+int health_initialize_global_silencers() {
+    silencers =  mallocz(sizeof(SILENCERS));
+    silencers->all_alarms=0;
+    silencers->stype=STYPE_NONE;
+    silencers->silencers=NULL;
+
+    return 0;
+}
