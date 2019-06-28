@@ -318,8 +318,8 @@ install_go() {
 		fi
 
 		# Install files
-		tar -xf "${tmp}/config.tar.gz" -C "%{_libdir}/%{name}/conf.d/"
-		mv "${tmp}/$GO_PACKAGE_BASENAME" "%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+		tar -xf "${tmp}/config.tar.gz" -C "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/"
+		mv "${tmp}/$GO_PACKAGE_BASENAME" "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 	fi
 	return 0
 }
