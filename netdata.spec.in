@@ -7,6 +7,9 @@
 %global __os_install_post %{nil}
 
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
+%define _prefix /usr
+%define _sysconfdir /etc
+%define _localstatedir /var
 %define _libexecdir /usr/libexec
 
 #
@@ -180,9 +183,9 @@ happened, on your systems and applications.
 # Conf step
 autoreconf -ivf
 %configure \
-	--prefix="/usr" \
-	--sysconfdir="/etc" \
-	--localstatedir="/var" \
+	--prefix="%{_prefix}" \
+	--sysconfdir="%{_sysconfdir}" \
+	--localstatedir="%{_localstatedir}" \
 	--libexecdir="%{_libexecdir}" \
 	--with-zlib \
 	--with-math \
@@ -231,6 +234,86 @@ install -m 755 system/netdata-init-d \
         "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
 %endif
 
+# ############################################################
+# Package Go within netdata (TBD: Package it separately)
+
+download_go() {
+	url="${1}"
+	dest="${2}"
+
+	if command -v curl >/dev/null 2>&1; then
+		curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -T 15 -O - "${url}" > "${dest}"
+	else
+		echo >&2
+		echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
+		echo >&2 "Either add packages or disable it by issuing '--disable-go' in the installer"
+		echo >&2
+		exit 1
+	fi
+}
+
+install_go() {
+	# When updating this value, ensure correct checksums in packaging/go.d.checksums
+	GO_PACKAGE_VERSION="v0.7.0"
+	ARCH_MAP=(
+		'i386::386'
+		'i686::386'
+		'x86_64::amd64'
+		'aarch64::arm64'
+		'armv64::arm64'
+		'armv6l::arm'
+		'armv7l::arm'
+		'armv5tel::arm'
+	)
+
+	if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
+		echo >&2 "Install go.d.plugin"
+		ARCH=$(uname -m)
+		OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+		for index in "${ARCH_MAP[@]}" ; do
+			KEY="${index%%::*}"
+			VALUE="${index##*::}"
+			if [ "$KEY" = "$ARCH" ]; then
+				ARCH="${VALUE}"
+				break
+			fi
+		done
+		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
+
+		if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+			return 1
+		fi
+
+		grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
+
+		# Checksum validation
+		if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
+
+			echo >&2 "go.d plugin checksum validation failure."
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+
+			echo "go.d.plugin package files checksum validation failed."
+			exit 1
+		fi
+
+		# Install files
+		tar -xf "${tmp}/config.tar.gz" -C "%{_libdir}/%{name}/conf.d/"
+		mv "${tmp}/$GO_PACKAGE_BASENAME" "%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+	fi
+	return 0
+}
+install_go
+
 %pre
 
 # User/Group creations, as needed
@@ -269,7 +352,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_sbindir}/%{name}
 %{_sysconfdir}/%{name}/edit-config
 
-%defattr(4750,root,netdata,0755)
+%defattr(4750,root,netdata,0750)
 
 %dir %{_libexecdir}/%{name}/python.d
 %dir %{_libexecdir}/%{name}/charts.d
@@ -294,7 +377,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %dir %{_datadir}/%{name}
 
-%defattr(0755,netdata,netdata,0755)
+%defattr(0750,netdata,netdata,0755)
 
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
@@ -323,6 +406,10 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 
 %changelog
+* Fri Jun 28 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-7
+- Raise the path overrides to the spec file level, not just the configure.
+- Adjust tighter permissions on some folders, based on what we did on our installer
+- Introduce go.d plugin download and install, to include it on the package (Temporarily, to become separate package on next iteration)
 * Tue Jun 25 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-6
 - Adjust dependency list: Some packages are missing on some distros, adopt to build successfully
 * Mon Jun 24 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-5
