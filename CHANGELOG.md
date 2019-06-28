@@ -4,6 +4,9 @@
 
 **Fixed bugs:**
 
+- Tomcat collector break on invalid XML caused by single quotes in Memory Pool names \(code solution inside\) [\#6343](https://github.com/netdata/netdata/issues/6343)
+- adaptec\_raid: failed to parse `arcconf GETCONFIG 1 LD` output [\#6337](https://github.com/netdata/netdata/issues/6337)
+- Cannot reinstall netdata [\#6329](https://github.com/netdata/netdata/issues/6329)
 - Redirect cannot overwrite netdata. [\#6288](https://github.com/netdata/netdata/issues/6288)
 - Netdata lateral menu hidden [\#6287](https://github.com/netdata/netdata/issues/6287)
 - How to remove/unregister a streaming node to prevent the health alarms from triggering [\#6266](https://github.com/netdata/netdata/issues/6266)
@@ -54,6 +57,7 @@
 - Netdata behind caddy reverse proxy wont login. [\#5794](https://github.com/netdata/netdata/issues/5794)
 - netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
 - cgroups name resolution doesn't work \(on Raspbian\) [\#5314](https://github.com/netdata/netdata/issues/5314)
+- netdata/packaging/docker: Fix docker documentation and a fix to avoid failures [\#6344](https://github.com/netdata/netdata/pull/6344) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix devuan support for initd [\#6275](https://github.com/netdata/netdata/pull/6275) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/docker: Fix docker socket utilization, first pass [\#6233](https://github.com/netdata/netdata/pull/6233) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/daemon: Eliminate a couple of warnings, plus tabs removal [\#6222](https://github.com/netdata/netdata/pull/6222) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -65,7 +69,10 @@
 
 **Closed issues:**
 
+- XMPP/Jabber notification support [\#6292](https://github.com/netdata/netdata/issues/6292)
+- collector/freeipmi - option to remove the ID added to the label [\#6284](https://github.com/netdata/netdata/issues/6284)
 - FreeIPMI - option to remove the ID added to the label [\#6283](https://github.com/netdata/netdata/issues/6283)
+- Scope of 1.16-rc2 [\#6243](https://github.com/netdata/netdata/issues/6243)
 - Documentation improvements [\#6214](https://github.com/netdata/netdata/issues/6214)
 - monitor dnsmasq dhcp server leases [\#6206](https://github.com/netdata/netdata/issues/6206)
 - Pihole stats modules  [\#6204](https://github.com/netdata/netdata/issues/6204)
@@ -76,6 +83,7 @@
 - When the collector restarts after having stopped a long time ago fill the chart gaps efficiently [\#6103](https://github.com/netdata/netdata/issues/6103)
 - Introduce cross-distro release testing on our CI  [\#6102](https://github.com/netdata/netdata/issues/6102)
 - Optimize the memory footprint of the Database Engine [\#6010](https://github.com/netdata/netdata/issues/6010)
+- phpdaemon monitoring [\#6006](https://github.com/netdata/netdata/issues/6006)
 - Secure streaming via SSL [\#6004](https://github.com/netdata/netdata/issues/6004)
 - \[Binary releases\] Create a script to containerise the RPM build process [\#5967](https://github.com/netdata/netdata/issues/5967)
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
@@ -89,13 +97,24 @@
 - netdata startup order on boot \(systemd\) [\#4266](https://github.com/netdata/netdata/issues/4266)
 - RFC: registry v2 [\#3990](https://github.com/netdata/netdata/issues/3990)
 - mail notifications wiki points to a non-existing file [\#3433](https://github.com/netdata/netdata/issues/3433)
+- Simple way to disable alerts [\#3414](https://github.com/netdata/netdata/issues/3414)
 - CPU performance monitoring [\#3232](https://github.com/netdata/netdata/issues/3232)
 - allow netdata to know the plugin that collects each chart [\#2692](https://github.com/netdata/netdata/issues/2692)
 - riak-rv support [\#2413](https://github.com/netdata/netdata/issues/2413)
 - alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
+- Support OpenTSDB back-end via HTTP\(S\) API [\#1642](https://github.com/netdata/netdata/issues/1642)
 
 **Merged pull requests:**
 
+- Better checks for nfacct headers [\#6351](https://github.com/netdata/netdata/pull/6351) ([vlvkobal](https://github.com/vlvkobal))
+- Tomcat status invalid XML fix [\#6345](https://github.com/netdata/netdata/pull/6345) ([Danamir](https://github.com/Danamir))
+- pihole: alarms delay fix [\#6342](https://github.com/netdata/netdata/pull/6342) ([ilyam8](https://github.com/ilyam8))
+- adaptec\_raid: logical device regex fix [\#6338](https://github.com/netdata/netdata/pull/6338) ([ilyam8](https://github.com/ilyam8))
+- Better context name to client context [\#6336](https://github.com/netdata/netdata/pull/6336) ([thiagoftsm](https://github.com/thiagoftsm))
+- installer: include go.d.plugin version v0.7.0 [\#6328](https://github.com/netdata/netdata/pull/6328) ([ilyam8](https://github.com/ilyam8))
+- pihole: add to the dashboard\_info [\#6325](https://github.com/netdata/netdata/pull/6325) ([ilyam8](https://github.com/ilyam8))
+- pihole collector: add alarms [\#6320](https://github.com/netdata/netdata/pull/6320) ([ilyam8](https://github.com/ilyam8))
+- dnsmasq\_dhcp: dhcp-range utilization alarm [\#6319](https://github.com/netdata/netdata/pull/6319) ([ilyam8](https://github.com/ilyam8))
 - Update the documentation on charts with zero metrics [\#6314](https://github.com/netdata/netdata/pull/6314) ([vlvkobal](https://github.com/vlvkobal))
 - fix elasticsearch plugin [\#6311](https://github.com/netdata/netdata/pull/6311) ([Wing924](https://github.com/Wing924))
 - Chart name streaming [\#6304](https://github.com/netdata/netdata/pull/6304) ([vlvkobal](https://github.com/vlvkobal))
@@ -109,6 +128,7 @@
 - netdata/packaging: Separate beta messages from production messages [\#6282](https://github.com/netdata/netdata/pull/6282) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add more info on the stream.conf health enabled by default = auto option [\#6281](https://github.com/netdata/netdata/pull/6281) ([cakrit](https://github.com/cakrit))
 - Add comments about AWS SDK for C++ installation [\#6277](https://github.com/netdata/netdata/pull/6277) ([vlvkobal](https://github.com/vlvkobal))
+- Easily disable alarms, by persisting the silencers configuration [\#6274](https://github.com/netdata/netdata/pull/6274) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/packaging: During install,  many file not found were raised [\#6272](https://github.com/netdata/netdata/pull/6272) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/documentation: Its Redhat, then came the others [\#6271](https://github.com/netdata/netdata/pull/6271) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Adjust CI notification logic [\#6268](https://github.com/netdata/netdata/pull/6268) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -126,6 +146,7 @@
 - URL\_parser fixing allmetrics! [\#6231](https://github.com/netdata/netdata/pull/6231) ([thiagoftsm](https://github.com/thiagoftsm))
 - Perf plugin [\#6225](https://github.com/netdata/netdata/pull/6225) ([vlvkobal](https://github.com/vlvkobal))
 - netdata/packaging: Introducing automatic binary packages generation and delivery for RPM types \(Phase 1\) [\#6223](https://github.com/netdata/netdata/pull/6223) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Backend and SSL! [\#6220](https://github.com/netdata/netdata/pull/6220) ([thiagoftsm](https://github.com/thiagoftsm))
 - SSL\_fix\_format Fix wrong format used with SSL! [\#6219](https://github.com/netdata/netdata/pull/6219) ([thiagoftsm](https://github.com/thiagoftsm))
 - installer: include go.d.plugin version v0.6.1 [\#6217](https://github.com/netdata/netdata/pull/6217) ([ilyam8](https://github.com/ilyam8))
 - Fill chart gaps efficiently. [\#6216](https://github.com/netdata/netdata/pull/6216) ([mfundul](https://github.com/mfundul))
@@ -161,6 +182,7 @@
 - Fix telemetry config in netdata-installer [\#6127](https://github.com/netdata/netdata/pull/6127) ([cakrit](https://github.com/cakrit))
 - Pass correct info to run funct. [\#6126](https://github.com/netdata/netdata/pull/6126) ([Steve8291](https://github.com/Steve8291))
 - Add modules to charts.d.conf [\#6120](https://github.com/netdata/netdata/pull/6120) ([Steve8291](https://github.com/Steve8291))
+- add userstats charts for mysql [\#6118](https://github.com/netdata/netdata/pull/6118) ([kam1kaze](https://github.com/kam1kaze))
 - Active processes number alert [\#6116](https://github.com/netdata/netdata/pull/6116) ([apardyl](https://github.com/apardyl))
 - add mysql deadlocks chart [\#6115](https://github.com/netdata/netdata/pull/6115) ([kam1kaze](https://github.com/kam1kaze))
 - Remove system\_info copying [\#6113](https://github.com/netdata/netdata/pull/6113) ([vlvkobal](https://github.com/vlvkobal))
@@ -1274,7 +1296,6 @@
 - httpcheck do not accept URLs that do not end with com [\#3656](https://github.com/netdata/netdata/issues/3656)
 - httpcheck python.d plugin fails [\#3641](https://github.com/netdata/netdata/issues/3641)
 - Issue with statsd sample rate [\#3630](https://github.com/netdata/netdata/issues/3630)
-- NetData and Kubernetes - Docker Name [\#3369](https://github.com/netdata/netdata/issues/3369)
 - netdata-uninstaller.sh not working \(with macOS 10.13\) [\#2941](https://github.com/netdata/netdata/issues/2941)
 - Problem with plugins in debug mode \(wrong path to cfgs\) [\#2593](https://github.com/netdata/netdata/issues/2593)
 - dashboard with thousands of charts [\#2275](https://github.com/netdata/netdata/issues/2275)
