@@ -426,7 +426,6 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     // unlink it from RRDHOST
     if(unlikely(rc == host->alarms))
         host->alarms = rc->next;
-
     else {
         RRDCALC *t;
         for(t = host->alarms; t && t->next != rc; t = t->next) ;
@@ -441,7 +440,12 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     if (rc) {
         RRDCALC *rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl *)rc);
         if (!rdcmp) {
-            error("Cannot remove the alarm index");
+            error("Cannot remove the health alarm index");
+        }
+
+        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_name, (avl *)rc);
+        if (!rdcmp) {
+            error("Cannot remove the health alarm index");
         }
     }
 
@@ -492,14 +496,14 @@ int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
  * Check the maximum last_repeat for the alarms associated a host
  *
  * @param host The structure that has the binary tree
- * @param ae the alarm entry
  *
  * @return It returns 1 case it is repeating and 0 otherwise
  */
-RRDCALC *alarm_max_last_repeat(RRDHOST *host, uint32_t alarm_id) {
+RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name,uint32_t hash) {
     RRDCALC findme;
-    findme.id = alarm_id;
-    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log, (avl *)&findme);
+    findme.name = alarm_name;
+    findme.hash = hash;
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_name, (avl *)&findme);
 
     return rc;
 }

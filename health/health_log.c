@@ -2,10 +2,6 @@
 
 #include "health.h"
 
-typedef struct health_internal_error {
-
-};
-
 // ----------------------------------------------------------------------------
 // health alarm log load/save
 // no need for locking - only one thread is reading / writing the alarms log
@@ -127,143 +123,6 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 }
 
-/**
- * Set Alarm Entry
- *
- * Set the alarm entry for host based in the log output.
- *
- * @param host the main structure for a specific client
- * @param pointers a pointer to pointer for the log
- * @param unique_id the unique id of the alarm converted from pointers
- * @param alarm_id the id of these alarm converted from pointer.
- * @param last_repeat is the last time the value repeated
- *
- * @return It returns one of the following values:
- *         0 - on Success
- */
-int health_set_alarm_entry_from_log(RRDHOST *host, char **pointers, uint32_t unique_id,uint32_t alarm_id,time_t last_repeat) {
-    ALARM_ENTRY *ae = NULL;
-    if(unlikely(*pointers[0] == 'A')) {
-        // make sure it is properly numbered
-        if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
-            error( "HEALTH [%s]: line %zu of file '%s' has alarm log entry %u in wrong order. Ignoring it."
-            , host->hostname, line, filename, unique_id);
-            errored++;
-            return -1;
-        }
-
-        ae = callocz(1, sizeof(ALARM_ENTRY));
-    }
-    else if(unlikely(*pointers[0] == 'U')) {
-        // find the original
-        for(ae = host->health_log.alarms; ae ; ae = ae->next) {
-            if(unlikely(unique_id == ae->unique_id)) {
-                if(unlikely(*pointers[0] == 'A')) {
-                    error("HEALTH [%s]: line %zu of file '%s' adds duplicate alarm log entry %u. Using the later."
-                    , host->hostname, line, filename, unique_id);
-                    *pointers[0] = 'U';
-                    duplicate++;
-                }
-                return -2;
-            }
-            else if(unlikely(unique_id > ae->unique_id)) {
-                // no need to continue
-                // the linked list is sorted
-                return -3;
-            }
-        }
-    }
-
-    // if not found, skip this line
-    if(unlikely(!ae)) {
-        // error("HEALTH [%s]: line %zu of file '%s' updates alarm log entry with unique id %u, but it is not found.", host->hostname, line, filename, unique_id);
-        return -4;
-    }
-
-    // check for a possible host missmatch
-    //if(strcmp(pointers[1], host->hostname))
-    //    error("HEALTH [%s]: line %zu of file '%s' provides an alarm for host '%s' but this is named '%s'.", host->hostname, line, filename, pointers[1], host->hostname);
-
-    ae->unique_id               = unique_id;
-    ae->alarm_id                = alarm_id;
-    ae->alarm_event_id          = (uint32_t)strtoul(pointers[4], NULL, 16);
-    ae->updated_by_id           = (uint32_t)strtoul(pointers[5], NULL, 16);
-    ae->updates_id              = (uint32_t)strtoul(pointers[6], NULL, 16);
-
-    ae->when                    = (uint32_t)strtoul(pointers[7], NULL, 16);
-    ae->duration                = (uint32_t)strtoul(pointers[8], NULL, 16);
-    ae->non_clear_duration      = (uint32_t)strtoul(pointers[9], NULL, 16);
-
-    ae->flags                   = (uint32_t)strtoul(pointers[10], NULL, 16);
-    ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
-
-    ae->exec_run_timestamp      = (uint32_t)strtoul(pointers[11], NULL, 16);
-    ae->delay_up_to_timestamp   = (uint32_t)strtoul(pointers[12], NULL, 16);
-
-    freez(ae->name);
-    ae->name = strdupz(pointers[13]);
-    ae->hash_name = simple_hash(ae->name);
-
-    freez(ae->chart);
-    ae->chart = strdupz(pointers[14]);
-    ae->hash_chart = simple_hash(ae->chart);
-
-    freez(ae->family);
-    ae->family = strdupz(pointers[15]);
-
-    freez(ae->exec);
-    ae->exec = strdupz(pointers[16]);
-    if(!*ae->exec) { freez(ae->exec); ae->exec = NULL; }
-
-    freez(ae->recipient);
-    ae->recipient = strdupz(pointers[17]);
-    if(!*ae->recipient) { freez(ae->recipient); ae->recipient = NULL; }
-
-    freez(ae->source);
-    ae->source = strdupz(pointers[18]);
-    if(!*ae->source) { freez(ae->source); ae->source = NULL; }
-
-    freez(ae->units);
-    ae->units = strdupz(pointers[19]);
-    if(!*ae->units) { freez(ae->units); ae->units = NULL; }
-
-    freez(ae->info);
-    ae->info = strdupz(pointers[20]);
-    if(!*ae->info) { freez(ae->info); ae->info = NULL; }
-
-    ae->exec_code   = str2i(pointers[21]);
-    ae->new_status  = str2i(pointers[22]);
-    ae->old_status  = str2i(pointers[23]);
-    ae->delay       = str2i(pointers[24]);
-
-    ae->new_value   = str2l(pointers[25]);
-    ae->old_value   = str2l(pointers[26]);
-
-    ae->last_repeat = last_repeat;
-
-    char value_string[100 + 1];
-    freez(ae->old_value_string);
-    freez(ae->new_value_string);
-    ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
-    ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
-
-    // add it to host if not already there
-    if(unlikely(*pointers[0] == 'A')) {
-        ae->next = host->health_log.alarms;
-        host->health_log.alarms = ae;
-        loaded++;
-    }
-    else updated++;
-
-    if(unlikely(ae->unique_id > host->health_max_unique_id))
-        host->health_max_unique_id = ae->unique_id;
-
-    if(unlikely(ae->alarm_id >= host->health_max_alarm_id))
-        host->health_max_alarm_id = ae->alarm_id;
-
-    return 0;
-}
-
 inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     errno = 0;
 
@@ -273,7 +132,6 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
-    int health_from_file = 0;
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
         line++;
@@ -321,35 +179,32 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             // Check if we got last_repeat field
             time_t last_repeat = 0;
             if(entries > 27) {
+                char* alarm_name = pointers[13];
                 last_repeat = (time_t)strtoul(pointers[27], NULL, 16);
-                RRDCALC *rc = alarm_max_last_repeat(host, alarm_id);
-                if (!rc && !health_from_file) {
-                    health_from_file = 1;
-                    //This function is called before I add any new RRDCALC, so case I cannot
-                    //find the string that I want, I must load it
+
+                RRDCALC *rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
+                if (!rc) {
                     for(rc = host->alarms; rc ; rc = rc->next) {
-                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log, (avl *)rc);
+                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_name, (avl *)rc);
                         if(rdcmp != rc) {
                             error("Cannot insert the alarm index ID using log %s", rc->name);
-                        } else {
-                            if(rrdcalc_isrepeating(rc)) {
-                                fprintf(stderr,"KILLME FIRST %s %lu %lu %d %s\n",rc->name,(size_t)last_repeat,(size_t)rc->next_update,rc->update_every,rc->units);
-                                health_set_alarm_entry_from_log(host, pointers, unique_id,last_repeat);
-                            }
                         }
                     }
+
+                    rc = alarm_max_last_repeat(host, alarm_name,simple_hash(alarm_name));
                 }
 
                 if(unlikely(rc)) {
-                    rc->last_repeat = last_repeat;
-                    // We iterate through repeating alarm entries only to
-                    // find the latest last_repeat timestamp. Otherwise,
-                    // there is no need to keep them in memory.
-                    continue;
+                    if (rrdcalc_isrepeating(rc)) {
+                        rc->last_repeat = last_repeat;
+                        // We iterate through repeating alarm entries only to
+                        // find the latest last_repeat timestamp. Otherwise,
+                        // there is no need to keep them in memory.
+                        continue;
+                    }
                 }
             }
 
-            //BEGIN MOVE FROM HERE
             if(unlikely(*pointers[0] == 'A')) {
                 // make sure it is properly numbered
                 if(unlikely(host->health_log.alarms && unique_id < host->health_log.alarms->unique_id)) {
@@ -468,7 +323,6 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
 
             if(unlikely(ae->alarm_id >= host->health_max_alarm_id))
                 host->health_max_alarm_id = ae->alarm_id;
-            //FINISH MOVE FROM HERE
         }
         else {
             error("HEALTH [%s]: line %zu of file '%s' is invalid (unrecognized entry type '%s').", host->hostname, line, filename, pointers[0]);
@@ -499,7 +353,6 @@ inline void health_alarm_log_load(RRDHOST *host) {
     if(!fp)
         error("HEALTH [%s]: cannot open health file: %s", host->hostname, filename);
     else {
-        fprintf(stderr,"KILLME filename %s\n",filename);
         health_alarm_log_read(host, fp, filename);
         fclose(fp);
     }

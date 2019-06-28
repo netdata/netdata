@@ -697,6 +697,7 @@ struct rrdhost {
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
     avl_tree_lock alarms_idx_health_log;
+    avl_tree_lock alarms_idx_name;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
@@ -1031,6 +1032,7 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 // Miscellaneous functions
 
 extern int alarm_compare_id(void *a, void *b);
+extern int alarm_compare_name(void *a, void *b);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions

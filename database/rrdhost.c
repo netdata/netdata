@@ -182,6 +182,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
     host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
     avl_init_lock(&(host->alarms_idx_health_log), alarm_compare_id);
+    avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
 
     // ------------------------------------------------------------------------
     // initialize health variables
