@@ -223,6 +223,10 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
+# Install registry directory
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry}"
+
+# ###########################################################
 # Install netdata service
 %if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
