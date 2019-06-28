@@ -102,10 +102,12 @@ BuildRequires: openssl-devel
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
 BuildRequires: netcat-openbsd
+BuildRequires: json-glib-devel
 %else
 BuildRequires: Judy-devel
 BuildRequires: lz4-devel
 BuildRequires: nc
+BuildRequires: json-c-devel
 %endif
 
 # Core build requirements for service install
@@ -113,6 +115,7 @@ BuildRequires: nc
 
 # Runtime dependencies
 #
+Requires:      json-c
 Requires:      python
 Requires:      zlib
 Requires:      libuuid
@@ -120,10 +123,12 @@ Requires:      libuuid
 # for libuv, Requires version >= 1
 Requires:      libuv1
 Requires:      libJudy1
+Requires:      json-glib
 %else
 # for libuv, Requires version >= 1
 Requires:      libuv >= 1
 Requires:      Judy
+Requires:      json-c
 %endif
 Requires:      openssl
 Requires:      lz4
@@ -162,6 +167,19 @@ Requires: libnetfilter_acct
 BuildRequires:  freeipmi-devel
 Requires: freeipmi
 # end - freeipmi plugin dependencies
+
+# CUPS plugin dependencies
+BuildRequires: cups-devel
+Requires: cups
+# end - cups plugin dependencies
+
+# Xenstat plugin dependencies
+BuildRequires: yajl-devel
+BuildRequires: xen-devel
+Requires: yajl
+Requires: xen
+# end - xenstat plugin dependencies
+
 
 # #####################################################################
 # End of dependency management configuration

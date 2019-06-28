@@ -131,7 +131,7 @@ download_url=""
 # TODO: Checksum validations
 if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     version_list=str(os.environ['BUILD_VERSION']).split('.')
-    rpm_friendly_version='.'.join(version_list[0:3]) + version_list[3]
+    rpm_friendly_version='.'.join(version_list[0:3]) + "." + version_list[3]
 
     print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
     dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
