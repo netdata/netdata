@@ -397,6 +397,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
 %dir %{_sysconfdir}/%{name}/charts.d
+%dir %{_sysconfdir}/%{name}/custom-plugins.d
+%dir %{_sysconfdir}/%{name}/go.d
+%dir %{_sysconfdir}/%{name}/ssl
 %dir %{_sysconfdir}/%{name}/node.d
 %dir %{_sysconfdir}/%{name}/statsd.d
 %{_libdir}/%{name}/conf.d/
