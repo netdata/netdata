@@ -6,7 +6,6 @@
 import xml.etree.ElementTree as ET
 
 from collections import namedtuple
-from copy import deepcopy
 
 from bases.FrameworkServices.UrlService import UrlService
 
@@ -203,8 +202,8 @@ class HostMonitService(BaseMonitService):
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
-        self.order = list(ORDER)
-        self.definitions = deepcopy(CHARTS)
+        self.order = ORDER
+        self.definitions = CHARTS
         base_url = self.configuration.get('url', "http://localhost:2812")
         self.url = '{0}/_status?format=xml&level=full'.format(base_url)
         self.active_services = list()
