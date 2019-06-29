@@ -122,7 +122,7 @@ CHARTS = {
 }
 
 
-class BaseMonitService:
+class BaseMonitService(object):
     def __init__(self, typ, name,  status, monitor):
         self.type = typ
         self.name = name
