@@ -135,7 +135,7 @@ dest_archive=""
 download_url=""
 # TODO: Checksum validations
 if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
-    version_list=str(os.environ['BUILD_VERSION']).split('.')
+    version_list=str(os.environ['BUILD_VERSION']).replace('v', '').split('.')
     rpm_friendly_version='.'.join(version_list[0:3]) + "." + version_list[3]
 
     print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
