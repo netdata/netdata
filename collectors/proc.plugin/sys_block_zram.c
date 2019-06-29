@@ -35,8 +35,8 @@ typedef struct zram_device {
     // --------------------------------------------------------------------
 
 static int try_get_zram_major_number(procfile *file) {
-    int i;
-    int lines = procfile_lines(file);
+    size_t i;
+    unsigned int lines = procfile_lines(file);
     int id = -1;
     char *name = NULL;
     for (i = 0; i < lines; i++)
@@ -125,7 +125,7 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
     d->rd_alloc_efficiency = rrddim_add(d->st_alloc_efficiency, "percent", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
 }
 
-static int init_devices(DICTIONARY *devices, int zram_id, int update_every) {
+static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_every) {
     int count = 0;
     DIR *dir = opendir("/dev");
     struct dirent *de;
@@ -136,7 +136,7 @@ static int init_devices(DICTIONARY *devices, int zram_id, int update_every) {
 
     if (unlikely(!dir))
         return 0;
-    while (de = readdir(dir))
+    while ((de = readdir(dir)))
     {
         snprintfz(filename, FILENAME_MAX, "/dev/%s", de->d_name);
         if (unlikely(stat(filename, &st) != 0))
@@ -185,7 +185,7 @@ static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     return 0;
 }
 
-static inline int _collect_zram_metrics(char *name, void *entry, int advance) {
+static inline int _collect_zram_metrics(void *entry, int advance) {
     MM_STAT mm;
     ZRAM_DEVICE *d = (ZRAM_DEVICE *)entry;
     int value;
@@ -219,13 +219,17 @@ static inline int _collect_zram_metrics(char *name, void *entry, int advance) {
 }
 
 static int collect_first_zram_metrics(char *name, void *entry, void *data) {
+    (void)name;
+    (void)data;
     // collect without calling rrdset_next (init only)
-    return _collect_zram_metrics(name, entry, 0);
+    return _collect_zram_metrics(entry, 0);
 }
 
 static int collect_zram_metrics(char *name, void *entry, void *data) {
+    (void)name;
+    (void)data;
     // collect with calling rrdset_next
-    return _collect_zram_metrics(name, entry, 1);
+    return _collect_zram_metrics(entry, 1);
 }
 
     // --------------------------------------------------------------------
@@ -258,7 +262,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         procfile_close(ff);
 
         devices = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
-        device_count = init_devices(devices, zram_id, update_every);
+        device_count = init_devices(devices, (unsigned int)zram_id, update_every);
         if (device_count < 1)
             return 1;
         dictionary_get_all_name_value(devices, collect_first_zram_metrics, NULL);
