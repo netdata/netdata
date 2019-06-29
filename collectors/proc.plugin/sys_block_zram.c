@@ -3,6 +3,7 @@
 #include "plugin_proc.h"
 
 #define PLUGIN_PROC_MODULE_ZRAM_NAME "/sys/block/zram"
+#define rrdset_obsolete_and_pointer_null(st) do { if(st) { rrdset_is_obsolete(st); (st) = NULL; } } while(st)
 
 typedef struct mm_stat {
     unsigned long long orig_data_size;
@@ -164,15 +165,25 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
     return count;
 }
 
+static void free_device(DICTIONARY *dict, char *name)
+{
+    ZRAM_DEVICE *d = (ZRAM_DEVICE*)dictionary_get(dict, name);
+    info("ZRAM : Disabling monitoring of device %s", name);
+    rrdset_obsolete_and_pointer_null(d->st_usage);
+    rrdset_obsolete_and_pointer_null(d->st_savings);
+    rrdset_obsolete_and_pointer_null(d->st_alloc_efficiency);
+    rrdset_obsolete_and_pointer_null(d->st_comp_ratio);
+    dictionary_del(dict, name);
+}
     // --------------------------------------------------------------------
 
 static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     ff = procfile_readall(ff);
-    if (unlikely(ff == NULL))
+    if (!ff)
         return -1;
-    if (unlikely(procfile_lines(ff) < 1))
+    if (procfile_lines(ff) < 1)
         return -1;
-    if (unlikely(procfile_linewords(ff, 0) < 7))
+    if (procfile_linewords(ff, 0) < 7)
         return -1;
 
     stats->orig_data_size = str2ull(procfile_word(ff, 0));
@@ -185,12 +196,14 @@ static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     return 0;
 }
 
-static inline int _collect_zram_metrics(void *entry, int advance) {
+static inline int _collect_zram_metrics(char* name, ZRAM_DEVICE *d, int advance, DICTIONARY* dict) {
     MM_STAT mm;
-    ZRAM_DEVICE *d = (ZRAM_DEVICE *)entry;
     int value;
     if (unlikely(read_mm_stat(d->file, &mm) < 0))
-        return 0;
+    {
+        free_device(dict, name);
+        return -1;
+    }
 
     if (likely(advance))
     {
@@ -219,17 +232,14 @@ static inline int _collect_zram_metrics(void *entry, int advance) {
 }
 
 static int collect_first_zram_metrics(char *name, void *entry, void *data) {
-    (void)name;
-    (void)data;
     // collect without calling rrdset_next (init only)
-    return _collect_zram_metrics(entry, 0);
+    return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 0, (DICTIONARY *)data);
 }
 
 static int collect_zram_metrics(char *name, void *entry, void *data) {
     (void)name;
-    (void)data;
     // collect with calling rrdset_next
-    return _collect_zram_metrics(entry, 1);
+    return _collect_zram_metrics(name, (ZRAM_DEVICE *)entry, 1, (DICTIONARY *)data);
 }
 
     // --------------------------------------------------------------------
@@ -265,13 +275,13 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         device_count = init_devices(devices, (unsigned int)zram_id, update_every);
         if (device_count < 1)
             return 1;
-        dictionary_get_all_name_value(devices, collect_first_zram_metrics, NULL);
+        dictionary_get_all_name_value(devices, collect_first_zram_metrics, devices);
     }
     else
     {
         if (unlikely(device_count < 1))
             return 1;
-        dictionary_get_all_name_value(devices, collect_zram_metrics, NULL);
+        dictionary_get_all_name_value(devices, collect_zram_metrics, devices);
     }
     return 0;
 }
