@@ -140,6 +140,9 @@ class BaseMonitService(object):
     def __ne__(self, other):
         return not self == other
 
+    def __hash__(self):
+        return hash(repr(self))
+
     def is_running(self):
         return self.status == '0' and self.monitor == '1'
 
