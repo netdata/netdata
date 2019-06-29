@@ -173,23 +173,6 @@ BuildRequires: cups-devel
 Requires: cups
 # end - cups plugin dependencies
 
-# Xenstat plugin dependencies
-%if 0%{?fedora}
-BuildRequires: yajl-devel
-BuildRequires: xen-devel
-Requires: yajl
-Requires: xen
-%else
-%if 0%{?suse_version} >= 1140
-BuildRequires: libyajl-devel
-BuildRequires: xen-devel
-Requires: yajl
-Requires: xen
-%endif
-%endif
-# end - xenstat plugin dependencies
-
-
 # #####################################################################
 # End of dependency management configuration
 # #####################################################################

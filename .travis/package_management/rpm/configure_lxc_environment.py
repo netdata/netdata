@@ -102,15 +102,6 @@ run_command([os.environ["REPO_TOOL"], "install", "-y", "sudo"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "wget"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
 run_command([os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
-
-if os.environ["BUILD_STRING"].count("el/") <= 0:
-    run_command([os.environ["REPO_TOOL"], "install", "-y", "xen-devel"])
-
-if os.environ["BUILD_STRING"].count("fedora") > 0:
-    run_command([os.environ["REPO_TOOL"], "install", "-y", "yajl-devel"])
-elif os.environ["BUILD_STRING"].count("opensuse") > 0:
-    run_command([os.environ["REPO_TOOL"], "install", "-y", "libyajl-devel"])
-
 run_command([os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
 
 # Exceptional cases, not available everywhere
