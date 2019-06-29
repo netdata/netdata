@@ -140,9 +140,6 @@ class BaseMonitService:
     def __ne__(self, other):
         return not self == other
 
-    def __hash__(self):
-        return hash(repr(self))
-
     def is_running(self):
         return self.status == '0' and self.monitor == '1'
 
@@ -155,7 +152,7 @@ class BaseMonitService:
 
 class ProcessMonitService(BaseMonitService):
     def __init__(self, typ, name,  status, monitor):
-        BaseMonitService.__init__(self, typ, name,  status, monitor)
+        super(ProcessMonitService, self).__init__(typ, name, status, monitor)
         self.uptime = None
         self.threads = None
         self.children = None
@@ -170,31 +167,32 @@ class ProcessMonitService(BaseMonitService):
         return 'process_children_{0}'.format(self.name)
 
     def data(self):
-        base = BaseMonitService.data(self)
+        base_data = super(ProcessMonitService, self).data()
         # skipping bugged metrics with negative uptime (monit before v5.16)
+        uptime = self.uptime if self.uptime and int(self.uptime) >= 0 else None
         data = {
-            self.uptime_key(): self.uptime if self.uptime and int(self.uptime) >= 0 else None,
+            self.uptime_key(): uptime,
             self.threads_key(): self.threads,
             self.children_key(): self.children,
         }
-        data.update(base)
+        data.update(base_data)
 
         return data
 
 
 class HostMonitService(BaseMonitService):
     def __init__(self, typ, name,  status, monitor):
-        BaseMonitService.__init__(self, typ, name,  status, monitor)
+        super(HostMonitService, self).__init__(typ, name, status, monitor)
         self.latency = None
 
     def latency_key(self):
         return 'host_latency_{0}'.format(self.name)
 
     def data(self):
-        base = BaseMonitService.data(self)
+        base_data = super(HostMonitService, self).data()
         latency = float(self.latency) * 1000000 if self.latency  else None
         data = {self.latency_key(): latency}
-        data.update(base)
+        data.update(base_data)
 
         return data
 
@@ -206,13 +204,13 @@ class Service(UrlService):
         self.definitions = deepcopy(CHARTS)
         base_url = self.configuration.get('url', "http://localhost:2812")
         self.url = '{0}/_status?format=xml&level=full'.format(base_url)
-        self.collected_services = list()
+        self.active_services = list()
 
-    def parse_xml(self, raw):
+    def parse(self, raw):
         try:
             root = ET.fromstring(raw)
         except ET.ParseError:
-            self.error("URL {0} didn't return a vaild XML page. Please check your settings.".format(self.url))
+            self.error("URL {0} didn't return a valid XML page. Please check your settings.".format(self.url))
             return None
         return root
 
@@ -221,7 +219,7 @@ class Service(UrlService):
         if not raw:
             return None
 
-        root = self.parse_xml(raw)
+        root = self.parse(raw)
         if root is None:
             return None
 
@@ -251,7 +249,7 @@ class Service(UrlService):
             self.debug('Searching for {0} as {1}'.format(typ.name, xpath_query))
 
             for svc_root in root.findall(xpath_query):
-                svc = get_service(svc_root, typ)
+                svc = create_service(svc_root, typ)
                 self.debug('=> found {0} with type={1}, status={2}, monitoring={3}'.format(
                     svc.name, svc.type.name, svc.status, svc.monitor))
 
@@ -260,15 +258,15 @@ class Service(UrlService):
         return services
 
     def update_charts(self, services):
-        remove = [svc for svc in self.collected_services if svc not in services]
-        add = [svc for svc in services if svc not in self.collected_services]
+        remove = [svc for svc in self.active_services if svc not in services]
+        add = [svc for svc in services if svc not in self.active_services]
 
-        self.remove_service_from_charts(remove)
-        self.add_service_to_charts(add)
+        self.remove_services_from_charts(remove)
+        self.add_services_to_charts(add)
 
-        self.collected_services = services
+        self.active_services = services
 
-    def add_service_to_charts(self, services):
+    def add_services_to_charts(self, services):
         for svc in services:
             if svc.type == TYPE_HOST:
                 self.charts['host_latency'].add_dimension([svc.latency_key(), svc.name, 'absolute', 1000, 1000000])
@@ -278,7 +276,7 @@ class Service(UrlService):
                 self.charts['process_children'].add_dimension([svc.children_key(), svc.name])
             self.charts[svc.type.name].add_dimension([svc.key(), svc.name])
 
-    def remove_service_from_charts(self, services):
+    def remove_services_from_charts(self, services):
         for svc in services:
             if svc.type == TYPE_HOST:
                 self.charts['host_latency'].del_dimension(svc.latency_key(), False)
@@ -289,15 +287,15 @@ class Service(UrlService):
             self.charts[svc.type.name].del_dimension(svc.key(), False)
 
 
-def get_service(root, typ):
+def create_service(root, typ):
     if typ == TYPE_HOST:
-        return get_host_service(root)
+        return create_host_service(root)
     elif typ == TYPE_PROCESS:
-        return get_process_service(root)
-    return get_base_service(root, typ)
+        return create_process_service(root)
+    return create_base_service(root, typ)
 
 
-def get_host_service(root):
+def create_host_service(root):
     svc = HostMonitService(
         TYPE_HOST,
         root.find('name').text,
@@ -312,7 +310,7 @@ def get_host_service(root):
     return svc
 
 
-def get_process_service(root):
+def create_process_service(root):
     svc = ProcessMonitService(
         TYPE_PROCESS,
         root.find('name').text,
@@ -335,7 +333,7 @@ def get_process_service(root):
     return svc
 
 
-def get_base_service(root, typ):
+def create_base_service(root, typ):
     return BaseMonitService(
         typ,
         root.find('name').text,
