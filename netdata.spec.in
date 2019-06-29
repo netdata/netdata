@@ -434,6 +434,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
 %attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 
 %changelog
