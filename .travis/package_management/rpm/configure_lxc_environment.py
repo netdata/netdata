@@ -133,46 +133,46 @@ run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltrR", "/home/" +
 rpm_friendly_version=""
 dest_archive=""
 download_url=""
+spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 
 # TODO: Checksum validations
 if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     version_list=str(os.environ['BUILD_VERSION']).replace('v', '').split('.')
     rpm_friendly_version='.'.join(version_list[0:3]) + "." + version_list[3]
 
-    # Extract the spec file in place
-    print ("5. Extract spec file from the source")
-    spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
-    run_command_in_host(['sudo', 'cp', 'netdata.spec', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
-    run_command_in_host(['sudo', 'chmod', '777', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
-
     print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
     dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
     download_url="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
 
-    print ("6. Preparing local latest implementation tarball for version %s" % rpm_friendly_version)
+    print ("5. Preparing local latest implementation tarball for version %s" % rpm_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
 
-    print ("6.1 Tagging the code with latest version: %s" % rpm_friendly_version)
+    print ("5.1 Tagging the code with latest version: %s" % rpm_friendly_version)
     run_command_in_host(['git', 'tag', '-a', rpm_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
 
-    print ("6.2 Run autoreconf -ivf")
+    print ("5.2 Run autoreconf -ivf")
     run_command_in_host(['autoreconf', '-ivf'])
 
-    print ("6.3 Run configure")
+    print ("5.3 Run configure")
     run_command_in_host(['./configure', '--with-math', '--with-zlib', '--with-user=netdata'])
 
-    print ("6.4 Run make dist")
+    print ("5.4 Run make dist")
     run_command_in_host(['make', 'dist'])
 
-    print ("6.5 Copy generated tarbal to desired path")
+    print ("5.5 Copy generated tarbal to desired path")
     if os.path.exists('netdata-%s.tar.gz' % rpm_friendly_version):
         run_command_in_host(['sudo', 'cp', 'netdata-%s.tar.gz' % rpm_friendly_version, tar_file])
 
-        print ("6.6 Fixing permissions on tarball")
+        print ("5.6 Fixing permissions on tarball")
         run_command_in_host(['sudo', 'chmod', '777', tar_file])
     else:
         print ("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % 'netdata-%s.tar.gz' % rpm_friendly_version)
         sys.exit(1)
+
+    # Extract the spec file in place
+    print ("6. Extract spec file from the source")
+    run_command_in_host(['sudo', 'cp', 'netdata.spec', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
+    run_command_in_host(['sudo', 'chmod', '777', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
 
     print ("7. Temporary hack: Change Source0 to %s on spec file %s" % (download_url, spec_file))
     replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
