@@ -17,66 +17,47 @@ struct prometheus_output_options {
         { NULL, PROMETHEUS_OUTPUT_NONE },
 };
 
-/**
- * Request V1 Allmetrics
- *
- * Get the values of all metrics maintained by netdata.
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It returns 200 on success and 400 otherwise.
- */
 inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     int format = ALLMETRICS_SHELL;
     const char *prometheus_server = w->client_ip;
     uint32_t prometheus_backend_options = global_backend_options;
     PROMETHEUS_OUTPUT_OPTIONS prometheus_output_options = PROMETHEUS_OUTPUT_TIMESTAMPS | ((global_backend_options & BACKEND_OPTION_SEND_NAMES)?PROMETHEUS_OUTPUT_NAMES:0);
     const char *prometheus_prefix = global_backend_prefix;
 
-    uint32_t end = w->total_params;
-    uint32_t i;
-    char sname[WEB_FIELDS_MAX];
-    char svalue[WEB_FIELDS_MAX];
-    for (i = 0; i < end ; ++i ) {
-        char *name = w->param_name[i].body;
-        size_t lname = w->param_name[i].length;
-        sname[i] = name[lname];
-        name[lname] = 0x00;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
 
-        char *value = w->param_values[i].body;
-        size_t lvalue = w->param_values[i].length;
-        svalue[i] = value[lvalue];
-        value[lvalue] = 0x00;
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
-        if(!strncmp(name, "format",lname)) {
-            if(!strncmp(value, ALLMETRICS_FORMAT_SHELL,lvalue))
+        if(!strcmp(name, "format")) {
+            if(!strcmp(value, ALLMETRICS_FORMAT_SHELL))
                 format = ALLMETRICS_SHELL;
-            else if(!strncmp(value, ALLMETRICS_FORMAT_PROMETHEUS,lvalue))
+            else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS))
                 format = ALLMETRICS_PROMETHEUS;
-            else if(!strncmp(value, ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS,lvalue))
+            else if(!strcmp(value, ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS))
                 format = ALLMETRICS_PROMETHEUS_ALL_HOSTS;
-            else if(!strncmp(value, ALLMETRICS_FORMAT_JSON,lvalue))
+            else if(!strcmp(value, ALLMETRICS_FORMAT_JSON))
                 format = ALLMETRICS_JSON;
             else
                 format = 0;
         }
-        else if(!strncmp(name, "server",lname)) {
+        else if(!strcmp(name, "server")) {
             prometheus_server = value;
         }
-        else if(!strncmp(name, "prefix",lname)) {
+        else if(!strcmp(name, "prefix")) {
             prometheus_prefix = value;
         }
-        else if(!strncmp(name, "data",lname) || !strncmp(name, "source",lname) || !strncmp(name, "data source",lname) || !strncmp(name, "data-source",lname) || !strncmp(name, "data_source",lname) || !strncmp(name, "datasource",lname)) {
+        else if(!strcmp(name, "data") || !strcmp(name, "source") || !strcmp(name, "data source") || !strcmp(name, "data-source") || !strcmp(name, "data_source") || !strcmp(name, "datasource")) {
             prometheus_backend_options = backend_parse_data_source(value, prometheus_backend_options);
         }
         else {
             int i;
             for(i = 0; prometheus_output_flags_root[i].name ; i++) {
-                if(!strncmp(name, prometheus_output_flags_root[i].name,lname)) {
-                    if(!strncmp(value, "yes",lvalue) || !strncmp(value, "1",lvalue) || !strncmp(value, "true",lvalue))
+                if(!strcmp(name, prometheus_output_flags_root[i].name)) {
+                    if(!strcmp(value, "yes") || !strcmp(value, "1") || !strcmp(value, "true"))
                         prometheus_output_options |= prometheus_output_flags_root[i].flag;
                     else
                         prometheus_output_options &= ~prometheus_output_flags_root[i].flag;
@@ -90,7 +71,6 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
     buffer_flush(w->response.data);
     buffer_no_cacheable(w->response.data);
 
-    int ret;
     switch(format) {
         case ALLMETRICS_JSON:
             w->response.data->contenttype = CT_APPLICATION_JSON;
@@ -112,8 +92,7 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
                     , prometheus_backend_options
                     , prometheus_output_options
             );
-            ret = 200;
-            break;
+            return 200;
 
         case ALLMETRICS_PROMETHEUS_ALL_HOSTS:
             w->response.data->contenttype = CT_PROMETHEUS;
@@ -125,25 +104,11 @@ inline int web_client_api_request_v1_allmetrics(RRDHOST *host, struct web_client
                     , prometheus_backend_options
                     , prometheus_output_options
             );
-            ret = 200;
-            break;
+            return 200;
 
         default:
             w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_strcat(w->response.data, "Which format? '" ALLMETRICS_FORMAT_SHELL "', '" ALLMETRICS_FORMAT_PROMETHEUS "', '" ALLMETRICS_FORMAT_PROMETHEUS_ALL_HOSTS "' and '" ALLMETRICS_FORMAT_JSON "' are currently supported.");
             return 400;
     }
-
-    i = 0;
-    do {
-        char *name = w->param_name[i].body;
-        size_t lname = w->param_name[i].length;
-        name[lname] = sname[i];
-
-        char *value = w->param_values[i].body;
-        size_t lvalue = w->param_values[i].length;
-        value[lvalue] = svalue[i];
-    } while( ++i < end);
-
-    return ret;
 }

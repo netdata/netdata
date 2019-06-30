@@ -21,15 +21,6 @@ typedef uint64_t kernel_uint_t;
 // for faster execution, allow the compiler to inline
 // these functions that are called thousands of times per second
 
-/**
- * Simple N hash
- *
- * Calculate the hash for name.
- *
- * @param name the input to the hash
- *
- * @return It returns the hash calculated.
- */
 static inline uint32_t simple_hash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5;
@@ -40,37 +31,6 @@ static inline uint32_t simple_hash(const char *name) {
     return hval;
 }
 
-/**
- * Simple N hash
- *
- * Calculate the hash for name that has the length len.
- *
- * @param name the input to the hash
- * @param len the length of the input
- *
- * @return It returns the hash calculated.
- */
-static inline uint32_t simple_nhash(const char *name, size_t len) {
-    unsigned char *s = (unsigned char *) name;
-    size_t i;
-    uint32_t hval = 0x811c9dc5;
-    for (i=0 ; i < len ; ++i) {
-        hval *= 16777619;
-        hval ^= (uint32_t) *s++;
-    }
-
-    return hval;
-}
-
-/**
- * Simple uhash
- *
- * Calculate the hash for name .
- *
- * @param name the input to the hash
- *
- * @return It returns the hash calculated.
- */
 static inline uint32_t simple_uhash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5, c;
@@ -79,31 +39,6 @@ static inline uint32_t simple_uhash(const char *name) {
         hval *= 16777619;
         hval ^= c;
     }
-    return hval;
-}
-
-/**
- * Simple N uhash
- *
- * Calculate the hash for name that has the length len.
- *
- * @param name the input to the hash
- * @param len the length of the input
- *
- * @return It returns the hash calculated.
- */
-static inline uint32_t simple_nuhash(const char *name, size_t len) {
-    unsigned char *s = (unsigned char *) name;
-    size_t i;
-    uint32_t hval = 0x811c9dc5, c;
-
-    for (i=0 ; i < len ; ++i) {
-        c = *s++;
-        if (unlikely(c >= 'A' && c <= 'Z')) c += 'a' - 'A';
-        hval *= 16777619;
-        hval ^= c;
-    }
-
     return hval;
 }
 

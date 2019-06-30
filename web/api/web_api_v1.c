@@ -194,28 +194,15 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
 }
 
 
-/**
- * Alarms
- *
- * Get a list of active or raised alarms on the server
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It always returns 200
- */
 inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     int all = 0;
 
-    uint32_t end = w->total_params;
-    uint32_t  i;
-    for ( i =0 ; i < end ; ++i) {
-        char *value = w->param_values[i].body;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
 
-        if(!strncmp(value, "all",3)) all = 1;
-        else if(!strncmp(value, "active",6)) all = 0;
+        if(!strcmp(value, "all")) all = 1;
+        else if(!strcmp(value, "active")) all = 0;
     }
 
     buffer_flush(w->response.data);
@@ -225,34 +212,18 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
-/**
- * Alarm Log
- *
- * Retrieves the entries of the alarm log
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It always return 200
- */
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     uint32_t after = 0;
 
-    uint32_t end = w->total_params;
-    uint32_t  i;
-    for(i = 0 ; i< end ; ++i) {
-        char *value = w->param_values[i].body;
-        size_t lvalue = w->param_values[i].length;
-        char save = value[lvalue];
-        value[lvalue] = 0x00;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
 
-        char *name = w->param_name[i].body;
-        size_t lname = w->param_name[i].length;
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
-        if(!strncmp(name, "after",lname)) after = (uint32_t)strtoul(value, NULL, 0);
-        value[lvalue] = save;
+        if(!strcmp(name, "after")) after = (uint32_t)strtoul(value, NULL, 0);
     }
 
     buffer_flush(w->response.data);
@@ -261,39 +232,24 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     return 200;
 }
 
-/**
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- * @param callback
- * @return
- */
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
-    (void)url;
     int ret = 400;
     char *chart = NULL;
 
     buffer_flush(w->response.data);
 
-    uint32_t  i = 0;
-    uint32_t end = w->total_params;
-    //In normal situation this vector is not necessary,
-    //but it is safety to have it here.
-    char save[WEB_FIELDS_MAX];
-    char *value;
-    size_t vlength;
-    for(i = 0 ; i< end ; ++i) {
-        char *name = w->param_name[i].body;
-        size_t nlength  = w->param_name[i].length;
-        value = w->param_values[i].body;
-        vlength  = w->param_values[i].length;
-        save[i] = value[vlength];
-        value[vlength] = 0x00;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
         // name and value are now the parameters
         // they are not null and not empty
-        if(!strncmp(name, "chart",nlength)) chart = value;
+
+        if(!strcmp(name, "chart")) chart = value;
         //else {
         /// buffer_sprintf(w->response.data, "Unknown parameter '%s' in request.", name);
         //  goto cleanup;
@@ -317,43 +273,16 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     w->response.data->contenttype = CT_APPLICATION_JSON;
     st->last_accessed_time = now_realtime_sec();
     callback(st, w->response.data);
-    ret =  200;
+    return 200;
 
     cleanup:
-    for(i = 0 ; i< end ; ++i) {
-            value = w->param_values[i].body;
-            vlength  = w->param_name[i].length;
-            value[vlength] = save[i];
-    }
     return ret;
 }
 
-/**
- * Alarm Variables
- *
- * List variables available to configure alarms for a chart
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It forwards the return of web_client_api_request_single_chart
- */
 inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }
 
-/**
- * Request v1 Charts
- *
- * Get a list of all charts available at the server
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It always return 200;
- */
 inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
 
@@ -363,17 +292,6 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
-/**
- * Request V1 Chart
- *
- * Get info about a specific chart
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It forwards the return of web_client_api_request_single_chart
- */
 inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
@@ -387,19 +305,8 @@ void fix_google_param(char *s) {
     }
 }
 
-/**
- * Request V1 Data
- *
- * Get collected data for a specific chart.
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It returns 200 on success and other number otherwise.
- */
+// returns the HTTP code
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
-    (void)url;
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = 400;
@@ -426,99 +333,73 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     uint32_t format = DATASOURCE_JSON;
     uint32_t options = 0x00000000;
 
-    uint32_t end = w->total_params;
-    //Save the value present in the options different of tqx
-    char save[WEB_FIELDS_MAX];
-    //Save the pointer where ';' and ':' are in tqx to restore
-    char *tqxname[WEB_FIELDS_MAX];
-    uint32_t tqxtotal=0;
-    char *value ;
-    size_t lvalue;
-    uint32_t i;
-    for(i = 0 ; i < end ; ++i) {
-        char *name = w->param_name[i].body;
-        size_t lname = w->param_name[i].length;
-        value = w->param_values[i].body;
-        lvalue = w->param_values[i].length;
-        save[i] = value[lvalue];
-        value[lvalue] = 0x00;
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
 
         debug(D_WEB_CLIENT, "%llu: API v1 data query param '%s' with value '%s'", w->id, name, value);
 
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strncmp(name, "chart",lname)) chart = value;
-        else if(!strncmp(name, "dimension",lname) || !strncmp(name, "dim",lname) || !strncmp(name, "dimensions",lname) || !strncmp(name, "dims",lname)) {
+        if(!strcmp(name, "chart")) chart = value;
+        else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
             if(!dimensions) dimensions = buffer_create(100);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
-        else if(!strncmp(name, "after",lname)) after_str = value;
-        else if(!strncmp(name, "before",lname)) before_str = value;
-        else if(!strncmp(name, "points",lname)) points_str = value;
-        else if(!strncmp(name, "gtime",lname)) group_time_str = value;
-        else if(!strncmp(name, "group",lname)) {
+        else if(!strcmp(name, "after")) after_str = value;
+        else if(!strcmp(name, "before")) before_str = value;
+        else if(!strcmp(name, "points")) points_str = value;
+        else if(!strcmp(name, "gtime")) group_time_str = value;
+        else if(!strcmp(name, "group")) {
             group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
         }
-        else if(!strncmp(name, "format",lname)) {
+        else if(!strcmp(name, "format")) {
             format = web_client_api_request_v1_data_format(value);
         }
-        else if(!strncmp(name, "options",lname)) {
+        else if(!strcmp(name, "options")) {
             options |= web_client_api_request_v1_data_options(value);
         }
-        else if(!strncmp(name, "callback",lname)) {
+        else if(!strcmp(name, "callback")) {
             responseHandler = value;
         }
-        else if(!strncmp(name, "filename",lname)) {
+        else if(!strcmp(name, "filename")) {
             outFileName = value;
         }
-        else if(!strncmp(name, "tqx",lname)) {
+        else if(!strcmp(name, "tqx")) {
             // parse Google Visualization API options
             // https://developers.google.com/chart/interactive/docs/dev/implementing_data_source
             char *tqx_name, *tqx_value;
 
-            char *moveme = value;
-            char *end = &moveme[lvalue];
-            while(moveme < end) {
-                tqx_value = strchr(moveme,';');
-                if(!tqx_value || !*tqx_value) {
-                    tqx_value = end;
-                }
+            while(value) {
+                tqx_value = mystrsep(&value, ";");
+                if(!tqx_value || !*tqx_value) continue;
 
-                tqx_name = strchr(moveme,':');
-                if(!tqx_name || !*tqx_name) {
-                    break;
-                }
-                if(!tqx_value || !*tqx_value) {
-                    if(tqx_value != end) {
-                        break;
-                    }
-                }
+                tqx_name = mystrsep(&tqx_value, ":");
+                if(!tqx_name || !*tqx_name) continue;
+                if(!tqx_value || !*tqx_value) continue;
 
-                tqxname[tqxtotal] = tqx_name;
-
-                tqxtotal++;
-                *tqx_name = 0x00;
-
-                if(!strcmp(moveme, "version"))
-                    google_version = tqx_name+1;
-                else if(!strcmp(moveme, "reqId"))
-                    google_reqId = tqx_name+1;
-                else if(!strcmp(moveme, "sig")) {
-                    google_sig = tqx_name+1;
+                if(!strcmp(tqx_name, "version"))
+                    google_version = tqx_value;
+                else if(!strcmp(tqx_name, "reqId"))
+                    google_reqId = tqx_value;
+                else if(!strcmp(tqx_name, "sig")) {
+                    google_sig = tqx_value;
                     google_timestamp = strtoul(google_sig, NULL, 0);
                 }
-                else if(!strcmp(moveme, "out")) {
-                    google_out = tqx_name+1;
+                else if(!strcmp(tqx_name, "out")) {
+                    google_out = tqx_value;
                     format = web_client_api_request_v1_data_google_format(google_out);
                 }
-                else if(!strcmp(moveme, "responseHandler"))
-                    responseHandler = tqx_name+1;
-                else if(!strcmp(moveme, "outFileName"))
-                    outFileName = tqx_name+1;
-
-                moveme = tqx_value+1;
+                else if(!strcmp(tqx_name, "responseHandler"))
+                    responseHandler = tqx_value;
+                else if(!strcmp(tqx_name, "outFileName"))
+                    outFileName = tqx_value;
             }
         }
     }
@@ -594,6 +475,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if(format == DATASOURCE_DATATABLE_JSONP) {
         if(google_timestamp < last_timestamp_in_data)
             buffer_strcat(w->response.data, "});");
+
         else {
             // the client already has the latest data
             buffer_flush(w->response.data);
@@ -606,48 +488,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
     cleanup:
-    if(end) {
-        uint32_t i;
-        for (i =0; i < tqxtotal ; ++i) {
-            *tqxname[i] = ':';
-        }
-
-        for (i =0; i < end ; ++i) {
-            value = w->param_values[i].body;
-            lvalue = w->param_values[i].length;
-            value[lvalue] = save[i];
-        }
-    }
     buffer_free(dimensions);
     return ret;
-}
-
-/**
- * Restore Registry Variable
- *
- * Restore the original values for the registry variables.
- *
- * @param names the structure where the names are linked
- * @param sname the value saved for names
- * @param values the structure where the values are linked
- * @param svalue the value saved for values
- * @param end the number of elements to check
- */
-static void web_client_api_restore_registry_variable(struct web_fields *names,char *sname,struct web_fields *values,char *svalue,uint32_t end) {
-    if(!end) {
-        return;
-    }
-
-    uint32_t i;
-    for (i = 0 ; i< end ; ++i) {
-        char *name = names[i].body;
-        size_t nlength = names[i].length;
-        name[nlength] = sname[i];
-
-        char *value = values[i].body;
-        size_t vlength = values[i].length;
-        value[vlength] = svalue[i];
-    }
 }
 
 // Pings a netdata server:
@@ -664,17 +506,6 @@ static void web_client_api_restore_registry_variable(struct web_fields *names,ch
 //
 // Impersonate:
 // /api/v1/registry?action=switch&machine=${machine_guid}&name=${hostname}&url=${url}&to=${new_person_guid}
-/**
- * Request V1 registry
- *
- * Where is the documentation for this?
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return
- */
 inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url) {
     static uint32_t hash_action = 0, hash_access = 0, hash_hello = 0, hash_delete = 0, hash_search = 0,
             hash_switch = 0, hash_machine = 0, hash_url = 0, hash_name = 0, hash_delete_url = 0, hash_for = 0,
@@ -720,40 +551,26 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     int redirects = 0;
 */
 
-    uint32_t i;
-    uint32_t end = w->total_params;
-    if (!end) {
-        goto nothing;
-    }
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if (!value || !*value) continue;
 
-    char sname[WEB_FIELDS_MAX];
-    char vname[WEB_FIELDS_MAX];
-    for (i =0 ; i < end ; ++i) {
-        char *name = w->param_name[i].body;
-        size_t nlength = w->param_name[i].length;
-        sname[i] = name[nlength];
-        name[nlength] = 0x00;
-
-        char *value = w->param_values[i].body;
-        size_t vlength = w->param_values[i].length;
-        vname[i] = value[vlength];
-        value[vlength] = 0x00;
+        char *name = mystrsep(&value, "=");
+        if (!name || !*name) continue;
+        if (!value || !*value) continue;
 
         debug(D_WEB_CLIENT, "%llu: API v1 registry query param '%s' with value '%s'", w->id, name, value);
 
-        //uint32_t hash = simple_hash(name);
-        uint32_t hash = simple_nhash(name,nlength);
+        uint32_t hash = simple_hash(name);
 
-        //if(hash == hash_action && !strcmp(name, "action")) {
-        if(hash == hash_action && !strncmp(name, "action",nlength)) {
-            //uint32_t vhash = simple_hash(value);
-            uint32_t vhash = simple_nhash(value,vlength);
+        if(hash == hash_action && !strcmp(name, "action")) {
+            uint32_t vhash = simple_hash(value);
 
-            if(vhash == hash_access && !strncmp(value, "access",vlength)) action = 'A';
-            else if(vhash == hash_hello && !strncmp(value, "hello",vlength)) action = 'H';
-            else if(vhash == hash_delete && !strncmp(value, "delete",vlength)) action = 'D';
-            else if(vhash == hash_search && !strncmp(value, "search",vlength)) action = 'S';
-            else if(vhash == hash_switch && !strncmp(value, "switch",vlength)) action = 'W';
+            if(vhash == hash_access && !strcmp(value, "access")) action = 'A';
+            else if(vhash == hash_hello && !strcmp(value, "hello")) action = 'H';
+            else if(vhash == hash_delete && !strcmp(value, "delete")) action = 'D';
+            else if(vhash == hash_search && !strcmp(value, "search")) action = 'S';
+            else if(vhash == hash_switch && !strcmp(value, "switch")) action = 'W';
 #ifdef NETDATA_INTERNAL_CHECKS
             else error("unknown registry action '%s'", value);
 #endif /* NETDATA_INTERNAL_CHECKS */
@@ -762,26 +579,26 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         else if(hash == hash_redirects && !strcmp(name, "redirects"))
             redirects = atoi(value);
 */
-        else if(hash == hash_machine && !strncmp(name, "machine",nlength))
+        else if(hash == hash_machine && !strcmp(name, "machine"))
             machine_guid = value;
 
-        else if(hash == hash_url && !strncmp(name, "url",nlength))
+        else if(hash == hash_url && !strcmp(name, "url"))
             machine_url = value;
 
         else if(action == 'A') {
-            if(hash == hash_name && !strncmp(name, "name",nlength))
+            if(hash == hash_name && !strcmp(name, "name"))
                 url_name = value;
         }
         else if(action == 'D') {
-            if(hash == hash_delete_url && !strncmp(name, "delete_url",nlength))
+            if(hash == hash_delete_url && !strcmp(name, "delete_url"))
                 delete_url = value;
         }
         else if(action == 'S') {
-            if(hash == hash_for && !strncmp(name, "for",nlength))
+            if(hash == hash_for && !strcmp(name, "for"))
                 search_machine_guid = value;
         }
         else if(action == 'W') {
-            if(hash == hash_to && !strncmp(name, "to",nlength))
+            if(hash == hash_to && !strcmp(name, "to"))
                 to_person_guid = value;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -789,27 +606,21 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 #endif /* NETDATA_INTERNAL_CHECKS */
     }
 
-nothing:
     if(unlikely(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w))) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
-        web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
         return 400;
     }
 
     if(unlikely(action == 'H')) {
         // HELLO request, dashboard ACL
-        if(unlikely(!web_client_can_access_dashboard(w))) {
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
+        if(unlikely(!web_client_can_access_dashboard(w)))
             return web_client_permission_denied(w);
-        }
     }
     else {
         // everything else, registry ACL
-        if(unlikely(!web_client_can_access_registry(w))) {
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
+        if(unlikely(!web_client_can_access_registry(w)))
             return web_client_permission_denied(w);
-        }
     }
 
     switch(action) {
@@ -818,12 +629,10 @@ nothing:
                 error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Access request.");
-                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_access_json(host, w, person_guid, machine_guid, machine_url, url_name, now_realtime_sec());
 
         case 'D':
@@ -831,12 +640,10 @@ nothing:
                 error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Delete request.");
-                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_delete_json(host, w, person_guid, machine_guid, machine_url, delete_url, now_realtime_sec());
 
         case 'S':
@@ -844,12 +651,10 @@ nothing:
                 error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
-                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_search_json(host, w, person_guid, machine_guid, machine_url, search_machine_guid, now_realtime_sec());
 
         case 'W':
@@ -857,22 +662,18 @@ nothing:
                 error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Switch request.");
-                web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
                 return 400;
             }
 
             web_client_enable_tracking_required(w);
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_switch_json(host, w, person_guid, machine_guid, machine_url, to_person_guid, now_realtime_sec());
 
         case 'H':
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return registry_request_hello_json(host, w);
 
         default:
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Invalid registry request - you need to set an action: hello, access, delete, search");
-            web_client_api_restore_registry_variable(w->param_name,sname,w->param_values,vname,end);
             return 400;
     }
 }
@@ -915,17 +716,6 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
-/**
- *  API Requests V1 Info
- *
- *  Get netdata basic information
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It returns 200 on success and 503 otherwise
- */
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     if (!netdata_ready) return 503;
@@ -995,17 +785,6 @@ static struct api_command {
         { NULL,              0, WEB_CLIENT_ACL_NONE,      NULL                                      },
 };
 
-/**
- * API Request Version 1.0
- *
- * Process the request made by the user.
- *
- * @param host main structure with client information!
- * @param w is the structure with all information of the client request.
- * @param url is the url that netdata is working
- *
- * @return It returns the code that will be used in the response.
- */
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
     static int initialized = 0;
     int i;
@@ -1018,27 +797,28 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
     }
 
     // get the command
+    char *tok = mystrsep(&url, "?");
+    if(tok && *tok) {
+        debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, tok);
+        uint32_t hash = simple_hash(tok);
 
-    char *cmd = w->command.body;
-    size_t length = w->command.length;
-    uint32_t hash = simple_nhash(cmd,length);
+        for(i = 0; api_commands[i].command ;i++) {
+            if(unlikely(hash == api_commands[i].hash && !strcmp(tok, api_commands[i].command))) {
+                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
+                    return web_client_permission_denied(w);
 
-    for(i = 0; api_commands[i].command ;i++) {
-        if(unlikely(hash == api_commands[i].hash && !strncmp(cmd, api_commands[i].command,length))) {
-            if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
-                return web_client_permission_denied(w);
-
-            return api_commands[i].callback(host, w, url);
+                return api_commands[i].callback(host, w, url);
+            }
         }
+
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Unsupported v1 API command: ");
+        buffer_strcat_htmlescape(w->response.data, tok);
+        return 404;
     }
-
-    char copyme[256];
-    length = w->path.length;
-    memcpy(copyme,w->path.body,length);
-    copyme[length] = 0x00;
-
-    buffer_flush(w->response.data);
-    buffer_strcat(w->response.data, "Unsupported v1 API command: ");
-    buffer_strcat_htmlescape(w->response.data, copyme);
-    return 404;
+    else {
+        buffer_flush(w->response.data);
+        buffer_sprintf(w->response.data, "Which API v1 command?");
+        return 400;
+    }
 }

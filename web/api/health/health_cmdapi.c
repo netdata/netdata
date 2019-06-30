@@ -193,7 +193,6 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             ret = 200;
         }
     }
-
     w->response.data = wb;
     buffer_no_cacheable(w->response.data);
     if (ret == 200 && config_changed) {
