@@ -57,6 +57,7 @@
 - Netdata behind caddy reverse proxy wont login. [\#5794](https://github.com/netdata/netdata/issues/5794)
 - netdata/packaging/installer: error when running the kickstart and also when uninstalling it with uninstaller [\#5745](https://github.com/netdata/netdata/issues/5745)
 - cgroups name resolution doesn't work \(on Raspbian\) [\#5314](https://github.com/netdata/netdata/issues/5314)
+- Old Monit metrics still remains in Netdata even after Netdata restarted [\#5074](https://github.com/netdata/netdata/issues/5074)
 - netdata/packaging/docker: Fix docker documentation and a fix to avoid failures [\#6344](https://github.com/netdata/netdata/pull/6344) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix devuan support for initd [\#6275](https://github.com/netdata/netdata/pull/6275) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/docker: Fix docker socket utilization, first pass [\#6233](https://github.com/netdata/netdata/pull/6233) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -69,6 +70,7 @@
 
 **Closed issues:**
 
+- \[QUESTION\] Show Docker Container without ID [\#6358](https://github.com/netdata/netdata/issues/6358)
 - XMPP/Jabber notification support [\#6292](https://github.com/netdata/netdata/issues/6292)
 - collector/freeipmi - option to remove the ID added to the label [\#6284](https://github.com/netdata/netdata/issues/6284)
 - FreeIPMI - option to remove the ID added to the label [\#6283](https://github.com/netdata/netdata/issues/6283)
@@ -106,9 +108,12 @@
 
 **Merged pull requests:**
 
+- apps.plugin: detect openldap server processes by default on Debian [\#6364](https://github.com/netdata/netdata/pull/6364) ([nodiscc](https://github.com/nodiscc))
+- Redirect old site to new site at www.netdata.cloud [\#6359](https://github.com/netdata/netdata/pull/6359) ([cakrit](https://github.com/cakrit))
 - Better checks for nfacct headers [\#6351](https://github.com/netdata/netdata/pull/6351) ([vlvkobal](https://github.com/vlvkobal))
 - Tomcat status invalid XML fix [\#6345](https://github.com/netdata/netdata/pull/6345) ([Danamir](https://github.com/Danamir))
 - pihole: alarms delay fix [\#6342](https://github.com/netdata/netdata/pull/6342) ([ilyam8](https://github.com/ilyam8))
+- monit: obsolete service in runtime [\#6340](https://github.com/netdata/netdata/pull/6340) ([ilyam8](https://github.com/ilyam8))
 - adaptec\_raid: logical device regex fix [\#6338](https://github.com/netdata/netdata/pull/6338) ([ilyam8](https://github.com/ilyam8))
 - Better context name to client context [\#6336](https://github.com/netdata/netdata/pull/6336) ([thiagoftsm](https://github.com/thiagoftsm))
 - installer: include go.d.plugin version v0.7.0 [\#6328](https://github.com/netdata/netdata/pull/6328) ([ilyam8](https://github.com/ilyam8))
