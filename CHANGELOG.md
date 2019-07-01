@@ -122,6 +122,7 @@
 - dnsmasq\_dhcp: dhcp-range utilization alarm [\#6319](https://github.com/netdata/netdata/pull/6319) ([ilyam8](https://github.com/ilyam8))
 - Update the documentation on charts with zero metrics [\#6314](https://github.com/netdata/netdata/pull/6314) ([vlvkobal](https://github.com/vlvkobal))
 - fix elasticsearch plugin [\#6311](https://github.com/netdata/netdata/pull/6311) ([Wing924](https://github.com/Wing924))
+- Repeating alarm notifications [\#6309](https://github.com/netdata/netdata/pull/6309) ([thiagoftsm](https://github.com/thiagoftsm))
 - Chart name streaming [\#6304](https://github.com/netdata/netdata/pull/6304) ([vlvkobal](https://github.com/vlvkobal))
 - Handle file descriptors running out [\#6303](https://github.com/netdata/netdata/pull/6303) ([mfundul](https://github.com/mfundul))
 - Add note regarding libexecdir [\#6301](https://github.com/netdata/netdata/pull/6301) ([cakrit](https://github.com/cakrit))
