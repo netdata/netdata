@@ -30,6 +30,7 @@ struct web_fields{
     char *body;
     size_t length;
 };
+
 // http_request_validate()
 // returns:
 // = 0 : all good, process the request
@@ -43,7 +44,7 @@ typedef enum {
     HTTP_VALIDATION_REDIRECT
 } HTTP_VALIDATION;
 
-extern HTTP_VALIDATION url_is_request_complete(char *begin,char *end,size_t length);
+extern int url_is_request_complete(char *begin,char *end,size_t length);
 extern char *url_find_protocol(char *s);
 extern int url_parse_query_string(struct web_fields *names,struct web_fields *values,char *moveme,char *divisor);
 

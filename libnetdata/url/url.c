@@ -221,57 +221,28 @@ fail_cleanup:
 /**
  * Is request complete?
  *
- * The URL will be ready top be parsed when the last characters are the string "\r\n\r\n",
- * this function checks the last characters of the message.
+ * Check whether the request is complete.
+ * This function cannot check all the requests METHODS, for example, case you are working with POST, it will fail.
  *
  * @param begin is the first character of the sequence to analyse.
  * @param end is the last character of the sequence
  * @param length is the length of the total of bytes read, it is not the difference between end and begin.
  *
- * @return It returns HTTP_VALIDATION_OK when the message is complete and HTTP_VALIDATION_INCOMPLETE otherwise.
+ * @return It returns 1 when the request is complete and 0 otherwise.
  */
-inline HTTP_VALIDATION url_is_request_complete(char *begin,char *end,size_t length) {
-    //Message cannot be complete when first and last address are the same
+inline int url_is_request_complete(char *begin,char *end,size_t length) {
+
     if ( begin == end) {
-        return HTTP_VALIDATION_INCOMPLETE;
+        //Message cannot be complete when first and last address are the same
+        return 0;
     }
 
-    //We always set as begin the first character of the message, but we wanna check
-    //the last characters, so I am adjusting it case it is possible.
+    //This math to verify  the last is valid, because we are discarding the POST
     if (length >= 4) {
         begin = end - 4;
     }
 
-    //I wanna have a pair of '\r\n', so I will count them.
-    uint32_t counter = 0;
-    do {
-        if (*begin == '\r') {
-            begin++;
-            if ( begin == end )
-            {
-                break;
-            }
-
-            if (*begin == '\n')
-            {
-                counter++;
-            }
-        } else if (*begin == '\n') {
-            begin++;
-            counter++;
-        } else {
-            counter = 0;
-            begin++;
-        }
-
-        //Case I already have the total expected, I stop it.
-        if ( counter == 2) {
-            break;
-        }
-    }
-    while (begin != end);
-
-    return (counter == 2)?HTTP_VALIDATION_OK:HTTP_VALIDATION_INCOMPLETE;
+    return ((strstr(begin,"\r\n\r\n")))?1:0;
 }
 
 /**
@@ -306,7 +277,6 @@ inline char *url_find_protocol(char *s) {
  * @param divisor the place of the first equal
  *
  * @return It returns the number of variables processed
- */
 int url_parse_query_string(struct web_fields *names,struct web_fields *values,char *moveme,char *divisor) {
     uint32_t i = 0;
     uint32_t max = WEB_FIELDS_MAX-1;
@@ -342,3 +312,4 @@ int url_parse_query_string(struct web_fields *names,struct web_fields *values,ch
 
     return ++i;
 }
+ */
