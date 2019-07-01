@@ -45,10 +45,6 @@ inline char *health_stock_config_dir(void) {
  * Function used to initialize the silencer structure.
  */
 void health_silencers_init(void) {
-    char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
-    silencers_filename = config_get(CONFIG_SECTION_HEALTH, "silencers file", filename);
-
     struct stat statbuf;
     if (!stat(silencers_filename,&statbuf)) {
         off_t length = statbuf.st_size;
