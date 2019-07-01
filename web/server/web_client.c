@@ -594,7 +594,6 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
 {
     // get the api version
     char *tok = mystrsep(&url, "/");
-    fprintf(stderr,"KILLME %s\n",tok);
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for API version '%s'.", w->id, tok);
         if(strcmp(tok, "v1") == 0)
@@ -905,15 +904,16 @@ void web_client_split_path_query(struct web_client *w, char *s) {
     //Here I test the second possibility, the URL is completely encoded by the user.
     //I am not using the strcasestr, because it is fastest to check %3f and compare
     //the next character.
+    //We executed some tests with "encodeURI(uri);" described in https://www.w3schools.com/jsref/jsref_encodeuri.asp
+    //on July 1st, 2019, that show us that URLs won't have '?','=' and '&' encoded, but we decided to move in front
+    //with the next part, because users can develop their own encoded that won't follow this rule.
     char *moveme = s;
     ptr = strchr(moveme, '%');
     while (moveme) {
         if(ptr) {
-            ptr++;
-            if (!strncmp(ptr,"3f",2) || !strncmp(ptr,"3F",2)) {
-                ptr++;
+            char *test = (ptr+1);
+            if (!strncmp(test,"3f",2) || !strncmp(test,"3F",2)) {
                 w->separator = *ptr;
-                ptr++;
                 web_client_set_path_query(w, s, ptr);
                 return;
             }
@@ -997,6 +997,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
     //After the method we have the path and query string together
     encoded_url = s;
 
+    //we search for the position where we have " HTTP/", because it finishes the user request
     s = url_find_protocol(s);
 
     // incomplete requests
@@ -1007,6 +1008,10 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // we have the end of encoded_url - remember it
     char *ue = s;
+
+    //Variables used to map the variables in the query string case it is present
+    int total_variables;
+    char *ptr_variables[WEB_FIELDS_MAX];
 
     // make sure we have complete request
     // complete requests contain: \r\n\r\n
@@ -1040,7 +1045,12 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
                     if (w->separator) {
                         *w->url_search_path = w->separator;
-                        url_decode_r(w->decoded_query_string, (encoded_url + w->url_path_length), NETDATA_WEB_REQUEST_URL_SIZE + 1);
+
+                        char *from = (encoded_url + w->url_path_length);
+                        total_variables = url_map_query_string(ptr_variables,from);
+
+                        fprintf(stderr,"KILLME %d %s\n",total_variables,from);
+                        url_decode_r(w->decoded_query_string, from, NETDATA_WEB_REQUEST_URL_SIZE + 1);
                     }
                 }
                 *ue = ' ';

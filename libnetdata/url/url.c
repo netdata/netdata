@@ -313,3 +313,52 @@ int url_parse_query_string(struct web_fields *names,struct web_fields *values,ch
     return ++i;
 }
  */
+
+/**
+ * Map query string
+ *
+ * Map the query string fields that will be decoded.
+ * This functions must be called after to check the presence of query strings,
+ * here we are assuming that you already tested this.
+ *
+ * @param out the pointer to pointers that will be used to map
+ * @param url the input url that we are decoding.
+ *
+ * @return It returns the number of total variables in the query string.
+ */
+int url_map_query_string(char **out, char *url) {
+    (void)out;
+    (void)url;
+    int count = 0;
+
+    //First we try to parse considering that there was not URL encode process
+    char *moveme = url;
+    char *ptr;
+
+    //We always we have at least one here, so I can set this.
+    out[count++] = moveme;
+    while(moveme) {
+        ptr = strchr((moveme+1),'&');
+        if(ptr) {
+            out[count++] = ptr;
+        }
+
+        moveme = ptr;
+    }
+
+    //I could not find any '&', so I am assuming now it is like '%26'
+    if (count == 1) {
+        moveme = url;
+        while(moveme) {
+            ptr = strchr(moveme,'%');
+            if(ptr) {
+                char *test = (ptr+1);
+                if (!strncmp(test,"3f",2) || !strncmp(test,"3F",2)) {
+
+                }
+            }
+        }
+    }
+
+    return count;
+}

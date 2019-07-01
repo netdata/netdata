@@ -25,11 +25,8 @@ extern char *url_decode(char *str);
 
 extern char *url_decode_r(char *to, char *url, size_t size);
 
-#define WEB_FIELDS_MAX 200
-struct web_fields{
-    char *body;
-    size_t length;
-};
+#define WEB_FIELDS_MAX 400
+extern int url_map_query_string(char **out, char *url);
 
 // http_request_validate()
 // returns:
@@ -46,6 +43,5 @@ typedef enum {
 
 extern int url_is_request_complete(char *begin,char *end,size_t length);
 extern char *url_find_protocol(char *s);
-extern int url_parse_query_string(struct web_fields *names,struct web_fields *values,char *moveme,char *divisor);
 
 #endif /* NETDATA_URL_H */
