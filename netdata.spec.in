@@ -31,8 +31,12 @@ BuildRequires: systemd-rpm-macros \
 %global netdata_initd_requires \
 %{?systemd_requires} \
 %{nil}
-%global netdata_init_post %service_add_post netdata.service
-%global netdata_init_preun %service_del_preun netdata.service
+%global netdata_init_post %service_add_post netdata.service \
+/sbin/service netdata restart > /dev/null 2>&1 \
+%{nil}
+%global netdata_init_preun %service_del_preun netdata.service \
+/sbin/service netdata stop > /dev/null 2>&1 \
+%{nil}
 %global netdata_init_postun %service_del_postun netdata.service
 %else
 %global netdata_initd_buildrequires \
@@ -42,7 +46,9 @@ Requires(preun):  systemd-units \
 Requires(postun): systemd-units \
 Requires(post):   systemd-units \
 %{nil}
-%global netdata_init_post %systemd_post netdata.service
+%global netdata_init_post %systemd_post netdata.service \
+/usr/bin/systemctl enable netdata.service \
+%{nil}
 %global netdata_init_preun %systemd_preun netdata.service
 %global netdata_init_postun %systemd_postun_with_restart netdata.service
 %endif
