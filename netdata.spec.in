@@ -385,7 +385,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libdir}/%{name}
 
 %config(noreplace) %{_sysconfdir}/%{name}/*.conf
-%config(noreplace) %{_sysconfdir}/%{name}/*/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 
 %{_libdir}/%{name}
