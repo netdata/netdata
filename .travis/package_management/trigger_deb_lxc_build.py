@@ -6,18 +6,11 @@
 #
 # Author   : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 
+import common
 import os
 import sys
 import lxc
 
-def run_command(command):
-    print ("Running command: %s" % command)
-    command_result = container.attach_wait(lxc.attach_run_command, command)
-
-    if command_result != 0:
-        raise Exception("Command failed with exit code %d" % command_result)
-
-print (sys.argv)
 if len(sys.argv) != 2:
     print ('You need to provide a container name to get things started')
     sys.exit(1)
@@ -53,6 +46,6 @@ print ("Starting DEB build process, running dh-make")
 new_version = os.environ["BUILD_VERSION"].replace('v', '')
 
 print ("Building the package")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "dpkg-buildpackage", "--host-arch", "amd64", "--target-arch", "amd64", "--post-clean", "--pre-clean", "--build=binary", "--release-by=\"Netdata Builder\"", "--build-by=\"Netdata Builder\""])
+common.run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "dpkg-buildpackage", "--host-arch", "amd64", "--target-arch", "amd64", "--post-clean", "--pre-clean", "--build=binary", "--release-by=\"Netdata Builder\"", "--build-by=\"Netdata Builder\""])
 
 print ('Done!')

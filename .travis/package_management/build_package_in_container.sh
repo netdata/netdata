@@ -54,24 +54,24 @@ case "${BUILD_ARCH}" in
 	echo "Building for amd64.."
 	export CONTAINER_NAME="${BUILDER_NAME}-${BUILD_DISTRO}${BUILD_RELEASE}-amd64"
 	export LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
-	.travis/package_management/"${PACKAGE_TYPE}"/trigger_lxc_build.py "${CONTAINER_NAME}"
+	.travis/package_management/trigger_${PACKAGE_TYPE}_lxc_build.py "${CONTAINER_NAME}"
 
 	echo "Building for arm64.."
 	export CONTAINER_NAME="${BUILDER_NAME}-${BUILD_DISTRO}${BUILD_RELEASE}-arm64"
 	export LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
-	.travis/package_management/"${PACKAGE_TYPE}"/trigger_lxc_build.py "${CONTAINER_NAME}"
+	.travis/package_management/trigger_${PACKAGE_TYPE}_lxc_build.py "${CONTAINER_NAME}"
 
 	echo "Building for i386.."
 	export CONTAINER_NAME="${BUILDER_NAME}-${BUILD_DISTRO}${BUILD_RELEASE}-i386"
 	export LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
-	.travis/package_management/"${PACKAGE_TYPE}"/trigger_lxc_build.py "${CONTAINER_NAME}"
+	.travis/package_management/trigger_${PACKAGE_TYPE}_lxc_build.py "${CONTAINER_NAME}"
 
 	;;
 "amd64"|"arm64"|"i386")
 	echo "Building for ${BUILD_ARCH}.."
 	export CONTAINER_NAME="${BUILDER_NAME}-${BUILD_DISTRO}${BUILD_RELEASE}-${BUILD_ARCH}"
 	export LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
-	.travis/package_management/"${PACKAGE_TYPE}"/trigger_lxc_build.py "${CONTAINER_NAME}"
+	.travis/package_management/trigger_${PACKAGE_TYPE}_lxc_build.py "${CONTAINER_NAME}"
 	;;
 *)
 	echo "Unknown build architecture '${BUILD_ARCH}', nothing to do for build"

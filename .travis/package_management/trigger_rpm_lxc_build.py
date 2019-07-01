@@ -6,18 +6,11 @@
 #
 # Author   : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 
+import common
 import os
 import sys
 import lxc
 
-def run_command(command):
-    print ("Running command: %s" % command)
-    command_result = container.attach_wait(lxc.attach_run_command, command)
-
-    if command_result != 0:
-        raise Exception("Command failed with exit code %d" % command_result)
-
-print (sys.argv)
 if len(sys.argv) != 2:
     print ('You need to provide a container name to get things started')
     sys.exit(1)
@@ -45,18 +38,18 @@ if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
 print ("Adding builder specific dependencies to the LXC container")
-run_command([os.environ["REPO_TOOL"], "install", "-y", "rpm-build"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "rpm-devel"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "rpmlint"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "make"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "python"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "diffutils"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "patch"])
-run_command([os.environ["REPO_TOOL"], "install", "-y", "rpmdevtools"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpm-build"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpm-devel"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpmlint"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "make"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "python"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "diffutils"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "patch"])
+common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpmdevtools"])
 
 # Run the build process on the container
 print ("Starting RPM build process")
-run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
+common.run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
 
 print ('Done!')
