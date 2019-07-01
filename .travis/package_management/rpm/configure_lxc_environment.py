@@ -142,7 +142,6 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
 
     print ("Building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
     dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
-    download_url="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
 
     print ("5. Preparing local latest implementation tarball for version %s" % rpm_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
@@ -174,7 +173,7 @@ if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     run_command_in_host(['sudo', 'cp', 'netdata.spec', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
     run_command_in_host(['sudo', 'chmod', '777', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
 
-    print ("7. Temporary hack: Change Source0 to %s on spec file %s" % (download_url, spec_file))
+    print ("7. Temporary hack: Change Source0 to %s on spec file %s" % (dest_archive, spec_file))
     replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
 else:
     rpm_friendly_version = os.environ['BUILD_VERSION']
