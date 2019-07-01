@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 #
+#
 # Prepare the build environment within the container
 # The script attaches to the running container and does the following:
 # 1) Create the container
