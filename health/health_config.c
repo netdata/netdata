@@ -490,7 +490,7 @@ static int health_readfile(const char *filename, void *data) {
             if(append < HEALTH_CONF_MAX_LINE)
                 continue;
             else {
-                error("Health configuration has too long muli-line at line %zu of file '%s'.", line, filename);
+                error("Health configuration has too long multi-line at line %zu of file '%s'.", line, filename);
             }
         }
         append = 0;

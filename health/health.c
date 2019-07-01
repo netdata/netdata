@@ -13,18 +13,69 @@ unsigned int default_health_enabled = 1;
 // ----------------------------------------------------------------------------
 // health initialization
 
+/**
+ * User Config directory
+ *
+ * Get the config directory for health and return it.
+ *
+ * @return a pointer to the user config directory
+ */
 inline char *health_user_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_user_config_dir);
     return config_get(CONFIG_SECTION_HEALTH, "health configuration directory", buffer);
 }
 
+/**
+ * Stock Config Directory
+ *
+ * Get the Stock config directory and return it.
+ *
+ * @return a pointer to the stock config directory.
+ */
 inline char *health_stock_config_dir(void) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
     return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
 }
 
+/**
+ * Silencers init
+ *
+ * Function used to initialize the silencer structure.
+ */
+void health_silencers_init(void) {
+    struct stat statbuf;
+    if (!stat(silencers_filename,&statbuf)) {
+        off_t length = statbuf.st_size;
+        if (length && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
+            FILE *fd = fopen(silencers_filename, "r");
+            if (fd) {
+                char *str = mallocz((length+1)* sizeof(char));
+                if(str) {
+                    fread(str, sizeof(char), length, fd);
+                    str[length] = 0x00;
+                    json_parse(str, NULL, health_silencers_json_read_callback);
+                    freez(str);
+                    info("Parsed health silencers file %s", silencers_filename);
+                }
+                fclose(fd);
+            } else {
+                error("Cannot open the file %s",silencers_filename);
+            }
+        } else {
+            error("Health silencers file %s has the size %ld that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, length, HEALTH_SILENCERS_MAX_FILE_LEN);
+        }
+    } else {
+        error("Cannot open the file %s",silencers_filename);
+    }
+}
+
+/**
+ * Health Init
+ *
+ * Initialize the health thread.
+ */
 void health_init(void) {
     debug(D_HEALTH, "Health configuration initializing");
 
@@ -32,11 +83,20 @@ void health_init(void) {
         debug(D_HEALTH, "Health is disabled.");
         return;
     }
+
+    health_silencers_init();
 }
 
 // ----------------------------------------------------------------------------
 // re-load health configuration
 
+/**
+ * Reload host
+ *
+ * Reload configuration for a specific host.
+ *
+ * @param host the structure of the host that the function will reload the configuration.
+ */
 void health_reload_host(RRDHOST *host) {
     if(unlikely(!host->health_enabled))
         return;
@@ -84,6 +144,11 @@ void health_reload_host(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+/**
+ * Reload
+ *
+ * Reload the host configuration for all hosts.
+ */
 void health_reload(void) {
 
     rrd_rdlock();
@@ -430,6 +495,16 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
     return STYPE_NONE;
 }
 
+/**
+ * Update Disabled Silenced
+ *
+ * Update the variable rrdcalc_flags of the structure RRDCALC according with the values of the host structure
+ *
+ * @param host structure that contains information about the host monitored.
+ * @param rc structure with information about the alarm
+ *
+ * @return It returns 1 case rrdcalc_flags is DISABLED or 0 otherwise
+ */
 int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 	uint32_t rrdcalc_flags_old = rc->rrdcalc_flags;
 	// Clear the flags
@@ -459,6 +534,15 @@ int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 		return 0;
 }
 
+/**
+ * Health Main
+ *
+ * The main thread of the health system. In this function all the alarms will be processed.
+ *
+ * @param ptr is a pointer to the netdata_static_thread structure.
+ *
+ * @return It always returns NULL
+ */
 void *health_main(void *ptr) {
     netdata_thread_cleanup_push(health_main_cleanup, ptr);
 
@@ -469,12 +553,6 @@ void *health_main(void *ptr) {
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     unsigned int loop = 0;
-
-    silencers =  mallocz(sizeof(SILENCERS));
-    silencers->all_alarms=0;
-    silencers->stype=STYPE_NONE;
-    silencers->silencers=NULL;
-
     while(!netdata_exit) {
 		loop++;
 		debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
