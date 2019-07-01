@@ -136,7 +136,11 @@ Requires:      lz4
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
+%if 0%{?suse_version} >= 1140
+Requires(post): libcap1
+%else
 Requires(post): libcap
+%endif
 
 %{netdata_initd_requires}
 
