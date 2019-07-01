@@ -157,8 +157,12 @@ Requires: libmnl0
 Requires: libmnl
 %endif
 
-%if 0%{?fedora} || 0%{?suse_version} >= 1140
+%if 0%{?fedora}
 Requires: libnetfilter_acct
+%else
+%if 0%{?suse_version} >= 1140
+Requires: libnetfilter_acct1
+%endif
 %endif
 # end nfacct plugin dependencies
 
@@ -364,7 +368,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %files
 %doc README.md
-%defattr(-,root,root)
+%defattr(-,root,netdata)
 
 %dir %{_sysconfdir}/%{name}
 %dir %{_libdir}/%{name}
