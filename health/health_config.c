@@ -23,6 +23,7 @@
 #define HEALTH_INFO_KEY "info"
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
+#define HEALTH_REPEAT_KEY "repeat"
 
 static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
@@ -45,7 +46,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
 
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
-    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             rc->chart?rc->chart:"NOCHART",
             rc->name,
             rc->id,
@@ -66,10 +67,12 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
             rc->delay_up_duration,
             rc->delay_down_duration,
             rc->delay_max_duration,
-            rc->delay_multiplier
+            rc->delay_multiplier,
+            rc->warn_repeat_every,
+            rc->crit_repeat_every
     );
 
-    rrdcalc_create_part2(host, rc);
+    rrdcalc_add_to_host(host, rc);
     return 1;
 }
 
@@ -100,7 +103,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         }
     }
 
-    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             rt->name,
             (rt->context)?rt->context:"NONE",
             (rt->exec)?rt->exec:"DEFAULT",
@@ -120,7 +123,9 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
             rt->delay_up_duration,
             rt->delay_down_duration,
             rt->delay_max_duration,
-            rt->delay_multiplier
+            rt->delay_multiplier,
+            rt->warn_repeat_every,
+            rt->crit_repeat_every
     );
 
     if(likely(last)) {
@@ -130,48 +135,6 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         rt->next = host->templates;
         host->templates = rt;
     }
-
-    return 1;
-}
-
-static inline int health_parse_duration(char *string, int *result) {
-    // make sure it is a number
-    if(!*string || !(isdigit(*string) || *string == '+' || *string == '-')) {
-        *result = 0;
-        return 0;
-    }
-
-    char *e = NULL;
-    calculated_number n = str2ld(string, &e);
-    if(e && *e) {
-        switch (*e) {
-            case 'Y':
-                *result = (int) (n * 86400 * 365);
-                break;
-            case 'M':
-                *result = (int) (n * 86400 * 30);
-                break;
-            case 'w':
-                *result = (int) (n * 86400 * 7);
-                break;
-            case 'd':
-                *result = (int) (n * 86400);
-                break;
-            case 'h':
-                *result = (int) (n * 3600);
-                break;
-            case 'm':
-                *result = (int) (n * 60);
-                break;
-
-            default:
-            case 's':
-                *result = (int) (n);
-                break;
-        }
-    }
-    else
-        *result = (int)(n);
 
     return 1;
 }
@@ -202,14 +165,14 @@ static inline int health_parse_delay(
         while(*s && isspace(*s)) *s++ = '\0';
 
         if(!strcasecmp(key, "up")) {
-            if (!health_parse_duration(value, delay_up_duration)) {
+            if (!config_parse_duration(value, delay_up_duration)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, filename, value, key);
             }
             else given_up = 1;
         }
         else if(!strcasecmp(key, "down")) {
-            if (!health_parse_duration(value, delay_down_duration)) {
+            if (!config_parse_duration(value, delay_down_duration)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, filename, value, key);
             }
@@ -224,7 +187,7 @@ static inline int health_parse_delay(
             else given_multiplier = 1;
         }
         else if(!strcasecmp(key, "max")) {
-            if (!health_parse_duration(value, delay_max_duration)) {
+            if (!config_parse_duration(value, delay_max_duration)) {
                 error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                         line, filename, value, key);
             }
@@ -285,6 +248,50 @@ static inline uint32_t health_parse_options(const char *s) {
     return options;
 }
 
+static inline int health_parse_repeat(
+        size_t line,
+        const char *file,
+        char *string,
+        uint32_t *warn_repeat_every,
+        uint32_t *crit_repeat_every
+) {
+
+    char *s = string;
+    while(*s) {
+        char *key = s;
+
+        while(*s && !isspace(*s)) s++;
+        while(*s && isspace(*s)) *s++ = '\0';
+
+        if(!*key) break;
+
+        char *value = s;
+        while(*s && !isspace(*s)) s++;
+        while(*s && isspace(*s)) *s++ = '\0';
+
+        if(!strcasecmp(key, "off")) {
+            *warn_repeat_every = 0;
+            *crit_repeat_every = 0;
+            return 1;
+        }
+        if(!strcasecmp(key, "warning")) {
+            if (!config_parse_duration(value, (int*)warn_repeat_every)) {
+                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                      line, file, value, key);
+            }
+        }
+        else if(!strcasecmp(key, "critical")) {
+            if (!config_parse_duration(value, (int*)crit_repeat_every)) {
+                error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
+                      line, file, value, key);
+            }
+        }
+    }
+
+    return 1;
+}
+
+
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_GROUPING *group_method, int *after, int *before, int *every,
@@ -322,7 +329,7 @@ static inline int health_parse_db_lookup(
     while(*s && !isspace(*s)) s++;
     while(*s && isspace(*s)) *s++ = '\0';
 
-    if(!health_parse_duration(key, after)) {
+    if(!config_parse_duration(key, after)) {
         error("Health configuration at line %zu of file '%s': invalid duration '%s' after group method",
                 line, filename, key);
         return 0;
@@ -343,7 +350,7 @@ static inline int health_parse_db_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!health_parse_duration(value, before)) {
+            if (!config_parse_duration(value, before)) {
                 error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                         line, filename, value, key);
             }
@@ -353,7 +360,7 @@ static inline int health_parse_db_lookup(
             while(*s && !isspace(*s)) s++;
             while(*s && isspace(*s)) *s++ = '\0';
 
-            if (!health_parse_duration(value, every)) {
+            if (!config_parse_duration(value, every)) {
                 error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                         line, filename, value, key);
             }
@@ -430,7 +437,8 @@ static int health_readfile(const char *filename, void *data) {
             hash_info = 0,
             hash_recipient = 0,
             hash_delay = 0,
-            hash_options = 0;
+            hash_options = 0,
+            hash_repeat = 0;
 
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
@@ -454,6 +462,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_recipient = simple_hash(HEALTH_RECIPIENT_KEY);
         hash_delay = simple_uhash(HEALTH_DELAY_KEY);
         hash_options = simple_uhash(HEALTH_OPTIONS_KEY);
+        hash_repeat = simple_uhash(HEALTH_REPEAT_KEY);
     }
 
     FILE *fp = fopen(filename, "r");
@@ -532,6 +541,9 @@ static int health_readfile(const char *filename, void *data) {
             rc->value = NAN;
             rc->old_value = NAN;
             rc->delay_multiplier = 1.0;
+            rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
+            rc->warn_repeat_every = host->health_default_warn_repeat_every;
+            rc->crit_repeat_every = host->health_default_crit_repeat_every;
 
             if(rrdvar_fix_name(rc->name))
                 error("Health configuration renamed alarm '%s' to '%s'", value, rc->name);
@@ -556,6 +568,8 @@ static int health_readfile(const char *filename, void *data) {
             rt->green = NAN;
             rt->red = NAN;
             rt->delay_multiplier = 1.0;
+            rt->warn_repeat_every = host->health_default_warn_repeat_every;
+            rt->crit_repeat_every = host->health_default_crit_repeat_every;
 
             if(rrdvar_fix_name(rt->name))
                 error("Health configuration renamed template '%s' to '%s'", value, rt->name);
@@ -612,7 +626,7 @@ static int health_readfile(const char *filename, void *data) {
                         &rc->options, &rc->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-                if(!health_parse_duration(value, &rc->update_every))
+                if(!config_parse_duration(value, &rc->update_every))
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' cannot parse duration: '%s'.",
                             line, filename, rc->name, key, value);
             }
@@ -707,6 +721,11 @@ static int health_readfile(const char *filename, void *data) {
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rc->options |= health_parse_options(value);
             }
+            else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
+                health_parse_repeat(line, filename, value,
+                                    &rc->warn_repeat_every,
+                                    &rc->crit_repeat_every);
+            }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
                         line, filename, rc->name, key);
@@ -736,7 +755,7 @@ static int health_readfile(const char *filename, void *data) {
                         &rt->update_every, &rt->options, &rt->dimensions);
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-                if(!health_parse_duration(value, &rt->update_every))
+                if(!config_parse_duration(value, &rt->update_every))
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' cannot parse duration: '%s'.",
                             line, filename, rt->name, key, value);
             }
@@ -830,6 +849,11 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_options && !strcasecmp(key, HEALTH_OPTIONS_KEY)) {
                 rt->options |= health_parse_options(value);
+            }
+            else if(hash == hash_repeat && !strcasecmp(key, HEALTH_REPEAT_KEY)){
+                health_parse_repeat(line, filename, value,
+                                    &rt->warn_repeat_every,
+                                    &rt->crit_repeat_every);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",

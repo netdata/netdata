@@ -108,7 +108,7 @@ extern void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 extern ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename);
 extern void health_alarm_log_load(RRDHOST *host);
 
-extern void health_alarm_log(
+extern ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
@@ -128,6 +128,8 @@ extern void health_alarm_log(
         const char *info,
         int delay,
         uint32_t flags);
+
+extern void health_alarm_log(RRDHOST *host, ALARM_ENTRY *ae);
 
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);

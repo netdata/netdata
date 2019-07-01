@@ -255,17 +255,18 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     ALARM_ENTRY *ae;
-    for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id ; ae = ae->next) {
-        if(unlikely(
-            !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
-            !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
+    for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
+        if(likely(!alarm_entry_isrepeating(host, ae))) {
+            if(unlikely(
+                    !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
+                    !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
             )) {
+                if(unlikely(ae->unique_id < first_waiting))
+                    first_waiting = ae->unique_id;
 
-            if(unlikely(ae->unique_id < first_waiting))
-                first_waiting = ae->unique_id;
-
-            if(likely(now >= ae->delay_up_to_timestamp))
-                health_process_notifications(host, ae);
+                if(likely(now >= ae->delay_up_to_timestamp))
+                    health_process_notifications(host, ae);
+            }
         }
     }
 
@@ -295,6 +296,10 @@ static inline void health_alarm_log_process(RRDHOST *host) {
         ALARM_ENTRY *t = ae->next;
 
         health_alarm_log_free_one_nochecks_nounlink(ae);
+        if(likely(!alarm_entry_isrepeating(host, ae))) {
+            health_alarm_log_free_one_nochecks_nounlink(ae);
+            host->health_log.count--;
+        }
 
         ae = t;
         host->health_log.count--;
@@ -411,7 +416,7 @@ SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
                 debug(D_HEALTH, "Alarm %s matched a silence entry, but no SILENCE or DISABLE command was issued via the command API. The match has no effect.", rc->name);
             } else {
                 debug(D_HEALTH, "Alarm %s via the command API - name:%s context:%s chart:%s host:%s family:%s"
-                		, (silencers->stype==STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
+                        , (silencers->stype == STYPE_DISABLE_ALARMS)?"Disabled":"Silenced"
                         , rc->name
                         , (rc->rrdset)?rc->rrdset->context:""
                         , rc->chart
@@ -756,20 +761,22 @@ void *health_main(void *ptr) {
 						rc->delay_last = delay;
 						rc->delay_up_to_timestamp = now + delay;
 
-						health_alarm_log(
-								host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
-								rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
-								rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
-								rc->delay_last,
-								(
-								    ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
-								    ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
-								)
-
-						);
-
-						rc->last_status_change = now;
-						rc->status = status;
+                        if(likely(!rrdcalc_isrepeating(rc))) {
+                            ALARM_ENTRY *ae = health_create_alarm_entry(
+                                    host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                    rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
+                                    rc->old_value, rc->value, rc->status, status, rc->source, rc->units, rc->info,
+                                    rc->delay_last,
+                                    (
+                                            ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                            ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                                    )
+                            );
+                            health_alarm_log(host, ae);
+                        }
+                        rc->last_status_change = now;
+                        rc->old_status = rc->status;
+                        rc->status = status;
 					}
 
 					rc->last_updated = now;
@@ -778,6 +785,35 @@ void *health_main(void *ptr) {
 					if (next_run > rc->next_update)
 						next_run = rc->next_update;
 				}
+
+                // process repeating alarms
+                RRDCALC *rc;
+                for(rc = host->alarms; rc ; rc = rc->next) {
+                    int repeat_every = 0;
+                    if(unlikely(rrdcalc_isrepeating(rc))) {
+                        if(unlikely(rc->status == RRDCALC_STATUS_WARNING))
+                            repeat_every = rc->warn_repeat_every;
+                        else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL))
+                            repeat_every = rc->crit_repeat_every;
+                    }
+                    if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
+                        rc->last_repeat = now;
+                        ALARM_ENTRY *ae = health_create_alarm_entry(
+                                host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
+                                rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
+                                rc->old_value, rc->value, rc->old_status, rc->status, rc->source, rc->units, rc->info,
+                                rc->delay_last,
+                                (
+                                        ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
+                                        ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
+                                )
+                        );
+                        ae->last_repeat = rc->last_repeat;
+                        health_process_notifications(host, ae);
+                        debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
+                        health_alarm_log_free_one_nochecks_nounlink(ae);
+                    }
+                }
 
 				rrdhost_unlock(host);
 			}

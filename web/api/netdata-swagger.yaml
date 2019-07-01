@@ -892,6 +892,12 @@ definitions:
                 type: string
               crit_parsed: 
                 type: string
+              warn_repeat_every:
+                type: integer
+                format: int32
+              crit_repeat_every:
+                type: integer
+                format: int32
               green: 
                 type: string
                 format: nullable
