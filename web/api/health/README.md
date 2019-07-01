@@ -195,7 +195,7 @@ json
 
 ### Persistence
 
-From netdata v1.13.1 and beyond, the silencers configuration is persisted to disk and loaded when netdata starts.
+From netdata v1.16.0 and beyond, the silencers configuration is persisted to disk and loaded when netdata starts.
 The JSON string returned by the [LIST command](#list-silencers) is automatically saved to the `silencers file`, every time a command alters the silencers configuration.
 The file's location is configurable in `netdata.conf`. The default is shown below:
 
