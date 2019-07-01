@@ -38,18 +38,18 @@ if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
 print ("Adding builder specific dependencies to the LXC container")
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpm-build"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpm-devel"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpmlint"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "make"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "python"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "bash"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "diffutils"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "patch"])
-common.run_command([os.environ["REPO_TOOL"], "install", "-y", "rpmdevtools"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpm-build"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpm-devel"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpmlint"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "make"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "python"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "diffutils"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "patch"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpmdevtools"])
 
 # Run the build process on the container
 print ("Starting RPM build process")
-common.run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
 
 print ('Done!')
