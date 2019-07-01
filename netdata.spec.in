@@ -115,7 +115,6 @@ BuildRequires: json-c-devel
 
 # Runtime dependencies
 #
-Requires:      json-c
 Requires:      python
 Requires:      zlib
 Requires:      libuuid
