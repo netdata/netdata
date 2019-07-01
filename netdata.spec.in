@@ -117,17 +117,18 @@ BuildRequires: json-c-devel
 #
 Requires:      python
 Requires:      zlib
-Requires:      libuuid
 %if 0%{?suse_version}
 # for libuv, Requires version >= 1
 Requires:      libuv1
 Requires:      libJudy1
 Requires:      json-glib
+Requires:      libuuid1
 %else
 # for libuv, Requires version >= 1
 Requires:      libuv >= 1
 Requires:      Judy
 Requires:      json-c
+Requires:      libuuid
 %endif
 Requires:      openssl
 Requires:      lz4
