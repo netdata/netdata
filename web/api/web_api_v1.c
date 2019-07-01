@@ -797,8 +797,6 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
     }
 
     // get the command
-    //char *tok = mystrsep(&url, "?");
-    //if(tok && *tok) {
     if(url) {
         debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, url);
         uint32_t hash = simple_hash(url);

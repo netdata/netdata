@@ -979,7 +979,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
         return HTTP_VALIDATION_NOT_SUPPORTED;
     } else if (!is_it_valid) {
         //Invalid request, we have more data after the end of message
-        char *check = strstr((char *)buffer_tostring(w->response.data),"\r\n\r\n");
+        char *check = strstr((char *)buffer_tostring(w->response.data), "\r\n\r\n");
         if(check) {
             check += 4;
             if (*check) {
