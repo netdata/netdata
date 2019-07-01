@@ -47,6 +47,7 @@ Requires(postun): systemd-units \
 Requires(post):   systemd-units \
 %{nil}
 %global netdata_init_post %systemd_post netdata.service \
+/usr/bin/systemctl daemon-reload \
 /usr/bin/systemctl enable netdata.service \
 %{nil}
 %global netdata_init_preun %systemd_preun netdata.service
