@@ -125,7 +125,6 @@ error_after_pipe:
 extern char **environ;
 
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
-    // Should we remove DETACH_PLUGINS_FROM_NETDATA from netdata altogether?
     return custom_popene(command, pidptr, environ);
 }
 
