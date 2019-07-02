@@ -360,14 +360,12 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
         ALARM_ENTRY *t = ae->next;
 
-        health_alarm_log_free_one_nochecks_nounlink(ae);
         if(likely(!alarm_entry_isrepeating(host, ae))) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             host->health_log.count--;
         }
 
         ae = t;
-        host->health_log.count--;
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
