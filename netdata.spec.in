@@ -60,6 +60,7 @@ Requires(post):   chkconfig \
 %{nil}
 %global netdata_init_post \
 /sbin/chkconfig --add netdata \
+/sbin/service netdata restart > /dev/null 2>&1 \
 %{nil}
 %global netdata_init_preun %{nil} \
 if [ $1 = 0 ]; then \

@@ -12,19 +12,19 @@ import sys
 import lxc
 
 if len(sys.argv) != 2:
-    print ('You need to provide a container name to get things started')
+    print('You need to provide a container name to get things started')
     sys.exit(1)
 container_name=sys.argv[1]
 
 # Load the container, break if its not there
-print ("Starting up container %s" % container_name)
+print("Starting up container %s" % container_name)
 container = lxc.Container(container_name)
 if not container.defined:
     raise Exception("Container %s does not exist!" % container_name)
 
 # Check if the container is running, attempt to start it up in case its not running
 if not container.running or not container.state == "RUNNING":
-    print ('Container %s is not running, attempt to start it up' % container_name)
+    print('Container %s is not running, attempt to start it up' % container_name)
 
     # Start the container
     if not container.start():
@@ -37,7 +37,7 @@ if not container.running or not container.state == "RUNNING":
 if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
-print ("Adding builder specific dependencies to the LXC container")
+print("Adding builder specific dependencies to the LXC container")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpm-build"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpm-devel"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpmlint"])
@@ -49,7 +49,7 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "patch"
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "rpmdevtools"])
 
 # Run the build process on the container
-print ("Starting RPM build process")
+print("Starting RPM build process")
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "rpmbuild", "-ba", "--rebuild", "/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']])
 
-print ('Done!')
+print('Done!')
