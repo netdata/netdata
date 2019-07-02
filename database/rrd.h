@@ -572,6 +572,8 @@ struct alarm_entry {
     uint32_t updated_by_id;
     uint32_t updates_id;
 
+    time_t last_repeat;
+
     struct alarm_entry *next;
 };
 
@@ -686,11 +688,16 @@ struct rrdhost {
     char *health_log_filename;                      // the alarms event log filename
     size_t health_log_entries_written;              // the number of alarm events writtern to the alarms event log
     FILE *health_log_fp;                            // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;      // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;      // the default value for the interval between repeating critical notifications
+
 
     // all RRDCALCs are primarily allocated and linked here
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
+    avl_tree_lock alarms_idx_health_log;
+    avl_tree_lock alarms_idx_name;
 
     ALARM_LOG health_log;                           // alarms historical events (event log)
     uint32_t health_last_processed_id;              // the last processed health id from the log
@@ -1020,6 +1027,12 @@ extern collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
 extern collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
 extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
+
+// ----------------------------------------------------------------------------
+// Miscellaneous functions
+
+extern int alarm_compare_id(void *a, void *b);
+extern int alarm_compare_name(void *a, void *b);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions

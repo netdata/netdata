@@ -128,6 +128,8 @@ The configuration options for plugins appear in sections following the pattern `
 
 Most internal plugins will provide additional options. Check [Internal Plugins](../../collectors/) for more information.
 
+Please note, that by default Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently.
+
 #### External plugins
 
 External plugins will have only 2 options at `netdata.conf`:

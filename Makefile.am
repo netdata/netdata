@@ -161,6 +161,12 @@ LIBNETDATA_FILES = \
     libnetdata/threads/threads.h \
 	libnetdata/url/url.c \
 	libnetdata/url/url.h \
+	libnetdata/json/json.c \
+	libnetdata/json/json.h \
+	libnetdata/json/jsmn.c \
+	libnetdata/json/jsmn.h \
+	libnetdata/health/health.c \
+	libnetdata/health/health.h \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
@@ -231,6 +237,11 @@ NFACCT_PLUGIN_FILES = \
 
 XENSTAT_PLUGIN_FILES = \
     collectors/xenstat.plugin/xenstat_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
+PERF_PLUGIN_FILES = \
+    collectors/perf.plugin/perf_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -507,6 +518,7 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_LZ4_LIBS) \
 	$(OPTIONAL_JUDY_LIBS) \
 	$(OPTIONAL_SSL_LIBS) \
+	$(OPTIONAL_JSONC_LIBS) \
 	$(NULL)
 
 sbin_PROGRAMS += netdata
@@ -570,6 +582,14 @@ if ENABLE_PLUGIN_XENSTAT
     xenstat_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_XENSTAT_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_PERF
+    plugins_PROGRAMS += perf.plugin
+    perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
+    perf_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 

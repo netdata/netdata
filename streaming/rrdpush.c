@@ -463,10 +463,10 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
 
 #ifdef ENABLE_HTTPS
-    if( netdata_cli_ctx ){
+    if( netdata_client_ctx ){
         host->ssl.flags = NETDATA_SSL_START;
         if (!host->ssl.conn){
-            host->ssl.conn = SSL_new(netdata_cli_ctx);
+            host->ssl.conn = SSL_new(netdata_client_ctx);
             if(!host->ssl.conn){
                 error("Failed to allocate SSL structure.");
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
@@ -651,7 +651,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
 #ifdef ENABLE_HTTPS
     if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
-        security_start_ssl(1);
+        security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
     }
 #endif
 

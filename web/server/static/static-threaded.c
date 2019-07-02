@@ -458,7 +458,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
                 fatal("LISTENER: no listen sockets available.");
 
 #ifdef ENABLE_HTTPS
-            security_start_ssl(0);
+            security_start_ssl(NETDATA_SSL_CONTEXT_SERVER);
 #endif
             // 6 threads is the optimal value
             // since 6 are the parallel connections browsers will do
@@ -474,7 +474,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
 
             if(static_threaded_workers_count < 1) static_threaded_workers_count = 1;
 
-            size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 2));
+            size_t max_sockets = (size_t)config_get_number(CONFIG_SECTION_WEB, "web server max sockets", (long long int)(rlimit_nofile.rlim_cur / 4));
 
             static_workers_private_data = callocz((size_t)static_threaded_workers_count, sizeof(struct web_server_static_threaded_worker));
 

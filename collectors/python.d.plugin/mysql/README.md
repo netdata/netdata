@@ -218,6 +218,24 @@ It will produce following charts (if data is available):
 45. **Flow Control** in ms
  * paused
 
+46. **Users CPU time** in percentage
+ * users
+
+**Per user statistics:**
+
+1. **Rows Operations** in operations/s
+ * read
+ * send
+ * updated
+ * inserted
+ * deleted
+
+2. **Commands** in commands/s
+ * select
+ * update
+ * other
+
+
 ### configuration
 
 You can provide, per server, the following:
@@ -234,7 +252,7 @@ You can provide, per server, the following:
  - ca: the path name of the Certificate Authority (CA) certificate file. This option, if used, must specify the same certificate used by the server.
  - capath: the path name of the directory that contains trusted SSL CA certificate files.
  - cipher: the list of permitted ciphers for SSL encryption.
- 
+
 Here is an example for 3 servers:
 
 ```yaml
@@ -259,6 +277,8 @@ remote:
 ```
 
 If no configuration is given, module will attempt to connect to mysql server via unix socket at `/var/run/mysqld/mysqld.sock` without password and with username `root`
+
+`userstats` graph works only if you enable such plugin in MariaDB server and set proper mysql priviliges (SUPER or PROCESS). For more detail please check [MariaDB User Statistics page](https://mariadb.com/kb/en/library/user-statistics/)
 
 ---
 

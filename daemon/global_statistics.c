@@ -538,7 +538,7 @@ void global_statistics_charts(void) {
         unsigned long long stats_array[RRDENG_NR_STATS];
 
         /* get localhost's DB engine's statistics */
-        rrdeng_get_28_statistics(localhost->rrdeng_ctx, stats_array);
+        rrdeng_get_33_statistics(localhost->rrdeng_ctx, stats_array);
 
         // ----------------------------------------------------------------
 
@@ -748,6 +748,75 @@ void global_statistics_charts(void) {
             rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[18]);
             rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[16]);
             rrdset_done(st_io_stats);
+        }
+
+        // ----------------------------------------------------------------
+
+        {
+            static RRDSET *st_errors = NULL;
+            static RRDDIM *rd_fs_errors = NULL;
+            static RRDDIM *rd_io_errors = NULL;
+
+            if (unlikely(!st_errors)) {
+                st_errors = rrdset_create_localhost(
+                        "netdata"
+                        , "dbengine_global_errors"
+                        , NULL
+                        , "dbengine"
+                        , NULL
+                        , "NetData DB engine errors"
+                        , "errors/s"
+                        , "netdata"
+                        , "stats"
+                        , 130507
+                        , localhost->rrd_update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rd_io_errors = rrddim_add(st_errors, "I/O errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rd_fs_errors = rrddim_add(st_errors, "FS errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            else
+                rrdset_next(st_errors);
+
+            rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
+            rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
+            rrdset_done(st_errors);
+        }
+
+        // ----------------------------------------------------------------
+
+        {
+            static RRDSET *st_fd = NULL;
+            static RRDDIM *rd_fd_current = NULL;
+            static RRDDIM *rd_fd_max = NULL;
+
+            if (unlikely(!st_fd)) {
+                st_fd = rrdset_create_localhost(
+                        "netdata"
+                        , "dbengine_global_file_descriptors"
+                        , NULL
+                        , "dbengine"
+                        , NULL
+                        , "NetData DB engine File Descriptors"
+                        , "descriptors"
+                        , "netdata"
+                        , "stats"
+                        , 130508
+                        , localhost->rrd_update_every
+                        , RRDSET_TYPE_LINE
+                );
+
+                rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_fd_max = rrddim_add(st_fd, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(st_fd);
+
+            rrddim_set_by_pointer(st_fd, rd_fd_current, (collected_number)stats_array[32]);
+            /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
+            rrddim_set_by_pointer(st_fd, rd_fd_max, (collected_number)rlimit_nofile.rlim_cur / 4);
+            rrdset_done(st_fd);
         }
     }
 #endif

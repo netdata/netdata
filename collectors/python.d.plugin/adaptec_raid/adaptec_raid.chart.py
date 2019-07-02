@@ -56,8 +56,8 @@ GOOD_PD_STATUS = (
 )
 
 RE_LD = re.compile(
-    r'Logical device number\s+([0-9]+).*?'
-    r'Status of logical device\s+: ([a-zA-Z]+)'
+    r'Logical [dD]evice number\s+([0-9]+).*?'
+    r'Status of [lL]ogical [dD]evice\s+: ([a-zA-Z]+)'
 )
 
 

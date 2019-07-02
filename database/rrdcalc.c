@@ -81,9 +81,9 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     if(!rc->units) rc->units = strdupz(st->units);
 
-    {
+    if(!rrdcalc_isrepeating(rc)) {
         time_t now = now_realtime_sec();
-        health_alarm_log(
+        ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc->id,
                 rc->next_event_id++,
@@ -104,6 +104,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 0,
                 0
         );
+        health_alarm_log(host, ae);
     }
 }
 
@@ -142,9 +143,9 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     RRDHOST *host = st->rrdhost;
 
-    {
+    if(!rrdcalc_isrepeating(rc)) {
         time_t now = now_realtime_sec();
-        health_alarm_log(
+        ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc->id,
                 rc->next_event_id++,
@@ -165,6 +166,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 0,
                 0
         );
+        health_alarm_log(host, ae);
     }
 
     debug(D_HEALTH, "Health unlinking alarm '%s.%s' from chart '%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, st->id, host->hostname);
@@ -253,7 +255,7 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
     return host->health_log.next_alarm_id++;
 }
 
-inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
+inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
     if(rc->calculation) {
@@ -301,8 +303,7 @@ inline void rrdcalc_create_part2(RRDHOST *host, RRDCALC *rc) {
     }
 }
 
-inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
-
+inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
     debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, rt->name);
 
     if(rrdcalc_exists(host, chart, rt->name, 0, 0))
@@ -327,6 +328,10 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
     rc->delay_down_duration = rt->delay_down_duration;
     rc->delay_max_duration = rt->delay_max_duration;
     rc->delay_multiplier = rt->delay_multiplier;
+
+    rc->last_repeat = 0;
+    rc->warn_repeat_every = rt->warn_repeat_every;
+    rc->crit_repeat_every = rt->crit_repeat_every;
 
     rc->group = rt->group;
     rc->after = rt->after;
@@ -356,7 +361,7 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             (rc->chart)?rc->chart:"NOCHART",
             rc->name,
             (rc->exec)?rc->exec:"DEFAULT",
@@ -376,15 +381,23 @@ inline RRDCALC *rrdcalc_create(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *c
             rc->delay_up_duration,
             rc->delay_down_duration,
             rc->delay_max_duration,
-            rc->delay_multiplier
+            rc->delay_multiplier,
+            rc->warn_repeat_every,
+            rc->crit_repeat_every
     );
 
-    rrdcalc_create_part2(host, rc);
+    rrdcalc_add_to_host(host, rc);
+    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
+    if (rdcmp != rc) {
+        error("Cannot insert the alarm index ID %s",rc->name);
+    }
+
     return rc;
 }
 
 void rrdcalc_free(RRDCALC *rc) {
     if(unlikely(!rc)) return;
+
 
     expression_free(rc->calculation);
     expression_free(rc->warning);
@@ -413,7 +426,6 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     // unlink it from RRDHOST
     if(unlikely(rc == host->alarms))
         host->alarms = rc->next;
-
     else {
         RRDCALC *t;
         for(t = host->alarms; t && t->next != rc; t = t->next) ;
@@ -425,5 +437,73 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
     }
 
+    if (rc) {
+        RRDCALC *rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl *)rc);
+        if (!rdcmp) {
+            error("Cannot remove the health alarm index");
+        }
+
+        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_name, (avl *)rc);
+        if (!rdcmp) {
+            error("Cannot remove the health alarm index");
+        }
+    }
+
     rrdcalc_free(rc);
+}
+
+// ----------------------------------------------------------------------------
+// Alarm
+
+
+/**
+ * Alarm is repeating
+ *
+ * Is this alarm repeating ?
+ *
+ * @param host The structure that has the binary tree
+ * @param alarm_id the id of the alarm to search
+ *
+ * @return It returns 1 case it is repeating and 0 otherwise
+ */
+int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id) {
+    RRDCALC findme;
+    findme.id = alarm_id;
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_health_log, (avl *)&findme);
+    if (!rc) {
+        return 0;
+    }
+    return rrdcalc_isrepeating(rc);
+}
+
+/**
+ * Entry is repeating
+ *
+ * Check whether the id of alarm entry is yet present in the host structure
+ *
+ * @param host The structure that has the binary tree
+ * @param ae the alarm entry
+ *
+ * @return It returns 1 case it is repeating and 0 otherwise
+ */
+int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae) {
+    return alarm_isrepeating(host, ae->alarm_id);
+}
+
+/**
+ * Max last repeat
+ *
+ * Check the maximum last_repeat for the alarms associated a host
+ *
+ * @param host The structure that has the binary tree
+ *
+ * @return It returns 1 case it is repeating and 0 otherwise
+ */
+RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name,uint32_t hash) {
+    RRDCALC findme;
+    findme.name = alarm_name;
+    findme.hash = hash;
+    RRDCALC *rc = (RRDCALC *)avl_search_lock(&host->alarms_idx_name, (avl *)&findme);
+
+    return rc;
 }

@@ -22,7 +22,7 @@ X seconds (though, it can send them per second if you need it to).
      metrics are sent to the backend server as `prefix.hostname.chart.dimension`. `prefix` is
      configured below, `hostname` is the hostname of the machine (can also be configured).
 
-   - **opentsdb** (`telnet interface`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc)
+   - **opentsdb** (`telnet or HTTP interfaces`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc)
 
      metrics are sent to opentsdb as `prefix.chart.dimension` with tag `host=hostname`.
 
@@ -76,7 +76,7 @@ of `netdata.conf` from your netdata):
 ```
 [backend]
     enabled = yes | no
-    type = graphite | opentsdb | json | prometheus_remote_write | kinesis
+    type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | prometheus_remote_write | json | kinesis
     host tags = list of TAG=VALUE
     destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used, or a region for kinesis
     data source = average | sum | as collected
@@ -92,7 +92,7 @@ of `netdata.conf` from your netdata):
 
 - `enabled = yes | no`, enables or disables sending data to a backend
 
-- `type = graphite | opentsdb | json | kinesis`, selects the backend type
+- `type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis`, selects the backend type
 
 - `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames,
    IPs (IPv4 and IPv6) and ports to connect to.

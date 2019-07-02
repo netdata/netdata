@@ -148,6 +148,12 @@ AC_ARG_ENABLE(
     ,
     [enable_dbengine="detect"]
 )
+AC_ARG_ENABLE(
+    [jsonc],
+    [AS_HELP_STRING([--enable-jsonc], [Enable JSON-C support @<:@default autodetect@:>@])],
+    ,
+    [enable_jsonc="detect"]
+)
 
 # -----------------------------------------------------------------------------
 # netdata required checks
@@ -348,6 +354,20 @@ OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
 OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 
 # -----------------------------------------------------------------------------
+# JSON-C library
+
+PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
+    [json-c],
+    [json_object_get_type],
+    [JSONC_LIBS="-ljson-c"]),AC_CHECK_LIB(
+        [json],
+        [json_object_get_type],
+        [JSONC_LIBS="-ljson"])
+    )
+
+OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
+
+# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
     AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
@@ -380,6 +400,21 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# JSON-C
+test "${enable_jsonc}" = "yes" -a -z "${JSONC_LIBS}" && \
+    AC_MSG_ERROR([JSON-C required but not found. Try installing 'libjson-c-dev' or 'json-c'.])
+
+AC_MSG_CHECKING([if json-c should be used])
+if test "${enable_jsonc}" != "no" -a "${JSONC_LIBS}"; then
+	enable_jsonc="yes"
+	AC_DEFINE([ENABLE_JSONC], [1], [netdata json-c usability])
+else
+	enable_jsonc="no"
+fi
+AC_MSG_RESULT([${enable_jsonc}])
+AM_CONDITIONAL([ENABLE_JSONC], [test "${enable_jsonc}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # compiler options
@@ -572,7 +607,16 @@ AM_CONDITIONAL([ENABLE_PLUGIN_CUPS], [test "${enable_plugin_cups}" = "yes"])
 # -----------------------------------------------------------------------------
 # nfacct.plugin - libmnl, libnetfilter_acct
 
-AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
+AC_CHECK_HEADER(
+    [linux/netfilter/nfnetlink_conntrack.h],
+    [AC_CHECK_DECL(
+        [CTA_STATS_MAX],
+        [have_nfnetlink_conntrack=yes],
+        [have_nfnetlink_conntrack=no],
+        [#include <linux/netfilter/nfnetlink_conntrack.h>]
+    )],
+    [have_nfnetlink_conntrack=no]
+)
 
 PKG_CHECK_MODULES(
     [NFACCT],
@@ -598,6 +642,9 @@ PKG_CHECK_MODULES(
     [have_libmnl=no]
 )
 
+test "${enable_plugin_nfacct}" = "yes" -a "${have_nfnetlink_conntrack}" != "yes" && \
+    AC_MSG_ERROR([nfnetlink_conntrack.h required but not found or too old])
+
 test "${enable_plugin_nfacct}" = "yes" -a "${have_libnetfilter_acct}" != "yes" && \
     AC_MSG_ERROR([netfilter_acct required but not found])
 
@@ -605,7 +652,9 @@ test "${enable_plugin_nfacct}" = "yes" -a "${have_libmnl}" != "yes" && \
     AC_MSG_ERROR([libmnl required but not found. Try installing 'libmnl-dev' or 'libmnl-devel'])
 
 AC_MSG_CHECKING([if nfacct.plugin should be enabled])
-if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" -a "${have_libmnl}" = "yes"; then
+if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" \
+                                          -a "${have_libmnl}" = "yes" \
+                                          -a "${have_nfnetlink_conntrack}" = "yes"; then
     enable_plugin_nfacct="yes"
     AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
     AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
@@ -683,6 +732,19 @@ else
 fi
 AC_MSG_RESULT([${enable_plugin_xenstat}])
 AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
+# perf.plugin
+
+AC_MSG_CHECKING([if perf.plugin should be enabled])
+if test "${build_target}" == "linux" ; then
+    enable_plugin_perf="yes"
+else
+    enable_plugin_perf="no"
+fi
+AC_MSG_RESULT([${enable_plugin_perf}])
+AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
@@ -948,6 +1010,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
+AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
@@ -999,6 +1062,7 @@ AC_CONFIG_FILES([
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
+    collectors/perf.plugin/Makefile
     daemon/Makefile
     database/Makefile
     database/engine/Makefile
@@ -1023,6 +1087,8 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
+    libnetdata/json/Makefile
+    libnetdata/health/Makefile
     registry/Makefile
     streaming/Makefile
     system/Makefile

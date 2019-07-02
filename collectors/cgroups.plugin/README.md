@@ -101,6 +101,15 @@ The whole point for the additional pattern list, is to limit the number of times
 
 The above pattern list is matched against the path of the cgroup. For matched cgroups, netdata calls the script [cgroup-name.sh](cgroup-name.sh.in) to get its name. This script queries `docker`, or applies heuristics to find give a name for the cgroup.
 
+### charts with zero metrics
+
+By default, Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a chart instead of `auto` to enable it permanently. For example:
+
+```
+[plugin:cgroups]
+	enable memory (used mem including cache) = yes
+```
+
 ### alarms
 
 CPU and memory limits are watched and used to rise alarms. Memory usage for every cgroup is checked against `ram` and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alarms is available in `health.d/cgroups.conf` file.

@@ -35,6 +35,7 @@ dist_healthconfig_DATA = \
     health.d/cpu.conf \
     health.d/couchdb.conf \
     health.d/disks.conf \
+    health.d/dnsmasq_dhcp.conf \
     health.d/dockerd.conf \
     health.d/elasticsearch.conf \
     health.d/entropy.conf \
@@ -62,6 +63,7 @@ dist_healthconfig_DATA = \
     health.d/netfilter.conf \
     health.d/nginx.conf \
     health.d/nginx_plus.conf \
+    health.d/pihole.conf \
     health.d/phpfpm.conf \
     health.d/portcheck.conf \
     health.d/postgres.conf \
@@ -86,4 +88,5 @@ dist_healthconfig_DATA = \
     health.d/wmi.conf \
     health.d/x509check.conf \
     health.d/zfs.conf \
+    health.d/dbengine.conf \
     $(NULL)

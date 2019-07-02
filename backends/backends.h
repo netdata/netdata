@@ -15,6 +15,20 @@ typedef enum backend_options {
     BACKEND_OPTION_SEND_NAMES        = (1 << 16)
 } BACKEND_OPTIONS;
 
+typedef enum backend_types {
+    BACKEND_TYPE_UNKNOWN,                   //Invalid type
+    BACKEND_TYPE_GRAPHITE,                  //Send plain text to Graphite
+    BACKEND_TYPE_OPENTSDB_USING_TELNET,     //Send data to OpenTSDB using telnet API
+    BACKEND_TYPE_OPENTSDB_USING_HTTP,       //Send data to OpenTSDB using HTTP API
+    BACKEND_TYPE_JSON,                      //Stores the data using JSON.
+    BACKEND_TYPE_PROMETEUS,                 //The user selected to use Prometheus backend
+    BACKEND_TYPE_KINESIS                    //Send message to AWS Kinesis
+} BACKEND_TYPE;
+
+
+typedef int (**backend_response_checker_t)(BUFFER *);
+typedef int (**backend_request_formatter_t)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS);
+
 #define BACKEND_OPTIONS_SOURCE_BITS (BACKEND_SOURCE_DATA_AS_COLLECTED|BACKEND_SOURCE_DATA_AVERAGE|BACKEND_SOURCE_DATA_SUM)
 #define BACKEND_OPTIONS_DATA_SOURCE(backend_options) (backend_options & BACKEND_OPTIONS_SOURCE_BITS)
 

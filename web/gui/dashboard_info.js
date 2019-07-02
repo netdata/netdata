@@ -285,6 +285,13 @@ netdataDashboard.menu = {
         info: 'Performance metrics for <b>PHP-FPM</b>, an alternative FastCGI implementation for PHP.'
     },
 
+    'pihole': {
+        title: 'Pi-hole',
+        icon: '<i class="fas fa-ban"></i>',
+        info: 'Metrics for <a href="https://pi-hole.net/" target="_blank">Pi-hole</a>, a black hole for Internet advertisements.' +
+            ' The metrics returned by Pi-Hole API is all from the last 24 hours.'
+    },
+
     'portcheck': {
         title: 'Port Check',
         icon: '<i class="fas fa-heartbeat"></i>',
@@ -473,6 +480,12 @@ netdataDashboard.menu = {
         title: 'wmi',
         icon: '<i class="fas fa-server"></i>',
         info: undefined
+    },
+
+    'perf': {
+        title: 'Perf Counters',
+        icon: '<i class="fas fa-tachometer-alt"></i>',
+        info: 'Performance Monitoring Counters (PMC). Data collected using <b>perf_event_open()</b> system call which utilises Hardware Performance Monitoring Units (PMU).'
     }
 };
 

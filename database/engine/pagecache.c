@@ -287,7 +287,7 @@ static void pg_cache_evict_unsafe(struct rrdengine_instance *ctx, struct rrdeng_
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
 
-    free(pg_cache_descr->page);
+    freez(pg_cache_descr->page);
     pg_cache_descr->page = NULL;
     pg_cache_descr->flags &= ~RRD_PAGE_POPULATED;
     pg_cache_release_pages_unsafe(ctx, 1);
@@ -330,7 +330,7 @@ static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
             return 1;
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
-    };
+    }
     uv_rwlock_wrunlock(&pg_cache->replaceQ.lock);
 
     /* failed to evict */
@@ -594,7 +594,7 @@ struct pg_cache_page_index *
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
 
-    };
+    }
     uv_rwlock_rdunlock(&page_index->lock);
 
     failed_to_reserve = 0;
@@ -767,6 +767,7 @@ struct pg_cache_page_index *create_page_index(uuid_t *id)
     assert(0 == uv_rwlock_init(&page_index->lock));
     page_index->oldest_time = INVALID_TIME;
     page_index->latest_time = INVALID_TIME;
+    page_index->prev = NULL;
 
     return page_index;
 }
@@ -776,6 +777,7 @@ static void init_metrics_index(struct rrdengine_instance *ctx)
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     pg_cache->metrics_index.JudyHS_array = (Pvoid_t) NULL;
+    pg_cache->metrics_index.last_page_index = NULL;
     assert(0 == uv_rwlock_init(&pg_cache->metrics_index.lock));
 }
 
@@ -809,4 +811,65 @@ void init_page_cache(struct rrdengine_instance *ctx)
     init_metrics_index(ctx);
     init_replaceQ(ctx);
     init_commited_page_index(ctx);
+}
+
+void free_page_cache(struct rrdengine_instance *ctx)
+{
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    Word_t ret_Judy, bytes_freed = 0;
+    Pvoid_t *PValue;
+    struct pg_cache_page_index *page_index, *prev_page_index;
+    Word_t Index;
+    struct rrdeng_page_descr *descr;
+    struct page_cache_descr *pg_cache_descr;
+
+    /* Free commited page index */
+    ret_Judy = JudyLFreeArray(&pg_cache->commited_page_index.JudyL_array, PJE0);
+    assert(NULL == pg_cache->commited_page_index.JudyL_array);
+    bytes_freed += ret_Judy;
+
+    for (page_index = pg_cache->metrics_index.last_page_index ;
+         page_index != NULL ;
+         page_index = prev_page_index) {
+        prev_page_index = page_index->prev;
+
+        /* Find first page in range */
+        Index = (Word_t) 0;
+        PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
+        if (likely(NULL != PValue)) {
+            descr = *PValue;
+        }
+        while (descr != NULL) {
+            /* Iterate all page descriptors of this metric */
+
+            if (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED) {
+                /* Check rrdenglocking.c */
+                pg_cache_descr = descr->pg_cache_descr;
+                if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
+                    freez(pg_cache_descr->page);
+                    bytes_freed += RRDENG_BLOCK_SIZE;
+                }
+                rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
+                bytes_freed += sizeof(*pg_cache_descr);
+            }
+            freez(descr);
+            bytes_freed += sizeof(*descr);
+
+            PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
+            descr = unlikely(NULL == PValue) ? NULL : *PValue;
+        }
+
+        /* Free page index */
+        ret_Judy = JudyLFreeArray(&page_index->JudyL_array, PJE0);
+        assert(NULL == page_index->JudyL_array);
+        bytes_freed += ret_Judy;
+        freez(page_index);
+        bytes_freed += sizeof(*page_index);
+    }
+    /* Free metrics index */
+    ret_Judy = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
+    assert(NULL == pg_cache->metrics_index.JudyHS_array);
+    bytes_freed += ret_Judy;
+
+    info("Freed %lu bytes of memory from page cache.", bytes_freed);
 }
