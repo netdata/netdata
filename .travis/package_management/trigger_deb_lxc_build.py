@@ -46,6 +46,6 @@ print("Starting DEB build process, running dh-make")
 new_version = os.environ["BUILD_VERSION"].replace('v', '')
 
 print("Building the package")
-common.run_command(["sudo", "-u", os.environ['BUILDER_NAME'], "dpkg-buildpackage", "--host-arch", "amd64", "--target-arch", "amd64", "--post-clean", "--pre-clean", "--build=binary", "--release-by=\"Netdata Builder\"", "--build-by=\"Netdata Builder\""])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "dpkg-buildpackage", "--host-arch", "amd64", "--target-arch", "amd64", "--post-clean", "--pre-clean", "--build=binary", "--release-by=\"Netdata Builder\"", "--build-by=\"Netdata Builder\""])
 
 print('Done!')
