@@ -42,24 +42,24 @@ if not container.get_ips(timeout=30):
 # Run the required activities now
 # 1. Create the builder user
 print("1. Adding user %s" % os.environ['BUILDER_NAME'])
-common.run_command((["useradd", "-m", os.environ['BUILDER_NAME']])
+common.run_command(container, (["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
 print("2. Installing package dependencies within LXC container")
-common.run_command((["apt-get", "update", "-y"])
-common.run_command((["apt-get", "install", "-y", "sudo"])
-common.run_command((["apt-get", "install", "-y", "wget"])
-common.run_command((["apt-get", "install", "-y", "bash"])
-common.run_command((["wget", "-T", "15", "-O", "~/.install-required-packages.sh", "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
-common.run_command((["bash", "~/.install-required-packages.sh", "netdata", "--dont-wait", "--non-interactive"])
+common.run_command(container, (["apt-get", "update", "-y"])
+common.run_command(container, (["apt-get", "install", "-y", "sudo"])
+common.run_command(container, (["apt-get", "install", "-y", "wget"])
+common.run_command(container, (["apt-get", "install", "-y", "bash"])
+common.run_command(container, (["wget", "-T", "15", "-O", "~/.install-required-packages.sh", "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+common.run_command(container, (["bash", "~/.install-required-packages.sh", "netdata", "--dont-wait", "--non-interactive"])
 
 # Download the source
 dest_archive="/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
 release_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
 print("3. Fetch netdata source (%s -> %s)" % (release_url, dest_archive))
-common.run_command((["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, release_url])
+common.run_command(container, (["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, release_url])
 
 print("4. Extracting directory contents to /home " + os.environ['BUILDER_NAME'])
-common.run_command((["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive, "-C", "/home/" + os.environ['BUILDER_NAME']])
+common.run_command(container, (["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive, "-C", "/home/" + os.environ['BUILDER_NAME']])
 
-print('Done!')
+print("Done!")
