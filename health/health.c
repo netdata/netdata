@@ -58,11 +58,11 @@ void health_silencers_init(void) {
                     if (copied == (length* sizeof(char))) {
                         str[length] = 0x00;
                         json_parse(str, NULL, health_silencers_json_read_callback);
-                        freez(str);
                         info("Parsed health silencers file %s", silencers_filename);
                     } else {
                         error("Cannot read the data from health silencers file %s", silencers_filename);
                     }
+                    freez(str);
                 }
                 fclose(fd);
             } else {
