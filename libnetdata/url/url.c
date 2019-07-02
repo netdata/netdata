@@ -267,54 +267,6 @@ inline char *url_find_protocol(char *s) {
 }
 
 /**
- * Parse query string
- *
- * Parse the query string sent by the client.
- *
- * @param names is the vector to store the variable names
- * @param values is the vector to store the values of the variables.
- * @param moveme the query string vector
- * @param divisor the place of the first equal
- *
- * @return It returns the number of variables processed
-int url_parse_query_string(struct web_fields *names,struct web_fields *values,char *moveme,char *divisor) {
-    uint32_t i = 0;
-    uint32_t max = WEB_FIELDS_MAX-1;
-
-    do {
-        if ( i == max) {
-            error("We are exceeding the maximum number of elements possible(%u) in this query string(%s)",max,moveme);
-            break;
-        }
-        if (divisor) {
-            names[i].body = moveme;
-            names[i].length = divisor - moveme;//= - begin
-
-            moveme = ++divisor; //value
-            values[i].body = moveme;
-
-            (void)divisor;
-            divisor = strchr(moveme,'&'); //end of value
-            if (divisor) {
-                values[i].length = (size_t )(divisor - moveme);
-            } else{
-                values[i].length = strlen(moveme);
-                break;
-            }
-
-            moveme = divisor;
-            divisor = strchr(++moveme,'='); //end of value
-            i++;
-        } else {
-            break;
-        }
-    } while (moveme);
-
-    return ++i;
-}
- */
-
-/**
  * Map query string
  *
  * Map the query string fields that will be decoded.
@@ -350,15 +302,66 @@ int url_map_query_string(char **out, char *url) {
     if (count == 1) {
         moveme = url;
         while(moveme) {
-            ptr = strchr(moveme,'%');
+            ptr = strchr((moveme+1),'%');
             if(ptr) {
                 char *test = (ptr+1);
                 if (!strncmp(test,"3f",2) || !strncmp(test,"3F",2)) {
-
+                    out[count++] = ptr;
                 }
             }
+            moveme = ptr;
         }
     }
 
     return count;
+}
+
+/**
+ * Parse query string
+ *
+ * Parse the query string mapped and store it inside output.
+ *
+ * @param output is a vector where I will store the string.
+ * @param max is the maximum length of the output
+ * @param map the map done by the function url_map_query_string.
+ * @param total the total number of variables inside map
+ */
+void url_parse_query_string(char *output, size_t max, char **map, int total) {
+    if(!total) {
+        return;
+    }
+
+    int counter, next;
+    size_t length;
+    char *end;
+    char *begin = map[0];
+    char save;
+    size_t copied = 0;
+    for(counter = 0, next=1 ; next <= total ; ++counter, ++next) {
+        if (next != total) {
+            end = map[next];
+            length = (size_t) (end - begin);
+            save = *end;
+            *end = 0x00;
+        } else {
+            length = strlen(begin);
+            end = NULL;
+        }
+        length++;
+
+        if (length > (max - copied)) {
+            error("Parsing query string: we cannot parse a query string so big");
+            break;
+        }
+
+        url_decode_r(output, begin, length);
+        length = strlen(output);
+        copied += length;
+        output += length;
+
+        begin = end;
+        if (begin) {
+            *begin = save;
+        }
+    }
 }
