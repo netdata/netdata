@@ -607,7 +607,7 @@ static unsigned long long end_clock() {
     return clk = tv.tv_sec  * 1000000 + tv.tv_usec - clk;
 }
 
-void main(void)
+int main(void)
 {
     cache_hash = simple_hash("cache");
     rss_hash = simple_hash("rss");
@@ -704,4 +704,5 @@ void main(void)
          , c7
          );
 
+    exit(EXIT_SUCCESS);
 }
