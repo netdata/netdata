@@ -556,6 +556,7 @@ void *pluginsd_worker_thread(void *arg) {
                 // we have collected something
 
                 if(likely(cd->serial_failures <= 10)) {
+                    if (code == -1) cd->enabled = 0;
                     error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, cd->pid, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
                     sleep((unsigned int) (cd->update_every * 10));
                 }
