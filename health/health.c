@@ -53,11 +53,16 @@ void health_silencers_init(void) {
             if (fd) {
                 char *str = mallocz((length+1)* sizeof(char));
                 if(str) {
-                    fread(str, sizeof(char), length, fd);
-                    str[length] = 0x00;
-                    json_parse(str, NULL, health_silencers_json_read_callback);
+                    size_t copied;
+                    copied = fread(str, sizeof(char), length, fd);
+                    if (copied == (length* sizeof(char))) {
+                        str[length] = 0x00;
+                        json_parse(str, NULL, health_silencers_json_read_callback);
+                        info("Parsed health silencers file %s", silencers_filename);
+                    } else {
+                        error("Cannot read the data from health silencers file %s", silencers_filename);
+                    }
                     freez(str);
-                    info("Parsed health silencers file %s", silencers_filename);
                 }
                 fclose(fd);
             } else {
