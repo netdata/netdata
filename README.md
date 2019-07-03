@@ -84,7 +84,6 @@ bash
 # install Netdata directly from GitHub source
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel
 ```
-
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 The above command will:

@@ -60,7 +60,7 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.
 
-In the example above, we appended `--stable-channel` to the `kickstart.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, simply remove `--stable-channel` when executing the `kickstart.sh` script.
+In the example above, we appended `--stable-channel` to the `kickstart.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, remove `--stable-channel` when executing the `kickstart.sh` script.
 
 If you don't want to receive any automatic updates, append `--no-updates` when executing `kickstart.sh` script.
 
@@ -105,7 +105,7 @@ Verify the integrity of the script with this:
 
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.
 
-In the example above, we appended `--stable-channel` to the `kickstart.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, simply remove `--stable-channel` when executing the `kickstart.sh` script.
+In the example above, we appended `--stable-channel` to the `kickstart.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, remove `--stable-channel` when executing the `kickstart.sh` script.
 
 If you don't want to receive any automatic updates, append `--no-updates` when executing `kickstart.sh` script.
 
