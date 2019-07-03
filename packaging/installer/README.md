@@ -30,7 +30,7 @@ This method is **fully automatic on all Linux** distributions. FreeBSD and MacOS
 
 To install Netdata from source and keep it up to date with our [latest major release](https://github.com/netdata/netdata/releases/latest) automatically, run the following:
 
-```bash
+``` bash
 $ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel
 ```
 
@@ -43,7 +43,7 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel
 &nbsp;<br/>
 Verify the integrity of the script with this:
 
-```bash
+``` bash
 [ "8a2b054081a108dff915994ce77f2f2d" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -105,9 +105,9 @@ Verify the integrity of the script with this:
 
 For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.
 
-In the example above, we appended `--stable-channel` to the `kickstart.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, remove `--stable-channel` when executing the `kickstart.sh` script.
+In the example above, we appended `--stable-channel` to the `kickstart-static64.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, remove `--stable-channel` when executing the script.
 
-If you don't want to receive any automatic updates, append `--no-updates` when executing `kickstart.sh` script.
+If you don't want to receive any automatic updates, append `--no-updates` when executing the `kickstart-static64.sh` script.
 
 Example:
 
