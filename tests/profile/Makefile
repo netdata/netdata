@@ -49,5 +49,5 @@ test-eval: test-eval.c
 
 
 clean:
-	rm -f benchmark-procfile-parser statsd-stress test-eval benchmark-dictionary benchmark-value-pairs
+	rm -f benchmark-procfile-parser statsd-stress test-eval benchmark-dictionary benchmark-value-pairs benchmark-line-parsing benchmark-registry
 
