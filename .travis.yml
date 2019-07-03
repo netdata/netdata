@@ -27,9 +27,7 @@ install:
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; fi;
 - export DEPLOY_REPO="netdata" # Default production packaging repository
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
-#- export PACKAGING_USER="$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
-#Override to help push packages towards netdata/netdata-edge
-- export PACKAGING_USER="netdata"
+- export PACKAGING_USER="$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
 
 
 
@@ -87,23 +85,23 @@ stages:
   # Build RPM packages under special conditions
   # Enterprise linux (Covers CentOS, Redhat, Amazon linux)
 - name: "Package Enterprise Linux 7"
-  if: type != cron AND branch = binary-packages-specfile-cleanup AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
 - name: "Package Enterprise linux 6"
-  if: type != cron AND branch = binary-packages-specfile-cleanup AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
 
   # Fedora
 - name: "Package Fedora 30"
-  if: type != cron AND branch = binary-packages-specfile-cleanup AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 - name: "Package Fedora 29"
-  if: type != cron AND branch = binary-packages-specfile-cleanup AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 - name: "Package Fedora 28"
-  if: type != cron AND branch = binary-packages-specfile-cleanup AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 
   # OpenSuSE
 - name: "Package OpenSuSE 15.1"
-  if: type != cron AND branch = binary-packages-specfile-cleanup AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
 - name: "Package OpenSuSE 15.0"
-  if: type != cron AND branch = binary-packages-specfile-cleanup AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
 
 
 
