@@ -737,8 +737,19 @@ AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"
 # -----------------------------------------------------------------------------
 # perf.plugin
 
+AC_CHECK_HEADER(
+    [linux/perf_event.h],
+    [AC_CHECK_DECL(
+        [PERF_COUNT_HW_REF_CPU_CYCLES],
+        [have_perf_event=yes],
+        [have_perf_event=no],
+        [#include <linux/perf_event.h>]
+    )],
+    [have_perf_event=no]
+)
+
 AC_MSG_CHECKING([if perf.plugin should be enabled])
-if test "${build_target}" == "linux" ; then
+if test "${build_target}" == "linux" -a "${have_perf_event}" = "yes"; then
     enable_plugin_perf="yes"
 else
     enable_plugin_perf="no"
