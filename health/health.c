@@ -53,11 +53,16 @@ void health_silencers_init(void) {
             if (fd) {
                 char *str = mallocz((length+1)* sizeof(char));
                 if(str) {
-                    fread(str, sizeof(char), length, fd);
-                    str[length] = 0x00;
-                    json_parse(str, NULL, health_silencers_json_read_callback);
+                    size_t copied;
+                    copied = fread(str, sizeof(char), length, fd);
+                    if (copied == (length* sizeof(char))) {
+                        str[length] = 0x00;
+                        json_parse(str, NULL, health_silencers_json_read_callback);
+                        info("Parsed health silencers file %s", silencers_filename);
+                    } else {
+                        error("Cannot read the data from health silencers file %s", silencers_filename);
+                    }
                     freez(str);
-                    info("Parsed health silencers file %s", silencers_filename);
                 }
                 fclose(fd);
             } else {
@@ -367,14 +372,12 @@ static inline void health_alarm_log_process(RRDHOST *host) {
 
         ALARM_ENTRY *t = ae->next;
 
-        health_alarm_log_free_one_nochecks_nounlink(ae);
         if(likely(!alarm_entry_isrepeating(host, ae))) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             host->health_log.count--;
         }
 
         ae = t;
-        host->health_log.count--;
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
