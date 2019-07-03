@@ -1,13 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
+
+#include "config.h"
+
 #include <stdio.h>
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/time.h>
-
-#define likely(x) __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define simple_hash(name) ({                                         \
     register unsigned char *__hash_source = (unsigned char *)(name); \
