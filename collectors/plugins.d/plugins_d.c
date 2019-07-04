@@ -554,7 +554,7 @@ void *pluginsd_worker_thread(void *arg) {
             }
 
             if(likely(cd->serial_failures <= SERIAL_FAILURES_THRESHOLD)) {
-                infoerr("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
+                info("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
                     cd->fullfilename, cd->pid,
                     cd->enabled ?
                         "Waiting a bit before starting it again." :
