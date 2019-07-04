@@ -1318,6 +1318,8 @@ NETDATA.options = {
 
     passive_events: null,           // true if the browser supports passive events
 
+    redirect_after: 0,              //Used to get information after a specific timestamp when an alert is raised.
+
     // the current profile
     // we may have many...
     current: {
@@ -8206,6 +8208,10 @@ let chartState = function (element) {
         this.data_url += "&group=" + this.method;
         this.data_url += "&gtime=" + this.gtime;
         this.data_url += "&options=" + this.chartURLOptions();
+
+        if(NETDATA.options.redirect_after >0) {
+            after = NETDATA.options.redirect_after;
+        }
 
         if (after) {
             this.data_url += "&after=" + after.toString();

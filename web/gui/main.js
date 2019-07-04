@@ -71,6 +71,7 @@ var urlOptions = {
     alarm_unique_id: 0,
     alarm_id: 0,
     alarm_event_id: 0,
+    alarm_freeze: false,
 
     hasProperty: function (property) {
         // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
@@ -3060,6 +3061,9 @@ function printPage() {
         }
 
         NETDATA.parseDom();
+        if(urlOptions.alarm_freeze && urlOptions.after > 0) {
+            NETDATA.options.redirect_after = urlOptions.after;
+        }
         showPageFooter();
 
         NETDATA.globalSelectionSync.stop();
@@ -4368,6 +4372,9 @@ function finalizePage() {
     // if we ommit this, the affix menu will be wrong, since all
     // the Dom elements are initially zero-sized
     NETDATA.parseDom();
+    if(urlOptions.alarm_freeze && urlOptions.after > 0) {
+        NETDATA.options.redirect_after = urlOptions.after;
+    }
 
     // ------------------------------------------------------------------------
 
