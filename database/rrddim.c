@@ -466,7 +466,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 }
 
-inline void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd) {
+inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
     debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", st->name, rd->name);
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
@@ -475,7 +475,7 @@ inline void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd) {
 // ----------------------------------------------------------------------------
 // RRDDIM - collect values for a dimension
 
-inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value) {
+inline collected_number rrddim_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, collected_number value) {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 
     now_realtime_timeval(&rd->last_collected_time);
