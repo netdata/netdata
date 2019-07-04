@@ -57,14 +57,14 @@ static int try_get_zram_major_number(procfile *file) {
 }
 
 static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) {
-    char buffer[RRD_ID_LENGTH_MAX + 1];
+    char chart_name[RRD_ID_LENGTH_MAX + 1];
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "zram_usage.%s", name);
+    snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_usage.%s", name);
     d->st_usage = rrdset_create_localhost(
         "mem"
-        , strdupz(buffer)
-        , strdupz(buffer)
-        , strdupz(name)
+        , chart_name
+        , chart_name
+        , name
         , "mem.zram_usage"
         , "ZRAM Memory Usage"
         , "MiB"
@@ -76,12 +76,12 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
     d->rd_compr_data_size = rrddim_add(d->st_usage, "compressed", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     d->rd_metadata_size = rrddim_add(d->st_usage, "metadata", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "zram_savings.%s", name);
+    snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_savings.%s", name);
     d->st_savings = rrdset_create_localhost(
         "mem"
-        , strdupz(buffer)
-        , strdupz(buffer)
-        , strdupz(name)
+        , chart_name
+        , chart_name
+        , name
         , "mem.zram_savings"
         , "ZRAM Memory Savings"
         , "MiB"
@@ -93,12 +93,12 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
     d->rd_savings_size = rrddim_add(d->st_savings, "savings", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
     d->rd_original_size = rrddim_add(d->st_savings, "original", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "zram_ratio.%s", name);
+    snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_ratio.%s", name);
     d->st_comp_ratio = rrdset_create_localhost(
         "mem"
-        , strdupz(buffer)
-        , strdupz(buffer)
-        , strdupz(name)
+        , chart_name
+        , chart_name
+        , name
         , "mem.zram_ratio"
         , "ZRAM Compression Ratio (original to compressed)"
         , "ratio"
@@ -109,12 +109,12 @@ static inline void init_rrd(const char *name, ZRAM_DEVICE *d, int update_every) 
         , RRDSET_TYPE_LINE);
     d->rd_comp_ratio = rrddim_add(d->st_comp_ratio, "ratio", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "zram_efficiency.%s", name);
+    snprintfz(chart_name, RRD_ID_LENGTH_MAX, "zram_efficiency.%s", name);
     d->st_alloc_efficiency = rrdset_create_localhost(
         "mem"
-        , strdupz(buffer)
-        , strdupz(buffer)
-        , strdupz(name)
+        , chart_name
+        , chart_name
+        , name
         , "mem.zram_efficiency"
         , "ZRAM Efficiency"
         , "percentage"
@@ -133,7 +133,7 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
     struct stat st;
     char filename[FILENAME_MAX + 1];
     procfile *ff = NULL;
-    ZRAM_DEVICE *device = NULL;
+    ZRAM_DEVICE device;
 
     if (unlikely(!dir))
         return 0;
@@ -155,13 +155,13 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
                 error("ZRAM : Failed to open %s: %s", filename, strerror(errno));
                 continue;
             }
-            device = (ZRAM_DEVICE *)malloc(sizeof(ZRAM_DEVICE));
-            device->file = ff;
-            init_rrd(de->d_name, device, update_every);
-            dictionary_set(devices, de->d_name, device, sizeof(ZRAM_DEVICE));
+            device.file = ff;
+            init_rrd(de->d_name, &device, update_every);
+            dictionary_set(devices, de->d_name, &device, sizeof(ZRAM_DEVICE));
             count++;
         }
     }
+    closedir(dir);
     return count;
 }
 
