@@ -82,7 +82,8 @@ int __netdata_mutex_unlock(netdata_mutex_t *mutex) {
     return ret;
 }
 
-int netdata_mutex_init_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
+int netdata_mutex_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                             const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
     usec_t start = 0;
     (void)start;
 
@@ -98,7 +99,8 @@ int netdata_mutex_init_debug( const char *file, const char *function, const unsi
     return ret;
 }
 
-int netdata_mutex_lock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
+int netdata_mutex_lock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                             const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
     usec_t start = 0;
     (void)start;
 
@@ -114,7 +116,8 @@ int netdata_mutex_lock_debug( const char *file, const char *function, const unsi
     return ret;
 }
 
-int netdata_mutex_trylock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
+int netdata_mutex_trylock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
     usec_t start = 0;
     (void)start;
 
@@ -130,7 +133,8 @@ int netdata_mutex_trylock_debug( const char *file, const char *function, const u
     return ret;
 }
 
-int netdata_mutex_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_mutex_t *mutex) {
+int netdata_mutex_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                               const unsigned long line __maybe_unused, netdata_mutex_t *mutex) {
     usec_t start = 0;
     (void)start;
 
@@ -219,7 +223,8 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 }
 
 
-int netdata_rwlock_destroy_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_destroy_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                 const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
     (void)start;
 
@@ -235,7 +240,8 @@ int netdata_rwlock_destroy_debug( const char *file, const char *function, const 
     return ret;
 }
 
-int netdata_rwlock_init_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_init_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                              const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
     (void)start;
 
@@ -251,7 +257,8 @@ int netdata_rwlock_init_debug( const char *file, const char *function, const uns
     return ret;
 }
 
-int netdata_rwlock_rdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_rdlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
     (void)start;
 
@@ -267,7 +274,8 @@ int netdata_rwlock_rdlock_debug( const char *file, const char *function, const u
     return ret;
 }
 
-int netdata_rwlock_wrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_wrlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
     (void)start;
 
@@ -283,7 +291,8 @@ int netdata_rwlock_wrlock_debug( const char *file, const char *function, const u
     return ret;
 }
 
-int netdata_rwlock_unlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_unlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
     (void)start;
 
@@ -299,7 +308,8 @@ int netdata_rwlock_unlock_debug( const char *file, const char *function, const u
     return ret;
 }
 
-int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_tryrdlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                   const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
     (void)start;
 
@@ -315,7 +325,8 @@ int netdata_rwlock_tryrdlock_debug( const char *file, const char *function, cons
     return ret;
 }
 
-int netdata_rwlock_trywrlock_debug( const char *file, const char *function, const unsigned long line, netdata_rwlock_t *rwlock) {
+int netdata_rwlock_trywrlock_debug(const char *file __maybe_unused, const char *function __maybe_unused,
+                                   const unsigned long line __maybe_unused, netdata_rwlock_t *rwlock) {
     usec_t start = 0;
     (void)start;
 
