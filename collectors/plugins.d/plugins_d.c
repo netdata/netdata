@@ -522,6 +522,69 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
 }
 
 #define SERIAL_FAILURES_THRESHOLD 10
+static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
+    if (likely(cd->successful_collections)) {
+        sleep((unsigned int) cd->update_every);
+        return;
+    }
+
+    if(likely(cd->serial_failures <= SERIAL_FAILURES_THRESHOLD)) {
+        info("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
+            cd->fullfilename, cd->pid,
+            cd->enabled ?
+                "Waiting a bit before starting it again." :
+                "Will not start it again - it is now disabled.");
+        sleep((unsigned int) (cd->update_every * 10));
+        return;
+    }
+
+    if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
+        error("'%s' (pid %d) does not generate useful output, although it reports success (exits with 0)."
+            "We have tried to collect something %zu times - unsuccessfully. Disabling it.",
+            cd->fullfilename, cd->pid, cd->serial_failures);
+        cd->enabled = 0;
+        return;
+    }
+
+    return;
+}
+
+static void pluginsd_worker_thread_handle_error(struct plugind *cd, int code) {
+    if (code == -1) {
+        info("'%s' (pid %d) was killed with SIGTERM. Disabling it.", cd->fullfilename, cd->pid);
+        cd->enabled = 0;
+        return;
+    }
+
+    if (!cd->successful_collections) {
+        error("'%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
+            cd->fullfilename, cd->pid, code);
+        cd->enabled = 0;
+        return;
+    }
+
+    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
+        error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
+            cd->fullfilename, cd->pid, code, cd->successful_collections,
+            cd->enabled ?
+                "Waiting a bit before starting it again." :
+                "Will not start it again - it is disabled.");
+        sleep((unsigned int) (cd->update_every * 10));
+        return;
+    }
+
+    if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
+        error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
+            "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
+            cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
+        cd->enabled = 0;
+        return;
+    }
+
+    return;
+}
+#undef SERIAL_FAILURES_THRESHOLD
+
 void *pluginsd_worker_thread(void *arg) {
     netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
@@ -545,69 +608,11 @@ void *pluginsd_worker_thread(void *arg) {
         // get the return code
         int code = mypclose(fp, cd->pid);
 
-        if (likely(code == 0)) {
-            // the plugin reports success
+        if (likely(code == 0))
+            pluginsd_worker_thread_handle_success(cd);
+        else
+            pluginsd_worker_thread_handle_error(cd, code);
 
-            if (likely(cd->successful_collections)) {
-                sleep((unsigned int) cd->update_every);
-                goto exit_code_analyzed;
-            }
-
-            if(likely(cd->serial_failures <= SERIAL_FAILURES_THRESHOLD)) {
-                info("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
-                    cd->fullfilename, cd->pid,
-                    cd->enabled ?
-                        "Waiting a bit before starting it again." :
-                        "Will not start it again - it is now disabled.");
-                sleep((unsigned int) (cd->update_every * 10));
-                goto exit_code_analyzed;
-            }
-
-            if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-                error("'%s' (pid %d) does not generate useful output, although it reports success (exits with 0)."
-                    "We have tried to collect something %zu times - unsuccessfully. Disabling it.",
-                    cd->fullfilename, cd->pid, cd->serial_failures);
-                cd->enabled = 0;
-                goto exit_code_analyzed;
-            }
-        }
-
-        if(code != 0) {
-            // the plugin reports failure
-
-            if (code == -1) {
-                infoerr("'%s' (pid %d) was killed with SIGTERM. Disabling it.", cd->fullfilename, cd->pid);
-                cd->enabled = 0;
-                goto exit_code_analyzed;
-            }
-
-            if (!cd->successful_collections) {
-                error("'%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
-                    cd->fullfilename, cd->pid, code);
-                cd->enabled = 0;
-                goto exit_code_analyzed;
-            }
-
-            if (cd->successful_collections && cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
-                error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
-                    cd->fullfilename, cd->pid, code, cd->successful_collections,
-                    cd->enabled ?
-                        "Waiting a bit before starting it again." :
-                        "Will not start it again - it is disabled.");
-                sleep((unsigned int) (cd->update_every * 10));
-                goto exit_code_analyzed;
-            }
-
-            if (cd->successful_collections && cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-                error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
-                    "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
-                    cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
-                cd->enabled = 0;
-                goto exit_code_analyzed;
-            }
-        }
-
-exit_code_analyzed:
         cd->pid = 0;
         if(unlikely(!cd->enabled)) break;
     }
@@ -615,7 +620,6 @@ exit_code_analyzed:
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
-#undef SERIAL_FAILURES_THRESHOLD
 
 static void pluginsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
