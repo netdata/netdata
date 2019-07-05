@@ -1,6 +1,6 @@
 # Demo sites
 
-Live demo installations of Netdata are available at **[https://my-netdata.io](https://my-netdata.io)**:
+Live demo installations of Netdata are available at **[https://www.netdata.cloud](https://www.netdata.cloud/#live-demo)**:
 
 Location |  Netdata demo URL | 60&nbsp;mins&nbsp;reqs | VM Donated by
 :-------:|:-----------------:|:----------:|:-------------
