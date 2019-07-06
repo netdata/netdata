@@ -1,4 +1,4 @@
-# Netdata via nginx
+# Running Netdata Behind Nginx
 
 To pass Netdata via a nginx, use this:
 
