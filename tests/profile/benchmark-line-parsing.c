@@ -9,6 +9,8 @@
 #include <ctype.h>
 #include <sys/time.h>
 
+#include "database/rrdcalc.h"
+
 #define simple_hash(name) ({                                         \
     register unsigned char *__hash_source = (unsigned char *)(name); \
     register uint32_t __hash_value = 0x811c9dc5;                     \
@@ -18,6 +20,40 @@
     }                                                                \
     __hash_value;                                                    \
 })
+
+char *netdata_configured_host_prefix = "";
+
+void netdata_cleanup_and_exit(int ret)
+{
+    exit(ret);
+}
+
+void signals_unblock(void)
+{
+}
+
+void signals_reset(void)
+{
+}
+
+int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result)
+{
+    (void)variable;
+    (void)hash;
+    (void)rc;
+    (void)result;
+
+    return 0;
+}
+
+void send_statistics(const char *action, const char *action_result, const char *action_data)
+{
+    (void)action;
+    (void)action_result;
+    (void)action_data;
+
+    return;
+}
 
 static inline uint32_t simple_hash2(const char *name) {
     register unsigned char *s = (unsigned char *)name;

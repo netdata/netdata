@@ -8,13 +8,47 @@
  */
 
 #include "config.h"
+
 #include "libnetdata/libnetdata.h"
+#include "database/rrdcalc.h"
 
 struct myvalue {
 	int i;
 };
 
-void netdata_cleanup_and_exit(int ret) { exit(ret); }
+char *netdata_configured_host_prefix = "";
+
+void netdata_cleanup_and_exit(int ret)
+{
+    exit(ret);
+}
+
+void signals_unblock(void)
+{
+}
+
+void signals_reset(void)
+{
+}
+
+int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result)
+{
+    (void)variable;
+    (void)hash;
+    (void)rc;
+    (void)result;
+
+    return 0;
+}
+
+void send_statistics(const char *action, const char *action_result, const char *action_data)
+{
+    (void)action;
+    (void)action_result;
+    (void)action_data;
+
+    return;
+}
 
 int main(int argc, char **argv) {
 	if(argc || argv) {;}

@@ -1,15 +1,78 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 
-/*
- * compile with
- *  gcc -O1 -ggdb -Wall -Wextra -I ../src/ -I ../ -o benchmark-registry benchmark-registry.c ../src/dictionary.o ../src/log.o ../src/avl.o ../src/common.o ../src/appconfig.o ../src/web_buffer.o ../src/storage_number.o ../src/rrd.o ../src/health.o -pthread -luuid -lm -DHAVE_CONFIG_H -DVARLIB_DIR="\"/tmp\""
- */
+#define _XOPEN_SOURCE           500         /* for random(3) */
 
-char *hostname = "me";
+#include "config.h"
 
-#include "../src/registry.c"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <time.h>
+#include <sys/types.h>
 
-void netdata_cleanup_and_exit(int ret) { exit(ret); }
+#include <uuid/uuid.h>
+
+char *netdata_configured_hostname = "me";
+char *netdata_configured_host_prefix = "";
+char *netdata_configured_cache_dir = "";
+char *netdata_configured_primary_plugins_dir = "";
+char *netdata_configured_stock_config_dir = "";
+char *netdata_configured_user_config_dir = "";
+char *netdata_configured_timezone = "";
+char *netdata_configured_web_dir = "";
+
+int netdata_anonymous_statistics_enabled;
+
+#include "registry/registry.c"
+
+#ifdef VARLIB_DIR
+char *netdata_configured_varlib_dir = VARLIB_DIR;
+#else
+char *netdata_configured_varlib_dir = "/var/tmp";
+#endif
+
+struct config netdata_config = {
+    .sections = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = {
+        .avl_tree = {
+            .root = NULL,
+            .compar = appconfig_section_compare
+        },
+        .rwlock = AVL_LOCK_INITIALIZER
+    }
+};
+
+int killpid(pid_t pid, int sig)
+{
+    (void)pid;
+    (void)sig;
+
+    return 0;
+}
+
+void signals_unblock(void)
+{
+}
+
+void signals_reset(void)
+{
+}
+
+void netdata_cleanup_and_exit(int ret)
+{
+    exit(ret);
+}
+
+void send_statistics(const char *action, const char *action_result, const char *action_data)
+{
+    (void)action;
+    (void)action_result;
+    (void)action_data;
+
+    return;
+}
 
 // ----------------------------------------------------------------------------
 // TESTS
@@ -35,7 +98,7 @@ int test1(int argc, char **argv) {
 	char **users_guids = malloc(users * sizeof(char *));
 	char **machines_guids = malloc(machines2 * sizeof(char *));
 	char **machines_urls = malloc(machines2 * sizeof(char *));
-	unsigned long long start;
+	usec_t start;
 
 	registry_init();
 
@@ -53,76 +116,76 @@ int test1(int argc, char **argv) {
 		// fprintf(stderr, "\tmachine %u: '%s', url: '%s'\n", m + 1, machines_guids[m], machines_urls[m]);
 	}
 
-	start = timems();
+	start = now_monotonic_usec();
 	fprintf(stderr, "\nGenerating %u users accessing %u machines\n", users, machines);
 	m = 0;
 	time_t now = time(NULL);
 	for(u = 0; u < users ; u++) {
 		if(++m == machines) m = 0;
 
-		PERSON *p = registry_request_access(NULL, machines_guids[m], machines_urls[m], "test", now);
+		REGISTRY_PERSON *p = registry_request_access(NULL, machines_guids[m], machines_urls[m], "test", now);
 		users_guids[u] = p->guid;
 	}
-	print_stats(u, start, timems());
+	print_stats(u, start, now_monotonic_usec());
 
-	start = timems();
+	start = now_monotonic_usec();
 	fprintf(stderr, "\nAll %u users accessing again the same %u servers\n", users, machines);
 	m = 0;
 	now = time(NULL);
 	for(u = 0; u < users ; u++) {
 		if(++m == machines) m = 0;
 
-		PERSON *p = registry_request_access(users_guids[u], machines_guids[m], machines_urls[m], "test", now);
+		REGISTRY_PERSON *p = registry_request_access(users_guids[u], machines_guids[m], machines_urls[m], "test", now);
 
 		if(p->guid != users_guids[u])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[u], p->guid);
 	}
-	print_stats(u, start, timems());
+	print_stats(u, start, now_monotonic_usec());
 
-	start = timems();
+	start = now_monotonic_usec();
 	fprintf(stderr, "\nAll %u users accessing a new server, out of the %u servers\n", users, machines);
 	m = 1;
 	now = time(NULL);
 	for(u = 0; u < users ; u++) {
 		if(++m == machines) m = 0;
 
-		PERSON *p = registry_request_access(users_guids[u], machines_guids[m], machines_urls[m], "test", now);
+		REGISTRY_PERSON *p = registry_request_access(users_guids[u], machines_guids[m], machines_urls[m], "test", now);
 
 		if(p->guid != users_guids[u])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[u], p->guid);
 	}
-	print_stats(u, start, timems());
+	print_stats(u, start, now_monotonic_usec());
 
-	start = timems();
+	start = now_monotonic_usec();
 	fprintf(stderr, "\n%u random users accessing a random server, out of the %u servers\n", users, machines);
 	now = time(NULL);
 	for(u = 0; u < users ; u++) {
 		uint32_t tu = random() * users / RAND_MAX;
 		uint32_t tm = random() * machines / RAND_MAX;
 
-		PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], machines_urls[tm], "test", now);
+		REGISTRY_PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], machines_urls[tm], "test", now);
 
 		if(p->guid != users_guids[tu])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[tu], p->guid);
 	}
-	print_stats(u, start, timems());
+	print_stats(u, start, now_monotonic_usec());
 
-	start = timems();
+	start = now_monotonic_usec();
 	fprintf(stderr, "\n%u random users accessing a random server, out of %u servers\n", users, machines2);
 	now = time(NULL);
 	for(u = 0; u < users ; u++) {
 		uint32_t tu = random() * users / RAND_MAX;
 		uint32_t tm = random() * machines2 / RAND_MAX;
 
-		PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], machines_urls[tm], "test", now);
+		REGISTRY_PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], machines_urls[tm], "test", now);
 
 		if(p->guid != users_guids[tu])
 			fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[tu], p->guid);
 	}
-	print_stats(u, start, timems());
+	print_stats(u, start, now_monotonic_usec());
 
 	for(m = 0; m < 10; m++) {
-		start = timems();
+		start = now_monotonic_usec();
 		fprintf(stderr,
 				"\n%u random user accesses to a random server, out of %u servers,\n > using 1/10000 with a random url, 1/1000 with a mismatched url\n",
 				users * 2, machines2);
@@ -140,23 +203,23 @@ int test1(int argc, char **argv) {
 			else if (random() % 1000 == 123)
 				url = machines_urls[random() * machines2 / RAND_MAX];
 
-			PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], url, "test", now);
+			REGISTRY_PERSON *p = registry_request_access(users_guids[tu], machines_guids[tm], url, "test", now);
 
 			if (p->guid != users_guids[tu])
 				fprintf(stderr, "ERROR: expected to get user guid '%s' but git '%s'", users_guids[tu], p->guid);
 		}
-		print_stats(u, start, timems());
+		print_stats(u, start, now_monotonic_usec());
 	}
 
 	fprintf(stderr, "\n\nSAVE\n");
-	start = timems();
-	registry_save();
-	print_stats(registry.persons_count, start, timems());
+	start = now_monotonic_usec();
+	registry_db_save();
+	print_stats(registry.persons_count, start, now_monotonic_usec());
 
 	fprintf(stderr, "\n\nCLEANUP\n");
-	start = timems();
+	start = now_monotonic_usec();
 	registry_free();
-	print_stats(registry.persons_count, start, timems());
+	print_stats(registry.persons_count, start, now_monotonic_usec());
 	return 0;
 }
 
@@ -174,7 +237,7 @@ int main(int argc, char **argv) {
 	(void)argv;
 
 
-	PERSON *p1, *p2;
+	REGISTRY_PERSON *p1, *p2;
 
 	fprintf(stderr, "\n\nINITIALIZATION\n");
 
@@ -219,7 +282,7 @@ int main(int argc, char **argv) {
 	}
 
 	fprintf(stderr, "\n\nSAVE\n");
-	registry_save();
+	registry_db_save();
 
 	fprintf(stderr, "\n\nCLEANUP\n");
 	registry_free();

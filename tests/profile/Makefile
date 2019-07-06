@@ -6,7 +6,7 @@ PERFORMANCE_CFLAGS = -O2 $(COMMON_CFLAGS)
 
 CFLAGS = $(PERFORMANCE_CFLAGS)
 
-LIBNETDATA_FILES = \
+LIBNETDATA_OBJS = \
     ../../libnetdata/popen/popen.o \
     ../../libnetdata/storage_number/storage_number.o \
     ../../libnetdata/avl/avl.o \
@@ -26,9 +26,10 @@ LIBNETDATA_FILES = \
     ../../libnetdata/adaptive_resortable_list/adaptive_resortable_list.o \
     ../../libnetdata/locks/locks.o \
     ../../libnetdata/log/log.o \
+    ../../libnetdata/socket/security.o \
     $(NULL)
 
-COMMON_LDFLAGS = $(LIBNETDATA_FILES) -pthread -lm
+COMMON_LDFLAGS = $(LIBNETDATA_OBJS) -pthread -lm -lssl -lcrypto
 
 all: statsd-stress benchmark-procfile-parser test-eval benchmark-dictionary benchmark-value-pairs
 
