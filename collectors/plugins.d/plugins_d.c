@@ -549,8 +549,8 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     return;
 }
 
-static void pluginsd_worker_thread_handle_error(struct plugind *cd, int code) {
-    if (code == -1) {
+static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_ret_code) {
+    if (worker_ret_code == -1) {
         info("'%s' (pid %d) was killed with SIGTERM. Disabling it.", cd->fullfilename, cd->pid);
         cd->enabled = 0;
         return;
@@ -558,14 +558,14 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int code) {
 
     if (!cd->successful_collections) {
         error("'%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
-            cd->fullfilename, cd->pid, code);
+            cd->fullfilename, cd->pid, worker_ret_code);
         cd->enabled = 0;
         return;
     }
 
     if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
         error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
-            cd->fullfilename, cd->pid, code, cd->successful_collections,
+            cd->fullfilename, cd->pid, worker_ret_code, cd->successful_collections,
             cd->enabled ?
                 "Waiting a bit before starting it again." :
                 "Will not start it again - it is disabled.");
@@ -576,7 +576,7 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int code) {
     if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
         error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
             "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
-            cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
+            cd->fullfilename, cd->pid, worker_ret_code, cd->successful_collections, cd->serial_failures);
         cd->enabled = 0;
         return;
     }
@@ -605,13 +605,12 @@ void *pluginsd_worker_thread(void *arg) {
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid, SIGTERM);
 
-        // get the return code
-        int code = mypclose(fp, cd->pid);
+        int worker_ret_code = mypclose(fp, cd->pid);
 
-        if (likely(code == 0))
+        if (likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else
-            pluginsd_worker_thread_handle_error(cd, code);
+            pluginsd_worker_thread_handle_error(cd, worker_ret_code);
 
         cd->pid = 0;
         if(unlikely(!cd->enabled)) break;
