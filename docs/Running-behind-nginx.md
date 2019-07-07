@@ -1,5 +1,10 @@
 # Running Netdata Behind Nginx
 
+[Nginx](https://nginx.org/en/) is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server used to host websites and applications of all sizes. 
+
+The software is known for its low impact on memory resources, high scalability, and its modular, event-driven architecture which can offer secure, predictable performance.
+
+
 To pass Netdata via a nginx, use this:
 
 ### As a virtual host
