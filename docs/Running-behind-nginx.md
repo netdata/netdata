@@ -26,7 +26,7 @@ Depending on your installation source, you’ll find an example configuration fi
 
 You can edit the Nginx configuration file with Nano, Vim or any other Text editors you are comfortable with.
 
-To pass Netdata via a nginx, use this:
+## Ways to pass Netdata via Nginx: ##
 
 ### As a virtual host ###
 
