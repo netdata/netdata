@@ -550,6 +550,7 @@ jobs:
     - echo "GIT Describe:" && git describe
     - echo "packaging/version:" && cat packaging/version
     - packaging/docker/check_login.sh
+    - echo "Switching to latest master branch, to pick up tagging if any" && git checkout master && git pull
     - packaging/docker/build.sh
     - packaging/docker/publish.sh
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"

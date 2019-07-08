@@ -39,10 +39,6 @@ if [ ! -z ${DEVEL+x} ]; then
     declare -a ARCHS=(${DEVEL_ARCHS[@]})
 fi
 
-echo "Syncing repository with latest changes (We may have updated with package versions)"
-git checkout master
-git pull
-
 # Ensure there is a version, the most appropriate one
 if [ "${VERSION}" == "" ]; then
     VERSION=$(git tag --points-at)
