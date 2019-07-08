@@ -2321,6 +2321,13 @@ function alarmsUpdateModal() {
                 exportOptions: {
                     fileName: 'netdata_alarm_log'
                 },
+                onClickRow: function (row, $element,field) {
+                    void (field);
+                    void ($element);
+                    //create a new function to reverse timestamp4human
+                    let ct = new Date(row['when'].toString()).valueOf();
+                    alert(row['chart'].toString()+" "+ct.toString());
+                },
                 rowStyle: function (row, index) {
                     void (index);
 
