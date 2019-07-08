@@ -8213,14 +8213,16 @@ let chartState = function (element) {
 
         if(NETDATA.options.redirect_freeze) {
             after = NETDATA.options.redirect_after;
-            /*
-            before = NETDATA.options.redirect_before;
-            if(!before) {
-                var temp = 60;
-                before = after + temp;
-                NETDATA.options.redirect_before = before;
+            if(!before || NETDATA.options.redirect_before > 0) {
+                if(!NETDATA.options.redirect_before) {
+                    before = after + 60;
+                    after -= 60;
+                    NETDATA.options.redirect_before  = before;
+                }else {
+                    before = NETDATA.options.redirect_before;
+                }
+
             }
-             */
         }
 
         if (after) {

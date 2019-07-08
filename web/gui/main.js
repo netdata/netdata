@@ -2324,9 +2324,8 @@ function alarmsUpdateModal() {
                 onClickRow: function (row, $element,field) {
                     void (field);
                     void ($element);
-                    //create a new function to reverse timestamp4human
-                    let ct = new Date(row['when'].toString()).valueOf();
-                    alert(row['chart'].toString()+" "+ct.toString());
+                    let host_url = window.location.protocol + "//" + window.location.hostname + ":" + window.location.port + "/goto-host-from-alarm.html?host=" + encodeURIComponent(row['hostname']) + "&chart=" + encodeURIComponent(row['chart']) + "&family=" + encodeURIComponent(row['family']) + "&alarm=" + encodeURIComponent(row['name']) + "&alarm_unique_id=" + row['unique_id'] + "&alarm_id=" + row['alarm_id'] + "&alarm_event_id=" +  row['alarm_event_id'] + "&alarm_when=" + row['when'] + "&alarm_freeze=true";
+                    window.open(host_url,"_blank");
                 },
                 rowStyle: function (row, index) {
                     void (index);
@@ -3069,6 +3068,7 @@ function printPage() {
 
         NETDATA.parseDom();
         if(urlOptions.alarm_freeze && urlOptions.after > 0) {
+            NETDATA.options.redirect_before = urlOptions.before;
             NETDATA.options.redirect_after = urlOptions.after;
             NETDATA.options.redirect_freeze = urlOptions.alarm_freeze;
         }
@@ -4382,6 +4382,7 @@ function finalizePage() {
     NETDATA.parseDom();
     if(urlOptions.alarm_freeze && urlOptions.after > 0) {
         NETDATA.options.redirect_after = urlOptions.after;
+        NETDATA.options.redirect_before = urlOptions.before;
         NETDATA.options.redirect_freeze = urlOptions.alarm_freeze;
     }
 
