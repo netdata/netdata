@@ -1319,6 +1319,8 @@ NETDATA.options = {
     passive_events: null,           // true if the browser supports passive events
 
     redirect_after: 0,              //Used to get information after a specific timestamp when an alert is raised.
+    redirect_before: 0,             //Used to get information before a specific timestamp when an alert is raised.
+    redirect_freeze: false,         //Freeze a chart in a specific interval
 
     // the current profile
     // we may have many...
@@ -8209,8 +8211,16 @@ let chartState = function (element) {
         this.data_url += "&gtime=" + this.gtime;
         this.data_url += "&options=" + this.chartURLOptions();
 
-        if(NETDATA.options.redirect_after >0) {
+        if(NETDATA.options.redirect_freeze) {
             after = NETDATA.options.redirect_after;
+            /*
+            before = NETDATA.options.redirect_before;
+            if(!before) {
+                var temp = 60;
+                before = after + temp;
+                NETDATA.options.redirect_before = before;
+            }
+             */
         }
 
         if (after) {

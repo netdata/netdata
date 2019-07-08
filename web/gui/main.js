@@ -3070,6 +3070,7 @@ function printPage() {
         NETDATA.parseDom();
         if(urlOptions.alarm_freeze && urlOptions.after > 0) {
             NETDATA.options.redirect_after = urlOptions.after;
+            NETDATA.options.redirect_freeze = urlOptions.alarm_freeze;
         }
         showPageFooter();
 
@@ -4381,6 +4382,7 @@ function finalizePage() {
     NETDATA.parseDom();
     if(urlOptions.alarm_freeze && urlOptions.after > 0) {
         NETDATA.options.redirect_after = urlOptions.after;
+        NETDATA.options.redirect_freeze = urlOptions.alarm_freeze;
     }
 
     // ------------------------------------------------------------------------
