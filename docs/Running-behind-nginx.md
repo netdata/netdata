@@ -1,8 +1,18 @@
 # Running Netdata Behind Nginx
 
+## Intro ##
+
 [Nginx](https://nginx.org/en/) is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server used to host websites and applications of all sizes. 
 
 The software is known for its low impact on memory resources, high scalability, and its modular, event-driven architecture which can offer secure, predictable performance.
+
+## Why Nginx 
+
+Nginx is used and useful in cases when you do not want to access Netdata via the default `IP ADDRESS:19999`. With Nginx the data is accessed via human-readable domains such as `example.com` or `sub.example.com`. 
+
+By default, Nginx is fast and lightweight out of the box.
+
+Nginx can be configured to secure your Netdata insights by the use of authentication to access the dashboard. 
 
 
 To pass Netdata via a nginx, use this:
