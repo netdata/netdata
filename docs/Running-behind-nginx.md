@@ -26,6 +26,12 @@ Depending on your installation source, you’ll find an example configuration fi
 
 You can edit the Nginx configuration file with Nano, Vim or any other Text editors you are comfortable with.
 
+After making changes to the configuration files:
+
+test Nginx configuration with `nginx -t` 
+
+restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
+
 ## Ways to pass Netdata via Nginx: ##
 
 ### As a virtual host ###
@@ -56,6 +62,7 @@ server {
     }
 }
 ```
+
 
 ### As a subfolder to an existing virtual host
 
