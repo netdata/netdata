@@ -110,6 +110,10 @@ NETDATA.options = {
 
     passive_events: null,           // true if the browser supports passive events
 
+    redirect_after: 0,              //Used to get information after a specific timestamp when an alert is raised.
+    redirect_before: 0,             //Used to get information before a specific timestamp when an alert is raised.
+    redirect_freeze: false,         //Freeze a chart in a specific interval
+
     // the current profile
     // we may have many...
     current: {

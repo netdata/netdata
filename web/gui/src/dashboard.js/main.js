@@ -3160,6 +3160,19 @@ let chartState = function (element) {
         this.data_url += "&gtime=" + this.gtime;
         this.data_url += "&options=" + this.chartURLOptions();
 
+        if(NETDATA.options.redirect_freeze) {
+            after = NETDATA.options.redirect_after;
+            if(!before || NETDATA.options.redirect_before > 0) {
+                if(!NETDATA.options.redirect_before) {
+                    before = after + 60;
+                    after -= 60;
+                    NETDATA.options.redirect_before  = before;
+                }else {
+                    before = NETDATA.options.redirect_before;
+                }
+            }
+        }
+
         if (after) {
             this.data_url += "&after=" + after.toString();
         }

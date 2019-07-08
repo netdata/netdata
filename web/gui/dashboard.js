@@ -8221,7 +8221,6 @@ let chartState = function (element) {
                 }else {
                     before = NETDATA.options.redirect_before;
                 }
-
             }
         }
 
