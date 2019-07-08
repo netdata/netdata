@@ -56,7 +56,8 @@ elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
     common.run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
     common.run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
-    common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
+    if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
+        common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
 else:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
     common.run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
