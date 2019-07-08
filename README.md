@@ -50,7 +50,7 @@ The following animated image, shows the top part of a typical Netdata dashboard.
 
 *A typical Netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
 
-> *We have a few online demos to experience it live: [https://my-netdata.io](https://my-netdata.io)*
+> *We have a few online demos to experience it live: [https://www.netdata.cloud](https://www.netdata.cloud/#live-demo)*
 
 ## User base
 

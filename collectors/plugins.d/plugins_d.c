@@ -154,7 +154,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
         char *r = fgets(line, PLUGINSD_LINE_MAX, fp);
         if(unlikely(!r)) {
-            error("read failed");
+            if(feof(fp))
+                error("read failed: end of file");
+            else if(ferror(fp))
+                error("read failed: input error");
+            else
+                error("read failed: unknown error");
             break;
         }
 
