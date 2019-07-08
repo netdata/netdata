@@ -36,6 +36,8 @@ restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service 
 
 ### As a virtual host ###
 
+With this method instead of `123.45.67.89:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
+
 ```
 upstream backend {
     # the Netdata server
