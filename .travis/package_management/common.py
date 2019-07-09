@@ -55,7 +55,8 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
         run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
     else:
         print(".1 Checking out tag %s" % tag)
-        run_command_in_host(['git', 'checkout', '%s' % pkg_friendly_version])
+        # TODO: Keep in mind that tricky 'v' there, needs to be removed once we clear our versioning scheme
+        run_command_in_host(['git', 'checkout', 'v%s' % pkg_friendly_version])
 
     print(".2 Run autoreconf -ivf")
     run_command_in_host(['autoreconf', '-ivf'])
