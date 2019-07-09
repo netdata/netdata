@@ -126,7 +126,7 @@ stages:
     - sudo chmod -R 755 "/var/lib/lxc"
     - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
     git:
-      depth: 250
+      depth: false
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
@@ -182,7 +182,7 @@ stages:
     - sudo chmod -R 755 "/var/lib/lxc"
     - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
     git:
-      depth: 250
+      depth: false
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
