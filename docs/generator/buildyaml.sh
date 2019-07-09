@@ -135,7 +135,6 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
-    - CONTRIBUTING.md
     - SECURITY.md
 - Why Netdata:
     - 'docs/why-netdata/README.md'
@@ -264,10 +263,16 @@ navpart 2 web/api/badges "" "" 2
 navpart 2 web/api/health "" "" 2
 navpart 2 web/api/queries "" "Queries" 2
 
-echo -ne "- Additional Info:
+echo -ne "- Contributing to Netdata:
+    - CONTRIBUTING.md
+    - 'docs/contributing/contributing.md'
+    - 'docs/contributing/style-guide.md'
     - CODE_OF_CONDUCT.md
     - CONTRIBUTORS.md
     - packaging/maintainers/README.md
+"
+
+echo -ne "- Additional information:
 "
 navpart 2 packaging/makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
