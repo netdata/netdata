@@ -100,40 +100,29 @@ rpm_friendly_version=""
 dest_archive=""
 download_url=""
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
+tag = None
 
 # TODO: Checksum validations
 if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
     version_list=str(os.environ['BUILD_VERSION']).replace('v', '').split('.')
     rpm_friendly_version='.'.join(version_list[0:3]) + "." + version_list[3]
-
-    print("5. I will be building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
-    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
-
-    prepare_latest_version_source(dest_archive)
-
-    # Extract the spec file in place
-    print("6. Extract spec file from the source")
-    common.run_command_in_host(['sudo', 'cp', 'netdata.spec', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
-    common.run_command_in_host(['sudo', 'chmod', '777', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
-
-    print("7. Temporary hack: Change Source0 to %s on spec file %s" % (dest_archive, spec_file))
-    common.replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
 else:
     rpm_friendly_version = os.environ['BUILD_VERSION'].replace('v', '')
+    tag = rpm_friendly_version # Go to stable tag
 
-    print("5. I will be building latest stable version of netdata.. (%s)" % os.environ['BUILD_VERSION'])
-    dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
-    download_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
+tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), rpm_friendly_version)
 
-    print("6. Fetch netdata source into the repo structure(%s -> %s)" % (download_url, dest_archive))
-    tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), rpm_friendly_version)
-    common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, download_url])
+print("5. I will be building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
+dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
 
-    print("7.Extract spec file from the source")
-    common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "--to-command=cat > %s" % spec_file, "-xvf", dest_archive, "netdata-%s/netdata.spec" % os.environ['BUILD_VERSION']])
+common.prepare_version_source(dest_archive, rpm_friendly_version, tag=tag)
 
-    print("8. Temporary hack: Adjust version string on the spec file (%s) to %s and Source0 to %s" % (os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version, download_url))
-    common.replace_tag("Version", os.environ['LXC_CONTAINER_ROOT'] + spec_file, rpm_friendly_version)
-    common.replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
+# Extract the spec file in place
+print("6. Extract spec file from the source")
+common.run_command_in_host(['sudo', 'cp', 'netdata.spec', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
+common.run_command_in_host(['sudo', 'chmod', '777', os.environ['LXC_CONTAINER_ROOT'] + spec_file])
+
+print("7. Temporary hack: Change Source0 to %s on spec file %s" % (dest_archive, spec_file))
+common.replace_tag("Source0", os.environ['LXC_CONTAINER_ROOT'] + spec_file, tar_file)
 
 print('Done!')

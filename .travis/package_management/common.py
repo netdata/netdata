@@ -6,6 +6,7 @@
 
 import lxc
 import subprocess
+import os
 
 def replace_tag(tag_name, spec, new_tag_content):
     print("Fixing tag %s in %s" % (tag_name, spec))
@@ -45,12 +46,16 @@ def run_command_in_host(cmd):
     print('Error: '  + e.decode('ascii'))
     print('code: ' + str(proc.returncode))
 
-def prepare_latest_version_source(dest_archive, pkg_friendly_version):
+def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     print(".0 Preparing local latest implementation tarball for version %s" % pkg_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
 
-    print(".1 Tagging the code with latest version: %s" % pkg_friendly_version)
-    run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
+    if tag is None:
+        print(".1 Tagging the code with latest version: %s" % pkg_friendly_version)
+        run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
+    else:
+        print(".1 Checking out tag %s" % tag)
+        run_command_in_host(['git', 'checkout', '%s' % pkg_friendly_version])
 
     print(".2 Run autoreconf -ivf")
     run_command_in_host(['autoreconf', '-ivf'])
