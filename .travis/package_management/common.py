@@ -50,30 +50,30 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     print(".0 Preparing local latest implementation tarball for version %s" % pkg_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
 
-    if tag is None:
-        print(".1 Tagging the code with latest version: %s" % pkg_friendly_version)
-        run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
-    else:
+    if tag is not None:
         print(".1 Checking out tag %s" % tag)
         run_command_in_host(['git', 'fetch', '--all'])
 
         # TODO: Keep in mind that tricky 'v' there, needs to be removed once we clear our versioning scheme
         run_command_in_host(['git', 'checkout', 'v%s' % pkg_friendly_version])
 
-    print(".2 Run autoreconf -ivf")
+    print(".2 Tagging the code with version: %s" % pkg_friendly_version)
+    run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
+ 
+    print(".3 Run autoreconf -ivf")
     run_command_in_host(['autoreconf', '-ivf'])
 
-    print(".3 Run configure")
+    print(".4 Run configure")
     run_command_in_host(['./configure', '--with-math', '--with-zlib', '--with-user=netdata'])
 
-    print(".4 Run make dist")
+    print(".5 Run make dist")
     run_command_in_host(['make', 'dist'])
 
-    print(".5 Copy generated tarbal to desired path")
+    print(".6 Copy generated tarbal to desired path")
     if os.path.exists('netdata-%s.tar.gz' % pkg_friendly_version):
         run_command_in_host(['sudo', 'cp', 'netdata-%s.tar.gz' % pkg_friendly_version, tar_file])
 
-        print(".6 Fixing permissions on tarball")
+        print(".7 Fixing permissions on tarball")
         run_command_in_host(['sudo', 'chmod', '777', tar_file])
     else:
         print("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % 'netdata-%s.tar.gz' % pkg_friendly_version)
