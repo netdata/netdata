@@ -47,7 +47,7 @@ def run_command_in_host(cmd):
     print('code: ' + str(proc.returncode))
 
 def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
-    print(".0 Preparing local latest implementation tarball for version %s" % pkg_friendly_version)
+    print(".0 Preparing local implementation tarball for version %s" % pkg_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
 
     if tag is not None:
@@ -59,7 +59,7 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
 
     print(".2 Tagging the code with version: %s" % pkg_friendly_version)
     run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
- 
+
     print(".3 Run autoreconf -ivf")
     run_command_in_host(['autoreconf', '-ivf'])
 

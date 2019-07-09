@@ -46,28 +46,33 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
 print("2. Installing package dependencies within LXC container")
-common.run_command(container, ["apt-get", "update", "-y"])
-common.run_command(container, ["apt-get", "install", "-y", "sudo"])
-common.run_command(container, ["apt-get", "install", "-y", "wget"])
-common.run_command(container, ["apt-get", "install", "-y", "bash"])
+common.run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
 
 print ("3. Run install-required-packages scriptlet")
 common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
 common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
 
+friendly_version=""
+dest_archive=""
+download_url=""
+tag = None
 
-# Download the source
-
+# TODO: Checksum validations
 if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
-    print ("TODO!")
+    version_list=str(os.environ['BUILD_VERSION']).replace('v', '').split('.')
+    friendly_version='.'.join(version_list[0:3]) + "." + version_list[3]
 else:
-    dest_archive="/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'],os.environ['BUILD_VERSION'])
-    release_url="https://github.com/netdata/netdata/releases/download/%s/netdata-%s.tar.gz" % (os.environ['BUILD_VERSION'], os.environ['BUILD_VERSION'])
+    friendly_version = os.environ['BUILD_VERSION'].replace('v', '')
+    tag = friendly_version # Go to stable tag
 
-    print("4. Fetch netdata source (%s -> %s)" % (release_url, dest_archive))
-    common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "wget", "-T", "15", "--output-document=" + dest_archive, release_url])
+tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), friendly_version)
 
-    print("5. Extracting directory contents to /home " + os.environ['BUILDER_NAME'])
-    common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", dest_archive, "-C", "/home/" + os.environ['BUILDER_NAME']])
+print("5. I will be building version '%s' of netdata." % os.environ['BUILD_VERSION'])
+dest_archive="/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], friendly_version)
+
+common.prepare_version_source(dest_archive, friendly_version, tag=tag)
 
 print("Done!")

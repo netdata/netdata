@@ -112,7 +112,7 @@ else:
 
 tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), rpm_friendly_version)
 
-print("5. I will be building latest nightly version of netdata..(%s)" % os.environ['BUILD_VERSION'])
+print("5. I will be building version '%s' of netdata." % os.environ['BUILD_VERSION'])
 dest_archive="/home/%s/rpmbuild/SOURCES/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], rpm_friendly_version)
 
 common.prepare_version_source(dest_archive, rpm_friendly_version, tag=tag)
