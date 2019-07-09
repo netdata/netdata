@@ -57,7 +57,8 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     else:
         print(".1 Checking out tag %s" % tag)
         # TODO: Keep in mind that tricky 'v' there, needs to be removed once we clear our versioning scheme
-        run_command_in_host(['git', 'fetch'])
+        run_command_in_host(['git', 'fetch', '--all'])
+        run_command_in_host(['git', 'pull'])
         run_command_in_host(['git', 'checkout', 'v%s' % pkg_friendly_version])
 
     print(".2 Run autoreconf -ivf")
