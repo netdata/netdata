@@ -10,7 +10,7 @@ The software is known for its low impact on memory resources, high scalability, 
 
 Nginx is used and useful in cases when you do not want to access Netdata via the default `IP ADDRESS:19999`.
 
-With Nginx the data is accessed via human-readable domains such as `example.com` or `sub.example.com`. 
+With Nginx, the data is accessed via human-readable domains such as `example.com` or `sub.example.com`. 
 
 By default, Nginx is fast and lightweight out of the box.
 
@@ -18,7 +18,7 @@ Nginx can be configured to secure your Netdata insights by the use of authentica
 
 ### Nginx configuration file ###
 
-All Nginx configurations can be found in the `/etc/nginx/` directory. The main configuration file is `/etc/nginx/nginx.conf`. Website or app -specific configurations can be found in the `/etc/nginx/site-available/` directory.
+All Nginx configurations can be found in the `/etc/nginx/` directory. The main configuration file is `/etc/nginx/nginx.conf`. Website or app-specific configurations can be found in the `/etc/nginx/site-available/` directory.
 
 Configuration options in Nginx are known as directives. Directives are organized into groups known as blocks or contexts. The two terms can be used interchangeably.
 
@@ -107,7 +107,7 @@ server {
 }
 ```
 
-### As a subfolder for multiple Netdata servers, via one nginx
+### As a subfolder for multiple Netdata servers, via one Nginx
 
 ```
 upstream backend-server1 {
@@ -160,18 +160,18 @@ Using the above, you access Netdata on the backend servers, like this:
 In case the Netdata web server has been [configured to use TLS](../web/server/#enabling-tls-support),
 you must also encrypt the communication between Nginx and Netdata.
 
-To enable encryption, first [enable SSL on nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of the Nginx configuration:
+To enable encryption, first [enable SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of the Nginx configuration:
 
 ```
 proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
 
-If nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
+If Nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
 
-Create an authentication file to enable the nginx basic authentication.
+Create an authentication file to enable the Nginx basic authentication.
 Do not use authentication without SSL/TLS!
 If you haven't one you can do the following:
 
@@ -192,7 +192,7 @@ server {
 
 ## Limit direct access to Netdata
 
-If your nginx is on `localhost`, you can use this to protect your Netdata:
+If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
 ```
 [web]
@@ -201,7 +201,7 @@ If your nginx is on `localhost`, you can use this to protect your Netdata:
 
 ---
 
-You can also use a unix domain socket. This will also provide a faster route between nginx and Netdata:
+You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
 ```
 [web]
@@ -209,7 +209,7 @@ You can also use a unix domain socket. This will also provide a faster route bet
 ```
 _note: Netdata v1.8+ support unix domain sockets_
 
-At the nginx side, use something like this to use the same unix domain socket:
+At the Nginx side, use something like this to use the same unix domain socket:
 
 ```
 upstream backend {
@@ -220,7 +220,7 @@ upstream backend {
 
 ---
 
-If your nginx server is not on localhost, you can set:
+If your Nginx server is not on localhost, you can set:
 
 ```
 [web]
@@ -243,7 +243,7 @@ nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 
 ## SELinux
 
-If you get an 502 Bad Gateway error you might check your nginx error log:
+If you get an 502 Bad Gateway error you might check your Nginx error log:
 
 ```sh
 # cat /var/log/nginx/error.log:
