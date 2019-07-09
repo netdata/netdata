@@ -41,7 +41,6 @@ extern int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt);
 extern int do_proc_interrupts(int update_every, usec_t dt);
 extern int do_proc_softirqs(int update_every, usec_t dt);
 extern int do_sys_kernel_mm_ksm(int update_every, usec_t dt);
-extern int do_sys_block_zram(int update_every, usec_t dt);
 extern int do_proc_loadavg(int update_every, usec_t dt);
 extern int do_proc_net_stat_synproxy(int update_every, usec_t dt);
 extern int do_proc_net_softnet_stat(int update_every, usec_t dt);

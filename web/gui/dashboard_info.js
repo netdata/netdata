@@ -826,32 +826,6 @@ netdataDashboard.context = {
         ]
     },
 
-    'mem.zram_usage': {
-        info: 'ZRAM total RAM usage metrics. ZRAM uses some memory to store metadata about stored memory pages, thus introducing an overhead which is proportional to disk size. It excludes same-element-filled-pages since no memory is allocated for them.'
-    },
-
-    'mem.zram_savings': {
-        info: 'Displays original and compressed memory data sizes.'
-    },
-
-    'mem.zram_ratio': {
-        heads: [
-            netdataDashboard.gaugeChart('Compression Ratio', '12%', 'ratio', '#0099CC')
-        ],
-        info: 'Compression ratio, calculated as <code>100 * original_size / compressed_size</code>. More means better compression and more RAM savings.'
-    },
-
-    'mem.zram_efficiency': {
-        heads: [
-            netdataDashboard.gaugeChart('Efficiency', '12%', 'percent', NETDATA.colors[0])
-        ],
-        commonMin: true,
-        commonMax: true,
-        valueRange: "[0, 100]",
-        info: 'Memory usage efficiency, calculated as <code>100 * compressed_size / total_mem_used</code>.'
-    },
-
-
     'mem.pgfaults': {
         info: 'A <a href="https://en.wikipedia.org/wiki/Page_fault" target="_blank">page fault</a> is a type of interrupt, called trap, raised by computer hardware when a running program accesses a memory page that is mapped into the virtual address space, but not actually loaded into main memory. If the page is loaded in memory at the time the fault is generated, but is not marked in the memory management unit as being loaded in memory, then it is called a <b>minor</b> or soft page fault. A <b>major</b> page fault is generated when the system needs to load the memory page from disk or swap memory.'
     },
