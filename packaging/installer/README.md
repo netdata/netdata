@@ -88,7 +88,7 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 
 **Nightly releases can be unstable!** If you have concerns about running nightly versions of Netdata, for example in a production system, you can append `--stable-channel` to the above command (`bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --stable-channel`) to ensure Netdata only updates on new major releases.
 
-**Do not use `sudo` for the the static binary installer**—it will escalate privileges itself if needed. If the target system does not have `bash` installed, see below for instructions to run it without `bash`)*
+**Do not use `sudo` for the static binary installer**—it will escalate privileges itself if needed. If the target system does not have `bash` installed, see below for instructions to run it without `bash`)*
 
 **This script installs Netdata at `/opt/netdata`**.
 
