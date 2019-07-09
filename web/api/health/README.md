@@ -54,7 +54,7 @@ Specifically, the API allows you to:
 
 The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://localhost:19999/netdata.conf`:
 
-```bash
+```
 [registry]
     # netdata management api key file = /var/lib/netdata/netdata.api.key
 ```
@@ -71,9 +71,11 @@ If you've configured and entered your token correclty, you should see the plain 
 ### Disable or silence all alarms
 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
+
 ```
 curl "http://myserver/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken" 
 ```
+
 The effect of disabling health checks is that the alarm criteria are not evaluated at all and nothing is written in the alarm log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
@@ -152,6 +154,7 @@ The command `LIST` was added in netdata v1.16.0 and returns a JSON with the curr
 ```
 
 As an example, the following response shows that we have two silencers configured, one for an alarm called `samplealarm` and one for alarms with context `random` on host `myhost`
+
 ```
 json
 {
@@ -178,7 +181,7 @@ json
         "type": "DISABLE",
         "silencers": []
 }
-
+```
 
 ### Responses
 

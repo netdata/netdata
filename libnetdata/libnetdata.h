@@ -81,6 +81,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
+#include <spawn.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>

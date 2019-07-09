@@ -3071,10 +3071,10 @@ let chartState = function (element) {
     };
 
     this.chartDataUniqueID = function () {
-        return this.id + ',' + this.library_name + ',' + this.dimensions + ',' + this.chartURLOptions();
+        return this.id + ',' + this.library_name + ',' + this.dimensions + ',' + this.chartURLOptions(true);
     };
 
-    this.chartURLOptions = function () {
+    this.chartURLOptions = function (isForUniqueId) {
         let ret = '';
 
         if (this.override_options !== null) {
@@ -3089,7 +3089,9 @@ let chartState = function (element) {
 
         ret += '%7C' + 'jsonwrap';
 
-        if (NETDATA.options.current.eliminate_zero_dimensions) {
+        // always add `nonzero` when it's used to create a chartDataUniqueID
+        // we cannot just remove `nonzero` because of backwards compatibility with old snapshots
+        if (isForUniqueId || NETDATA.options.current.eliminate_zero_dimensions) {
             ret += '%7C' + 'nonzero';
         }
 
