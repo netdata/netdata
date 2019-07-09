@@ -110,7 +110,7 @@ Example:
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 ```
 
-For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-the-communication) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
+For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-streaming-communications) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
 
 #### TLS/SSL errors
 
