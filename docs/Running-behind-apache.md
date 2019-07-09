@@ -262,7 +262,7 @@ You can also use a unix domain socket. This will also provide a faster route bet
     bind to = unix:/tmp/netdata.sock
 ```
 
-Apache 2.4.24+ can not read from /tmp so create your socket in /var/run/netdata
+Apache 2.4.24+ can not read from `/tmp` so create your socket in `/var/run/netdata`
 
 ```
 [web]
