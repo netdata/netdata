@@ -140,7 +140,7 @@ If you don't have an authentication file, you can use the following command:
 printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
 ```
 
-And thenenable the authentication inside your server directive:
+And then enable the authentication inside your server directive:
 
 ```
 server {
