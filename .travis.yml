@@ -117,6 +117,10 @@ stages:
     - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
     - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
     script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
     - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
     - sudo chmod -R 755 "/var/lib/lxc"
@@ -169,6 +173,10 @@ stages:
     - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
     - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
     script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
     - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
     - sudo chmod -R 755 "/var/lib/lxc"
