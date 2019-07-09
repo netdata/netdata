@@ -1,5 +1,27 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Fixed bugs:**
+
+- Cannot see charts in an imported snapshot [\#6384](https://github.com/netdata/netdata/issues/6384)
+- netdata does not send notifications for alarms which fail with \(errno 12, Out of memory\) [\#6335](https://github.com/netdata/netdata/issues/6335)
+- charts.d kills process twice [\#6190](https://github.com/netdata/netdata/issues/6190)
+
+**Closed issues:**
+
+- Feature Request: Linux zram device statistics. [\#2578](https://github.com/netdata/netdata/issues/2578)
+
+**Merged pull requests:**
+
+- Add news of v1.16.0 to main README [\#6411](https://github.com/netdata/netdata/pull/6411) ([cakrit](https://github.com/cakrit))
+- Update Running-behind-apache.md [\#6406](https://github.com/netdata/netdata/pull/6406) ([Steve8291](https://github.com/Steve8291))
+- Fix Web API Health documentation  [\#6404](https://github.com/netdata/netdata/pull/6404) ([thiagoftsm](https://github.com/thiagoftsm))
+- Snapshot uniqueId fix [\#6400](https://github.com/netdata/netdata/pull/6400) ([jacekkolasa](https://github.com/jacekkolasa))
+- Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
+- Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
+- ZRAM info collector module \(proc.plugin\) [\#6276](https://github.com/netdata/netdata/pull/6276) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
+
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
 **Fixed bugs:**
