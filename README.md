@@ -74,22 +74,24 @@ When you install multiple Netdata, they are integrated into **one distributed ap
 *in the last 24 hours:*<br/> [![New Users Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
 ## Quick Start
+![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-To install Netdata from source and keep it up to date with our [latest major release](https://github.com/netdata/netdata/releases/latest) automatically, run the following:
+To install Netdata from source on any Linux system (physical, virtual, container, IoT, edge) and keep it up to date with our **nightly releases** automatically, run the following:
 
 ```bash
 # make sure you run `bash` for your shell
 bash
 
 # install Netdata directly from GitHub source
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
-![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+
+**Nightly releases can be unstable!** If you have concerns about running nightly versions of Netdata, for example in a production system, you can append `--stable-channel` to the above command (`bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel`) to ensure Netdata only updates on new major releases.
 
 The above command will:
 
-1. install any required packages on your system (it will ask you to confirm before doing so),
-2. compile it, install it and start it
+- Install any required packages on your system (it will ask you to confirm before doing so)
+- Compile it, install it, and start it.
 
 More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
 

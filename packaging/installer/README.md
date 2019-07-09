@@ -24,23 +24,23 @@ Note: From Netdata v1.12 and above, anonymous usage information is collected by 
 
 ---
 
-## One line installation
+## One-line installation
+![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-This method is **fully automatic on all Linux** distributions. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](#freebsd) and the [MacOS](#macos) sections for more information.
+This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](#freebsd) and the [MacOS](#macos) sections for more information.
 
-To install Netdata from source and keep it up to date with our [latest major release](https://github.com/netdata/netdata/releases/latest) automatically, run the following:
+To install Netdata from source, and keep it up to date with our **nightly releases** automatically, run the following:
 
 ``` bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel
+$ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-*(do not `sudo` this command, it will do it by itself as needed)*
+**Nightly releases can be unstable!** If you have concerns about running nightly versions of Netdata, for example in a production system, you can append `--stable-channel` to the above command (`bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel`) to ensure Netdata only updates on new major releases.
 
-![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+**Do not use `sudo` for the one-line installer**—it will escalate privileges itself if needed.
 
 <details markdown="1"><summary>Click here for more information and advanced use of the one-line installation script.</summary>
 
-&nbsp;<br/>
 Verify the integrity of the script with this:
 
 ``` bash
@@ -56,18 +56,17 @@ The `kickstart.sh` script:
 - installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated daily (you will get a message from cron only if the update fails).
 - For QA purposes, this installation method lets us know if it succeed or failed.
 
-The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, so you can add more parameters to change the installation directory, enable/disable plugins, etc (check below).
+The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, so you can add more parameters to customize your installation. Here are a few important parameters:
 
-For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.
+- `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
+- `--dont-start-it`: Prevent the installer from starting Netdata automatically.
+- `--stable-channel`: Automatically update only on the release of new major versions.
+- `--no-updates`: Prevent automatic updates of any kind.
 
-In the example above, we appended `--stable-channel` to the `kickstart.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, remove `--stable-channel` when executing the `kickstart.sh` script.
-
-If you don't want to receive any automatic updates, append `--no-updates` when executing `kickstart.sh` script.
-
-Example:
+Example using all the above parameters:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates
+$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel
 ```
 
 </details>
@@ -77,24 +76,24 @@ Once Netdata is installed, see [Getting Started](../../docs/GettingStarted.md).
 ---
 
 ## Linux 64bit pre-built static binary
+![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 You can install a pre-compiled static binary of Netdata on any Intel/AMD 64bit Linux system (even those that don't have a package manager, like CoreOS, CirrOS, busybox systems, etc). You can also use these packages on systems with broken or unsupported package managers.
 
-To install Netdata from a binary package on any Linux distro and any kernel version on **Intel/AMD 64bit** systems, and to keep it up to date with our [latest major release](https://github.com/netdata/netdata/releases/latest) automatically, run the following:
+To install Netdata from a binary package on any Linux distro and any kernel version on **Intel/AMD 64bit** systems, and keep it up to date with our **nightly releases** automatically, run the following:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --stable-channel
+$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
-*(do not `sudo` this command, it will do it by itself as needed; if the target system does not have `bash` installed, see below for instructions to run it without `bash`)*
+**Nightly releases can be unstable!** If you have concerns about running nightly versions of Netdata, for example in a production system, you can append `--stable-channel` to the above command (`bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --stable-channel`) to ensure Netdata only updates on new major releases.
 
-![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-86400&label=today&units=installations&precision=0)
+**Do not use `sudo` for the the static binary installer**—it will escalate privileges itself if needed. If the target system does not have `bash` installed, see below for instructions to run it without `bash`)*
 
-> The static builds install Netdata at **`/opt/netdata`**
+**This script installs Netdata at `/opt/netdata`**.
 
 <details markdown="1"><summary>Click here for more information and advanced use of this command.</summary>
 
-&nbsp;<br/>
 Verify the integrity of the script with this:
 
 ```bash
@@ -103,16 +102,17 @@ Verify the integrity of the script with this:
 
 *It should print `OK, VALID` if the script is the one we ship.*
 
-For automated installs, append a space + `--dont-wait` to the command line. You can also append `--dont-start-it` to prevent the installer from starting Netdata.
+The `kickstart-static64.sh` script passes all its parameters to `netdata-installer.sh`, so you can add more parameters to customize your installation. Here are a few important parameters:
 
-In the example above, we appended `--stable-channel` to the `kickstart-static64.sh` script to automatically update only on the release of new major versions. If you would like to receive nightly updates, remove `--stable-channel` when executing the script.
+- `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
+- `--dont-start-it`: Prevent the installer from starting Netdata automatically.
+- `--stable-channel`: Automatically update only on the release of new major versions.
+- `--no-updates`: Prevent automatic updates of any kind.
 
-If you don't want to receive any automatic updates, append `--no-updates` when executing the `kickstart-static64.sh` script.
-
-Example:
+Example using all the above parameters:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates
+$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel
 ```
 
 If your shell fails to handle the above one liner, do this:
