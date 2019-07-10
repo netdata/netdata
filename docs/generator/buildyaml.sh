@@ -101,7 +101,9 @@ markdown_extensions:
  - pymdownx.caret
  - pymdownx.critic
  - pymdownx.details
- - pymdownx.highlight
+ - pymdownx.highlight:
+    pygments_style: manni
+    noclasses: true
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
