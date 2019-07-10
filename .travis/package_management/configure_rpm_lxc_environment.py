@@ -47,28 +47,7 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
 print("2. Installing package dependencies within LXC container")
-if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
-    common.run_command(container, [os.environ["REPO_TOOL"], "clean", "-a"])
-    common.run_command(container, [os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
-    common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
-
-elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
-    common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
-    common.run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
-    common.run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
-    if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
-        print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
-    else:
-        common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
-else:
-    common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
-    common.run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
-
-common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
-common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
-common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
-common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
-common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
+install_common_dependendencies()
 
 # Exceptional cases, not available everywhere
 #

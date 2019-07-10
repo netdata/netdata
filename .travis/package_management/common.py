@@ -46,6 +46,30 @@ def run_command_in_host(cmd):
     print('Error: '  + e.decode('ascii'))
     print('code: ' + str(proc.returncode))
 
+def install_common_dependendencies():
+    if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
+        run_command(container, [os.environ["REPO_TOOL"], "clean", "-a"])
+        run_command(container, [os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
+
+    elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
+        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+        if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
+            print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
+        else:
+            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
+    else:
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
+
 def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     print(".0 Preparing local implementation tarball for version %s" % pkg_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
