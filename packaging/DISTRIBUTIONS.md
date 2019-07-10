@@ -2,9 +2,13 @@
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
 
 In the following table we provide the list of officially supported operating systems.
-We detail the Distributions, flavours and the way of support Netdata is currently capable to provide.
+We detail the Distributions, flavours and the level of support Netdata is currently capable to provide.
 
-Distribution | Family| Code healthy | Installer support | Kickstart support | Binary packaging support | Integrity testing (CI) | Functionality testing (CI) | Community support
+Kindly note that the following table is a work in progress. We have concluded on the list of distributions
+that we currently supporting and we are working on documenting our current state so that our users
+have complete visibility over the range of support
+
+Distribution | Family| Code health | Installer support | Kickstart support | Binary packaging support | Integrity testing (CI) | Functionality testing (CI) | Community support
 :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :--------------------
 14.04.6 LTS (Trusty Tahr) | Ubuntu |  |  |  |  |  |  | 
 16.04.6 LTS (Xenial Xerus) | Ubuntu |  |  |  |  |  |  | 
