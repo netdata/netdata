@@ -294,7 +294,7 @@ The result is a highly efficient, low latency system, supporting multiple reader
 This is a high level overview of Netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
-[![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)
+[![image](https://user-images.githubusercontent.com/43294513/60951037-8ba5d180-a2f8-11e9-906e-e27356f168bc.png)](https://my-netdata.io/infographic.html)
 
 
 ## Features
