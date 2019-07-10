@@ -296,7 +296,7 @@ To apply the changes you made, you have to restart Netdata.
 ### Binary Packages
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
 
-Netdata is proud to present it's own flavour of binary packages for the most common operating systems that comply with .RPM and .DEB packaging formats.
+We provide our own flavour of binary packages for the most common operating systems that comply with .RPM and .DEB packaging formats.
 We have currently released .RPM versions with version [1.16.0](https://github.com/netdata/netdata/releases/tag/v1.16.0). We are planning to release packages following the .DEB format on one of the following releases. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io).
 Netdata is committed to support installation of our solution to all operating systems.
 This is a constant battle for Netdata, as we strive to automate and make things easier for our users.
