@@ -2324,8 +2324,14 @@ function alarmsUpdateModal() {
                 onClickRow: function (row, $element,field) {
                     void (field);
                     void ($element);
-                    let host_url = window.location.protocol + "//" + window.location.hostname + ":" + window.location.port + "/goto-host-from-alarm.html?host=" + encodeURIComponent(row['hostname']) + "&chart=" + encodeURIComponent(row['chart']) + "&family=" + encodeURIComponent(row['family']) + "&alarm=" + encodeURIComponent(row['name']) + "&alarm_unique_id=" + row['unique_id'] + "&alarm_id=" + row['alarm_id'] + "&alarm_event_id=" +  row['alarm_event_id'] + "&alarm_when=" + row['when'] + "&alarm_freeze=true";
-                    window.open(host_url,"_blank");
+                    let main_url;
+                    let common_url = "&host=" + encodeURIComponent(row['hostname']) + "&chart=" + encodeURIComponent(row['chart']) + "&family=" + encodeURIComponent(row['family']) + "&alarm=" + encodeURIComponent(row['name']) + "&alarm_unique_id=" + row['unique_id'] + "&alarm_id=" + row['alarm_id'] + "&alarm_event_id=" +  row['alarm_event_id'] + "&alarm_when=" + row['when'] + "&alarm_freeze=true";;
+                    if (NETDATA.registry.isUsingGlobalRegistry() && NETDATA.registry.machine_guid !== null) {
+                        main_url = "https://netdata.cloud/goto-host-from-alarm.html?" + common_url;
+                    }else {
+                        main_url = NETDATA.registry.server + "/alarms/redirect?agentID=" + NETDATA.registry.machine_guid + common_url;
+                    }
+                    window.open(main_url,"_blank");
                 },
                 rowStyle: function (row, index) {
                     void (index);

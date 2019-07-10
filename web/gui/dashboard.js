@@ -8215,14 +8215,12 @@ let chartState = function (element) {
 
         if(NETDATA.options.redirect_freeze) {
             after = NETDATA.options.redirect_after;
-            if(!before || NETDATA.options.redirect_before > 0) {
-                if(!NETDATA.options.redirect_before) {
-                    before = after + 60;
-                    after -= 60;
-                    NETDATA.options.redirect_before  = before;
-                }else {
-                    before = NETDATA.options.redirect_before;
-                }
+            if(!NETDATA.options.redirect_before) {
+                before = after + 60;
+                after -= 60;
+                NETDATA.options.redirect_before  = before;
+            }else {
+                before = NETDATA.options.redirect_before;
             }
         }
 
