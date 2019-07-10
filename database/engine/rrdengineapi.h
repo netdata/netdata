@@ -8,7 +8,9 @@
 #define RRDENG_MIN_PAGE_CACHE_SIZE_MB (32)
 #define RRDENG_MIN_DISK_SPACE_MB (256)
 
-#define RRDENG_NR_STATS (28)
+#define RRDENG_NR_STATS (33)
+
+#define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_disk_quota_mb;
@@ -30,7 +32,7 @@ extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_han
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
 extern time_t rrdeng_metric_latest_time(RRDDIM *rd);
 extern time_t rrdeng_metric_oldest_time(RRDDIM *rd);
-extern void rrdeng_get_28_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
+extern void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */
 extern int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,

@@ -30,6 +30,6 @@ fi
 
 for pkg in ${PACKAGES_LIST[@]}; do
 	echo "Attempting yank on ${pkg}.."
-	.travis/package_management/package_cloud_wrapper.sh yank "${TRAVIS_REPO_SLUG}/${DISTRO}" "${pkg}" || echo "Nothing to yank or error on ${pkg}"
+	.travis/package_management/package_cloud_wrapper.sh yank "${PACKAGING_USER}/${DEPLOY_REPO}/${DISTRO}" "${pkg}" || echo "Nothing to yank or error on ${pkg}"
 done
 

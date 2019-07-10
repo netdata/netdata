@@ -84,12 +84,15 @@ struct pg_cache_page_index {
      * It's also written by the data deletion workqueue when data collection is disabled for this metric.
      */
     usec_t latest_time;
+
+    struct pg_cache_page_index *prev;
 };
 
 /* maps UUIDs to page indices */
 struct pg_cache_metrics_index {
     uv_rwlock_t lock;
     Pvoid_t JudyHS_array;
+    struct pg_cache_page_index *last_page_index;
 };
 
 /* gathers dirty pages to be written on disk */
@@ -153,6 +156,7 @@ extern struct rrdeng_page_descr *
                         usec_t point_in_time);
 extern struct pg_cache_page_index *create_page_index(uuid_t *id);
 extern void init_page_cache(struct rrdengine_instance *ctx);
+extern void free_page_cache(struct rrdengine_instance *ctx);
 extern void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr);
 extern void pg_cache_update_metric_times(struct pg_cache_page_index *page_index);
 

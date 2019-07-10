@@ -22,7 +22,7 @@ void rrdeng_destroy_pg_cache_descr(struct rrdengine_instance *ctx, struct page_c
 {
     uv_cond_destroy(&pg_cache_descr->cond);
     uv_mutex_destroy(&pg_cache_descr->mutex);
-    free(pg_cache_descr);
+    freez(pg_cache_descr);
     rrd_stat_atomic_add(&ctx->stats.page_cache_descriptors, -1);
 }
 
@@ -102,7 +102,6 @@ void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrden
     we_locked = 0;
     while (1) { /* spin */
         old_state = descr->pg_cache_descr_state;
-        assert(old_state & PG_CACHE_DESCR_ALLOCATED);
         old_users = old_state >> PG_CACHE_DESCR_SHIFT;
 
         if (unlikely(we_locked)) {
@@ -119,6 +118,7 @@ void rrdeng_page_descr_mutex_unlock(struct rrdengine_instance *ctx, struct rrden
             assert(0 == old_users);
             continue; /* spin */
         }
+        assert(old_state & PG_CACHE_DESCR_ALLOCATED);
         pg_cache_descr = descr->pg_cache_descr;
         /* caller is the only page cache descriptor user and there are no pending references on the page */
         if ((old_state & PG_CACHE_DESCR_DESTROY) && (1 == old_users) &&

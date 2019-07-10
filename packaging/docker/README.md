@@ -50,7 +50,6 @@ services:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /path/to/actual/docker/on/the/host:/usr/bin/docker
 ```
 
 ### Docker container names resolution

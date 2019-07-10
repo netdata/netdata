@@ -381,6 +381,7 @@ declare -A configs_signatures=(
   ['7deb236ec68a512b9bdd18e6a51d76f7']='python.d/mysql.conf'
   ['7e5fc1644aa7a54f9dbb1bd102521b09']='health.d/memcached.conf'
   ['7f13631183fbdf79c21c8e5a171e9b34']='health.d/zfs.conf'
+  ['ce285c90747428ee5da4efb547418dda']='health.d/dbengine.conf'
   ['7fb8184d56a27040e73261ed9c6fc76f']='health_alarm_notify.conf'
   ['80266bddd3df374923c750a6de91d120']='health.d/apache.conf'
   ['803a7f9dcb942eeac0fd764b9e3e38ca']='fping.conf'

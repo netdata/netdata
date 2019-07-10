@@ -511,6 +511,12 @@ RRDSET *rrdset_create_custom(
     if(st) {
         rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
+
+        if(unlikely(name))
+            rrdset_set_name(st, name);
+        else
+            rrdset_set_name(st, id);
+
         return st;
     }
 

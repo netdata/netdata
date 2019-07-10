@@ -874,9 +874,6 @@ void *tc_main(void *ptr) {
     uint32_t SETDEVICEGROUP_HASH = simple_hash("SETDEVICEGROUP");
     uint32_t SETCLASSNAME_HASH = simple_hash("SETCLASSNAME");
     uint32_t WORKTIME_HASH = simple_hash("WORKTIME");
-#ifdef DETACH_PLUGINS_FROM_NETDATA
-    uint32_t MYPID_HASH = simple_hash("MYPID");
-#endif
     uint32_t first_hash;
 
     snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_primary_plugins_dir);
@@ -1119,17 +1116,6 @@ void *tc_main(void *ptr) {
                 rrdset_done(sttime);
 
             }
-#ifdef DETACH_PLUGINS_FROM_NETDATA
-            else if(unlikely(first_hash == MYPID_HASH && (strcmp(words[0], "MYPID") == 0))) {
-                // debug(D_TC_LOOP, "MYPID line '%s'", words[1]);
-                char *id = words[1];
-                pid_t pid = atol(id);
-
-                if(likely(pid)) tc_child_pid = pid;
-
-                debug(D_TC_LOOP, "TC: Child PID is %d.", tc_child_pid);
-            }
-#endif
             //else {
             //  debug(D_TC_LOOP, "IGNORED line");
             //}

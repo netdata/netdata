@@ -179,6 +179,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
+    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
+    avl_init_lock(&(host->alarms_idx_health_log), alarm_compare_id);
+    avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -274,12 +278,12 @@ RRDHOST *rrdhost_create(const char *hostname,
     // load health configuration
 
     if(host->health_enabled) {
-        health_alarm_log_load(host);
-        health_alarm_log_open(host);
-
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
+
+        health_alarm_log_load(host);
+        health_alarm_log_open(host);
     }
 
 
@@ -875,4 +879,44 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
     }
 
     return res;
+}
+
+/**
+ * Alarm Compare ID
+ *
+ * Callback function used with the binary trees to compare the id of RRDCALC
+ *
+ * @param a a pointer to the RRDCAL item to insert,compare or update the binary tree
+ * @param b the pointer to the binary tree.
+ *
+ * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
+ */
+int alarm_compare_id(void *a, void *b) {
+    register uint32_t hash1 = ((RRDCALC *)a)->id;
+    register uint32_t hash2 = ((RRDCALC *)b)->id;
+
+    if(hash1 < hash2) return -1;
+    else if(hash1 > hash2) return 1;
+
+    return 0;
+}
+
+/**
+ * Alarm Compare NAME
+ *
+ * Callback function used with the binary trees to compare the name of RRDCALC
+ *
+ * @param a a pointer to the RRDCAL item to insert,compare or update the binary tree
+ * @param b the pointer to the binary tree.
+ *
+ * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
+ */
+int alarm_compare_name(void *a, void *b) {
+    RRDCALC *in1 = (RRDCALC *)a;
+    RRDCALC *in2 = (RRDCALC *)b;
+
+    if(in1->hash < in2->hash) return -1;
+    else if(in1->hash > in2->hash) return 1;
+
+    return strcmp(in1->name,in2->name);
 }

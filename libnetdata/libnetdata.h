@@ -81,6 +81,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
+#include <spawn.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -310,5 +311,7 @@ extern char *netdata_configured_host_prefix;
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
 #include "url/url.h"
+#include "json/json.h"
+#include "health/health.h"
 
 #endif // NETDATA_LIB_H
