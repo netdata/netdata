@@ -17,9 +17,9 @@ collectors/ @vlvkobal @mfundul @cakrit
 collectors/charts.d.plugin/ @paulkatsoulakis @cakrit
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cakrit
 collectors/macos.plugin/ @vlvkobal @thiagoftsm @cakrit
-collectors/node.d.plugin/ @gmosx @cakrit
+collectors/node.d.plugin/ @VLegakis @cakrit
 collectors/node.d.plugin/fronius/ @ccremer @cakrit
-collectors/node.d.plugin/snmp/ @gmosx @cakrit
+collectors/node.d.plugin/snmp/ @VLegakis @cakrit
 collectors/node.d.plugin/stiebeleltron/ @ccremer @cakrit
 collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @cakrit
@@ -28,15 +28,15 @@ database/ @mfundul @thiagoftsm @cakrit
 docs/ @cakrit
 health/ @thiagoftsm @vlvkobal @cakrit
 health/health.d/ @thiagoftsm @vlvkobal @cakrit
-health/notifications/ @Ferroin @cakrit
+health/notifications/ @Ferroin @thiagoftsm @cakrit
 libnetdata/ @thiagofsm @mfundul @cakrit
 packaging/ @paulkatsoulakis @cakrit
 packaging/installer/ @paulkatsoulakis @cakrit
 packaging/makeself/ @paulkatsoulakis @cakrit
-registry/ @gmosx @cakrit
+registry/ @VLegakis @cakrit
 streaming/ @thiagoftsm @vlvkobal @cakrit
 web/ @thiagoftsm @mfundul @vlvkobal @cakrit
-web/gui/ @gmosx @cakrit
+web/gui/ @VLegakis @cakrit
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @cakrit
@@ -54,7 +54,7 @@ web/gui/ @gmosx @cakrit
 netdata.spec.in @paulkatsoulakis
 netdata-installer.sh @paulkatsoulakis @cakrit
 netlify.toml @cakrit
-package.json @gmosx
+package.json @VLegakis
 packaging/version @netdatabot
 
 LICENSE.md @cakrit
