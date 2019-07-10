@@ -6,7 +6,6 @@ The best way to install Netdata is directly from source. Our **automatic install
 
 !!! warning
     You can find Netdata packages distributed by third parties. In many cases, these packages are either too old or broken. So, the suggested ways to install Netdata are the ones in this page.
-    **We are currently working to provide our binary packages for all Linux distros.** Stay tuned...
 
 1. [Automatic one line installation](#one-line-installation), easy installation from source, **this is the default**
 2. [Install pre-built static binary on any 64bit Linux](#linux-64bit-pre-built-static-binary)
@@ -17,6 +16,7 @@ The best way to install Netdata is directly from source. Our **automatic install
 7. [Enable on FreeNAS Corral](#freenas)
 8. [Install on macOS (OS X)](#macos)
 9. [Install on a Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
+10. [Install using binary packages](#binary-packages)
 
 See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
 
@@ -387,6 +387,23 @@ sudo ./netdata-installer.sh --install /usr/local
 ```
 
 The installer will also install a startup plist to start Netdata when your Mac boots.
+
+##### Binary Packages
+![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
+
+Netdata is proud to present it's own flavour of binary packages for the most common operating systems that comply with .RPM and .DEB packaging formats.
+We have currently released .RPM versions with version [1.16.0](https://github.com/netdata/netdata/releases/tag/v1.16.0). We are planning to release packages following the .DEB format on one of the following releases. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io).
+
+We provide two separate repositories, one for our stable releases and one for our nightly releases.
+1. Stable releases
+
+   Our stable production releases are hosted in [netdata/netdata](https://packagecloud.io/netdata/netdata) repository of package cloud
+
+2. Nightly releases
+
+   Our latest releases are hosted in [netdata/netdata-edge](https://packagecloud.io/netdata/netdata-edge) repository of package cloud
+
+Visit the repository pages and follow the instructions for the quick repository set up
 
 ##### Alpine 3.x
 
