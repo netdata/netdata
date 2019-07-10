@@ -52,6 +52,51 @@ char *url_decode(char *str) {
     return url_decode_r(buf, str, size);
 }
 
+//decode %XX character or return 0 if cannot
+char url_percent_escape_decode(char *s) {
+    if(likely(s[1] && s[2]))
+        return from_hex(s[1]) << 4 | from_hex(s[2]);
+    return 0;
+}
+
+//this (utf8 string related) should be moved in separate file in future
+char url_utf8_get_byte_length(char c) {
+    char length = 0;
+    while(likely(c & 0x80)) {
+        length++;
+        c <<= 1;
+    }
+    //4 byte is max size for UTF-8 char
+    //10XX XXXX is not valid character -> check length == 1
+    if(length > 4 || length == 1)
+        return -1;
+    //0XXX XXXX means 1 byte
+    return (length) ? length : 1;
+}
+
+//decode % encoded UTF-8 characters and copy them to *d
+//return count of bytes written to *d
+char url_decode_multibyte_utf8(char *s, char *d, char* d_end) {
+    char first_byte = url_percent_escape_decode(s);
+
+    if(unlikely(!first_byte))
+        return 0;
+
+    char byte_length = url_utf8_get_byte_length(first_byte);
+
+    if(unlikely(byte_length <= 0 || d+byte_length >= d_end))
+        return 0;
+
+    char to_read = byte_length;
+    while(to_read > 0) {
+        *d++ = url_percent_escape_decode(s);
+        s+=3;
+        to_read--;
+    }
+
+    return byte_length;
+}
+
 char *url_decode_r(char *to, char *url, size_t size) {
     char *s = url,           // source
          *d = to,            // destination
@@ -59,8 +104,18 @@ char *url_decode_r(char *to, char *url, size_t size) {
 
     while(*s && d < e) {
         if(unlikely(*s == '%')) {
-            if(likely(s[1] && s[2])) {
-                char t = from_hex(s[1]) << 4 | from_hex(s[2]);
+            char t = url_percent_escape_decode(s);
+            if(t & 0x80) { //UTF-8 multibyte character
+                char bytes_written = url_decode_multibyte_utf8(s, d, e);
+                if(likely(bytes_written)){
+                    d += bytes_written;
+                    s += (bytes_written * 3)-1;
+                }
+                else {
+                    *d++ = ' ';
+                }
+            }
+            else if(likely(t)) { //ASCII Character if not 0 (error decoding %XX); if 0 skip char same as original implementation
                 // avoid HTTP header injection
                 *d++ = (char)((isprint(t))? t : ' ');
                 s += 2;
