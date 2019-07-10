@@ -260,15 +260,16 @@ int do_sys_block_zram(int update_every, usec_t dt) {
             error("Cannot read /proc/devices");
             return 1;
         }
-        procfile_readall(ff);
+        ff = procfile_readall(ff);
+        if (!ff)
+            return 1;
         zram_id = try_get_zram_major_number(ff);
         if (zram_id == -1)
         {
-            info("ZRAM : zram is not available");
-            procfile_close(ff);
+            if (ff != NULL)
+                procfile_close(ff);
             return 1;
         }
-        info("ZRAM : zram is available");
         procfile_close(ff);
 
         devices = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
