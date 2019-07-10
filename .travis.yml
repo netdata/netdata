@@ -64,44 +64,44 @@ stages:
   # Build DEB packages under special conditions
   # Ubuntu
 - name: "Package ubuntu/disco"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 - name: "Package ubuntu/cosmic"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 - name: "Package ubuntu/bionic"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 - name: "Package ubuntu/artful"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 
   # Debian
 - name: "Package debian/buster"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 - name: "Package debian/stretch"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 - name: "Package debian/jessie"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 - name: "Package debian/wheezy"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 
   # Build RPM packages under special conditions
   # Enterprise linux (Covers CentOS, Redhat, Amazon linux)
 - name: "Package Enterprise Linux 7"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
 - name: "Package Enterprise linux 6"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
 
   # Fedora
 - name: "Package Fedora 30"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 - name: "Package Fedora 29"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 - name: "Package Fedora 28"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 
   # OpenSuSE
 - name: "Package OpenSuSE 15.1"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
 - name: "Package OpenSuSE 15.0"
-  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
 
 
 
@@ -115,12 +115,17 @@ stages:
     - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
     - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
     script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
     - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
     - sudo chmod -R 755 "/var/lib/lxc"
     - echo "Preparing RPM packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+    git:
+      depth: false
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
-
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
     deploy:
@@ -135,7 +140,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: master
+          branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
       # Production release packages deployment
       - provider: packagecloud
@@ -155,6 +160,7 @@ stages:
       - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
 
+
   # TODO: This section is stale, will be aligned with the RPM implementation when we get to DEB packaging
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish DEB package"
@@ -165,10 +171,16 @@ stages:
     - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
     - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
     script:
+    - echo "GIT Branch:" && git branch
+    - echo "Last commit:" && git log -1
+    - echo "GIT Describe:" && git describe
+    - echo "packaging/version:" && cat packaging/version
     - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
     - sudo chmod -R 755 "/var/lib/lxc"
     - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
+    git:
+      depth: false
     after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
@@ -184,7 +196,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: master
+          branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
       # Production release packages deployment
       - provider: packagecloud
@@ -197,7 +209,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
           repo: "netdata/netdata"
-          branch: master
+          branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
       - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
