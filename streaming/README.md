@@ -138,7 +138,7 @@ headless proxy|`none`|not `none`|`yes`|only for `data source = as collected`|not
 proxy with db|not `none`|not `none`|`yes`|possible|possible|yes
 central netdata|not `none`|not `none`|`no`|possible|possible|yes
 
-For the options to encrypt the data stream between the slave and the master, refer to [securing the communication](#securing-the-communication)
+For the options to encrypt the data stream between the slave and the master, refer to [securing the communication](#securing-streaming-communications)
 
 ##### options for the receiving node
 
@@ -213,20 +213,23 @@ The receiving end (`proxy` or `master`) logs entries like these:
 
 For netdata v1.9+, streaming can also be monitored via `access.log`.
 
-### Securing the communication
+### Securing streaming communications
 
-Netdata does not activate TLS encryption by default. To encrypt the connection, you first need to [enable TLS support](../web/server/#enabling-tls-support) on the master. With encryption enabled on the receiving side, we need to instruct the slave to use SSL as well. On the slave's `stream.conf`, configure the destination as follows:
+Netdata does not activate TLS encryption by default. To encrypt streaming connections, you first need to [enable TLS support](../web/server/#enabling-tls-support) on the master. With encryption enabled on the receiving side, you need to instruct the slave to use TLS/SSL as well. On the slave's `stream.conf`, configure the destination as follows:
 
 ```
 [stream]
     destination = host:port:SSL
 ```
 
-The word SSL appended to the end of the destination tells the slave that the connection must be encrypted.
+The word `SSL` appended to the end of the destination tells the slave that connections must be encrypted.
+
+??? info "Differences in TLS and SSL terminology"
+    While Netdata uses Transport Layer Security (TLS) 1.2 to encrypt communications rather than the obsolete SSL protocol, it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS` or `TLS/SSL`.
 
 #### Certificate verification
 
-When SSL is enabled on the slave, the default behavior will be do not connect with the master unless the server's certificate can be verified via the default chain. In case you want to avoid this check, add to the slave's `stream.conf` the following:
+When TLS/SSL is enabled on the slave, the default behavior will be to not connect with the master unless the server's certificate can be verified via the default chain. In case you want to avoid this check, add the following to the slave's `stream.conf` file:
 
 ```
 [stream]
@@ -235,18 +238,19 @@ When SSL is enabled on the slave, the default behavior will be do not connect wi
 
 #### Expected behaviors
 
-With the introduction of SSL, the master-slave communication behaves as shown in the table below, depending on the following configurations:
-- Master TLS (Yes/No): Whether the `[web]` section in `netdata.conf` has `ssl key` and `ssl certificate`.
-- Master port SSL (-/force/optional): Depends on whether the `[web]` section `bind to` contains a `^SSL=force` or `^SSL=optional` directive on the port(s) used for streaming.
-- Slave TLS (Yes/No): Whether the destination in the slave's `stream.conf` has `:SSL` at the end.
-- Slave SSL Verification (yes/no): Value of the slave's `stream.conf` `ssl skip certificate verification` parameter (default is no).
+With the introduction of TLS/SSL, the master-slave communication behaves as shown in the table below, depending on the following configurations:
+
+- **Master TLS (Yes/No)**: Whether the `[web]` section in `netdata.conf` has `ssl key` and `ssl certificate`.
+- **Master port TLS (-/force/optional)**: Depends on whether the `[web]` section `bind to` contains a `^SSL=force` or `^SSL=optional` directive on the port(s) used for streaming.
+- **Slave TLS (Yes/No)**: Whether the destination in the slave's `stream.conf` has `:SSL` at the end.
+- **Slave TLS Verification (yes/no)**: Value of the slave's `stream.conf` `ssl skip certificate verification` parameter (default is no).
 
  Master TLS enabled | Master port SSL | Slave TLS | Slave SSL Ver. | Behavior
 :------:|:-----:|:-----:|:-----:|:--------
 No | - | No | no | Legacy behavior. The master-slave stream is unencrypted.
 Yes | force | No | no | The master rejects the slave connection.
 Yes | -/optional | No | no | The master-slave stream is unencrypted (expected situation for legacy slaves and newer masters)
-Yes | -/force/optional | Yes | no | The master-slave stream is encrypted, provided that the master has a valid SSL certificate. Otherwise, the slave refuses to connect.
+Yes | -/force/optional | Yes | no | The master-slave stream is encrypted, provided that the master has a valid TLS/SSL certificate. Otherwise, the slave refuses to connect.
 Yes | -/force/optional | Yes | yes | The master-slave stream is encrypted.
 
 ## Viewing remote host dashboards, using mirrored databases
