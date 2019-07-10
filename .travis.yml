@@ -28,8 +28,6 @@ install:
 - export DEPLOY_REPO="netdata" # Default production packaging repository
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
 - export PACKAGING_USER="$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
-- export DEV_CODE_REPO="binary-packages-deb-cleanup"
-- export PROD_CODE_REPO="master"
 
 
 
@@ -66,44 +64,44 @@ stages:
   # Build DEB packages under special conditions
   # Ubuntu
 - name: "Package ubuntu/disco"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 - name: "Package ubuntu/cosmic"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 - name: "Package ubuntu/bionic"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 - name: "Package ubuntu/artful"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
 
   # Debian
 - name: "Package debian/buster"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 - name: "Package debian/stretch"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 - name: "Package debian/jessie"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 - name: "Package debian/wheezy"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
 
   # Build RPM packages under special conditions
   # Enterprise linux (Covers CentOS, Redhat, Amazon linux)
 - name: "Package Enterprise Linux 7"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
 - name: "Package Enterprise linux 6"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
 
   # Fedora
 - name: "Package Fedora 30"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 - name: "Package Fedora 29"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 - name: "Package Fedora 28"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
 
   # OpenSuSE
 - name: "Package OpenSuSE 15.1"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
 - name: "Package OpenSuSE 15.0"
-  if: type != cron AND branch = binary-packages-deb-cleanup AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
 
 
 
@@ -142,7 +140,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "${DEV_CODE_REPO}"
+          branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
       # Production release packages deployment
       - provider: packagecloud
@@ -155,7 +153,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: "netdata/netdata"
-          branch: "${PROD_CODE_REPO}"
+          branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
       - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
@@ -198,7 +196,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "${DEV_CODE_REPO}"
+          branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
       # Production release packages deployment
       - provider: packagecloud
@@ -211,7 +209,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
           repo: "netdata/netdata"
-          branch: "${PROD_CODE_REPO}"
+          branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
       - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;

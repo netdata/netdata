@@ -47,11 +47,10 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
 print("2. Installing package dependencies within LXC container")
-install_common_dependendencies()
+common.install_common_dependendencies()
 
 # Exceptional cases, not available everywhere
 #
-
 # Not on Centos-7
 if os.environ["BUILD_STRING"].count("el/7") <= 0:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter_acct-devel"])
