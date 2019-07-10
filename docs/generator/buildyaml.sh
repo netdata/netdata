@@ -67,6 +67,9 @@ extra:
       link: "https://www.facebook.com/linuxnetdata/"
 theme:
     name: "material"
+    palette:
+      primary: "blue grey"
+      accent: "light green"
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
     language: '${language}'
