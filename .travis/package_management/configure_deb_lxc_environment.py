@@ -46,7 +46,7 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
 print("2. Installing package dependencies within LXC container")
-common.install_common_dependendencies()
+common.install_common_dependendencies(container)
 
 print ("3. Run install-required-packages scriptlet")
 common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])

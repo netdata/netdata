@@ -37,7 +37,7 @@ def run_command(container, command):
     if command_result != 0:
         raise Exception("Command failed with exit code %d" % command_result)
 
-def run_command_in_host(cmd):
+def run_command_in_host(container, cmd):
     print("Issue command in host: %s" % str(cmd))
 
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

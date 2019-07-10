@@ -47,7 +47,7 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
 print("2. Installing package dependencies within LXC container")
-common.install_common_dependendencies()
+common.install_common_dependendencies(container)
 
 # Exceptional cases, not available everywhere
 #
