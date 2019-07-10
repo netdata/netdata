@@ -138,6 +138,6 @@ We plan to support amd64, x86 and arm64 architectures. As of June 2019 only amd6
 
 The Package deployment can be triggered manually by executing an empty commit with the following message pattern: `[Package PACKAGE_TYPE PACKAGE_ARCH] DESCRIBE_THE_REASONING_HERE`.
 Travis Yaml configuration allows the user to combine package type and architecture as necessary to regenerate the current stable release (For example tag v1.15.0 as of 4th of May 2019)
-Sample patterns to trigger building of packages for all AMD64 supported architecture:
-- '[Package AMD64 RPM]': Build & publish all amd64 available RPM packages
-- '[Package AMD64 DEB]': Build & publish all amd64 available DEB packages
+Sample patterns to trigger building of packages for all amd64 supported architecture:
+- '[Package amd64 RPM]': Build & publish all amd64 available RPM packages
+- '[Package amd64 DEB]': Build & publish all amd64 available DEB packages

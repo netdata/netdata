@@ -83,7 +83,7 @@ case "${BUILD_ARCH}" in
 	.travis/package_management/configure_${PACKAGE_TYPE}_lxc_environment.py "${CONTAINER_NAME}"
 	;;
 "i386"|"amd64"|"arm64")
-	# AMD64 or i386
+	# amd64 or i386
 	echo "Creating LXC Container for ${BUILD_ARCH}.."
 	export CONTAINER_NAME="${BUILDER_NAME}-${BUILD_DISTRO}${BUILD_RELEASE}-${BUILD_ARCH}"
 	export LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
