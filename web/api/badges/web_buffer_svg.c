@@ -838,7 +838,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     value_width = verdana11_width(value_string) + (BADGE_HORIZONTAL_PADDING * 2);
     total_width = label_width + value_width;
 
-    escape_xmlz(label_escaped, label_buffer, LABEL_STRING_SIZE);
+    escape_xmlz(label_escaped, label, LABEL_STRING_SIZE);
     escape_xmlz(value_escaped, value_string, VALUE_STRING_SIZE);
     escape_xmlz(label_color_escaped, color_map(label_color), COLOR_STRING_SIZE);
     escape_xmlz(value_color_escaped, color_map(value_color_buffer), COLOR_STRING_SIZE);
@@ -862,19 +862,45 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
                 "<stop offset=\"1\" stop-opacity=\".1\"/>"
             "</linearGradient>"
             "<mask id=\"round\">"
-                "<rect width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
+                "<rect class=\"bdge-ttl-width\" width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
             "</mask>"
             "<g mask=\"url(#round)\">"
-                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
-                "<rect x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
-                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"url(#smooth)\"/>"
+                "<rect class=\"bdge-rect-lbl\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect class=\"bdge-rect-val\" x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect class=\"bdge-ttl-width\" width=\"%0.2f\" height=\"%0.2f\" fill=\"url(#smooth)\"/>"
             "</g>"
             "<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"%0.2f\">"
-                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
-                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
+                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\">%s</text>"
+                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\">%s</text>"
             "</g>"
+            "<script type=\"text/javascript\">"
+                "var bdg_horiz_padding = %d;"
+                "var this_svg = document.currentScript.closest(\"svg\");"
+                "var elem_lbl = this_svg.getElementsByClassName(\"bdge-lbl-lbl\");"
+                "var elem_val = this_svg.getElementsByClassName(\"bdge-lbl-val\");"
+                "var lbl_size = elem_lbl[0].getBBox();"
+                "var val_size = elem_val[0].getBBox();"
+                "var width_total = lbl_size.width + bdg_horiz_padding*2;"
+                "this_svg.getElementsByClassName(\"bdge-rect-lbl\")[0].setAttribute(\"width\", lbl_size.width + bdg_horiz_padding*2);"
+                "Array.prototype.forEach.call(elem_lbl, function(el){"
+                    "el.setAttribute(\"x\", (lbl_size.width / 2) + bdg_horiz_padding);"
+                "});"
+                "Array.prototype.forEach.call( elem_val, function(el){"
+                    "el.setAttribute(\"x\", width_total + (val_size.width / 2) + bdg_horiz_padding);"
+                "});"
+
+                "var val_rect = this_svg.getElementsByClassName(\"bdge-rect-val\")[0];"
+                "val_rect.setAttribute(\"width\", val_size.width + bdg_horiz_padding*2);"
+                "val_rect.setAttribute(\"x\", width_total);"
+                "width_total += val_size.width + bdg_horiz_padding*2;"
+                "var with_update_elems = this_svg.getElementsByClassName(\"bdge-ttl-width\");"
+                "Array.prototype.forEach.call (with_update_elems, function(el){"
+                    "el.setAttribute(\"width\", width_total);"
+                "});"
+                "this_svg.setAttribute(\"width\", width_total);"
+            "</script>"
         "</svg>",
         total_width, height,
         total_width, height, round_corner,
@@ -885,7 +911,8 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         label_width / 2, ceil(height - text_offset), label_escaped,
         label_width / 2, ceil(height - text_offset - 1.0), label_escaped,
         label_width + value_width / 2 -1, ceil(height - text_offset), value_escaped,
-        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped);
+        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped,
+        BADGE_HORIZONTAL_PADDING );
 }
 
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
