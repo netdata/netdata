@@ -138,6 +138,7 @@ echo -ne "    - 'docs/Demo-Sites.md'
     - 'packaging/installer/README.md'
     - 'packaging/docker/README.md'
     - 'packaging/installer/UPDATE.md'
+    - 'packaging/DISTRIBUTIONS.md'
     - 'packaging/installer/UNINSTALL.md'
 - 'docs/GettingStarted.md'
 - Running Netdata:
