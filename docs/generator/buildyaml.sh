@@ -88,7 +88,6 @@ markdown_extensions:
  - footnotes
  - tables
  - admonition
- - codehilite
  - meta
  - sane_lists
  - smarty
@@ -102,6 +101,7 @@ markdown_extensions:
  - pymdownx.caret
  - pymdownx.critic
  - pymdownx.details
+ - pymdownx.highlight
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
