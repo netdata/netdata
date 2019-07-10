@@ -17,7 +17,7 @@ Distribution | Family| Code health | Installer support | Kickstart support | Bin
 Debian 7 (Wheezy) | Debian |  |  |  |  |  |  | 
 Debian 8 (Jessie) | Debian |  |  |  |  |  |  | 
 Debian 9 (Stretch) | Debian |  |  |  |  |  |  | 
-Debian 10 (Buster) **Not released | Debian |  |  |  |  |  |  | 
+Debian 10 (Buster) | Debian |  |  |  |  |  |  | 
 Versions 6.* | RHEL |  |  |  |  |  |  | 
 Versions 7.* | RHEL |  |  |  |  |  |  | 
 Versions 8.* | RHEL |  |  |  |  |  |  | 
