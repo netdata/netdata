@@ -64,44 +64,44 @@ stages:
   # Build DEB packages under special conditions
   # Ubuntu
 - name: "Package ubuntu/disco"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 - name: "Package ubuntu/cosmic"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 - name: "Package ubuntu/bionic"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 - name: "Package ubuntu/artful"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package AMD64 DEB Ubuntu\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 
   # Debian
 - name: "Package debian/buster"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 - name: "Package debian/stretch"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 - name: "Package debian/jessie"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 - name: "Package debian/wheezy"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package AMD64 DEB Debian\]|\[Package AMD64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 
   # Build RPM packages under special conditions
   # Enterprise linux (Covers CentOS, Redhat, Amazon linux)
 - name: "Package Enterprise Linux 7"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
 - name: "Package Enterprise linux 6"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package AMD64 RPM Enterprise Linux\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
 
   # Fedora
 - name: "Package Fedora 30"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
 - name: "Package Fedora 29"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
 - name: "Package Fedora 28"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package AMD64 RPM Fedora\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
 
   # OpenSuSE
 - name: "Package OpenSuSE 15.1"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package amd64 RPM openSuSE\]|\[Package amd64 RPM\])/
 - name: "Package OpenSuSE 15.0"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package AMD64 RPM openSuSE\]|\[Package AMD64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package amd64 RPM openSuSE\]|\[Package amd64 RPM\])/
 
 
 
