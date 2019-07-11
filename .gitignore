@@ -139,8 +139,6 @@ cmake_install.cmake
 .DS_Store
 webcopylocal*
 
-contrib/debian/changelog
-
 # converted diagrams
 diagrams/*.png
 diagrams/*.svg

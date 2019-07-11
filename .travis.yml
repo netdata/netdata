@@ -24,6 +24,8 @@ install:
 - export NOTIF_CHANNEL="automation-beta"
 - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
 - export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
+- export LATEST_RELEASE_VERSION="$(cat packaging/version | cut -d'-' -f1)"
+- export LATEST_RELEASE_DATE="$(git log -1 --format=%aD "${LATEST_RELEASE_VERSION}" | cat)"
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; fi;
 - export DEPLOY_REPO="netdata" # Default production packaging repository
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;

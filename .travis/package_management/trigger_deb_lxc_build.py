@@ -42,10 +42,24 @@ os.environ["EMAIL"] = "bot@netdata.cloud"
 os.environ["DEBFULLNAME"] = "Netdata builder"
 
 # Run the build process on the container
-print("Starting DEB build process, running dh-make")
-new_version = os.environ["BUILD_VERSION"].replace('v', '')
+new_version = os.environ["BUILD_VERSION"].replace('v', '').replace('.latest', '')
+print("Starting DEB build process for version %s" % new_version)
+
+netdata_tarball = "/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], new_version)
+unpacked_netdata = netdata_tarball.replace(".tar.gz", "")
+
+print("Extracting tarball %s" % netdata_tarball)
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", netdata_tarball])
+
+print("Fixing changelog tags")
+changelog = "%s/contrib/debian/changelog" % unpacked_netdata
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-e', 's/PREVIOUS_PACKAGE_VERSION/%/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-e', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog])
+
+print("Generating changelog since %s" % os.environ["LATEST_RELEASE_VERSION"])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "-c", "cd %s; gbp dch --release --spawn-editor=snapshot --since=%s" % (unpacked_netdata, os.environ["LATEST_RELEASE_VERSION"])])
 
 print("Building the package")
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "dpkg-buildpackage", "--host-arch", "amd64", "--target-arch", "amd64", "--post-clean", "--pre-clean", "--build=binary", "--release-by=\"Netdata Builder\"", "--build-by=\"Netdata Builder\""])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "cd %s; dpkg-buildpackage --host-arch amd64 --target-arch amd64 --post-clean --pre-clean --build=binary" % netdata_tarball.replace(".tar.gz", "")])
 
 print('Done!')
