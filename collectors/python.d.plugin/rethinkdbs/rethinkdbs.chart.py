@@ -3,6 +3,8 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import re
+
 try:
     import rethinkdb as rdb
     HAS_RETHINKDB = True
@@ -136,16 +138,8 @@ class Server:
 # https://pypi.org/project/rethinkdb/2.4.0/
 NEW_DRIVER_VER = "2.4.0"
 
-
-# rdb.RethinkDB() can be used as rdb drop in replacement.
-# https://github.com/rethinkdb/rethinkdb-python#quickstart
-def get_rethinkdb():
-    cur = StrictVersion(rdb.__version__)
-    new = StrictVersion(NEW_DRIVER_VER)
-
-    if cur < new:
-        return rdb
-    return rdb.RethinkDB()
+# https://pypi.org/project/rethinkdb/#history
+RE_VERSION = re.compile(r'^[0-9](?:\.[0-9]+){2}')
 
 
 class Service(SimpleService):
@@ -162,12 +156,32 @@ class Service(SimpleService):
         self.conn = None
         self.alive = True
 
+    def get_rethinkdb(self):
+        # ex.:2.4.2.post1
+        self.debug("rethinkdb driver version {0}".format(rdb.__version__))
+        cur = RE_VERSION.search(rdb.__version__)
+        if not cur:
+            self.error("cant parse rethinkdb version {0}".format(rdb.__version__))
+            return
+
+        cur = StrictVersion(cur.group())
+        new = StrictVersion(NEW_DRIVER_VER)
+
+        # rdb.RethinkDB() can be used as rdb drop in replacement.
+        # https://github.com/rethinkdb/rethinkdb-python#quickstart
+        if cur < new:
+            self.rdb = rdb
+        else:
+            self.rdb = rdb.RethinkDB()
+
     def check(self):
         if not HAS_RETHINKDB:
             self.error('"rethinkdb" module is needed to use rethinkdbs.py')
             return False
 
-        self.rdb = get_rethinkdb()
+        self.get_rethinkdb()
+        if not self.rdb:
+            return None
 
         if not self.connect():
             return None
