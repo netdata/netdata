@@ -93,7 +93,7 @@ for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -ty
 		cp -r ${LOC_DIR}/${d}/* ${DOCS_DIR}/
 	fi
 	prep_html $d
-	rm -rf ${DOCS_DIR}/*
+	rm -rf ${DOCS_DIR}
 done
 
 # Remove cloned projects and temp directories
