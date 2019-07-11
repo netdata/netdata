@@ -932,7 +932,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
     }
 
     if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                                              (system_rbytes || system_tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                              (system_rbytes || system_tbytes ||
+                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
         static RRDSET *st_system_net = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;

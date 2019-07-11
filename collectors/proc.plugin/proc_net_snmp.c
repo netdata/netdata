@@ -704,7 +704,8 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
             if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO &&
-                                                        (snmp_root.tcp_CurrEstab || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                        (snmp_root.tcp_CurrEstab ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcp_sockets = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;

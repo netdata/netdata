@@ -974,7 +974,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // Do performance metrics
 
         if(d->do_io == CONFIG_BOOLEAN_YES || (d->do_io == CONFIG_BOOLEAN_AUTO &&
-                                              (readsectors || writesectors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                              (readsectors || writesectors ||
+                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             d->do_io = CONFIG_BOOLEAN_YES;
 
             if(unlikely(!d->st_io)) {
@@ -1207,9 +1208,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         if(likely(dt)) {
             if( (d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO &&
-                                                        (readms || writems || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
+                                                        (readms || writems ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
                 (d->do_ops    == CONFIG_BOOLEAN_YES || (d->do_ops    == CONFIG_BOOLEAN_AUTO &&
-                                                        (reads || writes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
+                                                        (reads || writes ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
 
                 if(unlikely(!d->st_await)) {
                     d->st_await = rrdset_create_localhost(
@@ -1273,9 +1276,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             }
 
             if( (d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO &&
-                                                      (busy_ms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
+                                                      (busy_ms ||
+                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) &&
                 (d->do_ops  == CONFIG_BOOLEAN_YES || (d->do_ops  == CONFIG_BOOLEAN_AUTO &&
-                                                      (reads || writes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
+                                                      (reads || writes ||
+                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))) {
 
                 if(unlikely(!d->st_svctm)) {
                     d->st_svctm = rrdset_create_localhost(
@@ -1596,7 +1601,8 @@ int do_proc_diskstats(int update_every, usec_t dt) {
     // update the system total I/O
 
     if(global_do_io == CONFIG_BOOLEAN_YES || (global_do_io == CONFIG_BOOLEAN_AUTO &&
-                                              (system_read_kb || system_write_kb || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                              (system_read_kb || system_write_kb ||
+                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         static RRDSET *st_io = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;
 
