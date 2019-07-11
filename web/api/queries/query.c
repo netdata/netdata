@@ -431,19 +431,19 @@ static inline void do_dimension(
         // read the value from the database
         //storage_number n = rd->values[slot];
 #ifdef NETDATA_INTERNAL_CHECKS
-        if (rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-#ifdef ENABLE_DBENGINE
-            if (now != handle.rrdeng.now)
-                error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)handle.rrdeng.now, (long)now);
-#endif
-        } else if (rrdset_time2slot(st, now) != (long unsigned)handle.slotted.slot) {
+        if ((rd->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) &&
+            (rrdset_time2slot(st, now) != (long unsigned)handle.slotted.slot)) {
             error("INTERNAL CHECK: Unaligned query for %s, database slot: %lu, expected slot: %lu", rd->id, (long unsigned)handle.slotted.slot, rrdset_time2slot(st, now));
         }
 #endif
-        storage_number n = rd->state->query_ops.next_metric(&handle);
+        storage_number n = rd->state->query_ops.next_metric(&handle, &now);
         calculated_number value = NAN;
         if(likely(does_storage_number_exist(n))) {
-
+#if defined(NETDATA_INTERNAL_CHECKS) && defined(ENABLE_DBENGINE)
+            if ((rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) && (now != handle.rrdeng.now)) {
+                error("INTERNAL CHECK: Unaligned query for %s, database time: %ld, expected time: %ld", rd->id, (long)handle.rrdeng.now, (long)now);
+            }
+#endif
             value = unpack_storage_number(n);
             if(likely(value != 0.0))
                 values_in_group_non_zero++;

@@ -231,75 +231,101 @@ void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_hand
     rrdimm_handle->start_time = start_time;
     rrdimm_handle->end_time = end_time;
     handle = &rrdimm_handle->rrdeng;
+    handle->next_page_time = start_time;
     handle->now = start_time;
-    handle->dt = rd->rrdset->update_every;
+    handle->position = 0;
     handle->ctx = ctx;
     handle->descr = NULL;
     handle->page_index = pg_cache_preload(ctx, rd->state->rrdeng_uuid,
                                           start_time * USEC_PER_SEC, end_time * USEC_PER_SEC);
+    if (unlikely(NULL == handle->page_index))
+        /* there are no metrics to load */
+        handle->next_page_time = INVALID_TIME;
 }
 
-storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle)
+/* Returns the metric and sets its timestamp into current_time */
+storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time)
 {
     struct rrdeng_query_handle *handle;
     struct rrdengine_instance *ctx;
     struct rrdeng_page_descr *descr;
     storage_number *page, ret;
-    unsigned position;
-    usec_t point_in_time;
+    unsigned position, entries;
+    usec_t next_page_time, current_position_time;
 
     handle = &rrdimm_handle->rrdeng;
-    if (unlikely(INVALID_TIME == handle->now)) {
+    if (unlikely(INVALID_TIME == handle->next_page_time)) {
         return SN_EMPTY_SLOT;
     }
     ctx = handle->ctx;
-    point_in_time = handle->now * USEC_PER_SEC;
-    descr = handle->descr;
-
-    if (unlikely(NULL == handle->page_index)) {
-        ret = SN_EMPTY_SLOT;
-        goto out;
+    if (unlikely(NULL == (descr = handle->descr))) {
+        /* it's the first call */
+        next_page_time = handle->next_page_time * USEC_PER_SEC;
     }
+    position = handle->position + 1;
+
     if (unlikely(NULL == descr ||
-                 point_in_time < descr->start_time ||
-                 point_in_time > descr->end_time)) {
+                 position >= (descr->page_length / sizeof(storage_number)))) {
+        /* We need to get a new page */
         if (descr) {
+            /* Drop old page's reference */
+            handle->next_page_time = (descr->end_time / USEC_PER_SEC) + 1;
+            if (unlikely(handle->next_page_time > rrdimm_handle->end_time)) {
+                goto no_more_metrics;
+            }
+            next_page_time = handle->next_page_time * USEC_PER_SEC;
 #ifdef NETDATA_INTERNAL_CHECKS
             rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, -1);
 #endif
             pg_cache_put(ctx, descr);
             handle->descr = NULL;
         }
-        descr = pg_cache_lookup(ctx, handle->page_index, &handle->page_index->id, point_in_time);
+        descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
+                                     next_page_time, rrdimm_handle->end_time * USEC_PER_SEC);
         if (NULL == descr) {
-            ret = SN_EMPTY_SLOT;
-            goto out;
+            goto no_more_metrics;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, 1);
 #endif
         handle->descr = descr;
-    }
-    if (unlikely(INVALID_TIME == descr->start_time ||
-                 INVALID_TIME == descr->end_time)) {
-        ret = SN_EMPTY_SLOT;
-        goto out;
+        if (unlikely(INVALID_TIME == descr->start_time ||
+                     INVALID_TIME == descr->end_time)) {
+            goto no_more_metrics;
+        }
+        if (unlikely(descr->start_time != descr->end_time && next_page_time > descr->start_time)) {
+            /* we're in the middle of the page somewhere */
+            entries = descr->page_length / sizeof(storage_number);
+            position = ((uint64_t)(next_page_time - descr->start_time)) * entries /
+                       (descr->end_time - descr->start_time + 1);
+        } else {
+            position = 0;
+        }
     }
     page = descr->pg_cache_descr->page;
-    if (unlikely(descr->start_time == descr->end_time)) {
-        ret = page[0];
-        goto out;
-    }
-    position = ((uint64_t)(point_in_time - descr->start_time)) * (descr->page_length / sizeof(storage_number)) /
-               (descr->end_time - descr->start_time + 1);
     ret = page[position];
+    entries = descr->page_length / sizeof(storage_number);
+    if (entries > 1) {
+        usec_t dt;
 
-out:
-    handle->now += handle->dt;
-    if (unlikely(handle->now > rrdimm_handle->end_time)) {
-        handle->now = INVALID_TIME;
+        dt = (descr->end_time - descr->start_time) / (entries - 1);
+        current_position_time = descr->start_time + position * dt;
+    } else {
+        current_position_time = descr->start_time;
     }
+    handle->position = position;
+    handle->now = current_position_time / USEC_PER_SEC;
+    assert(handle->now >= rrdimm_handle->start_time && handle->now <= rrdimm_handle->end_time);
+    if (unlikely(handle->now >= rrdimm_handle->end_time)) {
+        /* next calls will not load any more metrics */
+        handle->next_page_time = INVALID_TIME;
+    }
+    *current_time = handle->now;
     return ret;
+
+no_more_metrics:
+    handle->next_page_time = INVALID_TIME;
+    return SN_EMPTY_SLOT;
 }
 
 int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
@@ -307,7 +333,7 @@ int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle)
     struct rrdeng_query_handle *handle;
 
     handle = &rrdimm_handle->rrdeng;
-    return (INVALID_TIME == handle->now);
+    return (INVALID_TIME == handle->next_page_time);
 }
 
 /*

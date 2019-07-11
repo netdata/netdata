@@ -1593,7 +1593,7 @@ int test_dbengine(void)
     RRDSET *st[CHARTS];
     RRDDIM *rd[CHARTS][DIMS];
     char name[101];
-    time_t time_now;
+    time_t time_now, time_retrieved;
     collected_number last;
     struct rrddim_query_handle handle;
     calculated_number value, expected;
@@ -1678,7 +1678,7 @@ int test_dbengine(void)
                     last = i * DIMS * POINTS + j * POINTS + c + k;
                     expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
 
-                    n = rd[i][j]->state->query_ops.next_metric(&handle);
+                    n = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved);
                     value = unpack_storage_number(n);
 
                     same = (calculated_number_round(value * 10000000.0) == calculated_number_round(expected * 10000000.0)) ? 1 : 0;
@@ -1686,6 +1686,11 @@ int test_dbengine(void)
                         fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, expecting value "
                                         CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
                                 st[i]->name, rd[i][j]->name, (unsigned long)time_now + k, expected, value);
+                        errors++;
+                    }
+                    if(time_retrieved != time_now + k) {
+                        fprintf(stderr, "    DB-engine unittest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
+                                st[i]->name, rd[i][j]->name, (unsigned long)time_now + k, (unsigned long)time_retrieved);
                         errors++;
                     }
                 }

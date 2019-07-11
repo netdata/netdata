@@ -154,6 +154,9 @@ extern struct pg_cache_page_index *
 extern struct rrdeng_page_descr *
         pg_cache_lookup(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
                         usec_t point_in_time);
+extern struct rrdeng_page_descr *
+        pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
+                     usec_t start_time, usec_t end_time);
 extern struct pg_cache_page_index *create_page_index(uuid_t *id);
 extern void init_page_cache(struct rrdengine_instance *ctx);
 extern void free_page_cache(struct rrdengine_instance *ctx);

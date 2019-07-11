@@ -27,7 +27,7 @@ extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_n
 extern void rrdeng_store_metric_finalize(RRDDIM *rd);
 extern void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle,
                                     time_t start_time, time_t end_time);
-extern storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle);
+extern storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time);
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
 extern time_t rrdeng_metric_latest_time(RRDDIM *rd);
