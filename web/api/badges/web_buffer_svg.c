@@ -11,7 +11,7 @@
  * https://github.com/badges/shields/blob/master/measure-text.js
 */
 
-static double verdana11_widths[256] = {
+static double verdana11_widths[128] = {
     [0] = 0.0,
     [1] = 0.0,
     [2] = 0.0,
@@ -143,35 +143,32 @@ static double verdana11_widths[256] = {
 };
 
 // find the width of the string using the verdana 11points font
-// re-write the string in place, skiping zero-length characters
-static inline double verdana11_width(char *s, float em_size) {
+static inline double verdana11_width(const char *s, float em_size) {
     double w = 0.0;
-    char *d = s;
 
     while(*s) {
-        if(*s & 0x80) {
-            //if UTF8 multibyte char found
-            //count it as one character and guess it's width equal 1em
-            //as label width will be updated with JavaScript this is not so important
-            while(*s & 0x80)
+        // if UTF8 multibyte char found and guess it's width equal 1em
+        // as label width will be updated with JavaScript this is not so important
+
+        // TODO: maybe move UTF8 functions from url.c to separate util in libnetdata
+        //       then use url_utf8_get_byte_length etc.
+        if(IS_UTF8_STARTBYTE(*s)) {
+            s++;
+            while(IS_UTF8_BYTE(*s) && !IS_UTF8_STARTBYTE(*s)){
                 s++;
-            w += em_size + VERDANA_KERNING;
+            }
+            w += em_size;
         }
         else {
+            if(likely(!(*s & 0x80))){ // Byte 1XXX XXXX is not valid in UTF8
             double t = verdana11_widths[(unsigned char)*s];
-            if(t == 0.0)
-                s++;
-            else {
+                if(t != 0.0)
                 w += t + VERDANA_KERNING;
-                if(d != s)
-                    *d++ = *s++;
-                else
-                    d = ++s;
             }
+            s++;
         }
     }
 
-    *d = '\0';
     w -= VERDANA_KERNING;
     w += VERDANA_PADDING;
     return w;
