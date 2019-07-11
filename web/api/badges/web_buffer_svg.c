@@ -149,7 +149,6 @@ static inline double verdana11_width(char *s) {
     char *d = s;
 
     while(*s) {
-        double t;
         if(*s & 0x80) {
             //if UTF8 multibyte char found
             //count it as one character and guess it's width equal 1em
