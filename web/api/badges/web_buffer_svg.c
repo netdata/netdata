@@ -144,7 +144,7 @@ static double verdana11_widths[256] = {
 
 // find the width of the string using the verdana 11points font
 // re-write the string in place, skiping zero-length characters
-static inline double verdana11_width(char *s) {
+static inline double verdana11_width(char *s, float em_size) {
     double w = 0.0;
     char *d = s;
 
@@ -155,7 +155,7 @@ static inline double verdana11_width(char *s) {
             //as label width will be updated with JavaScript this is not so important
             while(*s & 0x80)
                 s++;
-            w += verdana11_widths['m'] + VERDANA_KERNING;
+            w += em_size + VERDANA_KERNING;
         }
         else {
             double t = verdana11_widths[(unsigned char)*s];
@@ -716,8 +716,8 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     // we need to copy the label, since verdana11_width may write to it
     strncpyz(label_buffer, label, LABEL_STRING_SIZE);
 
-    label_width = verdana11_width(label_buffer) + (BADGE_HORIZONTAL_PADDING * 2);
-    value_width = verdana11_width(value_string) + (BADGE_HORIZONTAL_PADDING * 2);
+    label_width = verdana11_width(label_buffer, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
+    value_width = verdana11_width(value_string, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
     total_width = label_width + value_width;
 
     escape_xmlz(label_escaped, label, LABEL_STRING_SIZE);
