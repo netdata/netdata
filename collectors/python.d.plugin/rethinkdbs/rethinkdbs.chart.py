@@ -9,8 +9,6 @@ try:
 except ImportError:
     HAS_RETHINKDB = False
 
-from distutils.version import StrictVersion
-
 from bases.FrameworkServices.SimpleService import SimpleService
 
 ORDER = [
