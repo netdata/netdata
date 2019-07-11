@@ -689,8 +689,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 #define COLOR_STRING_SIZE 100
 
 void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options) {
-    char      label_buffer[LABEL_STRING_SIZE + 1]
-            , value_color_buffer[COLOR_STRING_SIZE + 1]
+    char    value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
             , label_escaped[LABEL_STRING_SIZE + 1]
             , value_escaped[VALUE_STRING_SIZE + 1]
@@ -710,10 +709,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
     format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
 
-    // we need to copy the label, since verdana11_width may write to it
-    strncpyz(label_buffer, label, LABEL_STRING_SIZE);
-
-    label_width = verdana11_width(label_buffer, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
+    label_width = verdana11_width(label, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
     value_width = verdana11_width(value_string, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
     total_width = label_width + value_width;
 
