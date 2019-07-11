@@ -136,10 +136,12 @@ class Server:
 
 
 # https://pypi.org/project/rethinkdb/2.4.0/
-NEW_DRIVER_VER = "2.4.0"
-
-# https://pypi.org/project/rethinkdb/#history
-RE_VERSION = re.compile(r'^[0-9](?:\.[0-9]+){2}')
+# rdb.RethinkDB() can be used as rdb drop in replacement.
+# https://github.com/rethinkdb/rethinkdb-python#quickstart
+def get_rethinkdb():
+    if hasattr(rdb, 'RethinkDB'):
+        return rdb.RethinkDB()
+    return rdb
 
 
 class Service(SimpleService):
@@ -156,32 +158,13 @@ class Service(SimpleService):
         self.conn = None
         self.alive = True
 
-    def get_rethinkdb(self):
-        # ex.:2.4.2.post1
-        self.debug("rethinkdb driver version {0}".format(rdb.__version__))
-        cur = RE_VERSION.search(rdb.__version__)
-        if not cur:
-            self.error("cant parse rethinkdb version {0}".format(rdb.__version__))
-            return
-
-        cur = StrictVersion(cur.group())
-        new = StrictVersion(NEW_DRIVER_VER)
-
-        # rdb.RethinkDB() can be used as rdb drop in replacement.
-        # https://github.com/rethinkdb/rethinkdb-python#quickstart
-        if cur < new:
-            self.rdb = rdb
-        else:
-            self.rdb = rdb.RethinkDB()
-
     def check(self):
         if not HAS_RETHINKDB:
             self.error('"rethinkdb" module is needed to use rethinkdbs.py')
             return False
 
-        self.get_rethinkdb()
-        if not self.rdb:
-            return None
+        self.debug("rethinkdb driver version {0}".format(rdb.__version__))
+        self.rdb = get_rethinkdb()
 
         if not self.connect():
             return None
