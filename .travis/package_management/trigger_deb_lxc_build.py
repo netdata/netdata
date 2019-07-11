@@ -53,8 +53,8 @@ common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", 
 
 print("Fixing changelog tags")
 changelog = "%s/contrib/debian/changelog" % unpacked_netdata
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-e', 's/PREVIOUS_PACKAGE_VERSION/%s/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-e', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-i', 's/PREVIOUS_PACKAGE_VERSION/%s/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-i', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog])
 
 print("Generating changelog since %s" % os.environ["LATEST_RELEASE_VERSION"])
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "-c", "cd %s; gbp dch --release --spawn-editor=snapshot --since=%s" % (unpacked_netdata, os.environ["LATEST_RELEASE_VERSION"])])
