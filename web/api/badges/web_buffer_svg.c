@@ -152,7 +152,7 @@ static inline double verdana11_width(char *s) {
         if(*s & 0x80) {
             //if UTF8 multibyte char found
             //count it as one character and guess it's width equal 1em
-            //as lable width will be updated with JavaScript this is not so important
+            //as label width will be updated with JavaScript this is not so important
             while(*s & 0x80)
                 s++;
             w += verdana11_widths['m'] + VERDANA_KERNING;
