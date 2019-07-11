@@ -9,6 +9,8 @@ try:
 except ImportError:
     HAS_RETHINKDB = False
 
+from distutils.version import StrictVersion
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 ORDER = [
@@ -131,6 +133,21 @@ class Server:
         return dict(('{0}_{1}'.format(self.name, k), d[k]) for k in d)
 
 
+# https://pypi.org/project/rethinkdb/2.4.0/
+NEW_DRIVER_VER = "2.4.0"
+
+
+# rdb.RethinkDB() can be used as rdb drop in replacement.
+# https://github.com/rethinkdb/rethinkdb-python#quickstart
+def get_rethinkdb():
+    cur = StrictVersion(rdb.__version__)
+    new = StrictVersion(NEW_DRIVER_VER)
+
+    if cur < new:
+        return rdb
+    return rdb.RethinkDB()
+
+
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
@@ -141,6 +158,7 @@ class Service(SimpleService):
         self.user = self.configuration.get('user', 'admin')
         self.password = self.configuration.get('password')
         self.timeout = self.configuration.get('timeout', 2)
+        self.rdb = None
         self.conn = None
         self.alive = True
 
@@ -148,6 +166,8 @@ class Service(SimpleService):
         if not HAS_RETHINKDB:
             self.error('"rethinkdb" module is needed to use rethinkdbs.py')
             return False
+
+        self.rdb = get_rethinkdb()
 
         if not self.connect():
             return None
@@ -196,14 +216,14 @@ class Service(SimpleService):
 
     def get_stats(self):
         try:
-            return list(rdb.db('rethinkdb').table('stats').run(self.conn).items)
+            return list(self.rdb.db('rethinkdb').table('stats').run(self.conn).items)
         except rdb.errors.ReqlError:
             self.alive = False
             return None
 
     def connect(self):
         try:
-            self.conn = rdb.connect(
+            self.conn = self.rdb.connect(
                 host=self.host,
                 port=self.port,
                 user=self.user,
