@@ -5,6 +5,8 @@
 # Validates and tries to fix all links that will cause issues either in the repo, or in the html site
 
 GENERATOR_DIR="docs/generator"
+MKDOCS_DIR="doc"
+DOCS_DIR=${GENERATOR_DIR}/${MKDOCS_DIR}
 
 dbg () {
 	if [ "$VERBOSE" -eq 1 ] ; then printf "%s\\n" "${1}" ; fi
@@ -186,25 +188,27 @@ ck_netdata_relative () {
 			fi
 			;;
 		* )
-			if [ -f "$fpath/$rlnk" ] ; then
-				dbg "-- # (path/someotherfile) $rlnk"
-				if [ "$fpath" = "." ] ; then
-					s="https://github.com/netdata/netdata/tree/master/$rlnk"
-				else
-					s="https://github.com/netdata/netdata/tree/master/$fpath/$rlnk"
+			if [ -d "$fpath/$rlnk" ] ; then
+				dbg "-- # (path) -> htmldoc (path/)"
+				testf "$f" "$fpath/$rlnk/README.md"
+				if [ $? -eq 0 ] ; then
+					s="$rlnk/"
+					if [ "$fname" != "README.md" ] ; then s="../$s"; fi
 				fi
 			else
-				if [ -d "$fpath/$rlnk" ] ; then
-					dbg "-- # (path) -> htmldoc (path/)"
-					testf "$f" "$fpath/$rlnk/README.md"
-					if [ $? -eq 0 ] ; then
-						s="$rlnk/"
-						if [ "$fname" != "README.md" ] ; then s="../$s"; fi
+				cd - >/dev/null
+				if [ -f "$fpath/$rlnk" ] ; then
+					dbg "-- # (path/someotherfile) $rlnk"
+					if [ "$fpath" = "." ] ; then
+						s="https://github.com/netdata/netdata/tree/master/$rlnk"
+					else
+						s="https://github.com/netdata/netdata/tree/master/$fpath/$rlnk"
 					fi
 				else
 					echo "-- ERROR: $f - $rlnk is neither a file or a directory. Giving up!"
 					EXITCODE=1
 				fi
+				cd $DOCS_DIR >/dev/null
 			fi
 			;;
 		esac
@@ -212,7 +216,7 @@ ck_netdata_relative () {
 		if [[ ! -z $s ]] ; then
 			srch=$(echo "$rlnk" | sed 's/\//\\\//g')
 			rplc=$(echo "$s" | sed 's/\//\\\//g')
-			fix "sed -i 's/($srch)/($rplc)/g' $GENERATOR_DIR/doc/$f"
+			fix "sed -i 's/($srch)/($rplc)/g' $f"
 		fi
 }
 
@@ -314,9 +318,11 @@ if [ -z "${file}" ] ; then
 		printhelp
 		exit 1
 	fi
+	cd ${DOCS_DIR}
 	for f in $(find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print); do
 		checklinks "$f"
 	done
+	cd -
 else
 	if [ $RECURSIVE -eq 1 ] ; then 
 		printhelp
