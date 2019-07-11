@@ -59,42 +59,43 @@ The API requests are serviced as follows:
 
 ### Enabling TLS support
 
+Since v1.16.0, Netdata supports encrypted HTTP connections to the web server, plus encryption of streaming data between a slave and its master, via the TLS 1.2 protocol.
 
-Netdata since version 1.16 supports encrypted HTTP connections to the web server and encryption of the data stream between a slave and a master. 
-Inbound unix socket connections are unaffected, regardless of the SSL settings.  
-To enable SSL, provide the path to your certificate and private key in the `[web]` section of `netdata.conf`:
+Inbound unix socket connections are unaffected, regardless of the TLS settings.  
+??? info "Differences in TLS and SSL terminology"
+    While Netdata uses Transport Layer Security (TLS) 1.2 to encrypt communications rather than the obsolete SSL protocol, it's still common practice to refer to encrypted web connections as `SSL`. Many vendors, like Nginx and even Netdata itself, use `SSL` in configuration files, whereas documentation will always refer to encrypted communications as `TLS` or `TLS/SSL`.
 
-```
+To enable TLS, provide the path to your certificate and private key in the `[web]` section of `netdata.conf`:
+
+``` conf
 [web]
 	ssl key = /etc/netdata/ssl/key.pem
 	ssl certificate = /etc/netdata/ssl/cert.pem
 ```
 
-Both files must be readable by the netdata user. If any of the two files does not exist or is unreadable, Netdata falls back to HTTP.
-
-For a master/slave connection, only the master needs these settings.
+Both files must be readable by the `netdata` user. If either of these files do not exist or are unreadable, Netdata will fall back to HTTP. For a master/slave connection, only the master needs these settings.
 
 For test purposes, you can generate self-signed certificates with the following command:
 
-```
+``` bash
 $ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
 ```
 
-TIP: If you use 4096 bits for the key and the certificate, netdata will need more CPU to process the whole communication. 
-rsa4096 can be until 4 times slower than rsa2048, so we recommend using 2048 bits. You can verify the difference by running
+!!! note
+    If you use 4096 bits for your key and the certificate, Netdata will need more CPU to process the communication. `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. You can verify the difference by running:
+ 
+    ```
+    $ openssl speed rsa2048 rsa4096
+    ```
 
-```
-$ openssl speed rsa2048 rsa4096
-```
-
-#### SSL enforcement
+#### TLS/SSL enforcement
 
 When the certificates are defined and unless any other options are provided, a Netdata server will:
+
 - Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, netdata.conf and badges.
 - Allow incoming slave connections to use both unencrypted and encrypted communications for streaming.
  
-To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`.
-At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
+To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
 
 SSL setting | HTTP requests | HTTPS requests | Unencrypted Streams | Encrypted Streams 
 :------:|:-----:|:-----:|:-----:|:-------- 
@@ -109,12 +110,15 @@ Example:
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force
 ```
 
-For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-the-communication) in the streaming documentation.
-You will find there additional details on the expected behavior for client and server nodes, when their respective SSL options are enabled.
+For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-streaming-communications) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
 
-#### SSL error
+#### TLS/SSL errors
 
-It is possible that when you start to use the Netdata with SSL some erros will be register in the logs, this happens due possible incompatibilities between the browser options related to SSL like Ciphers and TLS/SSL version and the Netdata internal configuration. The most common error would be `error:00000006:lib(0):func(0):EVP lib`. In a near future the Netdata will allow our users to change the internal configuration to avoid errors like this, but until there we are setting the most common and safety options to the communication.
+When you start using Netdata with TLS, you may find errors in the Netdata log, which is stored at `/var/log/netdata/error.log` by default.
+
+Most of the time, these errors are due to incompatibilities between your browser's options related to TLS/SSL protocols and Netdata's internal configuration. The most common error is `error:00000006:lib(0):func(0):EVP lib`. 
+
+In the near future, Netdata will allow our users to change the internal configuration to avoid similar errors. Until then, we're recommending only the most common and safe encryption protocols, which you can find above.
 
 ### Access lists
 

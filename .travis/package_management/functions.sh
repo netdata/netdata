@@ -10,7 +10,7 @@ set -e
 
 function detect_arch_from_commit {
 	case "${TRAVIS_COMMIT_MESSAGE}" in
-		"[Package AMD64"*)
+		"[Package amd64"*)
 			export BUILD_ARCH="amd64"
 			;;
 		"[Package i386"*)
@@ -24,7 +24,7 @@ function detect_arch_from_commit {
 			;;
 
 		*)
-			echo "Unknown build architecture '${BUILD_ARCH}' provided"
+			echo "Unknown build architecture in '${TRAVIS_COMMIT_MESSAGE}'. No BUILD_ARCH can be provided"
 			exit 1
 			;;
 	esac
