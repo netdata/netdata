@@ -165,7 +165,7 @@ stages:
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish DEB package"
     before_install:
-    - sudo apt-get install -y wget lxc lxc-templates
+    - sudo apt-get install -y wget lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
     - source tests/installer/slack.sh
     before_script:
     - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"

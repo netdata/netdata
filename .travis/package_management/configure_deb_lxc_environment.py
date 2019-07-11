@@ -48,6 +48,12 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 print("2. Installing package dependencies within LXC container")
 common.install_common_dependendencies(container)
 
+print("2.1 Install .DEB build support packages")
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "build-essential"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libdistro-info-perl"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-make"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "git-buildpackage"])
+
 print ("3. Run install-required-packages scriptlet")
 common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
 common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
