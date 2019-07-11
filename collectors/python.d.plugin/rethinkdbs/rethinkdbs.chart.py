@@ -3,8 +3,6 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import re
-
 try:
     import rethinkdb as rdb
     HAS_RETHINKDB = True
