@@ -61,6 +61,9 @@ char url_percent_escape_decode(char *s) {
 
 //this (utf8 string related) should be moved in separate file in future
 char url_utf8_get_byte_length(char c) {
+    if(!IS_UTF8_BYTE(c))
+        return 1;
+
     char length = 0;
     while(likely(c & 0x80)) {
         length++;
@@ -70,8 +73,8 @@ char url_utf8_get_byte_length(char c) {
     //10XX XXXX is not valid character -> check length == 1
     if(length > 4 || length == 1)
         return -1;
-    //0XXX XXXX means 1 byte
-    return (length) ? length : 1;
+
+    return length;
 }
 
 //decode % encoded UTF-8 characters and copy them to *d
@@ -79,7 +82,7 @@ char url_utf8_get_byte_length(char c) {
 char url_decode_multibyte_utf8(char *s, char *d, char* d_end) {
     char first_byte = url_percent_escape_decode(s);
 
-    if(unlikely(!first_byte))
+    if(unlikely(!first_byte || !IS_UTF8_STARTBYTE(first_byte)))
         return 0;
 
     char byte_length = url_utf8_get_byte_length(first_byte);
@@ -89,7 +92,14 @@ char url_decode_multibyte_utf8(char *s, char *d, char* d_end) {
 
     char to_read = byte_length;
     while(to_read > 0) {
-        *d++ = url_percent_escape_decode(s);
+        char c = url_percent_escape_decode(s);
+
+        if(unlikely( !IS_UTF8_BYTE(c) ))
+            return 0;
+        if((to_read != byte_length) && IS_UTF8_STARTBYTE(c)) 
+            return 0;
+
+        *d++ = c;
         s+=3;
         to_read--;
     }
@@ -112,6 +122,8 @@ char *url_decode_r(char *to, char *url, size_t size) {
                     s += (bytes_written * 3)-1;
                 }
                 else {
+                    //TODO!: Should stop parsing and send HTTP error code 400 back to client instead
+                    //      same goes for other errors - if we see something suspicious abort and send 400
                     *d++ = ' ';
                 }
             }
