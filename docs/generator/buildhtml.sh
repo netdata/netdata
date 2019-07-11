@@ -88,9 +88,9 @@ prep_html() {
 
 for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -type d -printf '%f ') ; do
 	echo "Preparing source for $d"
-	cp -r ${SRC_DIR} ${DOCS_DIR}/
+	cp -r ${SRC_DIR} ${DOCS_DIR}
 	if [ "${d}" != "en" ] ; then
-		cp -r ${LOC_DIR}/${d}/* ${DOCS_DIR}/
+		cp -a ${LOC_DIR}/${d}/* ${DOCS_DIR}/
 	fi
 	prep_html $d
 	rm -rf ${DOCS_DIR}
