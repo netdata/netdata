@@ -49,11 +49,11 @@ netdata_tarball = "/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], ne
 unpacked_netdata = netdata_tarball.replace(".tar.gz", "")
 
 print("Extracting tarball %s" % netdata_tarball)
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", netdata_tarball])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", netdata_tarball, "-C", "/home/%s/" % os.environ['BUILDER_NAME']])
 
 print("Fixing changelog tags")
 changelog = "%s/contrib/debian/changelog" % unpacked_netdata
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-e', 's/PREVIOUS_PACKAGE_VERSION/%/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-e', 's/PREVIOUS_PACKAGE_VERSION/%s/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-e', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog])
 
 print("Generating changelog since %s" % os.environ["LATEST_RELEASE_VERSION"])
