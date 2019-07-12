@@ -58,10 +58,11 @@ override_dh_installdocs:
 		-name README.md \
 		-not -path './.travis/*' \
 		-not -path './debian/*' \
+		-not -path './contrib/*' \
 		-exec cp \
-						--parents \
-						--target $(TOP)/usr/share/doc/netdata/ \
-						{} \;
+		--parents \
+		--target $(TOP)/usr/share/doc/netdata/ \
+		{} \;
 
 override_dh_fixperms:
 	dh_fixperms
