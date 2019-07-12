@@ -54,6 +54,7 @@ print("2.1 Install .DEB build support packages")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "build-essential"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libdistro-info-perl"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-make"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-systemd"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "git-buildpackage"])
 
 print ("3. Run install-required-packages scriptlet")
