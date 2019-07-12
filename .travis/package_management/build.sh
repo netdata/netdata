@@ -18,6 +18,9 @@ echo "Running changelog generation mechanism since ${LATEST_RELEASE_VERSION}"
 echo "Entering ${UNPACKAGED_NETDATA_PATH}"
 cd "${UNPACKAGED_NETDATA_PATH}"
 
+echo "Linking debian -> contrib/debian"
+ln -sf contrib/debian debian
+
 echo "Executing dpkg-buildpackage"
 dpkg-buildpackage --host-arch amd64 --target-arch amd64 --post-clean --pre-clean --build=binary
 
