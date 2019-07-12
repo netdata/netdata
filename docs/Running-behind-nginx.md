@@ -64,12 +64,10 @@ server {
     }
 }
 ```
-
-
 ### As a subfolder to an existing virtual host
 
 This method is recommended when Netdata is to be served from a subfolder (or directory). 
-The virtual host, `netdata.example.com` exists and Netdata will be accessed via `netdata.example.com/netdata/`.
+The virtual host, `netdata.example.com` already exists and Netdata will be accessed via `netdata.example.com/netdata/`.
 
 ```
 upstream netdata {
@@ -107,7 +105,7 @@ server {
 }
 ```
 
-### As a subfolder for multiple Netdata servers, via one Nginx
+### As a subfolder for multiple Netdata servers, via one nginx
 
 ```
 upstream backend-server1 {
@@ -157,29 +155,28 @@ Using the above, you access Netdata on the backend servers, like this:
 
 ### Using TLS communication
 
-In case the Netdata web server has been [configured to use TLS](../web/server/#enabling-tls-support),
-you must also encrypt the communication between Nginx and Netdata.
+In case Netdata's web server has been [configured to use TLS](../web/server/#enabling-tls-support), you must also encrypt the communication between Nginx and Netdata.
 
-To enable encryption, first [enable SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of the Nginx configuration:
+To enable encryption, first [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of your Nginx configuration:
 
 ```
 proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
 
-If Nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
+If nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
 
-Create an authentication file to enable the Nginx basic authentication.
-Do not use authentication without SSL/TLS!
-If you haven't one you can do the following:
+Create an authentication file to enable basic authentication via Nginx. Do not use authentication without having first [enabled TLS](#using-tls-communication)!
+
+If you don't have an authentication file, you can use the following command:
 
 ```
 printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
 ```
 
-And enable the authentication inside your server directive:
+And then enable the authentication inside your server directive:
 
 ```
 server {
@@ -190,7 +187,7 @@ server {
 }
 ```
 
-## Limit direct access to Netdata
+## limit direct access to Netdata
 
 If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
@@ -201,7 +198,7 @@ If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
 ---
 
-You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
+You can also use a unix domain socket. This will also provide a faster route between nginx and Netdata:
 
 ```
 [web]
@@ -209,7 +206,7 @@ You can also use a unix domain socket. This will also provide a faster route bet
 ```
 _note: Netdata v1.8+ support unix domain sockets_
 
-At the Nginx side, use something like this to use the same unix domain socket:
+At the nginx side, use something like this to use the same unix domain socket:
 
 ```
 upstream backend {
@@ -220,7 +217,7 @@ upstream backend {
 
 ---
 
-If your Nginx server is not on localhost, you can set:
+If your nginx server is not on localhost, you can set:
 
 ```
 [web]
@@ -232,7 +229,7 @@ _note: Netdata v1.9+ support `allow connections from`_
 
 `allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
-## Prevent the double access.log
+## prevent the double access.log
 
 nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
@@ -243,7 +240,7 @@ nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 
 ## SELinux
 
-If you get an 502 Bad Gateway error you might check your Nginx error log:
+If you get an 502 Bad Gateway error you might check your nginx error log:
 
 ```sh
 # cat /var/log/nginx/error.log:
