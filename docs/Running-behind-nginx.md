@@ -64,12 +64,10 @@ server {
     }
 }
 ```
-
-
 ### As a subfolder to an existing virtual host
 
 This method is recommended when Netdata is to be served from a subfolder (or directory). 
-The virtual host, `netdata.example.com` exists and Netdata will be accessed via `netdata.example.com/netdata/`.
+The virtual host, `netdata.example.com` already exists and Netdata will be accessed via `netdata.example.com/netdata/`.
 
 ```
 upstream netdata {
@@ -189,7 +187,7 @@ server {
 }
 ```
 
-## Limit direct access to Netdata
+## limit direct access to Netdata
 
 If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
@@ -231,7 +229,7 @@ _note: Netdata v1.9+ support `allow connections from`_
 
 `allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
-## Prevent the double access.log
+## prevent the double access.log
 
 nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
