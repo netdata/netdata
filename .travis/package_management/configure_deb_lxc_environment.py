@@ -83,5 +83,6 @@ common.prepare_version_source(dest_archive, friendly_version, tag=tag)
 print("6. Installing build.sh script to build path")
 common.run_command_in_host(['sudo', 'cp', '.travis/package_management/build.sh', "%s/%s/build.sh" % (os.environ['LXC_CONTAINER_ROOT'], build_path)])
 common.run_command_in_host(['sudo', 'chmod', '777', "%s/%s/build.sh" % (os.environ['LXC_CONTAINER_ROOT'], build_path)])
+common.run_command_in_host(['sudo', 'ln', '-sf', 'contrib/debian', 'debian'])
 
 print("Done!")

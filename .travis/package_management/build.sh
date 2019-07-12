@@ -18,9 +18,6 @@ echo "Running changelog generation mechanism since ${LATEST_RELEASE_VERSION}"
 echo "Entering ${UNPACKAGED_NETDATA_PATH}"
 cd "${UNPACKAGED_NETDATA_PATH}"
 
-echo "Executing gbp dch command.."
-gbp dch --release --spawn-editor=snapshot --since="${LATEST_RELEASE_VERSION}"
-
 echo "Executing dpkg-buildpackage"
 dpkg-buildpackage --host-arch amd64 --target-arch amd64 --post-clean --pre-clean --build=binary
 

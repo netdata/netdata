@@ -58,6 +58,12 @@ changelog = "%s/contrib/debian/changelog" % unpacked_netdata
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-i', 's/PREVIOUS_PACKAGE_VERSION/%s/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-i', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog])
 
+print("Executing gbp dch command..")
+common.run_command_in_host(['gbp', 'dch', '--release', '--spawn-editor=snapshot', '--since="${LATEST_RELEASE_VERSION}"'])
+
+print("Copying over changelog to the destination machine")
+common.run_command_in_host(['sudo', 'cp', 'debian/changelog', "%s/%s/netdata-%s/debian/" % (os.environ['LXC_CONTAINER_ROOT'], build_path, new_version)])
+
 print("Running debian build script since %s" % os.environ["LATEST_RELEASE_VERSION"])
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "%s/build.sh" % build_path, unpacked_netdata, new_version])
 
