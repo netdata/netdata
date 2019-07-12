@@ -67,7 +67,7 @@ server {
 ### As a subfolder to an existing virtual host
 
 This method is recommended when Netdata is to be served from a subfolder (or directory). 
-The virtual host, `netdata.example.com` already exists and Netdata will be accessed via `netdata.example.com/netdata/`.
+In this case, the virtual host `netdata.example.com` already exists and Netdata has to be accessed via `netdata.example.com/netdata/`.
 
 ```
 upstream netdata {
