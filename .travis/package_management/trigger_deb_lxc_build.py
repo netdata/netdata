@@ -54,9 +54,9 @@ print("Extracting tarball %s" % netdata_tarball)
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", netdata_tarball, "-C", build_path])
 
 print("Fixing changelog tags")
-changelog = "%s/contrib/debian/changelog" % unpacked_netdata
-common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_VERSION/%s/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
-common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog])
+changelog_in_host = "contrib/debian/changelog"
+common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_VERSION/%s/g' % os.environ["LATEST_RELEASE_VERSION"], changelog_in_host])
+common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog_in_host])
 
 print("Executing gbp dch command..")
 common.run_command_in_host(['gbp', 'dch', '--release', '--ignore-branch', '--spawn-editor=snapshot', '--since=%s' % os.environ["LATEST_RELEASE_VERSION"]])
