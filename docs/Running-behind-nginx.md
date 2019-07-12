@@ -24,13 +24,13 @@ Configuration options in Nginx are known as directives. Directives are organized
 
 Depending on your installation source, you’ll find an example configuration file at `/etc/nginx/conf.d/default.conf` or `etc/nginx/sites-enabled/default`, in some cases you may have to manually create the `sites-available` and `sites-enabled` directories. 
 
-You can edit the Nginx configuration file with Nano, Vim or any other Text editors you are comfortable with.
+You can edit the Nginx configuration file with Nano, Vim or any other text editors you are comfortable with.
 
 After making changes to the configuration files:
 
-test Nginx configuration with `nginx -t` 
+- test Nginx configuration with `nginx -t` 
 
-restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
+- restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
 ## Ways to pass Netdata via Nginx
 
