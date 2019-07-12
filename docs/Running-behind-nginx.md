@@ -164,7 +164,7 @@ proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
 
-If nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
+If Nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
 
@@ -198,7 +198,7 @@ If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
 ---
 
-You can also use a unix domain socket. This will also provide a faster route between nginx and Netdata:
+You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
 ```
 [web]
@@ -206,7 +206,7 @@ You can also use a unix domain socket. This will also provide a faster route bet
 ```
 _note: Netdata v1.8+ support unix domain sockets_
 
-At the nginx side, use something like this to use the same unix domain socket:
+At the Nginx side, use something like this to use the same unix domain socket:
 
 ```
 upstream backend {
@@ -217,7 +217,7 @@ upstream backend {
 
 ---
 
-If your nginx server is not on localhost, you can set:
+If your Nginx server is not on localhost, you can set:
 
 ```
 [web]
@@ -240,7 +240,7 @@ nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 
 ## SELinux
 
-If you get an 502 Bad Gateway error you might check your nginx error log:
+If you get an 502 Bad Gateway error you might check your Nginx error log:
 
 ```sh
 # cat /var/log/nginx/error.log:
