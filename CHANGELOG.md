@@ -10,18 +10,24 @@
 - Cannot see charts in an imported snapshot [\#6384](https://github.com/netdata/netdata/issues/6384)
 - netdata does not send notifications for alarms which fail with \(errno 12, Out of memory\) [\#6335](https://github.com/netdata/netdata/issues/6335)
 - charts.d kills process twice [\#6190](https://github.com/netdata/netdata/issues/6190)
+- Alarm "system.softnet\_stat" is very strict. [\#1076](https://github.com/netdata/netdata/issues/1076)
 - netdata/packaging: Fix RPM packaging workflow issues, plus draft changes for .DEB packaging [\#6415](https://github.com/netdata/netdata/pull/6415) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 **Closed issues:**
 
+- Global option for enabling charts with zero metrics [\#6315](https://github.com/netdata/netdata/issues/6315)
 - Feature Request: Linux zram device statistics. [\#2578](https://github.com/netdata/netdata/issues/2578)
 - Authentication support [\#70](https://github.com/netdata/netdata/issues/70)
 
 **Merged pull requests:**
 
+- Add more supported backends to the documentation [\#6443](https://github.com/netdata/netdata/pull/6443) ([vlvkobal](https://github.com/vlvkobal))
+- netdata/packaging: Remove Ventureer from demo sites [\#6442](https://github.com/netdata/netdata/pull/6442) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Fix issue with HTML docs generation [\#6433](https://github.com/netdata/netdata/pull/6433) ([cakrit](https://github.com/cakrit))
 - rethinkdb collector new driver support [\#6431](https://github.com/netdata/netdata/pull/6431) ([ilyam8](https://github.com/ilyam8))
 - Netdata/packaging: Add documentation for binary packages, plus draft table for distributions support [\#6422](https://github.com/netdata/netdata/pull/6422) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/doc: Update documentation dependencies [\#6421](https://github.com/netdata/netdata/pull/6421) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Add global configuration option for zero metrics [\#6419](https://github.com/netdata/netdata/pull/6419) ([vlvkobal](https://github.com/vlvkobal))
 - Updated logos in the infographic and remaining favicons [\#6417](https://github.com/netdata/netdata/pull/6417) ([cakrit](https://github.com/cakrit))
 - SSL vs. TLS consistency and clarification in documentation [\#6414](https://github.com/netdata/netdata/pull/6414) ([joelhans](https://github.com/joelhans))
 - Add more codeowners to the core [\#6413](https://github.com/netdata/netdata/pull/6413) ([vlvkobal](https://github.com/vlvkobal))
@@ -808,7 +814,6 @@
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
 - alarm-notify.sh: WARNING: Cannot find file [\#5136](https://github.com/netdata/netdata/issues/5136)
-- Netdata w/ Docker Container not show Disk space utilization for mounts [\#5071](https://github.com/netdata/netdata/issues/5071)
 - zfs charts appear, even when they are zero [\#4115](https://github.com/netdata/netdata/issues/4115)
 - Ceph - No JSON object could be decoded [\#3563](https://github.com/netdata/netdata/issues/3563)
 
