@@ -4,6 +4,40 @@
 
 **Fixed bugs:**
 
+- Issue with rethinkdbs plugin [\#6429](https://github.com/netdata/netdata/issues/6429)
+- Double free or corruption \(again\) [\#6412](https://github.com/netdata/netdata/issues/6412)
+- rpm version should be 1.16.0 not v1.16.0 \(extra "v"\) [\#6409](https://github.com/netdata/netdata/issues/6409)
+- Cannot see charts in an imported snapshot [\#6384](https://github.com/netdata/netdata/issues/6384)
+- netdata does not send notifications for alarms which fail with \(errno 12, Out of memory\) [\#6335](https://github.com/netdata/netdata/issues/6335)
+- charts.d kills process twice [\#6190](https://github.com/netdata/netdata/issues/6190)
+- netdata/packaging: Fix RPM packaging workflow issues, plus draft changes for .DEB packaging [\#6415](https://github.com/netdata/netdata/pull/6415) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+
+**Closed issues:**
+
+- Feature Request: Linux zram device statistics. [\#2578](https://github.com/netdata/netdata/issues/2578)
+- Authentication support [\#70](https://github.com/netdata/netdata/issues/70)
+
+**Merged pull requests:**
+
+- rethinkdb collector new driver support [\#6431](https://github.com/netdata/netdata/pull/6431) ([ilyam8](https://github.com/ilyam8))
+- Netdata/packaging: Add documentation for binary packages, plus draft table for distributions support [\#6422](https://github.com/netdata/netdata/pull/6422) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/doc: Update documentation dependencies [\#6421](https://github.com/netdata/netdata/pull/6421) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Updated logos in the infographic and remaining favicons [\#6417](https://github.com/netdata/netdata/pull/6417) ([cakrit](https://github.com/cakrit))
+- SSL vs. TLS consistency and clarification in documentation [\#6414](https://github.com/netdata/netdata/pull/6414) ([joelhans](https://github.com/joelhans))
+- Add more codeowners to the core [\#6413](https://github.com/netdata/netdata/pull/6413) ([vlvkobal](https://github.com/vlvkobal))
+- Add news of v1.16.0 to main README [\#6411](https://github.com/netdata/netdata/pull/6411) ([cakrit](https://github.com/cakrit))
+- Update Running-behind-apache.md [\#6406](https://github.com/netdata/netdata/pull/6406) ([Steve8291](https://github.com/Steve8291))
+- Fix Web API Health documentation  [\#6404](https://github.com/netdata/netdata/pull/6404) ([thiagoftsm](https://github.com/thiagoftsm))
+- Snapshot uniqueId fix [\#6400](https://github.com/netdata/netdata/pull/6400) ([jacekkolasa](https://github.com/jacekkolasa))
+- Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
+- Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
+- Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
+- ZRAM info collector module \(proc.plugin\) [\#6276](https://github.com/netdata/netdata/pull/6276) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
+
+## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
+
+**Fixed bugs:**
+
 - Double free or corruption \(fasttop\) [\#6370](https://github.com/netdata/netdata/issues/6370)
 - Netdata not ignoring /dev and /run by default [\#6361](https://github.com/netdata/netdata/issues/6361)
 - \[critical\] netdata segfault when restart service [\#6356](https://github.com/netdata/netdata/issues/6356)
