@@ -39,6 +39,8 @@ print("Waiting for container connectivity to start configuration sequence")
 if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
+build_path = "/home/%s" % os.environ['BUILDER_NAME']
+
 # Run the required activities now
 # 1. Create the builder user
 print("1. Adding user %s" % os.environ['BUILDER_NAME'])
@@ -55,8 +57,8 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-mak
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "git-buildpackage"])
 
 print ("3. Run install-required-packages scriptlet")
-common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
-common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
+common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-packages.sh" % build_path, "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+common.run_command(container, ["bash", "%s/.install-required-packages.sh" % build_path, "netdata", "--dont-wait", "--non-interactive"])
 
 friendly_version=""
 dest_archive=""
@@ -74,8 +76,12 @@ else:
 tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), friendly_version)
 
 print("5. I will be building version '%s' of netdata." % os.environ['BUILD_VERSION'])
-dest_archive="/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], friendly_version)
+dest_archive="%s/netdata-%s.tar.gz" % (build_path, friendly_version)
 
 common.prepare_version_source(dest_archive, friendly_version, tag=tag)
+
+print("6. Installing build.sh script to build path")
+common.run_command_in_host(['sudo', 'cp', '.travis/package_managemenet/build.sh', "%s/%s/build.sh" %s (os.environ['LXC_CONTAINER_ROOT'], build_path)])
+common.run_command_in_host(['sudo', 'chmod', '777', "%s/%s/build.sh" %s (os.environ['LXC_CONTAINER_ROOT'], build_path)])
 
 print("Done!")
