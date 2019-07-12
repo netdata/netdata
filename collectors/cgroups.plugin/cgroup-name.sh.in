@@ -64,15 +64,14 @@ function docker_get_name_api() {
 	fi
 	if [ -S "${DOCKER_HOST}" ]; then
 		info "Running API command: curl --unix-socket ${DOCKER_HOST} http://localhost${path}"
-		JSON=$(curl --unix-socket "${DOCKER_HOST}" "http://localhost${path}")
+		JSON=$(curl -sS --unix-socket "${DOCKER_HOST}" "http://localhost${path}")
 	elif [ "${DOCKER_HOST}" == "/var/run/docker.sock" ]; then
 		warning "Docker socket was not found at ${DOCKER_HOST}"
 		return 1
 	else
 		info "Running API command: curl ${DOCKER_HOST}${path}"
-		JSON=$(curl "${DOCKER_HOST}${path}")
+		JSON=$(curl -sS "${DOCKER_HOST}${path}")
 	fi
-	info "Got docker result: ${JSON}"
 	NAME=$(echo "$JSON" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
 	return 0
 }
