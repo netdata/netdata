@@ -49,33 +49,55 @@ services:
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
 
 ### Docker container names resolution
 
-If you want to have your container names resolved by netdata, you need to do two things:
-1) Make netdata user be part of the group that owns the socket.
-   To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the netdata container,
-   where `[GROUP NUMBER]` is practically the group id of the group assigned to the docker socket, on your host.
-   This group number can be found by running the following (if socket group ownership is docker):
-   ```bash
-   grep docker /etc/group | cut -d ':' -f 3
-   ```
+There are a few options for resolving container names within netdata. Some methods of doing so will allow root access to your machine from within the container. Please read the following carefully.
 
-2) Change docker socket access level to read/write like so:
-   from
-   ```
-   /var/run/docker.sock:/var/run/docker.sock:ro
-   ```
+#### Docker Socket Proxy (Safest Option)
 
-   change to
-   ```
-   /var/run/docker.sock:/var/run/docker.sock:rw
-   ```
+Deploy a Docker socket proxy, such as [tecnativa/docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy/blob/master/README.md), so that it resticts connections to read only access to the CONTAINERS endpoint.
+
+A simple example is shown in the compose snippet below:
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    ports:
+      - 19999:19999
+    environment:
+      - DOCKER_HOST=proxy:2375
+  proxy:
+    image: tecnativa/docker-socket-proxy
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+```
+
+The reason it's safer to expose the socket to the proxy is because netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
+
+#### Running as root (Unsafe)
 
 **Important Note**: You should seriously consider the necessity of activating this option,
-as it grants to the netdata user access to the privileged socket connection of docker service
+as it grants to the netdata user access to the privileged socket connection of docker service and therefore your whole machine.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    volumes:
+      # ... other volumes ...
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOCKER_USR=root
+```
 
 ### Pass command line options to Netdata 
 
