@@ -105,7 +105,9 @@ server {
 }
 ```
 
-### As a subfolder for multiple Netdata servers, via one nginx
+### As a subfolder for multiple Netdata servers, via one Nginx
+
+This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via subfolders. 
 
 ```
 upstream backend-server1 {
