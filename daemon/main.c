@@ -2,6 +2,7 @@
 
 #include "common.h"
 
+int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 struct config netdata_config = {
@@ -1214,6 +1215,8 @@ int main(int argc, char **argv) {
 
     web_server_config_options();
 
+    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_GLOBAL, "enable zero metrics", CONFIG_BOOLEAN_NO);
+
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -1227,7 +1230,7 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
-  
+
     send_statistics("START", "-",  "-");
 
     // ------------------------------------------------------------------------

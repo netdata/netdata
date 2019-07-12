@@ -74,6 +74,7 @@ gap when lost iterations above | `1` |
 cleanup orphan hosts after seconds | `3600` |  How long to wait until automatically removing from the DB a remote netdata host (slave) that is no longer sending data.
 delete obsolete charts files | `yes` |  See [monitoring ephemeral containers](../../collectors/cgroups.plugin/#monitoring-ephemeral-containers), also affects the deletion of files for obsolete dimensions
 delete orphan hosts files | `yes` |  Set to `no` to disable non-responsive host removal.
+enable zero metrics | `no` |  Set to `yes` to show charts when all their metrics are zero.
 
 ### [web] section options
 
@@ -128,7 +129,7 @@ The configuration options for plugins appear in sections following the pattern `
 
 Most internal plugins will provide additional options. Check [Internal Plugins](../../collectors/) for more information.
 
-Please note, that by default Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently.
+Please note, that by default Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
 
 #### External plugins
 
