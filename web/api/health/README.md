@@ -65,7 +65,7 @@ You can access the API via GET requests, by adding the bearer token to an `Autho
 curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
 ```
 
-By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in netdata.conf within the [web] section. See [web server access lists](../../web/server/#access-lists) for more information.
+By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in netdata.conf within the [web] section. See [web server access lists](../../server/#access-lists) for more information.
 
 The command `RESET` just returns netdata to the default operation, with all health checks and notifications enabled.
 If you've configured and entered your token correclty, you should see the plain text response `All health checks and notifications are enabled`.
