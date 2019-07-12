@@ -440,7 +440,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 if (ifm->do_bandwidth == CONFIG_BOOLEAN_YES || (ifm->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
-                                                                (IFA_DATA(ibytes) || IFA_DATA(obytes)))) {
+                                                                (IFA_DATA(ibytes) ||
+                                                                 IFA_DATA(obytes) ||
+                                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                     if (unlikely(!ifm->st_bandwidth)) {
                         ifm->st_bandwidth = rrdset_create_localhost("net",
                                                                     ifa->ifa_name,
@@ -469,7 +471,11 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 if (ifm->do_packets == CONFIG_BOOLEAN_YES || (ifm->do_packets == CONFIG_BOOLEAN_AUTO &&
-                                                              (IFA_DATA(ipackets) || IFA_DATA(opackets) || IFA_DATA(imcasts) || IFA_DATA(omcasts)))) {
+                                                              (IFA_DATA(ipackets) ||
+                                                               IFA_DATA(opackets) ||
+                                                               IFA_DATA(imcasts) ||
+                                                               IFA_DATA(omcasts) ||
+                                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                     if (unlikely(!ifm->st_packets)) {
                         ifm->st_packets = rrdset_create_localhost("net_packets",
                                                                   ifa->ifa_name,
@@ -508,7 +514,9 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 if (ifm->do_errors == CONFIG_BOOLEAN_YES || (ifm->do_errors == CONFIG_BOOLEAN_AUTO &&
-                                                             (IFA_DATA(ierrors) || IFA_DATA(oerrors)))) {
+                                                             (IFA_DATA(ierrors) ||
+                                                              IFA_DATA(oerrors) ||
+                                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                     if (unlikely(!ifm->st_errors)) {
                         ifm->st_errors = rrdset_create_localhost("net_errors",
                                                                  ifa->ifa_name,
@@ -538,11 +546,11 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 if (ifm->do_drops == CONFIG_BOOLEAN_YES || (ifm->do_drops == CONFIG_BOOLEAN_AUTO &&
-                                                            (IFA_DATA(iqdrops)
+                                                            (IFA_DATA(iqdrops) ||
                                                              #if __FreeBSD__ >= 11
-                                                             || IFA_DATA(oqdrops)
-#endif
-                ))) {
+                                                             IFA_DATA(oqdrops) ||
+                                                             #endif
+                                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                     if (unlikely(!ifm->st_drops)) {
                         ifm->st_drops = rrdset_create_localhost("net_drops",
                                                                 ifa->ifa_name,
@@ -577,7 +585,8 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 // --------------------------------------------------------------------
 
                 if (ifm->do_events == CONFIG_BOOLEAN_YES || (ifm->do_events == CONFIG_BOOLEAN_AUTO &&
-                                                             IFA_DATA(collisions))) {
+                                                             (IFA_DATA(collisions) ||
+                                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                     if (unlikely(!ifm->st_events)) {
                         ifm->st_events = rrdset_create_localhost("net_events",
                                                                  ifa->ifa_name,

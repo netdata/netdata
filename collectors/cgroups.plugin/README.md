@@ -110,6 +110,8 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
 	enable memory (used mem including cache) = yes
 ```
 
+You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
+
 ### alarms
 
 CPU and memory limits are watched and used to rise alarms. Memory usage for every cgroup is checked against `ram` and `ram+swap` limits. CPU usage for every cgroup is checked against `cpuset.cpus` and `cpu.cfs_period_us` + `cpu.cfs_quota_us` pair assigned for the cgroup. Configuration for the alarms is available in `health.d/cgroups.conf` file.

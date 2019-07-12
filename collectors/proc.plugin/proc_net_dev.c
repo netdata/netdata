@@ -601,7 +601,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_bandwidth == CONFIG_BOOLEAN_AUTO && (d->rbytes || d->tbytes))))
+        if(unlikely(d->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
+                    (d->rbytes || d->tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_bandwidth = CONFIG_BOOLEAN_YES;
 
         if(d->do_bandwidth == CONFIG_BOOLEAN_YES) {
@@ -671,7 +672,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_packets == CONFIG_BOOLEAN_AUTO && (d->rpackets || d->tpackets || d->rmulticast))))
+        if(unlikely(d->do_packets == CONFIG_BOOLEAN_AUTO &&
+           (d->rpackets || d->tpackets || d->rmulticast || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_packets = CONFIG_BOOLEAN_YES;
 
         if(d->do_packets == CONFIG_BOOLEAN_YES) {
@@ -716,7 +718,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_errors == CONFIG_BOOLEAN_AUTO && (d->rerrors || d->terrors))))
+        if(unlikely(d->do_errors == CONFIG_BOOLEAN_AUTO &&
+                    (d->rerrors || d->terrors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_errors = CONFIG_BOOLEAN_YES;
 
         if(d->do_errors == CONFIG_BOOLEAN_YES) {
@@ -759,7 +762,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_drops == CONFIG_BOOLEAN_AUTO && (d->rdrops || d->tdrops))))
+        if(unlikely(d->do_drops == CONFIG_BOOLEAN_AUTO &&
+                    (d->rdrops || d->tdrops || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_drops = CONFIG_BOOLEAN_YES;
 
         if(d->do_drops == CONFIG_BOOLEAN_YES) {
@@ -802,7 +806,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_fifo == CONFIG_BOOLEAN_AUTO && (d->rfifo || d->tfifo))))
+        if(unlikely(d->do_fifo == CONFIG_BOOLEAN_AUTO &&
+                    (d->rfifo || d->tfifo || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_fifo = CONFIG_BOOLEAN_YES;
 
         if(d->do_fifo == CONFIG_BOOLEAN_YES) {
@@ -845,7 +850,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_compressed == CONFIG_BOOLEAN_AUTO && (d->rcompressed || d->tcompressed))))
+        if(unlikely(d->do_compressed == CONFIG_BOOLEAN_AUTO &&
+                    (d->rcompressed || d->tcompressed || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_compressed = CONFIG_BOOLEAN_YES;
 
         if(d->do_compressed == CONFIG_BOOLEAN_YES) {
@@ -888,7 +894,8 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         // --------------------------------------------------------------------
 
-        if(unlikely((d->do_events == CONFIG_BOOLEAN_AUTO && (d->rframe || d->tcollisions || d->tcarrier))))
+        if(unlikely(d->do_events == CONFIG_BOOLEAN_AUTO &&
+                    (d->rframe || d->tcollisions || d->tcarrier || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_events = CONFIG_BOOLEAN_YES;
 
         if(d->do_events == CONFIG_BOOLEAN_YES) {
@@ -924,7 +931,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         }
     }
 
-    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (system_rbytes || system_tbytes))) {
+    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
+                                              (system_rbytes || system_tbytes ||
+                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
         static RRDSET *st_system_net = NULL;
         static RRDDIM *rd_in = NULL, *rd_out = NULL;

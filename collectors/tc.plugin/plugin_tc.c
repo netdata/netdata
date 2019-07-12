@@ -382,7 +382,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // bytes
 
-    if(d->enabled_bytes == CONFIG_BOOLEAN_YES || (d->enabled_bytes == CONFIG_BOOLEAN_AUTO && bytes_sum)) {
+    if(d->enabled_bytes == CONFIG_BOOLEAN_YES || (d->enabled_bytes == CONFIG_BOOLEAN_AUTO &&
+                                                  (bytes_sum ||
+                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_bytes = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_bytes))
@@ -425,7 +427,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // packets
 
-    if(d->enabled_packets == CONFIG_BOOLEAN_YES || (d->enabled_packets == CONFIG_BOOLEAN_AUTO && packets_sum)) {
+    if(d->enabled_packets == CONFIG_BOOLEAN_YES || (d->enabled_packets == CONFIG_BOOLEAN_AUTO &&
+                                                    (packets_sum ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_packets = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_packets)) {
@@ -478,7 +482,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // dropped
 
-    if(d->enabled_dropped == CONFIG_BOOLEAN_YES || (d->enabled_dropped == CONFIG_BOOLEAN_AUTO && dropped_sum)) {
+    if(d->enabled_dropped == CONFIG_BOOLEAN_YES || (d->enabled_dropped == CONFIG_BOOLEAN_AUTO &&
+                                                    (dropped_sum ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_dropped = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_dropped)) {
@@ -531,7 +537,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // tokens
 
-    if(d->enabled_tokens == CONFIG_BOOLEAN_YES || (d->enabled_tokens == CONFIG_BOOLEAN_AUTO && tokens_sum)) {
+    if(d->enabled_tokens == CONFIG_BOOLEAN_YES || (d->enabled_tokens == CONFIG_BOOLEAN_AUTO &&
+                                                   (tokens_sum ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_tokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_tokens)) {
@@ -585,7 +593,9 @@ static inline void tc_device_commit(struct tc_device *d) {
     // --------------------------------------------------------------------
     // ctokens
 
-    if(d->enabled_ctokens == CONFIG_BOOLEAN_YES || (d->enabled_ctokens == CONFIG_BOOLEAN_AUTO && ctokens_sum)) {
+    if(d->enabled_ctokens == CONFIG_BOOLEAN_YES || (d->enabled_ctokens == CONFIG_BOOLEAN_AUTO &&
+                                                    (ctokens_sum ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         d->enabled_ctokens = CONFIG_BOOLEAN_YES;
 
         if(unlikely(!d->st_ctokens)) {
