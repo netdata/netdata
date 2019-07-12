@@ -79,7 +79,7 @@ char url_utf8_get_byte_length(char c) {
 
 //decode % encoded UTF-8 characters and copy them to *d
 //return count of bytes written to *d
-char url_decode_multibyte_utf8(char *s, char *d, char* d_end) {
+char url_decode_multibyte_utf8(char *s, char *d, char *d_end) {
     char first_byte = url_percent_escape_decode(s);
 
     if(unlikely(!first_byte || !IS_UTF8_STARTBYTE(first_byte)))
@@ -115,7 +115,7 @@ char *url_decode_r(char *to, char *url, size_t size) {
     while(*s && d < e) {
         if(unlikely(*s == '%')) {
             char t = url_percent_escape_decode(s);
-            if(t & 0x80) { //UTF-8 multibyte character
+            if(IS_UTF8_BYTE(t)) {
                 char bytes_written = url_decode_multibyte_utf8(s, d, e);
                 if(likely(bytes_written)){
                     d += bytes_written;
