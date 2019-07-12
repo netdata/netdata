@@ -34,18 +34,6 @@ create_group_and_assign_to_user() {
 	fi
 }
 
-DOCKER_USR="netdata"
-DOCKER_SOCKET="/var/run/docker.sock"
-DOCKER_GROUP="docker"
-
-if [ -S "${DOCKER_SOCKET}" ] && [ -n "${PGID}" ]; then
-	GRP=$(create_group_and_assign_to_user "${DOCKER_GROUP}" "${PGID}" "${DOCKER_USR}")
-	if [ -n "${GRP}" ]; then
-		echo "Adjusting ownership of mapped docker socket '${DOCKER_SOCKET}' to root:${GRP}"
-		chown "root:${GRP}" "${DOCKER_SOCKET}" || echo "Failed to change ownership on docker socket, container name resolution might not work"
-	fi
-fi
-
 exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_PORT}" "$@"
 
 echo "Netdata entrypoint script, completed!"
