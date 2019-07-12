@@ -19,7 +19,7 @@ We're here to make developers, sysadmins, and DevOps engineers better at their j
 If you'd like to contribute, start by reading the [guide on contributing to documentation](contributing.md) and then read the rest of this style guide.
 
 
-## Goals of the NEtdatastyle guide
+## Goals of the Netdata style guide
 
 An editorial style guide tries to establish a few important standards:
 
@@ -28,13 +28,16 @@ An editorial style guide tries to establish a few important standards:
 - Conciseness
 - Accessibility
 
+By following these principles, we can make 
 
 
 ### Breaking the rules
 
-None of the rules described in this style guide are absolute. Our highest priority is creating valuable, high-quality documentation, and while that most often means following the rules, there will be many exceptions. We welcome rule-breaking if it creates better, more accessible documentation.
+None of the rules described in this style guide are absolute.
 
-However, be aware that if you break rules you may be asked to justify your decision during the PR process.
+You'll come across broken rules across the existing documentation, and improvements will often require these types of deviates as well. **We welcome rule-breaking if it creates better, more accessible documentation.**
+
+However, be aware that if you deviate too far from these established rules you may be asked to justify your decisions during the PR review process.
 
 
 ## Style guide quickstart
@@ -46,7 +49,9 @@ This style guide is pretty overwhelming. The following list represents a few of 
 
 ## General principles
 
-### Mentioning future features/releases
+
+
+###Mentioning future features/releases
 
 Documentation is meant to describe the product as-is, not as it will be or could be in the future. Thus Netdata documentation generally avoids talking about future features or products, even if we know they are certain.
 
@@ -77,7 +82,7 @@ Click on the `Sign in` button in the bottom-right corner of the popup window.
 
 ### Language-specific syntax highlighting in code blocks
 
-
+Currently our documentation uses the 
 
 ````
 ```c
