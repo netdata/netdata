@@ -37,7 +37,7 @@ if not container.running or not container.state == "RUNNING":
 if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
-build_path = "/home/%s/" % os.environ['BUILDER_NAME']
+build_path = "/home/%s" % os.environ['BUILDER_NAME']
 
 print("Setting up EMAIL and DEBFULLNAME variables required by the build tools")
 os.environ["EMAIL"] = "bot@netdata.cloud"
@@ -61,4 +61,6 @@ common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', 
 print("Running debian build script since %s" % os.environ["LATEST_RELEASE_VERSION"])
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "%s/build.sh" % build_path, unpacked_netdata, new_version])
 
+print("Listing contents on build path")
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltr", build_path])
 print('Done!')
