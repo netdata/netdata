@@ -1,12 +1,12 @@
-# Running Netdata Behind Nginx #
+# Running Netdata Behind Nginx
 
-## Intro ##
+## Intro
 
 [Nginx](https://nginx.org/en/) is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server used to host websites and applications of all sizes. 
 
 The software is known for its low impact on memory resources, high scalability, and its modular, event-driven architecture which can offer secure, predictable performance.
 
-## Why Nginx ##
+## Why Nginx
 
 Nginx is used and useful in cases when you do not want to access Netdata via the default `IP ADDRESS:19999`.
 
@@ -16,7 +16,7 @@ By default, Nginx is fast and lightweight out of the box.
 
 Nginx can be configured to secure your Netdata insights by the use of authentication to access the dashboard. 
 
-### Nginx configuration file ###
+### Nginx configuration file
 
 All Nginx configurations can be found in the `/etc/nginx/` directory. The main configuration file is `/etc/nginx/nginx.conf`. Website or app -specific configurations can be found in the `/etc/nginx/site-available/` directory.
 
@@ -32,9 +32,9 @@ test Nginx configuration with `nginx -t`
 
 restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
-## Ways to pass Netdata via Nginx: ##
+## Ways to pass Netdata via Nginx:
 
-### As a virtual host ###
+### As a virtual host
 
 With this method instead of `192.0.2.0:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
 
