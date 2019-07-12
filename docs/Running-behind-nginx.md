@@ -152,8 +152,8 @@ Of course you can add as many backend servers as you like.
 
 Using the above, you access Netdata on the backend servers, like this:
 
-- `http://nginx.server/netdata/server1/` to reach `backend-server1`
-- `http://nginx.server/netdata/server2/` to reach `backend-server2`
+- `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
+- `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
 
 ### Using TLS communication
 
