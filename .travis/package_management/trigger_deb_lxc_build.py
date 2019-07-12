@@ -37,6 +37,8 @@ if not container.running or not container.state == "RUNNING":
 if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
+build_path = "/home/%s/" % os.environ['BUILDER_NAME']
+
 print("Setting up EMAIL and DEBFULLNAME variables required by the build tools")
 os.environ["EMAIL"] = "bot@netdata.cloud"
 os.environ["DEBFULLNAME"] = "Netdata builder"
@@ -45,21 +47,18 @@ os.environ["DEBFULLNAME"] = "Netdata builder"
 new_version = os.environ["BUILD_VERSION"].replace('v', '').replace('.latest', '')
 print("Starting DEB build process for version %s" % new_version)
 
-netdata_tarball = "/home/%s/netdata-%s.tar.gz" % (os.environ['BUILDER_NAME'], new_version)
+netdata_tarball = "%s/netdata-%s.tar.gz" % (build_path, new_version)
 unpacked_netdata = netdata_tarball.replace(".tar.gz", "")
 
 print("Extracting tarball %s" % netdata_tarball)
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", netdata_tarball, "-C", "/home/%s/" % os.environ['BUILDER_NAME']])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", netdata_tarball, "-C", build_path])
 
 print("Fixing changelog tags")
 changelog = "%s/contrib/debian/changelog" % unpacked_netdata
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-i', 's/PREVIOUS_PACKAGE_VERSION/%s/g' % os.environ["LATEST_RELEASE_VERSION"], changelog])
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], 'sed', '-i', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog])
 
-print("Generating changelog since %s" % os.environ["LATEST_RELEASE_VERSION"])
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "(cd %s && gbp dch --release --spawn-editor=snapshot --since=%s)" % (unpacked_netdata, os.environ["LATEST_RELEASE_VERSION"])])
-
-print("Building the package")
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "(cd %s && dpkg-buildpackage --host-arch amd64 --target-arch amd64 --post-clean --pre-clean --build=binary)" % netdata_tarball.replace(".tar.gz", "")])
+print("Running debian build script since %s" % os.environ["LATEST_RELEASE_VERSION"])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "%s/build.sh" % build_path, unpacked_netdata, new_version])
 
 print('Done!')
