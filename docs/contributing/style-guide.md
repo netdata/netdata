@@ -21,14 +21,14 @@ If you'd like to contribute, start by reading the [guide on contributing to docu
 
 ## Goals of the Netdata style guide
 
-An editorial style guide tries to establish a few important standards:
+An editorial style guide tries to establish a few important standards for how documentation is written and maintained, always focusing on the following principles:
 
 - Consistency
 - High-quality writing
 - Conciseness
 - Accessibility
 
-By following these principles, we can make 
+By following these principles, we can make better documentation 
 
 
 ### Breaking the rules
@@ -40,22 +40,26 @@ You'll come across broken rules across the existing documentation, and improveme
 However, be aware that if you deviate too far from these established rules you may be asked to justify your decisions during the PR review process.
 
 
-## Style guide quickstart
-
-This style guide is pretty overwhelming. The following list represents a few of the more essential points and rules featured in this style guide.
-
-- 
-
-
 ## General principles
 
+This style guide is pretty overwhelming. The following list represents a few of the more essential points and rules featured in this style guide. Where relevant, they link to more in-depth information about a given rule.
+
+### Tone and content
+
+  - Be conversational and friendly.
+  - Don't 
 
 
-###Mentioning future features/releases
+
+## Tone and content
+
+
+
+## Mentioning future features/releases
 
 Documentation is meant to describe the product as-is, not as it will be or could be in the future. Thus Netdata documentation generally avoids talking about future features or products, even if we know they are certain.
 
-An exception can be made for documenting beta features that don't yet fully work as expected. By briefly describing 
+An exception can be made for documenting beta features that don't yet fully work as expected. By briefly describing the state of th
 
 
 ## Grammar 
