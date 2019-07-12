@@ -32,7 +32,7 @@ test Nginx configuration with `nginx -t`
 
 restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
-## Ways to pass Netdata via Nginx:
+## Ways to pass Netdata via Nginx
 
 ### As a virtual host
 
