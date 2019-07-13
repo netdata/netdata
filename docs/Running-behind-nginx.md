@@ -26,9 +26,9 @@ You can edit the Nginx configuration file with Nano, Vim or any other text edito
 
 After making changes to the configuration files:
 
-- test Nginx configuration with `nginx -t` 
+- Test Nginx configuration with `nginx -t`.
 
-- restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
+- Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
 ## Ways to access Netdata via Nginx
 
@@ -187,7 +187,7 @@ server {
 }
 ```
 
-## limit direct access to Netdata
+## Limit direct access to Netdata
 
 If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
@@ -229,9 +229,9 @@ _note: Netdata v1.9+ support `allow connections from`_
 
 `allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
-## prevent the double access.log
+## Prevent the double access.log
 
-nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
+Nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```
 [global]
