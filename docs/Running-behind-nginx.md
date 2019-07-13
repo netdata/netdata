@@ -8,11 +8,13 @@ The software is known for its low impact on memory resources, high scalability, 
 
 ## Why Nginx
 
-Nginx is used and useful in cases when you do not want to access Netdata via the default `IP ADDRESS:19999`.
+- By default, Nginx is fast and lightweight out of the box.
 
-With Nginx, the data is accessed via human-readable domains such as `example.com` or `sub.example.com`. 
+- Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
 
-By default, Nginx is fast and lightweight out of the box.
+- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
+
+- A proxy was necessary to encrypt the communication to netdata, until v1.16.0, which provided TLS (HTTPS) support.
 
 ### Nginx configuration file
 
@@ -34,7 +36,7 @@ After making changes to the configuration files:
 
 ### As a virtual host
 
-With this method instead of `192.0.2.0:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
+With this method instead of `IP ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
 
 ```
 upstream backend {
