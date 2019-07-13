@@ -49,7 +49,6 @@ for d in ${CREATED_CONTAINERS[@]}; do
 		DEB_BUILD_PATH="${LXC_ROOT}/${d}/rootfs/home/${BUILDER_NAME}"
 		echo "Checking folder ${DEB_BUILD_PATH} for DEB packages"
 		if [ -d "${DEB_BUILD_PATH}" ]; then
-			ls -ltr "${DEB_BUILD_PATH}"
 			cp "${DEB_BUILD_PATH}/netdata*.ddeb" "${PACKAGES_DIRECTORY}" || echo "Could not copy any .ddeb files"
 			cp "${DEB_BUILD_PATH}/netdata*.deb" "${PACKAGES_DIRECTORY}" || echo "Could not copy any .deb files"
 			cp "${DEB_BUILD_PATH}/netdata*.buildinfo" "${PACKAGES_DIRECTORY}" || echo "Could not copy any .buildinfo files"

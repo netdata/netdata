@@ -179,7 +179,8 @@ stages:
     - echo "packaging/version:" && cat packaging/version
     - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
-    - sudo chmod -R 755 "/var/lib/lxc"
+    - sudo chown -R root:travis "/var/lib/lxc"
+    - sudo chmod -R 750 "/var/lib/lxc"
     - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
     git:
       depth: false
