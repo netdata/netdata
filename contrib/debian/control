@@ -4,7 +4,19 @@ Build-Depends: debhelper (>= 9),
                dh-systemd (>= 1.5),
                dpkg-dev (>= 1.13.19),
                zlib1g-dev,
-               uuid-dev
+               uuid-dev,
+               libuv1-dev,
+               liblz4-dev,
+               libjudy-dev,
+               libssl-dev,
+               libmnl-dev,
+               autogen,
+               autoconf,
+               automake,
+               pkg-config,
+               curl,
+               gcc
+
 Section: net
 Priority: optional
 Maintainer: Costa Tsaousis <costa@tsaousis.gr>
@@ -18,6 +30,7 @@ Depends: adduser,
          lsb-base (>= 3.1-23.2),
          ${misc:Depends},
          ${shlibs:Depends}
+
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
