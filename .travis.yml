@@ -142,7 +142,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "master"
+          branch: "binary-distros-deb-packaging"
           condition: -d "${PACKAGES_DIRECTORY}"
       # Production release packages deployment
       - provider: packagecloud
@@ -198,7 +198,7 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "master"
+          branch: "binary-distros-deb-packaging"
           condition: -d "${PACKAGES_DIRECTORY}"
       # Production release packages deployment
       - provider: packagecloud
