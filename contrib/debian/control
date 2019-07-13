@@ -17,7 +17,6 @@ Build-Depends: debhelper (>= 9),
                pkg-config,
                curl,
                gcc
-
 Section: net
 Priority: optional
 Maintainer: Costa Tsaousis <costa@tsaousis.gr>
@@ -39,7 +38,6 @@ Depends: adduser,
          libjson-c3,
          ${misc:Depends},
          ${shlibs:Depends}
-
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
