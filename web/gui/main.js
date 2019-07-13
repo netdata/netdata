@@ -2100,6 +2100,14 @@ function alarmsUpdateModal() {
                     + ((chart.red !== null) ? ('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + units + '</code></td></tr>') : '');
             }
 
+            if (alarm.warn_repeat_every > 0) {
+                html += '<tr><td width="10%" style="text-align:right">repeat&nbsp;warning</td><td>' + NETDATA.seconds4human(alarm.warn_repeat_every) + '</td></tr>';
+            }
+
+            if (alarm.crit_repeat_every > 0) {
+                html += '<tr><td width="10%" style="text-align:right">repeat&nbsp;critical</td><td>' + NETDATA.seconds4human(alarm.crit_repeat_every) + '</td></tr>';
+            }
+
             var delay = '';
             if ((alarm.delay_up_duration > 0 || alarm.delay_down_duration > 0) && alarm.delay_multiplier !== 0 && alarm.delay_max_duration > 0) {
                 if (alarm.delay_up_duration === alarm.delay_down_duration) {

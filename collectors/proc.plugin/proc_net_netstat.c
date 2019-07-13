@@ -262,7 +262,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (ipext_InOctets || ipext_OutOctets))) {
+            if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
+                                                      (ipext_InOctets ||
+                                                       ipext_OutOctets ||
+                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_bandwidth = CONFIG_BOOLEAN_YES;
                 static RRDSET *st_system_ip = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
@@ -297,7 +300,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_inerrors == CONFIG_BOOLEAN_YES || (do_inerrors == CONFIG_BOOLEAN_AUTO && (ipext_InNoRoutes || ipext_InTruncatedPkts))) {
+            if(do_inerrors == CONFIG_BOOLEAN_YES || (do_inerrors == CONFIG_BOOLEAN_AUTO &&
+                                                     (ipext_InNoRoutes ||
+                                                      ipext_InTruncatedPkts ||
+                                                      netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_inerrors = CONFIG_BOOLEAN_YES;
                 static RRDSET *st_ip_inerrors = NULL;
                 static RRDDIM *rd_noroutes = NULL, *rd_truncated = NULL, *rd_checksum = NULL;
@@ -336,7 +342,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO && (ipext_InMcastOctets || ipext_OutMcastOctets))) {
+            if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO &&
+                                                  (ipext_InMcastOctets ||
+                                                   ipext_OutMcastOctets ||
+                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_mcast = CONFIG_BOOLEAN_YES;
                 static RRDSET *st_ip_mcast = NULL;
                 static RRDDIM *rd_in = NULL, *rd_out = NULL;
@@ -373,7 +382,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO && (ipext_InBcastOctets || ipext_OutBcastOctets))) {
+            if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO &&
+                                                  (ipext_InBcastOctets ||
+                                                   ipext_OutBcastOctets ||
+                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_bcast = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_ip_bcast = NULL;
@@ -411,7 +423,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO && (ipext_InMcastPkts || ipext_OutMcastPkts))) {
+            if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO &&
+                                                    (ipext_InMcastPkts ||
+                                                     ipext_OutMcastPkts ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_mcast_p = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_ip_mcastpkts = NULL;
@@ -448,7 +463,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_bcast_p == CONFIG_BOOLEAN_YES || (do_bcast_p == CONFIG_BOOLEAN_AUTO && (ipext_InBcastPkts || ipext_OutBcastPkts))) {
+            if(do_bcast_p == CONFIG_BOOLEAN_YES || (do_bcast_p == CONFIG_BOOLEAN_AUTO &&
+                                                    (ipext_InBcastPkts ||
+                                                     ipext_OutBcastPkts ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_bcast_p = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_ip_bcastpkts = NULL;
@@ -486,7 +504,12 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO && (ipext_InCEPkts || ipext_InECT0Pkts || ipext_InECT1Pkts || ipext_InNoECTPkts))) {
+            if(do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO &&
+                                                (ipext_InCEPkts ||
+                                                 ipext_InECT0Pkts ||
+                                                 ipext_InECT1Pkts ||
+                                                 ipext_InNoECTPkts ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ecn = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_ecnpkts = NULL;
@@ -538,7 +561,9 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_memory == CONFIG_BOOLEAN_YES || (do_tcpext_memory == CONFIG_BOOLEAN_AUTO && (tcpext_TCPMemoryPressures))) {
+            if(do_tcpext_memory == CONFIG_BOOLEAN_YES || (do_tcpext_memory == CONFIG_BOOLEAN_AUTO &&
+                                                          (tcpext_TCPMemoryPressures ||
+                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_memory = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_tcpmemorypressures = NULL;
@@ -572,7 +597,14 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO && (tcpext_TCPAbortOnData || tcpext_TCPAbortOnClose || tcpext_TCPAbortOnMemory || tcpext_TCPAbortOnTimeout || tcpext_TCPAbortOnLinger || tcpext_TCPAbortFailed))) {
+            if(do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO &&
+                                                              (tcpext_TCPAbortOnData ||
+                                                               tcpext_TCPAbortOnClose ||
+                                                               tcpext_TCPAbortOnMemory ||
+                                                               tcpext_TCPAbortOnTimeout ||
+                                                               tcpext_TCPAbortOnLinger ||
+                                                               tcpext_TCPAbortFailed ||
+                                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_connaborts = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_tcpconnaborts = NULL;
@@ -616,7 +648,12 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_reorder == CONFIG_BOOLEAN_YES || (do_tcpext_reorder == CONFIG_BOOLEAN_AUTO && (tcpext_TCPRenoReorder || tcpext_TCPFACKReorder || tcpext_TCPSACKReorder || tcpext_TCPTSReorder))) {
+            if(do_tcpext_reorder == CONFIG_BOOLEAN_YES || (do_tcpext_reorder == CONFIG_BOOLEAN_AUTO &&
+                                                           (tcpext_TCPRenoReorder ||
+                                                            tcpext_TCPFACKReorder ||
+                                                            tcpext_TCPSACKReorder ||
+                                                            tcpext_TCPTSReorder ||
+                                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_reorder = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_tcpreorders = NULL;
@@ -656,7 +693,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO && (tcpext_TCPOFOQueue || tcpext_TCPOFODrop || tcpext_TCPOFOMerge))) {
+            if(do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO &&
+                                                       (tcpext_TCPOFOQueue ||
+                                                        tcpext_TCPOFODrop ||
+                                                        tcpext_TCPOFOMerge ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_ofo = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_ip_tcpofo = NULL;
@@ -697,7 +738,11 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO && (tcpext_SyncookiesSent || tcpext_SyncookiesRecv || tcpext_SyncookiesFailed))) {
+            if(do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO &&
+                                                              (tcpext_SyncookiesSent ||
+                                                               tcpext_SyncookiesRecv ||
+                                                               tcpext_SyncookiesFailed ||
+                                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_syscookies = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_syncookies = NULL;
@@ -736,7 +781,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_syn_queue == CONFIG_BOOLEAN_YES || (do_tcpext_syn_queue == CONFIG_BOOLEAN_AUTO && (tcpext_TCPReqQFullDrop || tcpext_TCPReqQFullDoCookies))) {
+            if(do_tcpext_syn_queue == CONFIG_BOOLEAN_YES || (do_tcpext_syn_queue == CONFIG_BOOLEAN_AUTO &&
+                                                             (tcpext_TCPReqQFullDrop ||
+                                                              tcpext_TCPReqQFullDoCookies ||
+                                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_syn_queue = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_syn_queue = NULL;
@@ -775,7 +823,10 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcpext_accept_queue == CONFIG_BOOLEAN_YES || (do_tcpext_accept_queue == CONFIG_BOOLEAN_AUTO && (tcpext_ListenOverflows || tcpext_ListenDrops))) {
+            if(do_tcpext_accept_queue == CONFIG_BOOLEAN_YES || (do_tcpext_accept_queue == CONFIG_BOOLEAN_AUTO &&
+                                                                (tcpext_ListenOverflows ||
+                                                                 tcpext_ListenDrops ||
+                                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_accept_queue = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st_accept_queue = NULL;

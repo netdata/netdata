@@ -479,7 +479,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO && (tcpstat.tcps_rcvpackafterwin || tcpstat.tcps_rcvafterclose || tcpstat.tcps_rcvmemdrop || tcpstat.tcps_persistdrop))) {
+            if (do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO &&
+                                                               (tcpstat.tcps_rcvpackafterwin ||
+                                                                tcpstat.tcps_rcvafterclose ||
+                                                                tcpstat.tcps_rcvmemdrop ||
+                                                                tcpstat.tcps_persistdrop ||
+                                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_connaborts = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv4.tcpconnaborts");
                 if (unlikely(!st)) {
@@ -514,7 +519,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO && tcpstat.tcps_rcvoopack)) {
+            if (do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO &&
+                                                        (tcpstat.tcps_rcvoopack ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_ofo = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv4.tcpofo");
                 if (unlikely(!st)) {
@@ -543,7 +550,11 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO && (tcpstat.tcps_sc_sendcookie || tcpstat.tcps_sc_recvcookie || tcpstat.tcps_sc_zonefail))) {
+            if (do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO &&
+                                                               (tcpstat.tcps_sc_sendcookie ||
+                                                                tcpstat.tcps_sc_recvcookie ||
+                                                                tcpstat.tcps_sc_zonefail ||
+                                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcpext_syscookies = CONFIG_BOOLEAN_YES;
 
                 st = rrdset_find_localhost("ipv4.tcpsyncookies");
@@ -579,7 +590,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
 
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
-            if (do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO && (tcpstat.tcps_ecn_recv_ce || tcpstat.tcps_ecn_not_supported))) {
+            if (do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO &&
+                                                 (tcpstat.tcps_ecn_recv_ce ||
+                                                  tcpstat.tcps_ecn_not_supported ||
+                                                  netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ecn = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv4.ecnpkts");
                 if (unlikely(!st)) {
@@ -980,8 +994,11 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             error("DISABLED: ipv6.errors");
         } else {
             if (do_ip6_packets == CONFIG_BOOLEAN_YES || (do_ip6_packets == CONFIG_BOOLEAN_AUTO &&
-                                                          (ip6stat.ip6s_localout || ip6stat.ip6s_total ||
-                                                           ip6stat.ip6s_forward || ip6stat.ip6s_delivered))) {
+                                                         (ip6stat.ip6s_localout ||
+                                                          ip6stat.ip6s_total ||
+                                                          ip6stat.ip6s_forward ||
+                                                          ip6stat.ip6s_delivered ||
+                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_packets = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.packets");
                 if (unlikely(!st)) {
@@ -1017,8 +1034,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (do_ip6_fragsout == CONFIG_BOOLEAN_YES || (do_ip6_fragsout == CONFIG_BOOLEAN_AUTO &&
-                                                           (ip6stat.ip6s_fragmented || ip6stat.ip6s_cantfrag ||
-                                                            ip6stat.ip6s_ofragments))) {
+                                                          (ip6stat.ip6s_fragmented ||
+                                                           ip6stat.ip6s_cantfrag ||
+                                                           ip6stat.ip6s_ofragments ||
+                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_fragsout = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.fragsout");
                 if (unlikely(!st)) {
@@ -1053,8 +1072,11 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             if (do_ip6_fragsin == CONFIG_BOOLEAN_YES || (do_ip6_fragsin == CONFIG_BOOLEAN_AUTO &&
-                                                          (ip6stat.ip6s_reassembled || ip6stat.ip6s_fragdropped ||
-                                                           ip6stat.ip6s_fragtimeout || ip6stat.ip6s_fragments))) {
+                                                         (ip6stat.ip6s_reassembled ||
+                                                          ip6stat.ip6s_fragdropped ||
+                                                          ip6stat.ip6s_fragtimeout ||
+                                                          ip6stat.ip6s_fragments ||
+                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_fragsin = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.fragsin");
                 if (unlikely(!st)) {
@@ -1090,16 +1112,17 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_ip6_errors == CONFIG_BOOLEAN_YES || (do_ip6_errors == CONFIG_BOOLEAN_AUTO && (
-                    ip6stat.ip6s_toosmall ||
-                    ip6stat.ip6s_odropped ||
-                    ip6stat.ip6s_badoptions ||
-                    ip6stat.ip6s_badvers ||
-                    ip6stat.ip6s_exthdrtoolong ||
-                    ip6stat.ip6s_sources_none ||
-                    ip6stat.ip6s_tooshort ||
-                    ip6stat.ip6s_cantforward ||
-                    ip6stat.ip6s_noroute))) {
+            if (do_ip6_errors == CONFIG_BOOLEAN_YES || (do_ip6_errors == CONFIG_BOOLEAN_AUTO &&
+                                                        (ip6stat.ip6s_toosmall ||
+                                                         ip6stat.ip6s_odropped ||
+                                                         ip6stat.ip6s_badoptions ||
+                                                         ip6stat.ip6s_badvers ||
+                                                         ip6stat.ip6s_exthdrtoolong ||
+                                                         ip6stat.ip6s_sources_none ||
+                                                         ip6stat.ip6s_tooshort ||
+                                                         ip6stat.ip6s_cantforward ||
+                                                         ip6stat.ip6s_noroute ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip6_errors = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.errors");
                 if (unlikely(!st)) {
@@ -1158,7 +1181,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 icmp6_total.msgs_out += icmp6stat.icp6s_outhist[i];
             }
             icmp6_total.msgs_in += icmp6stat.icp6s_badcode + icmp6stat.icp6s_badlen + icmp6stat.icp6s_checksum + icmp6stat.icp6s_tooshort;
-            if (do_icmp6 == CONFIG_BOOLEAN_YES || (do_icmp6 == CONFIG_BOOLEAN_AUTO && (icmp6_total.msgs_in || icmp6_total.msgs_out))) {
+            if (do_icmp6 == CONFIG_BOOLEAN_YES || (do_icmp6 == CONFIG_BOOLEAN_AUTO &&
+                                                   (icmp6_total.msgs_in ||
+                                                    icmp6_total.msgs_out ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6 = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.icmp");
                 if (unlikely(!st)) {
@@ -1189,7 +1215,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_icmp6_redir == CONFIG_BOOLEAN_YES || (do_icmp6_redir == CONFIG_BOOLEAN_AUTO && (icmp6stat.icp6s_inhist[ND_REDIRECT] || icmp6stat.icp6s_outhist[ND_REDIRECT]))) {
+            if (do_icmp6_redir == CONFIG_BOOLEAN_YES || (do_icmp6_redir == CONFIG_BOOLEAN_AUTO &&
+                                                         (icmp6stat.icp6s_inhist[ND_REDIRECT] ||
+                                                          icmp6stat.icp6s_outhist[ND_REDIRECT] ||
+                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_redir = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.icmpredir");
                 if (unlikely(!st)) {
@@ -1220,18 +1249,19 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_icmp6_errors == CONFIG_BOOLEAN_YES || (do_icmp6_errors == CONFIG_BOOLEAN_AUTO && (
-                                                                            icmp6stat.icp6s_badcode ||
-                                                                            icmp6stat.icp6s_badlen ||
-                                                                            icmp6stat.icp6s_checksum ||
-                                                                            icmp6stat.icp6s_tooshort ||
-                                                                            icmp6stat.icp6s_error ||
-                                                                            icmp6stat.icp6s_inhist[ICMP6_DST_UNREACH] ||
-                                                                            icmp6stat.icp6s_inhist[ICMP6_TIME_EXCEEDED] ||
-                                                                            icmp6stat.icp6s_inhist[ICMP6_PARAM_PROB] ||
-                                                                            icmp6stat.icp6s_outhist[ICMP6_DST_UNREACH] ||
-                                                                            icmp6stat.icp6s_outhist[ICMP6_TIME_EXCEEDED] ||
-                                                                            icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB]))) {
+            if (do_icmp6_errors == CONFIG_BOOLEAN_YES || (do_icmp6_errors == CONFIG_BOOLEAN_AUTO &&
+                                                          (icmp6stat.icp6s_badcode ||
+                                                           icmp6stat.icp6s_badlen ||
+                                                           icmp6stat.icp6s_checksum ||
+                                                           icmp6stat.icp6s_tooshort ||
+                                                           icmp6stat.icp6s_error ||
+                                                           icmp6stat.icp6s_inhist[ICMP6_DST_UNREACH] ||
+                                                           icmp6stat.icp6s_inhist[ICMP6_TIME_EXCEEDED] ||
+                                                           icmp6stat.icp6s_inhist[ICMP6_PARAM_PROB] ||
+                                                           icmp6stat.icp6s_outhist[ICMP6_DST_UNREACH] ||
+                                                           icmp6stat.icp6s_outhist[ICMP6_TIME_EXCEEDED] ||
+                                                           icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB] ||
+                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_errors = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.icmperrors");
                 if (unlikely(!st)) {
@@ -1279,11 +1309,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_icmp6_echos == CONFIG_BOOLEAN_YES || (do_icmp6_echos == CONFIG_BOOLEAN_AUTO && (
-                                                                 icmp6stat.icp6s_inhist[ICMP6_ECHO_REQUEST] ||
-                                                                 icmp6stat.icp6s_outhist[ICMP6_ECHO_REQUEST] ||
-                                                                 icmp6stat.icp6s_inhist[ICMP6_ECHO_REPLY] ||
-                                                                 icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]))) {
+            if (do_icmp6_echos == CONFIG_BOOLEAN_YES || (do_icmp6_echos == CONFIG_BOOLEAN_AUTO &&
+                                                         (icmp6stat.icp6s_inhist[ICMP6_ECHO_REQUEST] ||
+                                                          icmp6stat.icp6s_outhist[ICMP6_ECHO_REQUEST] ||
+                                                          icmp6stat.icp6s_inhist[ICMP6_ECHO_REPLY] ||
+                                                          icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY] ||
+                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_echos = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.icmpechos");
                 if (unlikely(!st)) {
@@ -1318,11 +1349,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_icmp6_router == CONFIG_BOOLEAN_YES || (do_icmp6_router == CONFIG_BOOLEAN_AUTO && (
-                                                                    icmp6stat.icp6s_inhist[ND_ROUTER_SOLICIT] ||
-                                                                    icmp6stat.icp6s_outhist[ND_ROUTER_SOLICIT] ||
-                                                                    icmp6stat.icp6s_inhist[ND_ROUTER_ADVERT] ||
-                                                                    icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT]))) {
+            if (do_icmp6_router == CONFIG_BOOLEAN_YES || (do_icmp6_router == CONFIG_BOOLEAN_AUTO &&
+                                                          (icmp6stat.icp6s_inhist[ND_ROUTER_SOLICIT] ||
+                                                           icmp6stat.icp6s_outhist[ND_ROUTER_SOLICIT] ||
+                                                           icmp6stat.icp6s_inhist[ND_ROUTER_ADVERT] ||
+                                                           icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT] ||
+                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_router = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.icmprouter");
                 if (unlikely(!st)) {
@@ -1357,11 +1389,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_icmp6_neighbor == CONFIG_BOOLEAN_YES || (do_icmp6_neighbor == CONFIG_BOOLEAN_AUTO && (
-                                                                    icmp6stat.icp6s_inhist[ND_NEIGHBOR_SOLICIT] ||
-                                                                    icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT] ||
-                                                                    icmp6stat.icp6s_inhist[ND_NEIGHBOR_ADVERT] ||
-                                                                    icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]))) {
+            if (do_icmp6_neighbor == CONFIG_BOOLEAN_YES || (do_icmp6_neighbor == CONFIG_BOOLEAN_AUTO &&
+                                                            (icmp6stat.icp6s_inhist[ND_NEIGHBOR_SOLICIT] ||
+                                                             icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT] ||
+                                                             icmp6stat.icp6s_inhist[ND_NEIGHBOR_ADVERT] ||
+                                                             icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT] ||
+                                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_neighbor = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.icmpneighbor");
                 if (unlikely(!st)) {
@@ -1396,17 +1429,18 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if (do_icmp6_types == CONFIG_BOOLEAN_YES || (do_icmp6_types == CONFIG_BOOLEAN_AUTO && (
-                                                                    icmp6stat.icp6s_inhist[1] ||
-                                                                    icmp6stat.icp6s_inhist[128] ||
-                                                                    icmp6stat.icp6s_inhist[129] ||
-                                                                    icmp6stat.icp6s_inhist[136] ||
-                                                                    icmp6stat.icp6s_outhist[1] ||
-                                                                    icmp6stat.icp6s_outhist[128] ||
-                                                                    icmp6stat.icp6s_outhist[129] ||
-                                                                    icmp6stat.icp6s_outhist[133] ||
-                                                                    icmp6stat.icp6s_outhist[135] ||
-                                                                    icmp6stat.icp6s_outhist[136]))) {
+            if (do_icmp6_types == CONFIG_BOOLEAN_YES || (do_icmp6_types == CONFIG_BOOLEAN_AUTO &&
+                                                         (icmp6stat.icp6s_inhist[1] ||
+                                                          icmp6stat.icp6s_inhist[128] ||
+                                                          icmp6stat.icp6s_inhist[129] ||
+                                                          icmp6stat.icp6s_inhist[136] ||
+                                                          icmp6stat.icp6s_outhist[1] ||
+                                                          icmp6stat.icp6s_outhist[128] ||
+                                                          icmp6stat.icp6s_outhist[129] ||
+                                                          icmp6stat.icp6s_outhist[133] ||
+                                                          icmp6stat.icp6s_outhist[135] ||
+                                                          icmp6stat.icp6s_outhist[136] ||
+                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp6_types = CONFIG_BOOLEAN_YES;
                 st = rrdset_find_localhost("ipv6.icmptypes");
                 if (unlikely(!st)) {

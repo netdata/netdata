@@ -4,9 +4,56 @@
 
 **Fixed bugs:**
 
+- Issue with rethinkdbs plugin [\#6429](https://github.com/netdata/netdata/issues/6429)
+- Double free or corruption \(again\) [\#6412](https://github.com/netdata/netdata/issues/6412)
+- rpm version should be 1.16.0 not v1.16.0 \(extra "v"\) [\#6409](https://github.com/netdata/netdata/issues/6409)
+- Cannot see charts in an imported snapshot [\#6384](https://github.com/netdata/netdata/issues/6384)
+- netdata does not send notifications for alarms which fail with \(errno 12, Out of memory\) [\#6335](https://github.com/netdata/netdata/issues/6335)
+- charts.d kills process twice [\#6190](https://github.com/netdata/netdata/issues/6190)
+- Alarm "system.softnet\_stat" is very strict. [\#1076](https://github.com/netdata/netdata/issues/1076)
+- netdata/packaging: Fix RPM packaging workflow issues, plus draft changes for .DEB packaging [\#6415](https://github.com/netdata/netdata/pull/6415) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+
+**Closed issues:**
+
+- Global option for enabling charts with zero metrics [\#6315](https://github.com/netdata/netdata/issues/6315)
+- Feature Request: Linux zram device statistics. [\#2578](https://github.com/netdata/netdata/issues/2578)
+- Authentication support [\#70](https://github.com/netdata/netdata/issues/70)
+
+**Merged pull requests:**
+
+- Add more supported backends to the documentation [\#6443](https://github.com/netdata/netdata/pull/6443) ([vlvkobal](https://github.com/vlvkobal))
+- netdata/packaging: Remove Ventureer from demo sites [\#6442](https://github.com/netdata/netdata/pull/6442) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Fix issue with HTML docs generation [\#6433](https://github.com/netdata/netdata/pull/6433) ([cakrit](https://github.com/cakrit))
+- rethinkdb collector new driver support [\#6431](https://github.com/netdata/netdata/pull/6431) ([ilyam8](https://github.com/ilyam8))
+- Netdata/packaging: Add documentation for binary packages, plus draft table for distributions support [\#6422](https://github.com/netdata/netdata/pull/6422) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging/doc: Update documentation dependencies [\#6421](https://github.com/netdata/netdata/pull/6421) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Add global configuration option for zero metrics [\#6419](https://github.com/netdata/netdata/pull/6419) ([vlvkobal](https://github.com/vlvkobal))
+- Updated logos in the infographic and remaining favicons [\#6417](https://github.com/netdata/netdata/pull/6417) ([cakrit](https://github.com/cakrit))
+- SSL vs. TLS consistency and clarification in documentation [\#6414](https://github.com/netdata/netdata/pull/6414) ([joelhans](https://github.com/joelhans))
+- Add more codeowners to the core [\#6413](https://github.com/netdata/netdata/pull/6413) ([vlvkobal](https://github.com/vlvkobal))
+- Add news of v1.16.0 to main README [\#6411](https://github.com/netdata/netdata/pull/6411) ([cakrit](https://github.com/cakrit))
+- Update Running-behind-apache.md [\#6406](https://github.com/netdata/netdata/pull/6406) ([Steve8291](https://github.com/Steve8291))
+- Fix Web API Health documentation  [\#6404](https://github.com/netdata/netdata/pull/6404) ([thiagoftsm](https://github.com/thiagoftsm))
+- Snapshot uniqueId fix [\#6400](https://github.com/netdata/netdata/pull/6400) ([jacekkolasa](https://github.com/jacekkolasa))
+- Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
+- Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
+- Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
+- ZRAM info collector module \(proc.plugin\) [\#6276](https://github.com/netdata/netdata/pull/6276) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
+
+## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
+
+**Fixed bugs:**
+
+- Double free or corruption \(fasttop\) [\#6370](https://github.com/netdata/netdata/issues/6370)
+- Netdata not ignoring /dev and /run by default [\#6361](https://github.com/netdata/netdata/issues/6361)
+- \[critical\] netdata segfault when restart service [\#6356](https://github.com/netdata/netdata/issues/6356)
+- Backend as-collected values from statsd are 1000 time to high [\#6347](https://github.com/netdata/netdata/issues/6347)
 - Tomcat collector break on invalid XML caused by single quotes in Memory Pool names \(code solution inside\) [\#6343](https://github.com/netdata/netdata/issues/6343)
 - adaptec\_raid: failed to parse `arcconf GETCONFIG 1 LD` output [\#6337](https://github.com/netdata/netdata/issues/6337)
 - Cannot reinstall netdata [\#6329](https://github.com/netdata/netdata/issues/6329)
+- collectors/perf.plugin/perf\_plugin.c:171: error: 'PERF\_COUNT\_HW\_REF\_CPU\_CYCLES' undeclared here \(not in a function\) [\#6321](https://github.com/netdata/netdata/issues/6321)
+- Never able to sign in [\#6306](https://github.com/netdata/netdata/issues/6306)
+- /dev/fd/63: line 113:  : command not found when trying to update  [\#6289](https://github.com/netdata/netdata/issues/6289)
 - Redirect cannot overwrite netdata. [\#6288](https://github.com/netdata/netdata/issues/6288)
 - Netdata lateral menu hidden [\#6287](https://github.com/netdata/netdata/issues/6287)
 - How to remove/unregister a streaming node to prevent the health alarms from triggering [\#6266](https://github.com/netdata/netdata/issues/6266)
@@ -71,6 +118,7 @@
 **Closed issues:**
 
 - \[QUESTION\] Show Docker Container without ID [\#6358](https://github.com/netdata/netdata/issues/6358)
+- Allow user to configure the maximum number of File Descriptors for the netdata service [\#6313](https://github.com/netdata/netdata/issues/6313)
 - XMPP/Jabber notification support [\#6292](https://github.com/netdata/netdata/issues/6292)
 - collector/freeipmi - option to remove the ID added to the label [\#6284](https://github.com/netdata/netdata/issues/6284)
 - FreeIPMI - option to remove the ID added to the label [\#6283](https://github.com/netdata/netdata/issues/6283)
@@ -87,8 +135,10 @@
 - Optimize the memory footprint of the Database Engine [\#6010](https://github.com/netdata/netdata/issues/6010)
 - phpdaemon monitoring [\#6006](https://github.com/netdata/netdata/issues/6006)
 - Secure streaming via SSL [\#6004](https://github.com/netdata/netdata/issues/6004)
+- \[Binary releases\] Optimise netdata.spec file [\#5969](https://github.com/netdata/netdata/issues/5969)
 - \[Binary releases\] Create a script to containerise the RPM build process [\#5967](https://github.com/netdata/netdata/issues/5967)
 - Clearer communiation of  telemetry [\#5863](https://github.com/netdata/netdata/issues/5863)
+- alarm-notify.sh should respect the cloud base url setting [\#5791](https://github.com/netdata/netdata/issues/5791)
 - Design k8s collector endpoint autodiscovery [\#5729](https://github.com/netdata/netdata/issues/5729)
 - notify package maintainers of the new netdata releases [\#5682](https://github.com/netdata/netdata/issues/5682)
 - \[preparation\] VMware Vsphere monitoring [\#5635](https://github.com/netdata/netdata/issues/5635)
@@ -101,6 +151,7 @@
 - mail notifications wiki points to a non-existing file [\#3433](https://github.com/netdata/netdata/issues/3433)
 - Simple way to disable alerts [\#3414](https://github.com/netdata/netdata/issues/3414)
 - CPU performance monitoring [\#3232](https://github.com/netdata/netdata/issues/3232)
+- \[RFE\] send notifications repeatedly until the alert is resolved [\#2956](https://github.com/netdata/netdata/issues/2956)
 - allow netdata to know the plugin that collects each chart [\#2692](https://github.com/netdata/netdata/issues/2692)
 - riak-rv support [\#2413](https://github.com/netdata/netdata/issues/2413)
 - alarms to monitor the number of processes in a system [\#2239](https://github.com/netdata/netdata/issues/2239)
@@ -108,7 +159,22 @@
 
 **Merged pull requests:**
 
+- Ignore /dev and /run space/inode usage [\#6399](https://github.com/netdata/netdata/pull/6399) ([vlvkobal](https://github.com/vlvkobal))
+- Update favicon with new logo  [\#6398](https://github.com/netdata/netdata/pull/6398) ([cakrit](https://github.com/cakrit))
+- Update apps\_groups.conf for time group [\#6397](https://github.com/netdata/netdata/pull/6397) ([mbarper](https://github.com/mbarper))
+- Update to icons [\#6396](https://github.com/netdata/netdata/pull/6396) ([ivorjvr](https://github.com/ivorjvr))
+- Changed links from my-netdata.io to netdata.cloud [\#6389](https://github.com/netdata/netdata/pull/6389) ([joelhans](https://github.com/joelhans))
+- alarm-notify.sh should respect the cloud base url setting  [\#6383](https://github.com/netdata/netdata/pull/6383) ([ladakis](https://github.com/ladakis))
+- Add a check for a macro declaration for the perf plugin [\#6382](https://github.com/netdata/netdata/pull/6382) ([vlvkobal](https://github.com/vlvkobal))
+- Add a .gitattributes file [\#6381](https://github.com/netdata/netdata/pull/6381) ([ac000](https://github.com/ac000))
+- Health fix double Free Corruption [\#6379](https://github.com/netdata/netdata/pull/6379) ([thiagoftsm](https://github.com/thiagoftsm))
+- Health giving wrong message [\#6377](https://github.com/netdata/netdata/pull/6377) ([thiagoftsm](https://github.com/thiagoftsm))
+- Health could not read properly the health silencers file [\#6374](https://github.com/netdata/netdata/pull/6374) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add more debug messages for pluginsd pipe errors [\#6373](https://github.com/netdata/netdata/pull/6373) ([vlvkobal](https://github.com/vlvkobal))
+- Improve documentation about file descriptors and systemd configuration. [\#6372](https://github.com/netdata/netdata/pull/6372) ([mfundul](https://github.com/mfundul))
+- netdata/packaging: Netdata binary packages generation - spec file refinement, support for nightlies \(RPM\) [\#6369](https://github.com/netdata/netdata/pull/6369) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - apps.plugin: detect openldap server processes by default on Debian [\#6364](https://github.com/netdata/netdata/pull/6364) ([nodiscc](https://github.com/nodiscc))
+- Easily disable alarms, by persisting the silencers configuration [\#6360](https://github.com/netdata/netdata/pull/6360) ([thiagoftsm](https://github.com/thiagoftsm))
 - Redirect old site to new site at www.netdata.cloud [\#6359](https://github.com/netdata/netdata/pull/6359) ([cakrit](https://github.com/cakrit))
 - Better checks for nfacct headers [\#6351](https://github.com/netdata/netdata/pull/6351) ([vlvkobal](https://github.com/vlvkobal))
 - Tomcat status invalid XML fix [\#6345](https://github.com/netdata/netdata/pull/6345) ([Danamir](https://github.com/Danamir))
@@ -122,6 +188,7 @@
 - dnsmasq\_dhcp: dhcp-range utilization alarm [\#6319](https://github.com/netdata/netdata/pull/6319) ([ilyam8](https://github.com/ilyam8))
 - Update the documentation on charts with zero metrics [\#6314](https://github.com/netdata/netdata/pull/6314) ([vlvkobal](https://github.com/vlvkobal))
 - fix elasticsearch plugin [\#6311](https://github.com/netdata/netdata/pull/6311) ([Wing924](https://github.com/Wing924))
+- Repeating alarm notifications [\#6309](https://github.com/netdata/netdata/pull/6309) ([thiagoftsm](https://github.com/thiagoftsm))
 - Chart name streaming [\#6304](https://github.com/netdata/netdata/pull/6304) ([vlvkobal](https://github.com/vlvkobal))
 - Handle file descriptors running out [\#6303](https://github.com/netdata/netdata/pull/6303) ([mfundul](https://github.com/mfundul))
 - Add note regarding libexecdir [\#6301](https://github.com/netdata/netdata/pull/6301) ([cakrit](https://github.com/cakrit))
@@ -747,7 +814,6 @@
 - python.d/dockerd plugin update error [\#5200](https://github.com/netdata/netdata/issues/5200)
 - Netdata registry with basic auth \(behind nginx proxy\) results in error 409 [\#5180](https://github.com/netdata/netdata/issues/5180)
 - alarm-notify.sh: WARNING: Cannot find file [\#5136](https://github.com/netdata/netdata/issues/5136)
-- Netdata w/ Docker Container not show Disk space utilization for mounts [\#5071](https://github.com/netdata/netdata/issues/5071)
 - zfs charts appear, even when they are zero [\#4115](https://github.com/netdata/netdata/issues/4115)
 - Ceph - No JSON object could be decoded [\#3563](https://github.com/netdata/netdata/issues/3563)
 

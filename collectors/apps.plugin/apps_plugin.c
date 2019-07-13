@@ -191,6 +191,12 @@ double  utime_fix_ratio = 1.0,
         cminflt_fix_ratio = 1.0,
         cmajflt_fix_ratio = 1.0;
 
+
+struct pid_on_target {
+    int32_t pid;
+    struct pid_on_target *next;
+};
+
 // ----------------------------------------------------------------------------
 // target
 //
@@ -261,6 +267,8 @@ struct target {
     int ends_with;
     int starts_with;        // if set, the compare string matches only the
                             // beginning of the command
+
+    struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
     struct target *target;  // the one that will be reported to netdata
     struct target *next;
@@ -2657,6 +2665,18 @@ static size_t zero_all_targets(struct target *root) {
             w->openeventpolls = 0;
             w->openother = 0;
         }
+
+        if(unlikely(w->root_pid)) {
+            struct pid_on_target *pid_on_target_to_free, *pid_on_target = w->root_pid;
+
+            while(pid_on_target) {
+                pid_on_target_to_free = pid_on_target;
+                pid_on_target = pid_on_target->next;
+                free(pid_on_target_to_free);
+            }
+
+            w->root_pid = NULL;
+        }
     }
 
     return count;
@@ -2799,8 +2819,14 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->processes++;
     w->num_threads += p->num_threads;
 
-    if(unlikely(debug_enabled || w->debug_enabled))
+    if(unlikely(debug_enabled || w->debug_enabled)) {
         debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
+        struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
+        pid_on_target->pid = p->pid;
+        pid_on_target->next = w->root_pid;
+        w->root_pid = pid_on_target;
+    }
 }
 
 static void calculate_netdata_statistics(void) {
@@ -3320,6 +3346,18 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
 
     for(w = root ; w ; w = w->next) {
         if (w->target) continue;
+
+        if(unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+            struct pid_on_target *pid_on_target;
+
+            fprintf(stderr, "apps.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes, (w->processes == 1)?"":"es");
+
+            for(pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
+                fprintf(stderr, " %d", pid_on_target->pid);
+            }
+
+            fputc('\n', stderr);
+        }
 
         if (!w->exposed && w->processes) {
             newly_added++;

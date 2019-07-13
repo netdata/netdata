@@ -258,7 +258,12 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_OutRequests || snmp_root.ip_InReceives || snmp_root.ip_ForwDatagrams || snmp_root.ip_InDelivers))) {
+            if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO &&
+                                                       (snmp_root.ip_OutRequests ||
+                                                        snmp_root.ip_InReceives ||
+                                                        snmp_root.ip_ForwDatagrams ||
+                                                        snmp_root.ip_InDelivers ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip_packets = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -299,7 +304,11 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_FragOKs || snmp_root.ip_FragFails || snmp_root.ip_FragCreates))) {
+            if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO &&
+                                                        (snmp_root.ip_FragOKs ||
+                                                         snmp_root.ip_FragFails ||
+                                                         snmp_root.ip_FragCreates ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip_fragsout = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -338,7 +347,11 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_fragsin == CONFIG_BOOLEAN_YES || (do_ip_fragsin == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_ReasmOKs || snmp_root.ip_ReasmFails || snmp_root.ip_ReasmReqds))) {
+            if(do_ip_fragsin == CONFIG_BOOLEAN_YES || (do_ip_fragsin == CONFIG_BOOLEAN_AUTO &&
+                                                       (snmp_root.ip_ReasmOKs ||
+                                                        snmp_root.ip_ReasmFails ||
+                                                        snmp_root.ip_ReasmReqds ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip_fragsin = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -377,7 +390,14 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_ip_errors == CONFIG_BOOLEAN_YES || (do_ip_errors == CONFIG_BOOLEAN_AUTO && (snmp_root.ip_InDiscards || snmp_root.ip_OutDiscards || snmp_root.ip_InHdrErrors || snmp_root.ip_InAddrErrors || snmp_root.ip_InUnknownProtos || snmp_root.ip_OutNoRoutes))) {
+            if(do_ip_errors == CONFIG_BOOLEAN_YES || (do_ip_errors == CONFIG_BOOLEAN_AUTO &&
+                                                      (snmp_root.ip_InDiscards ||
+                                                       snmp_root.ip_OutDiscards ||
+                                                       snmp_root.ip_InHdrErrors ||
+                                                       snmp_root.ip_InAddrErrors ||
+                                                       snmp_root.ip_InUnknownProtos ||
+                                                       snmp_root.ip_OutNoRoutes ||
+                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_ip_errors = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -447,7 +467,13 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_icmp_packets == CONFIG_BOOLEAN_YES || (do_icmp_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.icmp_InMsgs || snmp_root.icmp_OutMsgs || snmp_root.icmp_InErrors || snmp_root.icmp_OutErrors || snmp_root.icmp_InCsumErrors))) {
+            if(do_icmp_packets == CONFIG_BOOLEAN_YES || (do_icmp_packets == CONFIG_BOOLEAN_AUTO &&
+                                                         (snmp_root.icmp_InMsgs ||
+                                                          snmp_root.icmp_OutMsgs ||
+                                                          snmp_root.icmp_InErrors ||
+                                                          snmp_root.icmp_OutErrors ||
+                                                          snmp_root.icmp_InCsumErrors ||
+                                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmp_packets = CONFIG_BOOLEAN_YES;
 
                 {
@@ -540,28 +566,28 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_icmpmsg == CONFIG_BOOLEAN_YES || (do_icmpmsg == CONFIG_BOOLEAN_AUTO && (
-                    snmp_root.icmpmsg_InEchoReps
-                    || snmp_root.icmpmsg_OutEchoReps
-                    || snmp_root.icmpmsg_InDestUnreachs
-                    || snmp_root.icmpmsg_OutDestUnreachs
-                    || snmp_root.icmpmsg_InRedirects
-                    || snmp_root.icmpmsg_OutRedirects
-                    || snmp_root.icmpmsg_InEchos
-                    || snmp_root.icmpmsg_OutEchos
-                    || snmp_root.icmpmsg_InRouterAdvert
-                    || snmp_root.icmpmsg_OutRouterAdvert
-                    || snmp_root.icmpmsg_InRouterSelect
-                    || snmp_root.icmpmsg_OutRouterSelect
-                    || snmp_root.icmpmsg_InTimeExcds
-                    || snmp_root.icmpmsg_OutTimeExcds
-                    || snmp_root.icmpmsg_InParmProbs
-                    || snmp_root.icmpmsg_OutParmProbs
-                    || snmp_root.icmpmsg_InTimestamps
-                    || snmp_root.icmpmsg_OutTimestamps
-                    || snmp_root.icmpmsg_InTimestampReps
-                    || snmp_root.icmpmsg_OutTimestampReps
-                    ))) {
+            if(do_icmpmsg == CONFIG_BOOLEAN_YES || (do_icmpmsg == CONFIG_BOOLEAN_AUTO &&
+                                                    (snmp_root.icmpmsg_InEchoReps ||
+                                                     snmp_root.icmpmsg_OutEchoReps ||
+                                                     snmp_root.icmpmsg_InDestUnreachs ||
+                                                     snmp_root.icmpmsg_OutDestUnreachs ||
+                                                     snmp_root.icmpmsg_InRedirects ||
+                                                     snmp_root.icmpmsg_OutRedirects ||
+                                                     snmp_root.icmpmsg_InEchos ||
+                                                     snmp_root.icmpmsg_OutEchos ||
+                                                     snmp_root.icmpmsg_InRouterAdvert ||
+                                                     snmp_root.icmpmsg_OutRouterAdvert ||
+                                                     snmp_root.icmpmsg_InRouterSelect ||
+                                                     snmp_root.icmpmsg_OutRouterSelect ||
+                                                     snmp_root.icmpmsg_InTimeExcds ||
+                                                     snmp_root.icmpmsg_OutTimeExcds ||
+                                                     snmp_root.icmpmsg_InParmProbs ||
+                                                     snmp_root.icmpmsg_OutParmProbs ||
+                                                     snmp_root.icmpmsg_InTimestamps ||
+                                                     snmp_root.icmpmsg_OutTimestamps ||
+                                                     snmp_root.icmpmsg_InTimestampReps ||
+                                                     snmp_root.icmpmsg_OutTimestampReps ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_icmpmsg = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st                  = NULL;
@@ -677,7 +703,9 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
-            if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO && snmp_root.tcp_CurrEstab)) {
+            if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO &&
+                                                        (snmp_root.tcp_CurrEstab ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcp_sockets = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -709,7 +737,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_packets == CONFIG_BOOLEAN_YES || (do_tcp_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_InSegs || snmp_root.tcp_OutSegs))) {
+            if(do_tcp_packets == CONFIG_BOOLEAN_YES || (do_tcp_packets == CONFIG_BOOLEAN_AUTO &&
+                                                        (snmp_root.tcp_InSegs ||
+                                                         snmp_root.tcp_OutSegs ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcp_packets = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -744,7 +775,11 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_errors == CONFIG_BOOLEAN_YES || (do_tcp_errors == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_InErrs || snmp_root.tcp_InCsumErrors || snmp_root.tcp_RetransSegs))) {
+            if(do_tcp_errors == CONFIG_BOOLEAN_YES || (do_tcp_errors == CONFIG_BOOLEAN_AUTO &&
+                                                       (snmp_root.tcp_InErrs ||
+                                                        snmp_root.tcp_InCsumErrors ||
+                                                        snmp_root.tcp_RetransSegs ||
+                                                        netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcp_errors = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -783,7 +818,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_opens == CONFIG_BOOLEAN_YES || (do_tcp_opens == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_ActiveOpens || snmp_root.tcp_PassiveOpens))) {
+            if(do_tcp_opens == CONFIG_BOOLEAN_YES || (do_tcp_opens == CONFIG_BOOLEAN_AUTO &&
+                                                      (snmp_root.tcp_ActiveOpens ||
+                                                       snmp_root.tcp_PassiveOpens ||
+                                                       netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcp_opens = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -819,7 +857,11 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_tcp_handshake == CONFIG_BOOLEAN_YES || (do_tcp_handshake == CONFIG_BOOLEAN_AUTO && (snmp_root.tcp_EstabResets || snmp_root.tcp_OutRsts || snmp_root.tcp_AttemptFails))) {
+            if(do_tcp_handshake == CONFIG_BOOLEAN_YES || (do_tcp_handshake == CONFIG_BOOLEAN_AUTO &&
+                                                          (snmp_root.tcp_EstabResets ||
+                                                           snmp_root.tcp_OutRsts ||
+                                                           snmp_root.tcp_AttemptFails ||
+                                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_tcp_handshake = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -882,7 +924,10 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
             // --------------------------------------------------------------------
 
             // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
-            if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO && (snmp_root.udp_InDatagrams || snmp_root.udp_OutDatagrams))) {
+            if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO &&
+                                                        (snmp_root.udp_InDatagrams ||
+                                                         snmp_root.udp_OutDatagrams ||
+                                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_udp_packets = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -917,14 +962,14 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_udp_errors == CONFIG_BOOLEAN_YES || (do_udp_errors == CONFIG_BOOLEAN_AUTO && (
-                    snmp_root.udp_InErrors
-                    || snmp_root.udp_NoPorts
-                    || snmp_root.udp_RcvbufErrors
-                    || snmp_root.udp_SndbufErrors
-                    || snmp_root.udp_InCsumErrors
-                    || snmp_root.udp_IgnoredMulti
-                    ))) {
+            if(do_udp_errors == CONFIG_BOOLEAN_YES || (do_udp_errors == CONFIG_BOOLEAN_AUTO &&
+                                                     (snmp_root.udp_InErrors ||
+                                                      snmp_root.udp_NoPorts ||
+                                                      snmp_root.udp_RcvbufErrors ||
+                                                      snmp_root.udp_SndbufErrors ||
+                                                      snmp_root.udp_InCsumErrors ||
+                                                      snmp_root.udp_IgnoredMulti ||
+                                                      netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_udp_errors = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
@@ -992,16 +1037,16 @@ int do_proc_net_snmp(int update_every, usec_t dt) {
 
             // --------------------------------------------------------------------
 
-            if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO && (
-                    snmp_root.udplite_InDatagrams
-                    || snmp_root.udplite_OutDatagrams
-                    || snmp_root.udplite_NoPorts
-                    || snmp_root.udplite_InErrors
-                    || snmp_root.udplite_InCsumErrors
-                    || snmp_root.udplite_RcvbufErrors
-                    || snmp_root.udplite_SndbufErrors
-                    || snmp_root.udplite_IgnoredMulti
-                    ))) {
+            if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO &&
+                                                            (snmp_root.udplite_InDatagrams ||
+                                                             snmp_root.udplite_OutDatagrams ||
+                                                             snmp_root.udplite_NoPorts ||
+                                                             snmp_root.udplite_InErrors ||
+                                                             snmp_root.udplite_InCsumErrors ||
+                                                             snmp_root.udplite_RcvbufErrors ||
+                                                             snmp_root.udplite_SndbufErrors ||
+                                                             snmp_root.udplite_IgnoredMulti ||
+                                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
                 do_udplite_packets = CONFIG_BOOLEAN_YES;
 
                 {

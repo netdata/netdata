@@ -11,7 +11,6 @@ packet dropped).
 
 Netdata also supports alarm **templates**, so that an alarm can be attached to all the charts of the same context (i.e. all network interfaces, or all disks, or all mysql servers, etc.).  
 
-
 Each alarm can execute a single query to the database using statistical algorithms against past data,
 but alarms can be combined. So, if you need 2 queries in the database, you can combine
 2 alarms together (both will run a query to the database, and the results can be combined).
@@ -342,6 +341,24 @@ delay: [[[up U] [down D] multiplier M] max X]
      their matching one) and a delay is in place.
   - All are reset to their defaults when the alarm switches state without a delay in place.
 
+---
+
+#### Alarm line `repeat`
+
+Defines the interval between repeating notifications for the alarms in CRITICAL or WARNING mode. This will override the default interval settings inherited from health settings in `netdata.conf`. The default settings for repeating notifications are `default repeat warning = DURATION` and `default repeat critical = DURATION` which can be found in health stock configuration.
+
+Format:
+
+```
+repeat: [off] [warning DURATION] [critical DURATION]
+```
+
+* `off`: Turns off the repeating feature for the current alarm. This is effective when the default repeat settings has been enabled in health configuration.
+* `warning DURATION`: Defines the interval when the alarm is in WARNING state. Use `0s` to turn off the repeating notification for WARNING mode.
+* `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating notification for CRITICAL mode.
+
+---
+
 #### Alarm line `option`
 
 The only possible value for the `option` line is 
@@ -567,11 +584,14 @@ template: disk_full_percent
    every: 1m
     warn: $this > 80
     crit: $this > 95
+  repeat: warning 120s critical 10s
 ```
 
 `$used` and `$avail`  are the `used` and `avail` chart dimensions as shown on the dashboard.
 
 So, the `calc` line finds the percentage of used space. `$this` resolves to this percentage.
+
+This is a repeating alarm and if the alarm becomes CRITICAL it repeats the notifications every 10 seconds. It also repeats notifications every 2 minutes if the alarm goes into WARNING mode.
 
 ### Example 3
 

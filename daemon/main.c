@@ -2,6 +2,7 @@
 
 #include "common.h"
 
+int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 struct config netdata_config = {
@@ -774,6 +775,12 @@ void send_statistics( const char *action, const char *action_result, const char 
     freez(command_to_run);
 }
 
+void set_silencers_filename() {
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/health.silencers.json", netdata_configured_varlib_dir);
+    silencers_filename = config_get(CONFIG_SECTION_HEALTH, "silencers file", filename);
+}
+
 int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
@@ -1102,6 +1109,11 @@ int main(int argc, char **argv) {
 #endif
 
         // --------------------------------------------------------------------
+        // This is the safest place to start the SILENCERS structure
+        set_silencers_filename();
+        health_initialize_global_silencers();
+
+        // --------------------------------------------------------------------
         // setup process signals
 
         // block signals while initializing threads.
@@ -1203,6 +1215,8 @@ int main(int argc, char **argv) {
 
     web_server_config_options();
 
+    netdata_zero_metrics_enabled = config_get_boolean_ondemand(CONFIG_SECTION_GLOBAL, "enable zero metrics", CONFIG_BOOLEAN_NO);
+
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
@@ -1216,8 +1230,8 @@ int main(int argc, char **argv) {
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
-  
-    send_statistics("START","-", "-");
+
+    send_statistics("START", "-",  "-");
 
     // ------------------------------------------------------------------------
     // unblock signals

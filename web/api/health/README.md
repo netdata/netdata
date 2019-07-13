@@ -45,6 +45,7 @@ The following will return an SVG badge of the alarm named `NAME`, attached to th
 ## Health Management API
 
 Netdata v1.12 and beyond provides a command API to control health checks and notifications at runtime. The feature is especially useful for maintenance periods, during which you receive meaningless alarms.
+From Netdata v1.16.0 and beyond, the configuration controlled via the API commands is [persisted across netdata restarts](#persistence).
 
 Specifically, the API allows you to:
  - Disable health checks completely. Alarm conditions will not be evaluated at all and no entries will be added to the alarm log.
@@ -53,7 +54,7 @@ Specifically, the API allows you to:
 
 The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://localhost:19999/netdata.conf`:
 
-```bash
+```
 [registry]
     # netdata management api key file = /var/lib/netdata/netdata.api.key
 ```
@@ -70,9 +71,11 @@ If you've configured and entered your token correclty, you should see the plain 
 ### Disable or silence all alarms
 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
+
 ```
 curl "http://myserver/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken" 
 ```
+
 The effect of disabling health checks is that the alarm criteria are not evaluated at all and nothing is written in the alarm log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
@@ -142,6 +145,44 @@ Example 2.2: Add one more selector, to also silence alarms for cpu1 and cpu2
 http://localhost/api/v1/manage/health?families=cpu1 cpu2
 ```
 
+### List silencers
+
+The command `LIST` was added in netdata v1.16.0 and returns a JSON with the current status of the silencers.
+
+```
+ curl "http://myserver/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken"
+```
+
+As an example, the following response shows that we have two silencers configured, one for an alarm called `samplealarm` and one for alarms with context `random` on host `myhost`
+
+```
+json
+{
+        "all": false,
+        "type": "SILENCE",
+        "silencers": [
+                {
+                        "alarm": "samplealarm"
+                },
+                {
+                        "context": "random",
+                        "hosts": "myhost"
+                }
+        ]
+}
+```
+
+The response below shows that we have disabled all health checks.
+
+```
+json
+{
+        "all": true,
+        "type": "DISABLE",
+        "silencers": []
+}
+```
+
 ### Responses
 
 - "Auth Error" : Token authentication failed
@@ -154,6 +195,17 @@ http://localhost/api/v1/manage/health?families=cpu1 cpu2
 - "Invalid key. Ignoring it." : Wrong name of a parameter. Added to the response and ignored.
 - "WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command." : Added to the response if a selector is added without a selector-specific command.
 - "WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors." : Added to the response if a selector-specific command is issued without a selector.
+
+### Persistence
+
+From netdata v1.16.0 and beyond, the silencers configuration is persisted to disk and loaded when netdata starts.
+The JSON string returned by the [LIST command](#list-silencers) is automatically saved to the `silencers file`, every time a command alters the silencers configuration.
+The file's location is configurable in `netdata.conf`. The default is shown below:
+
+```
+[health]
+        # silencers file = /var/lib/netdata/health.silencers.json
+```
 
 ### Further reading
 

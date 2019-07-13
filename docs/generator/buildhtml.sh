@@ -39,7 +39,6 @@ find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-
 declare -a EXCLUDE_LIST=(
 	"HISTORICAL_CHANGELOG.md"
 	"contrib/sles11/README.md"
-	"packaging/maintainers/README.md"
 )
 
 for f in "${EXCLUDE_LIST[@]}"; do
@@ -56,7 +55,6 @@ MKDOCS_CONFIG_FILE="${GENERATOR_DIR}/mkdocs.yml"
 MKDOCS_DIR="doc"
 DOCS_DIR=${GENERATOR_DIR}/${MKDOCS_DIR}
 rm -rf ${DOCS_DIR}
-mkdir ${DOCS_DIR}
 
 prep_html() {
 	lang="${1}"
@@ -90,12 +88,12 @@ prep_html() {
 
 for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -type d -printf '%f ') ; do
 	echo "Preparing source for $d"
-	cp -a ${SRC_DIR}/* ${DOCS_DIR}/
+	cp -r ${SRC_DIR} ${DOCS_DIR}
 	if [ "${d}" != "en" ] ; then
 		cp -a ${LOC_DIR}/${d}/* ${DOCS_DIR}/
 	fi
 	prep_html $d
-	rm -rf ${DOCS_DIR}/*
+	rm -rf ${DOCS_DIR}
 done
 
 # Remove cloned projects and temp directories

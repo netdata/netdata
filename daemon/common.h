@@ -14,6 +14,7 @@
 #define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
 #define config_get_boolean(section, name, value) appconfig_get_boolean(&netdata_config, section, name, value)
 #define config_get_boolean_ondemand(section, name, value) appconfig_get_boolean_ondemand(&netdata_config, section, name, value)
+#define config_get_duration(section, name, value) appconfig_get_duration(&netdata_config, section, name, value)
 
 #define config_set(section, name, default_value) appconfig_set(&netdata_config, section, name, default_value)
 #define config_set_default(section, name, value) appconfig_set_default(&netdata_config, section, name, value)
@@ -77,6 +78,7 @@ extern char *netdata_configured_varlib_dir;
 extern char *netdata_configured_home_dir;
 extern char *netdata_configured_host_prefix;
 extern char *netdata_configured_timezone;
+extern int netdata_zero_metrics_enabled;
 extern int netdata_anonymous_statistics_enabled;
 
 int netdata_ready;

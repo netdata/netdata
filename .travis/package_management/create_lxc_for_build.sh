@@ -62,7 +62,7 @@ case "${BUILD_ARCH}" in
 	lxc-create -n "${CONTAINER_NAME}" -t "download" -- --dist "${BUILD_DISTRO}" --release "${BUILD_RELEASE}" --arch "i386" --no-validate
 
 	echo "Container(s) ready. Configuring container(s).."
-	.travis/package_management/"${PACKAGE_TYPE}"/configure_lxc_environment.py "${CONTAINER_NAME}"
+	.travis/package_management/configure_${PACKAGE_TYPE}_lxc_environment.py "${CONTAINER_NAME}"
 
 	# amd64
 	echo "Creating LXC Container for amd64.."
@@ -71,7 +71,7 @@ case "${BUILD_ARCH}" in
 	lxc-create -n "${CONTAINER_NAME}" -t "download" -- --dist "${BUILD_DISTRO}" --release "${BUILD_RELEASE}" --arch "amd64" --no-validate
 
 	echo "Container(s) ready. Configuring container(s).."
-	.travis/package_management/"${PACKAGE_TYPE}"/configure_lxc_environment.py "${CONTAINER_NAME}"
+	.travis/package_management/configure_${PACKAGE_TYPE}_lxc_environment.py "${CONTAINER_NAME}"
 
 	# arm64
 	echo "Creating LXC Container for arm64.."
@@ -80,17 +80,17 @@ case "${BUILD_ARCH}" in
 	lxc-create -n "${CONTAINER_NAME}" -t "download" -- --dist "${BUILD_DISTRO}" --release "${BUILD_RELEASE}" --arch "arm64" --no-validate
 
 	echo "Container(s) ready. Configuring container(s).."
-	.travis/package_management/"${PACKAGE_TYPE}"/configure_lxc_environment.py "${CONTAINER_NAME}"
+	.travis/package_management/configure_${PACKAGE_TYPE}_lxc_environment.py "${CONTAINER_NAME}"
 	;;
 "i386"|"amd64"|"arm64")
-	# AMD64 or i386
+	# amd64 or i386
 	echo "Creating LXC Container for ${BUILD_ARCH}.."
 	export CONTAINER_NAME="${BUILDER_NAME}-${BUILD_DISTRO}${BUILD_RELEASE}-${BUILD_ARCH}"
 	export LXC_CONTAINER_ROOT="/var/lib/lxc/${CONTAINER_NAME}/rootfs"
 	lxc-create -n "${CONTAINER_NAME}" -t "download" -- --dist "${BUILD_DISTRO}" --release "${BUILD_RELEASE}" --arch "${BUILD_ARCH}" --no-validate
 
 	echo "Container(s) ready. Configuring container(s).."
-	.travis/package_management/"${PACKAGE_TYPE}"/configure_lxc_environment.py "${CONTAINER_NAME}"
+	.travis/package_management/configure_${PACKAGE_TYPE}_lxc_environment.py "${CONTAINER_NAME}"
 	;;
 *)
 	echo "Unknown BUILD_ARCH value '${BUILD_ARCH}' given, process failed"

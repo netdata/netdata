@@ -6,11 +6,15 @@
 # error.
 %global __os_install_post %{nil}
 
+# Mitigate the cross-distro mayhem by strictly defining the libexec destination
+%define _prefix /usr
+%define _sysconfdir /etc
+%define _localstatedir /var
+%define _libexecdir /usr/libexec
+
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
-%bcond_with     nfacct   # build with nfacct plugin
-%bcond_with     freeipmi # build with freeipmi plugin
 %bcond_with     netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
@@ -27,8 +31,12 @@ BuildRequires: systemd-rpm-macros \
 %global netdata_initd_requires \
 %{?systemd_requires} \
 %{nil}
-%global netdata_init_post %service_add_post netdata.service
-%global netdata_init_preun %service_del_preun netdata.service
+%global netdata_init_post %service_add_post netdata.service \
+/sbin/service netdata restart > /dev/null 2>&1 \
+%{nil}
+%global netdata_init_preun %service_del_preun netdata.service \
+/sbin/service netdata stop > /dev/null 2>&1 \
+%{nil}
 %global netdata_init_postun %service_del_postun netdata.service
 %else
 %global netdata_initd_buildrequires \
@@ -38,7 +46,11 @@ Requires(preun):  systemd-units \
 Requires(postun): systemd-units \
 Requires(post):   systemd-units \
 %{nil}
-%global netdata_init_post %systemd_post netdata.service
+%global netdata_init_post %systemd_post netdata.service \
+/usr/bin/systemctl enable netdata.service \
+/usr/bin/systemctl daemon-reload \
+/usr/bin/systemctl restart netdata.service \
+%{nil}
 %global netdata_init_preun %systemd_preun netdata.service
 %global netdata_init_postun %systemd_postun_with_restart netdata.service
 %endif
@@ -49,6 +61,7 @@ Requires(post):   chkconfig \
 %{nil}
 %global netdata_init_post \
 /sbin/chkconfig --add netdata \
+/sbin/service netdata restart > /dev/null 2>&1 \
 %{nil}
 %global netdata_init_preun %{nil} \
 if [ $1 = 0 ]; then \
@@ -63,23 +76,7 @@ fi \
 %{nil}
 %endif
 
-%if 0%{?_fedora}
-%global netdata_recommends \
-Recommends:	curl \
-Recommends:	iproute-tc \
-Recommends:	lm_sensors \
-Recommends:	nmap-ncat \
-Recommends:	nodejs \
-Recommends:	python \
-Recommends:	PyYAML \
-Recommends:	python2-PyMySQL \
-Recommends:	python2-psycopg2 \
-%{nil}
-%else
-%global netdata_recommends %{nil}
-%endif
-
-Summary:	Real-time performance monitoring, done right
+Summary:	Real-time performance monitoring, done right!
 Name:		netdata
 Version:	@PACKAGE_VERSION@
 Release:	1%{?dist}
@@ -87,43 +84,122 @@ License:	GPLv3+
 Group:		Applications/System
 Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
 URL:		http://my-netdata.io
-BuildRequires:	pkgconfig
-BuildRequires:	xz
-BuildRequires:	zlib-devel
-BuildRequires:	libuuid-devel
-BuildRequires:	autoconf
-BuildRequires:	automake
-Requires:	zlib
-Requires:	libuuid
 
-# Packages can be found in the EPEL repo
-%if %{with nfacct}
-BuildRequires:	libmnl-devel
-BuildRequires:	libnetfilter_acct-devel
-Requires: libmnl
-Requires: libnetfilter_acct
+# #####################################################################
+# Core build/install/runtime dependencies
+# #####################################################################
+
+# Build dependencies
+#
+BuildRequires: gcc
+BuildRequires: make
+BuildRequires: git
+BuildRequires: autoconf
+%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
+BuildRequires: autoconf-archive
+BuildRequires: autogen
+%endif
+BuildRequires: automake
+BuildRequires: pkgconfig
+BuildRequires: curl
+BuildRequires: findutils
+BuildRequires: zlib-devel
+BuildRequires: libuuid-devel
+BuildRequires: libuv-devel >= 1
+BuildRequires: openssl-devel
+%if 0%{?suse_version}
+BuildRequires: judy-devel
+BuildRequires: liblz4-devel
+BuildRequires: netcat-openbsd
+BuildRequires: json-glib-devel
+%else
+BuildRequires: Judy-devel
+BuildRequires: lz4-devel
+BuildRequires: nc
+BuildRequires: json-c-devel
 %endif
 
-%if %{with freeipmi}
-BuildRequires:	freeipmi-devel
-Requires: freeipmi
-%endif
+# Core build requirements for service install
+%{netdata_initd_buildrequires}
 
+# Runtime dependencies
+#
+Requires:      python
+Requires:      zlib
+%if 0%{?suse_version}
+# for libuv, Requires version >= 1
+Requires:      libuv1
+Requires:      libJudy1
+Requires:      json-glib
+Requires:      libuuid1
+%else
+# for libuv, Requires version >= 1
+Requires:      libuv >= 1
+Requires:      Judy
+Requires:      json-c
+Requires:      libuuid
+%endif
+Requires:      openssl
+Requires:      lz4
+
+# Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
+%if 0%{?suse_version} >= 1140
+Requires(post): libcap1
+%else
 Requires(post): libcap
+%endif
 
-%{netdata_initd_buildrequires}
-%{netdata_recommends}
 %{netdata_initd_requires}
 
+# #####################################################################
+# Functionality-dependent package dependencies
+# #####################################################################
+# Note: Some or all of the Packages may be found in the EPEL repo, 
+# rather than the standard ones
+
+# nfacct plugin dependencies
+BuildRequires:  libmnl-devel
+%if 0%{?fedora} || 0%{?suse_version} >= 1140
+BuildRequires:  libnetfilter_acct-devel
+%endif
+
+%if 0%{?suse_version}
+Requires: libmnl0
+%else
+Requires: libmnl
+%endif
+
+%if 0%{?fedora}
+Requires: libnetfilter_acct
+%else
+%if 0%{?suse_version} >= 1140
+Requires: libnetfilter_acct1
+%endif
+%endif
+# end nfacct plugin dependencies
+
+# freeipmi plugin dependencies
+BuildRequires:  freeipmi-devel
+Requires: freeipmi
+# end - freeipmi plugin dependencies
+
+# CUPS plugin dependencies
+BuildRequires: cups-devel
+Requires: cups
+# end - cups plugin dependencies
+
+# #####################################################################
+# End of dependency management configuration
+# #####################################################################
+
 %description
-netdata is the fastest way to visualize metrics. It is a resource
+  netdata is the fastest way to visualize metrics. It is a resource
 efficient, highly optimized system for collecting and visualizing any
 type of realtime timeseries data, from CPU usage, disk activity, SQL
 queries, API calls, web site visitors, etc.
-
-netdata tries to visualize the truth of now, in its greatest detail,
+  netdata tries to visualize the truth of now, in its greatest detail,
 so that you can get insights of what is happening now and what just
 happened, on your systems and applications.
 
@@ -131,25 +207,57 @@ happened, on your systems and applications.
 %setup -q -n %{name}-%{version}
 
 %build
-autoreconf -i
+# Conf step
+autoreconf -ivf
 %configure \
+	--prefix="%{_prefix}" \
+	--sysconfdir="%{_sysconfdir}" \
+	--localstatedir="%{_localstatedir}" \
+	--libexecdir="%{_libexecdir}" \
 	--with-zlib \
 	--with-math \
-	%{?with_nfacct:--enable-plugin-nfacct} \
-	%{?with_freeipmi:--enable-plugin-freeipmi} \
-	--with-user=netdata
+	--with-user=netdata \
+
+# Build step
 %{__make} %{?_smp_mflags}
 
 %install
+
+# ###########################################################
+# Clear the directory, if already exists and install
 rm -rf "${RPM_BUILD_ROOT}"
 %{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
 
 find "${RPM_BUILD_ROOT}" -name .keep -delete
 
 install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
+
+# ###########################################################
+# logrotate settings
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d"
 install -m 644 -p system/netdata.logrotate "${RPM_BUILD_ROOT}%{_sysconfdir}/logrotate.d/%{name}"
 
+# ###########################################################
+# Install freeipmi
+install -m 4750 -p freeipmi.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/freeipmi.plugin"
+
+# ###########################################################
+# Install apps.plugin
+install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/apps.plugin"
+
+# ###########################################################
+# Install perf.plugin
+install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
+
+# ###########################################################
+# Install registry directory
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/custom-plugins.d"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/go.d"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/ssl"
+
+# ###########################################################
+# Install netdata service
 %if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
 install -m 644 -p system/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
@@ -160,7 +268,100 @@ install -m 755 system/netdata-init-d \
         "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
 %endif
 
+# ############################################################
+# Package Go within netdata (TBD: Package it separately)
+safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
+	fi
+}
+
+download_go() {
+	url="${1}"
+	dest="${2}"
+
+	if command -v curl >/dev/null 2>&1; then
+		curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
+	elif command -v wget >/dev/null 2>&1; then
+		wget -T 15 -O - "${url}" > "${dest}"
+	else
+		echo >&2
+		echo >&2 "Downloading go.d plugin from '${url}' failed because of missing mandatory packages."
+		echo >&2 "Either add packages or disable it by issuing '--disable-go' in the installer"
+		echo >&2
+		exit 1
+	fi
+}
+
+install_go() {
+	# When updating this value, ensure correct checksums in packaging/go.d.checksums
+	GO_PACKAGE_VERSION="v0.7.0"
+	ARCH_MAP=(
+		'i386::386'
+		'i686::386'
+		'x86_64::amd64'
+		'aarch64::arm64'
+		'armv64::arm64'
+		'armv6l::arm'
+		'armv7l::arm'
+		'armv5tel::arm'
+	)
+
+	if [ -z "${NETDATA_DISABLE_GO+x}" ]; then
+		echo >&2 "Install go.d.plugin"
+		ARCH=$(uname -m)
+		OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+		for index in "${ARCH_MAP[@]}" ; do
+			KEY="${index%%::*}"
+			VALUE="${index##*::}"
+			if [ "$KEY" = "$ARCH" ]; then
+				ARCH="${VALUE}"
+				break
+			fi
+		done
+		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
+		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
+
+		if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+			return 1
+		fi
+
+		grep "${GO_PACKAGE_BASENAME}\$" "packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "config.tar.gz" "packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
+
+		# Checksum validation
+		if ! (cd "${tmp}" && safe_sha256sum -c "sha256sums.txt"); then
+
+			echo >&2 "go.d plugin checksum validation failure."
+			echo >&2 "Either check the error or consider disabling it by issuing '--disable-go' in the installer"
+			echo >&2
+
+			echo "go.d.plugin package files checksum validation failed."
+			exit 1
+		fi
+
+		# Install files
+		tar -xf "${tmp}/config.tar.gz" -C "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/"
+		mv "${tmp}/$GO_PACKAGE_BASENAME" "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+	fi
+	return 0
+}
+install_go
+
 %pre
+
+# User/Group creations, as needed
 getent group netdata >/dev/null || groupadd -r netdata
 getent group docker >/dev/null || groupadd -r docker
 getent passwd netdata >/dev/null || \
@@ -181,23 +382,27 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %files
 %doc README.md
-%defattr(-,root,root)
+%defattr(-,root,netdata)
 
 %dir %{_sysconfdir}/%{name}
 %dir %{_libdir}/%{name}
 
-%config %{_sysconfdir}/%{name}/*.conf
-#%config %{_sysconfdir}/%{name}/charts.d/*.conf
-#%config %{_sysconfdir}/%{name}/health.d/*.conf
-#%config %{_sysconfdir}/%{name}/node.d/*.conf
-#%config %{_sysconfdir}/%{name}/python.d/*.conf
-#%config %{_sysconfdir}/%{name}/statsd.d/*.conf
-%config %{_sysconfdir}/logrotate.d/%{name}
+%config(noreplace) %{_sysconfdir}/%{name}/*.conf
+%config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 
 %{_libdir}/%{name}
+
+%defattr(0755,netdata,netdata,0755)
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 %{_sysconfdir}/%{name}/edit-config
+
+%defattr(4750,root,netdata,0750)
+
+%dir %{_libexecdir}/%{name}/python.d
+%dir %{_libexecdir}/%{name}/charts.d
+%dir %{_libexecdir}/%{name}/plugins.d
+%dir %{_libexecdir}/%{name}/node.d
 
 %caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
@@ -209,27 +414,25 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0550,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
-%if %{with freeipmi}
+# perf plugin
+%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
+
+
+# freeipmi files
 %caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
-%endif
-
-%attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
-%attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
-%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
-
 %dir %{_datadir}/%{name}
+
+%defattr(0750,netdata,netdata,0755)
 
 %dir %{_sysconfdir}/%{name}/health.d
 %dir %{_sysconfdir}/%{name}/python.d
 %dir %{_sysconfdir}/%{name}/charts.d
+%dir %{_sysconfdir}/%{name}/custom-plugins.d
+%dir %{_sysconfdir}/%{name}/go.d
+%dir %{_sysconfdir}/%{name}/ssl
 %dir %{_sysconfdir}/%{name}/node.d
 %dir %{_sysconfdir}/%{name}/statsd.d
-
-%dir %{_libdir}/%{name}/conf.d/health.d
-%dir %{_libdir}/%{name}/conf.d/python.d
-%dir %{_libdir}/%{name}/conf.d/charts.d
-#%dir %{_libdir}/%{name}/conf.d/node.d
-%dir %{_libdir}/%{name}/conf.d/statsd.d
+%{_libdir}/%{name}/conf.d/
 
 %if %{with systemd}
 %{_unitdir}/netdata.service
@@ -242,7 +445,31 @@ rm -rf "${RPM_BUILD_ROOT}"
 %defattr(0644,root,netdata,0755)
 %{_datadir}/%{name}/web
 
+# Enforce 0660 for files and 0770 for directories
+# for the netdata lib, cache and log dirs
+%defattr(0660,root,netdata,0770)
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/cache/%{name}
+%attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
+%attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
+
+
 %changelog
+* Fri Jun 28 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-7
+- Raise the path overrides to the spec file level, not just the configure.
+- Adjust tighter permissions on some folders, based on what we did on our installer
+- Introduce go.d plugin download and install, to include it on the package (Temporarily, to become separate package on next iteration)
+* Tue Jun 25 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-6
+- Adjust dependency list: Some packages are missing on some distros, adopt to build successfully
+* Mon Jun 24 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-5
+Another pass on cleaning up pre/post installation steps
+- Sync permission and ownership on files and directories
+* Sun Jun 16 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-4
+First draft refactor on package dependencies section
+- Remove freeipmi/nfacct plugin flags. We auto-detect all plugins by decision
+- Start refactor of package dependencies
+- Add missing dependencies, with respect to distro peculiarities
+- Adjust existing dependencies, so that distro-specific package names is applied
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
 - Temporary set version statically
 - Fix changelog ordering

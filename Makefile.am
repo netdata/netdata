@@ -161,6 +161,12 @@ LIBNETDATA_FILES = \
     libnetdata/threads/threads.h \
 	libnetdata/url/url.c \
 	libnetdata/url/url.h \
+	libnetdata/json/json.c \
+	libnetdata/json/json.h \
+	libnetdata/json/jsmn.c \
+	libnetdata/json/jsmn.h \
+	libnetdata/health/health.c \
+	libnetdata/health/health.h \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
@@ -512,6 +518,7 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_LZ4_LIBS) \
 	$(OPTIONAL_JUDY_LIBS) \
 	$(OPTIONAL_SSL_LIBS) \
+	$(OPTIONAL_JSONC_LIBS) \
 	$(NULL)
 
 sbin_PROGRAMS += netdata

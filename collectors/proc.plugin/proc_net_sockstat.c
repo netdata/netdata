@@ -218,7 +218,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_sockets == CONFIG_BOOLEAN_YES || (do_sockets == CONFIG_BOOLEAN_AUTO && sockstat_root.sockets_used)) {
+    if(do_sockets == CONFIG_BOOLEAN_YES || (do_sockets == CONFIG_BOOLEAN_AUTO &&
+                                            (sockstat_root.sockets_used ||
+                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_sockets = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -250,7 +252,12 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO && (sockstat_root.tcp_inuse || sockstat_root.tcp_orphan || sockstat_root.tcp_tw || sockstat_root.tcp_alloc))) {
+    if(do_tcp_sockets == CONFIG_BOOLEAN_YES || (do_tcp_sockets == CONFIG_BOOLEAN_AUTO &&
+                                                (sockstat_root.tcp_inuse ||
+                                                 sockstat_root.tcp_orphan ||
+                                                 sockstat_root.tcp_tw ||
+                                                 sockstat_root.tcp_alloc ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_tcp_sockets = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -291,7 +298,8 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_tcp_mem == CONFIG_BOOLEAN_YES || (do_tcp_mem == CONFIG_BOOLEAN_AUTO && sockstat_root.tcp_mem)) {
+    if(do_tcp_mem == CONFIG_BOOLEAN_YES || (do_tcp_mem == CONFIG_BOOLEAN_AUTO &&
+                                            (sockstat_root.tcp_mem || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_tcp_mem = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -323,7 +331,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_udp_sockets == CONFIG_BOOLEAN_YES || (do_udp_sockets == CONFIG_BOOLEAN_AUTO && sockstat_root.udp_inuse)) {
+    if(do_udp_sockets == CONFIG_BOOLEAN_YES || (do_udp_sockets == CONFIG_BOOLEAN_AUTO &&
+                                                (sockstat_root.udp_inuse ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_udp_sockets = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -355,7 +365,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_udp_mem == CONFIG_BOOLEAN_YES || (do_udp_mem == CONFIG_BOOLEAN_AUTO && sockstat_root.udp_mem)) {
+    if(do_udp_mem == CONFIG_BOOLEAN_YES || (do_udp_mem == CONFIG_BOOLEAN_AUTO &&
+                                            (sockstat_root.udp_mem ||
+                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_udp_mem = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -387,7 +399,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_udplite_sockets == CONFIG_BOOLEAN_YES || (do_udplite_sockets == CONFIG_BOOLEAN_AUTO && sockstat_root.udplite_inuse)) {
+    if(do_udplite_sockets == CONFIG_BOOLEAN_YES || (do_udplite_sockets == CONFIG_BOOLEAN_AUTO &&
+                                                    (sockstat_root.udplite_inuse ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_udplite_sockets = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -419,7 +433,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_raw_sockets == CONFIG_BOOLEAN_YES || (do_raw_sockets == CONFIG_BOOLEAN_AUTO && sockstat_root.raw_inuse)) {
+    if(do_raw_sockets == CONFIG_BOOLEAN_YES || (do_raw_sockets == CONFIG_BOOLEAN_AUTO &&
+                                                (sockstat_root.raw_inuse ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_raw_sockets = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -451,7 +467,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_frag_sockets == CONFIG_BOOLEAN_YES || (do_frag_sockets == CONFIG_BOOLEAN_AUTO && sockstat_root.frag_inuse)) {
+    if(do_frag_sockets == CONFIG_BOOLEAN_YES || (do_frag_sockets == CONFIG_BOOLEAN_AUTO &&
+                                                 (sockstat_root.frag_inuse ||
+                                                  netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_frag_sockets = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -483,7 +501,9 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
     // ------------------------------------------------------------------------
 
-    if(do_frag_mem == CONFIG_BOOLEAN_YES || (do_frag_mem == CONFIG_BOOLEAN_AUTO && sockstat_root.frag_memory)) {
+    if(do_frag_mem == CONFIG_BOOLEAN_YES || (do_frag_mem == CONFIG_BOOLEAN_AUTO &&
+                                             (sockstat_root.frag_memory ||
+                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_frag_mem = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;

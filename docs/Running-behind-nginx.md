@@ -119,10 +119,9 @@ Using the above, you access Netdata on the backend servers, like this:
 
 ### Using TLS communication
 
-In case the Netdata web server has been [configured to use TLS](../web/server/#enabling-tls-support),
-you must also encrypt the communication between Nginx and Netdata.
+In case Netdata's web server has been [configured to use TLS](../web/server/#enabling-tls-support), you must also encrypt the communication between Nginx and Netdata.
 
-To enable encryption, first [enable SSL on nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of the Nginx configuration:
+To enable encryption, first [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of your Nginx configuration:
 
 ```
 proxy_set_header X-Forwarded-Proto https;
@@ -133,15 +132,15 @@ If nginx is not configured as described here, you will probably receive the erro
 
 ### Enable authentication
 
-Create an authentication file to enable the nginx basic authentication.
-Do not use authentication without SSL/TLS!
-If you haven't one you can do the following:
+Create an authentication file to enable basic authentication via Nginx. Do not use authentication without having first [enabled TLS](#using-tls-communication)!
+
+If you don't have an authentication file, you can use the following command:
 
 ```
 printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
 ```
 
-And enable the authentication inside your server directive:
+And then enable the authentication inside your server directive:
 
 ```
 server {
@@ -154,7 +153,7 @@ server {
 
 ## limit direct access to Netdata
 
-If your nginx is on `localhost`, you can use this to protect your Netdata:
+If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
 ```
 [web]
