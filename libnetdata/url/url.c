@@ -122,16 +122,16 @@ char *url_decode_r(char *to, char *url, size_t size) {
                     s += (bytes_written * 3)-1;
                 }
                 else {
-                    //TODO!: Should stop parsing and send HTTP error code 400 back to client instead
-                    //      same goes for other errors - if we see something suspicious abort and send 400
-                    *d++ = ' ';
+                    goto fail_cleanup;
                 }
             }
-            else if(likely(t)) { //ASCII Character if not 0 (error decoding %XX); if 0 skip char same as original implementation
+            else if(likely(t) && isprint(t)) {
                 // avoid HTTP header injection
-                *d++ = (char)((isprint(t))? t : ' ');
+                *d++ = t;
                 s += 2;
             }
+            else
+                goto fail_cleanup;
         }
         else if(unlikely(*s == '+'))
             *d++ = ' ';
@@ -145,4 +145,8 @@ char *url_decode_r(char *to, char *url, size_t size) {
     *d = '\0';
 
     return to;
+
+fail_cleanup:
+    *d = '\0';
+    return NULL;
 }

@@ -11,6 +11,9 @@ extern int web_enable_gzip,
         web_gzip_strategy;
 #endif /* NETDATA_WITH_ZLIB */
 
+//HTTP_CODES 4XX
+#define HTTP_RESPONSE_BAD_REQUEST   400
+
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
