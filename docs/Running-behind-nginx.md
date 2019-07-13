@@ -14,8 +14,6 @@ With Nginx the data is accessed via human-readable domains such as `example.com`
 
 By default, Nginx is fast and lightweight out of the box.
 
-Nginx can be configured to secure your Netdata insights by the use of authentication to access the dashboard. 
-
 ### Nginx configuration file
 
 All Nginx configurations can be found in the `/etc/nginx/` directory. The main configuration file is `/etc/nginx/nginx.conf`. Website or app -specific configurations can be found in the `/etc/nginx/site-available/` directory.
