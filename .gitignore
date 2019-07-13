@@ -176,6 +176,7 @@ python.d/python-modules-installer.sh
 docs/generator/src
 docs/generator/build
 docs/generator/mkdocs.yml
+docs/generator/doc
 
 .environment.sh
 
