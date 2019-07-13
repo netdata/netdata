@@ -86,12 +86,12 @@ static struct netwireless {
 
 
 static void netwireless_free_st(struct netwireless *wireless_dev) {
-	if (wireless_dev->st_status) rrdset_is_obsolete(wireless_dev->st_status);
-	if (wireless_dev->st_link) rrdset_is_obsolete(wireless_dev->st_link);
-	if (wireless_dev->st_level) rrdset_is_obsolete(wireless_dev->st_level);
-	if (wireless_dev->st_noise) rrdset_is_obsolete(wireless_dev->st_noise);
-	if (wireless_dev->st_discarded_packets) rrdset_is_obsolete(wireless_dev->st_discarded_packets);
-	if (wireless_dev->st_missed_beacon) rrdset_is_obsolete(wireless_dev->st_missed_beacon);
+	if(wireless_dev->st_status) rrdset_is_obsolete(wireless_dev->st_status);
+	if(wireless_dev->st_link) rrdset_is_obsolete(wireless_dev->st_link);
+	if(wireless_dev->st_level) rrdset_is_obsolete(wireless_dev->st_level);
+	if(wireless_dev->st_noise) rrdset_is_obsolete(wireless_dev->st_noise);
+	if(wireless_dev->st_discarded_packets) rrdset_is_obsolete(wireless_dev->st_discarded_packets);
+	if(wireless_dev->st_missed_beacon) rrdset_is_obsolete(wireless_dev->st_missed_beacon);
 
 	wireless_dev->st_status = NULL;
 	wireless_dev->st_link = NULL;
@@ -121,21 +121,23 @@ static void netwireless_cleanup(struct timeval *timestamp) {
 
 	struct netwireless *previous = NULL;
     // search it, from begining to the end
-    for (struct netwireless* current = netwireless_root; current;) {
+    for(struct netwireless* current = netwireless_root; current;) {
 
-		if (timercmp(&current->updated, timestamp, <)) {
+		if(timercmp(&current->updated, timestamp, <)) {
 
 			struct netwireless *to_free = current;
 			current = current->next;
 			netwireless_free(to_free);
 
-			if (previous) {
+			if(previous) {
 				previous->next = current;
-			} else {
+			}
+			else {
 				netwireless_root = current;
 			}
 
-		} else {
+		}
+		else {
 			previous = current;
 			current = current->next;
 		}
@@ -151,17 +153,8 @@ static struct netwireless *find_or_create_wireless(const char *name) {
 
     uint32_t hash = simple_hash(name);
 
-	// search it from the beginning to the last position we used
-//  for(wireless = netwireless_root ; wireless != netwireless_last_used ; wireless = wireless->next) {
-//      if(unlikely(hash == wireless->hash && !strcmp(name, wireless->name))) {
-//          netwireless_last_used = wireless->next;
-//          return wireless;
-//      }
-//  }
-
-
     // search it, from begining to the end
-    for (wireless = netwireless_root ; wireless ; wireless = wireless->next) {
+    for(wireless = netwireless_root ; wireless ; wireless = wireless->next) {
         if(unlikely(hash == wireless->hash && !strcmp(name, wireless->name))) {
             return wireless;
         }
@@ -224,7 +217,7 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 	static char *proc_net_wireless_filename = NULL;
 	static int enable_new_interfaces = -1;
 
-	if (unlikely(enable_new_interfaces == -1)) {
+	if(unlikely(enable_new_interfaces == -1)) {
 		char filename[FILENAME_MAX + 1];
 		snprintfz(filename, FILENAME_MAX, "%s", "/proc/net/wireless");
 
@@ -253,35 +246,35 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 	}
 
-	if (unlikely(!ff)) {
+	if(unlikely(!ff)) {
 		ff = procfile_open(proc_net_wireless_filename, " \t,|", PROCFILE_FLAG_DEFAULT);
-		if (unlikely(!ff)) return 1;
+		if(unlikely(!ff)) return 1;
 	}
 
 	ff = procfile_readall(ff);
-	if (unlikely(!ff)) return 1;
+	if(unlikely(!ff)) return 1;
 
 	size_t lines = procfile_lines(ff);
 	struct timeval timestamp;
 	gettimeofday(&timestamp, NULL);
 
-	for (size_t l = 2; l < lines; l++) {
-		if (unlikely(procfile_linewords(ff, l) < 11)) continue;
+	for(size_t l = 2; l < lines; l++) {
+		if(unlikely(procfile_linewords(ff, l) < 11)) continue;
 		char *name = procfile_lineword(ff, l, 0);
 		size_t len = strlen(name);
-		if (name[len - 1] == ':') name[len - 1] = '\0';
+		if(name[len - 1] == ':') name[len - 1] = '\0';
 
 		struct netwireless *wireless_dev = find_or_create_wireless(name);
 
-		if (unlikely(!wireless_dev->configured)) {
+		if(unlikely(!wireless_dev->configured)) {
 			configure_device(do_status, do_quality, do_discarded_packets,
 							 do_missed, wireless_dev);
 		}
 
-		if (likely(do_status != CONFIG_BOOLEAN_NO)) {
+		if(likely(do_status != CONFIG_BOOLEAN_NO)) {
 			wireless_dev->status = str2kernel_uint_t(procfile_lineword(ff, l, 1));
 
-			if (unlikely(!wireless_dev->st_status)) {
+			if(unlikely(!wireless_dev->st_status)) {
 		        wireless_dev->st_status = rrdset_create_localhost(
 												"ap_status"
 												, wireless_dev->chart_id_net_status
@@ -300,7 +293,8 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 				wireless_dev->rd_status = rrddim_add(wireless_dev->st_status, "status", NULL, 1, 1,
 													 RRD_ALGORITHM_ABSOLUTE);
-			} else {
+			}
+			else {
 				rrdset_next(wireless_dev->st_status);
 			}
 
@@ -310,12 +304,12 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 		}
 
-		if (likely(do_quality != CONFIG_BOOLEAN_NO)) {
+		if(likely(do_quality != CONFIG_BOOLEAN_NO)) {
 			wireless_dev->link = str2kernel_uint_t(procfile_lineword(ff, l, 2));
 			wireless_dev->level = str2kernel_uint_t(procfile_lineword(ff, l, 3));
 			wireless_dev->noise = str2kernel_uint_t(procfile_lineword(ff, l, 4));
 
-			if (unlikely(!wireless_dev->st_link)) {
+			if(unlikely(!wireless_dev->st_link)) {
 
 				wireless_dev->st_link = rrdset_create_localhost(
 												"ap_quality_link"
@@ -335,13 +329,14 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 				wireless_dev->rd_link = rrddim_add(wireless_dev->st_link, "link", NULL, 1, 1,
 												   RRD_ALGORITHM_ABSOLUTE);
-			} else {
+			}
+			else {
 				rrdset_next(wireless_dev->st_link);
 			}
 
 
 
-			if (unlikely(!wireless_dev->st_level)) {
+			if(unlikely(!wireless_dev->st_level)) {
 
 				wireless_dev->st_level = rrdset_create_localhost(
 												"ap_quality_level"
@@ -361,11 +356,12 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 				wireless_dev->rd_level = rrddim_add(wireless_dev->st_level, "level", NULL, 1, 1,
 												  RRD_ALGORITHM_ABSOLUTE);
-			} else {
+			}
+			else {
 				rrdset_next(wireless_dev->st_level);
 			}
 
-			if (unlikely(!wireless_dev->st_noise)) {
+			if(unlikely(!wireless_dev->st_noise)) {
 
 				wireless_dev->st_noise = rrdset_create_localhost(
 												"ap_quality_noise"
@@ -385,7 +381,8 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 				wireless_dev->rd_noise = rrddim_add(wireless_dev->st_noise, "noise", NULL, 1, 1,
 												  RRD_ALGORITHM_ABSOLUTE);
-			} else {
+			}
+			else {
 				rrdset_next(wireless_dev->st_noise);
 			}
 
@@ -403,7 +400,7 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 			rrdset_done(wireless_dev->st_noise);
 		}
 
-		if (likely(do_discarded_packets)) {
+		if(likely(do_discarded_packets)) {
 			wireless_dev->nwid = str2kernel_uint_t(procfile_lineword(ff, l, 5));
 			wireless_dev->crypt = str2kernel_uint_t(procfile_lineword(ff, l, 6));
 			wireless_dev->frag = str2kernel_uint_t(procfile_lineword(ff, l, 7));
@@ -411,7 +408,7 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 			wireless_dev->misc = str2kernel_uint_t(procfile_lineword(ff, l, 9));
 
 
-			if (unlikely(!wireless_dev->st_discarded_packets)) {
+			if(unlikely(!wireless_dev->st_discarded_packets)) {
 
 				wireless_dev->st_discarded_packets = rrdset_create_localhost(
 												"ap_discarded"
@@ -440,7 +437,8 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 												   RRD_ALGORITHM_ABSOLUTE);
 				wireless_dev->rd_misc = rrddim_add(wireless_dev->st_discarded_packets, "misc", NULL, 1, 1,
 												  RRD_ALGORITHM_ABSOLUTE);
-			} else {
+			}
+			else {
 				rrdset_next(wireless_dev->st_discarded_packets);
 			}
 
@@ -462,10 +460,10 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 			rrdset_done(wireless_dev->st_discarded_packets);
 		}
 
-		if (likely(do_missed)) {
+		if(likely(do_missed)) {
 			wireless_dev->missed_beacon = str2kernel_uint_t(procfile_lineword(ff, l, 10));
 
-			if (unlikely(!wireless_dev->st_missed_beacon)) {
+			if(unlikely(!wireless_dev->st_missed_beacon)) {
 
 				wireless_dev->st_missed_beacon = rrdset_create_localhost(
 												"ap_missed"
@@ -485,7 +483,8 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 				wireless_dev->rd_missed_beacon = rrddim_add(wireless_dev->st_missed_beacon, "missed beacon", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
-			} else {
+			}
+			else {
 				rrdset_next(wireless_dev->st_missed_beacon);
 			}
 			rrddim_set_by_pointer(wireless_dev->st_missed_beacon, wireless_dev->rd_missed_beacon,
