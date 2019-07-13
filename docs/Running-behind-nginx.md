@@ -1,4 +1,4 @@
-# Running Netdata Behind Nginx
+# Running Netdata behind Nginx
 
 ## Intro
 
