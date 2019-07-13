@@ -36,7 +36,7 @@ After making changes to the configuration files:
 
 ### As a virtual host
 
-With this method instead of `IP ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
+With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
 
 ```
 upstream backend {
