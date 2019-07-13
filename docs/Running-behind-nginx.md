@@ -30,7 +30,7 @@ After making changes to the configuration files:
 
 - restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
-## Ways to pass Netdata via Nginx
+## Ways to access Netdata via Nginx
 
 ### As a virtual host
 
