@@ -49,10 +49,10 @@ for d in ${CREATED_CONTAINERS[@]}; do
 		DEB_BUILD_PATH="${LXC_ROOT}/${d}/rootfs/home/${BUILDER_NAME}"
 		echo "Checking folder ${DEB_BUILD_PATH} for DEB packages"
 		if [ -d "${DEB_BUILD_PATH}" ]; then
-			cp "${DEB_BUILD_PATH}/netdata*.ddeb" "${PACKAGES_DIRECTORY}" || echo "Could not copy any .ddeb files"
-			cp "${DEB_BUILD_PATH}/netdata*.deb" "${PACKAGES_DIRECTORY}" || echo "Could not copy any .deb files"
-			cp "${DEB_BUILD_PATH}/netdata*.buildinfo" "${PACKAGES_DIRECTORY}" || echo "Could not copy any .buildinfo files"
-			cp "${DEB_BUILD_PATH}/netdata*.changes" "${PACKAGES_DIRECTORY}" || echo "Could not copy any .changes files"
+			cp "${DEB_BUILD_PATH}"/netdata*.ddeb "${PACKAGES_DIRECTORY}" || echo "Could not copy any .ddeb files"
+			cp "${DEB_BUILD_PATH}"/netdata*.deb "${PACKAGES_DIRECTORY}" || echo "Could not copy any .deb files"
+			cp "${DEB_BUILD_PATH}"/netdata*.buildinfo "${PACKAGES_DIRECTORY}" || echo "Could not copy any .buildinfo files"
+			cp "${DEB_BUILD_PATH}"/netdata*.changes "${PACKAGES_DIRECTORY}" || echo "Could not copy any .changes files"
 		else
 			echo "Folder ${DEB_BUILD_PATH} does not exist or not a directory, nothing to do for package preparation"
 		fi
