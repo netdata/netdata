@@ -77,6 +77,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
 
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
