@@ -425,16 +425,6 @@ jobs:
 
 
 
-  - stage:
-    <<: *_DEB_TEMPLATE
-    stage: "Package ubuntu/artful"
-    env:
-    - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
-    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-    - ALLOW_SOFT_FAILURE_HERE=true
-
-
-
   # Debian distros build
   - stage:
     <<: *_DEB_TEMPLATE
