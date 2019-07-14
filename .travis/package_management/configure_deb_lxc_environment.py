@@ -51,7 +51,7 @@ print("2. Installing package dependencies within LXC container")
 common.install_common_dependendencies(container)
 
 print("2.1 Install .DEB build support packages")
-common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "build-essential"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dpkg-dev"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libdistro-info-perl"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-make"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-systemd"])
