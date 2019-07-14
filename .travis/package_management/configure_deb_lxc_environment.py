@@ -57,6 +57,11 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-mak
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-systemd"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "git-buildpackage"])
 
+print("2.2 Add more dependencies")
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter-acct-dev"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libfreeipmi-dev"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
+
 print ("3. Run install-required-packages scriptlet")
 common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-packages.sh" % build_path, "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
 common.run_command(container, ["bash", "%s/.install-required-packages.sh" % build_path, "netdata", "--dont-wait", "--non-interactive"])
