@@ -17,7 +17,9 @@ TOP = $(CURDIR)/debian/netdata
 	#dh $@ --with autoreconf
 
 override_dh_auto_configure:
-	dh_auto_configure -- --with-math --with-webdir=/var/lib/netdata/www
+	autoreconf -ivf
+	dh_auto_configure -- --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+	--libexecdir=/usr/libexec --with-user=netdata --with-math --with-webdir=/var/lib/netdata/www
 
 debian/%.postinst: debian/%.postinst.in
 	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' $< > $@
@@ -53,7 +55,7 @@ override_dh_install: debian/netdata.postinst
 
 	# Install go
 	#
-	debian/install_go.sh
+	debian/install_go.sh $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/ $(TOP)/usr/libexec/netdata
 
 override_dh_installdocs:
 	dh_installdocs

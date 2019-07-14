@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+LIB_DIR="$1"
+LIBEXEC_DIR="$2"
+
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
 safe_sha256sum() {
@@ -84,8 +87,8 @@ install_go() {
 		fi
 
 		# Install files
-		tar -xf "${tmp}/config.tar.gz" -C "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/"
-		mv "${tmp}/$GO_PACKAGE_BASENAME" "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+		tar -xf "${tmp}/config.tar.gz" -C "${LIB_DIR}/conf.d/"
+		mv "${tmp}/$GO_PACKAGE_BASENAME" "${LIBEXEC_DIR}/plugins.d/go.d.plugin"
 	fi
 	return 0
 }
