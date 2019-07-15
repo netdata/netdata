@@ -154,7 +154,7 @@ netdataDashboard.menu = {
     'zfs': {
         title: 'ZFS filesystem',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat.py" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary.py" target="_blank">arc_summary.py</a>.'
+        info: 'Performance metrics of the ZFS filesystem. The following charts visualize all metrics reported by <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arcstat/arcstat" target="_blank">arcstat.py</a> and <a href="https://github.com/zfsonlinux/zfs/blob/master/cmd/arc_summary/arc_summary3" target="_blank">arc_summary.py</a>.'
     },
 
     'btrfs': {
