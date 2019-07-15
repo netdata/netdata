@@ -8,6 +8,21 @@ import lxc
 import subprocess
 import os
 
+def fetch_version(orig_build_version):
+    tag = None
+    friendly_version = ""
+
+    # TODO: Checksum validations
+    if str(orig_build_version).count(".latest") == 1:
+        version_list=str(orig_build_version).replace('v', '').split('.')
+        friendly_version='.'.join(version_list[0:2]) + "." + version_list[3]
+    else:
+        friendly_version = orig_build_version.replace('v', '')
+        tag = friendly_version # Go to stable tag
+    print("Version set to %s from %s" % (friendly_version, orig_build_version))
+
+    return friendly_version, tag
+
 def replace_tag(tag_name, spec, new_tag_content):
     print("Fixing tag %s in %s" % (tag_name, spec))
 

@@ -70,14 +70,7 @@ friendly_version=""
 dest_archive=""
 download_url=""
 tag = None
-
-# TODO: Checksum validations
-if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
-    version_list=str(os.environ['BUILD_VERSION']).replace('v', '').split('.')
-    friendly_version='.'.join(version_list[0:2]) + "." + version_list[3]
-else:
-    friendly_version = os.environ['BUILD_VERSION'].replace('v', '')
-    tag = friendly_version # Go to stable tag
+friendly_version, tag = common.fetch_version(os.environ['BUILD_VERSION'])
 
 tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), friendly_version)
 

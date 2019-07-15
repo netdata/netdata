@@ -44,7 +44,7 @@ os.environ["EMAIL"] = "bot@netdata.cloud"
 os.environ["DEBFULLNAME"] = "Netdata builder"
 
 # Run the build process on the container
-new_version = os.environ["BUILD_VERSION"].replace('v', '').replace('.latest', '')
+new_version, tag = common.fetch_version(os.environ['BUILD_VERSION'])
 print("Starting DEB build process for version %s" % new_version)
 
 netdata_tarball = "%s/netdata-%s.tar.gz" % (build_path, new_version)
