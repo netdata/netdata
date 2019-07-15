@@ -13,7 +13,7 @@ To see whether Netdata supports your system, please visit our [distribution supp
 
 **Other installation methods for MacOS, FreeBSD, Kubernetes, and more:** 
 
-- [Pre-built static binary](OTHERS.md): An automated installation process for any Intel/AMD 64bit Linux system
+- [Pre-built static binary](OTHERS.md#pre-built-static-binary-for-linux-64-bit): An automated installation process for any Intel/AMD 64bit Linux system
 - [Manual installation](MANUAL-INSTALLATION.md)
 - [FreeBSD](OTHERS.md#freebsd)
 - [pfSense](OTHERS.md#pfsense)
