@@ -3,13 +3,18 @@
 
 static void flush_transaction_buffer_cb(uv_fs_t* req)
 {
-    struct generic_io_descriptor *io_descr;
+    struct generic_io_descriptor *io_descr = req->data;
+    struct rrdengine_worker_config* wc = req->loop->data;
+    struct rrdengine_instance *ctx = wc->ctx;
 
     debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     if (req->result < 0) {
-        fatal("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
+        ++ctx->stats.io_errors;
+        rrd_stat_atomic_add(&global_io_errors, 1);
+        error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
+    } else {
+        debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     }
-    io_descr = req->data;
 
     uv_fs_req_cleanup(req);
     free(io_descr->buf);
@@ -348,6 +353,7 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
     ret = crc32cmp(jf_trailer->checksum, crc);
     debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
+        error("Transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
         return size_bytes;
     }
     switch (jf_header->type) {
