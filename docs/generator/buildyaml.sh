@@ -127,7 +127,7 @@ navpart 1 . "README" ""
 
 navpart 1 . . "About Netdata"
 
-echo -ne "    - 'what-is-netdata.md'
+echo -ne "    - 'docs/what-is-netdata.md'
     - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
     - 'docs/anonymous-statistics.md'
