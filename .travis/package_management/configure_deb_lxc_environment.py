@@ -59,7 +59,6 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "git-bu
 
 print("2.2 Add more dependencies")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter-acct-dev"])
-common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libfreeipmi-dev"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
 
 print ("3. Run install-required-packages scriptlet")
