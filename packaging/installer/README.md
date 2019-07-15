@@ -4,7 +4,7 @@ You can install Netdata in many different ways, but a few methods will be ideal 
 
 - [**Automatic one-line installation**](#one-line-installation) (**recommended**): Easy, fully automated installation directly from Netdata's source code
 - [Binary packages via Netdata's repository](#binary-packages): Use your distribution's package manager (RPM-based distributions only) to install Netdata
-- [Docker container](docker/): Use our `Dockerfile` to test Netdata or install it in an existing Docker-based infrastructure
+- [Docker container](../docker/): Use our `Dockerfile` to test Netdata or install it in an existing Docker-based infrastructure
 
 To see whether Netdata supports your system, please visit our [distribution support matrix](../../packaging/DISTRIBUTIONS.md).
 
@@ -13,12 +13,12 @@ To see whether Netdata supports your system, please visit our [distribution supp
 
 **Other installation methods for MacOS, FreeBSD, Kubernetes, and more:** 
 
-- [Pre-built static binary](OTHERS.md#linux-64bit-pre-built-static-binary): An automated installation process for any Intel/AMD 64bit Linux system
+- [Pre-built static binary](OTHERS.md): An automated installation process for any Intel/AMD 64bit Linux system
 - [Manual installation](MANUAL-INSTALLATION.md)
-- [FreeBSD](#freebsd)
-- [pfSense](#pfsense)
-- [FreeNAS Corral](#freenas)
-- [macOS (OS X)](#macos)
+- [FreeBSD](OTHERS.md#freebsd)
+- [pfSense](OTHERS.md#pfsense)
+- [FreeNAS Corral](OTHERS.md#freenas)
+- [macOS (OS X)](OTHERS.md#macos)
 - [Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
 - See the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, and other niche systems.
 
@@ -27,11 +27,11 @@ To see whether Netdata supports your system, please visit our [distribution supp
 ## One-line installation 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](#freebsd) and the [MacOS](#macos) sections for more information.
+This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](OTHERS.md#freebsd) and the [MacOS](OTHERS.md#macos) sections for more information.
 
 To install Netdata from source, and keep it up to date with our **nightly releases** automatically, run the following: 
 
-``` bash
+```bash
 $ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
@@ -56,7 +56,7 @@ The `kickstart.sh` script:
 
 **Available options:**
 
-You can customize your Netdata installation by passing options from `kickstart.sh` to `netdata-installer.sh`. With these options you can change the installation directory, enable/disable automatic updates, choose between the nightly (default) or stable channel, enable/disable plugins, and much more. For a full list of options, see the [`netdata-installer.sh` script](https://github.com/netdata/netdata/blob/master/netdata-installer.sh#L149-L177).
+You can customize your Netdata installation by passing options from `kickstart.sh` to `netdata-installer.sh`. With these options you can change the installation directory, enable/disable automatic updates, choose between the nightly (default) or stable channel, enable/disable plugins, and much more. For a full list of options, see the [`netdata-installer.sh` script](https://github.com/netdata/netdata/netdata-installer.sh#L149-L177).
 
 Here are a few popular options:
 
@@ -83,7 +83,8 @@ This command will output `OK, VALID` to confirm that the script is intact and ha
 
 </details>
 
-### Binary Packages ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
+## Binary packages 
+![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
 
 In the effort to make Netdata's installation process easy and fully automated on as many operating systems as possible, we have begun providing our own binary packages for the most common Linux distributions that use `.RPM` or `.DEB` packaging formats.
 
