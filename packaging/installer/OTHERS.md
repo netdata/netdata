@@ -1,7 +1,15 @@
 # Other installation methods
 
+
+
 - [Pre-built static binary](#pre-built-static-binary-for-linux-64-bit)
 - [macOS](#macos)
+- [FreeBSD](#freebsd)
+- [pfSense](#pfsense)
+- [FreeNAS](#freenas)
+- [Alpine 3.x](#alpine-3-x)
+- [Synology](#synology)
+
 
 ## Pre-built static binary for Linux 64-bit
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-86400&label=today&units=installations&precision=0)
@@ -145,6 +153,7 @@ If you experience an issue with `/usr/bin/install` absense on pfSense 2.3 or ear
 
 
 ## FreeNAS
+
 On FreeNAS-Corral-RELEASE (>=10.0.3), Netdata is pre-installed.
 
 To use Netdata, the service will need to be enabled and started from the FreeNAS **[CLI](https://github.com/freenas/cli)**.
