@@ -68,6 +68,9 @@ extra:
       link: "https://www.facebook.com/linuxnetdata/"
 theme:
     name: "material"
+    palette:
+      primary: "blue grey"
+      accent: "light green"
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
     language: '${language}'
@@ -86,7 +89,6 @@ markdown_extensions:
  - footnotes
  - tables
  - admonition
- - codehilite
  - meta
  - sane_lists
  - smarty
@@ -100,6 +102,9 @@ markdown_extensions:
  - pymdownx.caret
  - pymdownx.critic
  - pymdownx.details
+ - pymdownx.highlight:
+    pygments_style: manni
+    noclasses: true
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark

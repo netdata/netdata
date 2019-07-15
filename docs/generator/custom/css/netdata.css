@@ -5,3 +5,26 @@
 .md-typeset {
     font-size: .75rem
 }
+
+/* Hide the label at the top of the navigation menu. Does nothing. */
+.md-nav__title {
+    display: none;
+}
+
+/* Change the language selector dropdown to match new color. */
+.md-header-nav select#sel {
+    background-color: rgba(0,0,0,.26) !important;
+    padding: 3px;
+    margin-left: 5px;
+    margin-right: 20px;
+}
+
+/* Add some whitespace to the bottom of each doc. */
+.md-content {
+    margin-bottom: 6rem;
+}
+
+/* Make sure inline code in tables doesn't break. */
+.md-typeset__table code {
+    word-break: normal;
+}
