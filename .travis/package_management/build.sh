@@ -21,13 +21,6 @@ cd "${UNPACKAGED_NETDATA_PATH}"
 echo "Linking debian -> contrib/debian"
 ln -sf contrib/debian debian
 
-echo "Adjusting control file for the distro"
-if [ "${BUILD_STRING}" == "debian/jessie" ]; then
-	echo "Setting control file for Jessie"
-	rm contrib/debian/control
-	cp contrib/debian/control.jessie contrib/debian/control
-fi
-
 echo "Executing dpkg-buildpackage"
 if dpkg-buildpackage --version 2> /dev/null | grep -q "1.18"; then
 	dpkg-buildpackage --post-clean --pre-clean --build=binary

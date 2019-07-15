@@ -84,6 +84,11 @@ tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), friendly_versi
 print("5. I will be building version '%s' of netdata." % os.environ['BUILD_VERSION'])
 dest_archive="%s/netdata-%s.tar.gz" % (build_path, friendly_version)
 
+if str(os.environ["BUILD_STRING"]).count("debian/jessie") == 1:
+    print("5.1 We are building for Jessie, adjusting control file")
+    common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
+    common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.jessie', 'contrib/debian/control'])
+
 common.prepare_version_source(dest_archive, friendly_version, tag=tag)
 
 print("6. Installing build.sh script to build path")
