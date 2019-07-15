@@ -193,7 +193,12 @@ Requires: cups
 # Prometheus remote write dependencies
 BuildRequires: snappy-devel
 BuildRequires: protobuf-devel
+%if 0%{?suse_version}
+BuildRequires: libprotobuf-c-devel
+%else
 BuildRequires: protobuf-c-devel
+%endif
+
 %if 0%{?suse_version}
 Requires: libsnappy1
 Requires: protobuf-c
