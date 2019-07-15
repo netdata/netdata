@@ -22,6 +22,6 @@ echo "Linking debian -> contrib/debian"
 ln -sf contrib/debian debian
 
 echo "Executing dpkg-buildpackage"
-dpkg-buildpackage --host-arch amd64 --target-arch amd64 --pre-clean --build=binary
+dpkg-buildpackage --host-arch "${BUILD_ARCH}" --target-arch "${BUILD_ARCH}" --build=binary
 
 echo "DEB build script completed!"
