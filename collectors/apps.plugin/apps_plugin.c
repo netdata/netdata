@@ -530,24 +530,30 @@ avl_tree all_user_id_index = {
 
 struct user_id *all_user_id_root = NULL;
 
+int file_changed(const struct stat *statbuf, struct timespec *last_modification_time) {
+    if(statbuf->st_mtim.tv_sec == last_modification_time->tv_sec &&
+       statbuf->st_mtim.tv_nsec == last_modification_time->tv_nsec) return 0;
+
+    last_modification_time->tv_sec = statbuf->st_mtim.tv_sec;
+    last_modification_time->tv_nsec = statbuf->st_mtim.tv_nsec;
+
+    return 1;
+}
+
 int read_user_ids() {
     static struct timespec last_modification_time;
     char filename[FILENAME_MAX + 1];
 
-    snprintfz(filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
+    // snprintfz(filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "/home/vlad/passwd");
 
     debug_log("passwd file: '%s'", filename);
 
     struct stat statbuf;
-    if(!stat(filename, &statbuf)) {
-        if(statbuf.st_mtim.tv_sec == last_modification_time.tv_sec &&
-           statbuf.st_mtim.tv_nsec == last_modification_time.tv_nsec) return 0;
-        last_modification_time.tv_sec = statbuf.st_mtim.tv_sec;
-        last_modification_time.tv_nsec = statbuf.st_mtim.tv_nsec;
-    }
-    else {
+    if(stat(filename, &statbuf))
         return 1;
-    }
+    else
+        if(!file_changed(&statbuf, &last_modification_time)) return 0;
 
     // ----------------------------------------
 
