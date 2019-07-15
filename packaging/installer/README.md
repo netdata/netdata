@@ -31,7 +31,7 @@ This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS
 
 To install Netdata from source, and keep it up to date with our **nightly releases** automatically, run the following: 
 
-```bash
+``` bash linenums="1"
 $ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
