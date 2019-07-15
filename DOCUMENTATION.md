@@ -22,7 +22,6 @@ Welcome! You've arrived at the documentation for Netdata. Use the links below to
   <div class="nav-configuration">
     <a class="nav-button" href="docs/configuration-guide/">Configuration guide</a>
     <p>Take your configuration options from the <em>getting started guide</em> to the next level. Increase metrics retention, modify how charts are displayed, disable collectors, and modify alarms.</p>
-
   </div>
 
 </div>
