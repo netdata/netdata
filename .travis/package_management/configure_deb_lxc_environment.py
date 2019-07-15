@@ -55,6 +55,7 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dpkg-d
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libdistro-info-perl"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-make"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-systemd"])
+common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-autoreconf"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "git-buildpackage"])
 
 print("2.2 Add more dependencies")

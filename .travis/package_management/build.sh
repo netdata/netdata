@@ -22,6 +22,10 @@ echo "Linking debian -> contrib/debian"
 ln -sf contrib/debian debian
 
 echo "Executing dpkg-buildpackage"
-dpkg-buildpackage --host-arch "${BUILD_ARCH}" --target-arch "${BUILD_ARCH}" --build=binary
+if dpkg-buildpackage --version 2> /dev/null | grep -q "1.18"; then
+	dpkg-buildpackage --post-clean --pre-clean --build=binary
+else
+	dpkg-buildpackage -b
+fi
 
 echo "DEB build script completed!"
