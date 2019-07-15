@@ -500,6 +500,142 @@ static int
         all_files_size = 0;
 
 // ----------------------------------------------------------------------------
+// /host/etc/passwd and /host/etc/group should be read when Netdata is inside
+// a container
+
+struct user_id {
+    avl avl;
+
+    uid_t id;
+    char *name;
+
+    int updated;
+
+    struct user_id * next;
+};
+
+int user_id_compare(void* a, void* b) {
+    if(((struct user_id *)a)->id < ((struct user_id *)b)->id)
+        return -1;
+    else if(((struct user_id *)a)->id > ((struct user_id *)b)->id)
+        return 1;
+    else
+        return 0;
+}
+
+avl_tree all_user_id_index = {
+        NULL,
+        user_id_compare
+};
+
+struct user_id *all_user_id_root = NULL;
+
+int read_user_ids() {
+    static struct timespec last_modification_time;
+    char filename[FILENAME_MAX + 1];
+
+    snprintfz(filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
+
+    debug_log("passwd file: '%s'", filename);
+
+    struct stat statbuf;
+    if(!stat(filename, &statbuf)) {
+        if(statbuf.st_mtim.tv_sec == last_modification_time.tv_sec &&
+           statbuf.st_mtim.tv_nsec == last_modification_time.tv_nsec) return 0;
+        last_modification_time.tv_sec = statbuf.st_mtim.tv_sec;
+        last_modification_time.tv_nsec = statbuf.st_mtim.tv_nsec;
+    }
+    else {
+        return 1;
+    }
+
+    // ----------------------------------------
+
+    info("READ FILE");
+
+    procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
+    if(!ff) return 1;
+
+    ff = procfile_readall(ff);
+    if(!ff) return 1;
+
+    size_t line, lines = procfile_lines(ff);
+
+    for(line = 0; line < lines ;line++) {
+        size_t words = procfile_linewords(ff, line);
+        if(words < 3) continue;
+
+        char *name = procfile_lineword(ff, line, 0);
+        if(!name || !*name) continue;
+
+        char *uid = procfile_lineword(ff, line, 2);
+        if(!uid || !*uid) continue;
+
+
+        struct user_id *user_id = callocz(1, sizeof(struct user_id));
+        user_id->id = (uid_t)str2ull(uid);
+        user_id->name = strdupz(name);
+        user_id->updated = 1;
+
+        struct user_id *existing_user_id = NULL;
+
+        if(all_user_id_index.root)
+            existing_user_id = (struct user_id *)avl_search(&all_user_id_index, (avl *) user_id);
+
+        if(existing_user_id) {
+            freez(existing_user_id->name);
+            existing_user_id->name = user_id->name;
+            existing_user_id->updated = 1;
+            freez(user_id);
+        }
+        else {
+            info("INSERT id = %u, name = %s", user_id->id, user_id->name);
+            if(avl_insert(&all_user_id_index, (avl *) user_id) != (void *) user_id) {
+                error("INTERNAL ERROR: duplicate indexing of user id during realloc");
+            };
+
+            user_id->next = all_user_id_root;
+            all_user_id_root = user_id;
+        }
+    }
+
+    procfile_close(ff);
+
+    struct user_id *user_id = all_user_id_root, *prev_user_id = NULL;
+
+    while(user_id) {
+        if(!user_id->updated) {
+            info("REMOVE id = %u, name = %s", user_id->id, user_id->name);
+            if((struct user_id *)avl_remove(&all_user_id_index, (avl *) user_id) != user_id)
+                error("INTERNAL ERROR: removal of unused user id from index, removed a different user id");
+
+            if(prev_user_id)
+                prev_user_id->next = user_id->next;
+            else
+                all_user_id_root = user_id->next;
+
+            freez(user_id->name);
+            freez(user_id);
+
+            if(prev_user_id)
+                user_id = prev_user_id->next;
+            else
+                user_id = all_user_id_root;
+        }
+        else {
+            user_id->updated = 0;
+
+            info("id = %u, name = %s", user_id->id, user_id->name);
+
+            prev_user_id = user_id;
+            user_id = user_id->next;
+        }
+    }
+
+    return 0;
+}
+
+// ----------------------------------------------------------------------------
 // apps_groups.conf
 // aggregate all processes in groups, to have a limited number of dimensions
 
@@ -516,11 +652,24 @@ static struct target *get_users_target(uid_t uid) {
     snprintfz(w->id, MAX_NAME, "%u", uid);
     w->idhash = simple_hash(w->id);
 
-    struct passwd *pw = getpwuid(uid);
-    if(!pw || !pw->pw_name || !*pw->pw_name)
-        snprintfz(w->name, MAX_NAME, "%u", uid);
-    else
-        snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
+    struct user_id tmp_user_id, *user_id = NULL;
+    tmp_user_id.id = uid;
+
+    if(all_user_id_index.root)
+            user_id = (struct user_id *)avl_search(&all_user_id_index, (avl *) &tmp_user_id);
+
+    if(user_id && user_id->name && *user_id->name) {
+        info("Copy name from passwd");
+        snprintfz(w->name, MAX_NAME, "%s", user_id->name);
+    }
+    else {
+        info("Copy name from getpwuid");
+        struct passwd *pw = getpwuid(uid);
+        if(!pw || !pw->pw_name || !*pw->pw_name)
+            snprintfz(w->name, MAX_NAME, "%u", uid);
+        else
+            snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
+    }
 
     netdata_fix_chart_name(w->name);
 
@@ -3847,6 +3996,8 @@ int main(int argc, char **argv) {
 #else
         usec_t dt = heartbeat_next(&hb, step);
 #endif
+
+        read_user_ids();
 
         if(!collect_data_for_all_processes()) {
             error("Cannot collect /proc data for running processes. Disabling apps.plugin...");
