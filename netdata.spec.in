@@ -190,6 +190,18 @@ BuildRequires: cups-devel
 Requires: cups
 # end - cups plugin dependencies
 
+# Prometheus remote write dependencies
+BuildRequires: snappy-devel
+BuildRequires: protobuf-devel
+%if 0%{?suse_version}
+Requires: libsnappy1
+Requires: protobuf-c
+%else
+Requires: snappy
+Requires: protobuf
+%endif
+# end - prometheus remote write dependencies
+
 # #####################################################################
 # End of dependency management configuration
 # #####################################################################

@@ -68,6 +68,8 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
@@ -75,6 +77,8 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
 
         if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
             print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
@@ -85,11 +89,15 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libipmimonitoring-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libjson-c-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libsnappy-dev"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotobuf-dev"])
     else:
+        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
-        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
 
     if os.environ["BUILD_STRING"].count("el/6") <= 0:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
