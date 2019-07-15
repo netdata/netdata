@@ -30,6 +30,7 @@ case "$1" in
         dpkg-statoverride --update --add --force root netdata 0775 /var/lib/netdata/registry
         chown -R root:netdata /usr/share/netdata
         chown -R root:netdata /usr/libexec/netdata/plugins.d
+	chown -R root:netdata /var/lib/netdata/www
         setcap cap_dac_read_search,cap_sys_ptrace+ep /usr/libexec/netdata/plugins.d/apps.plugin
 
 #PERMS#
