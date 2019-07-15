@@ -1,4 +1,4 @@
-# Manual installation of Netdata
+# Manual installation
 
 To install the latest git version of Netdata, please follow these 2 steps:
 

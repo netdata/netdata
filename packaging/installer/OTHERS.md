@@ -1,8 +1,9 @@
 # Other installation methods
 
-- [Pre-built static binary]()
+- [Pre-built static binary](#pre-built-static-binary-for-linux-64-bit)
+- [macOS](#macos)
 
-## Pre-built static binary (for Linux 64-bit) 
+## Pre-built static binary for Linux 64-bit
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart64&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 You can install a pre-compiled static binary of Netdata on any Intel/AMD 64bit Linux system (even those that don't have a package manager, like CoreOS, CirrOS, busybox systems, etc). You can also use these packages on systems with broken or unsupported package managers.
@@ -16,11 +17,9 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 !!! note
     Do not use `sudo` for this installer—it will escalate privileges itself if needed.
 
-!!! note
     If your system does not have `bash` installed, see below for instructions to run it without `bash`.
 
-!!! note
-    The static builds installs Netdata at **`/opt/netdata`.
+    The static builds installs Netdata at `/opt/netdata`.
 
 <details markdown="1"><summary>More information and advanced uses of the `kickstart-static64.sh` script</summary>
 
@@ -66,64 +65,7 @@ sh /tmp/kickstart-static64.sh
 Once Netdata is installed, see [Getting Started](../../docs/GettingStarted.md).
 
 
-## FreeBSD
-
-You can install Netdata from ports or packages collection.
-
-This is how to install the latest Netdata version from sources on FreeBSD:
-
-```sh
-# install required packages
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof
-
-# download Netdata
-git clone https://github.com/netdata/netdata.git --depth=100
-
-# install Netdata in /opt/netdata
-cd netdata
-./netdata-installer.sh --install /opt
-```
-
-##### pfSense
-To install Netdata on pfSense run the following commands (within a shell or under Diagnostics/Command Prompt within the pfSense web interface).
-
-Change platform (i386/amd64, etc) and FreeBSD versions (10/11, etc) according to your environment and change Netdata version (1.10.0 in example) according to latest version present within the FreeSBD repository:-
-
-Note first three packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata is downloaded from the FreeBSD repository.
-```
-pkg install pkgconf
-pkg install bash
-pkg install e2fsprogs-libuuid
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.8_2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.13.0.txz
-```
-To start Netdata manually run `service netdata onestart`
-
-To start Netdata automatically at each boot add `service netdata onestart` as a Shellcmd within the pfSense web interface (under **Services/Shellcmd**, which you need to install beforehand under **System/Package Manager/Available Packages**).
-Shellcmd Type should be set to `Shellcmd`.
-![](https://i.imgur.com/wcKiPe1.png)
-Alternatively more information can be found in https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages, for achieving the same via the command line and scripts.
-
-If you experience an issue with `/usr/bin/install` absense on pfSense 2.3 or earlier, update pfSense or use workaround from [https://redmine.pfsense.org/issues/6643](https://redmine.pfsense.org/issues/6643)  
-
-**Note:** In pfSense, the Netdata configuration files are located under `/usr/local/etc/netdata`
-
-##### FreeNAS
-On FreeNAS-Corral-RELEASE (>=10.0.3), Netdata is pre-installed.
-
-To use Netdata, the service will need to be enabled and started from the FreeNAS **[CLI](https://github.com/freenas/cli)**.
-
-To enable the Netdata service:
-```
-service netdata config set enable=true
-```
-
-To start the netdata service:
-```
-service netdata start
-```
-
-##### macOS
+## macOS
 
 Netdata on macOS still has limited charts, but external plugins do work.
 
@@ -157,7 +99,68 @@ sudo ./netdata-installer.sh --install /usr/local
 
 The installer will also install a startup plist to start Netdata when your Mac boots.
 
-##### Alpine 3.x
+
+## FreeBSD
+
+You can install Netdata from ports or packages collection.
+
+This is how to install the latest Netdata version from sources on FreeBSD:
+
+```sh
+# install required packages
+pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof
+
+# download Netdata
+git clone https://github.com/netdata/netdata.git --depth=100
+
+# install Netdata in /opt/netdata
+cd netdata
+./netdata-installer.sh --install /opt
+```
+
+## pfSense
+
+To install Netdata on pfSense, run the following commands (within a shell or under Diagnostics/Command Prompt within the pfSense web interface).
+
+Change platform (i386/amd64, etc) and FreeBSD versions (10/11, etc) according to your environment and change Netdata version (1.10.0 in example) according to latest version present within the FreeSBD repository:-
+
+Note first three packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata is downloaded from the FreeBSD repository.
+```
+pkg install pkgconf
+pkg install bash
+pkg install e2fsprogs-libuuid
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.8_2.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.13.0.txz
+```
+To start Netdata manually run `service netdata onestart`
+
+To start Netdata automatically at each boot add `service netdata onestart` as a Shellcmd within the pfSense web interface (under **Services/Shellcmd**, which you need to install beforehand under **System/Package Manager/Available Packages**).
+Shellcmd Type should be set to `Shellcmd`.
+![](https://i.imgur.com/wcKiPe1.png)
+Alternatively more information can be found in https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages, for achieving the same via the command line and scripts.
+
+If you experience an issue with `/usr/bin/install` absense on pfSense 2.3 or earlier, update pfSense or use workaround from [https://redmine.pfsense.org/issues/6643](https://redmine.pfsense.org/issues/6643)  
+
+**Note:** In pfSense, the Netdata configuration files are located under `/usr/local/etc/netdata`
+
+
+## FreeNAS
+On FreeNAS-Corral-RELEASE (>=10.0.3), Netdata is pre-installed.
+
+To use Netdata, the service will need to be enabled and started from the FreeNAS **[CLI](https://github.com/freenas/cli)**.
+
+To enable the Netdata service:
+```
+service netdata config set enable=true
+```
+
+To start the netdata service:
+```
+service netdata start
+```
+
+
+## Alpine 3.x
 
 Execute these commands to install Netdata in Alpine Linux 3.x:
 
@@ -172,10 +175,8 @@ apk add nodejs
 git clone https://github.com/netdata/netdata.git --depth=100
 cd netdata
 
-
 # build it, install it, start it
 ./netdata-installer.sh
-
 
 # make Netdata start at boot
 echo -e "#!/usr/bin/env bash\n/usr/sbin/netdata" >/etc/local.d/netdata.start
@@ -189,7 +190,8 @@ chmod 755 /etc/local.d/netdata.stop
 rc-update add local
 ```
 
-##### Synology
+
+## Synology
 
 The documentation previously recommended installing the Debian Chroot package from the Synology community package sources and then running Netdata from within the chroot. This does not work, as the chroot environment does not have access to `/proc`, and therefore exposes very few metrics to Netdata. Additionally, [this issue](https://github.com/SynoCommunity/spksrc/issues/2758), still open as of 2018/06/24, indicates that the Debian Chroot package is not suitable for DSM versions greater than version 5 and may corrupt system libraries and render the NAS unable to boot.
 
