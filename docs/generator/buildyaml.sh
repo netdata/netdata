@@ -145,6 +145,8 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'docs/why-netdata/immediate-results.md'
 - Installation:
     - 'packaging/installer/README.md'
+    - 'packaging/installer/OTHERS.md'
+    - 'packaging/installer/MANUAL-INSTALLATION.md'
     - 'packaging/docker/README.md'
     - 'packaging/installer/UPDATE.md'
     - 'packaging/DISTRIBUTIONS.md'
