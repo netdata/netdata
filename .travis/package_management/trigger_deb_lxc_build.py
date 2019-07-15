@@ -59,7 +59,7 @@ common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_VERSION/%s-1/g' % o
 common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog_in_host])
 
 print("Executing gbp dch command..")
-common.run_command_in_host(['gbp', 'dch', '--release', '--ignore-branch', '--spawn-editor=snapshot', '--since=%s' % os.environ["LATEST_RELEASE_VERSION"]])
+common.run_command_in_host(['gbp', 'dch', '--release', '--ignore-branch', '--spawn-editor=snapshot', '--since=%s' % os.environ["LATEST_RELEASE_VERSION"], '--new-version=%s' % new_version])
 
 print("Copying over changelog to the destination machine")
 common.run_command_in_host(['sudo', 'cp', 'debian/changelog', "%s/%s/netdata-%s/contrib/debian/" % (os.environ['LXC_CONTAINER_ROOT'], build_path, new_version)])
