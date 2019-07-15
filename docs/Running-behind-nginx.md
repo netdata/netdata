@@ -170,7 +170,7 @@ If Nginx is not configured as described here, you will probably receive the erro
 
 ### Enable authentication
 
-Create an authentication file to enable basic authentication via Nginx, this secures your Netdata dashboard. Do not use authentication without having first [enabled TLS](#using-tls-communication)!
+Create an authentication file to enable basic authentication via Nginx, this secures your Netdata dashboard.
 
 If you don't have an authentication file, you can use the following command:
 
