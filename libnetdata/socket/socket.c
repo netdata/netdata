@@ -320,31 +320,16 @@ void socket_ssl_acl(char *acl) {
             ssl += 4;
             if (!strcmp(ssl,"optional")) {
                 netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
-                //       return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
             }
             else if (!strcmp(ssl,"force")) {
                 netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
-                //       return WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
             }
         }
 #endif
     }
-
- //   return WEB_CLIENT_ACL_NONE;
 }
 
 WEB_CLIENT_ACL read_acl(char *st) {
-    /*
-    char *ssl = strchr(st,'^');
-    if (ssl) {
-        ssl++;
-        if (!strncmp("SSL=",ssl,4)) {
-            ssl += 4;
-        }
-        socket_ssl_acl(ssl);
-    }
-     */
-
     if (!strcmp(st,"dashboard")) return WEB_CLIENT_ACL_DASHBOARD;
     if (!strcmp(st,"registry")) return WEB_CLIENT_ACL_REGISTRY;
     if (!strcmp(st,"badges")) return WEB_CLIENT_ACL_BADGE;
@@ -352,7 +337,6 @@ WEB_CLIENT_ACL read_acl(char *st) {
     if (!strcmp(st,"streaming")) return WEB_CLIENT_ACL_STREAMING;
     if (!strcmp(st,"netdata.conf")) return WEB_CLIENT_ACL_NETDATACONF;
 
-    //return socket_ssl_acl(st);
     return WEB_CLIENT_ACL_NONE;
 }
 
