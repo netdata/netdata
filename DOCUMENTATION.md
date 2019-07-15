@@ -6,12 +6,26 @@
 ## Navigating the Netdata documentation
 
 Welcome! You've arrived at the documentation for Netdata. Use the links below to find answers to the most common questions about Netdata, such as how to install it, getting started guides, basic configuration, and adding more charts. Or, explore all of Netdata's documentation using the table of contents to your left.
- 
-1. **[Installation](packaging/installer/#installation)**: Step-by-step instructions on how to install Netdata either using our quick-start installer on Linux systems or manual installations on a variety of alternative systems. **[Go &rarr;](packaging/installer/#installation)**
 
-2. **[Getting Started Guide](docs/GettingStarted.md)**: The perfect place for Netdata beginners to start. Learn how to access Netdata's dashboard, start and stop the service, basic configuration, and more.  **[Go &rarr;](docs/GettingStarted.md)**
+<div class="homepage-nav">
 
-3. **[Configuration Guide](docs/configuration-guide.md)**: Take your configuration options from the *getting started guide* to the next level. Increase metrics retention, modify how charts are displayed, disable collectors, and modify alarms.  **[Go &rarr;](docs/configuration-guide.md)**
+  <div class="nav-install">
+    <a class="nav-button" href="packaging/installer/#one-line-installation">One-line installation</a>
+    <p>Use our completely automated one-line installation process to get Netdata on all Linux distributions. Or, find detailed instructions for binary packages, Kubernetes, macOS, and more.</p>
+
+  </div>
+  <div class="nav-getting-started">
+    <a class="nav-button" href="docs/GettingStarted/">Getting started guide</a>
+    <p>The perfect place for Netdata beginners to start. Learn how to access Netdata's dashboard, start and stop the service, basic configuration, and more.</p>
+
+  </div>
+  <div class="nav-configuration">
+    <a class="nav-button" href="docs/configuration-guide/">Configuration guide</a>
+    <p>Take your configuration options from the <em>getting started guide</em> to the next level. Increase metrics retention, modify how charts are displayed, disable collectors, and modify alarms.</p>
+
+  </div>
+
+</div>
 
 4. **Advanced users**: For those who already understand how to access a Netdata dashboard and perform basic configuration, feel free to see what's behind any of these other doors.
 
