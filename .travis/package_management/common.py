@@ -8,6 +8,21 @@ import lxc
 import subprocess
 import os
 
+def fetch_version(orig_build_version):
+    tag = None
+    friendly_version = ""
+
+    # TODO: Checksum validations
+    if str(orig_build_version).count(".latest") == 1:
+        version_list=str(orig_build_version).replace('v', '').split('.')
+        friendly_version='.'.join(version_list[0:2]) + "." + version_list[3]
+    else:
+        friendly_version = orig_build_version.replace('v', '')
+        tag = friendly_version # Go to stable tag
+    print("Version set to %s from %s" % (friendly_version, orig_build_version))
+
+    return friendly_version, tag
+
 def replace_tag(tag_name, spec, new_tag_content):
     print("Fixing tag %s in %s" % (tag_name, spec))
 
@@ -51,24 +66,36 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "clean", "-a"])
         run_command(container, [os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
-        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
+
         if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
             print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
         else:
             run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
+    elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libipmimonitoring-dev"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libjson-c-dev"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
     else:
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+
+    if os.environ["BUILD_STRING"].count("el/6") < 0:
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
 
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
-    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
-    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
 
 def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     print(".0 Preparing local implementation tarball for version %s" % pkg_friendly_version)

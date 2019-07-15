@@ -37,15 +37,37 @@ if not container.running or not container.state == "RUNNING":
 if not container.get_ips(timeout=30):
     raise Exception("Timeout while waiting for container")
 
+build_path = "/home/%s" % os.environ['BUILDER_NAME']
+
 print("Setting up EMAIL and DEBFULLNAME variables required by the build tools")
 os.environ["EMAIL"] = "bot@netdata.cloud"
 os.environ["DEBFULLNAME"] = "Netdata builder"
 
 # Run the build process on the container
-print("Starting DEB build process, running dh-make")
-new_version = os.environ["BUILD_VERSION"].replace('v', '')
+new_version, tag = common.fetch_version(os.environ['BUILD_VERSION'])
+print("Starting DEB build process for version %s" % new_version)
 
-print("Building the package")
-common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "dpkg-buildpackage", "--host-arch", "amd64", "--target-arch", "amd64", "--post-clean", "--pre-clean", "--build=binary", "--release-by=\"Netdata Builder\"", "--build-by=\"Netdata Builder\""])
+netdata_tarball = "%s/netdata-%s.tar.gz" % (build_path, new_version)
+unpacked_netdata = netdata_tarball.replace(".tar.gz", "")
+
+print("Extracting tarball %s" % netdata_tarball)
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "tar", "xf", netdata_tarball, "-C", build_path])
+
+print("Fixing changelog tags")
+changelog_in_host = "contrib/debian/changelog"
+common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_VERSION/%s-1/g' % os.environ["LATEST_RELEASE_VERSION"].replace("v", ""), changelog_in_host])
+common.run_command_in_host(['sed', '-i', 's/PREVIOUS_PACKAGE_DATE/%s/g' % os.environ["LATEST_RELEASE_DATE"], changelog_in_host])
+
+print("Executing gbp dch command..")
+common.run_command_in_host(['gbp', 'dch', '--release', '--ignore-branch', '--spawn-editor=snapshot', '--since=%s' % os.environ["LATEST_RELEASE_VERSION"], '--new-version=%s' % new_version])
+
+print("Copying over changelog to the destination machine")
+common.run_command_in_host(['sudo', 'cp', 'debian/changelog', "%s/%s/netdata-%s/contrib/debian/" % (os.environ['LXC_CONTAINER_ROOT'], build_path, new_version)])
+
+print("Running debian build script since %s" % os.environ["LATEST_RELEASE_VERSION"])
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "%s/build.sh" % build_path, unpacked_netdata, new_version])
+
+print("Listing contents on build path")
+common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "ls", "-ltr", build_path])
 
 print('Done!')

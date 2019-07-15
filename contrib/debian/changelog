@@ -1,0 +1,5 @@
+netdata (PREVIOUS_PACKAGE_VERSION) unstable; urgency=medium
+
+  * Initial Release
+
+-- Netdata Builder <bot@netdata.cloud> PREVIOUS_PACKAGE_DATE

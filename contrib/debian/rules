@@ -17,7 +17,9 @@ TOP = $(CURDIR)/debian/netdata
 	#dh $@ --with autoreconf
 
 override_dh_auto_configure:
-	dh_auto_configure -- --with-math --with-webdir=/var/lib/netdata/www
+	autoreconf -ivf
+	dh_auto_configure -- --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+	--libexecdir=/usr/libexec --with-user=netdata --with-math --with-webdir=/var/lib/netdata/www
 
 debian/%.postinst: debian/%.postinst.in
 	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' $< > $@
@@ -34,7 +36,7 @@ override_dh_install: debian/netdata.postinst
 	mkdir -p "$(TOP)/usr/share/netdata"
 	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
 		echo Relocating $$D; \
-		mv "$(TOP)/var/lib/netdata/www/$$D" "$(TOP)/usr/share/netdata/$$D"; \
+		mv "$(TOP)/var/lib/netdata/www/$$D" "$(TOP)/usr/share/netdata/www/$$D"; \
 		ln -s "/usr/share/netdata/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
 	done
 
@@ -51,6 +53,10 @@ override_dh_install: debian/netdata.postinst
 	done
 	sed -i "/^#PERMS#/d" $(CURDIR)/debian/netdata.postinst
 
+	# Install go
+	#
+	debian/install_go.sh $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/ $(TOP)/usr/libexec/netdata
+
 override_dh_installdocs:
 	dh_installdocs
 
@@ -58,10 +64,11 @@ override_dh_installdocs:
 		-name README.md \
 		-not -path './.travis/*' \
 		-not -path './debian/*' \
+		-not -path './contrib/*' \
 		-exec cp \
-						--parents \
-						--target $(TOP)/usr/share/doc/netdata/ \
-						{} \;
+		--parents \
+		--target $(TOP)/usr/share/doc/netdata/ \
+		{} \;
 
 override_dh_fixperms:
 	dh_fixperms
@@ -69,7 +76,10 @@ override_dh_fixperms:
 	# apps.plugin should only be runnable by the netdata user. It will be
 	# given extra capabilities in the postinst script.
 	#
-	chmod 0754 $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/plugins.d/apps.plugin
+	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/apps.plugin
+	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin
+	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
+	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
 
 override_dh_installlogrotate:
 	cp system/netdata.logrotate debian/netdata.logrotate

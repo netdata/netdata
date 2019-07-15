@@ -79,15 +79,7 @@ dest_archive=""
 download_url=""
 spec_file="/home/%s/rpmbuild/SPECS/netdata.spec" % os.environ['BUILDER_NAME']
 tag = None
-
-# TODO: Checksum validations
-if str(os.environ['BUILD_VERSION']).count(".latest") == 1:
-    version_list=str(os.environ['BUILD_VERSION']).replace('v', '').split('.')
-    rpm_friendly_version='.'.join(version_list[0:3]) + "." + version_list[3]
-else:
-    rpm_friendly_version = os.environ['BUILD_VERSION'].replace('v', '')
-    tag = rpm_friendly_version # Go to stable tag
-
+rpm_friendly_version, tag = common.fetch_version(os.environ['BUILD_VERSION'])
 tar_file="%s/netdata-%s.tar.gz" % (os.path.dirname(dest_archive), rpm_friendly_version)
 
 print("5. I will be building version '%s' of netdata." % os.environ['BUILD_VERSION'])
