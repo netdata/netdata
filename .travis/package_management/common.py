@@ -66,12 +66,10 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "clean", "-a"])
         run_command(container, [os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
-        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
-        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
@@ -92,7 +90,9 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
 
-    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
+    if os.environ["BUILD_STRING"].count("el/6") < 0:
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
+
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
