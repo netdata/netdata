@@ -16,7 +16,7 @@ The software is known for its low impact on memory resources, high scalability, 
 
 - A proxy was necessary to encrypt the communication to netdata, until v1.16.0, which provided TLS (HTTPS) support.
 
-### Nginx configuration file
+## Nginx configuration file
 
 All Nginx configurations can be found in the `/etc/nginx/` directory. The main configuration file is `/etc/nginx/nginx.conf`. Website or app-specific configurations can be found in the `/etc/nginx/site-available/` directory.
 
