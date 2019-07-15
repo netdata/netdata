@@ -155,7 +155,7 @@ Using the above, you access Netdata on the backend servers, like this:
 - `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
 - `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
 
-### Using TLS communication
+### Encrypt the communication between Nginx and Netdata
 
 In case Netdata's web server has been [configured to use TLS](../web/server/#enabling-tls-support), it is necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append the following parameters in your `nginx.conf`
 
