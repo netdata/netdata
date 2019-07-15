@@ -66,40 +66,40 @@ stages:
   # Build DEB packages under special conditions
   # Ubuntu
 - name: "Package ubuntu/disco"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 - name: "Package ubuntu/cosmic"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 - name: "Package ubuntu/bionic"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 
   # Debian
 - name: "Package debian/buster"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 - name: "Package debian/stretch"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 - name: "Package debian/jessie"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 
   # Build RPM packages under special conditions
   # Enterprise linux (Covers CentOS, Redhat, Amazon linux)
 - name: "Package Enterprise Linux 7"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Enterprise Linux\]|\[Package arm64 RPM\]|\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
 - name: "Package Enterprise linux 6"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
 
   # Fedora
 - name: "Package Fedora 30"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
 - name: "Package Fedora 29"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
 - name: "Package Fedora 28"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
 
   # OpenSuSE
 - name: "Package OpenSuSE 15.1"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package amd64 RPM openSuSE\]|\[Package amd64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package amd64 RPM openSuSE\]|\[Package amd64 RPM\])/
 - name: "Package OpenSuSE 15.0"
-  if: type != cron AND type != pull_request AND branch = binary-distros-deb-packaging AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package amd64 RPM openSuSE\]|\[Package amd64 RPM\])/
+  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package amd64 RPM openSuSE\]|\[Package amd64 RPM\])/
 
 
 
@@ -127,7 +127,6 @@ stages:
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
     deploy:
-      # Beta packages deployment
       - provider: packagecloud
         repository: "${DEPLOY_REPO}"
         username: "${PACKAGING_USER}"
@@ -138,19 +137,6 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "binary-distros-deb-packaging"
-          condition: -d "${PACKAGES_DIRECTORY}"
-      # Production release packages deployment
-      - provider: packagecloud
-        repository: "netdata"
-        username: "netdata"
-        token: "${PKG_CLOUD_TOKEN}"
-        dist: "${BUILD_STRING}"
-        local_dir: "${PACKAGES_DIRECTORY}"
-        skip_cleanup: true
-        on:
-          # Only deploy on ${USER}/netdata, master branch, when packages directory is created
-          repo: "netdata/netdata"
           branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
@@ -184,7 +170,6 @@ stages:
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
     deploy:
-      # Beta packages deployment
       - provider: packagecloud
         repository: "${DEPLOY_REPO}"
         username: "${PACKAGING_USER}"
@@ -195,19 +180,6 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "binary-distros-deb-packaging"
-          condition: -d "${PACKAGES_DIRECTORY}"
-      # Production release packages deployment
-      - provider: packagecloud
-        repository: "netdata"
-        username: "netdata"
-        token: "${PKG_CLOUD_TOKEN}"
-        dist: "${BUILD_STRING}"
-        local_dir: "${PACKAGES_DIRECTORY}"
-        skip_cleanup: true
-        on:
-          # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
-          repo: "netdata/netdata"
           branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
