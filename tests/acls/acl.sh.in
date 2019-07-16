@@ -52,7 +52,7 @@ CONF=$(grep "bind" netdata.cfg)
 MUSER=$(grep run netdata.cfg | cut -d= -f2|sed 's/^[ \t]*//')
 
 openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -sha512 -subj "/C=US/ST=Denied/L=Somewhere/O=Dis/CN=www.example.com" -keyout key.pem  -out cert.pem
-chown "$MUSER" *.pem
+chown "$MUSER" key.pem cert.pem
 CWD=$(pwd)
 
 if [ -f "${NETDATA_VARLIB_DIR}/netdata.api.key" ] ;then
