@@ -73,6 +73,11 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotobuf-c-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
+        if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
+            print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
+        else:
+            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
+
         run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
@@ -82,10 +87,6 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c-devel"])
 
-        if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
-            print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
-        else:
-            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
     elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libipmimonitoring-dev"])
