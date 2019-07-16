@@ -91,7 +91,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
 
-    if os.environ["BUILD_STRING"].count("el/6") < 0:
+    if os.environ["BUILD_STRING"].count("el/6") <= 0:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
 
     run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
