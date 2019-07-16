@@ -111,6 +111,8 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libsnappy-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotobuf-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotoc-dev"])
+        if os.environ["BUILD_STRING"].count("debian/jessie") == 1 or os.environ["BUILD_STRING"].count("debian/stretch") == 1:
+            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy")
     else:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
