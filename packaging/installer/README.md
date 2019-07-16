@@ -35,9 +35,10 @@ To install Netdata from source, and keep it up to date with our **nightly releas
 $ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-**Nightly releases can be unstable!** If you have concerns about running nightly versions of Netdata, for example in a production system, you can append `--stable-channel` to the above command (`bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel`) to ensure Netdata only updates on new major releases.
+!!! note
+    Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
 
-**Do not use `sudo` for the one-line installer**—it will escalate privileges itself if needed.
+    To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
 
 <details markdown="1"><summary>Click here for more information and advanced use of the one-line installation script.</summary>
 
@@ -85,6 +86,13 @@ To install Netdata from a binary package on any Linux distro and any kernel vers
 ```bash
 $ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
+
+!!! note
+    Do not use `sudo` for this installer—it will escalate privileges itself if needed.
+
+    To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](README.md#nightly-vs-stable-releases).
+
+    If your system does not have `bash` installed, open the `More information and advanced uses of the kickstart-static64.sh script` dropdown for instructions to run the installer without `bash`.
 
 **Nightly releases can be unstable!** If you have concerns about running nightly versions of Netdata, for example in a production system, you can append `--stable-channel` to the above command (`bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --stable-channel`) to ensure Netdata only updates on new major releases.
 
@@ -465,5 +473,39 @@ Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as a
 # Netdata startup
 [ -x /etc/rc.netdata ] && /etc/rc.netdata start
 ```
+
+
+## Nightly vs. stable releases
+
+The Netdata team maintains two releases of the Netdata agent: **nightly** and **stable**. By default, Netdata's installation scripts will give you **automatic, nightly** updates, as that is our recommended configuration.
+
+**Nightly**: We create nightly builds every 24 hours. They contain fully-tested code that fixes bugs or security flaws, or introduces new features to Netdata. Every nightly release is a candidate for then becoming a stable release—when we're ready, we simply change the release tags on GitHub. That means nightly releases are stable and proven to function correctly in the vast majority of Netdata use cases. That's why nightly is the *best choice for most Netdata users*.
+
+**Stable**: We create stable releases whenever we believe the code has reached a major milestone. Most often, stable releases correlate with the introduction of new, significant features. Stable releases might be a better choice for those who run Netdata in *mission-critical production systems*, as updates will come more infrequently, and only after the community helps fix any bugs that might have been introduced in previous releases.
+
+**Pros of using nightly releases:**
+
+  - Get the latest features and bugfixes as soon as they're available
+  - Receive security-related fixes immediately
+  - Use stable, fully-tested code that's always improving
+  - Leverage the same Netdata experience our community is using
+
+**Pros of using stable releases:**
+
+  - Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata installation
+  - Retain more control over the Netdata version you use
+
+
+## Automatic updates
+
+By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
+
+If you would prefer to manually update your Netdata agent, you can disable automatic updates by using the `--no-updates` option when you install or update Netdata using the [one-line installation script](#one-line-installation).
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
+```
+
+With automatic updates disabled, you can choose exactly when and how you [update Netdata](UPDATE.md).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

@@ -86,7 +86,7 @@ bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-**Nightly releases can be unstable!** If you have concerns about running nightly versions of Netdata, for example in a production system, you can append `--stable-channel` to the above command (`bash <(curl -Ss https://my-netdata.io/kickstart.sh) --stable-channel`) to ensure Netdata only updates on new major releases.
+To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](packaging/installer/README.md#nightly-vs-stable-releases).
 
 The above command will:
 
