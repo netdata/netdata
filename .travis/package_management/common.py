@@ -92,7 +92,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
-        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotobuf-c-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
@@ -102,6 +102,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-compiler"])
 
     elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "g++"])
@@ -111,8 +112,9 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libsnappy-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotobuf-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotoc-dev"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-compiler"])
         if os.environ["BUILD_STRING"].count("debian/jessie") == 1 or os.environ["BUILD_STRING"].count("debian/stretch") == 1:
-            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy")
+            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy"])
     else:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
@@ -121,6 +123,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c-devel"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-compiler"])
 
     if os.environ["BUILD_STRING"].count("el/6") <= 0:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
