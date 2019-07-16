@@ -1,6 +1,11 @@
 # diskspace.plugin
 
-This plugin monitors the disk space usage of mounted disks, under Linux. To be able to get the statistics, Netdata needs to have the search permission on the mount point.
+This plugin monitors the disk space usage of mounted disks, under Linux. The plugin requires Netdata to have execute/search permissions on the mount point itself, as well as each component of the absolute path to the mount point. You can create a separate group to control access to mount points, include `netdata` user to the group, and set the execute/search permissions using
+
+```sh
+chown :volumeadm /mnt/volume
+chmod g+x /mnt/volume
+```
 
 Two charts are available for every mount:
  - Disk Space Usage
