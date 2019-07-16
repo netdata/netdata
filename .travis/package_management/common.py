@@ -65,6 +65,7 @@ def install_common_dependendencies(container):
     if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "clean", "-a"])
         run_command(container, [os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
@@ -80,6 +81,7 @@ def install_common_dependendencies(container):
 
         run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
@@ -89,6 +91,7 @@ def install_common_dependendencies(container):
 
     elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "g++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libipmimonitoring-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libjson-c-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
@@ -97,6 +100,7 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotoc-dev"])
     else:
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])

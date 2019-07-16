@@ -22,7 +22,8 @@ Build-Depends: debhelper (>= 9),
                automake,
                pkg-config,
                curl,
-               gcc
+               gcc,
+               g++
 Section: net
 Priority: optional
 Maintainer: Costa Tsaousis <costa@tsaousis.gr>

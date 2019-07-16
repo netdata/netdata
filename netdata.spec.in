@@ -92,6 +92,7 @@ URL:		http://my-netdata.io
 # Build dependencies
 #
 BuildRequires: gcc
+BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git
 BuildRequires: autoconf
