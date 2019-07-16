@@ -11,7 +11,7 @@ GREEN='\033[0;32m'
 #change the previous acl file and with a new 
 #and store it on a new file
 change_file(){
-	sed "s/$1/$2/g" netdata.conf > $3
+	sed "s/$1/$2/g" netdata.cfg > $3
 }
 
 run_acl_tests() {
