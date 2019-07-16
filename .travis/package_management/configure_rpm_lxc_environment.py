@@ -46,11 +46,15 @@ print("1. Adding user %s" % os.environ['BUILDER_NAME'])
 common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
-print("2. Installing package dependencies within LXC container")
-common.install_common_dependendencies(container)
+print("2.1 Preparing repo on LXC container")
+common.prepare_repo(container)
+
+common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
 
 # Exceptional cases, not available everywhere
 #
+print("2.2 Running uncommon dependencies and preparing LXC environment")
 # Not on Centos-7
 if os.environ["BUILD_STRING"].count("el/7") <= 0:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter_acct-devel"])
@@ -59,8 +63,8 @@ if os.environ["BUILD_STRING"].count("el/7") <= 0:
 if os.environ["BUILD_STRING"].count("el/6") <= 0:
     common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autoconf-archive"])
 
-common.run_command(container, ["wget", "-T", "15", "-O", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
-common.run_command(container, ["bash", "/home/%s/.install-required-packages.sh" % (os.environ['BUILDER_NAME']), "netdata", "--dont-wait", "--non-interactive"])
+print("2.3 Installing common dependencies")
+common.install_common_dependendencies(container)
 
 print("3. Setting up macros")
 common.run_command(container, ["sudo", "-u", os.environ['BUILDER_NAME'], "/bin/echo", "'%_topdir %(echo /home/" + os.environ['BUILDER_NAME'] + ")/rpmbuild' > /home/" + os.environ['BUILDER_NAME'] + "/.rpmmacros"])

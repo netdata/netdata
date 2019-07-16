@@ -61,10 +61,31 @@ def run_command_in_host(cmd):
     print('Error: '  + e.decode('ascii'))
     print('code: ' + str(proc.returncode))
 
-def install_common_dependendencies(container):
+def prepare_repo(container):
     if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "clean", "-a"])
         run_command(container, [os.environ["REPO_TOOL"], "--no-gpg-checks", "update", "-y"])
+
+    elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
+        run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
+        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+
+        if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
+            print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
+        else:
+            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
+
+    elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
+        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+    else:
+        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
+
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
+    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
+
+def install_common_dependendencies(container):
+    if str(os.environ["REPO_TOOL"]).count("zypper") == 1:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-glib-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
@@ -74,13 +95,6 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotobuf-c-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("yum") == 1:
-        if os.environ["BUILD_STRING"].count("el/7") == 1 and os.environ["BUILD_ARCH"].count("i386") == 1:
-            print ("Skipping epel-release install for %s-%s" % (os.environ["BUILD_STRING"], os.environ["BUILD_ARCH"]))
-        else:
-            run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
-
-        run_command(container, [os.environ["REPO_TOOL"], "clean", "all"])
-        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
@@ -90,7 +104,6 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c-devel"])
 
     elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
-        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "g++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libipmimonitoring-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libjson-c-dev"])
@@ -99,7 +112,6 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotobuf-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libprotoc-dev"])
     else:
-        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
@@ -110,10 +122,6 @@ def install_common_dependendencies(container):
 
     if os.environ["BUILD_STRING"].count("el/6") <= 0:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "autogen"])
-
-    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "sudo"])
-    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "wget"])
-    run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "bash"])
 
 def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     print(".0 Preparing local implementation tarball for version %s" % pkg_friendly_version)
