@@ -33,8 +33,8 @@ find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o 
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
 
 # Modify the first line of the main README.md, to enable proper static html generation
-# echo "Modifying README header"
-# sed -i -e '0,/# Netdata /s//# What is Netdata?\n\n/' ${SRC_DIR}/docs/what-is-netdata.md
+echo "Modifying README header"
+sed -i -e '0,/# Netdata /s//# Netdata Documentation\n\n/' ${SRC_DIR}/README.md
 
 # Remove all GA tracking code
 find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
@@ -89,9 +89,9 @@ prep_html() {
 		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'
 	fi
 
-	# Replace index.html with docs/home/index.html
-	echo "Replacing index.html with docs/home/index.html"
-	cat ${GENERATOR_DIR}/${SITE_DIR}/docs/home/index.html > ${GENERATOR_DIR}/${SITE_DIR}/index.html
+	# Replace index.html with DOCUMENTATION/index.html
+	echo "Replacing index.html with DOCUMENTATION/index.html"
+	cat ${GENERATOR_DIR}/${SITE_DIR}/DOCUMENTATION/index.html > ${GENERATOR_DIR}/${SITE_DIR}/index.html
 }
 
 for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -type d -printf '%f ') ; do
