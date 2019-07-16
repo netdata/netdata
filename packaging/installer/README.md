@@ -1,46 +1,63 @@
 # Installation
 
-You can install Netdata in many different ways, but a few methods will be ideal for the vast majority of users:
+You can install Netdata in many different ways, but the following three methods will work best for the vast majority of would-be Netdata users:
 
-- [**Automatic one-line installation**](#one-line-installation) (**recommended**): Easy, fully automated installation directly from Netdata's source code
-- [Binary packages via Netdata's repository](#binary-packages): Use your distribution's package manager (RPM-based distributions only) to install Netdata
-- [Docker container](../docker/): Use our `Dockerfile` to test Netdata or install it in an existing Docker-based infrastructure
+<div class="install-nav-buttons">
+
+  <div>
+    <div class="inner">
+      <a class="nav-button" href="#one-line-installation">One-line installation (recommended)</a>
+      <p>Use our completely automated one-line installation process to install Netdata on all Linux distributions directly from the source code.</p>
+    </div>
+  </div>
+  <div>
+    <a class="nav-button" href="#binary-packages">Binary packages</a>
+    <p>Use your distribution's package manager to install Netdata via RPM or DEB binary packages.</p>
+
+  </div>
+  <div>
+    <a class="nav-button" href="../docker/">Docker container</a>
+    <p>Use our <code>Dockerfile</code> to test Netdata or install it in an existing Docker-based infrastructure.</p>
+  </div>
+
+</div>
 
 To see whether Netdata supports your system, please visit our [distribution support matrix](../../packaging/DISTRIBUTIONS.md).
 
 !!! note
-    Starting with Netdata v1.12, Netdata by default collects anonymous usage information and sends it to Google Analytics. To read more about what information is collected and how to opt-out, check the [anonymous statistics page](../../docs/anonymous-statistics.md).
+    Starting with Netdata v1.12, Netdata by default collects anonymous usage information and sends it to Google Analytics. To read more about what information is collected and how to opt-out, check out the [anonymous statistics page](../../docs/anonymous-statistics.md).
 
-**Other installation methods for MacOS, FreeBSD, Kubernetes, and more:** 
+**Other installation methods for macOS, FreeBSD, Kubernetes, and more:** 
 
-- [Pre-built static binary](OTHERS.md#pre-built-static-binary-for-linux-64-bit): An automated installation process for any Intel/AMD 64bit Linux system
+- [Pre-built static binary for Linux 64-bit](OTHERS.md#pre-built-static-binary-for-linux-64-bit)
 - [Manual installation](MANUAL-INSTALLATION.md)
+- [macOS (OS X)](OTHERS.md#macos)
 - [FreeBSD](OTHERS.md#freebsd)
 - [pfSense](OTHERS.md#pfsense)
-- [FreeNAS Corral](OTHERS.md#freenas)
-- [macOS (OS X)](OTHERS.md#macos)
+- [FreeNAS](OTHERS.md#freenas)
+- [Alpine 3.x](OTHERS.md#alpine-3-x)
+- [Synology](OTHERS.md#synology)
 - [Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
 - See the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, and other niche systems.
 
 ---
 
-## One-line installation 
+## One-line installation
+
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](OTHERS.md#freebsd) and the [MacOS](OTHERS.md#macos) sections for more information.
 
-To install Netdata from source, and keep it up to date with our **nightly releases** automatically, run the following: 
+To install Netdata from source and get **automatic, nightly** updates, run the following:
 
-``` bash linenums="1"
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 !!! note
     Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
 
     To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
-
-Once you have installed Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
 <details markdown="1"><summary>More information and advanced uses of the `kickstart.sh` script</summary>
 
@@ -68,7 +85,7 @@ Here are a few popular options:
 Here's an example of how to pass a few options through `kickstart.sh`:
 
 ```bash
-  bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --stable-channel
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --stable-channel
 ```
 
 **Verify the script's integrity:**
@@ -83,6 +100,10 @@ This command will output `OK, VALID` to confirm that the script is intact and ha
 
 </details>
 
+Once you have installed Netdata, see our [getting started guide](../../docs/GettingStarted.md).
+
+---
+
 ## Binary packages 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
 
@@ -96,7 +117,7 @@ We provide two separate repositories, one for our stable releases and one for ou
 
 Use the following command to add our stable repository to your system's package manager:
 
-```
+```bash
 curl -s https://packagecloud.io/install/repositories/netdata/netdata/script.rpm.sh | sudo bash
 ```
 
@@ -104,9 +125,11 @@ curl -s https://packagecloud.io/install/repositories/netdata/netdata/script.rpm.
 
 Use the following command to add our nightly repository to your system's package manager:
 
-```
+```bash
 curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.rpm.sh | sudo bash
 ```
+
+---
 
 ## Nightly vs. stable releases
 
