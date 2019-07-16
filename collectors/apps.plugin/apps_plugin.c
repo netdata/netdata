@@ -700,13 +700,15 @@ static struct target *get_users_target(uid_t uid) {
     struct user_or_group_id user_id_to_find, *user_or_group_id = NULL;
     user_id_to_find.id.uid = uid;
 
-    static struct timespec last_passwd_modification_time;
-    int ret = read_user_or_group_ids(&all_user_ids, &last_passwd_modification_time);
+    if(*netdata_configured_host_prefix) {
+        static struct timespec last_passwd_modification_time;
+        int ret = read_user_or_group_ids(&all_user_ids, &last_passwd_modification_time);
 
-    if(likely(!ret && all_user_ids.index.root))
-            user_or_group_id = (struct user_or_group_id *)avl_search(&all_user_ids.index, (avl *) &user_id_to_find);
+        if(likely(!ret && all_user_ids.index.root))
+                user_or_group_id = (struct user_or_group_id *)avl_search(&all_user_ids.index, (avl *) &user_id_to_find);
+    }
 
-    if(likely(user_or_group_id && user_or_group_id->name && *user_or_group_id->name)) {
+    if(user_or_group_id && user_or_group_id->name && *user_or_group_id->name) {
         snprintfz(w->name, MAX_NAME, "%s", user_or_group_id->name);
     }
     else {
@@ -746,13 +748,15 @@ struct target *get_groups_target(gid_t gid)
     struct user_or_group_id group_id_to_find, *group_id = NULL;
     group_id_to_find.id.gid = gid;
 
-    static struct timespec last_group_modification_time;
-    int ret = read_user_or_group_ids(&all_group_ids, &last_group_modification_time);
+    if(*netdata_configured_host_prefix) {
+        static struct timespec last_group_modification_time;
+        int ret = read_user_or_group_ids(&all_group_ids, &last_group_modification_time);
 
-    if(likely(!ret && all_group_ids.index.root))
-            group_id = (struct user_or_group_id *)avl_search(&all_group_ids.index, (avl *) &group_id_to_find);
+        if(likely(!ret && all_group_ids.index.root))
+                group_id = (struct user_or_group_id *)avl_search(&all_group_ids.index, (avl *) &group_id_to_find);
+    }
 
-    if(likely(group_id && group_id->name && *group_id->name)) {
+    if(group_id && group_id->name && *group_id->name) {
         snprintfz(w->name, MAX_NAME, "%s", group_id->name);
     }
     else {
