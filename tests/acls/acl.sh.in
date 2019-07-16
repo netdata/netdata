@@ -1,0 +1,66 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+CURLOPTS="-v --create-dirs -o"
+BASICURL="http://127.0.0.1:19999"
+
+NETDATA_VARLIB_DIR="@varlibdir_POST@"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+
+#change the previous acl file and with a new 
+#and store it on a new file
+change_file(){
+	sed "s/$1/$2/g" netdata.conf > $3
+}
+
+run_acl_tests() {
+	netdata -c $1
+
+	#Give a time for netdata start properly
+	sleep 2
+
+	curl $CURLOPTS index.html "$BASICURL" 2> log_index.txt
+	curl $CURLOPTS netdata.cfg "$BASICURL/netdata.conf" 2> log_nc.txt
+	curl $CURLOPTS badge.csv "$BASICURL/api/v1/badge.svg?chart=cpu.cpu0_interrupts" 2> log_badge.txt
+	curl -H "X-Auth-Token: $2" $CURLOPTS health.csv "$BASICURL/api/v1/manage/health?cmd=LIST" 2> log_health.txt
+
+	TOT=$(grep "HTTP/1.1 200 OK" log_* | wc -l)
+
+	if [ "$TOT" -ne "$3" ]; then
+		echo -e "${RED}I got a wrong number of 200 OK from the queries."
+		exit 1
+	else
+		echo -e "${GREEN}ACLs were applied correctly"
+	fi
+
+	killall netdata
+}
+
+CONF=$(grep "bind" netdata.conf)
+
+if [ -f "${NETDATA_VARLIB_DIR}/netdata.api.key" ] ;then
+	read -r TOKEN < "${NETDATA_VARLIB_DIR}/netdata.api.key"
+else
+	TOKEN="NULL"
+fi
+
+change_file "$CONF" "bind to = *" "netdata.conf.test0"
+run_acl_tests "netdata.conf.test0" $TOKEN 4
+
+change_file "$CONF" "bind to = *=dashboard|registry|badges|management|netdata.conf" "netdata.conf.test1"
+run_acl_tests "netdata.conf.test1" $TOKEN 4
+
+change_file "$CONF" "bind to = *=dashboard|registry|badges|management" "netdata.conf.test2"
+run_acl_tests "netdata.conf.test2" $TOKEN 3
+
+change_file "$CONF" "bind to = *=dashboard|registry|badges" "netdata.conf.test3"
+run_acl_tests "netdata.conf.test3" $TOKEN 2
+
+change_file "$CONF" "bind to = *=dashboard|registry" "netdata.conf.test4"
+run_acl_tests "netdata.conf.test4" $TOKEN 2
+
+change_file "$CONF" "bind to = *=dashboard" "netdata.conf.test5"
+run_acl_tests "netdata.conf.test5" $TOKEN 2
+
+rm log_* *conf.test* netdata.cfg health.csv index.html badge.csv

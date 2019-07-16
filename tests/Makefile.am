@@ -22,6 +22,7 @@ dist_noinst_DATA = \
     node.d/fronius.process.spec.js \
     node.d/fronius.validation.spec.js \
     health_mgmtapi/health-cmdapi-test.sh.in \
+    acl/acl.sh.in \
 	$(NULL)
 
 dist_plugins_SCRIPTS = \
