@@ -24,6 +24,7 @@ This is good for an internal network or to quickly analyse a host.
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v /etc:/host/etc:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
@@ -47,6 +48,7 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - /etc:/host/etc:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -132,6 +134,7 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - /etc:/host/etc:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
