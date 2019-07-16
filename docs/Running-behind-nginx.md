@@ -1,8 +1,42 @@
-# Netdata via nginx
+# Running Netdata behind Nginx
 
-To pass Netdata via a nginx, use this:
+## Intro
+
+[Nginx](https://nginx.org/en/) is an HTTP and reverse proxy server, a mail proxy server, and a generic TCP/UDP proxy server used to host websites and applications of all sizes. 
+
+The software is known for its low impact on memory resources, high scalability, and its modular, event-driven architecture which can offer secure, predictable performance.
+
+## Why Nginx
+
+- By default, Nginx is fast and lightweight out of the box.
+
+- Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
+
+- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
+
+- A proxy was necessary to encrypt the communication to netdata, until v1.16.0, which provided TLS (HTTPS) support.
+
+## Nginx configuration file
+
+All Nginx configurations can be found in the `/etc/nginx/` directory. The main configuration file is `/etc/nginx/nginx.conf`. Website or app-specific configurations can be found in the `/etc/nginx/site-available/` directory.
+
+Configuration options in Nginx are known as directives. Directives are organized into groups known as blocks or contexts. The two terms can be used interchangeably.
+
+Depending on your installation source, you’ll find an example configuration file at `/etc/nginx/conf.d/default.conf` or `etc/nginx/sites-enabled/default`, in some cases you may have to manually create the `sites-available` and `sites-enabled` directories. 
+
+You can edit the Nginx configuration file with Nano, Vim or any other text editors you are comfortable with.
+
+After making changes to the configuration files:
+
+- Test Nginx configuration with `nginx -t`.
+
+- Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
+
+## Ways to access Netdata via Nginx
 
 ### As a virtual host
+
+With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
 
 ```
 upstream backend {
@@ -30,8 +64,10 @@ server {
     }
 }
 ```
-
 ### As a subfolder to an existing virtual host
+
+This method is recommended when Netdata is to be served from a subfolder (or directory). 
+In this case, the virtual host `netdata.example.com` already exists and Netdata has to be accessed via `netdata.example.com/netdata/`.
 
 ```
 upstream netdata {
@@ -69,7 +105,9 @@ server {
 }
 ```
 
-### As a subfolder for multiple Netdata servers, via one nginx
+### As a subfolder for multiple Netdata servers, via one Nginx
+
+This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via subfolders. 
 
 ```
 upstream backend-server1 {
@@ -114,25 +152,25 @@ Of course you can add as many backend servers as you like.
 
 Using the above, you access Netdata on the backend servers, like this:
 
-- `http://nginx.server/netdata/server1/` to reach `backend-server1`
-- `http://nginx.server/netdata/server2/` to reach `backend-server2`
+- `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
+- `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
 
-### Using TLS communication
+### Encrypt the communication between Nginx and Netdata
 
-In case Netdata's web server has been [configured to use TLS](../web/server/#enabling-tls-support), you must also encrypt the communication between Nginx and Netdata.
-
-To enable encryption, first [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html) and then put the following in the location section of your Nginx configuration:
+In case Netdata's web server has been [configured to use TLS](../web/server/#enabling-tls-support), it is necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append the following parameters in your `nginx.conf`
 
 ```
 proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
 
-If nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
+Optionally it is also possible to [enable TLS/SSL on Nginx](http://nginx.org/en/docs/http/configuring_https_servers.html), this way the user will encrypt not only the communication between Nginx and Netdata but also between the user and Nginx.
+
+If Nginx is not configured as described here, you will probably receive the error `SSL_ERROR_RX_RECORD_TOO_LONG`.
 
 ### Enable authentication
 
-Create an authentication file to enable basic authentication via Nginx. Do not use authentication without having first [enabled TLS](#using-tls-communication)!
+Create an authentication file to enable basic authentication via Nginx, this secures your Netdata dashboard.
 
 If you don't have an authentication file, you can use the following command:
 
@@ -151,7 +189,7 @@ server {
 }
 ```
 
-## limit direct access to Netdata
+## Limit direct access to Netdata
 
 If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
@@ -162,7 +200,7 @@ If your Nginx is on `localhost`, you can use this to protect your Netdata:
 
 ---
 
-You can also use a unix domain socket. This will also provide a faster route between nginx and Netdata:
+You can also use a unix domain socket. This will also provide a faster route between Nginx and Netdata:
 
 ```
 [web]
@@ -170,7 +208,7 @@ You can also use a unix domain socket. This will also provide a faster route bet
 ```
 _note: Netdata v1.8+ support unix domain sockets_
 
-At the nginx side, use something like this to use the same unix domain socket:
+At the Nginx side, use something like this to use the same unix domain socket:
 
 ```
 upstream backend {
@@ -181,7 +219,7 @@ upstream backend {
 
 ---
 
-If your nginx server is not on localhost, you can set:
+If your Nginx server is not on localhost, you can set:
 
 ```
 [web]
@@ -193,9 +231,9 @@ _note: Netdata v1.9+ support `allow connections from`_
 
 `allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
-## prevent the double access.log
+## Prevent the double access.log
 
-nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
+Nginx logs accesses and Netdata logs them too. You can prevent Netdata from generating its access log, by setting this in `/etc/netdata/netdata.conf`:
 
 ```
 [global]
@@ -204,7 +242,7 @@ nginx logs accesses and Netdata logs them too. You can prevent Netdata from gene
 
 ## SELinux
 
-If you get an 502 Bad Gateway error you might check your nginx error log:
+If you get an 502 Bad Gateway error you might check your Nginx error log:
 
 ```sh
 # cat /var/log/nginx/error.log:
