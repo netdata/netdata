@@ -24,6 +24,8 @@ install:
 - export NOTIF_CHANNEL="automation-beta"
 - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
 - export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
+- export LATEST_RELEASE_VERSION="$(cat packaging/version | cut -d'-' -f1)"
+- export LATEST_RELEASE_DATE="$(git log -1 --format=%aD "${LATEST_RELEASE_VERSION}" | cat)"
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; fi;
 - export DEPLOY_REPO="netdata" # Default production packaging repository
 - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
@@ -69,8 +71,6 @@ stages:
   if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 - name: "Package ubuntu/bionic"
   if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
-- name: "Package ubuntu/artful"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
 
   # Debian
 - name: "Package debian/buster"
@@ -78,8 +78,6 @@ stages:
 - name: "Package debian/stretch"
   if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 - name: "Package debian/jessie"
-  if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
-- name: "Package debian/wheezy"
   if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 DEB Debian\]|\[Package arm64 DEB\]|\[Package i386 DEB Debian\]|\[Package i386 DEB\]|\[Package amd64 DEB Debian\]|\[Package amd64 DEB\])/
 
   # Build RPM packages under special conditions
@@ -129,7 +127,6 @@ stages:
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
     deploy:
-      # Beta packages deployment
       - provider: packagecloud
         repository: "${DEPLOY_REPO}"
         username: "${PACKAGING_USER}"
@@ -140,19 +137,6 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when packages directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "master"
-          condition: -d "${PACKAGES_DIRECTORY}"
-      # Production release packages deployment
-      - provider: packagecloud
-        repository: "netdata"
-        username: "netdata"
-        token: "${PKG_CLOUD_TOKEN}"
-        dist: "${BUILD_STRING}"
-        local_dir: "${PACKAGES_DIRECTORY}"
-        skip_cleanup: true
-        on:
-          # Only deploy on ${USER}/netdata, master branch, when packages directory is created
-          repo: "netdata/netdata"
           branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
@@ -165,7 +149,7 @@ stages:
 - stage: &_DEB_TEMPLATE
     name: "Build & Publish DEB package"
     before_install:
-    - sudo apt-get install -y wget lxc lxc-templates
+    - sudo apt-get install -y wget lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
     - source tests/installer/slack.sh
     before_script:
     - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
@@ -177,7 +161,8 @@ stages:
     - echo "packaging/version:" && cat packaging/version
     - echo "Creating LXC environment for the build" && sudo -E .travis/package_management/create_lxc_for_build.sh
     - echo "Building package in container" && sudo -E .travis/package_management/build_package_in_container.sh
-    - sudo chmod -R 755 "/var/lib/lxc"
+    - sudo chown -R root:travis "/var/lib/lxc"
+    - sudo chmod -R 750 "/var/lib/lxc"
     - echo "Preparing DEB packaging contents for upload" && sudo -E .travis/package_management/prepare_packages.sh
     git:
       depth: false
@@ -185,7 +170,6 @@ stages:
     before_deploy:
     - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
     deploy:
-      # Beta packages deployment
       - provider: packagecloud
         repository: "${DEPLOY_REPO}"
         username: "${PACKAGING_USER}"
@@ -196,19 +180,6 @@ stages:
         on:
           # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
           repo: ${TRAVIS_REPO_SLUG}
-          branch: "master"
-          condition: -d "${PACKAGES_DIRECTORY}"
-      # Production release packages deployment
-      - provider: packagecloud
-        repository: "netdata"
-        username: "netdata"
-        token: "${PKG_CLOUD_TOKEN}"
-        dist: "${BUILD_STRING}"
-        local_dir: "${PACKAGES_DIRECTORY}"
-        skip_cleanup: true
-        on:
-          # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
-          repo: "netdata/netdata"
           branch: "master"
           condition: -d "${PACKAGES_DIRECTORY}"
     after_deploy:
@@ -422,16 +393,6 @@ jobs:
 
 
 
-  - stage:
-    <<: *_DEB_TEMPLATE
-    stage: "Package ubuntu/artful"
-    env:
-    - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="artful" BUILD_STRING="ubuntu/artful"
-    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-    - ALLOW_SOFT_FAILURE_HERE=true
-
-
-
   # Debian distros build
   - stage:
     <<: *_DEB_TEMPLATE
@@ -458,16 +419,6 @@ jobs:
     stage: "Package debian/jessie"
     env:
     - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="jessie" BUILD_STRING="debian/jessie"
-    - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-    - ALLOW_SOFT_FAILURE_HERE=true
-
-
-
-  - stage:
-    <<: *_DEB_TEMPLATE
-    stage: "Package debian/wheezy"
-    env:
-    - BUILDER_NAME="builder" BUILD_DISTRO="debian" BUILD_RELEASE="wheezy" BUILD_STRING="debian/wheezy"
     - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
     - ALLOW_SOFT_FAILURE_HERE=true
 

@@ -21,7 +21,7 @@ fi
 
 PACKAGES_DIR="$1"
 DISTRO="$2"
-PACKAGES_LIST="$(ls -AR "${PACKAGES_DIR}" | grep '\.rpm')"
+PACKAGES_LIST="$(ls -AR "${PACKAGES_DIR}" | grep -e '\.rpm' -e '\.deb' -e '\.ddeb' )"
 
 if [ ! -d "${PACKAGES_DIR}" ] || [ -z "${PACKAGES_LIST}" ]; then
 	echo "Folder ${PACKAGES_DIR} does not seem to be a valid directory or is empty. No packages to check for yanking"

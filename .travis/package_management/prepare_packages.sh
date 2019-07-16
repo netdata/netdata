@@ -27,29 +27,36 @@ for d in ${CREATED_CONTAINERS[@]}; do
 
 	# Pick up any RPMS from builder
 	RPM_BUILD_PATH="${LXC_ROOT}/${d}/rootfs/home/${BUILDER_NAME}/rpmbuild"
-	echo "Checking folder ${RPM_BUILD_PATH} for RPMS and SRPMS"
+	if [ -d "${RPM_BUILD_PATH}" ]; then
+		echo "Checking folder ${RPM_BUILD_PATH} for RPMS and SRPMS"
 
-	if [ -d "${RPM_BUILD_PATH}/RPMS" ]; then
-		echo "Copying any RPMS in '${RPM_BUILD_PATH}', copying over the following:"
-		ls -ltrR "${RPM_BUILD_PATH}/RPMS"
-		[[ -d "${RPM_BUILD_PATH}/RPMS/x86_64" ]] && cp -r "${RPM_BUILD_PATH}"/RPMS/x86_64/* "${PACKAGES_DIRECTORY}"
-		[[ -d "${RPM_BUILD_PATH}/RPMS/i386" ]] && cp -r "${RPM_BUILD_PATH}"/RPMS/i386/* "${PACKAGES_DIRECTORY}"
-		[[ -d "${RPM_BUILD_PATH}/RPMS/i686" ]] && cp -r "${RPM_BUILD_PATH}"/RPMS/i686/* "${PACKAGES_DIRECTORY}"
+		if [ -d "${RPM_BUILD_PATH}/RPMS" ]; then
+			echo "Copying any RPMS in '${RPM_BUILD_PATH}', copying over the following:"
+			ls -ltrR "${RPM_BUILD_PATH}/RPMS"
+			[[ -d "${RPM_BUILD_PATH}/RPMS/x86_64" ]] && cp -r "${RPM_BUILD_PATH}"/RPMS/x86_64/* "${PACKAGES_DIRECTORY}"
+			[[ -d "${RPM_BUILD_PATH}/RPMS/i386" ]] && cp -r "${RPM_BUILD_PATH}"/RPMS/i386/* "${PACKAGES_DIRECTORY}"
+			[[ -d "${RPM_BUILD_PATH}/RPMS/i686" ]] && cp -r "${RPM_BUILD_PATH}"/RPMS/i686/* "${PACKAGES_DIRECTORY}"
+		fi
+
+		if [ -d "${RPM_BUILD_PATH}/SRPMS" ]; then
+			echo "Copying any SRPMS in '${RPM_BUILD_PATH}', copying over the following:"
+			ls -ltrR "${RPM_BUILD_PATH}/SRPMS"
+			[[ -d "${RPM_BUILD_PATH}/SRPMS/x86_64" ]] && cp -r "${RPM_BUILD_PATH}"/SRPMS/x86_64/* "${PACKAGES_DIRECTORY}"
+			[[ -d "${RPM_BUILD_PATH}/SRPMS/i386" ]] && cp -r "${RPM_BUILD_PATH}"/SRPMS/i386/* "${PACKAGES_DIRECTORY}"
+			[[ -d "${RPM_BUILD_PATH}/SRPMS/i686" ]] && cp -r "${RPM_BUILD_PATH}"/SRPMS/i686/* "${PACKAGES_DIRECTORY}"
+		fi
+	else
+		DEB_BUILD_PATH="${LXC_ROOT}/${d}/rootfs/home/${BUILDER_NAME}"
+		echo "Checking folder ${DEB_BUILD_PATH} for DEB packages"
+		if [ -d "${DEB_BUILD_PATH}" ]; then
+			cp "${DEB_BUILD_PATH}"/netdata*.ddeb "${PACKAGES_DIRECTORY}" || echo "Could not copy any .ddeb files"
+			cp "${DEB_BUILD_PATH}"/netdata*.deb "${PACKAGES_DIRECTORY}" || echo "Could not copy any .deb files"
+			cp "${DEB_BUILD_PATH}"/netdata*.buildinfo "${PACKAGES_DIRECTORY}" || echo "Could not copy any .buildinfo files"
+			cp "${DEB_BUILD_PATH}"/netdata*.changes "${PACKAGES_DIRECTORY}" || echo "Could not copy any .changes files"
+		else
+			echo "Folder ${DEB_BUILD_PATH} does not exist or not a directory, nothing to do for package preparation"
+		fi
 	fi
-
-	if [ -d "${RPM_BUILD_PATH}/SRPMS" ]; then
-		echo "Copying any SRPMS in '${RPM_BUILD_PATH}', copying over the following:"
-		ls -ltrR "${RPM_BUILD_PATH}/SRPMS"
-		[[ -d "${RPM_BUILD_PATH}/SRPMS/x86_64" ]] && cp -r "${RPM_BUILD_PATH}"/SRPMS/x86_64/* "${PACKAGES_DIRECTORY}"
-		[[ -d "${RPM_BUILD_PATH}/SRPMS/i386" ]] && cp -r "${RPM_BUILD_PATH}"/SRPMS/i386/* "${PACKAGES_DIRECTORY}"
-		[[ -d "${RPM_BUILD_PATH}/SRPMS/i686" ]] && cp -r "${RPM_BUILD_PATH}"/SRPMS/i686/* "${PACKAGES_DIRECTORY}"
-	fi
-
-	# Pick up any DEBs from builder
-	DEB_BUILD_PATH="${d}/home/${BUILDER_NAME}/build-area"
-	echo "Checking folder ${DEB_BUILD_PATH} for DEB packages"
-	#TODO: During debian clean up we 'll fill this up
-
 done
 
 chmod -R 777 "${PACKAGES_DIRECTORY}"
