@@ -81,6 +81,7 @@ def install_common_dependendencies(container):
         else:
             run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "epel-release"])
     elif str(os.environ["REPO_TOOL"]).count("apt-get") == 1:
+        run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libipmimonitoring-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libjson-c-dev"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
