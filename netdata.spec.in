@@ -92,6 +92,7 @@ URL:		http://my-netdata.io
 # Build dependencies
 #
 BuildRequires: gcc
+BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git
 BuildRequires: autoconf
@@ -189,6 +190,26 @@ Requires: freeipmi
 BuildRequires: cups-devel
 Requires: cups
 # end - cups plugin dependencies
+
+# Prometheus remote write dependencies
+BuildRequires: snappy-devel
+BuildRequires: protobuf-devel
+%if 0%{?suse_version}
+BuildRequires: libprotobuf-c-devel
+%else
+BuildRequires: protobuf-c-devel
+%endif
+
+%if 0%{?suse_version}
+Requires: libsnappy1
+Requires: protobuf-c
+Requires: libprotobuf15
+%else
+Requires: snappy
+Requires: protobuf-c
+Requires: protobuf
+%endif
+# end - prometheus remote write dependencies
 
 # #####################################################################
 # End of dependency management configuration
