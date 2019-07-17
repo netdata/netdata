@@ -149,10 +149,53 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         goto cleanup;
     }
 
+#ifdef ENABLE_HTTPS
+    int bytesleft = 0;
+    char tmpbuffer[PLUGINSD_LINE_MAX];
+    char *readfrom = tmpbuffer;
+    char *endbuffer;
+#endif
     while(!ferror(fp)) {
         if(unlikely(netdata_exit)) break;
 
-        char *r = fgets(line, PLUGINSD_LINE_MAX, fp);
+        char *r;
+#ifdef ENABLE_HTTPS
+        int normalread = 1;
+        if(netdata_srv_ctx) {
+            if(host->ssl.conn && !host->ssl.flags) {
+                if(!bytesleft) {
+                    bytesleft = SSL_read(host->ssl.conn,readfrom, PLUGINSD_LINE_MAX);
+                    if(bytesleft > 0) {
+                        r = line;
+                    }
+                }
+
+                //IS THIS COPY OF BUFFER THE BEST OPTION?
+                if(bytesleft) {
+                    endbuffer = strchr(readfrom,'\n');
+                    if(endbuffer) {
+                        endbuffer++;
+                        size_t length = endbuffer - readfrom;
+                        bytesleft -= length;
+                        strncpy(line,readfrom,length);
+                        line[length]= 0x00;
+                        readfrom += length;
+                    }else {
+                        readfrom = tmpbuffer;
+                    }
+                }
+
+                normalread = 0;
+            }
+        }
+
+        if(normalread) {
+            r = fgets(line, PLUGINSD_LINE_MAX, fp);
+        }
+        fprintf(stderr,"KILLME %s",line);
+#else
+        r = fgets(line, PLUGINSD_LINE_MAX, fp);
+#endif
         if(unlikely(!r)) {
             if(feof(fp))
                 error("read failed: end of file");
@@ -175,6 +218,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
         // debug(D_PLUGINSD, "PLUGINSD: words 0='%s' 1='%s' 2='%s' 3='%s' 4='%s' 5='%s' 6='%s' 7='%s' 8='%s' 9='%s'", words[0], words[1], words[2], words[3], words[4], words[5], words[6], words[7], words[8], words[9]);
 
+        fprintf(stderr,"KILLME CREATING %s\n",s);
         if(likely(!simple_hash_strcmp(s, "SET", &hash))) {
             char *dimension = words[1];
             char *value = words[2];
@@ -492,6 +536,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             break;
         }
     }
+    fprintf(stderr,"KILLME FINISHED\n");
 
 cleanup:
     cd->enabled = enabled;
