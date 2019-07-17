@@ -65,7 +65,7 @@ This line starts an alarm or alarm template.
 alarm: NAME
 ```
 
-or 
+or
 
 ```
 template: NAME
@@ -161,7 +161,7 @@ The simple pattern syntax and operation is explained in [simple patterns](../lib
 This line makes a database lookup to find a value. This result of this lookup is available as `$this`.
 
 The format is:
-  
+
 ```
 lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
 ```
@@ -311,15 +311,15 @@ delay: [[[up U] [down D] multiplier M] max X]
    notification for this event will be sent 10 seconds after the actual event. This is used in
    hope the alarm will get back to its previous state within the duration given. The default `U`
    is zero.
-  
+
 - `down D` defines the delay to be applied to a notification for an alarm that moves to lower
    state (i.e. CRITICAL to WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
    will delay the notification by 1 minute. This is used to prevent notifications for flapping
    alarms. The default `D` is zero.
-  
+
 - `mutliplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
    delayed. The default multiplier is `1.0`.
-  
+
 - `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
    is `max(U * M, D * M)` (i.e. the max duration of `U` or `D` multiplied once with `M`).
 
@@ -361,13 +361,13 @@ repeat: [off] [warning DURATION] [critical DURATION]
 
 #### Alarm line `option`
 
-The only possible value for the `option` line is 
+The only possible value for the `option` line is
 
 ```
 option: no-clear-notification
 ```
 
-For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an alarm template called `web_service_slow` that compares the average http call response time over the last 3 minutes, compared to the average over the last hour. It triggers a warning alarm when the average of the last 3 minutes is twice the average of the last hour. In such cases, it is easy to trigger the alarm, but difficult to tell when the alarm is cleared. As time passes, the newest window moves into the older, so the average response time of the last hour will keep increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alarm. However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alarms, it's a good idea to tell Netdata to not clear the notification, by using the `no-clear-notification` option. 
+For some alarms we need compare two time-frames, to detect anomalies. For example, `health.d/httpcheck.conf` has an alarm template called `web_service_slow` that compares the average http call response time over the last 3 minutes, compared to the average over the last hour. It triggers a warning alarm when the average of the last 3 minutes is twice the average of the last hour. In such cases, it is easy to trigger the alarm, but difficult to tell when the alarm is cleared. As time passes, the newest window moves into the older, so the average response time of the last hour will keep increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alarm. However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alarms, it's a good idea to tell Netdata to not clear the notification, by using the `no-clear-notification` option.
 
 ---
 
@@ -417,14 +417,14 @@ crit: $this > (($status == $CRITICAL) ? (85) : (95))
 The above say:
 * If the alarm is currently a warning, then the threshold for being considered a warning
    is 75, otherwise it's 85.
-  
+
 * If the alarm is currently critical, then the threshold for being considered critical
    is 85, otherwise it's 95.
 
 Which in turn, results in the following behavior:
 * While the value is rising, it will trigger a warning when it exceeds 85, and a critical
    alert when it exceeds 95.
-  
+
 * While the value is falling, it will return to a warning state when it goes below 85,
    and a normal state when it goes below 75.
 
@@ -442,13 +442,13 @@ Which in turn, results in the following behavior:
 You can find all the variables that can be used for a given chart, using
 `http://your.netdata.ip:19999/api/v1/alarm_variables?chart=CHART_NAME`
 Example: [variables for the `system.cpu` chart of the registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
- 
+
 _Hint: If you don't know how to find the CHART_NAME, you can read about it [here](../docs/Charts.md#charts)._
 
 
-Netdata supports 3 internal indexes for variables that will be used in health monitoring. 
+Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 <details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
-Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in templates for charts belonging to the same [context](../docs/Charts.md#contexts). The reason is that all charts of a given contexts are essentially identical, with the only difference being the [family](../docs/Charts.md#families) that identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway, unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families). 
+Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in templates for charts belonging to the same [context](../docs/Charts.md#contexts). The reason is that all charts of a given contexts are essentially identical, with the only difference being the [family](../docs/Charts.md#families) that identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway, unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
 </details>
 
   - **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of $this for the other configured alarms of the chart also appears, under the name of each configured alarm.
@@ -478,13 +478,13 @@ Although the `alarm_variables` link shows you variables for a particular chart, 
   - **special variables*** are:
 
      - `$this`, which is resolved to the value of the current alarm.
-     
+
      - `$status`, which is resolved to the current status of the alarm (the current = the last
         status, i.e. before the current database lookup and the evaluation of the `calc` line).
         This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
         `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAR` works as
         expected.
-        
+
      - `$now`, which is resolved to current unix timestamp.
 
 ## Alarm Statuses
@@ -493,16 +493,16 @@ Alarms can have the following statuses:
 
   - `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to netdata
      to reload health configuration)
-     
+
   - `UNINITIALIZED` - the alarm is not initialized yet
-  
+
   - `UNDEFINED` - the alarm failed to be calculated (i.e. the database lookup failed,
      a division by zero occurred, etc)
-     
+
   - `CLEAR` - the alarm is not armed / raised (i.e. is OK)
-  
+
   - `WARNING` - the warning expression resulted in true or non-zero
-  
+
   - `CRITICAL` - the critical expression resulted in true or non-zero
 
 The external script will be called for all status changes.
@@ -675,9 +675,6 @@ You can find how netdata interpreted the expressions by examining the alarm at `
 
 ## Disabling health checks or silencing notifications at runtime
 
-The health checks can be controlled at runtime via the [health management api](../web/api/health/#health-management-api).
+It's currently not possible to schedule notifications from within the alarm template. For those scenarios where you need to temporary disable notifications (for instance when running backups triggers a disk alert) you can disable or silence notifications are runtime. The health checks can be controlled at runtime via the [health management api](../web/api/health/#health-management-api).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
-
-
-
