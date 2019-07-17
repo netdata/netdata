@@ -53,7 +53,7 @@ repo_url: https://github.com/netdata/netdata
 repo_name: GitHub
 edit_uri: blob/master
 site_description: Netdata Documentation
-copyright: Netdata, 2018
+copyright: Netdata, 2019
 docs_dir: '${docs_dir}'
 site_dir: '${site_dir}'
 #use_directory_urls: false
@@ -123,9 +123,12 @@ markdown_extensions:
  - pymdownx.extrarawhtml
 nav:'
 
-navpart 1 . README "About"
+navpart 1 . "README" ""
 
-echo -ne "    - 'docs/Demo-Sites.md'
+navpart 1 . . "About Netdata"
+
+echo -ne "    - 'docs/what-is-netdata.md'
+    - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
     - 'docs/anonymous-statistics.md'
     - 'docs/Donations-netdata-has-received.md'

@@ -6,6 +6,36 @@
     font-size: .75rem
 }
 
+/*  Custom styling for the new documentation homepage.
+    In particular, the three buttons for install/getting started/configuration. */
+
+.homepage-nav {
+    display: flex;
+    margin-top: 1.4rem;
+}
+
+.homepage-nav div {
+    flex: 1;
+}
+
+.homepage-nav .nav-install {
+    margin-right: 1rem;
+}
+
+.homepage-nav .nav-configuration {
+    margin-left: 1rem;
+}
+
+.nav-button {
+    border: 2px solid black;
+    border-radius: 4px;
+    display: block;
+    font-weight: 700;
+    margin: 0 auto;
+    padding: 0.6rem 0;
+    text-align: center;
+}
+
 /* Hide the label at the top of the navigation menu. Does nothing. */
 .md-nav__title {
     display: none;
