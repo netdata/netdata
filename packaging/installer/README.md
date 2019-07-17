@@ -100,7 +100,6 @@ This command will output `OK, VALID` to confirm that the script is intact and ha
 
 Once you have installed Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
----
 
 ## Binary packages 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
@@ -111,7 +110,7 @@ We have currently released packages following the .RPM format with version 1.16.
 
 **We have currently only officially released `.RPM` packages**. `.DEB` packages will be officially released with v1.17.0 of Netdata. However, early adopters can experiment with our `.DEB` packages using our nightly releases.
 
-We provide two separate repositories, one for our stable releases and one for our nightly releases. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io). You can visit the repository pages to read more, or try the set-up commands to get started.
+We provide two separate repositories, one for our stable releases and one for our nightly releases. See this notice about [stable vs. nightly](#stable-vs-nightly-releases) for more information. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io). You can visit the repository pages to read more, or try the set-up commands to get started.
 
 **Stable releases:** Our stable production releases are hosted in the [netdata/netdata](https://packagecloud.io/netdata/netdata) repository on Packagecloud.
 
@@ -133,7 +132,6 @@ curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script
 curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.deb.sh | sudo bash
 ```
 
----
 
 ## Nightly vs. stable releases
 
