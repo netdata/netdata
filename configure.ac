@@ -816,17 +816,17 @@ if test "${have_libaws_cpp_sdk_core}" = "yes" -a "${have_libcrypto}" = "yes" -a 
     CXXFLAGS="${CXXFLAGS} -std=c++11"
 
     AC_TRY_LINK(
-    [
-    #include <aws/core/Aws.h>
-    #include <aws/core/client/ClientConfiguration.h>
-    #include <aws/core/auth/AWSCredentials.h>
-    #include <aws/core/utils/Outcome.h>
-    #include <aws/kinesis/KinesisClient.h>
-    #include <aws/kinesis/model/PutRecordRequest.h>
-    ],
-    [Aws::Kinesis::Model::PutRecordRequest request;],
-    [have_libaws_cpp_sdk_kinesis=yes],
-    [have_libaws_cpp_sdk_kinesis=no]
+        [
+            #include <aws/core/Aws.h>
+            #include <aws/core/client/ClientConfiguration.h>
+            #include <aws/core/auth/AWSCredentials.h>
+            #include <aws/core/utils/Outcome.h>
+            #include <aws/kinesis/KinesisClient.h>
+            #include <aws/kinesis/model/PutRecordRequest.h>
+        ],
+        [Aws::Kinesis::Model::PutRecordRequest request;],
+        [have_libaws_cpp_sdk_kinesis=yes],
+        [have_libaws_cpp_sdk_kinesis=no]
     )
 
     LIBS="${save_LIBS}"
