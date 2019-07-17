@@ -879,12 +879,36 @@ PKG_CHECK_MODULES(
     [have_libprotobuf=no]
 )
 
-PKG_CHECK_MODULES(
-    [SNAPPY],
-    [snappy],
-    [have_libsnappy=yes],
-    [have_libsnappy=no]
-)
+AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
+
+    AC_LANG_SAVE
+    AC_LANG_CPLUSPLUS
+    save_LIBS="${LIBS}"
+    LIBS="-lsnappy"
+    save_CXXFLAGS="${CXXFLAGS}"
+    CXXFLAGS="${CXXFLAGS} -std=c++11"
+
+    AC_TRY_LINK(
+        [
+            #include <stdlib.h>
+            #include <snappy.h>
+        ],
+        [
+            const char *input = "test";
+            size_t compressed_length;
+            char *buffer = (char *)malloc(5 * sizeof(char));
+            snappy::RawCompress(input, 4, buffer, &compressed_length);
+            free(buffer);
+        ],
+        [have_libsnappy=yes],
+        [have_libsnappy=no]
+    )
+
+    LIBS="${save_LIBS}"
+    CXXFLAGS="${save_CXXFLAGS}"
+    AC_LANG_RESTORE
+
+AC_MSG_RESULT([${have_libsnappy}])
 
 AC_PATH_PROG([PROTOC], [protoc], [no])
 AS_IF(
@@ -917,9 +941,9 @@ if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobu
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS}"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS}"
     CXX11FLAG="-std=c++11"
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS} "
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} -lsnappy"
 else
     enable_backend_prometheus_remote_write="no"
 fi
