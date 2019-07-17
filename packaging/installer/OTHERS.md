@@ -95,41 +95,55 @@ With either of these methods, your system does not need `bash` installed. You ca
 
 Once you have installed Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
----
 
 ## macOS
 
 Netdata on macOS still has limited charts, but external plugins do work.
 
-You can either install Netdata with [Homebrew](https://brew.sh/)
+You can install Netdata with [Homebrew](https://brew.sh/) or from source. In both cases, you need to have Homebrew installed. They offer a one-line installation script:
 
-```sh
+```bash
+/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+```
+
+Now that you have Homebrew installed, you can choose between continuing to use Homebrew to install Netdata, or install from source.
+
+### Install Netdata via Homebrew
+
+Homebrew makes installing Netdata quite easy. The entire installation package is wrapped up in a single command:
+
+```bash
 brew install netdata
 ```
 
-or from source:
+You're done! For more information on how to use and configure Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
-```sh
-# install Xcode Command Line Tools
+
+### Install Netdata from source
+
+To install Netdata from source, begin by installing Xcode command line tools.
+
+```bash
 xcode-select --install
 ```
-click `Install` in the software update popup window, then
-```sh
-# install HomeBrew package manager
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
-# install required packages
+Click `Install` in the software update popup window. Once the update is completed, run the following commands to install prerequisities and then Netdata itself:
+
+```sh
+# Install required packages
 brew install ossp-uuid autoconf automake pkg-config
 
-# download Netdata
+# Hownload Netdata
 git clone https://github.com/netdata/netdata.git --depth=100
 
-# install Netdata in /usr/local/netdata
+# Install Netdata in /usr/local/netdata
 cd netdata
 sudo ./netdata-installer.sh --install /usr/local
 ```
 
-The installer will also install a startup plist to start Netdata when your Mac boots.
+The installer will also install a startup plist to start Netdata when your macOS system boots.
+
+The installation from source should now be finished successfully. For more information on how to use and configure Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
 
 ## FreeBSD
