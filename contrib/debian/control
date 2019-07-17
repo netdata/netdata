@@ -26,9 +26,9 @@ Build-Depends: debhelper (>= 9),
                g++
 Section: net
 Priority: optional
-Maintainer: Costa Tsaousis <costa@tsaousis.gr>
+Maintainer: Netdata Builder <bot@netdata.cloud>
 Standards-Version: 3.9.6
-Homepage: https://github.com/netdata/netdata/wiki
+Homepage: https://netdata.cloud
 
 Package: netdata
 Architecture: any
