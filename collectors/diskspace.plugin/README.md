@@ -1,6 +1,6 @@
 # diskspace.plugin
 
-This plugin monitors the disk space usage of mounted disks, under Linux.
+This plugin monitors the disk space usage of mounted disks, under Linux. The plugin requires Netdata to have execute/search permissions on the mount point itself, as well as each component of the absolute path to the mount point.
 
 Two charts are available for every mount:
  - Disk Space Usage
