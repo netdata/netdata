@@ -402,8 +402,6 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-
-
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for Enterprise Linux 6"
       if: commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
@@ -411,8 +409,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-
 
     # Fedora distros build
     #
@@ -424,8 +420,6 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-
-
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for Fedora 29"
       if: commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
@@ -434,8 +428,6 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-
-
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for Fedora 28"
       if: commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
@@ -443,8 +435,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-
 
     # Opensuse distros build
     #
@@ -455,8 +445,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
         - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-
 
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for OpenSuSE 15.0"
