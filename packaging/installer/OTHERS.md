@@ -70,11 +70,9 @@ Verify the integrity of the script with this:
 
 This command will output `OK, VALID` to confirm that the script is intact and has not been tampered with.
 
-
 **If your shell fails to handle the `kickstart-static64.sh` script:**
 
-If the one-line installation script fails—for example, if you do not have `bash` installed—you can use the following commands to run 
-If your shell fails to handle the above one liner, do this:
+If the one-line installation script fails—for example, if you do not have `bash` installed—you can use the following commands to download the scripts and run them manually:
 
 ```bash
 # download the script with curl
@@ -87,10 +85,11 @@ wget -O /tmp/kickstart-static64.sh https://my-netdata.io/kickstart-static64.sh
 sh /tmp/kickstart-static64.sh
 ```
 
-- The static binary files are kept in repo [binary-packages](https://github.com/netdata/binary-packages). You can download any of the `.run` files, and run it. These files are self-extracting shell scripts built with [makeself](https://github.com/megastep/makeself).
-- The target system does **not** need to have bash installed.
-- The same files can be used for updates too.
-- For QA purposes, this installation method lets us know if it succeed or failed.
+The installation script will let you know if it was successful or not.
+
+You can also download staic binary files from our [stable releases page](https://github.com/netdata/netdata/releases) or grab the [nightly .run binary](https://storage.googleapis.com/netdata-nightlies/netdata-latest.gz.run). These `.run` files are self-extracting shell scripts build with [makeself](https://github.com/megastep/makeself).
+
+With either of these methods, your system does not need `bash` installed. You can use either of these methods to update your Netdata installation as well.
 
 </details>
 

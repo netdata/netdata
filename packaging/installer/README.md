@@ -13,13 +13,11 @@ You can install Netdata in many different ways, but the following three methods 
   <div>
     <a class="nav-button" href="#binary-packages">Binary packages</a>
     <p>Use your distribution's package manager to install Netdata via RPM or DEB binary packages.</p>
-
   </div>
   <div>
     <a class="nav-button" href="../docker/">Docker container</a>
     <p>Use our <code>Dockerfile</code> to test Netdata or install it in an existing Docker-based infrastructure.</p>
   </div>
-
 </div>
 
 To see whether Netdata supports your system, please visit our [distribution support matrix](../../packaging/DISTRIBUTIONS.md).
@@ -109,7 +107,9 @@ Once you have installed Netdata, see our [getting started guide](../../docs/Gett
 
 In the effort to make Netdata's installation process easy and fully automated on as many operating systems as possible, we have begun providing our own binary packages for the most common Linux distributions that use `.RPM` or `.DEB` packaging formats.
 
-**We have currently only released `.RPM` packages**. `.DEB` packages will be available in an upcoming release. 
+We have currently released packages following the .RPM format with version 1.16.0. We have planned to release packages following the .DEB format with version 1.17.0. Early adopters may  Our current packaging infrastructure provider is Package Cloud.
+
+**We have currently only officially released `.RPM` packages**. `.DEB` packages will be officially released with v1.17.0 of Netdata. However, early adopters can experiment with our `.DEB` packages using our nightly releases.
 
 We provide two separate repositories, one for our stable releases and one for our nightly releases. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io). You can visit the repository pages to read more, or try the set-up commands to get started.
 
@@ -126,7 +126,11 @@ curl -s https://packagecloud.io/install/repositories/netdata/netdata/script.rpm.
 Use the following command to add our nightly repository to your system's package manager:
 
 ```bash
+# .RPM (openSUSE, Fedora, RHEL)
 curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.rpm.sh | sudo bash
+
+# .DEB (Debian, Ubuntu)
+curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.deb.sh | sudo bash
 ```
 
 ---
