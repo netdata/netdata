@@ -900,7 +900,11 @@ AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
             snappy::RawCompress(input, 4, buffer, &compressed_length);
             free(buffer);
         ],
-        [have_libsnappy=yes],
+        [
+            have_libsnappy=yes
+            SNAPPY_CFLAGS=""
+            SNAPPY_LIBS="-lsnappy"
+        ],
         [have_libsnappy=no]
     )
 
@@ -941,9 +945,9 @@ if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobu
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS}"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS}"
     CXX11FLAG="-std=c++11"
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} -lsnappy"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS}"
 else
     enable_backend_prometheus_remote_write="no"
 fi
