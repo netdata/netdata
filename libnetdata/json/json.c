@@ -319,8 +319,8 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
             info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
             continue;
         }
-        sprintf(ne.name, "%s[%lu]", e->name, i);
-        sprintf(ne.fullname, "%s[%lu]", e->fullname, i);
+        snprintfz(ne.name, JSON_NAME_LEN, "%s[%lu]", e->name, i);
+        snprintfz(ne.fullname, JSON_FULLNAME_LEN, "%s[%lu]", e->fullname, i);
 
         switch(t[start].type) {
             case JSMN_PRIMITIVE:

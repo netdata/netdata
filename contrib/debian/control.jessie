@@ -13,12 +13,16 @@ Build-Depends: debhelper (>= 9),
                libcups2-dev,
                libipmimonitoring-dev,
                libnetfilter-acct-dev,
+               libsnappy-dev,
+               libprotobuf-dev,
+               libprotoc-dev,
                autogen,
                autoconf,
                automake,
                pkg-config,
                curl,
-               gcc
+               gcc,
+               g++
 Section: net
 Priority: optional
 Maintainer: Costa Tsaousis <costa@tsaousis.gr>
@@ -40,6 +44,9 @@ Depends: adduser,
          cups,
          freeipmi,
          libnetfilter-acct1,
+         libprotobuf-c1,
+         libsnappy1v5,
+         libprotoc10,
          ${misc:Depends},
          ${shlibs:Depends}
 Description: real-time charts for system monitoring
