@@ -70,7 +70,7 @@ change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|ne
 netdata -c "netdata.conf.test1"
 run_acl_tests $TOKEN "$BASICURL:19999" 5
 run_acl_tests $TOKEN "$BASICURL:20000" 4
-run_acl_tests $TOKEN "$BASICURLS:20001" 3
+run_acl_tests $TOKEN "$BASICURLS:20001" 4
 run_acl_tests $TOKEN "$BASICURLS:20002" 3 
 killall netdata
 
@@ -79,7 +79,7 @@ netdata -c "netdata.conf.test2"
 run_acl_tests $TOKEN "$BASICURL:19999" 5
 run_acl_tests $TOKEN "$BASICURLS:19999" 5
 run_acl_tests $TOKEN "$BASICURLS:20000" 4
-run_acl_tests $TOKEN "$BASICURLS:20001" 3
+run_acl_tests $TOKEN "$BASICURLS:20001" 4
 run_acl_tests $TOKEN "$BASICURLS:20002" 3 
 killall netdata
 
