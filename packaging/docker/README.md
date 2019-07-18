@@ -24,6 +24,8 @@ This is good for an internal network or to quickly analyse a host.
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
@@ -47,10 +49,14 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
+
+If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group` (they are used to get proper user and group names for the monitored host) to get slightly better security.
 
 ### Docker container names resolution
 
@@ -132,6 +138,8 @@ services:
     security_opt:
       - apparmor:unconfined
     volumes:
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
