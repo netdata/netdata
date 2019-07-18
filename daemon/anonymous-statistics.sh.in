@@ -25,24 +25,6 @@ fi
 # Shorten version for easier reporting
 NETDATA_VERSION=$(echo "${NETDATA_VERSION}" | sed 's/-.*//g' | tr -d 'v')
 
-echo "&av=${NETDATA_VERSION}\
-&ec=${ACTION}\
-&ea=${ACTION_RESULT}\
-&el=${ACTION_DATA}\
-&cd1=${NETDATA_SYSTEM_OS_NAME}\
-&cd2=${NETDATA_SYSTEM_OS_ID}\
-&cd3=${NETDATA_SYSTEM_OS_ID_LIKE}\
-&cd4=${NETDATA_SYSTEM_OS_VERSION}\
-&cd5=${NETDATA_SYSTEM_OS_VERSION_ID}\
-&cd6=${NETDATA_SYSTEM_OS_DETECTION}\
-&cd7=${NETDATA_SYSTEM_KERNEL_NAME}\
-&cd8=${NETDATA_SYSTEM_KERNEL_VERSION}\
-&cd9=${NETDATA_SYSTEM_ARCHITECTURE}\
-&cd10=${NETDATA_SYSTEM_VIRTUALIZATION}\
-&cd11=${NETDATA_SYSTEM_VIRT_DETECTION}\
-&cd12=${NETDATA_SYSTEM_CONTAINER}\
-&cd13=${NETDATA_SYSTEM_CONTAINER_DETECTION}" >> /tmp/as.log
-
 # -------------------------------------------------------------------------------------------------
 # send the anonymous statistics to GA
 # https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters
