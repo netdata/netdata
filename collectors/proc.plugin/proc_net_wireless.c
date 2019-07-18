@@ -120,8 +120,9 @@ static void netwireless_free(struct netwireless *wireless_dev) {
 static void netwireless_cleanup(struct timeval *timestamp) {
 
 	struct netwireless *previous = NULL;
+	struct netwireless *current = NULL;
     // search it, from begining to the end
-    for(struct netwireless* current = netwireless_root; current;) {
+    for(current = netwireless_root; current;) {
 
 		if(timercmp(&current->updated, timestamp, <)) {
 
@@ -242,7 +243,6 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
         dt_to_refresh_speed = config_get_number(CONFIG_SECTION_PLUGIN_PROC_NETWIRELESS,
 												"refresh interface speed every seconds", 10) * USEC_PER_SEC;
-        if(dt_to_refresh_speed < 0) dt_to_refresh_speed = 0;
 
 	}
 
@@ -256,9 +256,9 @@ int do_proc_net_wireless(int update_every, usec_t dt) {
 
 	size_t lines = procfile_lines(ff);
 	struct timeval timestamp;
+	size_t l;
 	gettimeofday(&timestamp, NULL);
-
-	for(size_t l = 2; l < lines; l++) {
+	for(l = 2; l < lines; l++) {
 		if(unlikely(procfile_linewords(ff, l) < 11)) continue;
 		char *name = procfile_lineword(ff, l, 0);
 		size_t len = strlen(name);
