@@ -83,4 +83,13 @@ run_acl_tests $TOKEN "$BASICURLS:20001" 4
 run_acl_tests $TOKEN "$BASICURLS:20002" 3 
 killall netdata
 
+change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management^SSL=optional *:20001=dashboard|registry|netdata.conf^SSL=force *:20002=dashboard|registry" "$CWD" "netdata.conf.test3"
+netdata -c "netdata.conf.test3"
+run_acl_tests $TOKEN "$BASICURL:19999" 5
+run_acl_tests $TOKEN "$BASICURLS:19999" 5
+run_acl_tests $TOKEN "$BASICURL:20000" 5
+run_acl_tests $TOKEN "$BASICURLS:20001" 4
+run_acl_tests $TOKEN "$BASICURLS:20002" 3
+killall netdata
+
 rm log_* netdata.conf.test* netdata.txt health.csv index.html badge.csv tmp* key.pem cert.pem info.txt

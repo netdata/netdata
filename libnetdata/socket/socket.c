@@ -320,9 +320,11 @@ void socket_ssl_acl(char *acl) {
             ssl += 4;
             if (!strcmp(ssl,"optional")) {
                 netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
+                netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
             }
             else if (!strcmp(ssl,"force")) {
                 netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+                netdata_use_ssl_on_http = NETDATA_SSL_FORCE;
             }
         }
 #endif
