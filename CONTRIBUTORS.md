@@ -28,8 +28,9 @@ The Contributor (*you*) hereby assigns netdata Inc. copyright in his
 contributions, to be licensed under the same terms as the rest of the code.
 
 > *Note: this means we may re-license netdata (your contributions included)
-> any way we see fit, without asking your permission.
-> Open-source licenses have significant differences and in our attempt to
+> any way we see fit, without asking your permission. 
+> We intend to keep the netdata agent forever FOSS.
+> But open-source licenses have significant differences and in our attempt to
 > help netdata grow we may have to distribute it under a different license.
 > For example, CNCF, the Cloud Native Computing Foundation, requires netdata
 > to be licensed under Apache-2.0 for it to be accepted as a member of the
