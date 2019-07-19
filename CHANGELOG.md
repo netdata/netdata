@@ -4,27 +4,46 @@
 
 **Fixed bugs:**
 
+- python sensors collector: sensors chips filtering doesnt work [\#6462](https://github.com/netdata/netdata/issues/6462)
+- fix CRC error handling in dbengine [\#6451](https://github.com/netdata/netdata/issues/6451)
 - Issue with rethinkdbs plugin [\#6429](https://github.com/netdata/netdata/issues/6429)
 - Double free or corruption \(again\) [\#6412](https://github.com/netdata/netdata/issues/6412)
 - rpm version should be 1.16.0 not v1.16.0 \(extra "v"\) [\#6409](https://github.com/netdata/netdata/issues/6409)
+- Netdata does not detect pkg-config under automated install [\#6405](https://github.com/netdata/netdata/issues/6405)
+- No LVM disk space usage on CentOS [\#6401](https://github.com/netdata/netdata/issues/6401)
 - Cannot see charts in an imported snapshot [\#6384](https://github.com/netdata/netdata/issues/6384)
 - netdata does not send notifications for alarms which fail with \(errno 12, Out of memory\) [\#6335](https://github.com/netdata/netdata/issues/6335)
 - charts.d kills process twice [\#6190](https://github.com/netdata/netdata/issues/6190)
+- If trailing slash is not included dashboard.js fails to load for slave dashboard for master [\#3820](https://github.com/netdata/netdata/issues/3820)
 - Alarm "system.softnet\_stat" is very strict. [\#1076](https://github.com/netdata/netdata/issues/1076)
 - netdata/packaging: Fix RPM packaging workflow issues, plus draft changes for .DEB packaging [\#6415](https://github.com/netdata/netdata/pull/6415) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 **Closed issues:**
 
+- Support for ScaleIO/VxFlexOS v3 [\#6475](https://github.com/netdata/netdata/issues/6475)
 - Global option for enabling charts with zero metrics [\#6315](https://github.com/netdata/netdata/issues/6315)
+- Netdata variable granularity support in dbengine [\#6254](https://github.com/netdata/netdata/issues/6254)
+- \[Binary releases\] Create a script that will containerise the DEB build process [\#5968](https://github.com/netdata/netdata/issues/5968)
+- HTML sanitizer for dashboard\_info.js [\#5652](https://github.com/netdata/netdata/issues/5652)
 - Feature Request: Linux zram device statistics. [\#2578](https://github.com/netdata/netdata/issues/2578)
 - Authentication support [\#70](https://github.com/netdata/netdata/issues/70)
 
 **Merged pull requests:**
 
+- Add a statement about permissions for the diskspace plugin [\#6474](https://github.com/netdata/netdata/pull/6474) ([vlvkobal](https://github.com/vlvkobal))
+- update Nginx guide with changes [\#6466](https://github.com/netdata/netdata/pull/6466) ([prhomhyse](https://github.com/prhomhyse))
+- netdata/packaging: Binary distributions - clean up .DEB package generation process [\#6465](https://github.com/netdata/netdata/pull/6465) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- python sensors collector: sensor chips filtering fix [\#6463](https://github.com/netdata/netdata/pull/6463) ([ilyam8](https://github.com/ilyam8))
+- Fix broken links [\#6461](https://github.com/netdata/netdata/pull/6461) ([TheLovinator1](https://github.com/TheLovinator1))
+- json function could create overflow [\#6460](https://github.com/netdata/netdata/pull/6460) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix CRC and I/O error handling in dbengine [\#6452](https://github.com/netdata/netdata/pull/6452) ([mfundul](https://github.com/mfundul))
+- Stop docs icon from linking to streaming page instead of docs root [\#6445](https://github.com/netdata/netdata/pull/6445) ([joelhans](https://github.com/joelhans))
 - Add more supported backends to the documentation [\#6443](https://github.com/netdata/netdata/pull/6443) ([vlvkobal](https://github.com/vlvkobal))
 - netdata/packaging: Remove Ventureer from demo sites [\#6442](https://github.com/netdata/netdata/pull/6442) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Update docs health monitoring and health management api [\#6435](https://github.com/netdata/netdata/pull/6435) ([jghaanstra](https://github.com/jghaanstra))
 - Fix issue with HTML docs generation [\#6433](https://github.com/netdata/netdata/pull/6433) ([cakrit](https://github.com/cakrit))
 - rethinkdb collector new driver support [\#6431](https://github.com/netdata/netdata/pull/6431) ([ilyam8](https://github.com/ilyam8))
+- Styling improvements to documentation [\#6425](https://github.com/netdata/netdata/pull/6425) ([joelhans](https://github.com/joelhans))
 - Netdata/packaging: Add documentation for binary packages, plus draft table for distributions support [\#6422](https://github.com/netdata/netdata/pull/6422) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/doc: Update documentation dependencies [\#6421](https://github.com/netdata/netdata/pull/6421) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add global configuration option for zero metrics [\#6419](https://github.com/netdata/netdata/pull/6419) ([vlvkobal](https://github.com/vlvkobal))

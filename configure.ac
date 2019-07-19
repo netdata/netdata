@@ -816,17 +816,17 @@ if test "${have_libaws_cpp_sdk_core}" = "yes" -a "${have_libcrypto}" = "yes" -a 
     CXXFLAGS="${CXXFLAGS} -std=c++11"
 
     AC_TRY_LINK(
-    [
-    #include <aws/core/Aws.h>
-    #include <aws/core/client/ClientConfiguration.h>
-    #include <aws/core/auth/AWSCredentials.h>
-    #include <aws/core/utils/Outcome.h>
-    #include <aws/kinesis/KinesisClient.h>
-    #include <aws/kinesis/model/PutRecordRequest.h>
-    ],
-    [Aws::Kinesis::Model::PutRecordRequest request;],
-    [have_libaws_cpp_sdk_kinesis=yes],
-    [have_libaws_cpp_sdk_kinesis=no]
+        [
+            #include <aws/core/Aws.h>
+            #include <aws/core/client/ClientConfiguration.h>
+            #include <aws/core/auth/AWSCredentials.h>
+            #include <aws/core/utils/Outcome.h>
+            #include <aws/kinesis/KinesisClient.h>
+            #include <aws/kinesis/model/PutRecordRequest.h>
+        ],
+        [Aws::Kinesis::Model::PutRecordRequest request;],
+        [have_libaws_cpp_sdk_kinesis=yes],
+        [have_libaws_cpp_sdk_kinesis=no]
     )
 
     LIBS="${save_LIBS}"
@@ -879,12 +879,40 @@ PKG_CHECK_MODULES(
     [have_libprotobuf=no]
 )
 
-PKG_CHECK_MODULES(
-    [SNAPPY],
-    [snappy],
-    [have_libsnappy=yes],
-    [have_libsnappy=no]
-)
+AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
+
+    AC_LANG_SAVE
+    AC_LANG_CPLUSPLUS
+    save_LIBS="${LIBS}"
+    LIBS="-lsnappy"
+    save_CXXFLAGS="${CXXFLAGS}"
+    CXXFLAGS="${CXXFLAGS} -std=c++11"
+
+    AC_TRY_LINK(
+        [
+            #include <stdlib.h>
+            #include <snappy.h>
+        ],
+        [
+            const char *input = "test";
+            size_t compressed_length;
+            char *buffer = (char *)malloc(5 * sizeof(char));
+            snappy::RawCompress(input, 4, buffer, &compressed_length);
+            free(buffer);
+        ],
+        [
+            have_libsnappy=yes
+            SNAPPY_CFLAGS=""
+            SNAPPY_LIBS="-lsnappy"
+        ],
+        [have_libsnappy=no]
+    )
+
+    LIBS="${save_LIBS}"
+    CXXFLAGS="${save_CXXFLAGS}"
+    AC_LANG_RESTORE
+
+AC_MSG_RESULT([${have_libsnappy}])
 
 AC_PATH_PROG([PROTOC], [protoc], [no])
 AS_IF(
@@ -919,7 +947,7 @@ if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobu
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
     OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS}"
     CXX11FLAG="-std=c++11"
-    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS} "
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS}"
 else
     enable_backend_prometheus_remote_write="no"
 fi

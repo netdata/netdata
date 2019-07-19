@@ -47,8 +47,8 @@ print("1. Adding user %s" % os.environ['BUILDER_NAME'])
 common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 
 # Fetch package dependencies for the build
-print("2. Installing package dependencies within LXC container")
-common.install_common_dependendencies(container)
+print("2. Preparing repo on LXC container")
+common.prepare_repo(container)
 
 print("2.1 Install .DEB build support packages")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dpkg-dev"])
@@ -62,9 +62,12 @@ print("2.2 Add more dependencies")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter-acct-dev"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
 
-print ("3. Run install-required-packages scriptlet")
+print ("3.1 Run install-required-packages scriptlet")
 common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-packages.sh" % build_path, "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
 common.run_command(container, ["bash", "%s/.install-required-packages.sh" % build_path, "netdata", "--dont-wait", "--non-interactive"])
+
+print("3.2 Installing package dependencies within LXC container")
+common.install_common_dependendencies(container)
 
 friendly_version=""
 dest_archive=""
