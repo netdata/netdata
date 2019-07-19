@@ -908,15 +908,16 @@ void web_client_split_path_query(struct web_client *w, char *s) {
     //on July 1st, 2019, that show us that URLs won't have '?','=' and '&' encoded, but we decided to move in front
     //with the next part, because users can develop their own encoded that won't follow this rule.
     char *moveme = s;
-    ptr = strchr(moveme, '%');
     while (moveme) {
+        ptr = strchr(moveme, '%');
         if(ptr) {
             char *test = (ptr+1);
-            if (!strncmp(test,"3f",2) || !strncmp(test,"3F",2)) {
+            if (!strncmp(test, "3f", 2) || !strncmp(test, "3F", 2)) {
                 w->separator = *ptr;
                 web_client_set_path_query(w, s, ptr);
                 return;
             }
+            ptr++;
         }
 
         moveme = ptr;
@@ -1047,7 +1048,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                         *w->url_search_path = w->separator;
 
                         char *from = (encoded_url + w->url_path_length);
-                        total_variables = url_map_query_string(ptr_variables,from);
+                        total_variables = url_map_query_string(ptr_variables, from);
 
                         url_parse_query_string(w->decoded_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1, ptr_variables, total_variables);
                     }

@@ -24,6 +24,14 @@ typedef enum web_client_mode {
     WEB_CLIENT_MODE_STREAM      = 3
 } WEB_CLIENT_MODE;
 
+
+typedef enum {
+    HTTP_VALIDATION_OK,
+    HTTP_VALIDATION_NOT_SUPPORTED,
+    HTTP_VALIDATION_INCOMPLETE,
+    HTTP_VALIDATION_REDIRECT
+} HTTP_VALIDATION;
+
 typedef enum web_client_flags {
     WEB_CLIENT_FLAG_DEAD              = 1 << 1, // if set, this client is dead
 

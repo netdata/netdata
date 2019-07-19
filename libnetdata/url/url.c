@@ -230,7 +230,7 @@ fail_cleanup:
  *
  * @return It returns 1 when the request is complete and 0 otherwise.
  */
-inline int url_is_request_complete(char *begin,char *end,size_t length) {
+inline int url_is_request_complete(char *begin, char *end, size_t length) {
 
     if ( begin == end) {
         //Message cannot be complete when first and last address are the same
@@ -238,11 +238,11 @@ inline int url_is_request_complete(char *begin,char *end,size_t length) {
     }
 
     //This math to verify  the last is valid, because we are discarding the POST
-    if (length >= 4) {
+    if (length > 4) {
         begin = end - 4;
     }
 
-    return ((strstr(begin,"\r\n\r\n")))?1:0;
+    return (strstr(begin, "\r\n\r\n"))?1:0;
 }
 
 /**
@@ -290,7 +290,7 @@ int url_map_query_string(char **out, char *url) {
     //We always we have at least one here, so I can set this.
     out[count++] = moveme;
     while(moveme) {
-        ptr = strchr((moveme+1),'&');
+        ptr = strchr((moveme+1), '&');
         if(ptr) {
             out[count++] = ptr;
         }
@@ -302,10 +302,10 @@ int url_map_query_string(char **out, char *url) {
     if (count == 1) {
         moveme = url;
         while(moveme) {
-            ptr = strchr((moveme+1),'%');
+            ptr = strchr((moveme+1), '%');
             if(ptr) {
                 char *test = (ptr+1);
-                if (!strncmp(test,"3f",2) || !strncmp(test,"3F",2)) {
+                if (!strncmp(test, "3f", 2) || !strncmp(test, "3F", 2)) {
                     out[count++] = ptr;
                 }
             }

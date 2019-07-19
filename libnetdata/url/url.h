@@ -29,19 +29,6 @@ extern char *url_decode_r(char *to, char *url, size_t size);
 extern int url_map_query_string(char **out, char *url);
 extern void url_parse_query_string(char *output, size_t max, char **map, int total);
 
-// http_request_validate()
-// returns:
-// = 0 : all good, process the request
-// > 0 : request is not supported
-// < 0 : request is incomplete - wait for more data
-
-typedef enum {
-    HTTP_VALIDATION_OK,
-    HTTP_VALIDATION_NOT_SUPPORTED,
-    HTTP_VALIDATION_INCOMPLETE,
-    HTTP_VALIDATION_REDIRECT
-} HTTP_VALIDATION;
-
 extern int url_is_request_complete(char *begin,char *end,size_t length);
 extern char *url_find_protocol(char *s);
 
