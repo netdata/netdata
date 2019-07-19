@@ -25,7 +25,7 @@ collectors/python.d.plugin/ @ilyam8
 collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @cakrit
 daemon/ @thiagoftsm @mfundul @cakrit
 database/ @mfundul @thiagoftsm @cakrit
-docs/ @cakrit
+docs/ @cakrit @joelhans
 health/ @thiagoftsm @vlvkobal @cakrit
 health/health.d/ @thiagoftsm @vlvkobal @cakrit
 health/notifications/ @Ferroin @thiagoftsm @cakrit
@@ -39,7 +39,7 @@ web/ @thiagoftsm @mfundul @vlvkobal @cakrit
 web/gui/ @VLegakis @cakrit
 
 # Ownership by filetype (overwrites ownership by directory)
-*.md @cakrit
+*.md @cakrit @joelhans
 *.am @paulkatsoulakis
 
 # Ownership of specific files
@@ -57,5 +57,5 @@ netlify.toml @cakrit
 package.json @VLegakis
 packaging/version @netdatabot
 
-LICENSE.md @cakrit
+LICENSE.md @cakrit @joelhans
 CHANGELOG.md @netdatabot
