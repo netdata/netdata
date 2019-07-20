@@ -3337,7 +3337,7 @@ NETDATA.gaugeChartCreate = function (state, data) {
         colorStart: startColor,     // Colors
         colorStop: stopColor,       // just experiment with them
         strokeColor: strokeColor,   // to see which ones work best for you
-        generateGradient: (generateGradient === true), // gmosx: 
+        generateGradient: (generateGradient === true), // gmosx:
         gradientType: 0,
         highDpiSupport: true        // High resolution support
     };
@@ -8843,6 +8843,10 @@ let chartState = function (element) {
             }
         } else {
             this.chart_url = "/api/v1/chart?chart=" + this.id;
+            if (this.host === 'http://localhost:3000') {
+              // for dev mode
+              this.host = 'http://localhost:19999';
+            }
 
             if (this.debug) {
                 this.log('downloading ' + this.chart_url);
@@ -9845,7 +9849,7 @@ NETDATA.registry = {
                 }
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);
-                });    
+                });
             }
         });
     },
@@ -9896,7 +9900,7 @@ NETDATA.registry = {
             // data.
             name = NETDATA.registry.hostname;
             url = NETDATA.serverDefault;
-        } 
+        }
 
         console.log("ACCESS", name, url);
 
