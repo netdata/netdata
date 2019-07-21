@@ -39,6 +39,9 @@ run_acl_tests() {
     if [ "$TOT1" -eq "5" ]; then
         echo -e "${YELLOW}All the urls were redirected to https"
         return
+    elif [ "$TOT1" -ne "5" ] && [ "$BASICURL" == "$2" ] ; then
+        echo -e "${RED}I got a wrong number of 301 when SSL is activated."
+        exit 1
     fi
 
     if [ "$TOT" -ne "$3" ]; then
