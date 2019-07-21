@@ -35,3 +35,14 @@ SuSE Enterprise Linux Server 12 | SLES |  |  |  |  |  |  | |
 SuSE Enterprise Linux Server 15 | SLES |  |  |  |  |  |  | | 
 Arch Linux (latest) | Arch |  |  |  |  |  |  | | 
 All other linux | Other | |  |  |  |  |  | | 
+
+---
+
+# Support matrix per functional area
+![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
+
+In this section we provide a detailed break down of the capabilities of netdata and how we distribute them throughout the different communication channels (source, kickstart, etc)
+
+     | Description | install from source | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker images | .RPM Packaging | .DEB Packaging | Flags/Instructions to enable | Packages required for auto-detection |
+:------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :------------------: | :--------------------: | :--------------------
+| |  |  |  |  |  |  |  |  |
