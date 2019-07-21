@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
 	health_mgmtapi/health-cmdapi-test.sh \
+	urls/request.sh \
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -22,10 +23,12 @@ dist_noinst_DATA = \
     node.d/fronius.process.spec.js \
     node.d/fronius.validation.spec.js \
     health_mgmtapi/health-cmdapi-test.sh.in \
+    urls/request.sh.in \
 	$(NULL)
 
 dist_plugins_SCRIPTS = \
 	health_mgmtapi/health-cmdapi-test.sh \
+	urls/request.sh \
 	$(NULL)
 
 dist_noinst_SCRIPTS = \
