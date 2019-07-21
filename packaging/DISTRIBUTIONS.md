@@ -9,7 +9,7 @@ have complete visibility over the range of support.
 
 ## AMD64 Architecture
 
-Version | Family | Code health | Installer | Kickstart | .DEB | .RPM | CI/Testing | CI/Integration | Community support
+Version | Family | Code health | CI/Testing | CI/Integration | .DEB | .RPM | Installer | Kickstart | Community support
 :------------------: | :------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------:
 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
@@ -43,9 +43,7 @@ All other linux | Other | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; |
 
 ## x86 Architecture
 
-
-
-Version | Family | Code health | Installer | Kickstart | .DEB | .RPM | CI/Testing | CI/Integration | Community support
+Version | Family | Code health | CI/Testing | CI/Integration | .DEB | .RPM | Installer | Kickstart | Community support
 :------------------: | :------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------: | :--------------------------:
 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
@@ -73,3 +71,4 @@ SLES 12 | SLES | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
 SLES 15 | SLES | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
 Arch Linux (latest) | Arch | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
 All other linux | Other | &#10004; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048; | &#x2048;
+
