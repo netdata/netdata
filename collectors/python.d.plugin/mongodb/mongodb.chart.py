@@ -426,7 +426,7 @@ class Service(SimpleService):
         self.definitions = deepcopy(CHARTS)
         self.authdb = self.configuration.get('authdb', 'admin')
         self.user = self.configuration.get('user')
-        self.password = self.configuration.get('pass')
+        self.password = self.configuration.get('pass', self.configuration.get('password'))
         self.host = self.configuration.get('host', '127.0.0.1')
         self.port = self.configuration.get('port', 27017)
         self.timeout = self.configuration.get('timeout', 100)
