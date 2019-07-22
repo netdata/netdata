@@ -94,6 +94,10 @@ backend netdata_backend
 
 TLS can be used by adding port `443` and a cert to the frontend. This example will only use Netdata if host matches example.com (replace with your domain).
 
+### Frontend
+
+This frontend uses a certificate list.
+
 ```
 frontend https_frontend
     ## HTTP ##
