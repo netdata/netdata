@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #shellcheck disable=SC2164
-
-# this script will uninstall netdata
-
+#
+# Netdata updater utility
+#
 # Variables needed by script:
 #  - PATH
 #  - CFLAGS
@@ -11,6 +11,12 @@
 #  - NETDATA_TARBALL_URL
 #  - NETDATA_TARBALL_CHECKSUM_URL
 #  - NETDATA_TARBALL_CHECKSUM
+#
+#
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author: Paweł Krupa <paulfantom@gmail.com>
+# Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 
 info() {
 	echo >&3 "$(date) : INFO: " "${@}"
