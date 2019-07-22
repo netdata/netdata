@@ -57,27 +57,7 @@ There are a few options for resolving container names within netdata. Some metho
 
 #### Docker Socket Proxy (Safest Option)
 
-Deploy a Docker socket proxy, such as [tecnativa/docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy/blob/master/README.md), so that it resticts connections to read only access to the CONTAINERS endpoint.
-
-A simple example is shown in the compose snippet below:
-
-```yaml
-version: '3'
-services:
-  netdata:
-    image: netdata/netdata
-    # ... rest of your config ...
-    ports:
-      - 19999:19999
-    environment:
-      - DOCKER_HOST=proxy:2375
-  proxy:
-    image: tecnativa/docker-socket-proxy
-    volumes:
-     - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - CONTAINERS=1
-```
+Deploy a Docker socket proxy that accepts will filter out requests using something like haproxy so that it resticts connections to read only access to the CONTAINERS endpoint.
 
 The reason it's safer to expose the socket to the proxy is because netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
 
