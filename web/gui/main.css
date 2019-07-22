@@ -151,12 +151,6 @@ body.modal-open {
     /*width: 220px;*/
 }
 
-/*
-.affix-top {
-    width: 220px;
-}
-*/
-
 .dashboard-sidebar {
     max-height: calc(100% - 70px) !important;
     overflow-y: auto;
@@ -166,12 +160,6 @@ body.modal-open {
 /* By default it's not affixed in mobile views, so undo that */
 .dashboard-sidebar.affix {
     position: static;
-}
-
-@media (min-width: 768px) {
-    .dashboard-sidebar {
-        padding-left: 20px;
-    }
 }
 
 /* First level of nav */
@@ -353,146 +341,6 @@ body.modal-open {
     user-select: none;
 }
 
-@media print {
-    body {
-        overflow: visible !important;
-        -webkit-print-color-adjust: exact;
-        page-break-inside: auto;
-        page-break-before: auto;
-        page-break-after: auto;
-    }
-
-    .dashboard-section {
-        page-break-inside: auto;
-        page-break-before: auto;
-        page-break-after: auto;
-    }
-
-    .dashboard-subsection {
-        page-break-before: avoid;
-        page-break-after: auto;
-        page-break-inside: auto;
-    }
-
-    .charts-body {
-        padding-left: 0%;
-        padding-right: 0%;
-        display: block;
-        page-break-inside: auto;
-        page-break-before: auto;
-        page-break-after: auto;
-    }
-
-    .back-to-top,
-    .dashboard-theme-toggle {
-        display: block;
-    }
-}
-
-@media (min-width: 768px) {
-    .charts-body {
-        padding-left: 0%;
-        padding-right: 0%;
-    }
-
-    .back-to-top,
-    .dashboard-theme-toggle {
-        display: block;
-    }
-}
-
-/* Show and affix the side nav when space allows it */
-@media (min-width: 992px) {
-    .container {
-        padding-left: 0% !important;
-    }
-
-    .charts-body {
-        width: calc(100% - 213px) !important;
-        padding-left: 1% !important;
-        padding-right: 0% !important;
-    }
-
-    .sidebar-body {
-        display: inline-block !important;
-        width: 213px !important;
-    }
-
-    .dashboard-sidebar .nav > .active > ul {
-        display: block;
-    }
-
-    /* Widen the fixed sidebar */
-    .dashboard-sidebar.affix,
-    .dashboard-sidebar.affix-top,
-    .dashboard-sidebar.affix-bottom {
-        width: 213px !important;
-    }
-
-    .dashboard-sidebar.affix {
-        position: fixed; /* Undo the static from mobile first approach */
-        top: 20px;
-    }
-
-    .dashboard-sidebar.affix-bottom {
-        position: absolute; /* Undo the static from mobile first approach */
-    }
-
-    .dashboard-sidebar.affix-bottom .dashboard-sidenav,
-    .dashboard-sidebar.affix .dashboard-sidenav {
-        margin-top: 0;
-        margin-bottom: 0;
-    }
-}
-
-@media (min-width: 1200px) {
-    .container {
-        padding-left: 2% !important;
-    }
-
-    .charts-body {
-        width: calc(100% - 233px) !important;
-        padding-left: 1% !important;
-        padding-right: 1% !important;
-    }
-
-    .sidebar-body {
-        display: inline-block !important;
-        width: 233px !important;
-    }
-
-    /* Widen the fixed sidebar again */
-    .dashboard-sidebar.affix,
-    .dashboard-sidebar.affix-top,
-    .dashboard-sidebar.affix-bottom {
-        width: 233px !important;
-    }
-}
-
-@media (min-width: 1360px) {
-    .container {
-        padding-left: 3% !important;
-    }
-
-    .charts-body {
-        width: calc(100% - 263px) !important;
-        padding-left: 1% !important;
-        padding-right: 2% !important;
-    }
-
-    .sidebar-body {
-        display: inline-block !important;
-        width: 263px !important;
-    }
-
-    /* Widen the fixed sidebar again */
-    .dashboard-sidebar.affix,
-    .dashboard-sidebar.affix-top,
-    .dashboard-sidebar.affix-bottom {
-        width: 263px !important;
-    }
-}
-
 .action-button {
     position: relative;
     display: inline-block;
@@ -664,8 +512,23 @@ body.modal-open {
     right: 19px;
 }
 
+#myNetdataDropdownParent {
+    float: left;
+}
+
 #hostname {
     font-size: 18px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+ }
+
+ #hostnametext {
+    white-space: pre;
+    float: left;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 160px;
 }
 
 .sign-in-btn {
@@ -717,4 +580,181 @@ body.modal-open {
 
 .beta {
     color:#FFCC00;    
+}
+
+ 
+@media (min-width: 1400px) {
+    #hostname {
+        max-width: 600px !important;
+    }
+
+    #hostnametext {
+        max-width: 540px !important;
+    }
+}
+
+@media (min-width: 1360px) {
+    .container {
+        padding-left: 3% !important;
+    }
+
+    #hostname {
+        max-width: 280px !important;
+     }
+ 
+     #hostnametext {
+        max-width: 220px !important;
+     }
+    
+    .charts-body {
+        width: calc(100% - 263px) !important;
+        padding-left: 1% !important;
+        padding-right: 2% !important;
+    }
+
+    .sidebar-body {
+        display: inline-block !important;
+        width: 263px !important;
+    }
+
+    /* Widen the fixed sidebar again */
+    .dashboard-sidebar.affix,
+    .dashboard-sidebar.affix-top,
+    .dashboard-sidebar.affix-bottom {
+        width: 263px !important;
+    }
+}
+
+@media (min-width: 1200px) {
+    #hostname {
+        max-width: 100px;
+    }
+ 
+    #hostnametext {
+        max-width: 40px;
+    }
+    .container {
+        padding-left: 2% !important;
+    }
+
+
+    .charts-body {
+        width: calc(100% - 233px) !important;
+        padding-left: 1% !important;
+        padding-right: 1% !important;
+    }
+
+    .sidebar-body {
+        display: inline-block !important;
+        width: 233px !important;
+    }
+
+    /* Widen the fixed sidebar again */
+    .dashboard-sidebar.affix,
+    .dashboard-sidebar.affix-top,
+    .dashboard-sidebar.affix-bottom {
+        width: 233px !important;
+    }
+}
+
+@media (min-width: 992px) {
+    .container {
+        padding-left: 0% !important;
+    }
+
+    .charts-body {
+        width: calc(100% - 213px) !important;
+        padding-left: 1% !important;
+        padding-right: 0% !important;
+    }
+
+    .sidebar-body {
+        display: inline-block !important;
+        width: 213px !important;
+    }
+
+    .dashboard-sidebar .nav > .active > ul {
+        display: block;
+    }
+
+    /* Widen the fixed sidebar */
+    .dashboard-sidebar.affix,
+    .dashboard-sidebar.affix-top,
+    .dashboard-sidebar.affix-bottom {
+        width: 213px !important;
+    }
+
+    .dashboard-sidebar.affix {
+        position: fixed; /* Undo the static from mobile first approach */
+        top: 20px;
+    }
+
+    .dashboard-sidebar.affix-bottom {
+        position: absolute; /* Undo the static from mobile first approach */
+    }
+
+    .dashboard-sidebar.affix-bottom .dashboard-sidenav,
+    .dashboard-sidebar.affix .dashboard-sidenav {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+}
+
+@media (min-width: 860px) {
+    .dashboard-sidebar {
+        padding-left: 20px;
+    }
+
+}
+
+@media (min-width: 768px) {
+    .dashboard-sidebar {
+        padding-left: 20px;
+    }
+
+    .charts-body {
+        padding-left: 0%;
+        padding-right: 0%;
+    }
+
+    .back-to-top,
+    .dashboard-theme-toggle {
+        display: block;
+    }
+}
+
+@media print {
+    body {
+        overflow: visible !important;
+        -webkit-print-color-adjust: exact;
+        page-break-inside: auto;
+        page-break-before: auto;
+        page-break-after: auto;
+    }
+
+    .dashboard-section {
+        page-break-inside: auto;
+        page-break-before: auto;
+        page-break-after: auto;
+    }
+
+    .dashboard-subsection {
+        page-break-before: avoid;
+        page-break-after: auto;
+        page-break-inside: auto;
+    }
+
+    .charts-body {
+        padding-left: 0%;
+        padding-right: 0%;
+        display: block;
+        page-break-inside: auto;
+        page-break-before: auto;
+        page-break-after: auto;
+    }
+
+    .back-to-top,
+    .dashboard-theme-toggle {
+        display: block;
+    }
 }
