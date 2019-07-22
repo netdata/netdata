@@ -1,4 +1,6 @@
 import React from 'react';
+
+import './dashboard';
 import logo from './logo.svg';
 import './App.css';
 
