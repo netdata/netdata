@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- Snappy library is not detected correctly in all Linux distributions [\#6478](https://github.com/netdata/netdata/issues/6478)
 - python sensors collector: sensors chips filtering doesnt work [\#6462](https://github.com/netdata/netdata/issues/6462)
 - fix CRC error handling in dbengine [\#6451](https://github.com/netdata/netdata/issues/6451)
 - Issue with rethinkdbs plugin [\#6429](https://github.com/netdata/netdata/issues/6429)
@@ -14,23 +15,33 @@
 - Cannot see charts in an imported snapshot [\#6384](https://github.com/netdata/netdata/issues/6384)
 - netdata does not send notifications for alarms which fail with \(errno 12, Out of memory\) [\#6335](https://github.com/netdata/netdata/issues/6335)
 - charts.d kills process twice [\#6190](https://github.com/netdata/netdata/issues/6190)
+- Cant see user name when run netdata in docker [\#5585](https://github.com/netdata/netdata/issues/5585)
 - If trailing slash is not included dashboard.js fails to load for slave dashboard for master [\#3820](https://github.com/netdata/netdata/issues/3820)
 - Alarm "system.softnet\_stat" is very strict. [\#1076](https://github.com/netdata/netdata/issues/1076)
+- Stop anonymous stats from writing log in /tmp [\#6491](https://github.com/netdata/netdata/pull/6491) ([cakrit](https://github.com/cakrit))
 - netdata/packaging: Fix RPM packaging workflow issues, plus draft changes for .DEB packaging [\#6415](https://github.com/netdata/netdata/pull/6415) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 **Closed issues:**
 
 - Support for ScaleIO/VxFlexOS v3 [\#6475](https://github.com/netdata/netdata/issues/6475)
+- netdata/packaging: Make go.d plugin an independent module [\#6367](https://github.com/netdata/netdata/issues/6367)
 - Global option for enabling charts with zero metrics [\#6315](https://github.com/netdata/netdata/issues/6315)
 - Netdata variable granularity support in dbengine [\#6254](https://github.com/netdata/netdata/issues/6254)
 - \[Binary releases\] Create a script that will containerise the DEB build process [\#5968](https://github.com/netdata/netdata/issues/5968)
+- health\_alarm\_notify Being Overwritten [\#5669](https://github.com/netdata/netdata/issues/5669)
 - HTML sanitizer for dashboard\_info.js [\#5652](https://github.com/netdata/netdata/issues/5652)
 - Feature Request: Linux zram device statistics. [\#2578](https://github.com/netdata/netdata/issues/2578)
+- Provide an include configuration mechanism  [\#2360](https://github.com/netdata/netdata/issues/2360)
 - Authentication support [\#70](https://github.com/netdata/netdata/issues/70)
 
 **Merged pull requests:**
 
+- Update CLA with intention to keep netdata FOSS [\#6504](https://github.com/netdata/netdata/pull/6504) ([cakrit](https://github.com/cakrit))
+- netdata/docs: Add @joelhans as co-owner on documentation [\#6501](https://github.com/netdata/netdata/pull/6501) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging: Enable built-in support for prometheus remote write in packaging [\#6480](https://github.com/netdata/netdata/pull/6480) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Fix the snappy library check [\#6479](https://github.com/netdata/netdata/pull/6479) ([vlvkobal](https://github.com/vlvkobal))
 - Add a statement about permissions for the diskspace plugin [\#6474](https://github.com/netdata/netdata/pull/6474) ([vlvkobal](https://github.com/vlvkobal))
+- Get user and group names from files  [\#6472](https://github.com/netdata/netdata/pull/6472) ([vlvkobal](https://github.com/vlvkobal))
 - update Nginx guide with changes [\#6466](https://github.com/netdata/netdata/pull/6466) ([prhomhyse](https://github.com/prhomhyse))
 - netdata/packaging: Binary distributions - clean up .DEB package generation process [\#6465](https://github.com/netdata/netdata/pull/6465) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - python sensors collector: sensor chips filtering fix [\#6463](https://github.com/netdata/netdata/pull/6463) ([ilyam8](https://github.com/ilyam8))
@@ -43,6 +54,7 @@
 - Update docs health monitoring and health management api [\#6435](https://github.com/netdata/netdata/pull/6435) ([jghaanstra](https://github.com/jghaanstra))
 - Fix issue with HTML docs generation [\#6433](https://github.com/netdata/netdata/pull/6433) ([cakrit](https://github.com/cakrit))
 - rethinkdb collector new driver support [\#6431](https://github.com/netdata/netdata/pull/6431) ([ilyam8](https://github.com/ilyam8))
+- New 'homepage' for documentation site [\#6428](https://github.com/netdata/netdata/pull/6428) ([joelhans](https://github.com/joelhans))
 - Styling improvements to documentation [\#6425](https://github.com/netdata/netdata/pull/6425) ([joelhans](https://github.com/joelhans))
 - Netdata/packaging: Add documentation for binary packages, plus draft table for distributions support [\#6422](https://github.com/netdata/netdata/pull/6422) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/doc: Update documentation dependencies [\#6421](https://github.com/netdata/netdata/pull/6421) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -54,6 +66,7 @@
 - Update Running-behind-apache.md [\#6406](https://github.com/netdata/netdata/pull/6406) ([Steve8291](https://github.com/Steve8291))
 - Fix Web API Health documentation  [\#6404](https://github.com/netdata/netdata/pull/6404) ([thiagoftsm](https://github.com/thiagoftsm))
 - Snapshot uniqueId fix [\#6400](https://github.com/netdata/netdata/pull/6400) ([jacekkolasa](https://github.com/jacekkolasa))
+- Change default installation to stable in documentation [\#6388](https://github.com/netdata/netdata/pull/6388) ([joelhans](https://github.com/joelhans))
 - Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
 - Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
 - Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
