@@ -57,7 +57,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
     To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
 
-<details markdown="1"><summary>More information and advanced uses of the `kickstart.sh` script</summary>
+<details markdown="1"><summary>More information and advanced uses of the kickstart.sh script</summary>
 
 **What `kickstart.sh` does:**
 
@@ -110,7 +110,7 @@ We have currently released packages following the .RPM format with version 1.16.
 
 **We have currently only officially released `.RPM` packages**. `.DEB` packages will be officially released with v1.17.0 of Netdata. However, early adopters can experiment with our `.DEB` packages using our nightly releases.
 
-We provide two separate repositories, one for our stable releases and one for our nightly releases. See this notice about [stable vs. nightly](#stable-vs-nightly-releases) for more information. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io). You can visit the repository pages to read more, or try the set-up commands to get started.
+We provide two separate repositories, one for our stable releases and one for our nightly releases. See this notice about [stable vs. nightly](#nightly-vs-stable-releases) for more information. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io). You can visit the repository pages to read more, or try the set-up commands to get started.
 
 **Stable releases:** Our stable production releases are hosted in the [netdata/netdata](https://packagecloud.io/netdata/netdata) repository on Packagecloud.
 
