@@ -9,7 +9,7 @@ have complete visibility over the range of support.
 
 ## AMD64 Architecture
 
-Version | Family | Code health | CI/Testing | CI/Integration | .DEB | .RPM | Installer | Kickstart | Community support
+Version | Family | CI:Smoke testing | CI:Testing | CI:Integration | .DEB | .RPM | Installer | Kickstart | Community support
 :------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#63; | &#10004; | N/A | &#10004; | &#63; | &#63;
 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#63; | &#10004; | N/A | &#10004; | &#63; | &#63;
@@ -43,7 +43,7 @@ All other linux | Other | &#63; | &#63; | &#63; | &#10007; | &#10007; | &#63; | 
 
 ## x86 Architecture
 
-Version | Family | Code health | CI/Testing | CI/Integration | .DEB | .RPM | Installer | Kickstart | Community support
+Version | Family | CI:Smoke testing | CI:Testing | CI:Integration | .DEB | .RPM | Installer | Kickstart | Community support
 :------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#63; | &#10004; | N/A | &#10004; | &#63; | &#63;
 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#63; | &#10004; | N/A | &#10004; | &#63; | &#63;
