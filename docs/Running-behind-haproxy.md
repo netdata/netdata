@@ -1,5 +1,9 @@
 # Netdata via HAproxy
 
+> HAProxy is a free, very fast and reliable solution offering high availability, load balancing, and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic web sites and powers quite a number of the world's most visited ones.
+
+If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name can be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port. This can make it possible to connect to Netdata at https://example.com or https://example.com/netdata/, which is a much nicer experience then http://example.com:19999.
+
 To proxy requests from [HAProxy](https://github.com/haproxy/haproxy) to Netdata, the following configuration can be used:
 
 ## Default Configuration
