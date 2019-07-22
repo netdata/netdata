@@ -93,7 +93,7 @@ The above command will:
 - Install any required packages on your system (it will ask you to confirm before doing so)
 - Compile it, install it, and start it.
 
-More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
+More installation methods and additional options can be found at the [installation page](packaging/installer/).
 
 To try Netdata in a docker container, run this:
 
