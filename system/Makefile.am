@@ -18,7 +18,6 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_config_SCRIPTS = \
-    edit-config \
     $(NULL)
 
 nodist_noinst_DATA = \
