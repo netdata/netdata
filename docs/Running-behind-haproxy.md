@@ -29,7 +29,7 @@ frontend http_frontend
 
 ### Backend
 
-Create the netdata backend which will send requests to port `19999`.
+Create the Netdata backend which will send requests to port `19999`.
 
 ```
 backend netdata_backend
@@ -88,7 +88,7 @@ backend netdata_backend
 
 ### Using TLS communication
 
-TLS can be used by adding port `443` and a cert to the frontend. This example will only use netdata if host matches example.com (replace with your domain).
+TLS can be used by adding port `443` and a cert to the frontend. This example will only use Netdata if host matches example.com (replace with your domain).
 
 ```
 frontend https_frontend
@@ -102,7 +102,7 @@ frontend https_frontend
     bind :::443 v4v6 ssl crt-list /etc/letsencrypt/certslist.txt
 
     ## ACL ##
-    # Optionally check host for netdata
+    # Optionally check host for Netdata
     acl is_example_host  hdr_sub(host) -i example.com
 
     ## Backends ##
@@ -226,7 +226,7 @@ frontend https_frontend
     bind :::443 v4v6 ssl crt-list /etc/letsencrypt/certslist.txt
 
     ## ACL ##
-    # Optionally check host for netdata
+    # Optionally check host for Netdata
     acl is_example_host  hdr_sub(host) -i example.com
     acl is_netdata       url_beg  /netdata
 
