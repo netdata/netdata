@@ -62,7 +62,7 @@ ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
 RUN \
     # provide judy installation to base image
-    apk add make alpine-sdk && \
+    apk add make alpine-sdk shadow && \
     cd /judy-${JUDY_VER} && make install && cd / && \
     # Clean the source stuff once judy is installed
     rm -rf /judy-${JUDY_VER} && apk del make alpine-sdk && \

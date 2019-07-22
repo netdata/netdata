@@ -61,6 +61,22 @@ Deploy a Docker socket proxy that accepts will filter out requests using somethi
 
 The reason it's safer to expose the socket to the proxy is because netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
 
+#### Giving group access to Docker Socket (Less safe)
+
+**Important Note**: You should seriously consider the necessity of activating this option,
+as it grants to the netdata user access to the privileged socket connection of docker service and therefore your whole machine.
+
+If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the socket.
+
+To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the Netdata container, 
+where `[GROUP NUMBER]` is practically the group id of the group assigned to the docker socket, on your host.
+
+This group number can be found by running the following (if socket group ownership is docker):
+
+```bash
+grep docker /etc/group | cut -d ':' -f 3
+```
+
 #### Running as root (Unsafe)
 
 **Important Note**: You should seriously consider the necessity of activating this option,
