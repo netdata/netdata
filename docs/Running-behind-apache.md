@@ -221,12 +221,14 @@ Note: Changes are applied by reloading or restarting Apache.
 
 ## Configuration of Content Security Policy
 
-If you want to enable csp within your apache, you should consider some special requirements of the headers. Modify your configuration like that:
+If you want to enable CSP within your Apache, you should consider some special requirements of the headers. Modify your configuration like that:
 
 ```
     Header always set Content-Security-Policy "default-src 'unsafe-inline' http://localhost:19999 https: 'self' 'unsafe-eval'; script-src 'unsafe-inline' https: 'self'
 'unsafe-eval'; style-src https: 'self' 'unsafe-inline'"
 ```
+
+Note: Changes are applied by reloading or restarting Apache.
 
 # Netdata configuration
 
