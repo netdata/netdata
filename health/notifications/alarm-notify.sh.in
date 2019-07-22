@@ -352,6 +352,7 @@ SYSLOG_FACILITY=
 EMAIL_SENDER=
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
 EMAIL_THREADING=
+EMAIL_PLAINTEXT_ONLY=
 
 # irc configs
 IRC_NICKNAME=
@@ -2093,16 +2094,7 @@ SENT_SYSLOG=$?
 # -----------------------------------------------------------------------------
 # send the email
 
-send_email <<EOF
-To: ${to_email}
-Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
-MIME-Version: 1.0
-Content-Type: multipart/alternative; boundary="multipart-boundary"
-${email_thread_headers}
-
-This is a MIME-encoded multipart message
-
---multipart-boundary
+IFS='' read -r -d '' email_plaintext_part <<EOF
 Content-Type: text/plain; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
@@ -2124,8 +2116,27 @@ Evaluated Expression :  ${calc_expression}
 Expression Variables :  ${calc_param_values}
 
 The host has ${total_warnings} WARNING and ${total_critical} CRITICAL alarm(s) raised.
+EOF
+
+if [[ "${EMAIL_PLAINTEXT_ONLY}" == "YES" ]]; then
+
+send_email <<EOF
+To: ${to_email}
+Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="multipart-boundary"
+${email_thread_headers}
+
+This is a MIME-encoded multipart message
 
 --multipart-boundary
+${email_plaintext_part}
+--multipart-boundary--
+EOF
+
+else
+
+IFS='' read -r -d '' email_html_part <<EOF
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
@@ -2231,8 +2242,25 @@ Content-Transfer-Encoding: 8bit
 </table>
 </body>
 </html>
+EOF
+
+send_email <<EOF
+To: ${to_email}
+Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="multipart-boundary"
+${email_thread_headers}
+
+This is a MIME-encoded multipart message
+
+--multipart-boundary
+${email_plaintext_part}
+--multipart-boundary
+${email_html_part}
 --multipart-boundary--
 EOF
+
+fi
 
 SENT_EMAIL=$?
 
