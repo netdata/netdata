@@ -155,7 +155,7 @@ userlist basic-auth-list
   user admin password passwordhere groups is-admin
 ```
 
-A hashed password can be used but using the `mkpassword` utility.
+You can create a hashed password using the `mkpassword` utility.
 
 ```
 $ printf "passwordhere" | mkpasswd --stdin --method=sha-256
