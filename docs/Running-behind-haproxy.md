@@ -13,7 +13,7 @@ defaults
 
 ## Simple Configuration
 
-A simple example where the base URL is used with no subpath:
+A simple example where the base URL, say http://example.com, is used with no subpath:
 
 ### Frontend
 
