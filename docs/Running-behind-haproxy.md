@@ -73,7 +73,7 @@ frontend http_frontend
     default_backend www_backend
 ```
 
-#### Backend
+### Backend
 
 Same as simple example, expept remove `/netdata/` with regex.
 
@@ -90,7 +90,7 @@ backend netdata_backend
     http-request set-header Connection "keep-alive"
 ```
 
-### Using TLS communication
+## Using TLS communication
 
 TLS can be used by adding port `443` and a cert to the frontend. This example will only use Netdata if host matches example.com (replace with your domain).
 
@@ -131,7 +131,7 @@ $ cat /etc/letsencrypt/live/example.com/fullchain.pem \
     /etc/letsencrypt/live/example.com/example.com.pem
 ```
 
-#### Backend
+### Backend
 
 Same as simple, except set protocol `https`.
 
@@ -147,7 +147,7 @@ backend netdata_backend
     http-request set-header Connection "keep-alive"
 ```
 
-### Enable authentication
+## Enable authentication
 
 To use basic HTTP Authentication, create a authentication list:
 
@@ -179,7 +179,7 @@ acl devops-auth http_auth_group(basic-auth-list) is-admin
 http-request auth realm netdata_local unless devops-auth
 ```
 
-### Full Example
+## Full Example
 
 Full example configuration with HTTP auth over TLS with subpath:
 
