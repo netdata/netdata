@@ -82,6 +82,8 @@ SIMPLE_PATTERN *web_allow_badges_from = NULL;
 SIMPLE_PATTERN *web_allow_mgmt_from = NULL;
 SIMPLE_PATTERN *web_allow_streaming_from = NULL;
 SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
+SIMPLE_PATTERN *web_allow_ssl_optional = NULL;
+SIMPLE_PATTERN *web_allow_ssl_force = NULL;
 
 void web_client_update_acl_matches(struct web_client *w) {
     w->acl = WEB_CLIENT_ACL_NONE;
@@ -103,6 +105,12 @@ void web_client_update_acl_matches(struct web_client *w) {
 
     if(!web_allow_netdataconf_from || simple_pattern_matches(web_allow_netdataconf_from, w->client_ip))
         w->acl |= WEB_CLIENT_ACL_NETDATACONF;
+
+    if(!web_allow_ssl_optional || simple_pattern_matches(web_allow_ssl_optional, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_SSL_OPTIONAL;
+
+    if(!web_allow_ssl_force || simple_pattern_matches(web_allow_ssl_force, w->client_ip))
+        w->acl |= WEB_CLIENT_ACL_SSL_FORCE;
 
     w->acl &= w->port_acl;
 }

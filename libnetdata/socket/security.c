@@ -8,7 +8,6 @@ SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
-int netdata_use_ssl_on_http = NETDATA_SSL_FORCE; //We force SSL due safety reasons
 int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 /**

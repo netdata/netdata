@@ -308,38 +308,42 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
  *
  *  @param acl is the acl given by the user.
  */
-void socket_ssl_acl(char *acl) {
+WEB_CLIENT_ACL socket_ssl_acl(char *acl) {
     char *ssl = strchr(acl,'^');
     if(ssl) {
-#ifdef ENABLE_HTTPS
         //Due the format of the SSL command it is always the last command,
         //we finish it here to avoid problems with the ACLs
         *ssl = '\0';
+#ifdef ENABLE_HTTPS
         ssl++;
         if (!strncmp("SSL=",ssl,4)) {
             ssl += 4;
             if (!strcmp(ssl,"optional")) {
-                netdata_use_ssl_on_http = NETDATA_SSL_OPTIONAL;
                 netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
+                return WEB_CLIENT_ACL_SSL_OPTIONAL;
             }
             else if (!strcmp(ssl,"force")) {
                 netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
-                netdata_use_ssl_on_http = NETDATA_SSL_FORCE;
+                return WEB_CLIENT_ACL_SSL_FORCE;
             }
         }
 #endif
     }
+
+    return WEB_CLIENT_ACL_NONE;
 }
 
 WEB_CLIENT_ACL read_acl(char *st) {
-    if (!strcmp(st,"dashboard")) return WEB_CLIENT_ACL_DASHBOARD;
-    if (!strcmp(st,"registry")) return WEB_CLIENT_ACL_REGISTRY;
-    if (!strcmp(st,"badges")) return WEB_CLIENT_ACL_BADGE;
-    if (!strcmp(st,"management")) return WEB_CLIENT_ACL_MGMT;
-    if (!strcmp(st,"streaming")) return WEB_CLIENT_ACL_STREAMING;
-    if (!strcmp(st,"netdata.conf")) return WEB_CLIENT_ACL_NETDATACONF;
+    WEB_CLIENT_ACL ret = socket_ssl_acl(st);
 
-    return WEB_CLIENT_ACL_NONE;
+    if (!strcmp(st,"dashboard")) ret |= WEB_CLIENT_ACL_DASHBOARD;
+    if (!strcmp(st,"registry")) ret |= WEB_CLIENT_ACL_REGISTRY;
+    if (!strcmp(st,"badges")) ret |= WEB_CLIENT_ACL_BADGE;
+    if (!strcmp(st,"management")) ret |= WEB_CLIENT_ACL_MGMT;
+    if (!strcmp(st,"streaming")) ret |= WEB_CLIENT_ACL_STREAMING;
+    if (!strcmp(st,"netdata.conf")) ret |= WEB_CLIENT_ACL_NETDATACONF;
+
+    return ret;
 }
 
 static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
@@ -389,7 +393,6 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
     }
 
     char *e = ip;
-    socket_ssl_acl(e);
     if(*e == '[') {
         e = ++ip;
         while(*e && *e != ']') e++;

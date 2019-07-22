@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/bin/bash -x
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 BASICURL="http://127.0.0.1"
 BASICURLS="https://127.0.0.1"
 
-NETDATA_VARLIB_DIR="@varlibdir_POST@"
+NETDATA_VARLIB_DIR="/var/lib/netdata"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;43m'
@@ -27,25 +27,56 @@ run_acl_tests() {
     #Give a time for netdata start properly
     sleep 2
 
+    REDIRECTED=0
     curl -v -k --tls-max 1.2 --create-dirs -o index.html "$2" 2> log_index.txt
-    curl -v -k --tls-max 1.2 --create-dirs -o netdata.txt "$2/netdata.conf" 2> log_nc.txt
-    curl -v -k --tls-max 1.2 --create-dirs -o badge.csv "$2/api/v1/badge.svg?chart=cpu.cpu0_interrupts" 2> log_badge.txt
-    curl -v -k --tls-max 1.2 --create-dirs -o info.txt "$2/api/v1/info" 2> log_info.txt
-    curl -H "X-Auth-Token: $1" -v -k --tls-max 1.2 --create-dirs -o health.csv "$2/api/v1/manage/health?cmd=LIST" 2> log_health.txt
-
-    TOT=$(grep -c "HTTP/1.1 200 OK" log_* | cut -d: -f2| grep -c 1)
-    TOT1=$(grep -c "HTTP/1.1 301" log_* | cut -d: -f2| grep -c 1)
-
-    if [ "$TOT1" -eq "5" ]; then
-        echo -e "${YELLOW}All the urls were redirected to https"
-        return
-    elif [ "$TOT1" -ne "5" ] && [ "$BASICURL" == "$2" ] ; then
-        echo -e "${RED}I got a wrong number of 301 when SSL is activated."
-        exit 1
+    TOT1=$(grep -c "HTTP/1.1 301" log_index.txt | cut -d: -f2| grep -c 1)
+    if [ "$TOT1" -eq "1" ]; then
+        REDIRECTED=$((REDIRECTED+1))
+        echo -e "${YELLOW}The request to '/' was redirected to https"
     fi
 
+    curl -v -k --tls-max 1.2 --create-dirs -o netdata.txt "$2/netdata.conf" 2> log_nc.txt
+    TOT1=$(grep -c "HTTP/1.1 301" log_nc.txt | cut -d: -f2| grep -c 1)
+    if [ "$TOT1" -eq "1" ]; then
+        REDIRECTED=$((REDIRECTED+1))
+        echo -e "${YELLOW}The request to 'netdata.conf' was redirected to https"
+    fi
+
+    curl -v -k --tls-max 1.2 --create-dirs -o badge.csv "$2/api/v1/badge.svg?chart=cpu.cpu0_interrupts" 2> log_badge.txt
+    TOT1=$(grep -c "HTTP/1.1 301" log_badge.txt | cut -d: -f2| grep -c 1)
+    if [ "$TOT1" -eq "1" ]; then
+        REDIRECTED=$((REDIRECTED+1))
+        echo -e "${YELLOW}The request to 'badge' was redirected to https"
+    fi
+
+    curl -v -k --tls-max 1.2 --create-dirs -o info.txt "$2/api/v1/info" 2> log_info.txt
+    TOT1=$(grep -c "HTTP/1.1 301" log_info.txt | cut -d: -f2| grep -c 1)
+    if [ "$TOT1" -eq "1" ]; then
+        REDIRECTED=$((REDIRECTED+1))
+        echo -e "${YELLOW}The request to 'info' was redirected to https"
+    fi
+
+    curl -H "X-Auth-Token: $1" -v -k --tls-max 1.2 --create-dirs -o health.csv "$2/api/v1/manage/health?cmd=LIST" 2> log_health.txt
+    TOT1=$(grep -c "HTTP/1.1 301" log_health.txt | cut -d: -f2| grep -c 1)
+    if [ "$TOT1" -eq "1" ]; then
+        REDIRECTED=$((REDIRECTED+1))
+        echo -e "${YELLOW}The request to 'health' was redirected to https"
+    fi
+
+    if [ "$REDIRECTED" -ne "0" ]; then
+        echo "I got a total of $REDIRECTED redirects"
+        if [ "$REDIRECTED" -ne "5" ]; then
+            echo -e "${RED}I got a wrong number of 301 ($REDIRECTED) when SSL is activated."
+            killall netdata
+            exit 1
+        fi
+        return
+    fi
+
+    TOT=$(grep -c "HTTP/1.1 200 OK" log_* | cut -d: -f2| grep -c 1)
     if [ "$TOT" -ne "$3" ]; then
         echo -e "${RED}I got a wrong number of 200 OK from the queries."
+        killall netdata
         exit 1
     fi
 
@@ -73,8 +104,15 @@ killall netdata
 change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management *:20001=dashboard|registry|netdata.conf^SSL=optional *:20002=dashboard|registry" "$CWD" "netdata.conf.test1"
 netdata -c "netdata.conf.test1"
 run_acl_tests $TOKEN "$BASICURL:19999" 5
+run_acl_tests $TOKEN "$BASICURLS:19999" 5
+
 run_acl_tests $TOKEN "$BASICURL:20000" 4
+run_acl_tests $TOKEN "$BASICURLS:20000" 4
+
+run_acl_tests $TOKEN "$BASICURL:20001" 4
 run_acl_tests $TOKEN "$BASICURLS:20001" 4
+
+run_acl_tests $TOKEN "$BASICURL:20002" 3 
 run_acl_tests $TOKEN "$BASICURLS:20002" 3 
 killall netdata
 
@@ -82,20 +120,27 @@ change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|ne
 netdata -c "netdata.conf.test2"
 run_acl_tests $TOKEN "$BASICURL:19999" 5
 run_acl_tests $TOKEN "$BASICURLS:19999" 5
+
+run_acl_tests $TOKEN "$BASICURL:20000" 4
 run_acl_tests $TOKEN "$BASICURLS:20000" 4
+
+run_acl_tests $TOKEN "$BASICURL:20001" 4
 run_acl_tests $TOKEN "$BASICURLS:20001" 4
+
+run_acl_tests $TOKEN "$BASICURL:20002" 3 
 run_acl_tests $TOKEN "$BASICURLS:20002" 3 
 killall netdata
 
-change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management^SSL=optional *:20001=dashboard|registry|netdata.conf^SSL=force *:20002=dashboard|registry" "$CWD" "netdata.conf.test3"
+change_ssl_file "$CONF" "    bind to = *=dashboard|registry|badges|management|netdata.conf *:20000=dashboard|registry|badges|management^SSL=optional *:20001=dashboard|registry|netdata.conf^SSL=force" "$CWD" "netdata.conf.test3"
 netdata -c "netdata.conf.test3"
 run_acl_tests $TOKEN "$BASICURL:19999" 5
 run_acl_tests $TOKEN "$BASICURLS:19999" 5
+
 run_acl_tests $TOKEN "$BASICURL:20000" 4
 run_acl_tests $TOKEN "$BASICURLS:20000" 4
+
 run_acl_tests $TOKEN "$BASICURL:20001" 4
 run_acl_tests $TOKEN "$BASICURLS:20001" 4
-run_acl_tests $TOKEN "$BASICURLS:20002" 3
 killall netdata
 
 rm log_* netdata.conf.test* netdata.txt health.csv index.html badge.csv tmp* key.pem cert.pem info.txt
