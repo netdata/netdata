@@ -71,4 +71,8 @@ extern int discard_response(BUFFER *b, const char *backend);
 #include "backends/prometheus/remote_write/remote_write.h"
 #endif
 
+#if HAVE_MONGOC
+#include "backends/mongodb/mongodb.h"
+#endif
+
 #endif /* NETDATA_BACKENDS_H */
