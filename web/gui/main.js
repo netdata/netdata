@@ -2881,10 +2881,8 @@ function xssModalKeepXss() {
     return false;
 }
 
-function initializeDynamicDashboard(netdata_url) {
-    if (typeof netdata_url === 'undefined' || netdata_url === null) {
-        netdata_url = NETDATA.serverDefault;
-    }
+function initializeDynamicDashboard() {
+    const netdata_url = NETDATA.serverDefault;
 
     initializeConfig.url = netdata_url;
 
