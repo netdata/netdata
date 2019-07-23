@@ -163,6 +163,7 @@ echo -ne "        - Running behind another web server:
             - 'docs/Running-behind-apache.md'
             - 'docs/Running-behind-lighttpd.md'
             - 'docs/Running-behind-caddy.md'
+        - 'docs/Running-behind-haproxy.md'
 "
 #navpart 2 system
 navpart 2 database

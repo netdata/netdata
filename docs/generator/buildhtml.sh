@@ -24,11 +24,6 @@ echo "Copying files"
 rm -rf ${SRC_DIR}
 find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${SRC_DIR}
 
-# Move main README.md file to what-is-netdata.md
-# echo "Replacing docs homepage"
-# mv ./${SRC_DIR}/README.md ./${SRC_DIR}/what-is-netdata.md
-# mv ./${SRC_DIR}/DOCUMENTATION.md ./${SRC_DIR}/README.md
-
 # Copy Netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
 
@@ -64,7 +59,7 @@ prep_html() {
 	lang="${1}"
 	echo "Creating ${lang} mkdocs.yaml"
 
-	if [ "${lang}" = "en" ] ; then
+	if [ "${lang}" == "en" ] ; then
 		SITE_DIR="build"
 	else
 		SITE_DIR="build/${lang}"
@@ -89,9 +84,10 @@ prep_html() {
 		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'
 	fi
 
-	# Replace index.html with DOCUMENTATION/index.html
+	# Replace index.html with DOCUMENTATION/index.html. Since we're moving it up one directory, we need to remove ../ from the links
 	echo "Replacing index.html with DOCUMENTATION/index.html"
-	cat ${GENERATOR_DIR}/${SITE_DIR}/DOCUMENTATION/index.html > ${GENERATOR_DIR}/${SITE_DIR}/index.html
+	sed 's/\.\.\///g' ${GENERATOR_DIR}/${SITE_DIR}/DOCUMENTATION/index.html > ${GENERATOR_DIR}/${SITE_DIR}/index.html
+
 }
 
 for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -type d -printf '%f ') ; do
