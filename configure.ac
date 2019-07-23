@@ -437,6 +437,14 @@ else
     AC_DEFINE_UNQUOTED([unlikely(x)], [(x)], [gcc branch optimization])
 fi
 
+if test "${GCC}" = "yes"; then
+    AC_DEFINE([__always_unused], [__attribute__((unused))], [gcc unused attribute])
+    AC_DEFINE([__maybe_unused], [__attribute__((unused))], [gcc unused attribute])
+else
+    AC_DEFINE([__always_unused], [], [dummy unused attribute])
+    AC_DEFINE([__maybe_unused], [], [dummy unused attribute])
+fi
+
 if test "${enable_pedantic}" = "yes"; then
     enable_strict="yes"
     CFLAGS="${CFLAGS} -pedantic -Wall -Wextra -Wno-long-long"

@@ -1067,7 +1067,7 @@ static const char *valuetype2string(STATSD_APP_CHART_DIM_VALUE_TYPE type) {
 }
 
 static STATSD_APP_CHART_DIM *add_dimension_to_app_chart(
-        STATSD_APP *app
+        STATSD_APP *app __maybe_unused
         , STATSD_APP_CHART *chart
         , const char *metric_name
         , const char *dim_name
