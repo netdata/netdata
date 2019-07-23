@@ -1,3 +1,5 @@
+/* eslint-disable no-unused-vars, spaced-comment, max-len */
+
 /**
  * this file is created only for refractor purposes - during the refractor process it should shrink in size,
  * because every feature added in "react way" will be removed from this file (if possible)
@@ -5,7 +7,6 @@
  * i haven't used the original dashboard.js file nor the dashboard.js/* partials so it's easy to compare
  * versions before and after refractor
  */
-
 
 
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -9869,12 +9870,6 @@ NETDATA.requiredJs = [
             return typeof netdataNoFontAwesome !== 'undefined' && netdataNoFontAwesome;
         }
     },
-    {
-        url: NETDATA.serverStatic + 'lib/perfect-scrollbar-0.6.15.min.js',
-        isAlreadyLoaded: function () {
-            return false;
-        }
-    }
 ];
 
 NETDATA.requiredCSS = [
