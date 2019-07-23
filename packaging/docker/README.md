@@ -57,7 +57,7 @@ There are a few options for resolving container names within netdata. Some metho
 
 #### Docker Socket Proxy (Safest Option)
 
-Deploy a Docker socket proxy that accepts will filter out requests using something like haproxy so that it resticts connections to read only access to the CONTAINERS endpoint.
+Deploy a Docker socket proxy that accepts will filter out requests using something like HAProxy so that it restricts connections to read-only access to the CONTAINERS endpoint.
 
 The reason it's safer to expose the socket to the proxy is because netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
 
