@@ -28,8 +28,8 @@ typedef enum web_client_acl {
 #define web_client_can_access_mgmt(w) ((w)->acl & WEB_CLIENT_ACL_MGMT)
 #define web_client_can_access_stream(w) ((w)->acl & WEB_CLIENT_ACL_STREAMING)
 #define web_client_can_access_netdataconf(w) ((w)->acl & WEB_CLIENT_ACL_NETDATACONF)
-#define web_client_is_using_ssl_optional(w) ((w)->acl & WEB_CLIENT_ACL_SSL_OPTIONAL)
-#define web_client_is_using_ssl_force(w) ((w)->acl & WEB_CLIENT_ACL_SSL_FORCE)
+#define web_client_is_using_ssl_optional(w) ((w)->port_acl & WEB_CLIENT_ACL_SSL_OPTIONAL)
+#define web_client_is_using_ssl_force(w) ((w)->port_acl & WEB_CLIENT_ACL_SSL_FORCE)
 
 typedef struct listen_sockets {
     struct config *config;              // the config file to use

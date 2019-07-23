@@ -319,11 +319,9 @@ WEB_CLIENT_ACL socket_ssl_acl(char *acl) {
         if (!strncmp("SSL=",ssl,4)) {
             ssl += 4;
             if (!strcmp(ssl,"optional")) {
-                netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
                 return WEB_CLIENT_ACL_SSL_OPTIONAL;
             }
             else if (!strcmp(ssl,"force")) {
-                netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
                 return WEB_CLIENT_ACL_SSL_FORCE;
             }
         }
@@ -385,7 +383,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             error("LISTENER: Cannot create unix socket '%s'", path);
             sockets->failed++;
         } else {
-            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_OPTIONAL;
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
@@ -435,7 +433,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
         acl_flags |= read_acl(portconfig);
     } else {
-        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_OPTIONAL;
     }
 
     uint32_t scope_id = 0;

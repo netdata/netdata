@@ -112,14 +112,19 @@ Example:
 
 For information how to configure the slaves to use TLS, check [securing the communication](../../streaming#securing-streaming-communications) in the streaming documentation. There you will find additional details on the expected behavior for client and server nodes, when their respective TLS options are enabled.
 
-When we define the use of SSL in a Netdata agent for different ports, the Netdata will apply the TLS rule for the specific port that is assigned, for example, in the next configuration line
+When we define the use of SSL in a Netdata agent for different ports,  Netdata will apply the behavior specified on each port. For example, using the configuration line below:
 
 ```
 [web]
     bind to = *=dashboard|registry|badges|management|streaming|netdata.conf^SSL=force *:20000=netdata.conf^SSL=optional *:20001=dashboard|registry
 ```
 
-the netdata will force all connections for the default port to be redirected to encrypted connections, when a connection goes to the port `20000`, the connections will be encrypted only case the user specifies the HTTPS protocol, finally the connections with the port `20001`, that is not assigned with any TLS rule, they will have the default behavior of Netdata that is works with TLS as optional when the pair certificate and key are specified.
+Netdata will:
+
+- Force all HTTP requests to the default port to be redirected to HTTPS (same port).
+- Refuse unencrypted streaming connections from slaves on the default port.
+- Allow both HTTP and HTTPS requests to port 20000 for netdata.conf
+- Allow both HTTP and HTTPS requests to port 20001 for the dashboard, the read API and the registry
 
 #### TLS/SSL errors
 
