@@ -20,7 +20,7 @@ int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
  * @param where the variable with the flags set.
  * @param ret the return of the caller
  */
-static void security_info_callback(const SSL *ssl, int where, int ret) {
+static void security_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
     (void)ssl;
     if (where & SSL_CB_ALERT) {
         debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));

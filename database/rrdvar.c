@@ -68,7 +68,8 @@ inline void rrdvar_free(RRDHOST *host, avl_tree_lock *tree, RRDVAR *rv) {
     freez(rv);
 }
 
-inline RRDVAR *rrdvar_create_and_index(const char *scope, avl_tree_lock *tree, const char *name, RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
+inline RRDVAR *rrdvar_create_and_index(const char *scope __maybe_unused, avl_tree_lock *tree, const char *name,
+                                       RRDVAR_TYPE type, RRDVAR_OPTIONS options, void *value) {
     char *variable = strdupz(name);
     rrdvar_fix_name(variable);
     uint32_t hash = simple_hash(variable);

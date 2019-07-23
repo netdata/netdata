@@ -2227,7 +2227,7 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
     return indent + 1;
 }
 
-static inline void debug_print_process_tree(struct pid_stat *p, char *msg) {
+static inline void debug_print_process_tree(struct pid_stat *p, char *msg __maybe_unused) {
     debug_log("%s: process %s (%d, %s) with parents:", msg, p->comm, p->pid, p->updated?"running":"exited");
     debug_print_process_and_parents(p, p->stat_collected_usec);
 }
