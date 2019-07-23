@@ -60,7 +60,7 @@ If you don't want to use the apps.plugin functionality, you can remove the mount
 
 ### Docker container names resolution
 
-If you want to have your container names resolved by netdata, make netdata user be part of the group that owns the socket.
+If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the socket.
    To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the Netdata container,
    where `[GROUP NUMBER]` is practically the group id of the group assigned to the docker socket, on your host.
    This group number can be found by running the following (if socket group ownership is docker):
