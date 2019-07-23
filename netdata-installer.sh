@@ -199,6 +199,7 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly"
+IS_NETDATA_STATIC_BINARY="no"
 while [ -n "${1}" ]; do
 	case "${1}" in
 		"--zlib-is-really-here") LIBS_ARE_HERE=1;;
@@ -207,6 +208,7 @@ while [ -n "${1}" ]; do
 		"--dont-wait") DONOTWAIT=1;;
 		"--auto-update"|"-u") AUTOUPDATE=1;;
 		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--static") IS_NETDATA_STATIC_BINARY="yes";;
 		"--enable-plugin-freeipmi")  NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi";;
 		"--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi";;
 		"--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct";;
@@ -1073,6 +1075,7 @@ INSTALL_UID="${UID}"
 NETDATA_GROUP="${NETDATA_GROUP}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
+IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 # This value is meant to be populated by autoupdater (if enabled)
 NETDATA_TARBALL_CHECKSUM="new_installation"
 EOF

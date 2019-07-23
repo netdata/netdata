@@ -16,6 +16,7 @@ fi
 run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
     --dont-wait \
     --dont-start-it \
+    --static \
     ${NULL}
 
 if [ ${NETDATA_BUILD_WITH_DEBUG} -eq 0 ]
