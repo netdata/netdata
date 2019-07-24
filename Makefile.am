@@ -456,7 +456,7 @@ PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
     $(NULL)
 
 MONGODB_BACKEND_FILES = \
-    backends/mongodb/mongodb.cc \
+    backends/mongodb/mongodb.c \
     backends/mongodb/mongodb.h \
     $(NULL)
 
