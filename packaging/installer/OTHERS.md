@@ -4,6 +4,8 @@ The Netdata team works hard to make Netdata installable on as many systems as po
 
 If you're installing Netdata on a Linux system, we recommend you try our [one-line automatic installation](README.md#one-line-installation) or [binary releases](README.md#binary-packages) first. If those don't work, you can try the [pre-built static binary](#pre-built-static-binary-for-linux-64-bit) or the [manual installation](MANUAL-INSTALLATION.md).
 
+macOS and FreeBSD users can find instructions for their operating systems below.
+
 - [Pre-built static binary for Linux 64-bit](#pre-built-static-binary-for-linux-64-bit)
 - [macOS](#macos)
 - [FreeBSD](#freebsd)
@@ -24,12 +26,14 @@ To install Netdata from a binary package on any Linux distro and any kernel vers
 $ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
-!!! note
+!!! note "Usage notes"
     Do not use `sudo` for this installer—it will escalate privileges itself if needed.
 
     To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](README.md#nightly-vs-stable-releases).
 
     If your system does not have `bash` installed, open the `More information and advanced uses of the kickstart-static64.sh script` dropdown for instructions to run the installer without `bash`.
+
+    This script installs Netdata at `/opt/netdata`.
 
 <details markdown="1"><summary>More information and advanced uses of the kickstart-static64.sh script</summary>
 
