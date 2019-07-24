@@ -1,12 +1,19 @@
 import React from 'react'
-import Ps from 'perfect-scrollbar';
+import Ps from 'perfect-scrollbar'
+import $ from 'jquery'
 
 import './types/global'
-import './dashboard'
 import logo from './logo.svg'
 import './App.css'
 
+// with this syntax it loads asynchronously, after window. assignments are done
+// @ts-ignore
+import('./dashboard')
+
+// support legacy code
 window.Ps = Ps
+window.$ = $
+window.jQuery = window.$
 
 const App: React.FC = () => { // eslint-disable-line arrow-body-style
   return (

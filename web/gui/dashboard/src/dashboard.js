@@ -88,8 +88,6 @@
 /* global NETDATA */
 /* eslint-disable */
 
-(function(window, document, $, undefined) {
-
 // *** src/dashboard.js/utils.js
 
 NETDATA.name2id = function (s) {
@@ -8713,39 +8711,6 @@ NETDATA.chartState = function (element) {
 // ----------------------------------------------------------------------------------------------------------------
 // Library functions
 
-// Load a script without jquery
-// This is used to load jquery - after it is loaded, we use jquery
-NETDATA._loadjQuery = function (callback) {
-    if (typeof jQuery === 'undefined') {
-        if (NETDATA.options.debug.main_loop) {
-            console.log('loading ' + NETDATA.jQuery);
-        }
-
-        let script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.async = true;
-        script.src = NETDATA.jQuery;
-
-        // script.onabort = onError;
-        script.onerror = function () {
-            NETDATA.error(101, NETDATA.jQuery);
-        };
-        if (typeof callback === "function") {
-            script.onload = function () {
-                $ = jQuery;
-                return callback();
-            };
-        }
-
-        let s = document.getElementsByTagName('script')[0];
-        s.parentNode.insertBefore(script, s);
-    }
-    else if (typeof callback === "function") {
-        $ = jQuery;
-        return callback();
-    }
-};
-
 NETDATA._loadCSS = function (filename) {
     // don't use jQuery here
     // styles are loaded before jQuery
@@ -9971,20 +9936,17 @@ if (typeof netdataPrepCallback === 'function') {
 NETDATA.errorReset();
 NETDATA.loadRequiredCSS(0);
 
-NETDATA._loadjQuery(function () {
-    NETDATA.loadRequiredJs(0, function () {
-        if (typeof $().emulateTransitionEnd !== 'function') {
-            // bootstrap is not available
-            NETDATA.options.current.show_help = false;
+NETDATA.loadRequiredJs(0, function () {
+    if (typeof $().emulateTransitionEnd !== 'function') {
+        // bootstrap is not available
+        NETDATA.options.current.show_help = false;
+    }
+
+    if (typeof netdataDontStart === 'undefined' || !netdataDontStart) {
+        if (NETDATA.options.debug.main_loop) {
+            console.log('starting chart refresh thread');
         }
 
-        if (typeof netdataDontStart === 'undefined' || !netdataDontStart) {
-            if (NETDATA.options.debug.main_loop) {
-                console.log('starting chart refresh thread');
-            }
-
-            NETDATA.start();
-        }
-    });
+        NETDATA.start();
+    }
 });
-})(window, document, (typeof jQuery === 'function')?jQuery:undefined);
