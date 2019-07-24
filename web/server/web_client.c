@@ -821,6 +821,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
+    HTTP_VALIDATION_MALFORMED_URL,
 #ifdef ENABLE_HTTPS
     HTTP_VALIDATION_INCOMPLETE,
     HTTP_VALIDATION_REDIRECT
@@ -941,7 +942,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // a valid complete HTTP request found
 
                 *ue = '\0';
-                url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1);
+                if(!url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1))
+                    return HTTP_VALIDATION_MALFORMED_URL;
                 *ue = ' ';
                 
                 // copy the URL - we are going to overwrite parts of it
@@ -1424,7 +1426,7 @@ void web_client_process_request(struct web_client *w) {
 
                 buffer_flush(w->response.data);
                 buffer_sprintf(w->response.data, "Received request is too big  (%zu bytes).\r\n", w->response.data->len);
-                w->response.code = 400;
+                w->response.code = HTTP_RESPONSE_BAD_REQUEST;
             }
             else {
                 // wait for more data
@@ -1441,12 +1443,19 @@ void web_client_process_request(struct web_client *w) {
             break;
         }
 #endif
+        case HTTP_VALIDATION_MALFORMED_URL:
+            debug(D_WEB_CLIENT_ACCESS, "%llu: URL parsing failed (malformed URL). Cannot understand '%s'.", w->id, w->response.data->buffer);
+
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "URL not valid. I don't understand you...\r\n");
+            w->response.code = HTTP_RESPONSE_BAD_REQUEST;
+            break;
         case HTTP_VALIDATION_NOT_SUPPORTED:
             debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "I don't understand you...\r\n");
-            w->response.code = 400;
+            w->response.code = HTTP_RESPONSE_BAD_REQUEST;
             break;
     }
 
