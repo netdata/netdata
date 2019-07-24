@@ -1,13 +1,13 @@
 # Installation
 
-You can install Netdata in many different ways, but the following three methods will work best for the vast majority of would-be Netdata users:
+You can install Netdata in many different ways, but the following three methods will work best for you in most cases:
 
 <div class="install-nav-buttons">
 
   <div>
     <div class="inner">
       <a class="nav-button" href="#one-line-installation">One-line installation (recommended)</a>
-      <p>Use our completely automated one-line installation process to install Netdata on all Linux distributions directly from the source code.</p>
+      <p>Use Netdata's completely automated one-line installation process to install Netdata on all Linux distributions directly from source.</p>
     </div>
   </div>
   <div>
@@ -22,21 +22,21 @@ You can install Netdata in many different ways, but the following three methods 
 
 To see whether Netdata supports your system, please visit our [distribution support matrix](../../packaging/DISTRIBUTIONS.md).
 
-!!! note
-    Starting with Netdata v1.12, Netdata by default collects anonymous usage information and sends it to Google Analytics. To read more about what information is collected and how to opt-out, check out the [anonymous statistics page](../../docs/anonymous-statistics.md).
-
-**Other installation methods for macOS, FreeBSD, Kubernetes, and more:** 
+### Other installation methods for macOS, Kubernetes, FreeBSD, and more
 
 - [Pre-built static binary for Linux 64-bit](OTHERS.md#pre-built-static-binary-for-linux-64-bit)
 - [Manual installation](MANUAL-INSTALLATION.md)
+- [Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
 - [macOS (OS X)](OTHERS.md#macos)
 - [FreeBSD](OTHERS.md#freebsd)
 - [pfSense](OTHERS.md#pfsense)
 - [FreeNAS](OTHERS.md#freenas)
 - [Alpine 3.x](OTHERS.md#alpine-3-x)
 - [Synology](OTHERS.md#synology)
-- [Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
 - See the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, and other niche systems.
+
+!!! note
+    Starting with Netdata v1.12, Netdata by default collects anonymous usage information and sends it to Google Analytics. To read more about what information is collected and how to opt-out, check out the [anonymous statistics page](../../docs/anonymous-statistics.md).
 
 ---
 
@@ -44,7 +44,7 @@ To see whether Netdata supports your system, please visit our [distribution supp
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](OTHERS.md#freebsd) and the [MacOS](OTHERS.md#macos) sections for more information.
+This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparation before installing Netdata for the first time. Check the [FreeBSD](OTHERS.md#freebsd) and the [MacOS](OTHERS.md#macos) installation instructions for more information.
 
 To install Netdata from source and get **automatic, nightly** updates, run the following:
 
@@ -52,7 +52,7 @@ To install Netdata from source and get **automatic, nightly** updates, run the f
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-!!! note
+!!! note "Usage notes"
     Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
 
     To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
@@ -131,6 +131,8 @@ curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script
 # .DEB (Debian, Ubuntu)
 curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.deb.sh | sudo bash
 ```
+
+Once you have installed Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
 
 ## Nightly vs. stable releases

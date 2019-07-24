@@ -1,7 +1,5 @@
 # Manual installation
 
-
-
 To install the latest version of Netdata from our [GitHub repository](https://github.com/netdata/netdata), please follow these two steps:
 
 1. [Prepare your system](#prepare-your-system): Install the required packages on your system.
@@ -15,7 +13,7 @@ To prepare your system, you can either use our [automatic requirements installer
 
 ### Prepare your system with our automatic requirements installer
 
-Try our experimental automatic requirements installer (no need to be root). This will try to find the packages that should be installed on your system to build and run Netdata. It supports most major Linux distributions released after 2010:
+Use our experimental automatic requirements installer to find and install the packages that should be present on your system to build and run Netdata. This installer script supports most major Linux distributions released after 2010, and there's no need to use it as the `root` user:
 
 - **Alpine** Linux and its derivatives
     - You have to install `bash` yourself before using the installer.
@@ -24,27 +22,32 @@ Try our experimental automatic requirements installer (no need to be root). This
 - **Gentoo** Linux and its derivatives
 - **Debian** Linux and its derivatives (including **Ubuntu** and **Mint**)
 - **Redhat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
-    - Please note that for RHEL/CentOS you need [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/). 
-    - In addition, RHEL/CentOS version 6 also needs [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package libuv version 1.
+    - Please note that for RHEL/CentOS you need the [EPEL repository](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/). 
+    - In addition, RHEL/CentOS version 6 also needs [OKay](https://okay.com.mx/blog-news/rpm-repositories-for-centos-6-and-7.html) for package `libuv` version 1.
 - **SuSe** Linux and its derivatives (including **openSuSe**)
 - **SLE12** Must have your system registered with Suse Customer Center or have the DVD. See [#1162](https://github.com/netdata/netdata/issues/1162)
 
-Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
+For a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`), install the following packages:
 
 ```sh
 curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/kickstart.sh && bash /tmp/kickstart.sh -i netdata
 ```
 
-Install all the required packages for **monitoring everything Netdata can monitor**:
+If you would rather be able to **monitor all metrics native to Netdata**, use the installer script this way:
 
 ```sh
 curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/kickstart.sh && bash /tmp/kickstart.sh -i netdata-all
 ```
 
-If the above do not work for you, please [open a github issue](https://github.com/netdata/netdata/issues/new?title=packages%20installer%20failed&labels=installation%20help&body=The%20experimental%20packages%20installer%20failed.%0A%0AThis%20is%20what%20it%20says:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20screen%20here%0A%0A%60%60%60) with a copy of the message you get on screen. We are trying to make it work everywhere (this is also why the script [reports back](https://github.com/netdata/netdata/issues/2054) success or failure for all its runs).
-
 Once finished, you can move on to [install Netdata](#install-netdata).
 
+<details markdown="1"><summary>Troubleshooting the installer script</summary>
+
+If the above command(s) do not work for you, please [open an issue on GitHub](https://github.com/netdata/netdata/issues/new?title=packages%20installer%20failed&labels=installation%20help&body=The%20experimental%20packages%20installer%20failed.%0A%0AThis%20is%20what%20it%20says:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20screen%20here%0A%0A%60%60%60) with a copy of the message you get on screen. 
+
+We're working hard to make this script work everywhere, and so your issues are invaluable to us. This is why the script [reports back](https://github.com/netdata/netdata/issues/2054) success or failure for all its runs.
+
+</details>
 
 ### Prepare your system manually
 
