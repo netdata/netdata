@@ -10,9 +10,9 @@
  *  but we need to run the react-app part after DOM is created and ready
  */
 
-
 // ----------------------------------------------------------------------------
 // global namespace
+/* eslint-disable no-undef */
 
 // Should stay var!
 var NETDATA = window.NETDATA || {};
@@ -36,8 +36,6 @@ const isSlowDevice = function () {
 
   return isSlowDeviceResult;
 };
-
-console.log('isSlowDeviceResult', isSlowDeviceResult); // eslint-disable-line no-console
 
 if (typeof netdataSnapshotData === 'undefined') {
   netdataSnapshotData = null;
