@@ -24,12 +24,16 @@ typedef enum web_client_mode {
     WEB_CLIENT_MODE_STREAM      = 3
 } WEB_CLIENT_MODE;
 
-
 typedef enum {
     HTTP_VALIDATION_OK,
     HTTP_VALIDATION_NOT_SUPPORTED,
+    HTTP_VALIDATION_MALFORMED_URL,
+#ifdef ENABLE_HTTPS
     HTTP_VALIDATION_INCOMPLETE,
     HTTP_VALIDATION_REDIRECT
+#else
+    HTTP_VALIDATION_INCOMPLETE
+#endif
 } HTTP_VALIDATION;
 
 typedef enum web_client_flags {
@@ -174,17 +178,6 @@ struct web_client {
 #endif
 };
 
-typedef enum {
-    HTTP_VALIDATION_OK,
-    HTTP_VALIDATION_NOT_SUPPORTED,
-    HTTP_VALIDATION_MALFORMED_URL,
-#ifdef ENABLE_HTTPS
-    HTTP_VALIDATION_INCOMPLETE,
-    HTTP_VALIDATION_REDIRECT
-#else
-    HTTP_VALIDATION_INCOMPLETE
-#endif
-} HTTP_VALIDATION;
 
 extern uid_t web_files_uid(void);
 extern uid_t web_files_gid(void);

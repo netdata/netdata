@@ -1050,7 +1050,9 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                         char *from = (encoded_url + w->url_path_length);
                         total_variables = url_map_query_string(ptr_variables, from);
 
-                        url_parse_query_string(w->decoded_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1, ptr_variables, total_variables);
+                        if (url_parse_query_string(w->decoded_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1, ptr_variables, total_variables)) {
+                            return HTTP_VALIDATION_MALFORMED_URL;
+                        }
                     }
                 }
                 *ue = ' ';

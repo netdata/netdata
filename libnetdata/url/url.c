@@ -43,8 +43,16 @@ char *url_encode(char *str) {
     return pbuf;
 }
 
-/* Returns a url-decoded version of str */
-/* IMPORTANT: be sure to free() the returned string after use */
+/**
+ * URL Decode
+ *
+ * Returns a url-decoded version of str
+ * IMPORTANT: be sure to free() the returned string after use
+ *
+ * @param str the string that will be decode
+ *
+ * @return a pointer for the url decoded.
+ */
 char *url_decode(char *str) {
     size_t size = strlen(str) + 1;
 
@@ -52,14 +60,30 @@ char *url_decode(char *str) {
     return url_decode_r(buf, str, size);
 }
 
-//decode %XX character or return 0 if cannot
+/**
+ *  Percentage escape decode
+ *
+ *  Decode %XX character or return 0 if cannot
+ *
+ *  @param s the string to decode
+ *
+ *  @return The character decoded on success and 0 otherwise
+ */
 char url_percent_escape_decode(char *s) {
     if(likely(s[1] && s[2]))
         return from_hex(s[1]) << 4 | from_hex(s[2]);
     return 0;
 }
 
-//this (utf8 string related) should be moved in separate file in future
+/**
+ * Get byte length
+ *
+ * This (utf8 string related) should be moved in separate file in future
+ *
+ * @param c is the utf8 character
+ *  *
+ * @return It reurns the length of the specific character.
+ */
 char url_utf8_get_byte_length(char c) {
     if(!IS_UTF8_BYTE(c))
         return 1;
@@ -77,8 +101,17 @@ char url_utf8_get_byte_length(char c) {
     return length;
 }
 
-//decode % encoded UTF-8 characters and copy them to *d
-//return count of bytes written to *d
+/**
+ * Decode Multibyte UTF8
+ *
+ * Decode % encoded UTF-8 characters and copy them to *d
+ *
+ * @param s first address
+ * @param d
+ * @param d_end last address
+ *
+ * @return count of bytes written to *d
+ */
 char url_decode_multibyte_utf8(char *s, char *d, char *d_end) {
     char first_byte = url_percent_escape_decode(s);
 
@@ -122,7 +155,6 @@ char url_decode_multibyte_utf8(char *s, char *d, char *d_end) {
  * Markus Kuhn <http://www.cl.cam.ac.uk/~mgk25/> -- 2005-03-30
  * License: http://www.cl.cam.ac.uk/~mgk25/short-license.html
  */
-
 unsigned char *utf8_check(unsigned char *s)
 {
     while (*s)
@@ -325,10 +357,12 @@ int url_map_query_string(char **out, char *url) {
  * @param max is the maximum length of the output
  * @param map the map done by the function url_map_query_string.
  * @param total the total number of variables inside map
+ *
+ * @return It returns 0 on success and -1 otherwise
  */
-void url_parse_query_string(char *output, size_t max, char **map, int total) {
+int url_parse_query_string(char *output, size_t max, char **map, int total) {
     if(!total) {
-        return;
+        return 0;
     }
 
     int counter, next;
@@ -354,7 +388,9 @@ void url_parse_query_string(char *output, size_t max, char **map, int total) {
             break;
         }
 
-        url_decode_r(output, begin, length);
+        if(!url_decode_r(output, begin, length)) {
+            return -1;
+        }
         length = strlen(output);
         copied += length;
         output += length;
@@ -364,4 +400,6 @@ void url_parse_query_string(char *output, size_t max, char **map, int total) {
             *begin = save;
         }
     }
+
+    return 0;
 }

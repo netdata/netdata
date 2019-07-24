@@ -27,7 +27,7 @@ extern char *url_decode_r(char *to, char *url, size_t size);
 
 #define WEB_FIELDS_MAX 400
 extern int url_map_query_string(char **out, char *url);
-extern void url_parse_query_string(char *output, size_t max, char **map, int total);
+extern int url_parse_query_string(char *output, size_t max, char **map, int total);
 
 extern int url_is_request_complete(char *begin,char *end,size_t length);
 extern char *url_find_protocol(char *s);
