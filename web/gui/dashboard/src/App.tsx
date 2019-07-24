@@ -3,7 +3,6 @@ import Ps from 'perfect-scrollbar'
 import $ from 'jquery'
 
 import './types/global'
-import logo from './logo.svg'
 import './App.css'
 
 // with this syntax it loads asynchronously, after window. assignments are done
@@ -19,7 +18,6 @@ const App: React.FC = () => { // eslint-disable-line arrow-body-style
   return (
     <div className="App">
       <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
         React app
         <a
           className="App-link"

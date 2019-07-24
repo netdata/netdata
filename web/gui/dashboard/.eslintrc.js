@@ -1,11 +1,18 @@
 module.exports = {
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint",
+  ],
+  "env": {
+    "browser": true,
+  },
   "extends": [
-    "react-app",
     "airbnb",
   ],
   "rules" : {
     "indent": ["error", 2],
     "semi": ["error", "never"],
+    "@typescript-eslint/semi": ["error", "never"],
     "react/jsx-filename-extension": [
       1,
       {
@@ -22,5 +29,13 @@ module.exports = {
         "paths": ["src"]
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "files": ["*.test.*"],
+      "env": {
+        "jest": true,
+      }
+    }
+  ]
 }

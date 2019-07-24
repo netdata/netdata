@@ -20,6 +20,7 @@
     "start:index": "cp ../index.html public/index.html && yarn start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "lint": "eslint --ext .jsx,.js,.tsx,.ts .",
     "eject": "react-scripts eject"
   },
   "browserslist": {
@@ -36,6 +37,8 @@
   },
   "devDependencies": {
     "@types/jquery": "^3.3.30",
+    "@typescript-eslint/eslint-plugin": "^1.13.0",
+    "@typescript-eslint/parser": "^1.13.0",
     "eslint-config-airbnb": "^17.1.1"
   }
 }
