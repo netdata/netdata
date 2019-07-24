@@ -383,7 +383,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             error("LISTENER: Cannot create unix socket '%s'", path);
             sockets->failed++;
         } else {
-            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_OPTIONAL;
+            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
@@ -433,7 +433,13 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
         acl_flags |= read_acl(portconfig);
     } else {
-        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_OPTIONAL;
+        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
+    }
+
+    //Case the user does not set the option SSL in the "bind to", but he has
+    //the certificates, I must redirect, so I am assuming here the default option
+    if(!(acl_flags & WEB_CLIENT_ACL_SSL_OPTIONAL) && !(acl_flags & WEB_CLIENT_ACL_SSL_FORCE)) {
+        acl_flags |= WEB_CLIENT_ACL_SSL_DEFAULT;
     }
 
     uint32_t scope_id = 0;
