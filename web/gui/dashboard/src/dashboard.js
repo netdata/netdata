@@ -507,10 +507,12 @@ if (typeof netdataServer !== 'undefined') {
     NETDATA.serverDefault = netdataServer;
 } else {
     let s = NETDATA._scriptSource();
-    if (s && s.indexOf('static/js/main.') !== -1) {
+    if (process.env.NODE_ENV === 'development') {
+      NETDATA.serverDefault = 'http://localhost:19999';
+    } else if (s && s.includes('static/js/') && s.includes('chunk.js')) {
         // in case it's webpack, temporarly hardcoded, will be removed when all
         // vendors will land in the bundle
-        NETDATA.serverDefault = s.replace(/static\/js\/main.*chunk\.js/, '');
+        NETDATA.serverDefault = s.replace(/static\/js\/.*chunk\.js/, '');
     } else if (s) {
         NETDATA.serverDefault = s.replace(/\/dashboard.js(\?.*)?$/g, "");
     } else {
@@ -8627,11 +8629,6 @@ let chartState = function (element) {
             }
         } else {
             this.chart_url = "/api/v1/chart?chart=" + this.id;
-            if (this.host === 'http://localhost:3000') {
-              // for dev mode
-              this.host = 'http://localhost:19999';
-            }
-
             if (this.debug) {
                 this.log('downloading ' + this.chart_url);
             }

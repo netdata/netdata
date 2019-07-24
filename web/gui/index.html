@@ -83,7 +83,7 @@
                                 <i class="fas fa-hourglass-half"></i>
                                 Loading, please wait...
                                 <div></div>
-                            </div>                            
+                            </div>
                         </div>
                     </li>
                 </ul>
@@ -112,15 +112,15 @@
 
     <div id="sign-in-banner" style="display: none">
         <div class="container">
-            Like what you see? 
-            <strong><a href="#" class="__link" onclick="signInDidClick(event); return false">Sign in</a> 
+            Like what you see?
+            <strong><a href="#" class="__link" onclick="signInDidClick(event); return false">Sign in</a>
             to experience the full-range of netdata capabilities!</strong>
             <div class="__close" onclick="closeSignInBannerDidClick(event)">
                 Close <i class="fas fa-times"></i>
             </div>
         </div>
     </div>
-    
+
     <div id="masthead" style="display: none;">
         <div class="container">
             <div class="row">
@@ -1180,14 +1180,14 @@
                 </div>
                 <div class="modal-body">
                     <p>
-                        Signing-in to netdata.cloud will synchronize the list of 
-                        your netdata monitored nodes known at registry 
-                        <strong><span id="sim-registry"></span></strong>. This 
-                        may include server hostnames, urls and identification 
+                        Signing-in to netdata.cloud will synchronize the list of
+                        your netdata monitored nodes known at registry
+                        <strong><span id="sim-registry"></span></strong>. This
+                        may include server hostnames, urls and identification
                         GUIDs.
                     </p>
                     <p>
-                        After you upgrade all your netdata servers, your private 
+                        After you upgrade all your netdata servers, your private
                         registry will not be needed any more.
                     </p>
                     <p>
@@ -1315,8 +1315,12 @@
             </div>
         </div>
     </div>
+    <div id="root"></div>
     <iframe id="ssoifrm" width="0" height="0"></iframe>
     <div id="hiddenDownloadLinks" style="display: none;" hidden></div>
     <script type="text/javascript" src="dashboard.js?v20190902-0"></script>
+
+    <!--    <script type="text/javascript" src="dashboard-react.js"></script>-->
+
 </body>
 </html>
