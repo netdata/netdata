@@ -163,7 +163,7 @@ static void *web_server_add_callback(POLLINFO *pi, short int *events, void *data
         //Case the user does not set the option SSL in the "bind to", but he has
         //the certificates, I must redirect, so I am assuming here the force option
         if(!web_client_is_using_ssl_force(w) && !web_client_is_using_ssl_optional(w)) {
-            w->port_acl |= WEB_CLIENT_ACL_SSL_FORCE;
+            w->port_acl |= WEB_CLIENT_ACL_SSL_DEFAULT;
         }
 
         if( sock_delnonblock(w->ifd) < 0 ){
