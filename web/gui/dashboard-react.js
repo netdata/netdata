@@ -184,7 +184,9 @@ NETDATA.options = {
 
     destroy_on_hide: isSlowDevice(), // destroy charts when they are not visible
 
-    show_help: netdataShowHelp, // when enabled the charts will show some help
+    // when enabled the charts will show some help
+    // when there's no bootstrap, we can't show it
+    show_help: netdataShowHelp && !window.netdataNoBootstrap,
     show_help_delay_show_ms: 500,
     show_help_delay_hide_ms: 0,
 

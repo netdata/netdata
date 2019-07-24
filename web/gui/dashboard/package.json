@@ -7,6 +7,7 @@
     "@types/node": "12.6.8",
     "@types/react": "16.8.23",
     "@types/react-dom": "16.8.4",
+    "bootstrap": "3.3.7",
     "jquery": "^2.2.4",
     "perfect-scrollbar": "0.6.15",
     "react": "^16.8.6",
@@ -36,6 +37,7 @@
     ]
   },
   "devDependencies": {
+    "@types/bootstrap": "^3",
     "@types/jquery": "^3.3.30",
     "@typescript-eslint/eslint-plugin": "^1.13.0",
     "@typescript-eslint/parser": "^1.13.0",

@@ -10,4 +10,7 @@ interface Window {
   Ps: any // perfect scrollbar
   $: jQuery
   jQuery: jQuery
+
+  // user configuration options
+  netdataNoBootstrap: boolean | undefined
 }

@@ -8,6 +8,10 @@ import './App.css'
 // with this syntax it loads asynchronously, after window. assignments are done
 // @ts-ignore
 import('./dashboard')
+if (!window.netdataNoBootstrap) {
+  // it needs to be imported indirectly, there's probably a bug in webpack
+  import('dynamic-imports/bootstrap')
+}
 
 // support legacy code
 window.Ps = Ps

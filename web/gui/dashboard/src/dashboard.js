@@ -9814,18 +9814,6 @@ NETDATA.registry = {
 
 NETDATA.requiredJs = [
     {
-        url: NETDATA.serverStatic + 'lib/bootstrap-3.3.7.min.js',
-        async: false,
-        isAlreadyLoaded: function () {
-            // check if bootstrap is loaded
-            if (typeof $().emulateTransitionEnd === 'function') {
-                return true;
-            } else {
-                return typeof netdataNoBootstrap !== 'undefined' && netdataNoBootstrap;
-            }
-        }
-    },
-    {
         url: NETDATA.serverStatic + 'lib/fontawesome-all-5.0.1.min.js',
         async: true,
         isAlreadyLoaded: function () {
@@ -9934,11 +9922,6 @@ NETDATA.errorReset();
 NETDATA.loadRequiredCSS(0);
 
 NETDATA.loadRequiredJs(0, function () {
-    if (typeof $().emulateTransitionEnd !== 'function') {
-        // bootstrap is not available
-        NETDATA.options.current.show_help = false;
-    }
-
     if (typeof netdataDontStart === 'undefined' || !netdataDontStart) {
         if (NETDATA.options.debug.main_loop) {
             console.log('starting chart refresh thread');
