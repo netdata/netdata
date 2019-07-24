@@ -5,10 +5,12 @@ services:
   - docker
 
 
+
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
   allow_failures:
     - env: ALLOW_SOFT_FAILURE_HERE=true
+
 
 
 # Install dependencies for all, once
@@ -30,10 +32,12 @@ install:
   - export PACKAGING_USER="$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
 
 
+
 # Setup notification system
 #
 notifications:
   webhooks: https://app.fossa.io/hooks/travisci
+
 
 
 # Define the stage sequence and conditionals
@@ -98,6 +102,7 @@ stages:
     if: type != cron AND type != pull_request AND branch = master AND commit_message =~ /(\[Package arm64 RPM openSuSE\]|\[Package arm64 RPM\]|\[Package amd64 RPM openSuSE\]|\[Package amd64 RPM\])/
 
 
+
 # DEB and RPM template flows
 - stage: &_RPM_TEMPLATE
     name: "Build & Publish RPM package"
@@ -137,6 +142,7 @@ stages:
     after_deploy:
       - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
       - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
+
 
 
 # TODO: This section is stale, will be aligned with the RPM implementation when we get to DEB packaging
@@ -179,6 +185,7 @@ stages:
     after_deploy:
       - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
       - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
+
 
 
 # Define stage implementation details
