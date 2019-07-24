@@ -1,7 +1,3 @@
-ecmaFeatures:
-  modules: true
-  jsx: true
-
 env:
   amd: true
   browser: true
@@ -57,7 +53,6 @@ rules:
   no-case-declarations: 2
   no-div-regex: 2
   no-else-return: 0
-  no-empty-label: 2
   no-empty-pattern: 2
   no-eq-null: 2
   no-eval: 2
@@ -179,7 +174,6 @@ rules:
   quotes: 0
   require-jsdoc: 0
   semi-spacing: 0
-  semi: 0
   sort-vars: 0
   space-after-keywords: 0
   space-before-blocks: 0

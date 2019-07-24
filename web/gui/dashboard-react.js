@@ -18,7 +18,7 @@
 var NETDATA = window.NETDATA || {};
 
 /// A heuristic for detecting slow devices.
-let isSlowDeviceResult = undefined;
+let isSlowDeviceResult;
 const isSlowDevice = function () {
   if (!isSlowDeviceResult) {
     return isSlowDeviceResult;
