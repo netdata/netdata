@@ -240,7 +240,7 @@ char *url_decode_r(char *to, char *url, size_t size) {
 
     *d = '\0';
 
-    if(unlikely( utf8_check(to) )) //NULL means sucess here
+    if(unlikely( utf8_check((unsigned  char *)to) )) //NULL means sucess here
         return NULL;
 
     return to;
