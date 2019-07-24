@@ -3,7 +3,7 @@
 ![image8](https://cloud.githubusercontent.com/assets/2662304/14253735/536f4580-fa95-11e5-9f7b-99112b31a5d7.gif)
 
 
-We suggest actively updating your Netdata Installation. We are actively developing it and you should always update to the latest version.
+We suggest actively updating your Netdata installation. We are actively developing it and you should always update to the latest version.
 
 The update procedure depends on how you installed it:
 
