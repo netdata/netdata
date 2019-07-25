@@ -96,6 +96,7 @@ markdown_extensions:
     permalink: True
     separator: "-"
  - wikilinks
+ - codehilite
  - pymdownx.arithmatex
  - pymdownx.betterem:
     smart_enable: all
@@ -104,8 +105,8 @@ markdown_extensions:
  - pymdownx.details
  - pymdownx.highlight:
     pygments_style: manni
-    noclasses: true
- - pymdownx.inlinehilite
+    css_class: "highlight codehilite"
+    linenums_style: pymdownx-inline
  - pymdownx.magiclink
  - pymdownx.mark
  - pymdownx.smartsymbols
