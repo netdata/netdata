@@ -166,6 +166,7 @@ callgrind.out.*
 gmon.out
 gmon.txt
 sitespeed-result/
+tests/acls/acl.sh
 tests/urls/request.sh
 
 # tests and temp files

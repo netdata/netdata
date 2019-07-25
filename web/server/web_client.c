@@ -835,7 +835,11 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
         s = &s[7];
 
 #ifdef ENABLE_HTTPS
-        if ( (w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)){
+        if (w->ssl.flags && web_client_is_using_ssl_force(w)){
+            w->header_parse_tries = 0;
+            w->header_parse_last_size = 0;
+            web_client_disable_wait_receive(w);
+
             char hostname[256];
             char *copyme = strstr(s,"hostname=");
             if ( copyme ){
@@ -1065,7 +1069,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 }
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
-                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
+                    if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
                         w->header_parse_tries = 0;
                         w->header_parse_last_size = 0;
                         web_client_disable_wait_receive(w);
