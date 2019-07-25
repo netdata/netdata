@@ -86,3 +86,12 @@
 .md-typeset__table code {
     word-break: normal;
 }
+
+/* Make the clipboard button a little darker. */
+.md-clipboard::before {
+    color: #546e7a;
+}
+
+.md-clipboard:focus::before {
+    color: #546e7a;
+}
