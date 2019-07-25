@@ -5,21 +5,19 @@
 
     Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with https://github.com/multiarch naming), so **`armv7hf` is not updated** either.
 
-See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
+    Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with https://github.com/multiarch naming), so **`armv7hf` is not updated** either.
 
 Running Netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running Netdata on the host.
 
-For monitoring the whole host, running Netdata in a container can limit its capabilities. Some data, like the host OS
-performance or status, is not accessible or not as detailed in a container as when running Netdata directly on the host.
+Running Netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running Netdata on the host.
 
 By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata docker container.
 
-Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint)
-directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about
-ENTRYPOINT vs COMMAND in the [Docker
-documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
+By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata docker container.
 
 ## Run Netdata with the docker command
+
+Quickly start Netdata with the docker command line. Netdata is then available at `http://host:19999`.
 
 Quickly start Netdata with the docker command line. Netdata is then available at `http://host:19999`.
 
@@ -91,10 +89,14 @@ _actively_ contributing to Netdata's future.
 
 ### Docker container names resolution
 
-There are a few options for resolving container names within Netdata. Some methods of doing so will allow root access to
-your machine from within the container. Please read the following carefully.
+If you want to have your container names resolved by Netdata, you need to do two things:
 
-#### Docker socket proxy (safest option)
+1) Make Netdata user be part of the group that owns the socket.
+   To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the Netdata container, where `[GROUP NUMBER]` is practically the group id of the group assigned to the docker socket, on your host. This group number can be found by running the following (if socket group ownership is docker):
+
+   ```bash
+   grep docker /etc/group | cut -d ':' -f 3
+   ```
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
 [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access
@@ -126,8 +128,10 @@ services:
     environment:
       - CONTAINERS=1
 
-```
-**Note:** Replace `2375` with the port of your proxy.
+!!! warning "Docker socket security"
+
+    You should seriously consider the necessity of activating this option, as it grants the `netdata` user access to Docker's privileged socket connection
+
 
 #### Giving group access to the Docker socket (less safe)
 
@@ -137,8 +141,7 @@ user access to the privileged socket connection of docker service and therefore 
 If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the
 socket.
 
-To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the Netdata container, where `[GROUP NUMBER]` is
-practically the group id of the group assigned to the docker socket, on your host.
+For a permanent installation on a public server, you should [secure your Netdata installation](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
 
 This group number can be found by running the following (if socket group ownership is docker):
 

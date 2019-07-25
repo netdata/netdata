@@ -1,6 +1,6 @@
 # Installation
 
-You can install Netdata in many different ways, but the following three methods are the best choice for you in most cases:
+You can install Netdata in many different ways, but the following three methods will work best for you in most cases:
 
 <div class="install-nav-buttons">
 
@@ -36,7 +36,7 @@ To see whether Netdata supports your system, please visit our [distribution supp
 - See the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, and other niche systems.
 
 !!! note
-    By default, Netdata collects anonymous usage information and sends it to Google Analytics. To read more about what information is collected and how to opt-out, check out the [anonymous statistics page](../../docs/anonymous-statistics.md).
+    Starting with Netdata v1.12, Netdata by default collects anonymous usage information and sends it to Google Analytics. To read more about what information is collected and how to opt-out, check out the [anonymous statistics page](../../docs/anonymous-statistics.md).
 
 ---
 
@@ -44,7 +44,7 @@ To see whether Netdata supports your system, please visit our [distribution supp
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-This method is **fully automatic on all Linux distributions**. FreeBSD and macOS systems need some preparation before installing Netdata for the first time. Check the [FreeBSD](OTHERS.md#freebsd) or the [MacOS](OTHERS.md#macos) installation instructions for more information.
+This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparation before installing Netdata for the first time. Check the [FreeBSD](OTHERS.md#freebsd) and the [MacOS](OTHERS.md#macos) installation instructions for more information.
 
 To install Netdata from source and get **automatic, nightly** updates, run the following:
 
@@ -53,10 +53,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 !!! note "Usage notes"
-    Do not use `sudo` for the one-line installer—it escalates privileges itself if needed.
+    Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
 
-
-To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
+    To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
 
 <details markdown="1"><summary>More information and advanced uses of the kickstart.sh script</summary>
 
@@ -64,15 +63,15 @@ To learn more about the pros and cons of using *nightly* vs. *stable* releases, 
 
 The `kickstart.sh` script:
 
-- Detects the Linux distro and installs the required system packages for building Netdata after asking for confirmation.
-- Downloads the latest Netdata source tree to `/usr/src/netdata.git`.
-- Installs Netdata by running `./netdata-installer.sh` from the source tree.
-- Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation updates daily.
+- Detects the Linux distro and installs the required system packages for building Netdata after asking for confirmation
+- Downloads the latest Netdata source tree to `/usr/src/netdata.git`
+- Installs Netdata by running `./netdata-installer.sh` from the source tree
+- Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated daily
 - Outputs details about whether the installation succeeded or failed.
 
 **Available options:**
 
-You can customize your Netdata installation by passing options from `kickstart.sh` to `netdata-installer.sh`. With these options, you can change the installation directory, enable/disable automatic updates, choose between the nightly (default) or stable channel, enable/disable plugins, and much more. For a full list of options, see the [`netdata-installer.sh` script](https://github.com/netdata/netdata/netdata-installer.sh#L149-L177).
+You can customize your Netdata installation by passing options from `kickstart.sh` to `netdata-installer.sh`. With these options you can change the installation directory, enable/disable automatic updates, choose between the nightly (default) or stable channel, enable/disable plugins, and much more. For a full list of options, see the [`netdata-installer.sh` script](https://github.com/netdata/netdata/netdata-installer.sh#L149-L177).
 
 Here are a few popular options:
 
@@ -95,7 +94,7 @@ Verify the integrity of the script with this:
 [ "8a2b054081a108dff915994ce77f2f2d" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
-This command outputs `OK, VALID` to confirm that the script is intact and that no one has tampered with it.
+This command will output `OK, VALID` to confirm that the script is intact and has not been tampered with.
 
 </details>
 
@@ -105,11 +104,13 @@ Once you have installed Netdata, see our [getting started guide](../../docs/Gett
 ## Binary packages 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
 
-In the effort to make Netdata's installation process easy and fully automated on as many operating systems as possible, we have begun providing binary packages for the most common Linux distributions that use `.RPM` or `.DEB` packaging formats.
+In the effort to make Netdata's installation process easy and fully automated on as many operating systems as possible, we have begun providing our own binary packages for the most common Linux distributions that use `.RPM` or `.DEB` packaging formats.
 
-We have currently released `.RPM` packages with version 1.16.0. We plan to release `.DEB` packages with version 1.17.0. Until then, early adopters can experiment with our `.DEB` packages using our nightly releases.
+We have currently released packages following the .RPM format with version 1.16.0. We have planned to release packages following the .DEB format with version 1.17.0. Early adopters may  Our current packaging infrastructure provider is Package Cloud.
 
-We provide two separate repositories, one for our stable releases and one for our nightly releases. See this notice about [stable vs. nightly](#nightly-vs-stable-releases) for more information. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io). You can visit the repository pages to read more or try the set-up commands to get started.
+**We have currently only officially released `.RPM` packages**. `.DEB` packages will be officially released with v1.17.0 of Netdata. However, early adopters can experiment with our `.DEB` packages using our nightly releases.
+
+We provide two separate repositories, one for our stable releases and one for our nightly releases. See this notice about [stable vs. nightly](#nightly-vs-stable-releases) for more information. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io). You can visit the repository pages to read more, or try the set-up commands to get started.
 
 **Stable releases:** Our stable production releases are hosted in the [netdata/netdata](https://packagecloud.io/netdata/netdata) repository on Packagecloud.
 
@@ -133,81 +134,8 @@ curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script
 
 Once you have installed Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
+
 ## Nightly vs. stable releases
-
-The Netdata team maintains two releases of the Netdata agent: **nightly** and **stable**. By default, Netdata's installation scripts give you **automatic, nightly** updates, as that is our recommended configuration.
-
-**Nightly**: We create nightly builds every 24 hours. They contain fully-tested code that fixes bugs or security flaws, or introduces new features to Netdata. Every nightly release is a candidate for then becoming a stable release; when we're ready, we change the release tags on GitHub. That means nightly releases are stable and proven to function correctly in the vast majority of Netdata use cases. That's why nightly is the *best choice for most Netdata users*.
-
-**Stable**: We create stable releases whenever we believe the code has reached a major milestone. Most often, stable releases correlate with the introduction of new, significant features. Stable releases might be a better choice for those who run Netdata in *mission-critical production systems*, as updates come more infrequently, and only after the community helps fix any bugs we might have inadvertently introduced in previous releases.
-
-**Pros of using nightly releases:**
-
-  - Get the latest features and bug fixes as soon as they're available
-  - Receive security-related fixes immediately
-  - Use stable, fully-tested code that's always improving
-  - Leverage the same Netdata experience our community is using
-
-**Pros of using stable releases:**
-
--   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata installation
--   Retain more control over the Netdata version you use
-
-## Offline installations
-
-You can install Netdata on systems without internet access, but you need to take
-a few extra steps to make it work.
-
-By default, the `kickstart.sh` and `kickstart-static64.sh` download Netdata
-assets, like the precompiled binary and a few dependencies, using the system's
-internet connection, but you can also supply these files from the local filesystem.
-
-First, download the required files. If you're using `kickstart.sh`, you need the
-Netdata tarball, the checksums, the go.d plugin binary, and the go.d plugin
-configuration. If you're using `kickstart-static64.sh`, you need only the
-Netdata tarball and checksums.
-
-Download the files you need to a system of yours that's connected to the
-internet. You can use the commands below, or visit the [latest Netdata release
-page](https://github.com/netdata/netdata/releases/latest) and [latest go.d
-plugin release page](https://github.com/netdata/go.d.plugin/releases) to
-download the required files manually.
-
-#### kickstart.sh
-```bash
-cd /tmp
-
-curl -s https://my-netdata.io/kickstart.sh > kickstart.sh
-
-# Netdata tarball
-curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
-
-# Netdata checksums
-curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
-
-# Netdata dependency handling script
-curl -s https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh | wget -qi -
-
-# go.d plugin 
-# For binaries for OS types and architectures not listed on [go.d releases](https://github.com/netdata/go.d.plugin/releases/latest), kindly open a github issue and we will do our best to serve your request
-export OS=$(uname -s | tr '[:upper:]' '[:lower:]') ARCH=$(uname -m | sed -e 's/i386/386/g' -e 's/i686/386/g' -e 's/x86_64/amd64/g' -e 's/aarch64/arm64/g' -e 's/armv64/arm64/g' -e 's/armv6l/arm/g' -e 's/armv7l/arm/g' -e 's/armv5tel/arm/g') && curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*${OS}-${ARCH}.tar.gz" | cut -d '"' -f 4 | wget -qi -
-
-# go.d configuration 
-curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
-```
-
-#### kickstart-static64.sh
-```bash
-cd /tmp
-
-curl -s https://my-netdata.io/kickstart-static64.sh > kickstart-static64.sh
-
-# Netdata static64 tarball
-curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*gz.run" | cut -d '"' -f 4 | wget -qi -
-
-# Netdata checksums
-curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
-```
 
 Move downloaded files to the `/tmp` directory on the offline system in whichever way
 your defined policy allows (if any).

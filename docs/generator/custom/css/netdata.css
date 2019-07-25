@@ -333,6 +333,34 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     margin-left: 2rem;
 }
 
+/*  Custom styling for the installation page. */
+
+.install-nav-buttons {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-around;
+    margin-top: 1.4rem;
+}
+
+.install-nav-buttons div {
+    flex: 1;
+    min-width: 300px;
+}
+
+.install-nav-buttons div:first-of-type {
+    flex: 1 100%;
+}
+
+.install-nav-buttons div:first-of-type .inner {
+    max-width: 400px;
+    margin: 0 auto;
+    margin-bottom: 1rem;
+}
+
+.install-nav-buttons > div:last-of-type {
+    margin-left: 2rem;
+}
+
 .nav-button {
     border: 2px solid black;
     border-radius: 4px;
