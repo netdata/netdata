@@ -1,8 +1,9 @@
-# Updating Netdata after its installation
+# Updating Netdata
 
 ![image8](https://cloud.githubusercontent.com/assets/2662304/14253735/536f4580-fa95-11e5-9f7b-99112b31a5d7.gif)
 
-We suggest to keep your Netdata updated. We are actively developing it and you should always update to the latest version.
+
+We suggest actively updating your Netdata installation. We are actively developing it and you should always update to the latest version.
 
 The update procedure depends on how you installed it:
 
@@ -44,13 +45,17 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --no-updates
 _Please, consider the risks of running an auto-update. Something can always go wrong. Keep an eye on your installation, and run a manual update if something ever fails._
 
 Calling the `netdata-installer.sh` with the `--auto-update` or `-u` option will create the `netdata-updater` script under 
-either  `/etc/cron.daily/`, or `/etc/periodic/daily/`. Whenever the `netdata-updater` is executed, it checks if a newer nightly build is available and then handles the download, installation and Netdata restart.  
+either  `/etc/cron.daily/`, or `/etc/periodic/daily/`. Whenever the `netdata-updater` is executed, it checks if a newer nightly build is available and then handles the download, installation and netdata restart.  
+
+Note that after Jan 2019, the `kickstart.sh` one-liner `bash <(curl -Ss https://my-netdata.io/kickstart.sh)` calls the `netdata-installer.sh` with the auto-update option. So if you just run the one-liner without options once, your Netdata installation will be kept auto-updated.
 
 Note that after Jan 2019, the `kickstart.sh` one-liner `bash <(curl -Ss https://my-netdata.io/kickstart.sh)` calls the `netdata-installer.sh` with the auto-update option. So if you just run the one-liner without options once, your Netdata will be kept auto-updated.
 
 ## You downloaded a binary package
 
-If you installed it from a binary package, the best way is to **obtain a newer copy** from the source you got it in the first place.
+If you installed it from a binary package, the best way is to **obtain a newer copy** from the source you got it in the first place. This includes the static binary installation via `kickstart-base64.sh`, which would need to be executed again.
+
+If a newer version of Netdata is not available from the source you got it, we suggest to uninstall the version you have and follow the [installation](README.md) instructions for installing a fresh version of Netdata.
 
 If a newer version of Netdata is not available from the source you got it, we suggest to uninstall the version you have and follow the [installation](README.md) instructions for installing a fresh version of Netdata.
 
