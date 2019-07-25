@@ -69,6 +69,12 @@
     word-break: normal;
 }
 
+/* Give code blocks a little more line height */
+
+.md-typeset pre {
+    line-height: 1.6;
+}
+
 /* Show line numbers. */
 [data-linenos]:before {
     border-right: .0625rem solid #ddd;

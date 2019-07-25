@@ -266,7 +266,7 @@ navpart 2 web/api/queries "" "Queries" 2
 
 echo -ne "- Contributing to Netdata:
     - CONTRIBUTING.md
-    - 'docs/contributing/contributing.md'
+    - 'docs/contributing/contributing-documentation.md'
     - 'docs/contributing/style-guide.md'
     - CODE_OF_CONDUCT.md
     - CONTRIBUTORS.md
