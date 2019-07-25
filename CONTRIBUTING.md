@@ -65,7 +65,7 @@ Our documentation is in need of constant improvement and expansion. As Netdata's
 
 We also need to produce beginner-level tutorials on using Netdata to monitor common applications, web servers, and more.
 
-Start with the [**Contributing to Documentation guide**](docs/contributing/contributing.md), and then review the [**Netdata documentation style guide**](docs/contributing/style-guide.md) for specifics on how we write our documentation.
+Start with the [guide for contributing to documentation](docs/contributing/contributing-documentation.md), and then review the [documentation style guide](docs/contributing/style-guide.md) for specifics on how we write our documentation.
 
 Don't be afraid to submit a pull request with your corrections or additions! We need a lot of help and are willing to guide new contributors through the process.
 
