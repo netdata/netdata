@@ -1,23 +1,23 @@
-# Install netdata with Docker
+# Install Netdata with Docker
 
-> :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running netdata in docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
->
-> Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with https://github.com/multiarch naming), so **`armv7hf` is not updated** either.
+!!! warning
+    As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running netdata in docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
+
+    Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with https://github.com/multiarch naming), so **`armv7hf` is not updated** either.
 
 ## Limitations
 
-Running netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running netdata on the host.
+Running Netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running Netdata on the host.
 
 ## Package scrambling in runtime (x86_64 only)
 
-By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting netdata docker container.
+By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata docker container.
 
 For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
 
-## Run netdata with docker command
+## Run Netdata with the docker command
 
-Quickly start netdata with the docker command line.
-Netdata is then available at http://host:19999
+Quickly start Netdata with the docker command line. Netdata is then available at `http://host:19999`.
 
 This is good for an internal network or to quickly analyse a host.
 
@@ -106,7 +106,7 @@ Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#e
 
 ## Install Netdata using Docker Compose with SSL/TLS enabled http proxy
 
-For a permanent installation on a public server, you should [secure the netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
+For a permanent installation on a public server, you should [secure your Netdata installation](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
 
 You can use use the following docker-compose.yml and Caddyfile files to run netdata with docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
 
@@ -128,7 +128,7 @@ netdata.example.org {
 
 ### docker-compose.yml
 
-After setting Caddyfile run this with `docker-compose up -d` to have fully functioning netdata setup behind HTTP reverse proxy.
+After setting Caddyfile run this with `docker-compose up -d` to have fully functioning Netdata setup behind a HTTP reverse proxy.
 
 ```yaml
 version: '3'
@@ -170,8 +170,7 @@ You can restrict access by following [official caddy guide](https://caddyserver.
 
 ## Publish a test image to your own repository
 
-At netdata we provide multiple ways of testing your docker images using your own repositories.
-You may either use the command line tools available or take advantage of our Travis CI infrastructure.
+At Netdata, we provide multiple ways of testing your docker images using your own repositories. You may either use the command line tools available or take advantage of our Travis CI infrastructure.
 
 ### Using tools manually from the command line
 
@@ -207,8 +206,7 @@ If we make changes to the code, we execute the same `build-test.sh` command, fol
 
 ### Inside netdata organization, using Travis CI
 
-To enable Travis CI integration on your own repositories (Docker and Github), you need to be part of the Netdata organization.
-Once you have contacted the netdata owners to setup you up on Github and Travis, execute the following steps
+To enable Travis CI integration on your own repositories (Docker and Github), you need to be part of the Netdata organization. Once you have contacted the netdata owners to setup you up on Github and Travis, execute the following steps:
 
 - Preparation
   - Have netdata forked on your personal GITHUB account
@@ -226,4 +224,4 @@ Once you have contacted the netdata owners to setup you up on Github and Travis,
   - GITHUB_TOKEN variable with the token generated on the preparation step, for travis workflows to function properly
   - COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN variables to enable Travis to submit your code for analysis to Coverity.
 
-Having followed these instructions, your forked repository should be all set up for Travis Integration, happy testing!
+Having followed these instructions, your forked repository should be all set up for Travis integration. Happy testing!

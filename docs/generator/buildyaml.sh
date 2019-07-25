@@ -104,7 +104,8 @@ markdown_extensions:
  - pymdownx.details
  - pymdownx.highlight:
     pygments_style: manni
-    noclasses: true
+    css_class: "highlight codehilite"
+    linenums_style: pymdownx-inline
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
@@ -145,6 +146,8 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'docs/why-netdata/immediate-results.md'
 - Installation:
     - 'packaging/installer/README.md'
+    - 'packaging/installer/MANUAL-INSTALLATION.md'
+    - 'packaging/installer/OTHERS.md'
     - 'packaging/docker/README.md'
     - 'packaging/installer/UPDATE.md'
     - 'packaging/DISTRIBUTIONS.md'

@@ -32,12 +32,40 @@
     margin-left: 1rem;
 }
 
+/*  Custom styling for the installation page. */
+
+.install-nav-buttons {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-around;
+    margin-top: 1.4rem;
+}
+
+.install-nav-buttons div {
+    flex: 1;
+    min-width: 300px;
+}
+
+.install-nav-buttons div:first-of-type {
+    flex: 1 100%;
+}
+
+.install-nav-buttons div:first-of-type .inner {
+    max-width: 400px;
+    margin: 0 auto;
+    margin-bottom: 1rem;
+}
+
+.install-nav-buttons > div:last-of-type {
+    margin-left: 2rem;
+}
+
 .nav-button {
     border: 2px solid black;
     border-radius: 4px;
     display: block;
     font-weight: 700;
-    margin: 0 auto;
+    margin: 0 auto -0.4rem auto;
     padding: 0.6rem 0;
     text-align: center;
 }
@@ -67,6 +95,15 @@
 /* Make sure inline code in tables doesn't break. */
 .md-typeset__table code {
     word-break: normal;
+}
+
+/* Make the clipboard button a little darker. */
+.md-clipboard::before {
+    color: #546e7a;
+}
+
+.md-clipboard:focus::before {
+    color: #546e7a;
 }
 
 /* Bold the first item on the docs sidebar: Netdata Documentation */
