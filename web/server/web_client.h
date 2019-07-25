@@ -11,8 +11,20 @@ extern int web_enable_gzip,
         web_gzip_strategy;
 #endif /* NETDATA_WITH_ZLIB */
 
-//HTTP_CODES 4XX
-#define HTTP_RESPONSE_BAD_REQUEST   400
+// HTTP_CODES 2XX Success
+#define HTTP_RESP_OK            200
+
+// HTTP_CODES 3XX Redirections
+#define HTTP_RESP_MOVED_PERM    301
+#define HTTP_RESP_REDIR_TEMP    307
+#define HTTP_RESP_REDIR_PERM    308
+
+// HTTP_CODES 4XX Client Errors
+#define HTTP_RESP_BAD_REQUEST   400
+#define HTTP_RESP_FORBIDDEN     403
+#define HTTP_RESP_NOT_FOUND     404
+#define HTTP_RESP_PRECOND_FAIL  412
+
 
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;

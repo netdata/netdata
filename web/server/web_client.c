@@ -16,8 +16,8 @@ inline int web_client_permission_denied(struct web_client *w) {
     w->response.data->contenttype = CT_TEXT_PLAIN;
     buffer_flush(w->response.data);
     buffer_strcat(w->response.data, "You are not allowed to access this resource.");
-    w->response.code = 403;
-    return 403;
+    w->response.code = HTTP_RESP_FORBIDDEN;
+    return HTTP_RESP_FORBIDDEN;
 }
 
 static inline int web_client_crock_socket(struct web_client *w) {
@@ -337,7 +337,7 @@ static inline int access_to_file_is_not_permitted(struct web_client *w, const ch
     w->response.data->contenttype = CT_TEXT_HTML;
     buffer_strcat(w->response.data, "Access to file is not permitted: ");
     buffer_strcat_htmlescape(w->response.data, filename);
-    return 403;
+    return HTTP_RESP_FORBIDDEN;
 }
 
 int mysendfile(struct web_client *w, char *filename) {
@@ -357,7 +357,7 @@ int mysendfile(struct web_client *w, char *filename) {
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_sprintf(w->response.data, "Filename contains invalid characters: ");
             buffer_strcat_htmlescape(w->response.data, filename);
-            return 400;
+            return HTTP_RESP_BAD_REQUEST;
         }
     }
 
@@ -367,7 +367,7 @@ int mysendfile(struct web_client *w, char *filename) {
         w->response.data->contenttype = CT_TEXT_HTML;
         buffer_strcat(w->response.data, "Relative filenames are not supported: ");
         buffer_strcat_htmlescape(w->response.data, filename);
-        return 400;
+        return HTTP_RESP_BAD_REQUEST;
     }
 
     // find the physical file on disk
@@ -383,7 +383,7 @@ int mysendfile(struct web_client *w, char *filename) {
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "File does not exist, or is not accessible: ");
             buffer_strcat_htmlescape(w->response.data, webfilename);
-            return 404;
+            return HTTP_RESP_NOT_FOUND;
         }
 
         if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
@@ -422,14 +422,14 @@ int mysendfile(struct web_client *w, char *filename) {
             buffer_sprintf(w->response.header, "Location: /%s\r\n", filename);
             buffer_strcat(w->response.data, "File is currently busy, please try again later: ");
             buffer_strcat_htmlescape(w->response.data, webfilename);
-            return 307;
+            return HTTP_RESP_REDIR_TEMP;
         }
         else {
             error("%llu: Cannot open file '%s'.", w->id, webfilename);
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Cannot open file: ");
             buffer_strcat_htmlescape(w->response.data, webfilename);
-            return 404;
+            return HTTP_RESP_NOT_FOUND;
         }
     }
 
@@ -451,7 +451,7 @@ int mysendfile(struct web_client *w, char *filename) {
 #endif /* __APPLE__ */
     buffer_cacheable(w->response.data);
 
-    return 200;
+    return HTTP_RESP_OK;
 }
 
 
@@ -570,7 +570,7 @@ static inline int check_host_and_call(RRDHOST *host, struct web_client *w, char 
     //if(unlikely(host->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
     //    buffer_flush(w->response.data);
     //    buffer_strcat(w->response.data, "This host does not maintain a database");
-    //    return 400;
+    //    return HTTP_RESP_BAD_REQUEST;
     //}
 
     return func(host, w, url);
@@ -603,13 +603,13 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url)
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "Unsupported API version: ");
             buffer_strcat_htmlescape(w->response.data, tok);
-            return 404;
+            return HTTP_RESP_NOT_FOUND;
         }
     }
     else {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Which API version?");
-        return 400;
+        return HTTP_RESP_BAD_REQUEST;
     }
 }
 
@@ -687,25 +687,25 @@ const char *web_content_type_to_string(uint8_t contenttype) {
 
 const char *web_response_code_to_string(int code) {
     switch(code) {
-        case 200:
+        case HTTP_RESP_OK:
             return "OK";
 
-        case 301:
+        case HTTP_RESP_MOVED_PERM:
             return "Moved Permanently";
 
-        case 307:
+        case HTTP_RESP_REDIR_TEMP:
             return "Temporary Redirect";
 
-        case 400:
+        case HTTP_RESP_BAD_REQUEST:
             return "Bad Request";
 
-        case 403:
+        case HTTP_RESP_FORBIDDEN:
             return "Forbidden";
 
-        case 404:
+        case HTTP_RESP_NOT_FOUND:
             return "Not Found";
 
-        case 412:
+        case HTTP_RESP_PRECOND_FAIL:
             return "Preconditions Failed";
 
         default:
@@ -1117,7 +1117,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 }
 
 static inline void web_client_send_http_header(struct web_client *w) {
-    if(unlikely(w->response.code != 200))
+    if(unlikely(w->response.code != HTTP_RESP_OK))
         buffer_no_cacheable(w->response.data);
 
     // set a proper expiration date, if not already set
@@ -1147,7 +1147,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     }
 
     char headerbegin[8328];
-    if (w->response.code == 301) {
+    if (w->response.code == HTTP_RESP_MOVED_PERM) {
         memcpy(headerbegin,"\r\nLocation: https://",20);
         size_t headerlength = strlen(w->host);
         memcpy(&headerbegin[20],w->host,headerlength);
@@ -1330,7 +1330,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     if(host != localhost) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Nesting of hosts is not allowed.");
-        return 400;
+        return HTTP_RESP_BAD_REQUEST;
     }
 
     char *tok = mystrsep(&url, "/");
@@ -1354,7 +1354,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     w->response.data->contenttype = CT_TEXT_HTML;
     buffer_strcat(w->response.data, "This netdata does not maintain a database for host: ");
     buffer_strcat_htmlescape(w->response.data, tok?tok:"");
-    return 404;
+    return HTTP_RESP_NOT_FOUND;
 }
 
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url) {
@@ -1399,7 +1399,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             w->response.data->contenttype = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
             config_generate(w->response.data, 0);
-            return 200;
+            return HTTP_RESP_OK;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
         else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
@@ -1416,7 +1416,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
             error("web request to exit received.");
             netdata_cleanup_and_exit(0);
-            return 200;
+            return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
             if(unlikely(!web_client_can_access_netdataconf(w)))
@@ -1437,7 +1437,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                     buffer_strcat(w->response.data, "Chart is not found: ");
                     buffer_strcat_htmlescape(w->response.data, tok);
                     debug(D_WEB_CLIENT_ACCESS, "%llu: %s is not found.", w->id, tok);
-                    return 404;
+                    return HTTP_RESP_NOT_FOUND;
                 }
 
                 debug_flags |= D_RRD_STATS;
@@ -1451,12 +1451,12 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
                 buffer_sprintf(w->response.data, "Chart has now debug %s: ", rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
                 buffer_strcat_htmlescape(w->response.data, tok);
                 debug(D_WEB_CLIENT_ACCESS, "%llu: debug for %s is %s.", w->id, tok, rrdset_flag_check(st, RRDSET_FLAG_DEBUG)?"enabled":"disabled");
-                return 200;
+                return HTTP_RESP_OK;
             }
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "debug which chart?\r\n");
-            return 400;
+            return HTTP_RESP_BAD_REQUEST;
         }
         else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
             if(unlikely(!web_client_can_access_netdataconf(w)))
@@ -1470,7 +1470,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             // just leave the buffer as is
             // it will be copied back to the client
 
-            return 200;
+            return HTTP_RESP_OK;
         }
 #endif  /* NETDATA_INTERNAL_CHECKS */
     }
@@ -1515,7 +1515,7 @@ void web_client_process_request(struct web_client *w) {
                     w->response.data->contenttype = CT_TEXT_PLAIN;
                     buffer_flush(w->response.data);
                     buffer_strcat(w->response.data, "OK");
-                    w->response.code = 200;
+                    w->response.code = HTTP_RESP_OK;
                     break;
 
                 case WEB_CLIENT_MODE_FILECOPY:
@@ -1544,7 +1544,7 @@ void web_client_process_request(struct web_client *w) {
 
                 buffer_flush(w->response.data);
                 buffer_sprintf(w->response.data, "Received request is too big  (%zu bytes).\r\n", w->response.data->len);
-                w->response.code = HTTP_RESPONSE_BAD_REQUEST;
+                w->response.code = HTTP_RESP_BAD_REQUEST;
             }
             else {
                 // wait for more data
@@ -1557,7 +1557,7 @@ void web_client_process_request(struct web_client *w) {
             buffer_flush(w->response.data);
             w->response.data->contenttype = CT_TEXT_HTML;
             buffer_strcat(w->response.data, "<!DOCTYPE html><!-- SPDX-License-Identifier: GPL-3.0-or-later --><html><body onload=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">Redirecting to safety connection, case your browser does not support redirection, please click <a onclick=\"window.location.href ='https://'+ window.location.hostname + ':' + window.location.port +  window.location.pathname\">here</a>.</body></html>");
-            w->response.code = 301;
+            w->response.code = HTTP_RESP_MOVED_PERM;
             break;
         }
 #endif
@@ -1566,14 +1566,14 @@ void web_client_process_request(struct web_client *w) {
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "URL not valid. I don't understand you...\r\n");
-            w->response.code = HTTP_RESPONSE_BAD_REQUEST;
+            w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
         case HTTP_VALIDATION_NOT_SUPPORTED:
             debug(D_WEB_CLIENT_ACCESS, "%llu: Cannot understand '%s'.", w->id, w->response.data->buffer);
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "I don't understand you...\r\n");
-            w->response.code = HTTP_RESPONSE_BAD_REQUEST;
+            w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
     }
 
