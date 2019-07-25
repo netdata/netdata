@@ -13,4 +13,6 @@ interface Window {
 
   // user configuration options
   netdataNoBootstrap: boolean | undefined
+
+  __REDUX_DEVTOOLS_EXTENSION__: (() => void | undefined)
 }

@@ -3,20 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@types/jest": "24.0.15",
-    "@types/node": "12.6.8",
-    "@types/react": "16.8.23",
-    "@types/react-dom": "16.8.4",
     "bootstrap": "3.3.7",
     "jquery": "^2.2.4",
     "perfect-scrollbar": "0.6.15",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
+    "react-redux": "^7.1.0",
     "react-scripts": "3.0.1",
+    "redux": "^4.0.4",
+    "redux-act": "^1.7.7",
+    "redux-saga": "^1.0.5",
     "typescript": "3.5.3"
+  },
+  "devDependencies": {
+    "@types/bootstrap": "^3",
+    "@types/jest": "24.0.15",
+    "@types/jquery": "^3.3.30",
+    "@types/node": "12.6.8",
+    "@types/react": "16.8.23",
+    "@types/react-dom": "16.8.4",
+    "@types/react-redux": "^7.1.1",
+    "@types/redux-saga": "^0.10.5",
+    "@typescript-eslint/eslint-plugin": "^1.13.0",
+    "@typescript-eslint/parser": "^1.13.0",
+    "eslint-config-airbnb": "^17.1.1"
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:console": "cp ../console.html public/index.html && yarn start",
     "start:tv": "cp ../tv.html public/index.html && yarn start",
     "start:index": "cp ../index.html public/index.html && yarn start",
     "build": "react-scripts build",
@@ -35,12 +49,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "devDependencies": {
-    "@types/bootstrap": "^3",
-    "@types/jquery": "^3.3.30",
-    "@typescript-eslint/eslint-plugin": "^1.13.0",
-    "@typescript-eslint/parser": "^1.13.0",
-    "eslint-config-airbnb": "^17.1.1"
   }
 }

@@ -13,6 +13,7 @@ module.exports = {
     "indent": ["error", 2],
     "semi": ["error", "never"],
     "@typescript-eslint/semi": ["error", "never"],
+    "quotes": ["error", "double"],
     "react/jsx-filename-extension": [
       1,
       {
@@ -21,11 +22,13 @@ module.exports = {
         ]
       }
     ],
+    "no-underscore-dangle": ["error", { "allow": ["__REDUX_DEVTOOLS_EXTENSION__"] }],
+    "import/prefer-default-export": 0
   },
   "settings": {
     "import/resolver": {
       "node": {
-        "extensions": [".js", ".jsx", ".ts", ".tsx"],
+        "extensions": [".js", ".jsx", ".ts", ".tsx", ".d.ts"],
         "paths": ["src"]
       }
     }

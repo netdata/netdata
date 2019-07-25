@@ -1,16 +1,16 @@
-import React from 'react'
-import Ps from 'perfect-scrollbar'
-import $ from 'jquery'
+import React from "react"
+import Ps from "perfect-scrollbar"
+import $ from "jquery"
 
-import './types/global'
-import './App.css'
+import "./types/global"
+import "./App.css"
 
 // with this syntax it loads asynchronously, after window. assignments are done
 // @ts-ignore
-import('./dashboard')
+import("./dashboard")
 if (!window.netdataNoBootstrap) {
   // it needs to be imported indirectly, there's probably a bug in webpack
-  import('dynamic-imports/bootstrap')
+  import("dynamic-imports/bootstrap")
 }
 
 // support legacy code
