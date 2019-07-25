@@ -90,6 +90,7 @@
 
 // *** src/dashboard.js/utils.js
 
+let reduxStore
 NETDATA.name2id = function (s) {
     return s
         .replace(/ /g, '_')
@@ -9921,12 +9922,14 @@ if (typeof netdataPrepCallback === 'function') {
 NETDATA.errorReset();
 NETDATA.loadRequiredCSS(0);
 
-NETDATA.loadRequiredJs(0, function () {
+export const startModule = (store) => {
+  reduxStore = store
+  NETDATA.loadRequiredJs(0, function () {
     if (typeof netdataDontStart === 'undefined' || !netdataDontStart) {
-        if (NETDATA.options.debug.main_loop) {
-            console.log('starting chart refresh thread');
-        }
-
-        NETDATA.start();
+      if (NETDATA.options.debug.main_loop) {
+        console.log('starting chart refresh thread');
+      }
+      NETDATA.start();
     }
-});
+  });
+}
