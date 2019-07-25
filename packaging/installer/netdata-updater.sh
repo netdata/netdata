@@ -196,9 +196,9 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
 
 	#shellcheck disable=SC2181
 	if [ $? -eq 0 ]; then
-		rm "${TMPDIR}/netdata-latest.gz.run"
+		rm -r "${TMPDIR}"
 	else
-		echo >&2 "NOTE: did not remove: ${TMPDIR}/netdata-latest.gz.run"
+		echo >&2 "NOTE: did not remove: ${TMPDIR}"
 	fi
 	echo >&2 "Switching back to ${PREVDIR}"
 	cd "${PREVDIR}"
