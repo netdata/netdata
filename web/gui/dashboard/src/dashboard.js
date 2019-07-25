@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars, spaced-comment, max-len */
+/* eslint-disable no-unused-vars, spaced-comment, max-len, @typescript-eslint/no-unused-vars */
 
 /**
  * this file is created only for refractor purposes - during the refractor process it should shrink in size,

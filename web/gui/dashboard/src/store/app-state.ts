@@ -1,5 +1,5 @@
 import { StateT as GlobalStateT, globalKey } from "domains/global/reducer"
 
 export type AppStateT = {
-  [globalKey: string]: GlobalStateT
+  [globalKey]: GlobalStateT
 }

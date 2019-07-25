@@ -23,7 +23,8 @@ module.exports = {
       }
     ],
     "no-underscore-dangle": ["error", { "allow": ["__REDUX_DEVTOOLS_EXTENSION__"] }],
-    "import/prefer-default-export": 0
+    "import/prefer-default-export": 0,
+    "@typescript-eslint/no-unused-vars": "error"
   },
   "settings": {
     "import/resolver": {
