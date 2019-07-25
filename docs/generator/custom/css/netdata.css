@@ -69,6 +69,22 @@
     word-break: normal;
 }
 
+/* Show line numbers. */
+[data-linenos]:before {
+    border-right: .0625rem solid #ddd;
+    color: #999;
+    content: attr(data-linenos);
+    display: inline-block;
+    margin-left: -1.2rem;
+    margin-right: .7rem;
+    padding-left: 1.2rem;
+}
+
+.md-typeset .highlight .hll {
+    display: inline;
+    margin: 0;
+    padding: 0;
+}
 /* Bold the first item on the docs sidebar: Netdata Documentation */
 .md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
     font-weight: 700;

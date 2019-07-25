@@ -1,4 +1,4 @@
-# Contributing to Documentation
+# Contributing to documentation
 
 We welcome contributions to Netdata's already extensive documentation, which we host at [docs.netdata.cloud](https://docs.netdata.cloud/) and store inside of the [main repository](https://github.com/netdata/netdata) on GitHub.
 
@@ -8,9 +8,13 @@ We also ask you to read our [documentation style guide](style-guide.md), which, 
 
 All our documentation uses the Markdown syntax. If you're not familiar with how it works, please read the [Markdown introduction post](https://daringfireball.net/projects/markdown/) by its creator, followed by [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub.
 
+
 ## How contributing to the documentation works
 
-There are two ways to contribute to the Netdata contribution. `1.` Edit documentation [directly in GitHub](#edit-documentation-directly-in-gitHub), or `2.` download the repository and [edit documentation locally](#edit-documentation-locally).
+There are two ways to contribute to the Netdata contribution. 
+
+1. Edit documentation [directly in GitHub](#edit-documentation-directly-in-gitHub).
+2. Download the repository and [edit documentation locally](#edit-documentation-locally).
 
 Editing in GitHub is a simpler process and is perfect for quick edits to a single document, such as fixing a typo or clarifying a confusing sentence.
 
@@ -35,6 +39,7 @@ Once you've hit that button, you'll see a full Markdown version of the file. Mak
 Under the `Propose file change` header, write in a descriptive title for your requested chagne. Beneath that, add a concise descrition of what you've changed and why you think it's important. Then, click the `Propose file change` button. 
 
 After you've hit that button, jump down to our instructions on [pull requests and cleanup](#pull-requests-and-final-steps) for your next steps. 
+
 
 ## Edit documentation locally
 
