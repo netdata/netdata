@@ -301,6 +301,35 @@ void backend_set_prometheus_variables(int *default_port,
 }
 
 /**
+ * Set MongoDB variables
+ *
+ * Set the variables necessaries to work with this specific backend.
+ *
+ * @param default_port  the default port of the backend
+ * @param brc function called to check the result.
+ * @param brf function called to format the msessage to the backend
+ * @param type the backend string selector.
+ */
+void backend_set_mongodb_variables(int *default_port,
+                                      backend_response_checker_t brc,
+                                      backend_request_formatter_t brf)
+{
+    (void)default_port;
+#ifndef HAVE_MONGOC
+    (void)brc;
+    (void)brf;
+#endif
+
+#if HAVE_MONGOC
+    *brc = process_mongodb_response;
+    if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        *brf = format_dimension_collected_mongodb_plaintext;
+    else
+        *brf = format_dimension_stored_mongodb_plaintext;
+#endif
+}
+
+/**
  * Set JSON variables
  *
  * Set the variables necessaries to work with this specific backend.
@@ -421,6 +450,9 @@ BACKEND_TYPE backend_select_type(const char *type) {
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
     }
+    else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) { // TODO: do we need plaintext for mongodb?
+        return BACKEND_TYPE_MONGODB;
+    }
 
     return BACKEND_TYPE_UNKNOWN;
 }
@@ -450,7 +482,16 @@ void *backends_main(void *ptr) {
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     int do_prometheus_remote_write = 0;
-    BUFFER *http_request_header = buffer_create(1);
+    BUFFER *http_request_header = NULL;
+#endif
+
+#if HAVE_MONGOC
+    int do_mongodb = 0;
+    // TODO: read these variables from configuration file
+    char *mongodb_uri = "mongodb://localhost:27017";
+    char *mongodb_database = "netdata";
+    char *mongodb_collection = "backend1";
+
 #endif
 
 #ifdef ENABLE_HTTPS
@@ -524,6 +565,7 @@ void *backends_main(void *ptr) {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
             do_prometheus_remote_write = 1;
 
+            http_request_header = buffer_create(1);
             init_write_request();
 #else
             error("BACKEND: Prometheus remote write support isn't compiled");
@@ -545,6 +587,18 @@ void *backends_main(void *ptr) {
             error("BACKEND: AWS Kinesis support isn't compiled");
 #endif // HAVE_KINESIS
             backend_set_kinesis_variables(&default_port,&backend_response_checker,&backend_request_formatter);
+            break;
+        }
+        case BACKEND_TYPE_MONGODB: {
+#if HAVE_MONGOC
+            if(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection))
+                do_mongodb = 1;
+            else
+                error("BACKEND: cannot initialize MongoDB backend");
+#else
+            error("BACKEND: MongoDB support isn't compiled");
+#endif // HAVE_MONGOC
+            backend_set_mongodb_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
         case BACKEND_TYPE_GRAPHITE: {
@@ -658,7 +712,8 @@ void *backends_main(void *ptr) {
         size_t count_dims_total = 0;
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-        clear_write_request();
+        if(do_prometheus_remote_write)
+            clear_write_request();
 #endif
         rrd_rdlock();
         RRDHOST *host;
@@ -705,6 +760,10 @@ void *backends_main(void *ptr) {
             else
 #endif
             {
+#if HAVE_MONGOC
+                // if(do_mongodb)
+                    buffer_sprintf(b, "{\n\"metrics\": [\n{}");
+#endif
                 RRDSET *st;
                 rrdset_foreach_read(st, host) {
                     if(likely(backends_can_send_rrdset(global_backend_options, st))) {
@@ -728,6 +787,11 @@ void *backends_main(void *ptr) {
                     }
                 }
             }
+
+#if HAVE_MONGOC
+                // if(do_mongodb)
+                    buffer_sprintf(b, "\n]\n}\n");
+#endif
 
             debug(D_BACKEND, "BACKEND: sending host '%s', metrics of %zu dimensions, of %zu charts. Skipped %zu dimensions.", __hostname, count_dims, count_charts, count_dims_skipped);
             count_charts_total += count_charts;
@@ -833,11 +897,54 @@ void *backends_main(void *ptr) {
                 chart_sent_metrics = chart_buffered_metrics;
 
             buffer_flush(b);
-        }
-        else {
-#else
-        {
+        } else
 #endif /* HAVE_KINESIS */
+
+#if HAVE_MONGOC
+        if(do_mongodb) {
+            size_t buffer_len = buffer_strlen(b);
+            size_t sent = 0;
+
+            while(sent < buffer_len) {
+                const char *first_char = buffer_tostring(b);
+
+                char error_message[ERROR_LINE_MAX + 1] = "";
+                debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
+                      buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
+
+                if(!mongodb_insert(first_char)) {
+                    sent += buffer_len;
+                    chart_transmission_successes++;
+                    chart_receptions++;
+                }
+                else {
+                    // oops! we couldn't send (all or some of the) data
+                    error("BACKEND: %s", error_message);
+                    error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                          mongodb_uri, buffer_len, 0UL);
+
+                    chart_transmission_failures++;
+                    chart_data_lost_events++;
+                    chart_lost_bytes += buffer_len;
+
+                    // estimate the number of lost metrics
+                    chart_lost_metrics += (collected_number)chart_buffered_metrics;
+
+                    break;
+                }
+
+                if(unlikely(netdata_exit)) break;
+            }
+
+            chart_sent_bytes += sent;
+            if(likely(sent == buffer_len))
+                chart_sent_metrics = chart_buffered_metrics;
+
+            buffer_flush(b);
+        } else
+#endif /* HAVE_MONGOC */
+
+        {
 
             // ------------------------------------------------------------------------
             // if we are connected, receive a response, without blocking
@@ -1027,13 +1134,13 @@ void *backends_main(void *ptr) {
 
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-        if(failures) {
+        if(do_prometheus_remote_write && failures) {
             (void) buffer_on_failures;
             failures = 0;
             chart_lost_bytes = chart_buffered_bytes = get_write_request_size(); // estimated write request size
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
-        }
+        } else
 #else
         if(failures > buffer_on_failures) {
             // too bad! we are going to lose data
@@ -1104,6 +1211,12 @@ cleanup:
     if(do_prometheus_remote_write) {
         buffer_free(http_request_header);
         protocol_buffers_shutdown();
+    }
+#endif
+
+#if HAVE_MONGOC
+    if(do_mongodb) {
+        mongodb_cleanup();
     }
 #endif
 

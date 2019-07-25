@@ -5,4 +5,36 @@
 
 #include "backends/backends.h"
 
+extern int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string);
+
+extern int mongodb_insert(const char *data);
+
+extern void mongodb_cleanup();
+
+extern int format_dimension_collected_mongodb_plaintext(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
+);
+
+extern int format_dimension_stored_mongodb_plaintext(
+          BUFFER *b                 // the buffer to write data to
+        , const char *prefix        // the prefix to use
+        , RRDHOST *host             // the host this chart comes from
+        , const char *hostname      // the hostname (to override host->hostname)
+        , RRDSET *st                // the chart
+        , RRDDIM *rd                // the dimension
+        , time_t after              // the start timestamp
+        , time_t before             // the end timestamp
+        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
+);
+
+extern int process_mongodb_response(BUFFER *b);
+
 #endif //NETDATA_BACKEND_MONGODB_H
