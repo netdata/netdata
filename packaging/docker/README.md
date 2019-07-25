@@ -26,7 +26,6 @@ docker run -d --name=netdata \
   -p 19999:19999 \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata
@@ -57,7 +56,7 @@ There are a few options for resolving container names within netdata. Some metho
 
 #### Docker Socket Proxy (Safest Option)
 
-Deploy a Docker socket proxy that accepts will filter out requests using something like HAProxy so that it restricts connections to read-only access to the CONTAINERS endpoint.
+Deploy a Docker socket proxy that accepts and filter out requests using something like [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access to the CONTAINERS endpoint.
 
 The reason it's safer to expose the socket to the proxy is because netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
 
