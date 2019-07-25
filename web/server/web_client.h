@@ -24,6 +24,18 @@ typedef enum web_client_mode {
     WEB_CLIENT_MODE_STREAM      = 3
 } WEB_CLIENT_MODE;
 
+typedef enum {
+    HTTP_VALIDATION_OK,
+    HTTP_VALIDATION_NOT_SUPPORTED,
+    HTTP_VALIDATION_MALFORMED_URL,
+#ifdef ENABLE_HTTPS
+    HTTP_VALIDATION_INCOMPLETE,
+    HTTP_VALIDATION_REDIRECT
+#else
+    HTTP_VALIDATION_INCOMPLETE
+#endif
+} HTTP_VALIDATION;
+
 typedef enum web_client_flags {
     WEB_CLIENT_FLAG_DEAD              = 1 << 1, // if set, this client is dead
 
@@ -131,8 +143,12 @@ struct web_client {
     char client_port[NI_MAXSERV+1];
 
     char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the URL in this buffer
+    char decoded_query_string[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the Query String in this buffer
     char last_url[NETDATA_WEB_REQUEST_URL_SIZE+1];       // we keep a copy of the decoded URL here
     char host[256];
+    size_t url_path_length;
+    char separator; // This value can be either '?' or 'f'
+    char *url_search_path; //A pointer to the search path sent by the client
 
     struct timeval tv_in, tv_ready;
 
@@ -161,6 +177,7 @@ struct web_client {
     struct netdata_ssl ssl;
 #endif
 };
+
 
 extern uid_t web_files_uid(void);
 extern uid_t web_files_gid(void);
