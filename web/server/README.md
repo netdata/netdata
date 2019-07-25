@@ -124,7 +124,7 @@ Netdata will:
 - Force all HTTP requests to the default port to be redirected to HTTPS (same port).
 - Refuse unencrypted streaming connections from slaves on the default port.
 - Allow both HTTP and HTTPS requests to port 20000 for netdata.conf
-- Allow both HTTP and HTTPS requests to port 20001 for the dashboard, the read API and the registry
+- Force HTTP requests to port 20001 to be redirected to HTTPS (same port). Only allow requests for the dashboard, the read API and the registry on port 20001.
 
 #### TLS/SSL errors
 
