@@ -772,7 +772,6 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     // terminate the value
     *ve = '\0';
 
-    // fprintf(stderr, "HEADER: '%s' = '%s'\n", s, v);
     uint32_t hash = simple_uhash(s);
 
     if(hash == hash_origin && !strcasecmp(s, "Origin"))
@@ -812,66 +811,31 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
     return ve;
 }
 
-// http_request_validate()
-// returns:
-// = 0 : all good, process the request
-// > 0 : request is not supported
-// < 0 : request is incomplete - wait for more data
-
-typedef enum {
-    HTTP_VALIDATION_OK,
-    HTTP_VALIDATION_NOT_SUPPORTED,
-    HTTP_VALIDATION_MALFORMED_URL,
-#ifdef ENABLE_HTTPS
-    HTTP_VALIDATION_INCOMPLETE,
-    HTTP_VALIDATION_REDIRECT
-#else
-    HTTP_VALIDATION_INCOMPLETE
-#endif
-} HTTP_VALIDATION;
-
-static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
-    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
-
-    size_t last_pos = w->header_parse_last_size;
-    if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
-    else last_pos = 0;
-
-    w->header_parse_tries++;
-    w->header_parse_last_size = buffer_strlen(w->response.data);
-
-    if(w->header_parse_tries > 1) {
-        if(w->header_parse_last_size < last_pos)
-            last_pos = 0;
-
-        if(strstr(&s[last_pos], "\r\n\r\n") == NULL) {
-            if(w->header_parse_tries > 10) {
-                info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
-                w->header_parse_tries = 0;
-                w->header_parse_last_size = 0;
-                web_client_disable_wait_receive(w);
-                return HTTP_VALIDATION_NOT_SUPPORTED;
-            }
-
-            return HTTP_VALIDATION_INCOMPLETE;
-        }
-    }
-
+/**
+ * Valid Method
+ *
+ * Netdata accepts only three methods, including one of these three(STREAM) is an internal method.
+ *
+ * @param w is the structure with the client request
+ * @param s is the start string to parse
+ *
+ * @return it returns the next address to parse case the method is valid and NULL otherwise.
+ */
+static inline char *web_client_valid_method(struct web_client *w, char *s) {
     // is is a valid request?
     if(!strncmp(s, "GET ", 4)) {
-        encoded_url = s = &s[4];
+        s = &s[4];
         w->mode = WEB_CLIENT_MODE_NORMAL;
     }
     else if(!strncmp(s, "OPTIONS ", 8)) {
-        encoded_url = s = &s[8];
+        s = &s[8];
         w->mode = WEB_CLIENT_MODE_OPTIONS;
     }
     else if(!strncmp(s, "STREAM ", 7)) {
+        s = &s[7];
+
 #ifdef ENABLE_HTTPS
         if ( (w->ssl.flags) && (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE)){
-            w->header_parse_tries = 0;
-            w->header_parse_last_size = 0;
-            web_client_disable_wait_receive(w);
             char hostname[256];
             char *copyme = strstr(s,"hostname=");
             if ( copyme ){
@@ -892,29 +856,150 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 hostname[13] = 0x00;
             }
             error("The server is configured to always use encrypt connection, please enable the SSL on slave with hostname '%s'.",hostname);
-            return HTTP_VALIDATION_NOT_SUPPORTED;
+            s = NULL;
         }
 #endif
 
-        encoded_url = s = &s[7];
         w->mode = WEB_CLIENT_MODE_STREAM;
     }
     else {
+        s = NULL;
+    }
+
+    return s;
+}
+
+/**
+ * Set Path Query
+ *
+ * Set the pointers to the path and query string according to the input.
+ *
+ * @param w is the structure with the client request
+ * @param s is the first address of the string.
+ * @param ptr is the address of the separator.
+ */
+static void web_client_set_path_query(struct web_client *w, char *s, char *ptr) {
+    w->url_path_length = (size_t)(ptr -s);
+
+    w->url_search_path = ptr;
+}
+
+/**
+ * Split path query
+ *
+ * Do the separation between path and query string
+ *
+ * @param w is the structure with the client request
+ * @param s is the string to parse
+ */
+void web_client_split_path_query(struct web_client *w, char *s) {
+    //I am assuming here that the separator character(?) is not encoded
+    char *ptr = strchr(s, '?');
+    if(ptr) {
+        w->separator = '?';
+        web_client_set_path_query(w, s, ptr);
+        return;
+    }
+
+    //Here I test the second possibility, the URL is completely encoded by the user.
+    //I am not using the strcasestr, because it is fastest to check %3f and compare
+    //the next character.
+    //We executed some tests with "encodeURI(uri);" described in https://www.w3schools.com/jsref/jsref_encodeuri.asp
+    //on July 1st, 2019, that show us that URLs won't have '?','=' and '&' encoded, but we decided to move in front
+    //with the next part, because users can develop their own encoded that won't follow this rule.
+    char *moveme = s;
+    while (moveme) {
+        ptr = strchr(moveme, '%');
+        if(ptr) {
+            char *test = (ptr+1);
+            if (!strncmp(test, "3f", 2) || !strncmp(test, "3F", 2)) {
+                w->separator = *ptr;
+                web_client_set_path_query(w, s, ptr);
+                return;
+            }
+            ptr++;
+        }
+
+        moveme = ptr;
+    }
+
+    w->separator = 0x00;
+    w->url_path_length = strlen(s);
+    w->url_search_path = NULL;
+}
+
+/**
+ * Request validate
+ *
+ * @param w is the structure with the client request
+ *
+ * @return It returns HTTP_VALIDATION_OK on success and another code present
+ *          in the enum HTTP_VALIDATION otherwise.
+ */
+static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
+    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+
+    size_t last_pos = w->header_parse_last_size;
+
+    w->header_parse_tries++;
+    w->header_parse_last_size = buffer_strlen(w->response.data);
+
+    int is_it_valid;
+    if(w->header_parse_tries > 1) {
+        if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
+        else last_pos = 0;
+
+        if(w->header_parse_last_size < last_pos)
+            last_pos = 0;
+
+        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size);
+        if(!is_it_valid) {
+            if(w->header_parse_tries > 10) {
+                info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
+                w->header_parse_tries = 0;
+                w->header_parse_last_size = 0;
+                web_client_disable_wait_receive(w);
+                return HTTP_VALIDATION_NOT_SUPPORTED;
+            }
+
+            return HTTP_VALIDATION_INCOMPLETE;
+        }
+
+        is_it_valid = 1;
+    } else {
+        last_pos = w->header_parse_last_size;
+        is_it_valid = url_is_request_complete(s, &s[last_pos], w->header_parse_last_size);
+    }
+
+    s = web_client_valid_method(w, s);
+    if (!s) {
         w->header_parse_tries = 0;
         w->header_parse_last_size = 0;
         web_client_disable_wait_receive(w);
+
         return HTTP_VALIDATION_NOT_SUPPORTED;
+    } else if (!is_it_valid) {
+        //Invalid request, we have more data after the end of message
+        char *check = strstr((char *)buffer_tostring(w->response.data), "\r\n\r\n");
+        if(check) {
+            check += 4;
+            if (*check) {
+                w->header_parse_tries = 0;
+                w->header_parse_last_size = 0;
+                web_client_disable_wait_receive(w);
+                return HTTP_VALIDATION_NOT_SUPPORTED;
+            }
+        }
+
+        web_client_enable_wait_receive(w);
+        return HTTP_VALIDATION_INCOMPLETE;
     }
 
-    // find the SPACE + "HTTP/"
-    while(*s) {
-        // find the next space
-        while (*s && *s != ' ') s++;
+    //After the method we have the path and query string together
+    encoded_url = s;
 
-        // is it SPACE + "HTTP/" ?
-        if(*s && !strncmp(s, " HTTP/", 6)) break;
-        else s++;
-    }
+    //we search for the position where we have " HTTP/", because it finishes the user request
+    s = url_find_protocol(s);
 
     // incomplete requests
     if(unlikely(!*s)) {
@@ -924,6 +1009,10 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // we have the end of encoded_url - remember it
     char *ue = s;
+
+    //Variables used to map the variables in the query string case it is present
+    int total_variables;
+    char *ptr_variables[WEB_FIELDS_MAX];
 
     // make sure we have complete request
     // complete requests contain: \r\n\r\n
@@ -942,13 +1031,38 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // a valid complete HTTP request found
 
                 *ue = '\0';
-                if(!url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1))
-                    return HTTP_VALIDATION_MALFORMED_URL;
+                if(w->mode != WEB_CLIENT_MODE_NORMAL) {
+                    if(!url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1))
+                        return HTTP_VALIDATION_MALFORMED_URL;
+                } else {
+                    web_client_split_path_query(w, encoded_url);
+
+                    if (w->separator) {
+                        *w->url_search_path = 0x00;
+                    }
+
+                    if(!url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1))
+                        return HTTP_VALIDATION_MALFORMED_URL;
+
+                    if (w->separator) {
+                        *w->url_search_path = w->separator;
+
+                        char *from = (encoded_url + w->url_path_length);
+                        total_variables = url_map_query_string(ptr_variables, from);
+
+                        if (url_parse_query_string(w->decoded_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1, ptr_variables, total_variables)) {
+                            return HTTP_VALIDATION_MALFORMED_URL;
+                        }
+                    }
+                }
                 *ue = ' ';
-                
+
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+                if (w->separator) {
+                    *w->url_search_path = 0x00;
+                }
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (netdata_use_ssl_on_http & NETDATA_SSL_FORCE) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
