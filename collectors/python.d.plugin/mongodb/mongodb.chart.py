@@ -730,9 +730,6 @@ class Service(SimpleService):
                 return ssl.CERT_NONE
             return ssl.CERT_REQUIRED
 
-        def is_set(d):
-            return len([v for v in d.values() if v is not None]) > 0
-
         ssl_params = {
             CONN_PARAM_SSL_SSL: conf.get(CONN_PARAM_SSL_SSL),
             CONN_PARAM_SSL_CERT_REQS: cert_req(conf.get(CONN_PARAM_SSL_CERT_REQS)),
@@ -743,9 +740,9 @@ class Service(SimpleService):
             CONN_PARAM_SSL_PEM_PASSPHRASE: conf.get(CONN_PARAM_SSL_PEM_PASSPHRASE),
         }
 
-        if is_set(ssl_params):
-            return ssl_params
-        return dict()
+        ssl_params = dict((k, v) for k, v in ssl_params.items() if v is not None)
+
+        return ssl_params
 
     def build_connection_params(self):
         conf = self.configuration
