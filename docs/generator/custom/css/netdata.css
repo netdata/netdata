@@ -97,6 +97,14 @@
     word-break: normal;
 }
 
+/* Make the clipboard button a little darker. */
+.md-clipboard::before {
+    color: #546e7a;
+}
+
+.md-clipboard:focus::before {
+    color: #546e7a;
+}
 /* Bold the first item on the docs sidebar: Netdata Documentation */
 .md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
     font-weight: 700;
