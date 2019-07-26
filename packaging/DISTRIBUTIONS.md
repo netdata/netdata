@@ -83,6 +83,7 @@ This is the base netdata capability, that includes basic monitoring, embedded we
 | YES | YES | YES | YES | YES | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: None
 - **What packages required for auto-detect?**: `install-required-packages.sh netdata`
 
 #### DB Engine
@@ -93,6 +94,7 @@ This is the brand new database engine capability of netdata. It is a mandatory f
 | Auto-detect | Auto-detect | YES | YES | YES | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-dbengine
 - **What packages required for auto-detect?**: `openssl`, `libuv1`, `lz4`, `Judy`
 
 #### Encryption Support (HTTPS)
@@ -103,6 +105,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | YES | YES | YES | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-https
 - **What packages required for auto-detect?**: `openssl`
 
 
@@ -114,6 +117,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-jsonc
 - **What packages required for auto-detect?**: `json-c`
 
 #### Link time optimizations
@@ -122,6 +126,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-lto
 - **What packages required for auto-detect?**: No package dependency, depends on GCC version
 
 ### Collectors
@@ -132,6 +137,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | No | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-plugin-freeipmi
 - **What packages required for auto-detect?**: `freeipmi-dev (or -devel)`
 
 
@@ -141,6 +147,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-plugin-nfacct
 - **What packages required for auto-detect?**: `libmnl-dev`, `libnetfilter_acct-dev`
 
 
@@ -151,6 +158,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | NO | NO |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-plugin-xenstat
 - **What packages required for auto-detect?**: `xen-dom0-libs-devel`, `yajl-dev`
 
 
@@ -160,6 +168,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-plugin-cups
 - **What packages required for auto-detect?**: `cups-devel`
 
 
@@ -169,6 +178,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime |
 
 - **Flags/instructions to enable**: ${INSTALL_PATH}/netdata/plugins.d/fping.plugin install
+- **Flags to disable from source**: None -- just dont install
 - **What packages required for auto-detect?**: None - only fping installed to start it up
 
 
@@ -178,6 +188,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime |
 
 - **Flags/instructions to enable**: ${INSTALL_PATH}/netdata/plugins.d/ioping.plugin install
+- **Flags to disable from source**: None -- just dont install
 - **What packages required for auto-detect?**: None - only ioping installed to start it up
 
 
@@ -187,6 +198,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime |
 
 - **Flags/instructions to enable**: Inside netdata.conf, section `[Plugins]`, set `"perf = yes"`
+- **Flags to disable from source**: --disable-perf
 - **What packages required for auto-detect?**: None
 
 
@@ -199,6 +211,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
+- **Flags to disable from source**: --disable-backend-prometheus-remote-write
 - **What packages required for auto-detect?**: `snappy-devel`, `protobuf`, `protobuf-compiler`
 
 #### AWS Kinesis
@@ -207,4 +220,5 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | NO | NO |
 
 - **Flags/instructions to enable**: [Instructions for AWS Kinesis](https://docs.netdata.cloud/backends/aws_kinesis)
+- **Flags to disable from source**: --disable-backend-kinesis
 - **What packages required for auto-detect?**: `AWS SDK for C++`, `libcurl`, `libssl`, `libcrypto`
