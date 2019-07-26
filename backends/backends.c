@@ -490,7 +490,7 @@ void *backends_main(void *ptr) {
     // TODO: read these variables from configuration file
     char *mongodb_uri = "mongodb://localhost:27017";
     char *mongodb_database = "netdata";
-    char *mongodb_collection = "backend1";
+    char *mongodb_collection = "backend";
 
 #endif
 
@@ -908,7 +908,6 @@ void *backends_main(void *ptr) {
             while(sent < buffer_len) {
                 const char *first_char = buffer_tostring(b);
 
-                char error_message[ERROR_LINE_MAX + 1] = "";
                 debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
                       buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
@@ -919,7 +918,6 @@ void *backends_main(void *ptr) {
                 }
                 else {
                     // oops! we couldn't send (all or some of the) data
-                    error("BACKEND: %s", error_message);
                     error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
                           mongodb_uri, buffer_len, 0UL);
 
