@@ -1,6 +1,6 @@
 # Other installation methods
 
-The Netdata team works hard to make Netdata installable on as many systems as possible. This page contains instructions for some less common operating systems or those with different installation requirements, in addition to certain machines that require unique configurations.
+The Netdata team works hard to make Netdata installable on as many systems as possible. This page contains instructions for some less common operating systems or those with different installation requirements, in addition to specific machines that require unique configurations.
 
 If you're installing Netdata on a Linux system, we recommend you try our [one-line automatic installation](README.md#one-line-installation) or [binary releases](README.md#binary-packages) first. If those don't work, you can try the [pre-built static binary](#pre-built-static-binary-for-linux-64-bit) or the [manual installation](MANUAL-INSTALLATION.md).
 
@@ -27,7 +27,7 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
 !!! note "Usage notes"
-    Do not use `sudo` for this installer—it will escalate privileges itself if needed.
+    Do not use `sudo` for the binary installer—it escalates privileges itself if needed.
 
     To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](README.md#nightly-vs-stable-releases).
 
@@ -44,12 +44,12 @@ The `kickstart-static64.sh` script:
 - Detects the Linux distro and installs the required system packages for building Netdata after asking for confirmation
 - Downloads the latest Netdata source tree to `/usr/src/netdata.git`
 - Installs Netdata at `/opt/netdata` by running `./netdata-installer.sh` from the source tree
-- Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated daily
+- Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation updates daily
 - Outputs details about whether the installation succeeded or failed.
 
 **Available options:**
 
-You can customize your Netdata installation by passing options from `kickstart-static64.sh` to `netdata-installer.sh`. With these options you can change the installation directory, enable/disable automatic updates, choose between the nightly (default) or stable channel, enable/disable plugins, and much more. For a full list of options, see the [`netdata-installer.sh` script](https://github.com/netdata/netdata/netdata-installer.sh#L149-L177).
+You can customize your Netdata installation by passing options from `kickstart-static64.sh` to `netdata-installer.sh`. With these options, you can change the installation directory, enable/disable automatic updates, choose between the nightly (default) or stable channel, enable/disable plugins, and much more. For a full list of options, see the [`netdata-installer.sh` script](https://github.com/netdata/netdata/netdata-installer.sh#L149-L177).
 
 Here are a few popular options:
 
@@ -72,7 +72,7 @@ Verify the integrity of the script with this:
 [ "8779d8717ccaa8dac18d599502eef591" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
-This command will output `OK, VALID` to confirm that the script is intact and has not been tampered with.
+This command outputs `OK, VALID` to confirm that the script is intact and that no one has tampered with it.
 
 **If your shell fails to handle the `kickstart-static64.sh` script:**
 
@@ -89,7 +89,7 @@ wget -O /tmp/kickstart-static64.sh https://my-netdata.io/kickstart-static64.sh
 sh /tmp/kickstart-static64.sh
 ```
 
-The installation script will let you know if it was successful or not.
+The installation script outputs whether it was successful or not.
 
 You can also download staic binary files from our [stable releases page](https://github.com/netdata/netdata/releases) or grab the [nightly .run binary](https://storage.googleapis.com/netdata-nightlies/netdata-latest.gz.run). These `.run` files are self-extracting shell scripts build with [makeself](https://github.com/megastep/makeself).
 
@@ -110,7 +110,7 @@ You can install Netdata with [Homebrew](https://brew.sh/) or from source. In bot
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 ```
 
-Now that you have Homebrew installed, you can choose between continuing to use Homebrew to install Netdata, or install from source.
+Now that you have Homebrew installed, you can choose between continuing to use Homebrew to install Netdata or install from source.
 
 ### Install Netdata via Homebrew
 
@@ -125,19 +125,19 @@ You're done! For more information on how to use and configure Netdata, see our [
 
 ### Install Netdata from source
 
-To install Netdata from source, begin by installing Xcode command line tools.
+To install Netdata from source, begin by installing Xcode command-line tools.
 
 ```bash
 xcode-select --install
 ```
 
-Click `Install` in the software update popup window. Once the update is completed, run the following commands to install prerequisities and then Netdata itself:
+Click `Install` in the software update popup window. Once the update is completed, run the following commands to install prerequisites and then Netdata itself:
 
 ```sh
 # Install required packages
 brew install ossp-uuid autoconf automake pkg-config
 
-# Hownload Netdata
+# Download Netdata
 git clone https://github.com/netdata/netdata.git --depth=100
 
 # Install Netdata in /usr/local/netdata
@@ -145,14 +145,14 @@ cd netdata
 sudo ./netdata-installer.sh --install /usr/local
 ```
 
-The installer will also install a startup plist to start Netdata when your macOS system boots.
+The installer also creates a startup plist to start Netdata when your macOS system boots.
 
-The installation from source should now be finished successfully. For more information on how to use and configure Netdata, see our [getting started guide](../../docs/GettingStarted.md).
+You should have now successfully finished installing from source. For more information on how to use and configure Netdata, see our [getting started guide](../../docs/GettingStarted.md).
 
 
 ## FreeBSD
 
-You can install Netdata from the ports or packages collections. This is how to install the latest Netdata version from source on FreeBSD:
+You can install Netdata from the ports or packages collections. Here's how to install the latest Netdata version from source on FreeBSD:
 
 ```sh
 # Install required packages
@@ -171,9 +171,9 @@ cd netdata
 
 To install Netdata on [pfSense](https://www.pfsense.org/), run the following commands within a shell or under the Diagnostics/Command Prompt within the pfSense web interface.
 
-Change platform (i386/amd64, etc) and FreeBSD versions (10/11, etc) according to your environment and change Netdata version (1.15.0 in the example below) according to latest version present within the FreeSBD repository.
+Change platform (i386/amd64) and FreeBSD versions (10/11) according to your environment and change Netdata version (1.15.0 in the example below) according to latest version present within the FreeBSD repository.
 
-The first three packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, but Netdata is downloaded from the FreeBSD repository.
+You first download three packages from the pfSense repository for maintaining compatibility with pfSense and then download Netdata directly from the FreeBSD repository.
 
 ```
 pkg install pkgconf
@@ -187,11 +187,11 @@ To start Netdata manually, run `service netdata onestart`.
 
 To start Netdata automatically at each boot, add `service netdata onestart` as a Shellcmd within the pfSense web interface (under `Services/Shellcmd`, which you need to install beforehand under `System/Package Manager/Available Packages`).
 
-The `Shellcmd Type` field should be set to `shellcmd`:
+Set the `Shellcmd Type` field to `shellcmd`:
 
 ![](https://i.imgur.com/wcKiPe1.png)
 
-More information can be found in the pfSense documentation on [installing FreeBSD packages](https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages).
+Find more information in the pfSense documentation on [installing FreeBSD packages](https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages).
 
 If you experience an issue with `/usr/bin/install` being absent from your system on pfSense 2.3 or earlier, update pfSense or use the workaround from [the pfSense issues](https://redmine.pfsense.org/issues/6643)  
 
@@ -251,12 +251,12 @@ rc-update add local
 
 ## Synology
 
-The [64-bit static installer](#pre-built-static-binary-for-linux-64-bit) works fine if your Synology NAS uses the `amd64` architecture. That script will install Netdata into `/opt/netdata`, making future removal safe and simple.
+The [64-bit static installer](#pre-built-static-binary-for-linux-64-bit) works fine if your Synology NAS uses the `amd64` architecture. That script installs Netdata into `/opt/netdata`, making future removal safe and simple.
 
-When Netdata is first installed, it will run as `root`. This may or may not be acceptable for you, and since other installations run it as the `netdata` user, you might wish to do the same. This requires some extra work:
+When you first install Netdata on Synology, it runs as `root`. If running Netdata with escalated privileges isn't acceptable for you, you can manually change the user/group:
 
 1. Create a group `netdata` via the Synology group interface. Give it no access to anything.
-2. Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign the user to the `netdata` group. Netdata will chuid to this user when running.
+2. Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign the user to the `netdata` group. Netdata changes its user/group to this user when running.
 3. Change ownership of the following directories, as defined in [Netdata's security design](../../docs/netdata-security.md#security-design):
 
 ```

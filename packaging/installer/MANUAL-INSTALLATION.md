@@ -45,13 +45,13 @@ Once finished, you can move on to [install Netdata](#install-netdata).
 
 If the above command(s) do not work for you, please [open an issue on GitHub](https://github.com/netdata/netdata/issues/new?title=packages%20installer%20failed&labels=installation%20help&body=The%20experimental%20packages%20installer%20failed.%0A%0AThis%20is%20what%20it%20says:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20screen%20here%0A%0A%60%60%60) with a copy of the message you get on screen. 
 
-We're working hard to make this script work everywhere, and so your issues are invaluable to us. This is why the script [reports back](https://github.com/netdata/netdata/issues/2054) success or failure for all its runs.
+We're working hard to make this script work everywhere, and so your issues are invaluable to us. The script [reports back](https://github.com/netdata/netdata/issues/2054) success or failure for all its runs so we can use the information to improve it.
 
 </details>
 
 ### Prepare your system manually
 
-Here's how to install the required packages directly using your disribution's package manager instead of the automatic script:
+Here's how to install the required packages directly using your distribution's package manager instead of the automatic script:
 
 ```bash
 # Debian / Ubuntu
@@ -96,7 +96,7 @@ package|description
 `python-yaml`|used for monitoring **beanstalkd**
 `python-beanstalkc`|used for monitoring **beanstalkd**
 `python-dnspython`|used for monitoring DNS query time
-`python-ipaddress`|used for monitoring **DHCPd**<br/>this package is required only if the system has python v2. python v3 has this functionality embedded
+`python-ipaddress`|used for monitoring **DHCPd**<br/>Netdata requires this package if the system has python v2. python v3 has this functionality embedded
 `python-mysqldb`<br/>or<br/>`python-pymysql`|used for monitoring **mysql** or **mariadb** databases<br/>`python-mysqldb` is a lot faster and thus preferred
 `python-psycopg2`|used for monitoring **postgresql** databases
 `python-pymongo`|used for monitoring **mongodb** databases
@@ -114,7 +114,7 @@ Do this to install and run Netdata:
 
 ```sh
 
-# Download it - the directory 'netdata' will be created
+# Download it to the `netdata` directory
 git clone https://github.com/netdata/netdata.git --depth=100
 cd netdata
 
@@ -127,12 +127,12 @@ cd netdata
 
 * You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
-* If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
+* If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This installs Netdata in `/opt/netdata`.
 
-* If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
+* If your server does not have access to the internet and you have manually put the installation directory on your server, you need to pass the option `--disable-go` to the installer. The option prevents the installer from attempting to download and install `go.d.plugin`. 
 
-Once the installer completes, the file `/etc/netdata/netdata.conf` will be created (if you changed the installation directory, the configuration will appear in that directory too).
+As the installer finishes, it creates the file `/etc/netdata/netdata.conf`. If you changed the installation directory, that configuration file appears wherever you specified.
 
-You can edit this file to set options. One common option to tweak is `history`, which controls the size of the memory database Netdata will use. By default is `3600` seconds (an hour of data at the charts) which makes Netdata use about 10-15MB of RAM (depending on the number of charts detected on your system). Check out the [memory requirements](../../database/#database) to understand how much memory Netdata will use at different `history` values.
+You can edit this file to set options. One common option to tweak is `history`, which controls the size of the memory database Netdata uses. By default is `3600` seconds (an hour of data at the charts) which makes Netdata use about 10-15MB of RAM (depending on the number of charts detected on your system). Check out the [memory requirements](../../database/#database) to understand how much memory Netdata will use at different `history` values.
 
 Restart Netdata to apply any of the changes you've made.
