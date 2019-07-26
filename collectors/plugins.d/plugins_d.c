@@ -254,7 +254,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     while(!ferror(fp)) {
         if(unlikely(netdata_exit)) break;
 
-        char *r;
+        char *r = NULL;
 #ifdef ENABLE_HTTPS
         int normalread = 1;
         if(netdata_srv_ctx) {

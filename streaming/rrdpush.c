@@ -104,8 +104,8 @@ int rrdpush_init() {
         }
     }
 
-    netdata_ssl_cert_directory = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl certificate directory", "/etc/ssl/certs/");
-    netdata_ssl_master_cert = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl master certificate", "/etc/ssl/certs/");
+    netdata_ssl_cert_directory = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", "/etc/ssl/certs/");
+    netdata_ssl_master_cert = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/");
     if(!strcmp(netdata_ssl_cert_directory,netdata_ssl_master_cert)) {
         info("Netdata does not have a SSL master certificate, so it will use the default OpenSSL configuration to validade certificates!");
     }
