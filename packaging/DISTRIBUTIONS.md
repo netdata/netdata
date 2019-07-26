@@ -48,8 +48,11 @@ TBD
 
 ---
 
-## Supported distribution channels
+## Supported functionalities accross different distribution channels
 
+At this section we try to depict how we distribute our various functionalities, across the different distribution channels available.
+There are various limitations and problems we try to attend as we evolve and grow and through this documentation we want to provide some clarity as to 
+what is available and in what way. Of course we strive to deliver our full solution through all channels, but that may not be feasible at once.
 
 **Legend**:
 
@@ -61,7 +64,6 @@ TBD
 ### Core functionality
 
 #### Core
-
 This is the base netdata capability, that includes basic monitoring, embedded web server, and so on.
 
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
@@ -72,7 +74,6 @@ This is the base netdata capability, that includes basic monitoring, embedded we
 - **What packages required for auto-detect?**: `install-required-packages.sh netdata`
 
 #### DB Engine
-
 This is the brand new database engine capability of netdata. It is a mandatory facility required by netdata. Given it's special needs and dependencies though, it remains an optional facility so that users can enjoy netdata even when they cannot cover the dependencies or the H/W requirements.
 
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
@@ -83,7 +84,6 @@ This is the brand new database engine capability of netdata. It is a mandatory f
 - **What packages required for auto-detect?**: `openssl`, `libuv1`, `lz4`, `judy`
 
 #### Encryption Support (HTTPS)
-
 This is netdata's SSL capability that incorporates encryption on the web server and the APIs between master and slaves. Also a mandatory facility for netdata, but remains optional for users who are limited or not interested in tight security
 
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
@@ -93,10 +93,10 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 - **Flags/instructions to enable**: None
 - **What packages required for auto-detect?**: `openssl`
 
+
 ### Libraries/optimizations
 
 #### JSON-C Support
-
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
 | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
@@ -105,11 +105,95 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 - **What packages required for auto-detect?**: `json-c`
 
 #### Link time optimizations
-
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
 | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect |
 
 - **Flags/instructions to enable**: None
 - **What packages required for auto-detect?**: No package dependency, depends on GCC version
+
+### Collectors
+
+#### FREEIPMI
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+
+#### NFACCT
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+
+#### Xenstat
+
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+
+#### CUPS
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+
+#### FPING
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+
+#### IOPING
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+
+#### PERF
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+
+### Backends
+
+
+#### Prometheus remote write
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
+
+#### AWS Kinesis
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| |  |  |  |  |  |  |
+
+- **Flags/instructions to enable**: TBD
+- **What packages required for auto-detect?**: TBD
 
