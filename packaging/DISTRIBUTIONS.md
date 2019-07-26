@@ -63,7 +63,7 @@ what is available and in what way. Of course we strive to deliver our full solut
 This is the base netdata capability, that includes basic monitoring, embedded web server, and so on.
 
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | YES | YES | YES | YES | YES | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -73,7 +73,7 @@ This is the base netdata capability, that includes basic monitoring, embedded we
 This is the brand new database engine capability of netdata. It is a mandatory facility required by netdata. Given it's special needs and dependencies though, it remains an optional facility so that users can enjoy netdata even when they cannot cover the dependencies or the H/W requirements.
 
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | YES | YES | YES | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -83,7 +83,7 @@ This is the brand new database engine capability of netdata. It is a mandatory f
 This is netdata's SSL capability that incorporates encryption on the web server and the APIs between master and slaves. Also a mandatory facility for netdata, but remains optional for users who are limited or not interested in tight security
 
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | YES | YES | YES | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -94,7 +94,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### JSON-C Support
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -102,7 +102,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### Link time optimizations
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect |
 
 - **Flags/instructions to enable**: None
@@ -112,7 +112,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### FREEIPMI
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | No | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -121,7 +121,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### NFACCT
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -131,7 +131,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 #### Xenstat
 
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | NO | NO |
 
 - **Flags/instructions to enable**: None
@@ -140,7 +140,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### CUPS
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -149,7 +149,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### FPING
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled |
 
 - **Flags/instructions to enable**: ${INSTALL_PATH}/netdata/plugins.d/fping.plugin install
@@ -158,7 +158,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### IOPING
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled |
 
 - **Flags/instructions to enable**: ${INSTALL_PATH}/netdata/plugins.d/ioping.plugin install
@@ -167,7 +167,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### PERF
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled |
 
 - **Flags/instructions to enable**: Inside netdata.conf, section `[Plugins]`, set `"perf = yes"`
@@ -179,7 +179,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### Prometheus remote write
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
 
 - **Flags/instructions to enable**: None
@@ -187,7 +187,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 
 #### AWS Kinesis
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
-| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
 | Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | NO | NO |
 
 - **Flags/instructions to enable**: [Instructions for AWS Kinesis](https://docs.netdata.cloud/backends/aws_kinesis)
