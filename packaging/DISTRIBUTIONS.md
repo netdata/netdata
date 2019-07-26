@@ -45,3 +45,71 @@ All other linux | Other | &#63; | &#63; | &#63; | &#10007; | &#10007; | &#63; | 
 ## x86 Architecture
 
 TBD
+
+---
+
+## Supported distribution channels
+
+
+**Legend**:
+
+- **Auto-detect**: Depends on the programs package dependencies. If the required dependencies are covered during compile time, capability is enabled
+- **YES**: This flag imply that the functionality is available for that distribution channel                
+- **NO**: That means the availability is a work in progress for netdata, and not available at the moment for that distribution channel. We constantly work to provide everything to our users on all possible ways
+- **Runtime-enabled**: This means that the given module or functionality is available and only requires configuration after install to enable it                
+
+### Core functionality
+
+#### Core
+
+This is the base netdata capability, that includes basic monitoring, embedded web server, and so on.
+
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| YES | YES | YES | YES | YES | YES | YES |
+
+- **Flags/instructions to enable**: None
+- **What packages required for auto-detect?**: `install-required-packages.sh netdata`
+
+#### DB Engine
+
+This is the brand new database engine capability of netdata. It is a mandatory facility required by netdata. Given it's special needs and dependencies though, it remains an optional facility so that users can enjoy netdata even when they cannot cover the dependencies or the H/W requirements.
+
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| Auto-detect | Auto-detect | YES | YES | YES | YES | YES |
+
+- **Flags/instructions to enable**: None
+- **What packages required for auto-detect?**: `openssl`, `libuv1`, `lz4`, `judy`
+
+#### Encryption Support (HTTPS)
+
+This is netdata's SSL capability that incorporates encryption on the web server and the APIs between master and slaves. Also a mandatory facility for netdata, but remains optional for users who are limited or not interested in tight security
+
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| Auto-detect | Auto-detect | YES | YES | YES | YES | YES |
+
+- **Flags/instructions to enable**: None
+- **What packages required for auto-detect?**: `openssl`
+
+### Libraries/optimizations
+
+#### JSON-C Support
+
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| Auto-detect | Auto-detect | Auto-detect | Auto-detect | NO | YES | YES |
+
+- **Flags/instructions to enable**: None
+- **What packages required for auto-detect?**: `json-c`
+
+#### Link time optimizations
+
+| make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
+| ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- | ----------------- |
+| Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect | Auto-detect |
+
+- **Flags/instructions to enable**: None
+- **What packages required for auto-detect?**: No package dependency, depends on GCC version
+
