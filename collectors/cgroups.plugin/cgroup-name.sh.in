@@ -53,18 +53,25 @@ function docker_get_name_classic() {
 }
 
 function docker_get_name_api() {
-	local id="${1}"
-	if [ ! -S "${DOCKER_HOST}" ]; then
-		warning "Can't find ${DOCKER_HOST}"
+	local path="/containers/${1}/json"
+	if [ -z "${DOCKER_HOST}" ]; then
+		warning "No DOCKER_HOST is set"
 		return 1
 	fi
 	if ! command -v jq >/dev/null 2>&1; then
 		warning "Can't find jq command line tool. jq is required for netdata to retrieve docker container name using ${DOCKER_HOST} API, falling back to docker ps"
 		return 1
 	fi
-
-	info "Running API command: /containers/${id}/json"
-	JSON=$(echo -e "GET /containers/${id}/json HTTP/1.0\\r\\n" | nc -U "${DOCKER_HOST}" | grep '^{.*')
+	if [ -S "${DOCKER_HOST}" ]; then
+		info "Running API command: curl --unix-socket ${DOCKER_HOST} http://localhost${path}"
+		JSON=$(curl -sS --unix-socket "${DOCKER_HOST}" "http://localhost${path}")
+	elif [ "${DOCKER_HOST}" == "/var/run/docker.sock" ]; then
+		warning "Docker socket was not found at ${DOCKER_HOST}"
+		return 1
+	else
+		info "Running API command: curl ${DOCKER_HOST}${path}"
+		JSON=$(curl -sS "${DOCKER_HOST}${path}")
+	fi
 	NAME=$(echo "$JSON" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
 	return 0
 }

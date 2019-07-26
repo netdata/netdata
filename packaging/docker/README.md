@@ -28,7 +28,6 @@ docker run -d --name=netdata \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata
@@ -53,35 +52,53 @@ services:
       - /etc/group:/host/etc/group:ro
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
 
 If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group` (they are used to get proper user and group names for the monitored host) to get slightly better security.
 
 ### Docker container names resolution
 
-If you want to have your container names resolved by netdata, you need to do two things:
-1) Make netdata user be part of the group that owns the socket.
-   To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the netdata container,
-   where `[GROUP NUMBER]` is practically the group id of the group assigned to the docker socket, on your host.
-   This group number can be found by running the following (if socket group ownership is docker):
-   ```bash
-   grep docker /etc/group | cut -d ':' -f 3
-   ```
+There are a few options for resolving container names within netdata. Some methods of doing so will allow root access to your machine from within the container. Please read the following carefully.
 
-2) Change docker socket access level to read/write like so:
-   from
-   ```
-   /var/run/docker.sock:/var/run/docker.sock:ro
-   ```
+#### Docker Socket Proxy (Safest Option)
 
-   change to
-   ```
-   /var/run/docker.sock:/var/run/docker.sock:rw
-   ```
+Deploy a Docker socket proxy that accepts and filter out requests using something like [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access to the CONTAINERS endpoint.
+
+The reason it's safer to expose the socket to the proxy is because netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
+
+#### Giving group access to Docker Socket (Less safe)
 
 **Important Note**: You should seriously consider the necessity of activating this option,
-as it grants to the netdata user access to the privileged socket connection of docker service
+as it grants to the netdata user access to the privileged socket connection of docker service and therefore your whole machine.
+
+If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the socket.
+
+To achieve that just add environment variable `PGID=[GROUP NUMBER]` to the Netdata container, 
+where `[GROUP NUMBER]` is practically the group id of the group assigned to the docker socket, on your host.
+
+This group number can be found by running the following (if socket group ownership is docker):
+
+```bash
+grep docker /etc/group | cut -d ':' -f 3
+```
+
+#### Running as root (Unsafe)
+
+**Important Note**: You should seriously consider the necessity of activating this option,
+as it grants to the netdata user access to the privileged socket connection of docker service and therefore your whole machine.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    volumes:
+      # ... other volumes ...
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - DOCKER_USR=root
+```
 
 ### Pass command line options to Netdata 
 
