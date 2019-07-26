@@ -236,11 +236,19 @@ When TLS/SSL is enabled on the slave, the default behavior will be to not connec
     ssl skip certificate verification = yes
 ```
 
-#### Trusted Certificate
+#### Trusted certificate
 
-Case the [Certificate verification](Certificate verification) is enabled, it is possible that the OpenSSL library gives errors like `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, when there is a problem to check the certificate chain, and no less important it will reject self-signed certificates. Considering these known problems, the Netdata brings two options to avoid them. Case you trust your certificate it is possible to set the options `CApath` and `CAfile` to inform Netdata where the certificates are stored and what is the certificate trusted file respectively. For more details about these options, you can read [Verify locations](https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_load_verify_locations.html).
+If you've enabled [certificate verification](#certificate-verification), you might see errors from the OpenSSL library when there's a problem with checking the certificate chain (`X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`). More importantly, OpenSSL will reject self-signed certificates.
 
-Before we set the stream variables it is necessary to bring the trusted certificate to the slave and add it to the OpenSSL list of certificates. To do this, let us suppose that the command `update-ca-certificates` is searching for certificates with the format PEM inside the directory `/usr/share/ca-certificates`, you can confirm this reading its manual(update-ca-certificate(8)), after to confirm the destination directory, we copy the certificate and adjust the permissions running the next commands
+Given these known issues, you have two options. If you trust your certificate, you can set the options `CApath` and `CAfile` to inform Netdata where your certificates, and the certificate trusted file, are stored.
+
+For more details about these options, you can read about [verify locations](https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_load_verify_locations.html).
+
+Before you changed your streaming configuration, you need to copy your trusted certificate to your slave system and add the certificate to OpenSSL's list.
+
+On most Linux distributions, the `update-ca-certificates` command searches inside the `/usr/share/ca-certificates` directory for certificates. You should double-check by reading the `update-ca-certificate` manual (`man update-ca-certificate`), and then change the directory in the below commands if needed.
+
+If you have `sudo` configured on your slave system, you can use that to run the following commands. If not, you'll have to log in as `root` to complete them.
 
 ```
 # mkdir /usr/share/ca-certificates/netdata
@@ -248,23 +256,24 @@ Before we set the stream variables it is necessary to bring the trusted certific
 # chown -R netdata.netdata /usr/share/ca-certificates/netdata/
 ```
 
-we are running the commands as root, but case you have the `sudo` configured, the login as root can be avoided. The extension crt is a common extension in the files inside `/usr/share/ca-certificates`, this is the motive we are renaming our certificate. It is important to notice that we changed the permissions for the user that runs Netdata access the certificate in the directory where we copied it.
+First, you create a new directory to store your certificates for Netdata. Next, you need to change the extension on your certificate from `.pem` to `.crt` so it's compatible with `update-ca-certificate`. Finally, you need to change permissions so the user that runs Netdata can access the directory where you copied in your certificate.
 
-After to copy the certificate for the final destination, it is necessary to edit the file `/etc/ca-certificates.conf` and add the following line:
+Next, edit the file `/etc/ca-certificates.conf` and add the following line:
 
 ```
 netdata/master_cert.crt
 ```
 
-Now we will update the list of certificates running the next command also as root:
+Now you update the list of certificates running the following, again either as `sudo` or `root`:
 
 ```
 # update-ca-certificates
 ```
 
-Please, pay attention, for the fact that for all the commands ran until now, we are assuming that you are running a Linux environment, but some Linux distributions can change the steps described here to update the certificate list, for more details, please read [Trust root certificate](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
+!!! note
+    Some Linux distributions have different methods of updating the certificate list. For more details, please read this guide on [addding trusted root certificates](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
 
-After to update the list of certificates, we can set the stream parameters for Netdata to trust the master certificate, to do this we will set the necessary options inside stream.conf, for example,
+Once you update your certificate list, you can set the stream parameters for Netdata to trust the master certificate. Open `stream.conf` for editing and change the following lines:
 
 ```
 [stream]
@@ -272,7 +281,7 @@ After to update the list of certificates, we can set the stream parameters for N
     CAfile = /etc/ssl/certs/master_cert.pem
 ```
 
-here `CApath` is saying for Netdata to search the trusted certificates inside `/etc/ssl/certs` while `CAfile` says that the list of certificates is `/etc/ssl/certs/master_cert.pem`, instead the whole list of certificate, it is possible to specify direct the Netdata master certificate.
+With this configuration, the `CApath` option tells Netdata to search for trusted certificates inside `/etc/ssl/certs`. The `CAfile` option specifies the Netdata master certificate is located at `/etc/ssl/certs/master_cert.pem`. With this configuration, you can skip using the system's entire list of certificates and use Netdata's master certificate instead.
 
 #### Expected behaviors
 
