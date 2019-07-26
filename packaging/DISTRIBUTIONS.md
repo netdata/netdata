@@ -7,9 +7,25 @@ The following table is a work in progress. We have concluded on the list of dist
 that we currently supporting and we are working on documenting our current state so that our users
 have complete visibility over the range of support.
 
+**Legend**:
+
+- **Version**: Operating System Version supported
+- **Family**: The family that the OS belongs to
+- **CI Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
+- **Ci Testing**: Testing has been implemented, to prevent broken or problematic code reaching our users
+- **CI Integration**: CI Integration has been fully implemented for the particular operating system version
+- **CD**: Continious deployment support has been fully enabled for this operating system
+- **.DEB**: We provides a .DEB package for netdata, for that particular operating system
+- **.RPM**: We provides a .RPM package for netdata, for that particular operating system
+- **Installer**: Running netdata from source, using our installer, is working for this operating system
+- **Kickstart**: Kickstart installation is working fine for this operating system
+- **Kickstart64**: Kickstart static64 installation is working fine for this operating system
+- **Community**: There is community support, of any kind for this operating system (Packaging maintainers, contributors, etc)
+
+
 ## AMD64 Architecture
 
-Version | Family | CI Smoke testing | CI Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart static64 | Community support
+Version | Family | CI Smoke testing | CI Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
 :------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
@@ -42,7 +58,7 @@ All other linux | Other | &#63; | &#63; | &#63; | &#10007; | &#10007; | &#63; | 
 
 ## x86 Architecture
 
-TBD
+The x864 architecture support is still a work in progress
 
 ## Supported functionalities accross different distribution channels
 
