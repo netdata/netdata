@@ -49,6 +49,11 @@ char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
+#ifdef ENABLE_HTTPS
+char *netdata_ssl_cert_directory = NULL;
+char *netdata_ssl_master_cert = NULL;
+#endif
+
 
 static void load_stream_conf() {
     errno = 0;
@@ -90,12 +95,19 @@ int rrdpush_init() {
             }
         }
     }
+
     char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
     if ( !strcmp(invalid_certificate,"yes")){
         if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
-            info("The Netdata is configured to accept invalid certificate.");
+            info("The Netdata is configured to accept invalid SSL certificate.");
             netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
         }
+    }
+
+    netdata_ssl_cert_directory = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl certificate directory", "/etc/ssl/certs/");
+    netdata_ssl_master_cert = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl master certificate", "/etc/ssl/certs/");
+    if(!strcmp(netdata_ssl_cert_directory,netdata_ssl_master_cert)) {
+        info("Netdata does not have a SSL master certificate, so it will use the default OpenSSL configuration to validade certificates!");
     }
 #endif
 
@@ -653,6 +665,7 @@ void *rrdpush_sender_thread(void *ptr) {
 #ifdef ENABLE_HTTPS
     if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
         security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
+        security_location_for_context(netdata_client_ctx, netdata_ssl_master_cert, netdata_ssl_cert_directory);
     }
 #endif
 

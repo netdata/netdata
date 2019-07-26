@@ -236,6 +236,44 @@ When TLS/SSL is enabled on the slave, the default behavior will be to not connec
     ssl skip certificate verification = yes
 ```
 
+#### Trusted Certificate
+
+Case the [Certificate verification](Certificate verification) is enabled, it is possible that the OpenSSL library gives errors like `X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, when there is a problem to verificate the certificate chain, and no less important it will reject self-signed certificates. Considering these known problems, the Netdata brings two options to avoid them. Case you trust your certificate it is possible to set the options `ssl certificate directory` and `ssl master certificate` to inform Netdata where the certificates are stored and what is the Netdata master certificate respectively.
+
+Before we set the stream variables it is necessary to bring the Master certificate to the slave and add it to the list of trusted certificates. To do this, let us suppose that the command `update-ca-certificates` is searching for certificates with the format PEM inside the directory `/usr/share/ca-certificates`, you can confirm this reading its manual. Continuing our example, we copy the certificate and adjust the permissions running the next commands
+
+```
+# mkdir /usr/share/ca-certificates/netdata
+# cp master_cert.pem /usr/share/ca-certificates/netdata/master_cert.crt
+# chown -R netdata.netdata /usr/share/ca-certificates/netdata/
+```
+
+we are running the commands as root, but case you have the `sudo` configured, the login as root can be avoided. The extension crt is a common extension in the files inside `/usr/share/ca-certificates`, this is the motive we are renaming our certificate. It is important to notice that we changed the permissions for the user that runs Netdata access the certificate in the directory where we copied it.
+
+After to copy the certificate for the final destination, it is necessary to edit the file `/etc/ca-certificates.conf` and add the following line:
+
+```
+netdata/master_cert.crt
+```
+
+Now we will update the list of certificates running the next command also as root:
+
+```
+# update-ca-certificates
+```
+
+Please, pay attention, for the fact that for all the commands ran until now, we are assuming that you are running a Linux environment, but some Linux distributions can change the place where they store the certificates, for more details, please read [Trust root certificate](https://github.com/Busindre/How-to-Add-trusted-root-certificates).
+
+After to update your list of certificates, it is possible to change Netdata to trust the master certificate setting the necessary options inside stream.conf, for example,
+
+```
+[stream]
+    ssl certificate directory = /etc/ssl/certs/
+    ssl master certificate = /etc/ssl/certs/master_cert.pem
+```
+
+here `ssl certificate directory` is saying for Netdata to search the trusted certificates inside `/etc/ssl/certs` while `ssl master certificate` says that the certificate for Netdata master is `/etc/ssl/certs/master_cert.pem`.
+
 #### Expected behaviors
 
 With the introduction of TLS/SSL, the master-slave communication behaves as shown in the table below, depending on the following configurations:
