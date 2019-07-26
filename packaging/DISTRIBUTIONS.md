@@ -90,9 +90,8 @@ All other linux | Other | &#63; | &#63; | &#63; | &#10007; | &#10007; | &#63; | 
 
 ## Supported functionalities accross different distribution channels
 
-At this section we try to depict how we distribute our various functionalities, across the different distribution channels available.
-There are various limitations and problems we try to attend as we evolve and grow and through this documentation we want to provide some clarity as to 
-what is available and in what way. Of course we strive to deliver our full solution through all channels, but that may not be feasible at once.
+On the following section we try to depict what functionalities are available, across the different distribution channels.
+There are various limitations and problems we try to attend as we evolve and grow. Through this report we want to provide some clarity as to what is available and in what way. Of course we strive to deliver our full solution through all channels, but that may not be feasible yet for some cases.
 
 **Legend**:
 
