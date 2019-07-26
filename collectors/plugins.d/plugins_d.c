@@ -5,6 +5,9 @@
 char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
 struct plugind *pluginsd_root = NULL;
 
+//extern RRDSET  *__netdata_stream_st;
+
+
 static inline int pluginsd_space(char c) {
     switch(c) {
     case ' ':
@@ -126,6 +129,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     }
 
     size_t count = 0;
+				size_t total_bytes = 0;
 
     char line[PLUGINSD_LINE_MAX + 1];
 
@@ -140,6 +144,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
     RRDSET *st = NULL;
     uint32_t hash;
+				unsigned int stream_stats_enabled = 1;
 
     errno = 0;
     clearerr(fp);
@@ -147,6 +152,33 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     if(unlikely(fileno(fp) == -1)) {
         error("file descriptor given is not a valid stream");
         goto cleanup;
+    }
+
+				RRDSET  *__netdata_stream_st = NULL;
+
+				if (stream_stats_enabled && host != localhost) {
+        __netdata_stream_st = rrdset_create_localhost(
+                                "netdata"
+                                , host->hostname 
+                                , host->hostname
+                                , "streams"
+                                , NULL
+                                , "NetData Client Stream"
+                                , "RAM (MB)"
+                                , "netdata"
+                                , "stats"
+                                , 130000
+                                , localhost->rrd_update_every
+                                , RRDSET_TYPE_LINE
+                        );
+    }
+
+    if (__netdata_stream_st && host != localhost && stream_stats_enabled) {
+								RRDDIM *slave_mem = rrddim_find(__netdata_stream_st, host->hostname);
+        if (!slave_mem) {
+												rrddim_add(__netdata_stream_st, host->hostname,  NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            info("adding dimension %s on streams", host->hostname);
+        }
     }
 
     while(!ferror(fp)) {
@@ -204,7 +236,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                     break;
                 }
                 else
-                    rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
+                    rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));                                
             }
         }
         else if(likely(hash == BEGIN_HASH && !strcmp(s, PLUGINSD_KEYWORD_BEGIN))) {
@@ -236,6 +268,13 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                 }
                 else rrdset_next(st);
             }
+
+												//info("Total bytes = %ld, reseting", total_bytes);
+												
+												//total_bytes = 0;
+
+												if (__netdata_stream_st)
+																rrdset_next(__netdata_stream_st);
         }
         else if(likely(hash == END_HASH && !strcmp(s, PLUGINSD_KEYWORD_END))) {
             if(unlikely(!st)) {
@@ -246,6 +285,21 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
             if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
                 debug(D_PLUGINSD, "requested an END on chart %s", st->id);
+
+												if (__netdata_stream_st && host != localhost) {
+																RRDDIM *rd_exists = rrddim_find(__netdata_stream_st, host->hostname);
+																if (rd_exists) {
+																								//char name[RRDVAR_MAX_LENGTH + 1];
+																								//snprintfz(name, RRDVAR_MAX_LENGTH, "%s.memory", host->hostname);
+
+																								//RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(__netdata_stream_st, name);
+																								//if (rs)  
+																												//rrddim_set(__netdata_stream_st, host->hostname, (collected_number) *(calculated_number *) rs->value);
+																								rrddim_set(__netdata_stream_st, host->hostname, (collected_number) total_bytes);
+																}
+                rrdset_next(__netdata_stream_st);
+                rrdset_done(__netdata_stream_st);
+            }
 
             rrdset_done(st);
             st = NULL;
@@ -323,6 +377,10 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                   , update_every
             );
 
+												//char fullid[RRD_ID_LENGTH_MAX + 1];
+												//snprintfz(fullid, RRD_ID_LENGTH_MAX, "%s.%s", type, id);
+												//RRDSET		*exists_st = rrdset_find(host, fullid);
+           
             st = rrdset_create(
                     host
                     , type
@@ -338,6 +396,31 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                     , update_every
                     , chart_type
             );
+
+												total_bytes += st->memsize;
+
+            /*{                
+                if (__netdata_stream_st && host != localhost && !exists_st) {
+																				RRDDIM *rd_exists = rrddim_find(__netdata_stream_st, host->hostname);
+																				if (rd_exists) {
+																												char name[RRDVAR_MAX_LENGTH + 1];
+																												snprintfz(name, RRDVAR_MAX_LENGTH, "%s.memory", host->hostname);
+																												//calculated_number v = (calculated_number) st->memsize;
+																												RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(__netdata_stream_st, name);
+																												if (rs) {
+																																				//rrdsetvar_custom_chart_variable_set(rs, v);
+																																				rrdsetvar_custom_chart_variable_set(rs, (calculated_number) *((calculated_number *) rs->value) + (calculated_number) st->memsize);
+																																				info("Updated variable %s with value %Lf for dimension %s %s", name, 
+																																				(calculated_number) *((calculated_number *) rs->value) + (calculated_number) st->memsize, 
+																																				st->id, id);
+																												}
+																												else {                          
+																																error("cannot find/create variable '%s' for incoming stream on host '%s'", name, host->hostname);    
+																												}
+																				}
+                }
+            }*/
+
 
             if(options && *options) {
                 if(strstr(options, "obsolete"))
@@ -406,8 +489,28 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
                       , divisor
                       , options?options:""
                 );
-
+												
+												//RRDDIM *rd_exists = rrddim_find(st, id);
             RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
+
+												total_bytes += rd->memsize;
+
+            // calculate memory
+            /*if (__netdata_stream_st && host != localhost && !rd_exists) {
+                    char name[RRDVAR_MAX_LENGTH + 1];
+                    snprintfz(name, RRDVAR_MAX_LENGTH, "%s.memory", host->hostname);
+                    RRDSETVAR *rs = rrdsetvar_custom_chart_variable_create(__netdata_stream_st, name);
+                    if (rs) {
+                        rrdsetvar_custom_chart_variable_set(rs, (calculated_number) *((calculated_number *) rs->value) + (calculated_number) rd->memsize);
+                        //info("Updated variable %s with value %Lf for dimension %s %s", name, 
+																								//				(calculated_number) *((calculated_number *) rs->value) + (calculated_number) rd->memsize, 
+																								//				st->id, id);
+                    }
+                    else {
+                        error("cannot find/create variable '%s' for incoming stream on host '%s'", name, host->hostname);
+                    }
+            }*/
+
             rrddim_flag_clear(rd, RRDDIM_FLAG_HIDDEN);
             rrddim_flag_clear(rd, RRDDIM_FLAG_DONT_DETECT_RESETS_OR_OVERFLOWS);
             if(options && *options) {
@@ -495,6 +598,19 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
 cleanup:
     cd->enabled = enabled;
+
+				if (host != localhost) {
+								if (__netdata_stream_st) {
+																RRDDIM *rd_exists = rrddim_find(__netdata_stream_st, host->hostname);
+																if (rd_exists) {
+																				rrddim_hide(__netdata_stream_st, host->hostname);
+																				rrddim_is_obsolete(__netdata_stream_st, rd_exists);
+																				rrddim_free(__netdata_stream_st, rd_exists);
+																}
+																rrdset_flag_set(__netdata_stream_st, RRDSET_FLAG_HIDDEN);
+																rrdset_is_obsolete(__netdata_stream_st);
+								}
+				}
 
     if(likely(count)) {
         cd->successful_collections += count;
