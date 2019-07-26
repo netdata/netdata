@@ -558,6 +558,7 @@ class DiskLogFile:
 
 class BaseDisk:
     def __init__(self, name, log_file):
+        self.raw_name = name
         self.name = re.sub(r'_+', '_', name)
         self.log_file = log_file
         self.attrs = list()
@@ -566,8 +567,8 @@ class BaseDisk:
 
     def __eq__(self, other):
         if isinstance(other, BaseDisk):
-            return self.name == other.name
-        return self.name == other
+            return self.raw_name == other.raw_name
+        return self.raw_name == other
 
     def __ne__(self, other):
         return not self == other
@@ -657,7 +658,7 @@ class Service(SimpleService):
                     not disk.log_file.is_active(current_time, self.age),
                 ]
             ):
-                self.disks.remove(disk.name)
+                self.disks.remove(disk.raw_name)
                 self.remove_disk_from_charts(disk)
 
     def scan(self):
@@ -681,9 +682,11 @@ class Service(SimpleService):
         path = os.path.join(self.log_path, full_name)
 
         if name in self.disks:
+            self.debug('skipping {0}: already in disks'.format(full_name))
             return None
 
         if [p for p in self.exclude if p in name]:
+            self.debug('skipping {0}: filtered by `exclude` option'.format(full_name))
             return None
 
         if not os.access(path, os.R_OK):

@@ -11,7 +11,7 @@
  * https://github.com/badges/shields/blob/master/measure-text.js
 */
 
-static double verdana11_widths[256] = {
+static double verdana11_widths[128] = {
     [0] = 0.0,
     [1] = 0.0,
     [2] = 0.0,
@@ -139,157 +139,36 @@ static double verdana11_widths[256] = {
     [124] = 4.9951171875, // |
     [125] = 6.982421875, // }
     [126] = 9.001953125, // ~
-    [127] = 0.0,
-    [128] = 0.0,
-    [129] = 0.0,
-    [130] = 0.0,
-    [131] = 0.0,
-    [132] = 0.0,
-    [133] = 0.0,
-    [134] = 0.0,
-    [135] = 0.0,
-    [136] = 0.0,
-    [137] = 0.0,
-    [138] = 0.0,
-    [139] = 0.0,
-    [140] = 0.0,
-    [141] = 0.0,
-    [142] = 0.0,
-    [143] = 0.0,
-    [144] = 0.0,
-    [145] = 0.0,
-    [146] = 0.0,
-    [147] = 0.0,
-    [148] = 0.0,
-    [149] = 0.0,
-    [150] = 0.0,
-    [151] = 0.0,
-    [152] = 0.0,
-    [153] = 0.0,
-    [154] = 0.0,
-    [155] = 0.0,
-    [156] = 0.0,
-    [157] = 0.0,
-    [158] = 0.0,
-    [159] = 0.0,
-    [160] = 0.0,
-    [161] = 0.0,
-    [162] = 0.0,
-    [163] = 0.0,
-    [164] = 0.0,
-    [165] = 0.0,
-    [166] = 0.0,
-    [167] = 0.0,
-    [168] = 0.0,
-    [169] = 0.0,
-    [170] = 0.0,
-    [171] = 0.0,
-    [172] = 0.0,
-    [173] = 0.0,
-    [174] = 0.0,
-    [175] = 0.0,
-    [176] = 0.0,
-    [177] = 0.0,
-    [178] = 0.0,
-    [179] = 0.0,
-    [180] = 0.0,
-    [181] = 0.0,
-    [182] = 0.0,
-    [183] = 0.0,
-    [184] = 0.0,
-    [185] = 0.0,
-    [186] = 0.0,
-    [187] = 0.0,
-    [188] = 0.0,
-    [189] = 0.0,
-    [190] = 0.0,
-    [191] = 0.0,
-    [192] = 0.0,
-    [193] = 0.0,
-    [194] = 0.0,
-    [195] = 0.0,
-    [196] = 0.0,
-    [197] = 0.0,
-    [198] = 0.0,
-    [199] = 0.0,
-    [200] = 0.0,
-    [201] = 0.0,
-    [202] = 0.0,
-    [203] = 0.0,
-    [204] = 0.0,
-    [205] = 0.0,
-    [206] = 0.0,
-    [207] = 0.0,
-    [208] = 0.0,
-    [209] = 0.0,
-    [210] = 0.0,
-    [211] = 0.0,
-    [212] = 0.0,
-    [213] = 0.0,
-    [214] = 0.0,
-    [215] = 0.0,
-    [216] = 0.0,
-    [217] = 0.0,
-    [218] = 0.0,
-    [219] = 0.0,
-    [220] = 0.0,
-    [221] = 0.0,
-    [222] = 0.0,
-    [223] = 0.0,
-    [224] = 0.0,
-    [225] = 0.0,
-    [226] = 0.0,
-    [227] = 0.0,
-    [228] = 0.0,
-    [229] = 0.0,
-    [230] = 0.0,
-    [231] = 0.0,
-    [232] = 0.0,
-    [233] = 0.0,
-    [234] = 0.0,
-    [235] = 0.0,
-    [236] = 0.0,
-    [237] = 0.0,
-    [238] = 0.0,
-    [239] = 0.0,
-    [240] = 0.0,
-    [241] = 0.0,
-    [242] = 0.0,
-    [243] = 0.0,
-    [244] = 0.0,
-    [245] = 0.0,
-    [246] = 0.0,
-    [247] = 0.0,
-    [248] = 0.0,
-    [249] = 0.0,
-    [250] = 0.0,
-    [251] = 0.0,
-    [252] = 0.0,
-    [253] = 0.0,
-    [254] = 0.0,
-    [255] = 0.0
+    [127] = 0.0
 };
 
 // find the width of the string using the verdana 11points font
-// re-write the string in place, skiping zero-length characters
-static inline double verdana11_width(char *s) {
+static inline double verdana11_width(const char *s, float em_size) {
     double w = 0.0;
-    char *d = s;
 
     while(*s) {
-        double t = verdana11_widths[(unsigned char)*s];
-        if(t == 0.0)
+        // if UTF8 multibyte char found and guess it's width equal 1em
+        // as label width will be updated with JavaScript this is not so important
+
+        // TODO: maybe move UTF8 functions from url.c to separate util in libnetdata
+        //       then use url_utf8_get_byte_length etc.
+        if(IS_UTF8_STARTBYTE(*s)) {
             s++;
+            while(IS_UTF8_BYTE(*s) && !IS_UTF8_STARTBYTE(*s)){
+                s++;
+            }
+            w += em_size;
+        }
         else {
-            w += t + VERDANA_KERNING;
-            if(d != s)
-                *d++ = *s++;
-            else
-                d = ++s;
+            if(likely(!(*s & 0x80))){ // Byte 1XXX XXXX is not valid in UTF8
+            double t = verdana11_widths[(unsigned char)*s];
+                if(t != 0.0)
+                w += t + VERDANA_KERNING;
+            }
+            s++;
         }
     }
 
-    *d = '\0';
     w -= VERDANA_KERNING;
     w += VERDANA_PADDING;
     return w;
@@ -810,8 +689,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 #define COLOR_STRING_SIZE 100
 
 void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options) {
-    char      label_buffer[LABEL_STRING_SIZE + 1]
-            , value_color_buffer[COLOR_STRING_SIZE + 1]
+    char    value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
             , label_escaped[LABEL_STRING_SIZE + 1]
             , value_escaped[VALUE_STRING_SIZE + 1]
@@ -831,14 +709,11 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
     format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
 
-    // we need to copy the label, since verdana11_width may write to it
-    strncpyz(label_buffer, label, LABEL_STRING_SIZE);
-
-    label_width = verdana11_width(label_buffer) + (BADGE_HORIZONTAL_PADDING * 2);
-    value_width = verdana11_width(value_string) + (BADGE_HORIZONTAL_PADDING * 2);
+    label_width = verdana11_width(label, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
+    value_width = verdana11_width(value_string, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
     total_width = label_width + value_width;
 
-    escape_xmlz(label_escaped, label_buffer, LABEL_STRING_SIZE);
+    escape_xmlz(label_escaped, label, LABEL_STRING_SIZE);
     escape_xmlz(value_escaped, value_string, VALUE_STRING_SIZE);
     escape_xmlz(label_color_escaped, color_map(label_color), COLOR_STRING_SIZE);
     escape_xmlz(value_color_escaped, color_map(value_color_buffer), COLOR_STRING_SIZE);
@@ -862,19 +737,43 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
                 "<stop offset=\"1\" stop-opacity=\".1\"/>"
             "</linearGradient>"
             "<mask id=\"round\">"
-                "<rect width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
+                "<rect class=\"bdge-ttl-width\" width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
             "</mask>"
             "<g mask=\"url(#round)\">"
-                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
-                "<rect x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
-                "<rect width=\"%0.2f\" height=\"%0.2f\" fill=\"url(#smooth)\"/>"
+                "<rect class=\"bdge-rect-lbl\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect class=\"bdge-rect-val\" x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect class=\"bdge-ttl-width\" width=\"%0.2f\" height=\"%0.2f\" fill=\"url(#smooth)\"/>"
             "</g>"
             "<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"%0.2f\">"
-                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
-                "<text x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text x=\"%0.2f\" y=\"%0.0f\">%s</text>"
+                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\">%s</text>"
+                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
+                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\">%s</text>"
             "</g>"
+            "<script type=\"text/javascript\">"
+                "var bdg_horiz_padding = %d;"
+                "function netdata_bdge_each(list, attr, value){"
+                    "Array.prototype.forEach.call(list, function(el){"
+                        "el.setAttribute(attr, value);"
+                    "});"
+                "};"
+                "var this_svg = document.currentScript.closest(\"svg\");"
+                "var elem_lbl = this_svg.getElementsByClassName(\"bdge-lbl-lbl\");"
+                "var elem_val = this_svg.getElementsByClassName(\"bdge-lbl-val\");"
+                "var lbl_size = elem_lbl[0].getBBox();"
+                "var val_size = elem_val[0].getBBox();"
+                "var width_total = lbl_size.width + bdg_horiz_padding*2;"
+                "this_svg.getElementsByClassName(\"bdge-rect-lbl\")[0].setAttribute(\"width\", width_total);"
+                "netdata_bdge_each(elem_lbl, \"x\", (lbl_size.width / 2) + bdg_horiz_padding);"
+                "netdata_bdge_each(elem_val, \"x\", width_total + (val_size.width / 2) + bdg_horiz_padding);"
+                "var val_rect = this_svg.getElementsByClassName(\"bdge-rect-val\")[0];"
+                "val_rect.setAttribute(\"width\", val_size.width + bdg_horiz_padding*2);"
+                "val_rect.setAttribute(\"x\", width_total);"
+                "width_total += val_size.width + bdg_horiz_padding*2;"
+                "var width_update_elems = this_svg.getElementsByClassName(\"bdge-ttl-width\");"
+                "netdata_bdge_each(width_update_elems, \"width\", width_total);"
+                "this_svg.setAttribute(\"width\", width_total);"
+            "</script>"
         "</svg>",
         total_width, height,
         total_width, height, round_corner,
@@ -885,7 +784,8 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         label_width / 2, ceil(height - text_offset), label_escaped,
         label_width / 2, ceil(height - text_offset - 1.0), label_escaped,
         label_width + value_width / 2 -1, ceil(height - text_offset), value_escaped,
-        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped);
+        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped,
+        BADGE_HORIZONTAL_PADDING );
 }
 
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {

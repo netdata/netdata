@@ -179,6 +179,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     silencer = health_silencers_addparam(silencer, key, value);
                 }
             }
+
             if (likely(silencer)) {
                 health_silencers_add(silencer);
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_ADDED);
