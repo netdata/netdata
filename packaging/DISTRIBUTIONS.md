@@ -39,14 +39,10 @@ Alpine | Alpine | &#10004; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; 
 Arch Linux (latest) | Arch | &#10004; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
 All other linux | Other | &#63; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#63; | &#63;
 
----
-
 
 ## x86 Architecture
 
 TBD
-
----
 
 ## Supported functionalities accross different distribution channels
 
