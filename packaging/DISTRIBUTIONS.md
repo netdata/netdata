@@ -55,7 +55,7 @@ what is available and in what way. Of course we strive to deliver our full solut
 - **Auto-detect**: Depends on the programs package dependencies. If the required dependencies are covered during compile time, capability is enabled
 - **YES**: This flag imply that the functionality is available for that distribution channel                
 - **NO**: That means the availability is a work in progress for netdata, and not available at the moment for that distribution channel. We constantly work to provide everything to our users on all possible ways
-- **Runtime-enabled**: This means that the given module or functionality is available and only requires configuration after install to enable it                
+- **At Runtime**: This means that the given module or functionality is available and only requires configuration after install to enable it                
 
 ### Core functionality
 
@@ -150,7 +150,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 #### FPING
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
 | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
-| Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled |
+| At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime |
 
 - **Flags/instructions to enable**: ${INSTALL_PATH}/netdata/plugins.d/fping.plugin install
 - **What packages required for auto-detect?**: None - only fping installed to start it up
@@ -159,7 +159,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 #### IOPING
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
 | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
-| Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled |
+| At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime |
 
 - **Flags/instructions to enable**: ${INSTALL_PATH}/netdata/plugins.d/ioping.plugin install
 - **What packages required for auto-detect?**: None - only ioping installed to start it up
@@ -168,7 +168,7 @@ This is netdata's SSL capability that incorporates encryption on the web server 
 #### PERF
 | make/make install    | netdata-installer.sh | kickstart.sh | kickstart-static64.sh | Docker image | RPM packaging | DEB packaging |
 | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: | :-----------------: |
-| Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled | Runtime-enabled |
+| At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime | At Runtime |
 
 - **Flags/instructions to enable**: Inside netdata.conf, section `[Plugins]`, set `"perf = yes"`
 - **What packages required for auto-detect?**: None
