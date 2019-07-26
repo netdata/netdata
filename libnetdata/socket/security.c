@@ -164,7 +164,7 @@ void security_start_ssl(int selector) {
     switch (selector) {
         case NETDATA_SSL_CONTEXT_SERVER: {
             struct stat statbuf;
-            if (stat(security_key,&statbuf) || stat(security_cert,&statbuf)) {
+            if (stat(security_key, &statbuf) || stat(security_cert, &statbuf)) {
                 info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 return;
             }
@@ -314,7 +314,9 @@ int security_test_certificate(SSL *ssl) {
  * @return It returns 0 on success and -1 otherwise.
  */
 int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
-    if(!strcmp(file, path)){
+    struct stat statbuf;
+    if (stat(file, &statbuf)) {
+        info("Netdata does not have a SSL master certificate, so it will use the default OpenSSL configuration to validate certificates!");
         return 0;
     }
 

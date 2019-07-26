@@ -99,16 +99,13 @@ int rrdpush_init() {
     char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
     if ( !strcmp(invalid_certificate,"yes")){
         if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
-            info("The Netdata is configured to accept invalid SSL certificate.");
+            info("Netdata is configured to accept invalid SSL certificate.");
             netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
         }
     }
 
     netdata_ssl_cert_directory = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", "/etc/ssl/certs/");
-    netdata_ssl_master_cert = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/");
-    if(!strcmp(netdata_ssl_cert_directory,netdata_ssl_master_cert)) {
-        info("Netdata does not have a SSL master certificate, so it will use the default OpenSSL configuration to validade certificates!");
-    }
+    netdata_ssl_master_cert = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/certs.pem");
 #endif
 
     return default_rrdpush_enabled;
