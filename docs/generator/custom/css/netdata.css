@@ -6,6 +6,12 @@
     font-size: .75rem
 }
 
+/* Underline text */
+
+.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
+    border-bottom: 1px solid #272b30;
+}
+
 /*  Custom styling for the new documentation homepage.
     In particular, the three buttons for install/getting started/configuration. */
 
@@ -36,9 +42,13 @@
     text-align: center;
 }
 
-/* Hide the label at the top of the navigation menu. Does nothing. */
-.md-nav__title {
-    display: none;
+/* Hide the label at the top of the navigation menu. Does nothing. 
+   Well, it does do something on mobile, and this media query makes
+   sure it's hidden only on screens wide enough to not use the mobile sidebar. */
+@media only screen and (min-width:76.25em) {
+    .md-nav--primary .md-nav__title {
+        display: none;
+    }
 }
 
 /* Change the language selector dropdown to match new color. */
@@ -57,4 +67,9 @@
 /* Make sure inline code in tables doesn't break. */
 .md-typeset__table code {
     word-break: normal;
+}
+
+/* Bold the first item on the docs sidebar: Netdata Documentation */
+.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
+    font-weight: 700;
 }

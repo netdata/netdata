@@ -11,6 +11,21 @@ extern int web_enable_gzip,
         web_gzip_strategy;
 #endif /* NETDATA_WITH_ZLIB */
 
+// HTTP_CODES 2XX Success
+#define HTTP_RESP_OK            200
+
+// HTTP_CODES 3XX Redirections
+#define HTTP_RESP_MOVED_PERM    301
+#define HTTP_RESP_REDIR_TEMP    307
+#define HTTP_RESP_REDIR_PERM    308
+
+// HTTP_CODES 4XX Client Errors
+#define HTTP_RESP_BAD_REQUEST   400
+#define HTTP_RESP_FORBIDDEN     403
+#define HTTP_RESP_NOT_FOUND     404
+#define HTTP_RESP_PRECOND_FAIL  412
+
+
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
 
@@ -20,6 +35,18 @@ typedef enum web_client_mode {
     WEB_CLIENT_MODE_OPTIONS     = 2,
     WEB_CLIENT_MODE_STREAM      = 3
 } WEB_CLIENT_MODE;
+
+typedef enum {
+    HTTP_VALIDATION_OK,
+    HTTP_VALIDATION_NOT_SUPPORTED,
+    HTTP_VALIDATION_MALFORMED_URL,
+#ifdef ENABLE_HTTPS
+    HTTP_VALIDATION_INCOMPLETE,
+    HTTP_VALIDATION_REDIRECT
+#else
+    HTTP_VALIDATION_INCOMPLETE
+#endif
+} HTTP_VALIDATION;
 
 typedef enum web_client_flags {
     WEB_CLIENT_FLAG_DEAD              = 1 << 1, // if set, this client is dead
@@ -128,8 +155,12 @@ struct web_client {
     char client_port[NI_MAXSERV+1];
 
     char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the URL in this buffer
+    char decoded_query_string[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the Query String in this buffer
     char last_url[NETDATA_WEB_REQUEST_URL_SIZE+1];       // we keep a copy of the decoded URL here
     char host[256];
+    size_t url_path_length;
+    char separator; // This value can be either '?' or 'f'
+    char *url_search_path; //A pointer to the search path sent by the client
 
     struct timeval tv_in, tv_ready;
 
@@ -158,6 +189,7 @@ struct web_client {
     struct netdata_ssl ssl;
 #endif
 };
+
 
 extern uid_t web_files_uid(void);
 extern uid_t web_files_gid(void);

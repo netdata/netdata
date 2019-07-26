@@ -48,6 +48,7 @@ unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
+int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 
 static void load_stream_conf() {
     errno = 0;
@@ -801,7 +802,17 @@ void *rrdpush_sender_thread(void *ptr) {
                         rrdpush_buffer_lock(host);
 
                         debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", begin, buffer_strlen(host->rrdpush_sender_buffer));
-                        ssize_t ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+                        ssize_t ret;
+#ifdef ENABLE_HTTPS
+                        SSL *conn = host->ssl.conn ;
+                        if(conn && !host->ssl.flags) {
+                            ret = SSL_write(conn,&host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin);
+                        } else {
+                            ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+                        }
+#else
+                        ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+#endif
                         if (unlikely(ret == -1)) {
                             if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
                                 debug(D_STREAM, "STREAM: Send failed - closing socket...");
@@ -1059,6 +1070,8 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
 #ifdef ENABLE_HTTPS
+    host->ssl.conn = ssl->conn;
+    host->ssl.flags = ssl->flags;
     if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {

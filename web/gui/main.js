@@ -705,11 +705,11 @@ function restrictMyNetdataMenu() {
     </div>`);
 }
 
-function openAuthenticatedUrl(url) {  
+function openAuthenticatedUrl(url) {
     if (isSignedIn()) {
         window.open(url);
     } else {
-        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`);
+        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}&redirectUrl=${encodeURIComponent(window.location.origin + "/" + url)}`);
     }
 }
 
@@ -4920,6 +4920,9 @@ function handleSignInMessage(e) {
     cloudToken = e.data.token;
 
     netdataRegistryCallback(registryAgents);
+    if (e.data.redirectUrl) {
+        window.location.replace(e.data.redirectUrl);
+    }
 }
 
 function handleSignOutMessage(e) {

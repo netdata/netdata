@@ -7,8 +7,6 @@ SSL_CTX *netdata_client_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
-int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
-int netdata_use_ssl_on_http = NETDATA_SSL_FORCE; //We force SSL due safety reasons
 int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 /**
@@ -176,6 +174,9 @@ void security_start_ssl(int selector) {
         }
         case NETDATA_SSL_CONTEXT_STREAMING: {
             netdata_client_ctx = security_initialize_openssl_client();
+            //This is necessary for the stream, because it is working sometimes with nonblock socket.
+            //It returns the bitmask afte to change, there is not any description of errors in the documentation
+            SSL_CTX_set_mode(netdata_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }
         case NETDATA_SSL_CONTEXT_OPENTSDB: {
@@ -206,6 +207,17 @@ void security_clean_openssl() {
 #endif
 }
 
+/**
+ * Process accept
+ *
+ * Process the SSL handshake with the client case it is necessary.
+ *
+ * @param ssl is a pointer for the SSL structure
+ * @param msg is a copy of the first 8 bytes of the initial message received
+ *
+ * @return it returns 0 case it performs the handshake, 8 case it is clean connection
+ *  and another integer power of 2 otherwise.
+ */
 int security_process_accept(SSL *ssl,int msg) {
     int sock = SSL_get_fd(ssl);
     int test;
@@ -250,7 +262,7 @@ int security_process_accept(SSL *ssl,int msg) {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d", ERR_error_string((long)SSL_get_error(ssl, test), NULL), errno, sock);
     }
 
-    return 0;
+    return NETDATA_SSL_HANDSHAKE_COMPLETE;
 }
 
 int security_test_certificate(SSL *ssl) {

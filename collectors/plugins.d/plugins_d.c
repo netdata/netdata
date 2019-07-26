@@ -117,6 +117,103 @@ inline int pluginsd_split_words(char *str, char **words, int max_words) {
     return quoted_strings_splitter(str, words, max_words, pluginsd_space);
 }
 
+#ifdef ENABLE_HTTPS
+/**
+ * Update Buffer
+ *
+ * Update the temporary buffer used to parse data received from slave
+ *
+ * @param output is a pointer to the vector where I will store the data
+ * @param ssl is the connection pointer with the server
+ *
+ * @return it returns the total of bytes read on success and a negative number otherwise
+ */
+int pluginsd_update_buffer(char *output, SSL *ssl) {
+    ERR_clear_error();
+    int bytesleft = SSL_read(ssl, output, PLUGINSD_LINE_MAX_SSL_READ);
+    if(bytesleft <= 0) {
+        int sslerrno = SSL_get_error(ssl, bytesleft);
+        switch(sslerrno) {
+            case SSL_ERROR_WANT_READ:
+            case SSL_ERROR_WANT_WRITE:
+            {
+                break;
+            }
+            default:
+            {
+                u_long err;
+                char buf[256];
+                int counter = 0;
+                while ((err = ERR_get_error()) != 0) {
+                    ERR_error_string_n(err, buf, sizeof(buf));
+                    info("%d SSL Handshake error (%s) on socket %d ", counter++, ERR_error_string((long)SSL_get_error(ssl, bytesleft), NULL), SSL_get_fd(ssl));
+                }
+            }
+
+        }
+    } else {
+        output[bytesleft] = '\0';
+    }
+
+    return bytesleft;
+}
+
+/**
+ *  Get from Buffer
+ *
+ *  Get data to process from buffer
+ *
+ * @param output is the output vector that will be used to parse the string.
+ * @param bytesread the amount of bytes read in the previous iteration.
+ * @param input the input vector where there are data to process
+ * @param ssl a pointer to the connection with the server
+ * @param src the first address of the input, because sometime will be necessary to restart the addr with it.
+ *
+ * @return It returns a pointer for the next iteration on success and NULL otherwise.
+ */
+char * pluginsd_get_from_buffer(char *output, int *bytesread, char *input, SSL *ssl, char *src) {
+    int copying = 1;
+    char *endbuffer;
+    size_t length;
+    while(copying) {
+        if(*bytesread > 0) {
+            endbuffer = strchr(input, '\n');
+            if(endbuffer) {
+                copying = 0;
+                endbuffer++; //Advance due the fact I wanna copy '\n'
+                length = endbuffer - input;
+                *bytesread -= length;
+
+                memcpy(output, input, length);
+                output += length;
+                *output = '\0';
+                input += length;
+            }else {
+                length = strlen(input);
+                memcpy(output, input, length);
+                output += length;
+                input = src;
+
+                *bytesread = pluginsd_update_buffer(input, ssl);
+                if(*bytesread <= 0) {
+                    input = NULL;
+                    copying = 0;
+                }
+            }
+        }else {
+            //reduce sample of bytes read, print the length
+            *bytesread = pluginsd_update_buffer(input, ssl);
+            if(*bytesread <= 0) {
+                input = NULL;
+                copying = 0;
+            }
+        }
+    }
+
+    return input;
+}
+#endif
+
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations) {
     int enabled = cd->enabled;
 
@@ -149,10 +246,43 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         goto cleanup;
     }
 
+#ifdef ENABLE_HTTPS
+    int bytesleft = 0;
+    char tmpbuffer[PLUGINSD_LINE_MAX];
+    char *readfrom;
+#endif
     while(!ferror(fp)) {
         if(unlikely(netdata_exit)) break;
 
-        char *r = fgets(line, PLUGINSD_LINE_MAX, fp);
+        char *r;
+#ifdef ENABLE_HTTPS
+        int normalread = 1;
+        if(netdata_srv_ctx) {
+            if(host->ssl.conn && !host->ssl.flags) {
+                if(!bytesleft) {
+                    r = line;
+                    readfrom = tmpbuffer;
+                    bytesleft = pluginsd_update_buffer(readfrom, host->ssl.conn);
+                    if(bytesleft <= 0) {
+                        break;
+                    }
+                }
+
+                readfrom =  pluginsd_get_from_buffer(line, &bytesleft, readfrom, host->ssl.conn, tmpbuffer);
+                if(!readfrom) {
+                    r = NULL;
+                }
+
+                normalread = 0;
+            }
+        }
+
+        if(normalread) {
+            r = fgets(line, PLUGINSD_LINE_MAX, fp);
+        }
+#else
+        r = fgets(line, PLUGINSD_LINE_MAX, fp);
+#endif
         if(unlikely(!r)) {
             if(feof(fp))
                 error("read failed: end of file");
