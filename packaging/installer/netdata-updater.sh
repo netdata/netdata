@@ -73,10 +73,15 @@ download() {
 }
 
 set_tarball_urls() {
+	local extension="tar.gz"
 
 	if [ ! -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
 		info "Not fetching remote tarballs, local override was given"
 		return
+	fi
+
+	if [ "$2" == "yes" ]; then
+		extension="gz.run"
 	fi
 
 	if [ "$1" = "stable" ]; then
@@ -84,10 +89,10 @@ set_tarball_urls() {
 		# Simple version
 		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
 		latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
-		export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.tar.gz"
+		export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.${extension}"
 		export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
 	else
-		export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+		export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.${extension}"
 		export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
 	fi
 }
@@ -171,7 +176,34 @@ else
 	exec 3>"${logfile}"
 fi
 
-set_tarball_urls "${RELEASE_CHANNEL}"
+set_tarball_urls "${RELEASE_CHANNEL}" "${IS_NETDATA_STATIC_BINARY}"
 
-# the installer updates this script - so we run and exit in a single line
-update && exit 0
+if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
+	TMPDIR="$(create_tmp_directory)"
+	PREVDIR="$(pwd)"
+
+	echo >&2 "Entering ${TMPDIR}"
+	cd "${TMPDIR}"
+
+	download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
+	download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
+	if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
+		fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
+	fi
+
+	# Do not pass any options other than the accept, for now
+	sh "${TMPDIR}/netdata-latest.gz.run" --accept
+
+	#shellcheck disable=SC2181
+	if [ $? -eq 0 ]; then
+		rm -r "${TMPDIR}"
+	else
+		echo >&2 "NOTE: did not remove: ${TMPDIR}"
+	fi
+	echo >&2 "Switching back to ${PREVDIR}"
+	cd "${PREVDIR}"
+else
+	# the installer updates this script - so we run and exit in a single line
+	update && exit 0
+fi
+

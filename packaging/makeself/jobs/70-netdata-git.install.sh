@@ -13,6 +13,10 @@ else
 #    export CFLAGS="-static -O1 -ggdb -Wall -Wextra -Wformat-signedness"
 fi
 
+# We export this to 'yes', installer sets this to .environment.
+# The updater consumes this one, so that it can tell whether it should update a static install or a non-static one
+export IS_NETDATA_STATIC_BINARY="yes"
+
 run ./netdata-installer.sh --install "${NETDATA_INSTALL_PARENT}" \
     --dont-wait \
     --dont-start-it \
