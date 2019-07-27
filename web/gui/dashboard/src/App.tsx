@@ -3,6 +3,7 @@ import { useStore } from "react-redux"
 import Ps from "perfect-scrollbar"
 import $ from "jquery"
 
+import { Portals } from "./components/Portals"
 import "./types/global"
 import "./App.css"
 
@@ -27,9 +28,10 @@ const App: React.FC = () => { // eslint-disable-line arrow-body-style
       // (just for refractoring purposes)
       dashboard.startModule(store)
     })
-  }, [])
+  }, [store])
   return (
     <div className="App">
+      <Portals />
       <header className="App-header">
         React app
         <a
