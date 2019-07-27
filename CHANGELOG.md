@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- netdata/packaging: Adopt netdata-updater to run properly for static64 installations. [\#6520](https://github.com/netdata/netdata/pull/6520) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Do not deliver edit-config as part of the distribution tarball [\#6507](https://github.com/netdata/netdata/pull/6507) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Stop anonymous stats from writing log in /tmp [\#6491](https://github.com/netdata/netdata/pull/6491) ([cakrit](https://github.com/cakrit))
 - netdata/packaging: Fix RPM packaging workflow issues, plus draft changes for .DEB packaging [\#6415](https://github.com/netdata/netdata/pull/6415) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
