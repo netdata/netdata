@@ -213,6 +213,43 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
+#define CHECK_HTTP400(x) { if(!(x)) { error("CHECK_HTTP400(%s)", #x); return 400; } }
+
+inline int web_client_api_request_v1_alarm_counts(RRDHOST *host, struct web_client *w, char *url) {
+    int i = 0;
+
+    CHECK_HTTP400(host);
+    CHECK_HTTP400(w);
+    CHECK_HTTP400(url);
+
+    buffer_flush(w->response.data);
+    buffer_sprintf(w->response.data, "{\n");
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        debug(D_WEB_CLIENT, "%llu: API v1 alarm_counts query param '%s' with value '%s'", w->id, name, value);
+
+        if(likely(i))
+            buffer_strcat(w->response.data, ",\n");
+
+        if(likely(!strcmp(name, "context"))) {
+            health_agregate_alarms(host, w->response.data, simple_hash(value), value);
+            i++;
+        }
+    }
+
+    buffer_sprintf(w->response.data, "\n}\n");
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(w->response.data);
+    return 200;
+}
+
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     uint32_t after = 0;
 
@@ -780,6 +817,7 @@ static struct api_command {
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
+        { "alarm_counts",    0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_counts    },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
         // terminator

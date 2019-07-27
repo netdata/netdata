@@ -231,6 +231,30 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
 //
 //}
 
+#define CHECK(x) { if(!(x)) { error("CHECK(%s)", #x); return; } }
+
+void health_agregate_alarms(RRDHOST *host, BUFFER *wb, uint32_t hash_context, char* context) {
+    int status = RRDCALC_STATUS_REMOVED;
+    RRDCALC *rc;
+
+    CHECK(host);
+    CHECK(wb);
+    CHECK(context);
+
+    rrdhost_rdlock(host);
+    for(rc = host->alarms; rc ; rc = rc->next) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        if(unlikely(rc->rrdset && rc->rrdset->hash_context == hash_context
+                    && !strcmp(rc->rrdset->context, context) && rc->status > status))
+            status = rc->status;
+    }
+
+    buffer_sprintf(wb, "\t{%s:'%s'}", context, rrdcalc_status2string(status));
+    rrdhost_unlock(host);
+}
+
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     int i;
 
