@@ -48,12 +48,11 @@ unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
-int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 #ifdef ENABLE_HTTPS
+int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 char *netdata_ssl_cert_directory = NULL;
 char *netdata_ssl_master_cert = NULL;
 #endif
-
 
 static void load_stream_conf() {
     errno = 0;
