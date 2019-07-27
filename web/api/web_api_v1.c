@@ -213,14 +213,8 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
-#define CHECK_HTTP400(x) { if(!(x)) { error("CHECK_HTTP400(%s)", #x); return 400; } }
-
 inline int web_client_api_request_v1_alarm_counts(RRDHOST *host, struct web_client *w, char *url) {
     int i = 0;
-
-    CHECK_HTTP400(host);
-    CHECK_HTTP400(w);
-    CHECK_HTTP400(url);
 
     buffer_flush(w->response.data);
     buffer_sprintf(w->response.data, "{\n");

@@ -231,15 +231,9 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
 //
 //}
 
-#define CHECK(x) { if(!(x)) { error("CHECK(%s)", #x); return; } }
-
 void health_agregate_alarms(RRDHOST *host, BUFFER *wb, uint32_t hash_context, char* context) {
     int status = RRDCALC_STATUS_REMOVED;
     RRDCALC *rc;
-
-    CHECK(host);
-    CHECK(wb);
-    CHECK(context);
 
     rrdhost_rdlock(host);
     for(rc = host->alarms; rc ; rc = rc->next) {
