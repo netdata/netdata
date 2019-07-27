@@ -1062,7 +1062,10 @@ else
 	fi
 fi
 
+progress "Wrap up environment set up"
+
 # Save environment variables
+echo >&2 "Preparing .environment file"
 cat <<EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 # Created by installer
 PATH="${PATH}"
@@ -1075,10 +1078,13 @@ NETDATA_GROUP="${NETDATA_GROUP}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
-# This value is meant to be populated by autoupdater (if enabled)
-NETDATA_TARBALL_CHECKSUM="new_installation"
+NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
 EOF
 
+echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
+cat <<EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
+new_installation
+EOF
 
 # -----------------------------------------------------------------------------
 echo >&2
