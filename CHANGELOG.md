@@ -11,6 +11,7 @@
 
 **Merged pull requests:**
 
+- netdata/packaging: Notify us when CHANGELOG.md gets too old [\#6556](https://github.com/netdata/netdata/pull/6556) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - redirect after clicking Nodes \> SignIn [\#6544](https://github.com/netdata/netdata/pull/6544) ([jacekkolasa](https://github.com/jacekkolasa))
 - smartd\_log: Disk \_\_eq\_\_ fix [\#6540](https://github.com/netdata/netdata/pull/6540) ([ilyam8](https://github.com/ilyam8))
 - minor - code readability HTTP CODES as defines && clear warnings [\#6539](https://github.com/netdata/netdata/pull/6539) ([underhood](https://github.com/underhood))
