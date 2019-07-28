@@ -34,6 +34,14 @@
 #define PLUGINSD_LINE_MAX_SSL_READ 512
 #define PLUGINSD_MAX_WORDS 20
 
+#define PLUGINSD_STREAM_INIT_ALLOW_TIME 120     // Do not check for existing SET or DIMs within these seconds after slave thread init
+
+#define PLUGINSD_STREAM_MEMORY      "ram"
+#define PLUGINSD_STREAM_COUNT       "streams"
+#define PLUGINSD_STREAM_PROCESSORS  "processors"
+#define PLUGINSD_STREAM_METRICS     "metrics"
+#define PLUGINSD_STREAM_PROCESSES   "processes"
+
 #define PLUGINSD_MAX_DIRECTORIES 20
 extern char *plugin_directories[PLUGINSD_MAX_DIRECTORIES];
 
@@ -72,5 +80,8 @@ extern int pluginsd_split_words(char *str, char **words, int max_words);
 extern int pluginsd_initialize_plugin_directories();
 
 extern int config_isspace(char c);
+
+extern size_t get_set_memory_usage(RRDSET *st);
+extern size_t get_dim_memory_usage(RRDDIM *rd);
 
 #endif /* NETDATA_PLUGINS_D_H */
