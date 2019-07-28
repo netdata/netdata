@@ -145,7 +145,7 @@ stages:
 
 
 
-  # TODO: This section is stale, will be aligned with the RPM implementation when we get to DEB packaging
+    # TODO: This section is stale, will be aligned with the RPM implementation when we get to DEB packaging
   - stage: &_DEB_TEMPLATE
       name: "Build & Publish DEB package"
       before_install:
@@ -192,7 +192,7 @@ stages:
 #
 jobs:
   include:
-    # Do code quality, syntax checking and other pre-build activities
+      # Do code quality, syntax checking and other pre-build activities
     - stage: Code quality, linting, syntax, code style
 
       name: Run shellchecking on BASH
@@ -209,7 +209,7 @@ jobs:
 
 
 
-    # Ensure netdata code builds successfully
+      # Ensure netdata code builds successfully
     - stage: Build process
 
       name: Standard netdata build
@@ -317,7 +317,7 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "alpine" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Alpine"
 
-    # Arch linux runs
+      # Arch linux runs
     - name: Run netdata lifecycle, on ArchLinux
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "archlinux/base:latest" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
