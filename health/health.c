@@ -168,6 +168,14 @@ void health_reload(void) {
 // ----------------------------------------------------------------------------
 // health main thread and friends
 
+/**
+ * Value to status
+ *
+ * @param n the number used to define the status
+ *
+ * @return It returns RRDCALC_STATUS_UNDEFINED case we have a NAN or infinite,
+ * RRDCALC_STATUS_RAISED case we have a normal number, and RRDCALC_STATUS_CLEAR for the last case.
+ */
 static inline RRDCALC_STATUS rrdcalc_value2status(calculated_number n) {
     if(isnan(n) || isinf(n)) return RRDCALC_STATUS_UNDEFINED;
     if(n) return RRDCALC_STATUS_RAISED;
@@ -176,6 +184,15 @@ static inline RRDCALC_STATUS rrdcalc_value2status(calculated_number n) {
 
 #define ALARM_EXEC_COMMAND_LENGTH 8192
 
+/**
+ * Alarm Execute
+ *
+ * Check the alarm flags to run the notification script/software, case it is necessary
+ * it runs it, at the end the function stores a log of the alarm.
+ *
+ * @param host the structure with information about the computer
+ * @param ae the alarm entry with information to log and execute the notification
+ */
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
 
@@ -307,6 +324,14 @@ done:
     health_alarm_log_save(host, ae);
 }
 
+/**
+ * Proccess notification
+ *
+ * The function calls the health_alarm_execute to run the script set in Alarm Entry.
+ *
+ * @param host the structure with information about the computer
+ * @param ae the alarm entry with information to log and execute the notification
+ */
 static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) {
     debug(D_HEALTH, "Health alarm '%s.%s' = " CALCULATED_NUMBER_FORMAT_AUTO " - changed status from %s to %s",
          ae->chart?ae->chart:"NOCHART", ae->name,
@@ -318,6 +343,13 @@ static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) 
     health_alarm_execute(host, ae);
 }
 
+/**
+ * Log process
+ *
+ * Execute the alarm and adjust the log case it is necessary.
+ *
+ * @param host the structure with information about the computer
+ */
 static inline void health_alarm_log_process(RRDHOST *host) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
@@ -376,6 +408,21 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
+/**
+ * Is runnable?
+ *
+ * This function checks some variables inside RRDCAL to confirm the following policies:
+ *  Next Update is not bigger than now
+ *  Health has an update frequency
+ *  Chart is not marked as obsolete
+ *  Char is not marked as disabled
+ *
+ * @param rc is the structure with the chart information
+ * @param now the current timestamp
+ * @param next_run next time that this alarm must run;
+ *
+ * @return It returns 1 to run the alarm and 0 otherwise
+ */
 static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) {
     if(unlikely(!rc->rrdset)) {
         debug(D_HEALTH, "Health not running alarm '%s.%s'. It is not linked to a chart.", rc->chart?rc->chart:"NOCHART", rc->name);
@@ -440,6 +487,14 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
     return 1;
 }
 
+/**
+ * Resumed from suspension
+ *
+ * Detect if monotonic and realtime have twice the difference
+ * in which case we assume the system was just waken from hibernation
+ *
+ * @return It returns 1 case it resumed and 0 otherwise
+ */
 static inline int check_if_resumed_from_suspention(void) {
     static usec_t last_realtime = 0, last_monotonic = 0;
     usec_t realtime = now_realtime_usec(), monotonic = now_monotonic_usec();
@@ -457,6 +512,13 @@ static inline int check_if_resumed_from_suspention(void) {
     return ret;
 }
 
+/**
+ * Main cleanup
+ *
+ * Register a log information.
+ *
+ * @param ptr a pointer to netdata_static_threaded.
+ */
 static void health_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
@@ -466,6 +528,18 @@ static void health_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+/**
+ * Check Silenced
+ *
+ * Check the silencers status.
+ *
+ * @param rc a pointer to the chart structure
+ * @param host the hostname variable
+ * @param silencers a pointer for all the silencers associated to the chart
+ *
+ * @return It returns the alarm silence type of a specific alarm case the patterns matches
+ * and it returns STYPE_NONE case it was not silenced.
+ */
 SILENCE_TYPE check_silenced(RRDCALC *rc, char* host, SILENCERS *silencers) {
 	SILENCER *s;
     debug(D_HEALTH, "Checking if alarm was silenced via the command API. Alarm info name:%s context:%s chart:%s host:%s family:%s",

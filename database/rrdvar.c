@@ -265,6 +265,14 @@ static int single_variable2json(void *entry, void *data) {
     return 0;
 }
 
+/**
+ * AP1 V1 Chart Variable to JSON
+ *
+ * Write information about the variable chart inside a JSON buffer
+ *
+ * @param st the input structure
+ * @param buf the output buffer
+ */
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     RRDHOST *host = st->rrdhost;
 
