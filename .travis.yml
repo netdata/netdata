@@ -557,7 +557,9 @@ jobs:
     # This is generating the changelog for nightly release and publish it
   - name: Generate nightly changelog
     before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation for nightlies" "${NOTIF_CHANNEL}"
-    script: ".travis/nightlies.sh"
+    script:
+    - ".travis/nightlies.sh"
+    - ".travis/check_changelog_last_modification.sh"
     after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly changelog generation failed"
     git:
       depth: false
