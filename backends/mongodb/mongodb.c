@@ -36,14 +36,21 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
 }
 
 int mongodb_insert(char *data) {
-    bson_t *insert;
-    bson_error_t error;
     char *start = data, *end = data;
 
     while(*end) {
+        bson_t *insert;
+        bson_error_t error;
+
         while(*end && *end != '\n') end++;
-        *end = '\0';
-        end++;
+
+        if(*end) {
+            *end = '\0';
+            end++;
+        }
+        else {
+            break;
+        }
 
         insert = bson_new_from_json((const uint8_t *)start, -1, &error);
 
