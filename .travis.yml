@@ -20,7 +20,7 @@ install:
   - sudo apt install -y --only-upgrade docker-ce
   - sudo pip install git-semver
   - docker info
-  - source tests/installer/slack.sh
+  - source system/slack.sh
   - export NOTIF_CHANNEL="automation-beta"
   - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
   - export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1)"
@@ -245,14 +245,12 @@ jobs:
     # References:
     # https://us.images.linuxcontainers.org
     # https://packagecloud.io/docs#install_repo
-
-    # TODO: This section is stale, will be aligned with the RPM implementation when we get to DEB packaging
     - &_DEB_TEMPLATE
       stage: Package ubuntu/* and debian/*
       if: true == false  # Never run. This is only the template for the jobs below
       before_install:
         - sudo apt-get install -y wget lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
-        - source tests/installer/slack.sh
+        - source system/slack.sh
       before_script:
         - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
         - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
@@ -357,7 +355,7 @@ jobs:
       if: true == false  # Never run. This is only the template for the jobs below
       before_install:
         - sudo apt-get install -y wget lxc lxc-templates
-        - source tests/installer/slack.sh
+        - source system/slack.sh
       before_script:
         - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
         - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"

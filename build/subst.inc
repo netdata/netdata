@@ -8,6 +8,8 @@
 		-e 's#[@]cachedir_POST@#$(cachedir)#g' \
 		-e 's#[@]registrydir_POST@#$(registrydir)#g' \
 		-e 's#[@]varlibdir_POST@#$(varlibdir)#g' \
+		-e 's#[@]usrlibdir_POST@#$(usrlibdir)#g' \
+		-e 's#[@]netdatalibexecdir_POST@#$(netdatalibexecdir)#g' \
 		$< > $@.tmp; then \
 		mv "$@.tmp" "$@"; \
 	else \

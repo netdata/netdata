@@ -1023,6 +1023,8 @@ configdir="${sysconfdir}/netdata"
 libconfigdir="${libdir}/netdata/conf.d"
 logdir="${localstatedir}/log/netdata"
 pluginsdir="${libexecdir}/netdata/plugins.d"
+usrlibdir="${libdir}/netdata"
+netdatalibexecdir="${libexecdir}/netdata"
 
 AC_SUBST([build_target])
 AC_SUBST([varlibdir])
@@ -1036,6 +1038,8 @@ AC_SUBST([libconfigdir])
 AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
+AC_SUBST([usrlibdir])
+AC_SUBST([netdatalibexecdir])
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1049,6 +1053,7 @@ CPPFLAGS="\
 	-DPLUGINS_DIR=\"\\\"${pluginsdir}\\\"\" \
 	-DRUN_DIR=\"\\\"${localstatedir}/run/netdata\\\"\" \
 	-DWEB_DIR=\"\\\"${webdir}\\\"\" \
+	-DUSRLIB_DIR=\"\\\"${libdir}/netdata\\\"\" \
 "
 
 AC_SUBST([OPTIONAL_MATH_CFLAGS])

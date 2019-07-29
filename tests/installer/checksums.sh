@@ -18,7 +18,7 @@ if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
 fi
 
 README_DOC="packaging/installer/README.md"
-source ./tests/installer/slack.sh
+source ./system/slack.sh
 
 for file in kickstart.sh kickstart-static64.sh; do
 	README_MD5=$(grep "$file" $README_DOC | grep md5sum | cut -d '"' -f2)

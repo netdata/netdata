@@ -396,6 +396,7 @@ run ./configure \
 	--sysconfdir="${NETDATA_PREFIX}/etc" \
 	--localstatedir="${NETDATA_PREFIX}/var" \
 	--libexecdir="${NETDATA_PREFIX}/usr/libexec" \
+	--libdir="${NETDATA_PREFIX}/usr/lib" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
@@ -864,6 +865,14 @@ if grep -q docker /proc/1/cgroup >/dev/null 2>&1; then
 else
 	install_netdata_service || run_failed "Cannot install netdata init service."
 fi
+
+echo >&2 "Adding slack library to ${NETDATA_PREFIX}/usr/lib/netdata/slack.sh"
+run cp system/slack.sh "${NETDATA_PREFIX}/usr/lib/netdata/slack.sh"
+
+echo >&2 "Adding systemd notification script to ${NETDATA_PREFIX}/usr/libexec/netdata/systemd_stop_monitor.sh"
+run cp system/systemd_stop_monitor.sh  "${NETDATA_PREFIX}/usr/libexec/netdata/systemd_stop_monitor.sh"
+run chown "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/systemd_stop_monitor.sh"
+run chmod 750 "${NETDATA_PREFIX}/usr/libexec/netdata/systemd_stop_monitor.sh"
 
 # -----------------------------------------------------------------------------
 # check if we can re-start netdata

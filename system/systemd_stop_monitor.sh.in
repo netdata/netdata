@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#
+# Support script for systemd ExecStopPost action on netdata.service
+# It facilitates slack notifications upon netdata STOP action
+#
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
+set -e
+
+hostname="undefined_hostname"
+if command -v hostname > /dev/null 2>&1; then
+	hostname="$(hostname)"
+fi
+
+# We expect users to override systemd config and set variable NETDATA_SYSTEMD_SLACK_NOTIFY_URL
+# to an appropriate incoming webhook from slack for this script to work
+if [ -z "${NETDATA_SYSTEMD_SLACK_NOTIFY_URL}" ]; then
+	echo >&2 "$0: No slack integration URL was defined, nothing to notify from systemd"
+	exit 0
+fi
+
+source "@usrlibdir_POST@/slack.sh"
+
+case "${EXIT_STATUS}" in
+"0")
+	echo >&2 "$0: Netdata service exited succesfully, nothing to notify"
+	;;
+*)
+	echo >&2 "$0: Netdata service stopped with ${SERVICE_RESULT}: ${EXIT_STATUS} - ${EXIT_CODE}"
+
+	export SLACK_NOTIFY_WEBHOOK_URL="${NETDATA_SYSTEMD_SLACK_NOTIFY_URL}"
+	post_message "TRAVIS_MESSAGE" "Hello <!here>, this is your systemd notification system. Netdata service stopped with ${SERVICE_RESULT}: ${EXIT_STATUS} - ${EXIT_CODE}"
+	;;
+esac

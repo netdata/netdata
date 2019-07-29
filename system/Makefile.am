@@ -5,6 +5,7 @@
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
     edit-config \
+    systemd_stop_monitor.sh \
 	netdata-openrc \
 	netdata.logrotate \
 	netdata.service \
@@ -29,10 +30,13 @@ nodist_noinst_DATA = \
 	netdata-lsb \
 	netdata-freebsd \
 	netdata.plist \
+	slack.sh \
+	systemd_stop_monitor.sh \
 	$(NULL)
 
 dist_noinst_DATA = \
 	edit-config.in \
+	systemd_stop_monitor.sh.in \
 	netdata-openrc.in \
 	netdata.logrotate.in \
 	netdata.service.in \

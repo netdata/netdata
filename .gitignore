@@ -109,6 +109,7 @@ system/netdata.service
 system/netdata.plist
 system/netdata-freebsd
 system/edit-config
+system/systemd_stop_monitor.sh
 
 daemon/anonymous-statistics.sh
 
