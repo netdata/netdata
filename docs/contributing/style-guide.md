@@ -41,7 +41,7 @@ But be aware that Netdata staff or community members may ask you to justify your
 
 ## General principles
 
-Yes, this style guide is pretty overwhelming! Establishing standards for a community of hundreds is never easy.
+Yes, this style guide is pretty overwhelming! Establishing standards for a global community is never easy.
 
 Here's a few key points to start with. Where relevant, they link to more in-depth information about a given rule.
 
@@ -56,7 +56,7 @@ Here's a few key points to start with. Where relevant, they link to more in-dept
 
 - [Capitalize words](#capitalization) at the beginning of sentences, for proper nouns, and at the beginning of document titles and section headers.
 - Use [second person](#second-person)—"you" rather than "we"—when giving instructions.
-- Use [active voice](#active-voice) to make clear who or what is performing an aciton.
+- Use [active voice](#active-voice) to make clear who or what is performing an action.
 - Always employ an [Oxford comma](#oxford-comma) on lists.
 
 **[Markdown syntax](#markdown-syntax)**:
@@ -163,33 +163,11 @@ Also, don't put a period (`.`) or colon (`:`) at the end of a title or header.
 
 **Document titles**:
 
-```
-# Not recommended
-Getting Started Guide
-
-# Recommended
-Getting started guide
-```
-
-**Page headings**:
-
-```
-# Not recommended
-Service Discovery and Auto-Detection:
-
-# Recommended
-Service discovery and auto-detection
-```
-
-**Capitalization of proper nouns**:
-
-```
-# Not recommended
-Install netdata with docker
-
-# Recommended
-Install Netdata with Docker
-```
+| Capitalization | Not recommended | Recommended 
+| --- | --- | --- 
+| Document titles | Getting Started Guide | Getting started guide 
+| Page headings | Service Discovery and Auto-Detection: | Service discovery and auto-detection
+| Proper nouns | Install netdata with docker | Install Netdata with Docker
 
 ### Second person
 
@@ -274,8 +252,11 @@ Click on the **Sign in** button.
 ```
 
 !!! note
-    
-    Avoid using directional language to orient readers, because not every reader can use instructions like "look at the top-left corner" to find their way around an interface.
+    Whenever possible, avoid using directional language to orient readers, because not every reader can use instructions like "look at the top-left corner" to find their way around an interface.
+
+    If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
+
+    We're also working to establish standards for how we refer to certain elements of the Netdata's web interface. We'll include that in this style guide as soon as it's complete.
 
 
 ### Language-specific syntax highlighting in code blocks
@@ -306,105 +287,12 @@ inline char *health_stock_config_dir(void) {
 }
 ```
 
-### Line numbers in code blocks
+You can also use the Highlight and [SuperFences](https://facelessuser.github.io/pymdown-extensions/extensions/superfences/) extensions together to show line numbers or highlight specific lines.
 
-You can also use the Highlight and [SuperFences plugin](https://facelessuser.github.io/pymdown-extensions/extensions/superfences/) extensions together to show line numbers on the left-hand side of the code block.
+Display line numbers by appending `linenums="1"` after the language declaration, replacing `1` with the starting line number of your choice. Highlight lines by appending `hl_lines="2"`, replacing `2` with the line you'd like to highlight. Or, multiple lines: `hl_lines="1 2 4 12`.
 
-To create line numbers, create one non-breaking space after your syntax language declaration and then specify the starting line number with `linenums="1"`.
-
-````
-```c linenums="1"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-````
-
-```c linenums="1"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-
-You can start line numbering at a number other than 1, which is useful if you'd like the line numbering to reflect the file from which the code came:
-
-````
-```c linenums="36"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-````
-
-```c linenums="36"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-
-### Highlighted lines in code blocks
-
-If you want to direct readers to a specific line within a code block, you can use the `hl_lines` option to highlight as many lines as you would like.
-
-A single line:
-
-````
-```c hl_lines="2"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-````
-
-```c hl_lines="2"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-
-Or multiple lines:
-
-````
-```c hl_lines="1 2 4"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-````
-
-```c hl_lines="1 2 4"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
-
-### Combining all the highlighting functions
-
-Let's get a little wild!
-
-```c linenums="36" hl_lines="1 2 4"
-inline char *health_stock_config_dir(void) {
-    char buffer[FILENAME_MAX + 1];
-    snprintfz(buffer, FILENAME_MAX, "%s/health.d", netdata_configured_stock_config_dir);
-    return config_get(CONFIG_SECTION_HEALTH, "stock health configuration directory", buffer);
-}
-```
+!!! note
+    Line numbers and highlights are not compatible with GitHub's Markdown parser, and thus will only be viewable on our [documentation site](https://docs.netdata.cloud/). They should be used sparingly and only when necessary.
 
 ## Accessibility
 
@@ -413,8 +301,20 @@ Netdata's documentation should be as accessible as possible to as many people as
 
 ### Images
 
+Images are an important component to documentation, which is why we have a few rules around their usage.
+
+Perhaps most importantly, don't use only images to convey instructions. Each image should be accompanied by alt text and text-based instructions to ensure that every reader can access the information in the best way for them.
+
+#### Alt text
+
 Provide alt text for every image you include in Netdata's documentation. It should summarize the intent and content of the image.
 
-Don't use images of text, code samples, or terminal output. Instead, put that text content in a code block so that all devices can render it clearly and screen readers can parse it.
+In Markdown, use the standard image syntax, `![]()`, and place the alt text between the brackets `[]`. Here's an example using our logo:
 
-Don't rely on images to present new information, such as directions on where to click a button or UI element. Be sure to explain each image with text in case a reader can't see images for whatever reason.
+```
+![The Netdata logo](https://github.com/netdata/netdata/blob/master/web/gui/images/netdata-logomark.svg)
+```
+
+#### Images of text
+
+Don't use images of text, code samples, or terminal output. Instead, put that text content in a code block so that all devices can render it clearly and screen readers can parse it.

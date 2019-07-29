@@ -11,41 +11,48 @@ All our documentation uses the Markdown syntax. If you're not familiar with how 
 
 ## How contributing to the documentation works
 
-There are two ways to contribute to the Netdata contribution. 
+There are two ways to contribute to Netdata's documentation: 
 
-1. Edit documentation [directly in GitHub](#edit-documentation-directly-in-gitHub).
+1. Edit documentation [directly in GitHub](#edit-documentation-directly-on-gitHub).
 2. Download the repository and [edit documentation locally](#edit-documentation-locally).
 
 Editing in GitHub is a simpler process and is perfect for quick edits to a single document, such as fixing a typo or clarifying a confusing sentence.
 
-Editing locally is more complex, as you need to download the Netdata repository and build the documentation using `mkdocs`, but allows you to better oragnize complex projects. Plus, it's the only way to preview your work or change the table of contents.
+Editing locally is more complex, as you need to download the Netdata repository and build the documentation using `mkdocs`, but allows you to better organize complex projects. By building documentation locally, you can preview your work using a local web server before you submit your PR.
 
-In both cases, you'll finish by submitting a pull request.
+In both cases, you'll finish by submitting a pull request (PR). Once you submit your PR, GitHub will initiate a number of jobs, including a Netlify preview. You can use this preview to view the documentation site with your changes applied, which might help you catch any lingering issues.
 
 To continue, follow one of the paths below:
 
-- [Edit documentation directly in GitHub](#edit-documentation-directly-in-github)
+- [Edit documentation directly in GitHub](#edit-documentation-directly-on-github)
 - [Edit documentation locally](#edit-documentation-locally)
 
 
-## Edit documentation directly in GitHub
+## Edit documentation directly on GitHub
 
-Every documentation file—those that end in the `.md` (Markdown) extension—will have a small pencil icon in the top-right corner that allows you to edit the file in question directly.
+Start editing documentation on GitHub by clicking the small pencil icon on any page on Netdata's [documentation site](https://docs.netdata.cloud/). You can find them at the top of every page.
+
+Clicking on this icon will take you to the associated page in the `netdata/netdata` repository. Then click the small pencil icon on any documentation file (those ending in the `.md` [Markdown] extension) in the `netdata/netdata` repository.
 
 ![A screenshot of editing a Markdown file directly in the Netdata repository](https://user-images.githubusercontent.com/1153921/59637188-10426d00-910a-11e9-99f2-ec564d6fb7d5.png)
 
-Once you've hit that button, you'll see a full Markdown version of the file. Make changes as you see fit. You can use the `Preview changes` button to ensure your Markdown syntax is working properly.
+If you know where a file resides in the Netdata repository already, you can skip the step of beginning on the documentation site and go directly to GitHub.
 
-Under the `Propose file change` header, write in a descriptive title for your requested chagne. Beneath that, add a concise descrition of what you've changed and why you think it's important. Then, click the `Propose file change` button. 
+Once you've clicked the pencil icon on GitHub, you'll see a full Markdown version of the file. Make changes as you see fit. You can use the `Preview changes` button to ensure your Markdown syntax is working properly.
+
+Under the `Propose file change` header, write in a descriptive title for your requested change. Beneath that, add a concise descrition of what you've changed and why you think it's important. Then, click the `Propose file change` button. 
 
 After you've hit that button, jump down to our instructions on [pull requests and cleanup](#pull-requests-and-final-steps) for your next steps. 
+
+!!! note
+    This process will create a branch directly on the `netdata/netdata` repository, which then requires manual cleanup. If you're going to make significant documentation contributions, or contribute often, we recommend the local editing process just below.
 
 
 ## Edit documentation locally
 
 Editing documentation locally is the preferred method for complex changes, PRs that span across multiple documents, or those that change the styling or underlying functionality of the documentation.
 
-Here is the workflow for editing documentation locally. First, create a fork of the Netdata repository, if you don't have one already. Visit the [Netdata repository](https://github.com/netdata/netdata) and click on the `#!text Fork` button in the upper-right corner of the window.
+Here is the workflow for editing documentation locally. First, create a fork of the Netdata repository, if you don't have one already. Visit the [Netdata repository](https://github.com/netdata/netdata) and click on the `Fork` button in the upper-right corner of the window.
 
 ![Screenshot of forking the Netdata repository](https://user-images.githubusercontent.com/1153921/59873572-25f5a380-9351-11e9-92a4-a681fe4a2ed9.png)
 
@@ -78,6 +85,8 @@ If the documentation you're working on doesn't have a direct relaionship to a co
 ### Make your edits
 
 Now that you're set up and understand where to find or create your `.md` file, you can now begin to make your edits. Just use your favorite editor and keep in mind our [style guide](style-guide.md) as you work.
+
+If you add a new file to the documentation, you may need to modify the `buildyaml.sh` file to ensure it's added to the site's navigation. This is true for any file added to the `docs/` folder.
 
 Be sure to periodically add/commit your edits so that you don't lose your work! We use version control software for a reason.
 
