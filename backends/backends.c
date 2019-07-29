@@ -901,7 +901,7 @@ void *backends_main(void *ptr) {
                 debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
                       buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
-                if(!mongodb_insert((char *)first_char)) {
+                if(!mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics)) {
                     sent += buffer_len;
                     chart_transmission_successes++;
                     chart_receptions++;

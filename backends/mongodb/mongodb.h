@@ -7,7 +7,7 @@
 
 extern int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string);
 
-extern int mongodb_insert(char *data);
+extern int mongodb_insert(char *data, size_t n_metrics);
 
 extern void mongodb_cleanup();
 

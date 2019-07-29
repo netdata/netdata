@@ -37,13 +37,22 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
     return 0;
 }
 
-int mongodb_insert(char *data) {
+void free_bson (bson_t **insert, size_t n_documents) {
+    size_t i;
+
+    for(i = 0; i < n_documents; i++)
+        bson_destroy (insert[i]);
+
+    free(insert);
+}
+
+int mongodb_insert(char *data, size_t n_metrics) {
+    bson_t **insert = calloc(n_metrics, sizeof(bson_t *));
+    bson_error_t error;
     char *start = data, *end = data;
+    size_t n_documents = 0;
 
-    while(*end) {
-        bson_t *insert;
-        bson_error_t error;
-
+    while(*end && n_documents <= n_metrics) {
         while(*end && *end != '\n') end++;
 
         if(*end) {
@@ -54,21 +63,26 @@ int mongodb_insert(char *data) {
             break;
         }
 
-        insert = bson_new_from_json((const uint8_t *)start, -1, &error);
+        insert[n_documents] = bson_new_from_json((const uint8_t *)start, -1, &error);
 
-        if (!insert) {
-           fprintf (stderr, "%s\n", error.message);
+        if (!insert[n_documents]) {
+           error("BACKEND: %s", error.message);
+           free_bson(insert, n_documents);
            return 1;
         }
 
         start = end;
 
-        if (!mongoc_collection_insert_one(mongodb_collection, insert, NULL, NULL, &error)) {
-           fprintf (stderr, "%s\n", error.message);
-        }
-
-        bson_destroy (insert);
+        n_documents++;
     }
+
+    if (!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error)) {
+       error("BACKEND: %s", error.message);
+       free_bson(insert, n_documents);
+       return 1;
+    }
+
+    free_bson(insert, n_documents);
 
     return 0;
 }
