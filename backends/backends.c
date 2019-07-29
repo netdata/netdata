@@ -598,7 +598,7 @@ void *backends_main(void *ptr) {
 #else
             error("BACKEND: MongoDB support isn't compiled");
 #endif // HAVE_MONGOC
-            backend_set_mongodb_variables(&default_port,&backend_response_checker,&backend_request_formatter);
+            backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
             break;
         }
         case BACKEND_TYPE_GRAPHITE: {

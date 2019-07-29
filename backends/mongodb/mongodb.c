@@ -93,39 +93,42 @@ int format_dimension_collected_mongodb_plaintext(
         }
     }
 
-    buffer_sprintf(b, ",\n{"
-                      "\"prefix\":\"%s\","
-                      "\"hostname\":\"%s\","
-                      "%s%s%s"
+    buffer_sprintf(b,
 
-                      "\"chart_id\":\"%s\","
-                      "\"chart_name\":\"%s\","
-                      "\"chart_family\":\"%s\","
-                      "\"chart_context\": \"%s\","
-                      "\"chart_type\":\"%s\","
-                      "\"units\": \"%s\","
+                   ",\n{"
+                   "\"prefix\":\"%s\","
+                   "\"hostname\":\"%s\","
+                   "%s%s%s"
 
-                      "\"id\":\"%s\","
-                      "\"name\":\"%s\","
-                      "\"value\":" COLLECTED_NUMBER_FORMAT ","
+                   "\"chart_id\":\"%s\","
+                   "\"chart_name\":\"%s\","
+                   "\"chart_family\":\"%s\","
+                   "\"chart_context\": \"%s\","
+                   "\"chart_type\":\"%s\","
+                   "\"units\": \"%s\","
 
-                      "\"timestamp\": %llu}",
-            prefix,
-            hostname,
-            tags_pre, tags, tags_post,
+                   `"\"id\":\"%s\","
+                   `"\"name\":\"%s\","
+                   `"\"value\":" COLLECTED_NUMBER_FORMAT ","
 
-            st->id,
-            st->name,
-            st->family,
-            st->context,
-            st->type,
-            st->units,
+                   "\"timestamp\": %llu}",
 
-            rd->id,
-            rd->name,
-            rd->last_collected_value,
+                   prefix,
+                   hostname,
+                   tags_pre, tags, tags_post,
 
-            (unsigned long long) rd->last_collected_time.tv_sec
+                   st->id,
+                   st->name,
+                   st->family,
+                   st->context,
+                   st->type,
+                   st->units,
+
+                   rd->id,
+                   rd->name,
+                   rd->last_collected_value,
+
+                   (unsigned long long) rd->last_collected_time.tv_sec
     );
 
     return 1;
@@ -162,39 +165,42 @@ int format_dimension_stored_mongodb_plaintext(
             }
         }
 
-        buffer_sprintf(b, ",\n{"
-                          "\"prefix\":\"%s\","
-                          "\"hostname\":\"%s\","
-                          "%s%s%s"
+        buffer_sprintf(b,
 
-                          "\"chart_id\":\"%s\","
-                          "\"chart_name\":\"%s\","
-                          "\"chart_family\":\"%s\","
-                          "\"chart_context\": \"%s\","
-                          "\"chart_type\":\"%s\","
-                          "\"units\": \"%s\","
+                       ",\n{"
+                       "\"prefix\":\"%s\","
+                       "\"hostname\":\"%s\","
+                       "%s%s%s"
 
-                          "\"id\":\"%s\","
-                          "\"name\":\"%s\","
-                          "\"value\":" CALCULATED_NUMBER_FORMAT ","
+                       "\"chart_id\":\"%s\","
+                       "\"chart_name\":\"%s\","
+                       "\"chart_family\":\"%s\","
+                       "\"chart_context\": \"%s\","
+                       "\"chart_type\":\"%s\","
+                       "\"units\": \"%s\","
 
-                          "\"timestamp\": %llu}",
-                prefix,
-                hostname,
-                tags_pre, tags, tags_post,
+                       "\"id\":\"%s\","
+                       "\"name\":\"%s\","
+                       "\"value\":" CALCULATED_NUMBER_FORMAT ","
 
-                st->id,
-                st->name,
-                st->family,
-                st->context,
-                st->type,
-                st->units,
+                       "\"timestamp\": %llu}",
 
-                rd->id,
-                rd->name,
-                value,
+                       prefix,
+                       hostname,
+                       tags_pre, tags, tags_post,
 
-                (unsigned long long) last_t
+                       st->id,
+                       st->name,
+                       st->family,
+                       st->context,
+                       st->type,
+                       st->units,
+
+                       rd->id,
+                       rd->name,
+                       value,
+
+                       (unsigned long long) last_t
         );
 
         return 1;
