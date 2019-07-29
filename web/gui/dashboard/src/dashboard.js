@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars, spaced-comment, max-len, @typescript-eslint/no-unused-vars */
+/* eslint-disable spaced-comment, max-len */
 
 /**
  * this file is created only for refractor purposes - during the refractor process it should shrink in size,
@@ -26,15 +26,15 @@
  *                                                  (default: false) */
 /*global netdataNoGoogleCharts       *//* boolean,  disable google charts
  *                                                  (default: false) */
-/*global netdataNoMorris             *//* boolean,  disable morris charts
+/*netdataNoMorris                   *//* boolean,  disable morris charts
  *                                                  (default: false) */
 /*global netdataNoEasyPieChart       *//* boolean,  disable easypiechart charts
  *                                                  (default: false) */
 /*global netdataNoGauge              *//* boolean,  disable gauge.js charts
  *                                                  (default: false) */
-/*global netdataNoD3                 *//* boolean,  disable d3 charts
+/*netdataNoD3                       *//* boolean,  disable d3 charts
  *                                                  (default: false) */
-/*global netdataNoC3                 *//* boolean,  disable c3 charts
+/*netdataNoC3                       *//* boolean,  disable c3 charts
  *                                                  (default: false) */
 /*global netdataNoD3pie              *//* boolean,  disable d3pie charts
  *                                                  (default: false) */
@@ -50,11 +50,11 @@
  *                                                  (default: null) */
 /*global netdataRegistry:true        *//* boolean,  use the netdata registry
  *                                                  (default: false) */
-/*global netdataNoRegistry           *//* boolean,  included only for compatibility with existing custom dashboard
+/*netdataNoRegistry                 *//* boolean,  included only for compatibility with existing custom dashboard
  *                                                  (obsolete - do not use this any more) */
-/*global netdataRegistryCallback     *//* function, callback that will be invoked with one param: the URLs from the registry
+/*netdataRegistryCallback           *//* function, callback that will be invoked with one param: the URLs from the registry
  *                                                  (default: null) */
-/*global netdataShowHelp:true        *//* boolean,  disable charts help
+/*netdataShowHelp:true              *//* boolean,  disable charts help
  *                                                  (default: true) */
 /*global netdataShowAlarms:true      *//* boolean,  enable alarms checks and notifications
  *                                                  (default: false) */
@@ -89,6 +89,8 @@
 /* eslint-disable */
 
 // *** src/dashboard.js/utils.js
+
+import { updateChartDataAction } from './domains/chart/actions';
 
 let reduxStore
 NETDATA.name2id = function (s) {
@@ -5618,7 +5620,8 @@ NETDATA.globalSelectionSync = {
                 NETDATA.globalSelectionSync.slaves[len].setSelection(t);
             }
 
-            this.timeoutId = undefined;
+            // this wasn't working anyway because it was bound to window.timeoutId (before bundling with react app)
+            // this.timeoutId = undefined;
         }
     },
 
@@ -5774,8 +5777,12 @@ NETDATA.intersectionObserver.init();
 // ----------------------------------------------------------------------------------------------------------------
 // Our state object, where all per-chart values are stored
 
-let chartState = function (element) {
+let chartState = function (element, chartIndex) {
     this.element = element;
+    if (!chartIndex === undefined) {
+        console.warn('chartIndex is not available');
+    }
+    this.chartIndex = chartIndex;
 
     // IMPORTANT:
     // all private functions should use 'that', instead of 'this'
@@ -8362,6 +8369,10 @@ let chartState = function (element) {
                 }
 
                 that.updateChartWithData(data);
+                reduxStore.dispatch(updateChartDataAction({
+                    id: `${data.id}-${that.chartIndex}`, // the same way as creating uniqueId in portals.tsx
+                    chartData: data,
+                }))
             })
             .fail(function (msg) {
                 that.xhr = undefined;
@@ -8695,12 +8706,12 @@ NETDATA.resetAllCharts = function (state) {
 };
 
 // get or create a chart state, given a DOM element
-NETDATA.chartState = function (element) {
+NETDATA.chartState = function (element, index) {
     let self = $(element);
 
     let state = self.data('netdata-state-object') || null;
     if (state === null) {
-        state = new chartState(element);
+        state = new chartState(element, index);
         self.data('netdata-state-object', state);
     }
     return state;
@@ -8978,13 +8989,14 @@ NETDATA.parseDom = function (callback) {
 
     NETDATA.intersectionObserver.globalReset();
     NETDATA.options.targets = [];
-    let len = targets.length;
-    while (len--) {
+    let len = 0;
+    while (len < targets.length) {
         // the initialization will take care of sizing
         // and the "loading..." message
-        let state = NETDATA.chartState(targets[len]);
+        let state = NETDATA.chartState(targets[len], len);
         NETDATA.options.targets.push(state);
         NETDATA.intersectionObserver.observe(state);
+        len++;
     }
 
     if (NETDATA.globalChartUnderlay.isActive()) {

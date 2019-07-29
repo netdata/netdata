@@ -2,7 +2,7 @@ import React from "react"
 import { createPortal } from "react-dom"
 import { filter, mapObjIndexed, pipe } from "ramda"
 
-import { ChartContainer } from "./ChartContainer"
+import { ChartContainer } from "./chart-container"
 
 const nodesArray = Array.from(document.querySelectorAll("[data-netdata-react]"))
 
@@ -24,11 +24,14 @@ const getAttributes = pipe(
 
 export const Portals = () => (
   <>
-    {nodesArray.map(node => (
-      createPortal(
-        <ChartContainer {...getAttributes(node)} />,
-        node,
+    {nodesArray.map((node, index) => {
+      const attributesMapped = getAttributes(node) as { id: string }
+      return (
+        createPortal(
+          <ChartContainer {...attributesMapped} uniqueId={`${attributesMapped.id}-${index}`} />,
+          node,
+        )
       )
-    ))}
+    })}
   </>
 )
