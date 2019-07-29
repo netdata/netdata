@@ -321,11 +321,11 @@ void backend_set_mongodb_variables(int *default_port,
 #endif
 
 #if HAVE_MONGOC
-    *brc = process_mongodb_response;
+    *brc = process_json_response;
     if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_mongodb_plaintext;
+        *brf = format_dimension_collected_json_plaintext;
     else
-        *brf = format_dimension_stored_mongodb_plaintext;
+        *brf = format_dimension_stored_json_plaintext;
 #endif
 }
 
@@ -760,10 +760,6 @@ void *backends_main(void *ptr) {
             else
 #endif
             {
-#if HAVE_MONGOC
-                // if(do_mongodb)
-                    buffer_sprintf(b, "{\n\"metrics\": [\n{}");
-#endif
                 RRDSET *st;
                 rrdset_foreach_read(st, host) {
                     if(likely(backends_can_send_rrdset(global_backend_options, st))) {
@@ -787,11 +783,6 @@ void *backends_main(void *ptr) {
                     }
                 }
             }
-
-#if HAVE_MONGOC
-                // if(do_mongodb)
-                    buffer_sprintf(b, "\n]\n}\n");
-#endif
 
             debug(D_BACKEND, "BACKEND: sending host '%s', metrics of %zu dimensions, of %zu charts. Skipped %zu dimensions.", __hostname, count_dims, count_charts, count_dims_skipped);
             count_charts_total += count_charts;

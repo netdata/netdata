@@ -35,22 +35,31 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
     return 0;
 }
 
-int mongodb_insert(const char *data) {
+int mongodb_insert(char *data) {
     bson_t *insert;
     bson_error_t error;
+    char *start = data, *end = data;
 
-    insert = bson_new_from_json((const uint8_t *)data, -1, &error);
+    while(*end) {
+        while(*end && *end != '\n') end++;
+        *end = '\0';
+        end++;
 
-    if (!insert) {
-       fprintf (stderr, "%s\n", error.message);
-       return 1;
+        insert = bson_new_from_json((const uint8_t *)start, -1, &error);
+
+        if (!insert) {
+           fprintf (stderr, "%s\n", error.message);
+           return 1;
+        }
+
+        start = end;
+
+        if (!mongoc_collection_insert_one(collection, insert, NULL, NULL, &error)) {
+           fprintf (stderr, "%s\n", error.message);
+        }
+
+        bson_destroy (insert);
     }
-
-    if (!mongoc_collection_insert_one(collection, insert, NULL, NULL, &error)) {
-       fprintf (stderr, "%s\n", error.message);
-    }
-
-    bson_destroy (insert);
 
     return 0;
 }
@@ -61,153 +70,4 @@ void mongodb_cleanup() {
     mongoc_cleanup ();
 
     return;
-}
-
-int format_dimension_collected_mongodb_plaintext(
-        BUFFER *b                 // the buffer to write data to
-        , const char *prefix        // the prefix to use
-        , RRDHOST *host             // the host this chart comes from
-        , const char *hostname      // the hostname (to override host->hostname)
-        , RRDSET *st                // the chart
-        , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
-        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
-) {
-    (void)host;
-    (void)after;
-    (void)before;
-    (void)backend_options;
-
-    const char *tags_pre = "", *tags_post = "", *tags = host->tags;
-    if(!tags) tags = "";
-
-    if(*tags) {
-        if(*tags == '{' || *tags == '[' || *tags == '"') {
-            tags_pre = "\"host_tags\":";
-            tags_post = ",";
-        }
-        else {
-            tags_pre = "\"host_tags\":\"";
-            tags_post = "\",";
-        }
-    }
-
-    buffer_sprintf(b,
-
-                   ",\n{"
-                   "\"prefix\":\"%s\","
-                   "\"hostname\":\"%s\","
-                   "%s%s%s"
-
-                   "\"chart_id\":\"%s\","
-                   "\"chart_name\":\"%s\","
-                   "\"chart_family\":\"%s\","
-                   "\"chart_context\": \"%s\","
-                   "\"chart_type\":\"%s\","
-                   "\"units\": \"%s\","
-
-                   "\"id\":\"%s\","
-                   "\"name\":\"%s\","
-                   "\"value\":" COLLECTED_NUMBER_FORMAT ","
-
-                   "\"timestamp\": %llu}",
-
-                   prefix,
-                   hostname,
-                   tags_pre, tags, tags_post,
-
-                   st->id,
-                   st->name,
-                   st->family,
-                   st->context,
-                   st->type,
-                   st->units,
-
-                   rd->id,
-                   rd->name,
-                   rd->last_collected_value,
-
-                   (unsigned long long) rd->last_collected_time.tv_sec
-    );
-
-    return 1;
-}
-
-int format_dimension_stored_mongodb_plaintext(
-        BUFFER *b                 // the buffer to write data to
-        , const char *prefix        // the prefix to use
-        , RRDHOST *host             // the host this chart comes from
-        , const char *hostname      // the hostname (to override host->hostname)
-        , RRDSET *st                // the chart
-        , RRDDIM *rd                // the dimension
-        , time_t after              // the start timestamp
-        , time_t before             // the end timestamp
-        , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
-) {
-    (void)host;
-
-    time_t first_t = after, last_t = before;
-    calculated_number value = backend_calculate_value_from_stored_data(st, rd, after, before, backend_options, &first_t, &last_t);
-
-    if(!isnan(value)) {
-        const char *tags_pre = "", *tags_post = "", *tags = host->tags;
-        if(!tags) tags = "";
-
-        if(*tags) {
-            if(*tags == '{' || *tags == '[' || *tags == '"') {
-                tags_pre = "\"host_tags\":";
-                tags_post = ",";
-            }
-            else {
-                tags_pre = "\"host_tags\":\"";
-                tags_post = "\",";
-            }
-        }
-
-        buffer_sprintf(b,
-
-                       ",\n{"
-                       "\"prefix\":\"%s\","
-                       "\"hostname\":\"%s\","
-                       "%s%s%s"
-
-                       "\"chart_id\":\"%s\","
-                       "\"chart_name\":\"%s\","
-                       "\"chart_family\":\"%s\","
-                       "\"chart_context\": \"%s\","
-                       "\"chart_type\":\"%s\","
-                       "\"units\": \"%s\","
-
-                       "\"id\":\"%s\","
-                       "\"name\":\"%s\","
-                       "\"value\":" CALCULATED_NUMBER_FORMAT ","
-
-                       "\"timestamp\": %llu}",
-
-                       prefix,
-                       hostname,
-                       tags_pre, tags, tags_post,
-
-                       st->id,
-                       st->name,
-                       st->family,
-                       st->context,
-                       st->type,
-                       st->units,
-
-                       rd->id,
-                       rd->name,
-                       value,
-
-                       (unsigned long long) last_t
-        );
-
-        return 1;
-    }
-    return 0;
-}
-
-int process_mongodb_response(BUFFER *b) {
-    return discard_response(b, "mongodb");
 }
