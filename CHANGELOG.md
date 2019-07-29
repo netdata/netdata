@@ -4,6 +4,7 @@
 
 **Fixed bugs:**
 
+- netdata/packaging: Move tarball checksum information into lib dir of netdata [\#6555](https://github.com/netdata/netdata/pull/6555) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Adopt netdata-updater to run properly for static64 installations. [\#6520](https://github.com/netdata/netdata/pull/6520) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Do not deliver edit-config as part of the distribution tarball [\#6507](https://github.com/netdata/netdata/pull/6507) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Stop anonymous stats from writing log in /tmp [\#6491](https://github.com/netdata/netdata/pull/6491) ([cakrit](https://github.com/cakrit))
@@ -12,12 +13,14 @@
 **Merged pull requests:**
 
 - netdata/packaging: Notify us when CHANGELOG.md gets too old [\#6556](https://github.com/netdata/netdata/pull/6556) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Add configurable default locations for trusted CA certificates [\#6549](https://github.com/netdata/netdata/pull/6549) ([thiagoftsm](https://github.com/thiagoftsm))
 - redirect after clicking Nodes \> SignIn [\#6544](https://github.com/netdata/netdata/pull/6544) ([jacekkolasa](https://github.com/jacekkolasa))
 - smartd\_log: Disk \_\_eq\_\_ fix [\#6540](https://github.com/netdata/netdata/pull/6540) ([ilyam8](https://github.com/ilyam8))
 - minor - code readability HTTP CODES as defines && clear warnings [\#6539](https://github.com/netdata/netdata/pull/6539) ([underhood](https://github.com/underhood))
 - \[ci skip\] minor/vanity - add self.name\(\) to contrib.md [\#6538](https://github.com/netdata/netdata/pull/6538) ([underhood](https://github.com/underhood))
 - Docs: Remove text about nightly version [\#6534](https://github.com/netdata/netdata/pull/6534) ([joelhans](https://github.com/joelhans))
 - Documentation navigation fix [\#6533](https://github.com/netdata/netdata/pull/6533) ([joelhans](https://github.com/joelhans))
+- .travis.yml: Fix some yamllint errors [\#6526](https://github.com/netdata/netdata/pull/6526) ([knatsakis](https://github.com/knatsakis))
 - mongodb: change `password` to `pass` in the module config [\#6518](https://github.com/netdata/netdata/pull/6518) ([ilyam8](https://github.com/ilyam8))
 - Fixed broken left navbar links in translated docs [\#6505](https://github.com/netdata/netdata/pull/6505) ([cakrit](https://github.com/cakrit))
 - Update CLA with intention to keep netdata FOSS [\#6504](https://github.com/netdata/netdata/pull/6504) ([cakrit](https://github.com/cakrit))

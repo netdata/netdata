@@ -50,6 +50,8 @@ char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
 #ifdef ENABLE_HTTPS
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
+char *netdata_ssl_ca_path = NULL;
+char *netdata_ssl_ca_file = NULL;
 #endif
 
 static void load_stream_conf() {
@@ -92,13 +94,17 @@ int rrdpush_init() {
             }
         }
     }
+
     char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
     if ( !strcmp(invalid_certificate,"yes")){
         if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
-            info("The Netdata is configured to accept invalid certificate.");
+            info("Netdata is configured to accept invalid SSL certificate.");
             netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
         }
     }
+
+    netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", "/etc/ssl/certs/");
+    netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/certs.pem");
 #endif
 
     return default_rrdpush_enabled;
@@ -655,6 +661,7 @@ void *rrdpush_sender_thread(void *ptr) {
 #ifdef ENABLE_HTTPS
     if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
         security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
+        security_location_for_context(netdata_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
     }
 #endif
 

@@ -11,7 +11,7 @@
 #  - NETDATA_TARBALL_URL
 #  - NETDATA_TARBALL_CHECKSUM_URL
 #  - NETDATA_TARBALL_CHECKSUM
-#
+#  - NETDATA_PREFIX / NETDATA_LIB_DIR (After 1.16.1 we will only depend on lib dir)
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -142,10 +142,12 @@ update() {
 
 		info "Re-installing netdata..."
 		eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
+
+		# We no longer store checksum info here. but leave this so that we clean up all environment files upon next update.
 		sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
-		cat <<EOF >>"${ENVIRONMENT_FILE}"
-NETDATA_TARBALL_CHECKSUM="$NEW_CHECKSUM"
-EOF
+
+		info "Updating tarball checksum info"
+		echo "${NEW_CHECKSUM}" > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
 	fi
 
 	rm -rf "${tmpdir}" >&3 2>&3
@@ -158,6 +160,12 @@ EOF
 
 # shellcheck source=/dev/null
 source "${ENVIRONMENT_FILE}" || exit 1
+
+# We dont expect to find lib dir variable on older installations, so load this path if none found
+export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
+
+# Source the tarbal checksum, if not already available from environment (for existing installations with the old logic)
+[[ -z "${NETDATA_TARBALL_CHECKSUM}" ]] && [[ -f ${NETDATA_LIB_DIR}/netdata.tarball.checksum ]] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
 
 if [ "${INSTALL_UID}" != "$(id -u)" ]; then
 	fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)"
