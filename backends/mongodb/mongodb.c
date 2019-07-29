@@ -174,7 +174,7 @@ int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **
     fclose(fp);
 
     if(unlikely(!collection || !*collection)) {
-        error("BACKEND: collection name is a mandatory MongoDB parameter but it is not configured");
+        error("BACKEND: collection name is a mandatory MongoDB parameter, but it is not configured");
         return 1;
     }
 
