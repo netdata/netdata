@@ -273,7 +273,7 @@ class Service(SocketService):
                 self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
                 self._sock.close()
             except Exception as error:
-                if not ('errno' in error and error.errno == errno.ENOTCONN):
+                if not (hasattr(error, 'errno') and error.errno == errno.ENOTCONN):
                     self.error(error)
             self._sock = None
 
