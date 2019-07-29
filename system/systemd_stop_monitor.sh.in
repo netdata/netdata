@@ -6,6 +6,7 @@
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
+# shellcheck disable=SC1091
 set -e
 
 hostname="undefined_hostname"
