@@ -104,7 +104,8 @@ markdown_extensions:
  - pymdownx.details
  - pymdownx.highlight:
     pygments_style: manni
-    noclasses: true
+    css_class: "highlight codehilite"
+    linenums_style: pymdownx-inline
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
