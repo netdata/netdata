@@ -213,7 +213,7 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
-inline int web_client_api_request_v1_alarm_counts(RRDHOST *host, struct web_client *w, char *url) {
+inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
     int i = 0;
 
     buffer_flush(w->response.data);
@@ -227,7 +227,7 @@ inline int web_client_api_request_v1_alarm_counts(RRDHOST *host, struct web_clie
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        debug(D_WEB_CLIENT, "%llu: API v1 alarm_counts query param '%s' with value '%s'", w->id, name, value);
+        debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
 
         if(likely(i))
             buffer_strcat(w->response.data, ",\n");
@@ -811,7 +811,7 @@ static struct api_command {
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
-        { "alarm_counts",    0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_counts    },
+        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
         // terminator
