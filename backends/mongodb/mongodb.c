@@ -107,9 +107,9 @@ int format_dimension_collected_mongodb_plaintext(
                    "\"chart_type\":\"%s\","
                    "\"units\": \"%s\","
 
-                   `"\"id\":\"%s\","
-                   `"\"name\":\"%s\","
-                   `"\"value\":" COLLECTED_NUMBER_FORMAT ","
+                   "\"id\":\"%s\","
+                   "\"name\":\"%s\","
+                   "\"value\":" COLLECTED_NUMBER_FORMAT ","
 
                    "\"timestamp\": %llu}",
 
