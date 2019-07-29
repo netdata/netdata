@@ -34,7 +34,7 @@ inline void health_alarm_log_close(RRDHOST *host) {
  *
  * Set the rotate_every local variable and truncate the file case it has a number of line bigger than the accepted.
  *
- * @param host
+ * @param host the structure with the host information
  */
 inline void health_log_rotate(RRDHOST *host) {
     static size_t rotate_every = 0;
@@ -455,6 +455,14 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
+/**
+ * Alarm log
+ *
+ * Add an alarm entry to "health alarm log" of the host.
+ *
+ * @param host the structure with the host information
+ * @param ae the alarm entry structure.
+ */
 inline void health_alarm_log(
         RRDHOST *host,
         ALARM_ENTRY *ae
