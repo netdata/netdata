@@ -4,6 +4,8 @@
 #include "mongodb.h"
 #include <mongoc.h>
 
+#define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
+
 mongoc_client_t *client;
 mongoc_collection_t *collection;
 
@@ -77,4 +79,94 @@ void mongodb_cleanup() {
     mongoc_cleanup ();
 
     return;
+}
+
+int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **collection_p) {
+    char *uri = *uri_p;
+    char *database = *database_p;
+    char *collection = *collection_p;
+
+    if(unlikely(uri)) freez(uri);
+    if(unlikely(database)) freez(database);
+    if(unlikely(collection)) freez(collection);
+    uri = NULL;
+    database = NULL;
+    collection = NULL;
+
+    int line = 0;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/mongodb.conf", path);
+
+    char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
+
+    debug(D_BACKEND, "BACKEND: opening config file '%s'", filename);
+
+    FILE *fp = fopen(filename, "r");
+    if(!fp) {
+        return 1;
+    }
+
+    while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
+        buffer[CONFIG_FILE_LINE_MAX] = '\0';
+        line++;
+
+        s = trim(buffer);
+        if(!s || *s == '#') {
+            debug(D_BACKEND, "BACKEND: ignoring line %d of file '%s', it is empty.", line, filename);
+            continue;
+        }
+
+        char *name = s;
+        char *value = strchr(s, '=');
+        if(unlikely(!value)) {
+            error("BACKEND: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
+            continue;
+        }
+        *value = '\0';
+        value++;
+
+        name = trim(name);
+        value = trim(value);
+
+        if(unlikely(!name || *name == '#')) {
+            error("BACKEND: ignoring line %d of file '%s', name is empty.", line, filename);
+            continue;
+        }
+
+        if(!value) value = "";
+
+        // strip quotes
+        if(*value == '"' || *value == '\'') {
+            value++;
+
+            s = value;
+            while(*s) s++;
+            if(s != value) s--;
+
+            if(*s == '"' || *s == '\'') *s = '\0';
+        }
+        if(name[0] == 'u' && !strcmp(name, "uri")) {
+            uri = strdupz(value);
+        }
+        else if(name[0] == 'd' && !strcmp(name, "database")) {
+            database = strdupz(value);
+        }
+        else if(name[0] == 'c' && !strcmp(name, "collection")) {
+            collection = strdupz(value);
+        }
+    }
+
+    fclose(fp);
+
+    if(unlikely(!collection || !*collection)) {
+        error("BACKEND: collection name is a mandatory MongoDB parameter but it is not configured");
+        return 1;
+    }
+
+    *uri_p = uri;
+    *database_p = database;
+    *collection_p = collection;
+
+    return 0;
 }

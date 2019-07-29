@@ -480,10 +480,9 @@ void *backends_main(void *ptr) {
 
 #if HAVE_MONGOC
     int do_mongodb = 0;
-    // TODO: read these variables from configuration file
-    char *mongodb_uri = "mongodb://localhost:27017";
-    char *mongodb_database = "netdata";
-    char *mongodb_collection = "backend";
+    char *mongodb_uri = NULL;
+    char *mongodb_database = NULL;
+    char *mongodb_collection = NULL;
 
 #endif
 
@@ -584,10 +583,17 @@ void *backends_main(void *ptr) {
         }
         case BACKEND_TYPE_MONGODB: {
 #if HAVE_MONGOC
+            if(unlikely(read_mongodb_conf(netdata_configured_user_config_dir, &mongodb_uri, &mongodb_database, &mongodb_collection))) {
+                error("BACKEND: mongodb backend type is set but cannot read its configuration from %s/mongodb.conf", netdata_configured_user_config_dir);
+                goto cleanup;
+            }
+
             if(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection))
                 do_mongodb = 1;
-            else
+            else {
                 error("BACKEND: cannot initialize MongoDB backend");
+                goto cleanup;
+            }
 #else
             error("BACKEND: MongoDB support isn't compiled");
 #endif // HAVE_MONGOC
@@ -895,7 +901,7 @@ void *backends_main(void *ptr) {
                 debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
                       buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
-                if(!mongodb_insert(first_char)) {
+                if(!mongodb_insert((char *)first_char)) {
                     sent += buffer_len;
                     chart_transmission_successes++;
                     chart_receptions++;

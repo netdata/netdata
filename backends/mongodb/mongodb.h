@@ -11,4 +11,6 @@ extern int mongodb_insert(char *data);
 
 extern void mongodb_cleanup();
 
+extern int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **collection_p);
+
 #endif //NETDATA_BACKEND_MONGODB_H
