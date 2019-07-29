@@ -6,8 +6,8 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-mongoc_client_t *client;
-mongoc_collection_t *collection;
+mongoc_client_t *mongodb_client;
+mongoc_collection_t *mongodb_collection;
 
 int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string) {
     mongoc_uri_t *uri;
@@ -23,14 +23,14 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
 
     mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, 9000); // TODO: use variable for timeout
 
-    client = mongoc_client_new_from_uri (uri);
-    if (!client) {
+    mongodb_client = mongoc_client_new_from_uri (uri);
+    if (!mongodb_client) {
        return 1;
     }
 
-    mongoc_client_set_appname (client, "netdata");
+    mongoc_client_set_appname (mongodb_client, "netdata");
 
-    collection = mongoc_client_get_collection (client, database_string, collection_string);
+    mongodb_collection = mongoc_client_get_collection (mongodb_client, database_string, collection_string);
 
     mongoc_uri_destroy (uri);
 
@@ -63,7 +63,7 @@ int mongodb_insert(char *data) {
 
         start = end;
 
-        if (!mongoc_collection_insert_one(collection, insert, NULL, NULL, &error)) {
+        if (!mongoc_collection_insert_one(mongodb_collection, insert, NULL, NULL, &error)) {
            fprintf (stderr, "%s\n", error.message);
         }
 
@@ -74,8 +74,8 @@ int mongodb_insert(char *data) {
 }
 
 void mongodb_cleanup() {
-    mongoc_collection_destroy (collection);
-    mongoc_client_destroy (client);
+    mongoc_collection_destroy (mongodb_collection);
+    mongoc_client_destroy (mongodb_client);
     mongoc_cleanup ();
 
     return;
