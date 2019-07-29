@@ -96,7 +96,7 @@ Be sure to periodically add/commit your edits so that you don't lose your work! 
 Building the documentation periodically gives you a glimpse into the final product, and is generally required if you're making changes to the table of contents.
 
 !!! attention ""
-    The build process has only been tested on Linux, but it should also work on OS X machines. Windows is fully untested at this point, but we would love to know if it works there as well!
+    We have only tested the build process on Linux. Initial tests on OS X have been unsuccessful. Windows is fully untested at this point, but we would love to know if it works there as well!
 
 To build the documentation, you need `python`/`pip`, `mkdocs`, and `mkdocs-material` installed on your machine.
 
@@ -111,7 +111,7 @@ $ pip install mkdocs mkdocs-material
 ??? note "Troubleshooting"
     If you're having trouble with the installation of Python, `mkdocs`, or `mkdocs-material`, try looking into the `mkdocs` [installation instructions](https://squidfunk.github.io/mkdocs-material/getting-started/#installation).
 
-When that is finished, navigate to the root directory of the Netdata repository and run the documentation generator script.
+When `pip` is finished installing, navigate to the root directory of the Netdata repository and run the documentation generator script.
 
 ``` bash
 $ sh docs/generator/buildhtml.sh
@@ -138,7 +138,7 @@ Open your web browser and navigate to `http://localhost:20000`. If you replaced 
 
 When you're finished with your changes, add and commit them to your fork of the Netdata repository. Head over to GitHub to create your pull request (PR).
 
-Once we receive your pull request (PR), we'll take time to read through it and assess it for correctness, conciseness, and overall quality. We may point to specific sections and ask for additonal information or other fixes.
+Once we receive your pull request (PR), we'll take time to read through it and assess it for correctness, conciseness, and overall quality. We may point to specific sections and ask for additional information or other fixes.
 
 
 ## What's next
