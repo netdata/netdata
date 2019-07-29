@@ -282,6 +282,9 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/ssl"
 %if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
 install -m 644 -p system/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
+install -m 755 -p system/systemd_stop_monitor.sh "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/systemd_stop_monitor.sh"
+install -m 640 -p system/slack.sh "${RPM_BUILD_ROOT}%{_libdir}/%{name}/slack.sh"
+
 %else
 # install SYSV init stuff
 install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
