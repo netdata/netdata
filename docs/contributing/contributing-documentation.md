@@ -102,7 +102,7 @@ To build the documentation, you need `python`/`pip`, `mkdocs`, and `mkdocs-mater
 
 Follow the [Python installation instructions](https://www.python.org/downloads/) for your machine.
 
-Use `pip`, which was installed alongside Python, to install `mkdocs` and `mkdocs-material`.
+Use `pip`, which was installed alongside Python, to install `mkdocs` and `mkdocs-material`. Your operating system might force you to use `pip2` or `pip3` instead, dependin on which version of Python you have installed.
 
 ``` bash
 $ pip install mkdocs mkdocs-material
