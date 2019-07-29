@@ -254,7 +254,6 @@ static void backends_main_cleanup(void *ptr) {
  * @param default_port  the default port of the backend
  * @param brc function called to check the result.
  * @param brf function called to format the msessage to the backend
- * @param type the backend string selector.
  */
 void backend_set_kinesis_variables(int *default_port,
                                    backend_response_checker_t brc,
@@ -283,7 +282,6 @@ void backend_set_kinesis_variables(int *default_port,
  * @param default_port  the default port of the backend
  * @param brc function called to check the result.
  * @param brf function called to format the msessage to the backend
- * @param type the backend string selector.
  */
 void backend_set_prometheus_variables(int *default_port,
                                       backend_response_checker_t brc,
@@ -308,7 +306,6 @@ void backend_set_prometheus_variables(int *default_port,
  * @param default_port  the default port of the backend
  * @param brc function called to check the result.
  * @param brf function called to format the msessage to the backend
- * @param type the backend string selector.
  */
 void backend_set_mongodb_variables(int *default_port,
                                       backend_response_checker_t brc,
@@ -337,7 +334,6 @@ void backend_set_mongodb_variables(int *default_port,
  * @param default_port  the default port of the backend
  * @param brc function called to check the result.
  * @param brf function called to format the msessage to the backend
- * @param type the backend string selector.
  */
 void backend_set_json_variables(int *default_port,
                                 backend_response_checker_t brc,
@@ -360,7 +356,6 @@ void backend_set_json_variables(int *default_port,
  * @param default_port  the default port of the backend
  * @param brc function called to check the result.
  * @param brf function called to format the msessage to the backend
- * @param type the backend string selector.
  */
 void backend_set_opentsdb_http_variables(int *default_port,
                                          backend_response_checker_t brc,
@@ -384,7 +379,6 @@ void backend_set_opentsdb_http_variables(int *default_port,
  * @param default_port  the default port of the backend
  * @param brc function called to check the result.
  * @param brf function called to format the msessage to the backend
- * @param type the backend string selector.
  */
 void backend_set_opentsdb_telnet_variables(int *default_port,
                                            backend_response_checker_t brc,
@@ -407,7 +401,6 @@ void backend_set_opentsdb_telnet_variables(int *default_port,
  * @param default_port  the default port of the backend
  * @param brc function called to check the result.
  * @param brf function called to format the msessage to the backend
- * @param type the backend string selector.
  */
 void backend_set_graphite_variables(int *default_port,
                                     backend_response_checker_t brc,
