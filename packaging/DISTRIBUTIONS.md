@@ -20,7 +20,7 @@ have complete visibility over the range of support.
 - **Installer**: Running netdata from source, using our installer, is working for this operating system
 - **Kickstart**: Kickstart installation is working fine for this operating system
 - **Kickstart64**: Kickstart static64 installation is working fine for this operating system
-- **Community**: There is community support, of any kind for this operating system (Packaging maintainers, contributors, etc)
+- **Community**: This operating system receives community support, such as packaging maintainers, contributors, and so on
 
 
 ## AMD64 Architecture
