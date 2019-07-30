@@ -319,7 +319,7 @@ void backend_set_mongodb_variables(int *default_port,
 
 #if HAVE_MONGOC
     *brc = process_json_response;
-    if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+    if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
         *brf = format_dimension_collected_json_plaintext;
     else
         *brf = format_dimension_stored_json_plaintext;
@@ -588,7 +588,7 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            if(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection))
+            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection)))
                 do_mongodb = 1;
             else {
                 error("BACKEND: cannot initialize MongoDB backend");
@@ -901,7 +901,7 @@ void *backends_main(void *ptr) {
                 debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
                       buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
-                if(!mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics)) {
+                if(likely(!mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics))) {
                     sent += buffer_len;
                     chart_transmission_successes++;
                     chart_receptions++;

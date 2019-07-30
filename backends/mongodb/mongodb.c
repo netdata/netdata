@@ -16,7 +16,7 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
     mongoc_init();
 
     uri = mongoc_uri_new_with_error(uri_string, &error);
-    if(!uri) {
+    if(unlikely(!uri)) {
        error("BACKEND: failed to parse URI: %s. Error message: %s", uri_string, error.message);
        return 1;
     }
@@ -24,7 +24,7 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
     mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, 9000); // TODO: use variable for timeout
 
     mongodb_client = mongoc_client_new_from_uri(uri);
-    if(!mongodb_client) {
+    if(unlikely(!mongodb_client)) {
        return 1;
     }
 
@@ -55,7 +55,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
     while(*end && n_documents <= n_metrics) {
         while(*end && *end != '\n') end++;
 
-        if(*end) {
+        if(likely(*end)) {
             *end = '\0';
             end++;
         }
@@ -65,7 +65,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
 
         insert[n_documents] = bson_new_from_json((const uint8_t *)start, -1, &error);
 
-        if(!insert[n_documents]) {
+        if(unlikely(!insert[n_documents])) {
            error("BACKEND: %s", error.message);
            free_bson(insert, n_documents);
            return 1;
@@ -76,7 +76,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
         n_documents++;
     }
 
-    if(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error)) {
+    if(unlikely(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
        error("BACKEND: %s", error.message);
        free_bson(insert, n_documents);
        return 1;
