@@ -255,7 +255,7 @@ class Service(SocketService):
             raw = self._get_raw_data()
             if raw is None:
                 result = False
-                self.warning('Recieved no data from socket.')
+                self.warning('Received no data from socket.')
             else:
                 for line in raw.splitlines():
                     if line.startswith('threads'):
@@ -278,10 +278,13 @@ class Service(SocketService):
         raw = self._get_raw_data()
         data = dict()
         tmp = dict()
-        for line in raw.splitlines():
-            stat = line.split('=')
-            tmp[stat[0]] = stat[1]
-        for item in self.statmap:
-            if item in tmp:
-                data[self.statmap[item][0]] = float(tmp[item]) * self.statmap[item][1]
+        if raw is not None:
+            for line in raw.splitlines():
+                stat = line.split('=')
+                tmp[stat[0]] = stat[1]
+            for item in self.statmap:
+                if item in tmp:
+                    data[self.statmap[item][0]] = float(tmp[item]) * self.statmap[item][1]
+        else:
+            self.warning('Received no data from socket.')
         return data
