@@ -967,7 +967,7 @@ AM_CONDITIONAL([ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE], [test "${enable_backend
 
 PKG_CHECK_MODULES(
     [LIBMONGOC],
-    [libmongoc-1.0],
+    [libmongoc-1.0 >= 1.7],
     [have_libmongoc=yes],
     [have_libmongoc=no]
 )
