@@ -12,7 +12,7 @@ have complete visibility over the range of support.
 - **Version**: Operating system version supported
 - **Family**: The family that the OS belongs to
 - **CI Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
-- **Ci Testing**: Testing has been implemented, to prevent broken or problematic code reaching our users
+- **CI Testing**: Testing has been implemented to prevent broken or problematic code reaching our users
 - **CI Integration**: CI Integration has been fully implemented for the particular operating system version
 - **CD**: Continious deployment support has been fully enabled for this operating system
 - **.DEB**: We provide a `.DEB` package for that particular operating system
