@@ -9,7 +9,7 @@ have complete visibility over the range of support.
 
 **Legend**:
 
-- **Version**: Operating System Version supported
+- **Version**: Operating system version supported
 - **Family**: The family that the OS belongs to
 - **CI Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
 - **Ci Testing**: Testing has been implemented, to prevent broken or problematic code reaching our users
