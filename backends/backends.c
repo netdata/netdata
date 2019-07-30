@@ -443,7 +443,7 @@ BACKEND_TYPE backend_select_type(const char *type) {
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
     }
-    else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) { // TODO: do we need plaintext for mongodb?
+    else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
         return BACKEND_TYPE_MONGODB;
     }
 
@@ -483,6 +483,9 @@ void *backends_main(void *ptr) {
     char *mongodb_uri = NULL;
     char *mongodb_database = NULL;
     char *mongodb_collection = NULL;
+
+    // set the default socket timeout in ms
+    int32_t mongodb_socket_timeout = (int32_t)(global_backend_update_every >= 2)?(global_backend_update_every * MSEC_PER_SEC - 500):1000;
 
 #endif
 
@@ -583,12 +586,16 @@ void *backends_main(void *ptr) {
         }
         case BACKEND_TYPE_MONGODB: {
 #if HAVE_MONGOC
-            if(unlikely(read_mongodb_conf(netdata_configured_user_config_dir, &mongodb_uri, &mongodb_database, &mongodb_collection))) {
-                error("BACKEND: mongodb backend type is set but cannot read its configuration from %s/mongodb.conf", netdata_configured_user_config_dir);
+            if(unlikely(read_mongodb_conf(netdata_configured_user_config_dir,
+                                          &mongodb_uri,
+                                          &mongodb_database,
+                                          &mongodb_collection))) {
+                error("BACKEND: mongodb backend type is set but cannot read its configuration from %s/mongodb.conf",
+                      netdata_configured_user_config_dir);
                 goto cleanup;
             }
 
-            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection)))
+            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_socket_timeout)))
                 do_mongodb = 1;
             else {
                 error("BACKEND: cannot initialize MongoDB backend");

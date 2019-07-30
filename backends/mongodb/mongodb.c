@@ -9,7 +9,7 @@
 mongoc_client_t *mongodb_client;
 mongoc_collection_t *mongodb_collection;
 
-int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string) {
+int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string, int32_t socket_timeout) {
     mongoc_uri_t *uri;
     bson_error_t error;
 
@@ -21,7 +21,8 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
        return 1;
     }
 
-    mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, 9000); // TODO: use variable for timeout
+    socket_timeout = mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
+    mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
 
     mongodb_client = mongoc_client_new_from_uri(uri);
     if(unlikely(!mongodb_client)) {
