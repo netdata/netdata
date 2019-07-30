@@ -13,35 +13,35 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
     mongoc_uri_t *uri;
     bson_error_t error;
 
-    mongoc_init ();
+    mongoc_init();
 
-    uri = mongoc_uri_new_with_error (uri_string, &error);
-    if (!uri) {
+    uri = mongoc_uri_new_with_error(uri_string, &error);
+    if(!uri) {
        error("BACKEND: failed to parse URI: %s. Error message: %s", uri_string, error.message);
        return 1;
     }
 
     mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, 9000); // TODO: use variable for timeout
 
-    mongodb_client = mongoc_client_new_from_uri (uri);
-    if (!mongodb_client) {
+    mongodb_client = mongoc_client_new_from_uri(uri);
+    if(!mongodb_client) {
        return 1;
     }
 
-    mongoc_client_set_appname (mongodb_client, "netdata");
+    mongoc_client_set_appname(mongodb_client, "netdata");
 
-    mongodb_collection = mongoc_client_get_collection (mongodb_client, database_string, collection_string);
+    mongodb_collection = mongoc_client_get_collection(mongodb_client, database_string, collection_string);
 
-    mongoc_uri_destroy (uri);
+    mongoc_uri_destroy(uri);
 
     return 0;
 }
 
-void free_bson (bson_t **insert, size_t n_documents) {
+void free_bson(bson_t **insert, size_t n_documents) {
     size_t i;
 
     for(i = 0; i < n_documents; i++)
-        bson_destroy (insert[i]);
+        bson_destroy(insert[i]);
 
     free(insert);
 }
@@ -65,7 +65,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
 
         insert[n_documents] = bson_new_from_json((const uint8_t *)start, -1, &error);
 
-        if (!insert[n_documents]) {
+        if(!insert[n_documents]) {
            error("BACKEND: %s", error.message);
            free_bson(insert, n_documents);
            return 1;
@@ -76,7 +76,7 @@ int mongodb_insert(char *data, size_t n_metrics) {
         n_documents++;
     }
 
-    if (!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error)) {
+    if(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error)) {
        error("BACKEND: %s", error.message);
        free_bson(insert, n_documents);
        return 1;
@@ -88,9 +88,9 @@ int mongodb_insert(char *data, size_t n_metrics) {
 }
 
 void mongodb_cleanup() {
-    mongoc_collection_destroy (mongodb_collection);
-    mongoc_client_destroy (mongodb_client);
-    mongoc_cleanup ();
+    mongoc_collection_destroy(mongodb_collection);
+    mongoc_client_destroy(mongodb_client);
+    mongoc_cleanup();
 
     return;
 }
