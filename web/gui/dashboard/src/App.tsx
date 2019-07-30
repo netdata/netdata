@@ -1,4 +1,4 @@
-import React, { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { useStore } from "react-redux"
 import Ps from "perfect-scrollbar"
 import $ from "jquery"
@@ -22,13 +22,20 @@ window.jQuery = window.$
 
 const App: React.FC = () => { // eslint-disable-line arrow-body-style
   const store = useStore()
+  const [hasStarted, setHasStarted] = useState(false)
   useEffect(() => {
     dashboardModule.then((dashboard) => {
       // give working-dashboard module access to the store
       // (just for refractoring purposes)
       dashboard.startModule(store)
+      setHasStarted(true)
     })
   }, [store])
+  if (!hasStarted) {
+    return (
+      <div>loading...</div>
+    )
+  }
   return (
     <div className="App">
       <Portals />
