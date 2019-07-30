@@ -1205,6 +1205,9 @@ cleanup:
 #if HAVE_MONGOC
     if(do_mongodb) {
         mongodb_cleanup();
+        freez(mongodb_uri);
+        freez(mongodb_database);
+        freez(mongodb_collection);
     }
 #endif
 
