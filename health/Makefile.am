@@ -42,6 +42,7 @@ dist_healthconfig_DATA = \
     health.d/fping.conf \
     health.d/ioping.conf \
     health.d/fronius.conf \
+    health.d/gearman.conf \
     health.d/haproxy.conf \
     health.d/httpcheck.conf \
     health.d/ipc.conf \

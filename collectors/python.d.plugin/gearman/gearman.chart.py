@@ -13,10 +13,10 @@ priority = 60500
 
 CHARTS = {
     'total_workers': {
-        'options': [None, 'Total Workers', 'Workers', 'Total Workers', 'gearman.workers', 'stacked'],
+        'options': ['total', 'Total Workers', 'Workers', 'Total Workers', 'gearman.total', 'line'],
         'lines': [
             ['total_queued', 'Queued', 'absolute'],
-            ['total_active', 'Active', 'absolute'],
+            ['total_running', 'Running', 'absolute'],
         ]
     },
 }
@@ -24,11 +24,11 @@ CHARTS = {
 
 def job_chart_template(job_name):
     return {
-        'options': [None, job_name, 'Workers', 'Jobs', 'gearman.{0}'.format(job_name), 'stacked'],
+        'options': [job_name, job_name, 'Workers', 'Jobs', 'gearman.job', 'stacked'],
         'lines': [
             ['{0}_queued'.format(job_name), 'Queued', 'absolute'],
             ['{0}_idle'.format(job_name), 'Idle', 'absolute'],
-            ['{0}_active'.format(job_name), 'Active', 'absolute'],
+            ['{0}_running'.format(job_name), 'Running', 'absolute'],
         ]
     }
 
@@ -60,7 +60,8 @@ class Service(SocketService):
         # a worker can be assigned to more than one job.
         output = {
             'total_queued': 0,
-            'total_active': 0,
+            'total_idle': 0,
+            'total_running': 0,
         }
 
         found_jobs = set()
@@ -80,7 +81,7 @@ class Service(SocketService):
                 output.update(job_data)
                 found_jobs.add(job_name)
 
-                for sum_value in ('queued', 'active'):
+                for sum_value in ('queued', 'running', 'idle'):
                     output['total_{0}'.format(sum_value)] += job_data['{0}_{1}'.format(job_name, sum_value)]
 
         for to_remove in self.active_jobs - found_jobs:
@@ -122,7 +123,7 @@ class Service(SocketService):
         return {
             '{0}_queued'.format(job[0]): pending,
             '{0}_idle'.format(job[0]): idle,
-            '{0}_active'.format(job[0]): running,
+            '{0}_running'.format(job[0]): running,
         }
 
     def _add_chart(self, job_name):
