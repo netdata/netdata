@@ -43,6 +43,7 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->units);
     freez(rt->info);
     freez(rt->dimensions);
+    freez(rt->foreachdim);
     freez(rt);
 }
 

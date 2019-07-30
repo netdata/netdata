@@ -318,6 +318,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->hash_chart = simple_hash(rc->chart);
 
     if(rt->dimensions) rc->dimensions = strdupz(rt->dimensions);
+    if(rt->foreachdim) rc->foreachdim = strdupz(rt->foreachdim);
 
     rc->green = rt->green;
     rc->red = rt->red;
@@ -361,7 +362,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             (rc->chart)?rc->chart:"NOCHART",
             rc->name,
             (rc->exec)?rc->exec:"DEFAULT",
@@ -373,6 +374,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             rc->before,
             rc->options,
             (rc->dimensions)?rc->dimensions:"NONE",
+            (rc->foreachdim)?rc->foreachdim:"NONE",
             rc->update_every,
             (rc->calculation)?rc->calculation->parsed_as:"NONE",
             (rc->warning)?rc->warning->parsed_as:"NONE",
@@ -407,6 +409,7 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->chart);
     freez(rc->family);
     freez(rc->dimensions);
+    freez(rc->foreachdim);
     freez(rc->exec);
     freez(rc->recipient);
     freez(rc->source);
