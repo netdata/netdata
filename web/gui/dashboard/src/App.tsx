@@ -3,7 +3,7 @@ import { useStore } from "react-redux"
 import Ps from "perfect-scrollbar"
 import $ from "jquery"
 
-import { Portals } from "./components/portals"
+import { Portals } from "./domains/chart/components/portals"
 import "./types/global"
 import "./App.css"
 

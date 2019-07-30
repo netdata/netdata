@@ -1,5 +1,18 @@
+/* eslint-disable camelcase */
 // @ts-ignore isolated-modules
 interface NETDATA {
+  chartDefaults: {
+    width: string | null
+    height: string | null
+    min_width: string | null
+    library: string
+    method: string
+    before: number
+    after: number
+    pixels_per_point: number
+    fill_luminance: number
+  }
+  serverDefault: string
   start: () => void
 }
 
