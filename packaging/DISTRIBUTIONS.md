@@ -121,7 +121,7 @@ This is the brand new database engine capability of netdata. It is a mandatory f
 | Auto-detect | Auto-detect | YES | YES | YES | YES | YES |
 
 - **Flags/instructions to enable**: None
-- **Flags to disable from source**: --disable-dbengine
+- **Flags to disable from source**: `--disable-dbengine`
 - **What packages required for auto-detect?**: `openssl`, `libuv1`, `lz4`, `Judy`
 
 #### Encryption Support (HTTPS)
