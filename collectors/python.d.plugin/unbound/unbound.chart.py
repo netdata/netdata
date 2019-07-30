@@ -253,15 +253,19 @@ class Service(SocketService):
             else:
                 self.request = b'UBCT1 status\n'
             raw = self._get_raw_data()
-            for line in raw.splitlines():
-                if line.startswith('threads'):
-                    self.threads = int(line.split()[1])
-                    self._generate_perthread_charts()
-                    break
-            if self.threads is None:
-                self.info('Unable to auto-detect thread counts, disabling per-thread stats.')
-                self.perthread = False
-            self.request = tmp
+            if raw is None:
+                result = False
+                self.warning('Recieved no data from socket.')
+            else:
+                for line in raw.splitlines():
+                    if line.startswith('threads'):
+                        self.threads = int(line.split()[1])
+                        self._generate_perthread_charts()
+                        break
+                if self.threads is None:
+                    self.info('Unable to auto-detect thread counts, disabling per-thread stats.')
+                    self.perthread = False
+                self.request = tmp
         return result
 
     @staticmethod
