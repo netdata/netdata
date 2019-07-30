@@ -15,7 +15,7 @@ have complete visibility over the range of support.
 - **Ci Testing**: Testing has been implemented, to prevent broken or problematic code reaching our users
 - **CI Integration**: CI Integration has been fully implemented for the particular operating system version
 - **CD**: Continious deployment support has been fully enabled for this operating system
-- **.DEB**: We provides a .DEB package for netdata, for that particular operating system
+- **.DEB**: We provide a `.DEB` package for that particular operating system
 - **.RPM**: We provides a .RPM package for netdata, for that particular operating system
 - **Installer**: Running netdata from source, using our installer, is working for this operating system
 - **Kickstart**: Kickstart installation is working fine for this operating system
