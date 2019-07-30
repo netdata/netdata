@@ -163,7 +163,7 @@ This line makes a database lookup to find a value. This result of this lookup is
 The format is:
 
 ```
-lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
+lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [foreach DIMENSIONS]
 ```
 
 Everything is the same with [badges](../web/api/badges/). In short:
@@ -185,10 +185,14 @@ Everything is the same with [badges](../web/api/badges/). In short:
 - `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
    `match-ids`, `match-names`. Check the badges documentation for more info.
 
-- `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
+- `of DIMENSIONS` is optional and has to be the last parameter unless there is a `foreach`. Dimensions have to be separated
    by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
    have spaces in their names). This accepts netdata simple patterns and the `match-ids` and
    `match-names` options affect the searches for dimensions.
+
+- `foreach DIMENSIONS` is optional and it will always be the last parameter. The rules for dimension here follow the same
+   pattern of the previous parameter. It is used to set the group of the dimensions of a chart that will have the same
+   rule to raise an alarm.
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions.
 The timestamps of the timeframe evaluated by the database lookup is available as variables

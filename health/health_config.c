@@ -420,7 +420,6 @@ static inline int health_parse_db_lookup(
         while(*s && isspace(*s)) *s++ = '\0';
         if(!*key) break;
 
-        fprintf(stderr,"KILLME 2 %s : %s\n",key,s);
         if(!strcasecmp(key, "at")) {
             char *value = s;
             while(*s && !isspace(*s)) s++;
@@ -478,7 +477,8 @@ static inline int health_parse_db_lookup(
             s = ++find;
         }
         else if(!strcasecmp(key, HEALTH_FOREACH_KEY )) {
-            //*foreachdim = strdupz(s);
+            *foreachdim = strdupz(s);
+            break;
         }
         else {
             error("Health configuration at line %zu of file '%s': unknown keyword '%s'",
@@ -738,7 +738,6 @@ static int health_readfile(const char *filename, void *data) {
                 rc->hash_chart = simple_hash(rc->chart);
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
-                fprintf(stderr,"KILLME %s: %s\n",filename,value);
                 health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
                         &rc->update_every,
                         &rc->options, &rc->dimensions, &rc->foreachdim);

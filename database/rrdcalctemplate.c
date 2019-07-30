@@ -68,5 +68,3 @@ inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) 
 
     rrdcalctemplate_free(rt);
 }
-
-
