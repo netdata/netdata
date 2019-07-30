@@ -5,7 +5,6 @@
 
 import os
 import sys
-import errno
 
 from copy import deepcopy
 
@@ -264,18 +263,6 @@ class Service(SocketService):
                 self.perthread = False
             self.request = tmp
         return result
-
-    def _disconnect(self):
-        # Custom _disconnect method to work around the issue reported in #6434
-        if self._sock is not None:
-            try:
-                self.debug('closing socket')
-                self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
-                self._sock.close()
-            except Exception as error:
-                if not (hasattr(error, 'errno') and error.errno == errno.ENOTCONN):
-                    self.error(error)
-            self._sock = None
 
     @staticmethod
     def _check_raw_data(data):

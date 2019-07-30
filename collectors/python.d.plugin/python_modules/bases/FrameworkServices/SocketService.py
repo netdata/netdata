@@ -4,6 +4,7 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import errno
 import socket
 
 try:
@@ -181,7 +182,8 @@ class SocketService(SimpleService):
                 self._sock.shutdown(2)  # 0 - read, 1 - write, 2 - all
                 self._sock.close()
             except Exception as error:
-                self.error(error)
+                if not (hasattr(error, 'errno') and error.errno == errno.ENOTCONN):
+                    self.error(error)
             self._sock = None
 
     def _send(self, request=None):
