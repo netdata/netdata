@@ -253,15 +253,19 @@ class Service(SocketService):
             else:
                 self.request = b'UBCT1 status\n'
             raw = self._get_raw_data()
-            for line in raw.splitlines():
-                if line.startswith('threads'):
-                    self.threads = int(line.split()[1])
-                    self._generate_perthread_charts()
-                    break
-            if self.threads is None:
-                self.info('Unable to auto-detect thread counts, disabling per-thread stats.')
-                self.perthread = False
-            self.request = tmp
+            if raw is None:
+                result = False
+                self.warning('Received no data from socket.')
+            else:
+                for line in raw.splitlines():
+                    if line.startswith('threads'):
+                        self.threads = int(line.split()[1])
+                        self._generate_perthread_charts()
+                        break
+                if self.threads is None:
+                    self.info('Unable to auto-detect thread counts, disabling per-thread stats.')
+                    self.perthread = False
+                self.request = tmp
         return result
 
     @staticmethod
@@ -274,10 +278,13 @@ class Service(SocketService):
         raw = self._get_raw_data()
         data = dict()
         tmp = dict()
-        for line in raw.splitlines():
-            stat = line.split('=')
-            tmp[stat[0]] = stat[1]
-        for item in self.statmap:
-            if item in tmp:
-                data[self.statmap[item][0]] = float(tmp[item]) * self.statmap[item][1]
+        if raw is not None:
+            for line in raw.splitlines():
+                stat = line.split('=')
+                tmp[stat[0]] = stat[1]
+            for item in self.statmap:
+                if item in tmp:
+                    data[self.statmap[item][0]] = float(tmp[item]) * self.statmap[item][1]
+        else:
+            self.warning('Received no data from socket.')
         return data
