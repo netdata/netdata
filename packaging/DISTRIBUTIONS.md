@@ -97,7 +97,7 @@ There are various limitations and problems we try to attend as we evolve and gro
 
 - **Auto-detect**: Depends on the programs package dependencies. If the required dependencies are covered during compile time, capability is enabled
 - **YES**: This flag imply that the functionality is available for that distribution channel                
-- **NO**: That means the availability is a work in progress for netdata, and not available at the moment for that distribution channel. We constantly work to provide everything to our users on all possible ways
+- **NO**: Not available at the moment for that distribution channel at this time, but may be a work-in-progress effort from the Netdata team.
 - **At Runtime**: This means that the given module or functionality is available and only requires configuration after install to enable it                
 
 ### Core functionality
