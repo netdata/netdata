@@ -17,7 +17,7 @@ post_message() {
 
 	case "$TYPE" in
 		"PLAIN_MESSAGE")
-			curl -X POST --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" ${SLACK_NOTIFY_WEBHOOK_URL}
+			curl -X POST --connect-timeout 10 --retry 3 --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" ${SLACK_NOTIFY_WEBHOOK_URL}
 			;;
 		"TRAVIS_MESSAGE")
 			EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}', on '${TRAVIS_OS_NAME}'"
@@ -55,7 +55,7 @@ post_message() {
 				}]
 			}"
 			echo "Sending ${POST_MESSAGE}"
-			curl -X POST --data-urlencode "payload=${POST_MESSAGE}" "${SLACK_NOTIFY_WEBHOOK_URL}"
+			curl -X POST --connect-timeout 10 --retry 3 --data-urlencode "payload=${POST_MESSAGE}" "${SLACK_NOTIFY_WEBHOOK_URL}"
 			;;
 		*)
 			echo "Unrecognized message type \"$TYPE\" was given"
