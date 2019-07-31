@@ -2453,11 +2453,7 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // VMware vSphere
 
-    // Host
-    'vsphere.host_cpu_usage_total': {
-        info: 'Summary CPU usage statistics across all CPUs/cores.'
-    },
-
+    // Host specific
     'vsphere.host_mem_usage_percentage': {
         info: 'Percentage of used machine memory: <code>consumed</code> / <code>machine-memory-size</code>.'
     },
@@ -2485,35 +2481,7 @@ netdataDashboard.context = {
             '<code>swapoutRate</code> is rate at which VMkernel writes to the virtual machine’s swap file from machine memory.'
     },
 
-    'vsphere.host_net_bandwidth_total': {
-        info: 'Summary receive/transmit statistics across all network interfaces.'
-    },
-
-    'vsphere.host_net_packets_total': {
-        info: 'Summary receive/transmit statistics across all network interfaces.'
-    },
-
-    'vsphere.host_net_errors_total': {
-        info: 'Summary receive/transmit statistics across all network interfaces.'
-    },
-
-    'vsphere.host_net_drops_total': {
-        info: 'Summary receive/transmit statistics across all network interfaces.'
-    },
-
-    'vsphere.host_disk_usage_total': {
-        info: 'Summary read/write statistics across all disks.'
-    },
-
-    'vsphere.host_disk_max_latency': {
-        info: '<code>latency</code> is highest latency value across all disks used by the host.'
-    },
-
-    // VM
-    'vsphere.vm_cpu_usage_total': {
-        info: 'Summary CPU usage statistics across all CPUs/cores.'
-    },
-
+    // VM specific
     'vsphere.vm_mem_usage_percentage': {
         info: 'Percentage of used virtual machine “physical” memory: <code>actvive</code> / <code>virtual machine configured size</code>.'
     },
@@ -2544,25 +2512,36 @@ netdataDashboard.context = {
             'Swapped memory stays on disk until the virtual machine needs it.'
     },
 
-    'vsphere.vm_net_bandwidth_total': {
+    // Common
+    'vsphere.cpu_usage_total': {
+        info: 'Summary CPU usage statistics across all CPUs/cores.'
+    },
+
+    'vsphere.net_bandwidth_total': {
         info: 'Summary receive/transmit statistics across all network interfaces.'
     },
 
-    'vsphere.vm_net_packets_total': {
+    'vsphere.net_packets_total': {
         info: 'Summary receive/transmit statistics across all network interfaces.'
     },
 
-    'vsphere.vm_net_drops_total': {
+    'vsphere.net_errors_total': {
         info: 'Summary receive/transmit statistics across all network interfaces.'
     },
 
-    'vsphere.vm_disk_usage_total': {
+    'vsphere.net_drops_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.disk_usage_total': {
         info: 'Summary read/write statistics across all disks.'
     },
 
-    'vsphere.vm_disk_max_latency': {
-        info: '<code>latency</code> is highest latency value across all disks used by the virtual machine.'
-    }
+    'vsphere.disk_max_latency': {
+        info: '<code>latency</code> is highest latency value across all disks used by the host.'
+    },
 
-    // ------------------------------------------------------------------------
+    'vsphere.overall_status': {
+        info: '<code>0</code> is unknown, <code>1</code> is OK, <code>1</code> is might have a problem, <code>2</code> is definitely has a problem.'
+    }
 };
