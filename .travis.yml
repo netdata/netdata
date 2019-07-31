@@ -188,10 +188,6 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
 
-    - name: Run netdata lifecycle on CentOS 8 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:8" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 8"
-
       # Debian runs
     - name: Run netdata lifecycle, on Debian 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:wheezy" tests/updater_checks.sh
