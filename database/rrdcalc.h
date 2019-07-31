@@ -36,7 +36,7 @@ struct rrdcalc {
     uint32_t next_event_id;         // the next event id that will be used for this alarm
 
     char *name;                     // the name of this alarm
-    uint32_t hash;
+    uint32_t hash;                  // the hash of the alarm name
 
     char *exec;                     // the command to execute when this alarm switches state
     char *recipient;                // the recipient of the alarm (the first parameter to exec)

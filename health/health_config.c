@@ -26,6 +26,40 @@
 #define HEALTH_REPEAT_KEY "repeat"
 
 /**
+ * Alarm name with dimension
+ *
+ * Change the name of the current alarm appending a new diagram.
+ *
+ * @param name the alarm name
+ * @param dim the dimension of the chart.
+ *
+ * @return It returns the new name on success and the old otherwise
+ */
+char *health_alarm_name_with_dim(char *name, char *dim) {
+    size_t namelen,dimlen;
+
+    char *newname,*move;
+    namelen = strlen(name);
+    dimlen = strlen(dim);
+
+    newname = malloc(namelen + dimlen + 2);
+    if(newname) {
+        move = newname;
+        strncpy(move, name, namelen);
+        move += namelen;
+
+        *move++ = '_';
+        strncpy(move, dim, dimlen);
+        move += dimlen;
+        *move = '\0';
+    } else {
+        newname = name;
+    }
+
+    return newname;
+}
+
+/**
  * Add alarm from config
  *
  * Add a new RRDCALC to the host
@@ -54,6 +88,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if (rrdcalc_exists(host, rc->chart, rc->name, rc->hash_chart, rc->hash))
         return 0;
 
+    fprintf(stderr,"KILLME alarm from config %s\n",rc->name);
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
     debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
@@ -84,6 +119,7 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     );
 
     rrdcalc_add_to_host(host, rc);
+
     return 1;
 }
 
@@ -113,6 +149,7 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         return 0;
     }
 
+    fprintf(stderr,"KILLME template from config %s %s \n",rt->name,(rt->foreachdim)?rt->foreachdim:"NONE");
     RRDCALCTEMPLATE *t, *last = NULL;
     for (t = host->templates; t ; last = t, t = t->next) {
         if(unlikely(t->hash_name == rt->hash_name
@@ -588,6 +625,7 @@ static int health_readfile(const char *filename, void *data) {
         return 0;
     }
 
+    fprintf(stderr,"KILLME file: %s\n",filename);
     RRDCALC *rc = NULL;
     RRDCALCTEMPLATE *rt = NULL;
 
@@ -640,10 +678,15 @@ static int health_readfile(const char *filename, void *data) {
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if (rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
                 rrdcalc_free(rc);
+            else
+                if(rc)
+                    fprintf(stderr,"KILLME rc 1 added %s\n",rc->name);
 
             if(rt) {
                 if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
                     rrdcalctemplate_free(rt);
+                else
+                    fprintf(stderr,"KILLME rt 1 added %s\n",rt->name);
 
                 rt = NULL;
             }
@@ -671,12 +714,17 @@ static int health_readfile(const char *filename, void *data) {
             if(rc) {
                 if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
                     rrdcalc_free(rc);
+                else
+                    fprintf(stderr,"KILLME rc 2 added %s\n",rc->name);
 
                 rc = NULL;
             }
 
             if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
                 rrdcalctemplate_free(rt);
+            else
+                if(rt)
+                    fprintf(stderr,"KILLME rt 2 added %s\n",rt->name);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
@@ -985,9 +1033,15 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
         rrdcalc_free(rc);
+    else
+        if(rc)
+            fprintf(stderr,"KILLME rc added 3 %s\n",rc->name);
 
     if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
         rrdcalctemplate_free(rt);
+    else
+        if(rt)
+            fprintf(stderr,"KILLME rt added 3 %s\n",rt->name);
 
     fclose(fp);
     return 1;

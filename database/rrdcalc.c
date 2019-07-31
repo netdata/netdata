@@ -83,6 +83,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     if(!rrdcalc_isrepeating(rc)) {
         time_t now = now_realtime_sec();
+        fprintf(stderr,"KILLME alarm entry: %s\n",rc->name);
         ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc->id,
@@ -126,6 +127,7 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
         if(unlikely(rc->rrdset))
             continue;
 
+        fprintf(stderr,"KILLME link_matching: %s %s\n",rc->chart,(rc->foreachdim)?rc->foreachdim:"NONE");
         if(unlikely(rrdcalc_is_matching_this_rrdset(rc, st)))
             rrdsetcalc_link(st, rc);
     }
@@ -400,6 +402,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
 void rrdcalc_free(RRDCALC *rc) {
     if(unlikely(!rc)) return;
 
+    fprintf(stderr,"KILLME CLEANING %s\n",rc->name);
 
     expression_free(rc->calculation);
     expression_free(rc->warning);

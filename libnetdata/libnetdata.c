@@ -1359,6 +1359,7 @@ void recursive_config_double_dir_load(const char *user_path, const char *stock_p
 
     debug(D_HEALTH, "CONFIG traversing user-config directory '%s', stock config directory '%s'", udir, sdir);
 
+    fprintf(stderr,"KILLME path: %s\n",udir);
     DIR *dir = opendir(udir);
     if (!dir) {
         error("CONFIG cannot open user-config directory '%s'.", udir);

@@ -13,6 +13,7 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     for(rt = host->templates; rt ; rt = rt->next) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
            && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
+            fprintf(stderr,"KILLME adding chart: %s %s\n",st->id,(rt->foreachdim)?rt->foreachdim:"nothing");
             RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
             if(unlikely(!rc))
                 info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
