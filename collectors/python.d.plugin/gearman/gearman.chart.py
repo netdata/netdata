@@ -93,7 +93,7 @@ class Service(SocketService):
     def _get_worker_data(self):
         """
         Split the data returned from Gearman into a list of lists
-        :return: list
+        :return: generator
         """
 
         try:
@@ -127,16 +127,31 @@ class Service(SocketService):
         }
 
     def _add_chart(self, job_name):
-        self.active_jobs.add(job_name)
+        """
+        Adds a new job chart
+        :param job_name: The name of the job to add
+        :type job_name: string
+        :return: None
+        """
+
         job_key = 'job_{0}'.format(job_name)
         template = job_chart_template(job_name)
         new_chart = self.charts.add_chart([job_key] + template['options'])
         for dimension in template['lines']:
             new_chart.add_dimension(dimension)
 
+        self.active_jobs.add(job_name)
+
     def _remove_chart(self, job_name):
-        self.active_jobs.remove(job_name)
+        """
+        Removes a job chart
+        :param job_name: The name of the job to remove
+        :type job_name: string
+        :return: None
+        """
+
         job_key = 'job_{0}'.format(job_name)
         self.charts[job_key].obsolete()
+        self.active_jobs.remove(job_name)
 
 
