@@ -43,6 +43,14 @@ systemctl enable netdata
 systemctl start netdata
 ```
 
+Note: Netdata can send notifications to Slack from `systemd` if netdata service shuts down unsuccessfully.
+To enable this option, execute `sudo systemctl edit netdata` and override the `Environment` section.
+Append the variable `NETDATA_SYSTEMD_SLACK_NOTIFY_URL` with the value of the respective Slack incoming webhook you want to use. The result should look like this:
+```
+[Service]
+Environment=NETDATA_SYSTEMD_SLACK_NOTIFY_URL=[THE_SLACK_INCOMING_WEBHOOK_URL_HERE]
+```
+
 #### init.d
 
 In the system directory you can find `netdata-lsb`. Copy it to the proper place according to your distribution documentation. For Ubuntu, this can be done via running the following commands as root.
