@@ -312,7 +312,7 @@ Provide alt text for every image you include in Netdata's documentation. It shou
 In Markdown, use the standard image syntax, `![]()`, and place the alt text between the brackets `[]`. Here's an example using our logo:
 
 ```
-![The Netdata logo](https://github.com/netdata/netdata/blob/master/web/gui/images/netdata-logomark.svg)
+![The Netdata logo](../../web/gui/images/netdata-logomark.svg)
 ```
 
 #### Images of text
