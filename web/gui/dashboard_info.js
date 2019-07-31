@@ -2477,9 +2477,9 @@ netdataDashboard.context = {
     'vsphere.host_mem_swap_rate': {
         info:
             'This statistic refers to VMkernel swapping and not to guest OS swapping. ' +
-            '<code>rx</code> is sum of <code>swapinRate</code> values for all powered-on virtual machines on the host.' +
+            '<code>in</code> is sum of <code>swapinRate</code> values for all powered-on virtual machines on the host.' +
             '<code>swapinRate</code> is rate at which VMKernel reads data into machine memory from the swap file. ' +
-            '<code>tx</code> is sum of <code>swapoutRate</code> values for all powered-on virtual machines on the host.' +
+            '<code>out</code> is sum of <code>swapoutRate</code> values for all powered-on virtual machines on the host.' +
             '<code>swapoutRate</code> is rate at which VMkernel writes to the virtual machine’s swap file from machine memory.'
     },
 
@@ -2529,8 +2529,8 @@ netdataDashboard.context = {
     'vsphere.vm_mem_swap_rate': {
         info:
             'This statistic refers to VMkernel swapping and not to guest OS swapping. ' +
-            '<code>rx</code> is rate at which VMKernel reads data into machine memory from the swap file. ' +
-            '<code>tx</code> is rate at which VMkernel writes to the virtual machine’s swap file from machine memory.'
+            '<code>in</code> is rate at which VMKernel reads data into machine memory from the swap file. ' +
+            '<code>out</code> is rate at which VMkernel writes to the virtual machine’s swap file from machine memory.'
     },
 
     'vsphere.vm_mem_swap': {
