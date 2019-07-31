@@ -2542,6 +2542,6 @@ netdataDashboard.context = {
     },
 
     'vsphere.overall_status': {
-        info: '<code>0</code> is unknown, <code>1</code> is OK, <code>1</code> is might have a problem, <code>2</code> is definitely has a problem.'
+        info: '<code>0</code> is unknown, <code>1</code> is OK, <code>2</code> is might have a problem, <code>3</code> is definitely has a problem.'
     }
 };
