@@ -486,6 +486,12 @@ netdataDashboard.menu = {
         title: 'Perf Counters',
         icon: '<i class="fas fa-tachometer-alt"></i>',
         info: 'Performance Monitoring Counters (PMC). Data collected using <b>perf_event_open()</b> system call which utilises Hardware Performance Monitoring Units (PMU).'
+    },
+
+    'vsphere': {
+        title: 'vSphere',
+        icon: '<i class="fas fa-server"></i>',
+        info: 'Performance statistics for ESXI hosts and virtual machines. Data collected from <a href="https://www.vmware.com/products/vcenter-server.html">VMware vCenter Server</a> using <code><a href="https://github.com/vmware/govmomi"> govmomi</a></code>  library.'
     }
 };
 
@@ -2442,6 +2448,116 @@ netdataDashboard.context = {
 
     'powersupply.voltage': {
         info: undefined
+    },
+
+    // ------------------------------------------------------------------------
+    // VMware vSphere
+
+    // Host
+    'vsphere.host_cpu_usage_total': {
+        info: 'Summary CPU usage statistics across all CPUs/cores.'
+    },
+
+    'vsphere.host_mem_usage_percentage': {
+        info: 'Percentage of used machine memory: <code>consumed</code> / <code>machine-memory-size</code>.'
+    },
+
+    'vsphere.host_mem_usage': {
+        info:
+            '<code>granted</code> is amount of machine memory that is mapped for a host, '+
+            'it equals sum of all granted metrics for all powered-on virtual machines, plus machine memory for vSphere services on the host. ' +
+            '<code>consumed</code> is amount of machine memory used on the host, it includes memory used by the Service Console, the VMkernel, vSphere services, plus the total consumed metrics for all running virtual machines. ' +
+            '<code>consumed</code> = <code>total host memory</code> - <code>free host memory</code>.' +
+            '<code>active</code> is sum of all active metrics for all powered-on virtual machines plus vSphere services (such as COS, vpxa) on the host.' +
+            '<code>shared</code> is sum of all shared metrics for all powered-on virtual machines, plus amount for vSphere services on the host. ' +
+            '<code>sharedcommon</code> is amount of machine memory that is shared by all powered-on virtual machines and vSphere services on the host. ' +
+            '<code>shared</code> - <code>sharedcommon</code> = machine memory (host memory) savings (KB).'
+    },
+
+    'vsphere.host_mem_swap_rate': {
+        info:
+            'This statistic refers to VMkernel swapping and not to guest OS swapping. ' +
+            '<code>rx</code> is sum of <code>swapinRate</code> values for all powered-on virtual machines on the host.' +
+            '<code>swapinRate</code> is rate at which VMKernel reads data into machine memory from the swap file. ' +
+            '<code>tx</code> is sum of <code>swapoutRate</code> values for all powered-on virtual machines on the host.' +
+            '<code>swapoutRate</code> is rate at which VMkernel writes to the virtual machine’s swap file from machine memory.'
+    },
+
+    'vsphere.host_net_bandwidth_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.host_net_packets_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.host_net_errors_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.host_net_drops_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.host_disk_usage_total': {
+        info: 'Summary read/write statistics across all disks.'
+    },
+
+    'vsphere.host_disk_max_latency': {
+        info: '<code>latency</code> is highest latency value across all disks used by the host.'
+    },
+
+    // VM
+    'vsphere.vm_cpu_usage_total': {
+        info: 'Summary CPU usage statistics across all CPUs/cores.'
+    },
+
+    'vsphere.vm_mem_usage_percentage': {
+        info: 'Percentage of used virtual machine “physical” memory: <code>actvive</code> / <code>virtual machine configured size</code>.'
+    },
+
+    'vsphere.vm_mem_usage': {
+        info:
+            '<code>granted</code> is amount of guest “physical” memory that is mapped to machine memory, it includes <code>shared</code> memory amount. ' +
+            '<code>consumed</code> is amount of guest “physical” memory consumed by the virtual machine for guest memory, ' +
+            '<code>consumed</code> = <code>granted</code> - <code>memory saved due to memory sharing</code>. ' +
+            '<code>active</code> is amount of memory that is actively used, as estimated by VMkernel based on recently touched memory pages. ' +
+            '<code>shared</code> is amount of guest “physical” memory shared with other virtual machines (through the VMkernel’s transparent page-sharing mechanism, a RAM de-duplication technique).'
+
+    },
+
+    'vsphere.vm_mem_swap_rate': {
+        info:
+            'This statistic refers to VMkernel swapping and not to guest OS swapping. ' +
+            '<code>rx</code> is rate at which VMKernel reads data into machine memory from the swap file. ' +
+            '<code>tx</code> is rate at which VMkernel writes to the virtual machine’s swap file from machine memory.'
+    },
+
+    'vsphere.vm_mem_swap': {
+        info:
+            'This statistic refers to VMkernel swapping and not to guest OS swapping. ' +
+            '<code>swapped</code> is amount of guest physical memory swapped out to the virtual machine\'s swap file by the VMkernel. ' +
+            'Swapped memory stays on disk until the virtual machine needs it.'
+    },
+
+    'vsphere.vm_net_bandwidth_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.vm_net_packets_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.vm_net_drops_total': {
+        info: 'Summary receive/transmit statistics across all network interfaces.'
+    },
+
+    'vsphere.vm_disk_usage_total': {
+        info: 'Summary read/write statistics across all disks.'
+    },
+
+    'vsphere.vm_disk_max_latency': {
+        info: '<code>latency</code> is highest latency value across all disks used by the virtual machine.'
     }
 
     // ------------------------------------------------------------------------
