@@ -17,19 +17,25 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
 
     uri = mongoc_uri_new_with_error(uri_string, &error);
     if(unlikely(!uri)) {
-       error("BACKEND: failed to parse URI: %s. Error message: %s", uri_string, error.message);
-       return 1;
+        error("BACKEND: failed to parse URI: %s. Error message: %s", uri_string, error.message);
+        return 1;
     }
 
     socket_timeout = mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
-    mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
+    if(!mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout)) {
+        error("BACKEND: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
+        return 1;
+    };
 
     mongodb_client = mongoc_client_new_from_uri(uri);
     if(unlikely(!mongodb_client)) {
-       return 1;
+        error("BACKEND: failed to create a new client");
+        return 1;
     }
 
-    mongoc_client_set_appname(mongodb_client, "netdata");
+    if(!mongoc_client_set_appname(mongodb_client, "netdata")) {
+        error("BACKEND: failed to set client appname");
+    };
 
     mongodb_collection = mongoc_client_get_collection(mongodb_client, database_string, collection_string);
 

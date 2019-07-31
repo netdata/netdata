@@ -595,8 +595,10 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_socket_timeout)))
+            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_socket_timeout))) {
+                backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
                 do_mongodb = 1;
+            }
             else {
                 error("BACKEND: cannot initialize MongoDB backend");
                 goto cleanup;
@@ -604,7 +606,6 @@ void *backends_main(void *ptr) {
 #else
             error("BACKEND: MongoDB support isn't compiled");
 #endif // HAVE_MONGOC
-            backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
             break;
         }
         case BACKEND_TYPE_GRAPHITE: {
