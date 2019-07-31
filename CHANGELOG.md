@@ -12,8 +12,10 @@
 
 **Merged pull requests:**
 
+- Handle disconnected sockets in unbound collector. [\#6561](https://github.com/netdata/netdata/pull/6561) ([Ferroin](https://github.com/Ferroin))
 - netdata/packaging: Notify us when CHANGELOG.md gets too old [\#6556](https://github.com/netdata/netdata/pull/6556) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add configurable default locations for trusted CA certificates [\#6549](https://github.com/netdata/netdata/pull/6549) ([thiagoftsm](https://github.com/thiagoftsm))
+- smartd\_log: use `del\_dimension` instead of `hide\_dimension` to delete inactive disks [\#6547](https://github.com/netdata/netdata/pull/6547) ([ilyam8](https://github.com/ilyam8))
 - redirect after clicking Nodes \> SignIn [\#6544](https://github.com/netdata/netdata/pull/6544) ([jacekkolasa](https://github.com/jacekkolasa))
 - smartd\_log: Disk \_\_eq\_\_ fix [\#6540](https://github.com/netdata/netdata/pull/6540) ([ilyam8](https://github.com/ilyam8))
 - minor - code readability HTTP CODES as defines && clear warnings [\#6539](https://github.com/netdata/netdata/pull/6539) ([underhood](https://github.com/underhood))
