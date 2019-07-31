@@ -189,10 +189,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
 
       # Debian runs
-    - name: Run netdata lifecycle, on Debian 7 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:wheezy" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 7 (Wheezy)"
-
     - name: Run netdata lifecycle, on Debian 8 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:jessie" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 8 (Jessie)"
