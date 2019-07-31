@@ -8,7 +8,7 @@
 #
 # Copyright:
 #
-# Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud
+# Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 
 post_message() {
 	TYPE="$1"
