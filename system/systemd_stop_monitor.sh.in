@@ -31,6 +31,6 @@ case "${EXIT_STATUS}" in
 	echo >&2 "$0: Netdata service stopped with ${SERVICE_RESULT}: ${EXIT_STATUS} - ${EXIT_CODE}"
 
 	export SLACK_NOTIFY_WEBHOOK_URL="${NETDATA_SYSTEMD_SLACK_NOTIFY_URL}"
-	post_message "TRAVIS_MESSAGE" "Hello <!here>, this is your systemd notification system from ${hostname}. Netdata service stopped with ${SERVICE_RESULT}: ${EXIT_STATUS} - ${EXIT_CODE}"
+	post_message "PLAIN_MESSAGE" "Hello <!here>, this is your systemd notification system from ${hostname}. Netdata service terminated with ${SERVICE_RESULT}: ${EXIT_STATUS} - ${EXIT_CODE}"
 	;;
 esac
