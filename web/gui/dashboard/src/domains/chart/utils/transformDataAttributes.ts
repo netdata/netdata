@@ -1,5 +1,7 @@
 import { mapObjIndexed } from "ramda"
 
+import { ChartLibraryName } from "./chartLibrariesSettings"
+
 type OutputValue = string | boolean | number | null | undefined | any[]
 // almost the same as in old dashboard to ensure readers that it works the same way
 const getDataAttribute = (element: Element, key: string, defaultValue?: OutputValue) => {
@@ -91,9 +93,20 @@ const getAttributesMap = (): AttributesMap => ({
   dygraphTheme: { key: "data-dygraph-theme", defaultValue: "default" },
 })
 
-export type Attributes = {
-  [key in AttributePropKeys]: OutputValue
+export interface Attributes {
+  id: string
+  host: string
+  title: string
+  chartLibrary: ChartLibraryName
+  width: number | string | null
+  height: number | string | null
+  after: number
+  before: number
+  legend: boolean
+  dygraphValueRange: any[]
+  dygraphTheme: string
 }
+
 export const getAttributes = (node: Element): Attributes => mapObjIndexed(
   (attribute: AttributeConfig) => (
     (attribute as BooleanAttributeConfig).type === "boolean"
