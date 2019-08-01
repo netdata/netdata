@@ -1041,7 +1041,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 } else {
                     web_client_split_path_query(w, encoded_url);
 
-                    if (w->separator) {
+                    if (w->separator && w->url_search_path) {
                         *w->url_search_path = 0x00;
                     }
 
@@ -1064,7 +1064,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
-                if (w->separator) {
+                if (w->separator && w->url_search_path) {
                     *w->url_search_path = 0x00;
                 }
 #ifdef ENABLE_HTTPS
