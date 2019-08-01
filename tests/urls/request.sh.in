@@ -212,7 +212,7 @@ netdata_create_directory $OUTEDIR
 netdata_create_directory $OUTOPTDIR
 netdata_create_directory $ERRDIR
 
-wget --execute="robots = off" --mirror --convert-links --no-parent http://127.0.0.1:19999
+wget --no-check-certificate --execute="robots = off" --mirror --convert-links --no-parent $MURL
 TEST=$?
 if [ $TEST -ne "0" ] ; then
     echo "Cannot connect to Netdata"
@@ -232,9 +232,9 @@ netdata_download_various_with_options $MURL "api/v1/info" "info"
 netdata_download_various $MURL "api/v1/info?this%20could%20not%20be%20here" "err_info"
 
 netdata_print_header "Getting all the netdata charts"
-CHARTS=$( netdata_download_charts "http://127.0.0.1:19999" "api/v1/charts" )
-WCHARTS=$( netdata_download_charts "http://127.0.0.1:19999" "api/v1/charts?this%20could%20not%20be%20here" )
-WCHARTS2=$( netdata_download_charts "http://127.0.0.1:19999" "api/v1/charts%3fthis%20could%20not%20be%20here" )
+CHARTS=$( netdata_download_charts "$MURL" "api/v1/charts" )
+WCHARTS=$( netdata_download_charts "$MURL" "api/v1/charts?this%20could%20not%20be%20here" )
+WCHARTS2=$( netdata_download_charts "$MURL" "api/v1/charts%3fthis%20could%20not%20be%20here" )
 
 if [ ${#CHARTS[@]} -ne ${#WCHARTS[@]} ]; then
     echo "The number of charts does not match with division not encoded.";
@@ -294,8 +294,6 @@ for I in $CHARTS ; do
     netdata_download_chart $MURL "api/v1/data?chart" "$I" "data"
     break;
 done
-
-#http://arch-esxi:19999/api/v1/(*@&$!$%%5E)!$*%&)!$*%%5E*!%5E%!%5E$%!%5E%(!*%5E*%5E%(*@&$%5E%(!%5E#*&!^#$*&!^%)@($%^)!*&^(!*&^#$&#$)!$%^)!$*%&)#$!^#*$^!(*#^#)!%^!)$*%&!(*&$!^#$*&^!*#^$!*^)%(!*&$%)(!&#$!^*#&$^!*^%)!$%)!(&#$!^#*&^$
 
 WHITE='\033[0;37m'
 echo -e "${WHITE}ALL the URLS got 200 as answer!"
