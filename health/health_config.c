@@ -678,15 +678,16 @@ static int health_readfile(const char *filename, void *data) {
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if (rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
                 rrdcalc_free(rc);
-            else
-                if(rc)
+            else if (rc)
+                if(rc->foreachdim)
                     fprintf(stderr,"KILLME rc 1 added %s\n",rc->name);
 
             if(rt) {
                 if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
                     rrdcalctemplate_free(rt);
-                else
-                    fprintf(stderr,"KILLME rt 1 added %s\n",rt->name);
+                else if(rt)
+                    if(rt->foreachdim)
+                        fprintf(stderr,"KILLME rt 1 added %s\n",rt->name);
 
                 rt = NULL;
             }
@@ -714,16 +715,17 @@ static int health_readfile(const char *filename, void *data) {
             if(rc) {
                 if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
                     rrdcalc_free(rc);
-                else
-                    fprintf(stderr,"KILLME rc 2 added %s\n",rc->name);
+                else if (rc)
+                    if(rc->foreachdim)
+                        fprintf(stderr,"KILLME rc 2 added %s\n",rc->name);
 
                 rc = NULL;
             }
 
             if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
                 rrdcalctemplate_free(rt);
-            else
-                if(rt)
+            else if (rt)
+                if(rt->foreachdim)
                     fprintf(stderr,"KILLME rt 2 added %s\n",rt->name);
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
@@ -1033,14 +1035,14 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
         rrdcalc_free(rc);
-    else
-        if(rc)
+    else if (rc)
+        if(rc->foreachdim)
             fprintf(stderr,"KILLME rc added 3 %s\n",rc->name);
 
     if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
         rrdcalctemplate_free(rt);
-    else
-        if(rt)
+    else if (rt)
+        if(rt->foreachdim)
             fprintf(stderr,"KILLME rt added 3 %s\n",rt->name);
 
     fclose(fp);
