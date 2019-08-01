@@ -4,12 +4,13 @@ import classNames from "classnames"
 import { ChartLegend } from "./chart-legend"
 import { Attributes } from "../utils/transformDataAttributes"
 import { chartLibrariesSettings, ChartLibraryConfig } from "../utils/chartLibrariesSettings"
-import { ChartData } from "../chart-types"
+import { ChartData, ChartDetails } from "../chart-types"
 import { LegendToolbox } from "./legend-toolbox"
 import { ResizeHandler } from "./resize-handler"
 
 interface Props {
   chartData: ChartData
+  chartDetails: ChartDetails
   attributes: Attributes
 }
 
@@ -42,6 +43,7 @@ const getStyles = (attributes: Attributes, chartSettings: ChartLibraryConfig) =>
 
 export const Chart = ({
   chartData,
+  chartDetails,
   attributes: {
     chartLibrary,
   },
@@ -76,6 +78,7 @@ export const Chart = ({
       />
       {hasLegend && (
         <ChartLegend
+          chartDetails={chartDetails}
           chartLibrary={chartLibrary}
         />
       )}

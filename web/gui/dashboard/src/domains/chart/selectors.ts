@@ -14,3 +14,8 @@ export const selectChartData = createSelector(
   selectSingleChartState,
   chartState => chartState.chartData,
 )
+
+export const selectChartDetails = createSelector(
+  selectSingleChartState,
+  chartState => chartState.chartDetails,
+)

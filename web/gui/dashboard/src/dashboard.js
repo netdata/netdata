@@ -90,7 +90,7 @@
 
 // *** src/dashboard.js/utils.js
 
-import { updateChartDataAction } from './domains/chart/actions';
+import { updateChartDataAction, updateChartDetailsAction } from './domains/chart/actions';
 
 let reduxStore
 NETDATA.name2id = function (s) {
@@ -8655,6 +8655,10 @@ let chartState = function (element, chartIndex) {
                     chart = NETDATA.xss.checkOptional('/api/v1/chart', chart);
 
                     chart.url = that.chart_url;
+                    reduxStore.dispatch(updateChartDetailsAction({
+                        id: `${chart.id}-${that.chartIndex}`,
+                        chartDefaults: chart,
+                    }))
                     that.__defaultsFromDownloadedChart(chart);
                     NETDATA.chartRegistry.add(that.host, that.id, chart);
                 })

@@ -1,10 +1,14 @@
 import React from "react"
 import classNames from "classnames"
 
+import { ChartDetails } from "../chart-types"
+
 interface Props {
+  chartDetails: ChartDetails
   chartLibrary: string
 }
 export const ChartLegend = ({
+  chartDetails, // eslint-disable-line no-unused-vars
   chartLibrary,
 }: Props) => (
   <div className={classNames(
