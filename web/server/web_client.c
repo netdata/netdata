@@ -929,7 +929,6 @@ void web_client_split_path_query(struct web_client *w, char *s) {
 
     w->separator = 0x00;
     w->url_path_length = strlen(s);
-    w->url_search_path = NULL;
 }
 
 /**
@@ -1035,6 +1034,8 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // a valid complete HTTP request found
 
                 *ue = '\0';
+                //This is to avoid crash in line
+                w->url_search_path = NULL;
                 if(w->mode != WEB_CLIENT_MODE_NORMAL) {
                     if(!url_decode_r(w->decoded_url, encoded_url, NETDATA_WEB_REQUEST_URL_SIZE + 1))
                         return HTTP_VALIDATION_MALFORMED_URL;
