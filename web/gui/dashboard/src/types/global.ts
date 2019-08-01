@@ -77,6 +77,10 @@ interface NETDATA {
       retries_on_data_failures: number
     }
   }
+  dateTime: {
+    localeDateString: (d: Date) => string
+    localeTimeString: (d: Date) => string
+  }
   serverDefault: string
   start: () => void
 }

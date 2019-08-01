@@ -12,4 +12,4 @@ export interface UpdateChartDetailsAction {
   chartDetails: ChartDetails
   id: string
 }
-export const updateChartDetailsAction = createAction<UpdateChartDetailsAction>("updateChartDefaults")
+export const updateChartDetailsAction = createAction<UpdateChartDetailsAction>("updateChartDetails")

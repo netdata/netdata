@@ -78,6 +78,7 @@ export const Chart = ({
       />
       {hasLegend && (
         <ChartLegend
+          chartData={chartData}
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}
         />

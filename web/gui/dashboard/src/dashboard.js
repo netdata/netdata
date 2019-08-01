@@ -8657,7 +8657,7 @@ let chartState = function (element, chartIndex) {
                     chart.url = that.chart_url;
                     reduxStore.dispatch(updateChartDetailsAction({
                         id: `${chart.id}-${that.chartIndex}`,
-                        chartDefaults: chart,
+                        chartDetails: chart,
                     }))
                     that.__defaultsFromDownloadedChart(chart);
                     NETDATA.chartRegistry.add(that.host, that.id, chart);
