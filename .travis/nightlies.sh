@@ -12,8 +12,6 @@
 set -e
 FAIL=0
 
-source tests/installer/slack.sh || echo "Could not load slack library"
-
 # If we are not in netdata git repo, at the top level directory, fail
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
 CWD=$(git rev-parse --show-cdup || echo "")
@@ -22,6 +20,8 @@ if [ -n "${CWD}" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     echo "Changelog generation process aborted"
     exit 1
 fi
+
+source system/slack.sh || echo "Could not load slack library"
 
 LAST_TAG=$(git describe --abbrev=0 --tags)
 COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
