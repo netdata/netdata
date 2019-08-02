@@ -2538,7 +2538,7 @@ netdataDashboard.context = {
     },
 
     'vsphere.disk_max_latency': {
-        info: '<code>latency</code> is highest latency value across all disks used by the host.'
+        info: '<code>latency</code> is highest latency value across all disks.'
     },
 
     'vsphere.overall_status': {
