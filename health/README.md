@@ -192,7 +192,8 @@ Everything is the same with [badges](../web/api/badges/). In short:
 
 - `foreach DIMENSIONS` is optional and it will always be the last parameter. The rules for dimension here follow the same
    pattern of the previous parameter. It is used to set the group of the dimensions of a chart that will have the same
-   rule to raise an alarm.
+   rule to raise an alarm. It is important to say that when both `foreach` and `of` are set, the `of` condition will be
+   discarded with one of the dimensions given into `foreach` assuming its place.
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions.
 The timestamps of the timeframe evaluated by the database lookup is available as variables

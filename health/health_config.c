@@ -45,11 +45,11 @@ char *health_alarm_name_with_dim(char *name, char *dim) {
     newname = malloc(namelen + dimlen + 2);
     if(newname) {
         move = newname;
-        strncpy(move, name, namelen);
+        memcpy(move, name, namelen);
         move += namelen;
 
         *move++ = '_';
-        strncpy(move, dim, dimlen);
+        memcpy(move, dim, dimlen);
         move += dimlen;
         *move = '\0';
     } else {
@@ -88,7 +88,6 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if (rrdcalc_exists(host, rc->chart, rc->name, rc->hash_chart, rc->hash))
         return 0;
 
-    fprintf(stderr,"KILLME alarm from config %s\n",rc->name);
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
     debug(D_HEALTH, "Health configuration adding alarm '%s.%s' (%u): exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
@@ -149,7 +148,6 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
         return 0;
     }
 
-    fprintf(stderr,"KILLME template from config %s %s \n",rt->name,(rt->foreachdim)?rt->foreachdim:"NONE");
     RRDCALCTEMPLATE *t, *last = NULL;
     for (t = host->templates; t ; last = t, t = t->next) {
         if(unlikely(t->hash_name == rt->hash_name
@@ -386,6 +384,22 @@ static inline int health_parse_repeat(
 }
 
 /**
+ * Remove pipe
+ *
+ * Remove the pipes converting them to comma.
+ *
+ * @param str the string to change.
+ */
+static void health_remove_pipe(char *str) {
+    while(*str) {
+        if(*str == '|')
+            *str = ',';
+
+        str++;
+    }
+}
+
+/**
  * Parse DB lookup
  *
  *
@@ -515,6 +529,7 @@ static inline int health_parse_db_lookup(
         }
         else if(!strcasecmp(key, HEALTH_FOREACH_KEY )) {
             *foreachdim = strdupz(s);
+            health_remove_pipe(*foreachdim);
             break;
         }
         else {
@@ -531,8 +546,8 @@ static inline int health_parse_db_lookup(
  *
  * Make a buffer with the file name and return to store inside a RRDCALCTEMPLATE or RRDCALC
  *
- * @param line
- * @param file
+ * @param line the line number
+ * @param file the filename
  *
  * @return It returns the buffer with the source file
  */
@@ -553,6 +568,82 @@ static inline void strip_quotes(char *s) {
     while(*s) {
         if(*s == '\'' || *s == '"') *s = ' ';
         s++;
+    }
+}
+
+/**
+ * Add Alarms Logs
+ *
+ * Do a loop through the dimensions to add alarms case the "foreach" is present, case it is not
+ * it will add the unique alarm.
+ *
+ * @param host the host structure where it will be stored the alarm.
+ * @param rc the alarm structure to be appended to host
+ * @param ignore_this an integer that you describe the action to do with rc.
+ */
+static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignore_this) {
+    char *foreachdim;
+    char *tok;
+    char *copyname;
+    char *move;
+    if(rc->foreachdim) {
+        foreachdim = rc->foreachdim;
+        tok = foreachdim;
+        move = tok;
+        copyname = rc->name;
+    } else {
+        foreachdim = NULL;
+        tok = rc->name;
+        copyname = NULL;
+        move = NULL;
+    }
+
+    RRDCALC *original = rc;
+    int isfirst = 1;
+    while(tok) {
+        if(foreachdim) {
+            tok = strchr(move,',');
+            if(tok) { //We have only one dimension
+                *tok = '\0';
+            }
+
+            if(!isfirst) { //It is not the first, so I need a new RRDCALC
+                rc = rrdcalc_create_from_rrdcalc(original, host, health_alarm_name_with_dim(copyname, move), move);
+            } else {
+                rc->name = health_alarm_name_with_dim(copyname, move);
+                rc->hash = simple_hash(rc->name);
+
+                //We clean the initial dimensions, because we will overwrite it
+                //with the specific dimension of foreach
+                if(rc->dimensions) {
+                    freez(rc->dimensions);
+                    rc->dimensions = NULL;
+                }
+                rc->dimensions = strdupz(move);
+            }
+        } else {
+            tok = NULL;
+        }
+
+        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
+            rrdcalc_free(rc);
+
+        if(tok) {
+            *tok++ = ',';
+        }
+
+        move = tok;
+
+        isfirst =0;
+    }
+
+    //The original name is changed when we
+    //have a "foreach", so we release the
+    //original name here.
+    if(rc->foreachdim) {
+        if (copyname) {
+            freez(copyname);
+        }
     }
 }
 
@@ -625,7 +716,6 @@ static int health_readfile(const char *filename, void *data) {
         return 0;
     }
 
-    fprintf(stderr,"KILLME file: %s\n",filename);
     RRDCALC *rc = NULL;
     RRDCALCTEMPLATE *rt = NULL;
 
@@ -676,18 +766,16 @@ static int health_readfile(const char *filename, void *data) {
         uint32_t hash = simple_uhash(key);
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
-            if (rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
-                rrdcalc_free(rc);
-            else if (rc)
-                if(rc->foreachdim)
-                    fprintf(stderr,"KILLME rc 1 added %s\n",rc->name);
+            if(rc) {
+                health_add_alarms_loop(host, rc, ignore_this) ;
+            }
 
             if(rt) {
+                if(rt->foreachdim)
+                    fprintf(stderr,"KILLME rt 1 added %s\n",rt->name);
+
                 if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
                     rrdcalctemplate_free(rt);
-                else if(rt)
-                    if(rt->foreachdim)
-                        fprintf(stderr,"KILLME rt 1 added %s\n",rt->name);
 
                 rt = NULL;
             }
@@ -713,20 +801,18 @@ static int health_readfile(const char *filename, void *data) {
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
-                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
-                    rrdcalc_free(rc);
-                else if (rc)
-                    if(rc->foreachdim)
-                        fprintf(stderr,"KILLME rc 2 added %s\n",rc->name);
+                health_add_alarms_loop(host, rc, ignore_this) ;
 
                 rc = NULL;
             }
 
-            if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
-                rrdcalctemplate_free(rt);
-            else if (rt)
+            if(rt) {
                 if(rt->foreachdim)
                     fprintf(stderr,"KILLME rt 2 added %s\n",rt->name);
+
+                if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
+                    rrdcalctemplate_free(rt);
+            }
 
             rt = callocz(1, sizeof(RRDCALCTEMPLATE));
             rt->name = strdupz(value);
@@ -1033,17 +1119,17 @@ static int health_readfile(const char *filename, void *data) {
         }
     }
 
-    if(rc && (ignore_this || !rrdcalc_add_alarm_from_config(host, rc)))
-        rrdcalc_free(rc);
-    else if (rc)
-        if(rc->foreachdim)
-            fprintf(stderr,"KILLME rc added 3 %s\n",rc->name);
+    if(rc) {
+        health_add_alarms_loop(host, rc, ignore_this) ;
+    }
 
-    if(rt && (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt)))
-        rrdcalctemplate_free(rt);
-    else if (rt)
+    if(rt) {
         if(rt->foreachdim)
             fprintf(stderr,"KILLME rt added 3 %s\n",rt->name);
+
+        if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
+            rrdcalctemplate_free(rt);
+    }
 
     fclose(fp);
     return 1;

@@ -83,7 +83,6 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     if(!rrdcalc_isrepeating(rc)) {
         time_t now = now_realtime_sec();
-        fprintf(stderr,"KILLME alarm entry: %s\n",rc->name);
         ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc->id,
@@ -127,7 +126,6 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
         if(unlikely(rc->rrdset))
             continue;
 
-        fprintf(stderr,"KILLME link_matching: %s %s\n",rc->chart,(rc->foreachdim)?rc->foreachdim:"NONE");
         if(unlikely(rrdcalc_is_matching_this_rrdset(rc, st)))
             rrdsetcalc_link(st, rc);
     }
@@ -305,6 +303,17 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     }
 }
 
+/**
+ * RRDCALC Create From Template
+ *
+ * Create a new alarm from the template.
+ *
+ * @param host the host structure with the alarms united.
+ * @param rt the template for the alarm.
+ * @param chart the chart name
+ *
+ * @return it returns the alarm on success and NULL otherwise.
+ */
 inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
     debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, rt->name);
 
@@ -313,7 +322,6 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
 
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
     rc->next_event_id = 1;
-    rc->id = rrdcalc_get_unique_id(host, chart, rt->name, &rc->next_event_id);
     rc->name = strdupz(rt->name);
     rc->hash = simple_hash(rc->name);
     rc->chart = strdupz(chart);
@@ -353,11 +361,13 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
         if(!rc->calculation)
             error("Health alarm '%s.%s': failed to parse calculation expression '%s'", chart, rt->name, rt->calculation->source);
     }
+
     if(rt->warning) {
         rc->warning = expression_parse(rt->warning->source, NULL, NULL);
         if(!rc->warning)
             error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", chart, rt->name, rt->warning->source);
     }
+
     if(rt->critical) {
         rc->critical = expression_parse(rt->critical->source, NULL, NULL);
         if(!rc->critical)
@@ -399,10 +409,87 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     return rc;
 }
 
+/**
+ *  Create from RRDCALC
+ *
+ *  Create a new alarm using another alarm as template.
+ *
+ * @param rc is the alarm that will be used as source
+ * @param host is the host structure.
+ * @param name is the newest chart name.
+ *
+ * @return it returns the new alarm changed.
+ */
+inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension) {
+    RRDCALC *newrc = callocz(1, sizeof(RRDCALC));
+
+    newrc->next_event_id = 1;
+    newrc->id = rrdcalc_get_unique_id(host, rc->chart, name, &rc->next_event_id);
+    newrc->name = name;
+    newrc->hash = simple_hash(rc->name);
+    newrc->chart = strdupz(rc->chart);
+    newrc->hash_chart = simple_hash(rc->chart);
+
+    newrc->dimensions = strdupz(dimension);
+    if(rc->foreachdim) newrc->foreachdim = strdupz(rc->foreachdim);
+
+    newrc->green = rc->green;
+    newrc->red = rc->red;
+    newrc->value = NAN;
+    newrc->old_value = NAN;
+
+    newrc->delay_up_duration = rc->delay_up_duration;
+    newrc->delay_down_duration = rc->delay_down_duration;
+    newrc->delay_max_duration = rc->delay_max_duration;
+    newrc->delay_multiplier = rc->delay_multiplier;
+
+    newrc->last_repeat = 0;
+    newrc->warn_repeat_every = rc->warn_repeat_every;
+    newrc->crit_repeat_every = rc->crit_repeat_every;
+
+    newrc->group = rc->group;
+    newrc->after = rc->after;
+    newrc->before = rc->before;
+    newrc->update_every = rc->update_every;
+    newrc->options = rc->options;
+
+    if(newrc->exec) rc->exec = strdupz(rc->exec);
+    if(newrc->recipient) rc->recipient = strdupz(rc->recipient);
+    if(newrc->source) rc->source = strdupz(rc->source);
+    if(newrc->units) rc->units = strdupz(rc->units);
+    if(newrc->info) rc->info = strdupz(rc->info);
+
+    if(rc->calculation) {
+        rc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
+        if(!rc->calculation)
+            error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rc->chart, rc->name, rc->calculation->source);
+    }
+
+    if(rc->warning) {
+        newrc->warning = expression_parse(rc->warning->source, NULL, NULL);
+        if(!newrc->warning)
+            error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", rc->chart, rc->name, rc->warning->source);
+    }
+
+    if(rc->critical) {
+        newrc->critical = expression_parse(rc->critical->source, NULL, NULL);
+        if(!newrc->critical)
+            error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", rc->chart, rc->name, rc->critical->source);
+    }
+
+    return newrc;
+}
+
+
+/**
+ * RRDCALC Free
+ *
+ * Clean the alarm structure.
+ *
+ * @param rc the structure with the addresses to release.
+ */
 void rrdcalc_free(RRDCALC *rc) {
     if(unlikely(!rc)) return;
-
-    fprintf(stderr,"KILLME CLEANING %s\n",rc->name);
 
     expression_free(rc->calculation);
     expression_free(rc->warning);
