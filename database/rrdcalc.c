@@ -463,8 +463,8 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *na
     if(newrc->info) rc->info = strdupz(rc->info);
 
     if(rc->calculation) {
-        newrc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
-        if(!newrc->calculation)
+        rc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
+        if(!rc->calculation)
             error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rc->chart, rc->name, rc->calculation->source);
     }
 

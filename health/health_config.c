@@ -392,7 +392,8 @@ static inline int health_parse_repeat(
  */
 static void health_remove_pipe(char *str) {
     while(*str) {
-        if(*str == '|') *str = ',';
+        if(*str == '|')
+            *str = ',';
 
         str++;
     }
