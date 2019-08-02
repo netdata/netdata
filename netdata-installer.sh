@@ -800,7 +800,7 @@ install_go() {
 			fi
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 
@@ -813,7 +813,8 @@ install_go() {
 			return 0
 		fi
 
-		grep "${GO_PACKAGE_BASENAME}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		run tar xf "${GO_PACKAGE_BASENAME}" && run rm -f "${GO_PACKAGE_BASENAME}"
+		grep "${GO_PACKAGE_BASENAME/\.tar\.gz/}\$" "${INSTALLER_DIR}/packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "${INSTALLER_DIR}/packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
@@ -833,7 +834,7 @@ install_go() {
 		run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
 		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-		run mv "${tmp}/$GO_PACKAGE_BASENAME" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		run mv "${tmp}/${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		if [ "${UID}" -eq 0 ]; then
 			run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		fi

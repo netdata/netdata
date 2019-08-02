@@ -62,7 +62,7 @@ install_go() {
 			fi
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
 
@@ -72,7 +72,8 @@ install_go() {
 			return 1
 		fi
 
-		grep "${GO_PACKAGE_BASENAME}\$" "packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		tar xf "${GO_PACKAGE_BASENAME}" && run rm -f "${GO_PACKAGE_BASENAME}"
+		grep "${GO_PACKAGE_BASENAME/\.tar\.gz/}\$" "packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
@@ -88,7 +89,7 @@ install_go() {
 
 		# Install files
 		tar -xf "${tmp}/config.tar.gz" -C "${LIB_DIR}/conf.d/"
-		mv "${tmp}/$GO_PACKAGE_BASENAME" "${LIBEXEC_DIR}/plugins.d/go.d.plugin"
+		mv "${tmp}/${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${LIBEXEC_DIR}/plugins.d/go.d.plugin"
 	fi
 	return 0
 }
