@@ -72,8 +72,7 @@ install_go() {
 			return 1
 		fi
 
-		tar xf "${GO_PACKAGE_BASENAME}" && run rm -f "${GO_PACKAGE_BASENAME}"
-		grep "${GO_PACKAGE_BASENAME/\.tar\.gz/}\$" "packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
+		grep "${GO_PACKAGE_BASENAME}\$" "packaging/go.d.checksums" > "${tmp}/sha256sums.txt" 2>/dev/null
 		grep "config.tar.gz" "packaging/go.d.checksums" >> "${tmp}/sha256sums.txt" 2>/dev/null
 
 		# Checksum validation
@@ -89,6 +88,7 @@ install_go() {
 
 		# Install files
 		tar -xf "${tmp}/config.tar.gz" -C "${LIB_DIR}/conf.d/"
+		tar xf "${GO_PACKAGE_BASENAME}" && run rm -f "${GO_PACKAGE_BASENAME}"
 		mv "${tmp}/${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${LIBEXEC_DIR}/plugins.d/go.d.plugin"
 	fi
 	return 0
