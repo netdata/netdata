@@ -392,8 +392,7 @@ static inline int health_parse_repeat(
  */
 static void health_remove_pipe(char *str) {
     while(*str) {
-        if(*str == '|')
-            *str = ',';
+        if(*str == '|') *str = ',';
 
         str++;
     }
@@ -602,7 +601,7 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
     int isfirst = 1;
     while(tok) {
         if(foreachdim) {
-            tok = strchr(move,',');
+            tok = strchr(move, ',');
             if(tok) { //We have only one dimension
                 *tok = '\0';
             }

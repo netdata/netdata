@@ -327,6 +327,9 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->chart = strdupz(chart);
     rc->hash_chart = simple_hash(rc->chart);
 
+    //INSTEAD TO COPY THE DIMENSIONS WHEN THERE IS A FOREACH, IT WILL BE NECESSARY TO
+    //CREATE A NEW ARGUMENT TO GIVE THE DIMENSION TO APPLY CASE THE FOREACH IS PRESENT
+    //SEE THE LINE 426 OF THIS FILE
     if(rt->dimensions) rc->dimensions = strdupz(rt->dimensions);
     if(rt->foreachdim) rc->foreachdim = strdupz(rt->foreachdim);
 
@@ -460,8 +463,8 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *na
     if(newrc->info) rc->info = strdupz(rc->info);
 
     if(rc->calculation) {
-        rc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
-        if(!rc->calculation)
+        newrc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
+        if(!newrc->calculation)
             error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rc->chart, rc->name, rc->calculation->source);
     }
 

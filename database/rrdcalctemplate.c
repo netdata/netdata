@@ -6,6 +6,13 @@
 // ----------------------------------------------------------------------------
 // RRDCALCTEMPLATE management
 
+/**
+ * RRDCALC TEMPLATE LINK MATCHING
+ *
+ * Link a template for a specific chart.
+ *
+ * @param st is the chart where the alarm will be attached.
+ */
 void rrdcalctemplate_link_matching(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     RRDCALCTEMPLATE *rt;
@@ -13,7 +20,8 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     for(rt = host->templates; rt ; rt = rt->next) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
            && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
-            fprintf(stderr,"KILLME adding chart: %s %s\n",st->id,(rt->foreachdim)?rt->foreachdim:"nothing");
+            fprintf(stderr,"KILLME creating chart from template: %s %s\n",st->id,(rt->foreachdim)?rt->foreachdim:"nothing");
+            //IT IS NECESSRY TO BRING THE SAME STRUCTURE USED IN THE FILE health_config.c (line 583)
             RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
             if(unlikely(!rc))
                 info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
@@ -26,6 +34,14 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     }
 }
 
+/**
+ * Template free
+ *
+ * After the template to be unlinked from the caller, this function
+ * cleans the heap.
+ *
+ * @param rt the template to be cleaned.
+ */
 inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt)) return;
 
@@ -48,6 +64,14 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt);
 }
 
+/**
+ * RRDCALC Templace Unlink and Free
+ *
+ * Unlink the template from Host and call rrdcalctemplate_free
+ *
+ * @param host the structure with the template links
+ * @param rt the template that will be unlink and cleaned.
+ */
 inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt)) return;
 
