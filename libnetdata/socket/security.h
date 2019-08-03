@@ -34,6 +34,7 @@ extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
 extern const char *security_cert;
 extern int netdata_validate_server;
+extern int security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
 void security_openssl_library();
 void security_clean_openssl();
