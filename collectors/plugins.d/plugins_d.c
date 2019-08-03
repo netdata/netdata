@@ -371,14 +371,28 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
             if (likely(__stream_mem_st)) 
                 rrddim_add(__stream_mem_st, PLUGINSD_STREAM_MEMORY,  PLUGINSD_STREAM_MEMORY, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
+            else
+                error("Failed to allocate stream_mem chart");           
+            
             if (likely(__stream_cnt_st))
                 rrddim_add(__stream_cnt_st, PLUGINSD_STREAM_COUNT,  PLUGINSD_STREAM_COUNT, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            else
+                error("Failed to allocate stream_cnt chart");
+            
             if (likely(__stream_prs_st))
                 rrddim_add(__stream_prs_st, PLUGINSD_STREAM_PROCESSORS, PLUGINSD_STREAM_PROCESSORS, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            else 
+                error("Failed to allocate stream_prs chart");
+            
             if (likely(__stream_metrics_st))
                 rrddim_add(__stream_metrics_st, PLUGINSD_STREAM_METRICS, PLUGINSD_STREAM_METRICS, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            else 
+                error("Failed to allocate stream_metrics chart");
+
             if (likely(__stream_processes_st))
                 rrddim_add(__stream_processes_st, PLUGINSD_STREAM_PROCESSES, PLUGINSD_STREAM_PROCESSES, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            else 
+                error("Failed to allocate stream_processes chart");
     }
 
     if (likely(host != localhost) && likely(stream_stats_enabled)) {
@@ -538,31 +552,31 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             if (likely(stream_stats_enabled) && (now_realtime_sec() - stream_updated > 0)) {
                 if (likely(__stream_mem_st)) {
                     rrddim_set(__stream_mem_st, PLUGINSD_STREAM_MEMORY, (collected_number) total_ram);
-                    //rrdset_next(__stream_mem_st);
+                    rrdset_next(__stream_mem_st);
                     rrdset_done(__stream_mem_st);
                 }
             
                 if (likely(__stream_cnt_st)) {         
                     rrddim_set(__stream_cnt_st, PLUGINSD_STREAM_COUNT, (collected_number) total_streams);
-                    //rrdset_next(__stream_cnt_st);
+                    rrdset_next(__stream_cnt_st);
                     rrdset_done(__stream_cnt_st);
                 }
 
                 if (likely(__stream_prs_st)) {
                     rrddim_set(__stream_prs_st, PLUGINSD_STREAM_PROCESSORS, (collected_number) total_processors);
-                    //rrdset_next(__stream_prs_st);
+                    rrdset_next(__stream_prs_st);
                     rrdset_done(__stream_prs_st);
                 }
 
                 if (likely(__stream_metrics_st)) {
                     rrddim_set(__stream_metrics_st, PLUGINSD_STREAM_METRICS, (collected_number) total_metrics);
-                    //rrdset_next(__stream_metrics_st);
+                    rrdset_next(__stream_metrics_st);
                     rrdset_done(__stream_metrics_st);
                 }
 
                 if (likely(__stream_processes_st)) {
                     rrddim_set(__stream_processes_st, PLUGINSD_STREAM_PROCESSES, (collected_number) total_processes);
-                    //rrdset_next(__stream_processes_st);
+                    rrdset_next(__stream_processes_st);
                     rrdset_done(__stream_processes_st);
                 }
                 stream_updated = now_realtime_sec();
