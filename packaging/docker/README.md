@@ -108,7 +108,7 @@ Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#e
 
 For a permanent installation on a public server, you should [secure the Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
 
-You can use the following docker-compose.yml and Caddyfile files to run Netdata with Docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
+You can use the following docker-compose.yml and Caddyfile files to run Netdata with Docker. Replace the Domains and email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
 
 ### Prerequisites
 * [Docker](https://docs.docker.com/install/#server)
@@ -205,22 +205,22 @@ Then we can run `helm install [path to our helmchart clone]`.
 
 If we make changes to the code, we execute the same `build-test.sh` command, followed by `helm upgrade [name] [path to our helmchart clone]`
 
-### Inside netdata organization, using Travis CI
+### Inside Netdata organization, using Travis CI
 
 To enable Travis CI integration on your own repositories (Docker and Github), you need to be part of the Netdata organization.
-Once you have contacted the netdata owners to setup you up on Github and Travis, execute the following steps
+Once you have contacted the Netdata owners to setup you up on Github and Travis, proceed with the following steps
 
 - Preparation
-  - Have netdata forked on your personal GITHUB account
+  - Have Netdata forked on your personal GITHUB account
   - Get a GITHUB token: Go to Github settings -> Developer Settings -> Personal access tokens, generate a new token with full access to repo_hook, read only access to admin:org, public_repo, repo_deployment, repo:status and user:email settings enabled. This will be your GITHUB_TOKEN that is described later in the instructions, so keep it somewhere safe until is needed.
-  - Contact netdata team and seek for permissions on https://scan.coverity.com should you require Travis to be able to push your forked code to coverity for analysis and report. Once you are setup, you should have your email you used in coverity and a token from them. These will be your COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN that we will refer to later.
+  - Contact Netdata team and seek for permissions on https://scan.coverity.com should you require Travis to be able to push your forked code to coverity for analysis and report. Once you are setup, you should have your email you used in coverity and a token from them. These will be your COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN that we will refer to later.
   - Have a valid Docker hub account, the credentials from this account will be your DOCKER_USERNAME and DOCKER_PWD mentioned later
 
 - Setting up Travis CI for your own fork (Detailed instructions provided by Travis team [here](https://docs.travis-ci.com/user/tutorial/))
   - Login to travis with your own GITHUB credentials (There is Open Auth access)
   - Go to your profile settings, under [repositories](https://travis-ci.com/account/repositories) section and setup your netdata fork to be built by travis
   - Once the repository has been setup, go to repository settings within travis (usually under https://travis-ci.com/NETDATA_DEVELOPER/netdata/settings, where "NETDATA_DEVELOPER" is your github handle) and select your desired settings.
-- While in Travis settings, under netdata repository settings in the Environment Variables section, you need to add the following:
+- While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add the following:
   - DOCKER_USERNAME and DOCKER_PWD variables so that Travis can login to your docker hub account and publish docker images there. 
   - REPOSITORY variable to "NETDATA_DEVELOPER/netdata" where NETDATA_DEVELOPER is your github handle again.
   - GITHUB_TOKEN variable with the token generated on the preparation step, for travis workflows to function properly
