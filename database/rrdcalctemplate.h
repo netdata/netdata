@@ -71,5 +71,5 @@ extern void rrdcalctemplate_link_matching(RRDSET *st);
 
 extern void rrdcalctemplate_free(RRDCALCTEMPLATE *rt);
 extern void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt);
-
+extern void rrdcalctemplate_create_alarms(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET *st);
 #endif //NETDATA_RRDCALCTEMPLATE_H
