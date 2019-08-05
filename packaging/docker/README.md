@@ -10,13 +10,13 @@ Running Netdata in a container for monitoring the whole host, can limit its capa
 
 ## Package scrambling in runtime (x86_64 only)
 
-By default on x86_64 architecture our Docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting netdata docker container.
+By default on x86_64 architecture, our Docker images use Polymorphic Polyverse Linux package scrambling. For increased security, you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata Docker container.
 
 For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
 
-## Run Netdata with docker command
+## Run Netdata with Docker command
 
-Quickly start Netdata with the docker command line.
+Quickly start Netdata with the Docker command line.
 Netdata is then available at http://host:19999
 
 This is good for an internal network or to quickly analyze a host.
@@ -64,12 +64,11 @@ There are a few options for resolving container names within Netdata. Some metho
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access to the CONTAINERS endpoint.
 
-The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
+The reason it's safer to expose the socket to the proxy is that Netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
 
 #### Giving group access to Docker Socket (Less safe)
 
-**Important Note**: You should seriously consider the necessity of activating this option,
-as it grants to the netdata user access to the privileged socket connection of docker service and therefore your whole machine.
+**Important Note**: You should seriously consider the necessity of activating this option, as it grants to the netdata user access to the privileged socket connection of docker service and therefore your whole machine.
 
 If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the socket.
 
