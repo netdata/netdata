@@ -723,7 +723,6 @@ class Service(MySQLService):
         for row in rows:
             slave_data = dict(zip(description_keys, row))
             channel_name = slave_data.get('Channel_Name', DEFAULT_REPL_CHANNEL)
-            channel_name = "new_channel"
 
             if channel_name not in self.repl_channels and len(self.charts) > 0:
                 self.add_repl_channel_charts(channel_name)
