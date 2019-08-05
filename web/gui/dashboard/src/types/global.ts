@@ -1,5 +1,23 @@
 /* eslint-disable camelcase */
 // @ts-ignore isolated-modules
+
+interface Theme {
+  ackground: string
+  foreground: string
+  grid: string
+  axis: string
+  highlight: string
+  colors: string[]
+  d3pie: {
+    [d3pieKey: string]: string
+  }
+  easypiechart_track: string
+  easypiechart_scale: string
+  gauge_pointer: string
+  gauge_stroke: string
+  gauge_gradient: string
+}
+
 interface NETDATA {
   chartDefaults: {
     width: string | null
@@ -83,6 +101,7 @@ interface NETDATA {
   }
   serverDefault: string
   start: () => void
+  themes: { [key: string]: Theme }
 }
 
 type jQuery = any

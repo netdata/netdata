@@ -73,7 +73,7 @@ interface BooleanAttributeConfig extends BaseAttributeConfig {
 type AttributeConfig = BaseAttributeConfig | BooleanAttributeConfig
 
 export type AttributePropKeys = "id" | "host" | "title" | "chartLibrary" | "width" | "height" | "after"
-  | "before" | "legend" | "dygraphValueRange" | "dygraphTheme"
+  | "before" | "legend" | "units" | "colors" | "commonColors" | "dygraphValueRange" | "dygraphTheme"
 type AttributesMap = {
   [key in AttributePropKeys]: AttributeConfig
 }
@@ -89,6 +89,9 @@ const getAttributesMap = (): AttributesMap => ({
   after: { key: "data-after", defaultValue: window.NETDATA.chartDefaults.after },
   before: { key: "data-after", defaultValue: window.NETDATA.chartDefaults.before },
   legend: { key: "data-legend", type: "boolean", defaultValue: true },
+  units: { key: "data-units" },
+  colors: { key: "data-colors" },
+  commonColors: { key: "data-common-colors" },
   dygraphValueRange: { key: "data-dygraph-valuerange", defaultValue: [null, null] },
   dygraphTheme: { key: "data-dygraph-theme", defaultValue: "default" },
 })
@@ -103,6 +106,9 @@ export interface Attributes {
   after: number
   before: number
   legend: boolean
+  units: string
+  colors: string | undefined
+  commonColors: string | undefined
   dygraphValueRange: any[]
   dygraphTheme: string
 }

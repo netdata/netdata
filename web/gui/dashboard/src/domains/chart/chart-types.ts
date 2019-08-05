@@ -30,7 +30,7 @@ interface Dimension {
 export interface ChartDetails {
   alarms: {}
   chart_type: string
-  context?: string
+  context: string
   data_url: string
   dimensions: {
     [key: string]: Dimension

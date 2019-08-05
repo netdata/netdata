@@ -5,10 +5,11 @@ export type ChartLibraryName = "dygraph"
   | "easypiechart"
 // | "gauge" | "textonly"
 export interface ChartLibraryConfig {
-  hasToolboxPanAndZoom: boolean
-  xssRegexIgnore: RegExp
-  hasLegend: (attributes: Attributes) => boolean
   aspectRatio?: number
+  hasLegend: (attributes: Attributes) => boolean
+  hasToolboxPanAndZoom: boolean
+  trackColors: boolean
+  xssRegexIgnore: RegExp
 }
 export type ChartLibrariesSettings = {
   [key in ChartLibraryName]: ChartLibraryConfig
@@ -52,10 +53,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //   void (state)
     //   return 5000
     // },
-    // track_colors(state) {
-    //   void (state)
-    //   return true
-    // },
+    trackColors: true,
     // pixels_per_point(state) {
     //   return (this.isSparkline(state) === false) ? 3 : 2
     // },
@@ -322,10 +320,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //     void (state)
     //     return 5000
     //   },
-    //   track_colors(state) {
-    //     void (state)
-    //     return true
-    //   },
+    trackColors: true,
     //   pixels_per_point(state) {
     //     void (state)
     //     return 3

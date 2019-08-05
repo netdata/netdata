@@ -1,5 +1,9 @@
 import React from "react"
 import classNames from "classnames"
+import { useDispatch, useSelector } from "react-redux"
+
+import { requestCommonColorsAction } from "domains/global/actions"
+import { createSelectAssignedColors } from "domains/global/selectors"
 
 import { ChartLegend } from "./chart-legend"
 import { Attributes } from "../utils/transformDataAttributes"
@@ -11,6 +15,7 @@ import { ResizeHandler } from "./resize-handler"
 interface Props {
   chartData: ChartData
   chartDetails: ChartDetails
+  chartUuid: string
   attributes: Attributes
 }
 
@@ -44,13 +49,12 @@ const getStyles = (attributes: Attributes, chartSettings: ChartLibraryConfig) =>
 export const Chart = ({
   chartData,
   chartDetails,
+  chartUuid,
   attributes: {
     chartLibrary,
   },
   attributes,
 }: Props) => {
-  console.log("chartData", chartData) // eslint-disable-line no-console
-  const chartUuid = "chart-uuid" // todo
   const chartElemId = `${chartLibrary}-${chartUuid}-chart`
 
   const chartSettings = chartLibrariesSettings[chartLibrary]
@@ -58,6 +62,27 @@ export const Chart = ({
 
   const shouldDisplayToolbox = hasLegend(attributes)
     && window.NETDATA.options.current.legend_toolbox
+
+  const dispatch = useDispatch()
+  // this actually works correctly without wrapping with useEffect()
+  // but perhaps it will need closer look when the component will grow
+  dispatch(requestCommonColorsAction({
+    chartContext: chartDetails.context,
+    chartUuid,
+    colorsAttribute: attributes.colors,
+    commonColorsAttribute: attributes.commonColors,
+    dimensionNames: chartData.dimension_names,
+  }))
+
+  const selectAssignedColors = createSelectAssignedColors({
+    chartContext: chartDetails.context,
+    chartUuid,
+    colorsAttribute: attributes.colors,
+    commonColorsAttribute: attributes.commonColors,
+  })
+  const colors = useSelector(selectAssignedColors)
+  console.log("colors", colors) // eslint-disable-line no-console
+
   return (
     <div
       style={getStyles(attributes, chartSettings)}
@@ -78,6 +103,7 @@ export const Chart = ({
       />
       {hasLegend && (
         <ChartLegend
+          attributes={attributes}
           chartData={chartData}
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}

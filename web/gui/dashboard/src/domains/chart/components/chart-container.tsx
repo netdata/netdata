@@ -9,25 +9,26 @@ import { selectChartData, selectChartDetails } from "../selectors"
 
 export type Props = {
   attributes: Attributes
-  uniqueId: string
+  chartUuid: string
 }
 
 export const ChartContainer = ({
   attributes,
-  uniqueId,
+  chartUuid,
 }: Props) => {
-  const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: uniqueId }))
+  const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
   const chartDetails = useSelector((state: AppStateT) => selectChartDetails(
-    state, { id: uniqueId },
+    state, { id: chartUuid },
   ))
   if (!chartData || !chartDetails) {
     return <span>loading...</span>
   }
   return (
     <Chart
+      attributes={attributes}
       chartData={chartData}
       chartDetails={chartDetails}
-      attributes={attributes}
+      chartUuid={chartUuid}
     />
   )
 }
