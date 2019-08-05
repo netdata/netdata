@@ -1,25 +1,25 @@
-# Install netdata with Docker
+# Install Netdata with Docker
 
-> :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running netdata in docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
+> :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running Netdata in docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 >
 > Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with https://github.com/multiarch naming), so **`armv7hf` is not updated** either.
 
 ## Limitations
 
-Running netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running netdata on the host.
+Running Netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running Netdata on the host.
 
 ## Package scrambling in runtime (x86_64 only)
 
-By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting netdata docker container.
+By default on x86_64 architecture our Docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting netdata docker container.
 
 For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
 
-## Run netdata with docker command
+## Run Netdata with docker command
 
-Quickly start netdata with the docker command line.
+Quickly start Netdata with the docker command line.
 Netdata is then available at http://host:19999
 
-This is good for an internal network or to quickly analyse a host.
+This is good for an internal network or to quickly analyze a host.
 
 ```bash
 docker run -d --name=netdata \
@@ -58,13 +58,13 @@ If you don't want to use the apps.plugin functionality, you can remove the mount
 
 ### Docker container names resolution
 
-There are a few options for resolving container names within netdata. Some methods of doing so will allow root access to your machine from within the container. Please read the following carefully.
+There are a few options for resolving container names within Netdata. Some methods of doing so will allow root access to your machine from within the container. Please read the following carefully.
 
 #### Docker Socket Proxy (Safest Option)
 
-Deploy a Docker socket proxy that accepts and filter out requests using something like [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access to the CONTAINERS endpoint.
+Deploy a Docker socket proxy that accepts and filters out requests using something like [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access to the CONTAINERS endpoint.
 
-The reason it's safer to expose the socket to the proxy is because netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
+The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
 
 #### Giving group access to Docker Socket (Less safe)
 
@@ -106,7 +106,7 @@ Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#e
 
 ## Install Netdata using Docker Compose with SSL/TLS enabled http proxy
 
-For a permanent installation on a public server, you should [secure the netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
+For a permanent installation on a public server, you should [secure the Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
 
 You can use use the following docker-compose.yml and Caddyfile files to run netdata with docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
 
