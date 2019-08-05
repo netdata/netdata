@@ -5,9 +5,22 @@
 
 #include "backends/backends.h"
 
+struct mongodb_thread {
+    netdata_thread_t thread;
+    netdata_mutex_t mutex;
+
+    BUFFER *buffer;
+    size_t n_bytes;
+    size_t n_metrics;
+
+    int busy;
+    int finished;
+    int error;
+};
+
 extern int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string, const int32_t socket_timeout);
 
-extern int mongodb_insert(char *data, size_t n_metrics);
+extern void *mongodb_insert(void *mongodb_thread);
 
 extern void mongodb_cleanup();
 

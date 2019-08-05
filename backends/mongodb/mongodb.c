@@ -6,8 +6,9 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-mongoc_client_t *mongodb_client;
-mongoc_collection_t *mongodb_collection;
+mongoc_client_pool_t *mongodb_client_pool;
+const char *mongodb_database_string;
+const char *mongodb_collection_string;
 
 int mongodb_init(const char *uri_string,
                  const char *database_string,
@@ -15,6 +16,9 @@ int mongodb_init(const char *uri_string,
                  int32_t default_socket_timeout) {
     mongoc_uri_t *uri;
     bson_error_t error;
+
+    mongodb_database_string = database_string;
+    mongodb_collection_string = collection_string;
 
     mongoc_init();
 
@@ -30,17 +34,18 @@ int mongodb_init(const char *uri_string,
         return 1;
     };
 
-    mongodb_client = mongoc_client_new_from_uri(uri);
-    if(unlikely(!mongodb_client)) {
-        error("BACKEND: failed to create a new client");
+    mongodb_client_pool = mongoc_client_pool_new(uri);
+    if(unlikely(!mongodb_client_pool)) {
+        error("BACKEND: failed to create a new client pool");
         return 1;
     }
 
-    if(!mongoc_client_set_appname(mongodb_client, "netdata")) {
+    mongoc_client_pool_set_error_api(mongodb_client_pool, MONGOC_ERROR_API_VERSION_2);
+
+    const char *appname = mongoc_uri_get_option_as_utf8(uri, MONGOC_URI_APPNAME, "netdata");
+    if(!mongoc_client_pool_set_appname(mongodb_client_pool, appname)) {
         error("BACKEND: failed to set client appname");
     };
-
-    mongodb_collection = mongoc_client_get_collection(mongodb_client, database_string, collection_string);
 
     mongoc_uri_destroy(uri);
 
@@ -56,13 +61,28 @@ void free_bson(bson_t **insert, size_t n_documents) {
     free(insert);
 }
 
-int mongodb_insert(char *data, size_t n_metrics) {
-    bson_t **insert = calloc(n_metrics, sizeof(bson_t *));
+void *mongodb_insert(void *mongodb_thread) {
+    struct mongodb_thread *thread_data = (struct mongodb_thread *)mongodb_thread;
+    mongoc_client_t *client;
+    mongoc_collection_t *collection;
+    bson_t **insert = calloc(thread_data->n_metrics, sizeof(bson_t *));
     bson_error_t error;
-    char *start = data, *end = data;
+    char *start = (char *)buffer_tostring(thread_data->buffer);
+    char *end = start;
     size_t n_documents = 0;
 
-    while(*end && n_documents <= n_metrics) {
+    client = mongoc_client_pool_pop(mongodb_client_pool);
+    if(unlikely(!client)) {
+        error("BACKEND: failed to create a new client");
+        thread_data->error = 1;
+        free_bson(insert, n_documents);
+        buffer_flush(thread_data->buffer);
+        return NULL;
+    }
+
+    collection = mongoc_client_get_collection(client, mongodb_database_string, mongodb_collection_string);
+
+    while(*end && n_documents <= thread_data->n_metrics) {
         while(*end && *end != '\n') end++;
 
         if(likely(*end)) {
@@ -76,9 +96,9 @@ int mongodb_insert(char *data, size_t n_metrics) {
         insert[n_documents] = bson_new_from_json((const uint8_t *)start, -1, &error);
 
         if(unlikely(!insert[n_documents])) {
-           error("BACKEND: %s", error.message);
-           free_bson(insert, n_documents);
-           return 1;
+            error("BACKEND: %s", error.message);
+            thread_data->error = 1;
+            goto cleanup;
         }
 
         start = end;
@@ -86,20 +106,28 @@ int mongodb_insert(char *data, size_t n_metrics) {
         n_documents++;
     }
 
-    if(unlikely(!mongoc_collection_insert_many(mongodb_collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
-       error("BACKEND: %s", error.message);
-       free_bson(insert, n_documents);
-       return 1;
+    if(unlikely(!mongoc_collection_insert_many(collection, (const bson_t **)insert, n_documents, NULL, NULL, &error))) {
+        error("BACKEND: %s", error.message);
+        thread_data->error = 1;
+        goto cleanup;
     }
 
+cleanup:
     free_bson(insert, n_documents);
+    mongoc_collection_destroy(collection);
+    mongoc_client_pool_push(mongodb_client_pool, client);
 
-    return 0;
+    buffer_flush(thread_data->buffer);
+
+    netdata_mutex_lock(&thread_data->mutex);
+    thread_data->finished = 1;
+    netdata_mutex_unlock(&thread_data->mutex);
+
+    return NULL;
 }
 
 void mongodb_cleanup() {
-    mongoc_collection_destroy(mongodb_collection);
-    mongoc_client_destroy(mongodb_client);
+    mongoc_client_pool_destroy(mongodb_client_pool);
     mongoc_cleanup();
 
     return;

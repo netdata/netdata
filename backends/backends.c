@@ -464,7 +464,7 @@ void *backends_main(void *ptr) {
 
     int default_port = 0;
     int sock = -1;
-    BUFFER *b = buffer_create(1), *response = buffer_create(1);
+    BUFFER *default_buffer = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
@@ -479,13 +479,19 @@ void *backends_main(void *ptr) {
 #endif
 
 #if HAVE_MONGOC
+
+#define MONGODB_THREADS_NUMBER 3
+#define MONGODB_THREAD_INDEX_UNDEFINED -1
+
     int do_mongodb = 0;
     char *mongodb_uri = NULL;
     char *mongodb_database = NULL;
     char *mongodb_collection = NULL;
 
+    struct mongodb_thread *mongodb_threads = NULL;
+
     // set the default socket timeout in ms
-    int32_t mongodb_default_socket_timeout = (int32_t)(global_backend_update_every >= 2)?(global_backend_update_every * MSEC_PER_SEC - 500):1000;
+    int32_t mongodb_default_socket_timeout = (int32_t)(global_backend_update_every < 60)?(global_backend_update_every * 10 * MSEC_PER_SEC):600 * MSEC_PER_SEC;
 
 #endif
 
@@ -595,7 +601,15 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_default_socket_timeout))) {
+            mongodb_threads = callocz(MONGODB_THREADS_NUMBER, sizeof(struct mongodb_thread));
+
+            int i;
+            for(i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+                netdata_mutex_init(&mongodb_threads[i].mutex);
+                mongodb_threads[i].buffer = buffer_create(1);
+            }
+
+            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_socket_timeout))) {
                 backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
                 do_mongodb = 1;
             }
@@ -718,10 +732,35 @@ void *backends_main(void *ptr) {
         size_t count_charts_total = 0;
         size_t count_dims_total = 0;
 
+        BUFFER *b = NULL;
+
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
         if(do_prometheus_remote_write)
             clear_write_request();
 #endif
+
+#if HAVE_MONGOC
+        int mongodb_thread_index = MONGODB_THREAD_INDEX_UNDEFINED;
+
+        chart_buffered_metrics = 0;
+
+        if(do_mongodb) {
+            for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+                if(mongodb_threads[i].busy == 0) {
+                    mongodb_thread_index = i;
+                    break;
+                }
+            }
+
+            if(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED)
+                b = default_buffer;
+            else
+                b = mongodb_threads[mongodb_thread_index].buffer;
+        }
+#else
+        b = default_buffer;
+#endif
+
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
@@ -900,43 +939,76 @@ void *backends_main(void *ptr) {
 
 #if HAVE_MONGOC
         if(do_mongodb) {
+            for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+                netdata_mutex_lock(&mongodb_threads[i].mutex);
+                if(mongodb_threads[i].finished) {
+                    if(mongodb_threads[i].error) {
+                        // oops! we couldn't send (all or some of the) data
+                        error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                              mongodb_uri, mongodb_threads[i].n_bytes, 0UL);
+
+                        chart_transmission_failures++;
+                        chart_data_lost_events++;
+                        chart_lost_bytes += mongodb_threads[i].n_bytes;
+                        chart_lost_metrics += (collected_number)mongodb_threads[i].n_metrics;
+                    }
+                    mongodb_threads[i].finished = 0;
+                    mongodb_threads[i].busy = 0;
+                    mongodb_threads[i].error = 0;
+                }
+                netdata_mutex_unlock(&mongodb_threads[i].mutex);
+            }
+
             size_t buffer_len = buffer_strlen(b);
             size_t sent = 0;
 
-            while(sent < buffer_len) {
-                const char *first_char = buffer_tostring(b);
+            if(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED) {
+                error("BACKEND: failed to write data to database backend '%s'. All available threads are busy. Willing to write %zu bytes, wrote %zu bytes.",
+                              mongodb_uri, buffer_len, 0UL);
 
-                debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
-                      buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
+                chart_transmission_failures++;
+                chart_data_lost_events++;
+                chart_lost_bytes += buffer_len;
+                chart_lost_metrics += (collected_number)chart_buffered_metrics;
 
-                if(likely(!mongodb_insert((char *)first_char, (size_t)chart_buffered_metrics))) {
-                    sent += buffer_len;
-                    chart_transmission_successes++;
-                    chart_receptions++;
-                }
-                else {
-                    // oops! we couldn't send (all or some of the) data
-                    error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                          mongodb_uri, buffer_len, 0UL);
+                buffer_flush(b);
 
-                    chart_transmission_failures++;
-                    chart_data_lost_events++;
-                    chart_lost_bytes += buffer_len;
-
-                    // estimate the number of lost metrics
-                    chart_lost_metrics += (collected_number)chart_buffered_metrics;
-
-                    break;
-                }
-
-                if(unlikely(netdata_exit)) break;
+                continue;
             }
+
+            int i = mongodb_thread_index;
+
+            mongodb_threads[i].n_bytes = buffer_len;
+            mongodb_threads[i].n_metrics = chart_buffered_metrics;
+
+            debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
+                  buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
+
+            if(!netdata_thread_create(&mongodb_threads[i].thread, "BACKENDS[mongodb]", NETDATA_THREAD_OPTION_DONT_LOG, mongodb_insert, (void *)&mongodb_threads[i])) {
+                mongodb_threads[i].busy = 1;
+
+                sent += buffer_len;
+                chart_transmission_successes++;
+                chart_receptions++;
+            }
+            else {
+                // oops! we couldn't send (all or some of the) data
+                error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
+                      mongodb_uri, mongodb_threads[i].n_bytes, 0UL);
+
+                chart_transmission_failures++;
+                chart_data_lost_events++;
+                chart_lost_bytes += buffer_len;
+                chart_lost_metrics += (collected_number)chart_buffered_metrics;
+
+                break;
+            }
+
+            if(unlikely(netdata_exit)) break;
 
             chart_sent_bytes += sent;
             if(likely(sent == buffer_len))
                 chart_sent_metrics = chart_buffered_metrics;
-
-            buffer_flush(b);
         } else
 #endif /* HAVE_MONGOC */
 
@@ -1214,13 +1286,14 @@ cleanup:
         freez(mongodb_uri);
         freez(mongodb_database);
         freez(mongodb_collection);
+        freez(mongodb_threads);
     }
 #endif
 
     if(sock != -1)
         close(sock);
 
-    buffer_free(b);
+    buffer_free(default_buffer);
     buffer_free(response);
 
 #ifdef ENABLE_HTTPS
