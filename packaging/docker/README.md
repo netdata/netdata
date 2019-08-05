@@ -33,7 +33,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-The above can be converted to docker-compose file for ease of management:
+The above can be converted to `docker-compose` file for ease of management:
 
 ```yaml
 version: '3'
@@ -108,7 +108,7 @@ Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#e
 
 For a permanent installation on a public server, you should [secure the Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
 
-You can use use the following docker-compose.yml and Caddyfile files to run netdata with docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
+You can use the following docker-compose.yml and Caddyfile files to run Netdata with Docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
 
 ### Prerequisites
 * [Docker](https://docs.docker.com/install/#server)
@@ -117,7 +117,7 @@ You can use use the following docker-compose.yml and Caddyfile files to run netd
 
 ### Caddyfile
 
-This file needs to be placed in /opt with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Letsencrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
+This file needs to be placed in /opt with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
 
 ```
 netdata.example.org {
@@ -170,7 +170,7 @@ You can restrict access by following [official caddy guide](https://caddyserver.
 
 ## Publish a test image to your own repository
 
-At netdata we provide multiple ways of testing your docker images using your own repositories.
+At Netdata we provide multiple ways of testing your Docker images using your own repositories.
 You may either use the command line tools available or take advantage of our Travis CI infrastructure.
 
 ### Using tools manually from the command line
