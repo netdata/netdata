@@ -25,6 +25,8 @@ extern int web_enable_gzip,
 #define HTTP_RESP_NOT_FOUND     404
 #define HTTP_RESP_PRECOND_FAIL  412
 
+// HTTP_CODES 5XX Server Errors
+#define HTTP_RESP_INTERNAL_SERVER_ERROR 500
 
 extern int respect_web_browser_do_not_track_policy;
 extern char *web_x_frame_options;
