@@ -150,6 +150,8 @@ extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
 extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension);
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
+extern void dimension_remove_pipe(char *str);
+extern char *alarm_name_with_dim(char *name, char *dim);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {

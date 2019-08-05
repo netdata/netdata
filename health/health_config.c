@@ -26,40 +26,6 @@
 #define HEALTH_REPEAT_KEY "repeat"
 
 /**
- * Alarm name with dimension
- *
- * Change the name of the current alarm appending a new diagram.
- *
- * @param name the alarm name
- * @param dim the dimension of the chart.
- *
- * @return It returns the new name on success and the old otherwise
- */
-char *health_alarm_name_with_dim(char *name, char *dim) {
-    size_t namelen,dimlen;
-
-    char *newname,*move;
-    namelen = strlen(name);
-    dimlen = strlen(dim);
-
-    newname = malloc(namelen + dimlen + 2);
-    if(newname) {
-        move = newname;
-        memcpy(move, name, namelen);
-        move += namelen;
-
-        *move++ = '_';
-        memcpy(move, dim, dimlen);
-        move += dimlen;
-        *move = '\0';
-    } else {
-        newname = name;
-    }
-
-    return newname;
-}
-
-/**
  * Add alarm from config
  *
  * Add a new RRDCALC to the host
@@ -384,22 +350,6 @@ static inline int health_parse_repeat(
 }
 
 /**
- * Remove pipe
- *
- * Remove the pipes converting them to comma.
- *
- * @param str the string to change.
- */
-static void health_remove_pipe(char *str) {
-    while(*str) {
-        if(*str == '|')
-            *str = ',';
-
-        str++;
-    }
-}
-
-/**
  * Parse DB lookup
  *
  *
@@ -529,7 +479,7 @@ static inline int health_parse_db_lookup(
         }
         else if(!strcasecmp(key, HEALTH_FOREACH_KEY )) {
             *foreachdim = strdupz(s);
-            health_remove_pipe(*foreachdim);
+            dimension_remove_pipe(*foreachdim);
             break;
         }
         else {
@@ -603,14 +553,14 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
     while(tok) {
         if(foreachdim) {
             tok = strchr(move, ',');
-            if(tok) { //We have only one dimension
+            if(tok) { //We have more than one dimension
                 *tok = '\0';
             }
 
             if(!isfirst) { //It is not the first, so I need a new RRDCALC
-                rc = rrdcalc_create_from_rrdcalc(original, host, health_alarm_name_with_dim(copyname, move), move);
+                rc = rrdcalc_create_from_rrdcalc(original, host, alarm_name_with_dim(copyname, move), move);
             } else {
-                rc->name = health_alarm_name_with_dim(copyname, move);
+                rc->name = alarm_name_with_dim(copyname, move);
                 rc->hash = simple_hash(rc->name);
 
                 //We clean the initial dimensions, because we will overwrite it
@@ -771,9 +721,6 @@ static int health_readfile(const char *filename, void *data) {
             }
 
             if(rt) {
-                if(rt->foreachdim)
-                    fprintf(stderr,"KILLME rt 1 added %s\n",rt->name);
-
                 if (ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
                     rrdcalctemplate_free(rt);
 
@@ -807,9 +754,6 @@ static int health_readfile(const char *filename, void *data) {
             }
 
             if(rt) {
-                if(rt->foreachdim)
-                    fprintf(stderr,"KILLME rt 2 added %s\n",rt->name);
-
                 if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
                     rrdcalctemplate_free(rt);
             }
@@ -1124,9 +1068,6 @@ static int health_readfile(const char *filename, void *data) {
     }
 
     if(rt) {
-        if(rt->foreachdim)
-            fprintf(stderr,"KILLME rt added 3 %s\n",rt->name);
-
         if(ignore_this || !rrdcalctemplate_add_template_from_config(host, rt))
             rrdcalctemplate_free(rt);
     }

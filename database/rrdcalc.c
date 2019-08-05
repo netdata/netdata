@@ -255,6 +255,63 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
     return host->health_log.next_alarm_id++;
 }
 
+/**
+ * Alarm name with dimension
+ *
+ * Change the name of the current alarm appending a new diagram.
+ *
+ * @param name the alarm name
+ * @param dim the dimension of the chart.
+ *
+ * @return It returns the new name on success and the old otherwise
+ */
+char *alarm_name_with_dim(char *name, char *dim) {
+    size_t namelen,dimlen;
+
+    char *newname,*move;
+    namelen = strlen(name);
+    dimlen = strlen(dim);
+
+    newname = malloc(namelen + dimlen + 2);
+    if(newname) {
+        move = newname;
+        memcpy(move, name, namelen);
+        move += namelen;
+
+        *move++ = '_';
+        memcpy(move, dim, dimlen);
+        move += dimlen;
+        *move = '\0';
+    } else {
+        newname = name;
+    }
+
+    return newname;
+}
+
+/**
+ * Remove pipe
+ *
+ * Remove the pipes converting them to comma.
+ *
+ * @param str the string to change.
+ */
+void dimension_remove_pipe(char *str) {
+    while(*str) {
+        if(*str == '|') *str = ',';
+
+        str++;
+    }
+}
+
+/**
+ * Add to host
+ *
+ * Add an alarm for a specific host.
+ *
+ * @param host the output structure
+ * @param rc the alarm that will be added
+ */
 inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
@@ -327,9 +384,8 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->chart = strdupz(chart);
     rc->hash_chart = simple_hash(rc->chart);
 
-    //INSTEAD TO COPY THE DIMENSIONS WHEN THERE IS A FOREACH, IT WILL BE NECESSARY TO
-    //CREATE A NEW ARGUMENT TO GIVE THE DIMENSION TO APPLY CASE THE FOREACH IS PRESENT
-    //SEE THE LINE 426 OF THIS FILE
+    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
+
     if(rt->dimensions) rc->dimensions = strdupz(rt->dimensions);
     if(rt->foreachdim) rc->foreachdim = strdupz(rt->foreachdim);
 
@@ -463,8 +519,8 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *na
     if(newrc->info) rc->info = strdupz(rc->info);
 
     if(rc->calculation) {
-        rc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
-        if(!rc->calculation)
+        newrc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
+        if(!newrc->calculation)
             error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rc->chart, rc->name, rc->calculation->source);
     }
 
