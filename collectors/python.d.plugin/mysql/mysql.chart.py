@@ -723,6 +723,7 @@ class Service(MySQLService):
         for row in rows:
             slave_data = dict(zip(description_keys, row))
             channel_name = slave_data.get('Channel_Name', DEFAULT_REPL_CHANNEL)
+            channel_name = "new_channel"
 
             if channel_name not in self.repl_channels and len(self.charts) > 0:
                 self.add_repl_channel_charts(channel_name)
@@ -740,15 +741,7 @@ class Service(MySQLService):
         return data
 
     def add_repl_channel_charts(self, name):
-        order, charts = slave_status_chart_template(name)
-
-        for chart_name in order:
-            params = [chart_name] + charts[chart_name]['options']
-            dimensions = charts[chart_name]['lines']
-
-            new_chart = self.charts.add_chart(params)
-            for dimension in dimensions:
-                new_chart.add_dimension(dimension)
+        self.add_new_charts(slave_status_chart_template, name)
 
     def get_userstats(self, raw_data):
         # raw_data['user_statistics'] contains the following data structure:
@@ -807,7 +800,10 @@ class Service(MySQLService):
         self.charts['userstats_cpu'].add_dimension(['userstats_{0}_Cpu_time'.format(name), name, 'incremental', 100, 1])
 
     def create_new_userstats_charts(self, tube):
-        order, charts = userstats_chart_template(tube)
+        self.add_new_charts(userstats_chart_template, tube)
+
+    def add_new_charts(self, template, *params):
+        order, charts = template(*params)
 
         for chart_name in order:
             params = [chart_name] + charts[chart_name]['options']
