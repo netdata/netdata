@@ -1,36 +1,34 @@
-# Getting Started
+# Getting started guide
 
-These are your first steps **after** you have installed Netdata. If you haven't installed it already, please check the [installation page](../packaging/installer).
+Thanks for installing Netdata! In this guide, we'll walk you through the first steps you should take after getting Netdata installed.
 
-## Accessing the dashboard
+Netdata can collect thousands of metrics in real-time without any configuration, but there are a few things you can do, like extending the history, to make Netdata work best for your particular needs.
 
-To access the Netdata dashboard, navigate with your browser to:
+!!! note
+    If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details, including our one-liner script that works on almost all Linux distributions.
 
-```
-http://your.server.ip:19999/
-```
 
-<details markdown="1"><summary>Click here, if it does not work.</summary>
+## Access the dashboard
 
-**Verify Netdata is running.**
+Open up your browser of choice and navigate to `http://SERVER-IP:19999/`. Replace `SERVER-IP` with the IP address of the system you have Netdata installed on. You'll then be able to see Netdata's dashboard directly in your browser window.
 
-Open an ssh session to the server and execute `sudo ps -e | grep netdata`. It should respond with the PID of the Netdata daemon. If it prints nothing, Netdata is not running. Check the [installation page](../packaging/installer) to install it.
+<details markdown="1"><summary>I don't know my system's IP address!</summary>
 
-**Verify Netdata responds to HTTP requests.**
+If you installed Netdata on your **local system** (as in the same system you're using to browse this very guide), replace `SERVER-IP` with `localhost`: `http://localhost:19999`.
 
-Using the same ssh session, execute `curl -Ss http://localhost:19999`. It should dump on your screen the `index.html` page of the dashboard. If it does not, check the [installation page](../packaging/installer) to install it.
+If you installed Netdata on **another system in your network**, you need to know its *internal IP address*. Run `ip route get 8.8.8.8 | grep -oP " src [0-9\.]+ "` and try to navigate to the IP address(es) that the command returns.
 
-**Verify Netdata receives the HTTP requests.**
+If you installed Netdata on a **remote system**, such as VPS or other cloud hosting environment, you need to know its *external IP address*. Check out your provider's dashboard for that information. If you happen to be connected to the remote system with SSH, run either `dig +short myip.opendns.com @resolver1.opendns.com` or `curl ifconfig.me` to find the external IP address, and use that to visit the Netdata dashboard.
 
-On the same ssh session, execute `tail -f /var/log/netdata/access.log` (if you installed the static 64bit package, use: `tail -f /opt/netdata/var/log/netdata/access.log`). This command will print on your screen all HTTP requests Netdata receives.
+</details>
 
-Next, try to access the dashboard using your web browser, using the URL posted above. If nothing is printed on your terminal, the HTTP request is not routed to your Netdata.
+<details markdown="1"><summary>Can't see the Netdata dashboard? Try to verify that Netdata is installed, running, and operational:</summary>
 
-If you are not sure about your server IP, run this for a hint: `ip route get 8.8.8.8 | grep -oP " src [0-9\.]+ "`. It should print the IP of your server.
+**Verify Netdata is running**
 
-If still Netdata does not receive the requests, something is blocking them. A firewall possibly. Please check your network.
+If the system you're trying to monitor is a remote server, open an SSH session to the server and execute `sudo ps -e | grep netdata`. You should see a response with the PID of the Netdata daemon.
 
-</details>&nbsp;<br/>
+If it prints nothing, Netdata is not running. Check out the [installation page](../packaging/installer) to reinstall Netdata or fix your installation.
 
 When you install multiple Netdata servers, all your servers will appear at the node menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your Netdata servers.
 
@@ -43,11 +41,11 @@ The node menu is more than just browser bookmarks. When switching Netdata server
 -   the theme you use,
 -   etc.
 
-are all sent over to other Netdata server, to allow you troubleshoot cross-server performance issues easily.
+On the same SSH session, execute `tail -f /var/log/netdata/access.log`. Or, if you used the static 64-bit package, try `tail -f /opt/netdata/var/log/netdata/access.log`. This command will print all the HTTP requests Netdata receives.
 
-## Starting and stopping Netdata
+With this command still running, try accessing your dashboard using your browser. If nothing new is printed into your terminal, it means Netdata isn't receiving your HTTP request. That probably means something, like a firewall, is blocking the requests from reaching Netdata.
 
-Netdata installer integrates Netdata to your init / systemd environment.
+</details>
 
 To start/stop Netdata, depending on your environment, you should use:
 
@@ -55,11 +53,9 @@ To start/stop Netdata, depending on your environment, you should use:
 -   `service netdata start` and `service netdata stop`
 -   `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
 
-Once Netdata is installed, the installer configures it to start at boot and stop at shutdown.
+## Change how long Netdata stores metrics
 
-For more information about using these commands, consult your system documentation.
 
-## Sizing Netdata
 
 The default installation of Netdata is configured for a small round-robin database: just 1 hour of data. Depending on the memory your system has and the amount you can dedicate to Netdata, you should adapt this. On production systems with limited RAM, we suggest to set this to 3-4 hours. For best results you should set this to 24 or 48 hours.
 
@@ -172,7 +168,38 @@ and set `SEND_EMAIL="NO"`.
 
 (For static 64bit installations use `sudo /opt/netdata/etc/netdata/edit-config health_alarm_notify.conf`).
 
-## What is next?
+## Starting and stopping Netdata
+
+Netdata installer integrates Netdata to your init / systemd environment.
+
+To start/stop Netdata, depending on your environment, you should use:
+
+- `systemctl start netdata` and `systemctl stop netdata`
+- `service netdata start` and `service netdata stop`
+- `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
+
+Once Netdata is installed, the installer configures it to start at boot and stop at shutdown.
+
+For more information about using these commands, consult your system documentation.
+
+
+## Add more Netdata agents to the My nodes menu
+
+When you install multiple Netdata servers, all your servers will appear at the node menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your netdata servers.
+
+The node menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other netdata server:
+
+- the current charts panning (drag the charts left or right),
+- the current charts zooming (`SHIFT` + mouse wheel over a chart),
+- the highlighted time-frame (`ALT` + select an area on a chart),
+- the scrolling position of the dashboard,
+- the theme you use,
+- etc.
+
+are all sent over to other Netdata server, to allow you troubleshoot cross-server performance issues easily.
+
+
+## What's next?
 
 -   Check [Data Collection](../collectors) for configuring data collection plugins.
 -   Check [Health Monitoring](../health) for configuring your own alarms, or setting up alarm notifications.
