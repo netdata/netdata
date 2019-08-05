@@ -1,27 +1,51 @@
 # Getting started guide
 
-Thanks for installing Netdata! In this guide, we'll walk you through the first
-steps you should take after getting Netdata installed.
+Thanks for installing Netdata! In this guide, we'll walk you through the first steps you should take after getting Netdata installed.
 
-Netdata can collect thousands of metrics in real-time without any configuration,
-but there are a few things you can do, like extending the history, to make
-Netdata work best for your particular needs.
+Netdata can collect thousands of metrics in real-time without any configuration, but there are a few things you can do, like extending the history, to make Netdata work best for your particular needs.
 
-!!! note If you haven't installed Netdata yet, visit the [installation
-    instructions](../packaging/installer) for details, including our one-liner
-    script that works on almost all Linux distributions.
+!!! note
+    If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details, including our one-liner script that works on almost all Linux distributions.
+
 
 ## Access the dashboard
 
-Open up your browser of choice. If you installed Netdata on the same system
-you're using to open your browser, navigate to `http://localhost:19999/`. If you
-installed Netdata on a remote system, navigate to `http://SYSTEM-IP:19999/`
-after replacing `SYSTEM-IP` with the IP address of that system.
+Open up your browser of choice and navigate to `http://SERVER-IP:19999/`. Replace `SERVER-IP` with the IP address of the system you have Netdata installed on. You'll then be able to see Netdata's dashboard directly in your browser window.
 
-Hit `Enter`. Welcome to Netdata!
+<details markdown="1"><summary>I don't know my system's IP address!</summary>
 
-![Animated GIF of navigating to the
-dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)
+If you installed Netdata on your **local system** (as in the same system you're using to browse this very guide), replace `SERVER-IP` with `localhost`: `http://localhost:19999`.
+
+If you installed Netdata on **another system in your network**, you need to know its *internal IP address*. Run `ip route get 8.8.8.8 | grep -oP " src [0-9\.]+ "` and try to navigate to the IP address(es) that the command returns.
+
+If you installed Netdata on a **remote system**, such as VPS or other cloud hosting environment, you need to know its *external IP address*. Check out your provider's dashboard for that information. If you happen to be connected to the remote system with SSH, run either `dig +short myip.opendns.com @resolver1.opendns.com` or `curl ifconfig.me` to find the external IP address, and use that to visit the Netdata dashboard.
+
+</details>
+
+<details markdown="1"><summary>Can't see the Netdata dashboard? Try to verify that Netdata is installed, running, and operational:</summary>
+
+**Verify Netdata is running**
+
+If the system you're trying to monitor is a remote server, open an SSH session to the server and execute `sudo ps -e | grep netdata`. You should see a response with the PID of the Netdata daemon.
+
+If it prints nothing, Netdata is not running. Check out the [installation page](../packaging/installer) to reinstall Netdata or fix your installation.
+
+**Verify Netdata responds to HTTP requests**
+
+Using the same SSH session, execute `curl -Ss http://localhost:19999`. You should see the raw HTML of the dashboard's `index.html` page. If you see anything else, head back to the [installation page](../packaging/installer) and try reinstalling.
+
+**Verify Netdata receives the HTTP requests**
+
+On the same SSH session, execute `tail -f /var/log/netdata/access.log`. Or, if you used the static 64-bit package, try `tail -f /opt/netdata/var/log/netdata/access.log`. This command will print all the HTTP requests Netdata receives.
+
+With this command still running, try accessing your dashboard using your browser. If nothing new is printed into your terminal, it means Netdata isn't receiving your HTTP request. That probably means something, like a firewall, is blocking the requests from reaching Netdata.
+
+</details>
+
+
+## Change how long Netdata stores metrics
+
+
 
 **Next**: 
 
