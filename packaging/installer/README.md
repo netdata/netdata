@@ -255,8 +255,8 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 
 |package|description|
 |:-----:|-----------|
-|`libuv`|multi-platform support library with a focus on asynchronous I/O|
-|`liblz4`|Extremely Fast Compression algorithm|
+|`libuv`|multi-platform support library with a focus on asynchronous I/O, version 1 or greater|
+|`liblz4`|Extremely Fast Compression algorithm, version r129 or greater|
 |`Judy`|General purpose dynamic array|
 |`openssl`|Cryptography and SSL/TLS Toolkit|
 
