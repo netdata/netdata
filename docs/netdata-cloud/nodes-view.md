@@ -107,20 +107,18 @@ To the right of the filtering field is three functions that will help you organi
 
 The view mode button lets you switch between three view modes:
 
-![Annotated screenshot of the full view mode](https://user-images.githubusercontent.com/1153921/60219885-15e63400-9829-11e9-8654-b49f119efb9a.png)
-
 - **Full** mode, which displays the following information in a large squares for each connected Node:
     - Operating system
     - Critical/warning alerts in two separate indicators
     - Hostname
     - Icons for [supported services](#services-available-in-the-nodes-view)
 
-![Annotated screenshot of the compact view mode](https://user-images.githubusercontent.com/1153921/60220570-547cee00-982b-11e9-9caf-9dd449184f3a.png)
+![Annotated screenshot of the full view mode](https://user-images.githubusercontent.com/1153921/60219885-15e63400-9829-11e9-8654-b49f119efb9a.png)
 
 - **Compact** mode, which displays the following information in small squares for each connected Node:
     - Operating system
 
-![Annotated screenshot of the detailed view mode](https://user-images.githubusercontent.com/1153921/60220574-56df4800-982b-11e9-8300-aa9190bbf09f.png)
+![Annotated screenshot of the compact view mode](https://user-images.githubusercontent.com/1153921/60220570-547cee00-982b-11e9-9caf-9dd449184f3a.png)
 
 - **Detailed** mode, which displays the following information in large horizontal rectangles for each connected Node:
     - Operating system
@@ -128,6 +126,7 @@ The view mode button lets you switch between three view modes:
     - Hostname
     - Icons for [supported services](#services-available-in-the-nodes-view) 
 
+![Annotated screenshot of the detailed view mode](https://user-images.githubusercontent.com/1153921/60220574-56df4800-982b-11e9-8300-aa9190bbf09f.png)
 
 ## Sorting, and grouping
 
