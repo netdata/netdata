@@ -22,8 +22,8 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
 	OIFS="$IFS"
 	IFS=$'\n'
 	set $(sw_vers) > /dev/null
-	NAME=$(echo $1 | tr "\n" ' ' | sed 's/ProductName:[ ]*//')
-	VERSION=$(echo $2 | tr "\n" ' ' | sed 's/ProductVersion:[ ]*//')
+	NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
+	VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
 	ID="mac"
 	ID_LIKE="mac"
 	OS_DETECTION="sw_vers"
