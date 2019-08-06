@@ -603,8 +603,7 @@ void *backends_main(void *ptr) {
 
             mongodb_threads = callocz(MONGODB_THREADS_NUMBER, sizeof(struct mongodb_thread));
 
-            int i;
-            for(i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+            for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
                 netdata_mutex_init(&mongodb_threads[i].mutex);
                 mongodb_threads[i].buffer = buffer_create(1);
             }
@@ -1284,6 +1283,12 @@ cleanup:
         freez(mongodb_uri);
         freez(mongodb_database);
         freez(mongodb_collection);
+
+        for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+            if(mongodb_threads[i].busy)
+                netdata_thread_cancel(mongodb_threads[i].thread);
+            buffer_free(mongodb_threads[i].buffer);
+        }
         freez(mongodb_threads);
     }
 #endif
