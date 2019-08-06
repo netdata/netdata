@@ -384,7 +384,7 @@ install_netdata_service() {
 				IS_NETDATA_ENABLED=`systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there"`
 				if [ "${IS_NETDATA_ENABLED}" == "disabled" ]; then
 					echo >&2 "Netdata was there and disabled, make sure we don't re-enable it ourselves"
-					ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="echo"
+					ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="true"
 				fi
 
 				echo >&2 "Installing systemd service..."
