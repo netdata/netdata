@@ -4,5 +4,5 @@ import { GetKeyArguments, getKeyForCommonColorsState, globalKey } from "./reduce
 export const createSelectAssignedColors = (args: GetKeyArguments) => (state: AppStateT) => {
   const keyName = getKeyForCommonColorsState(args)
   const substate = state[globalKey].commonColorsKeys[keyName]
-  return substate.assigned
+  return substate && substate.assigned
 }

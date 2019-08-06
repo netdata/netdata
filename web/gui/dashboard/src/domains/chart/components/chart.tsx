@@ -1,4 +1,4 @@
-import React from "react"
+import React, { useEffect } from "react"
 import classNames from "classnames"
 import { useDispatch, useSelector } from "react-redux"
 
@@ -64,15 +64,19 @@ export const Chart = ({
     && window.NETDATA.options.current.legend_toolbox
 
   const dispatch = useDispatch()
-  // this actually works correctly without wrapping with useEffect()
-  // but perhaps it will need closer look when the component will grow
-  dispatch(requestCommonColorsAction({
-    chartContext: chartDetails.context,
-    chartUuid,
-    colorsAttribute: attributes.colors,
-    commonColorsAttribute: attributes.commonColors,
-    dimensionNames: chartData.dimension_names,
-  }))
+  useEffect(() => {
+    dispatch(requestCommonColorsAction({
+      chartContext: chartDetails.context,
+      chartUuid,
+      colorsAttribute: attributes.colors,
+      commonColorsAttribute: attributes.commonColors,
+      dimensionNames: chartData.dimension_names,
+    }))
+  }, [ // eslint-disable-line react-hooks/exhaustive-deps
+    dispatch, attributes.commonColors, chartDetails.context, chartUuid, attributes.colors,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    chartData.dimension_names.join(("")),
+  ])
 
   const selectAssignedColors = createSelectAssignedColors({
     chartContext: chartDetails.context,
@@ -81,7 +85,9 @@ export const Chart = ({
     commonColorsAttribute: attributes.commonColors,
   })
   const colors = useSelector(selectAssignedColors)
-  console.log("colors", colors) // eslint-disable-line no-console
+  if (!colors) {
+    return null
+  }
 
   return (
     <div
