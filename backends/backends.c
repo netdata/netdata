@@ -948,9 +948,15 @@ void *backends_main(void *ptr) {
                               mongodb_uri, mongodb_threads[i].n_bytes, 0UL);
 
                         chart_transmission_failures++;
-                        chart_data_lost_events++;
                         chart_lost_bytes += mongodb_threads[i].n_bytes;
                         chart_lost_metrics += (collected_number)mongodb_threads[i].n_metrics;
+                    }
+                    else {
+                        // we sent the data successfully
+                        chart_transmission_successes++;
+                        chart_receptions++;
+                        chart_sent_bytes += mongodb_threads[i].n_bytes;
+                        chart_sent_metrics += mongodb_threads[i].n_metrics;
                     }
                     mongodb_threads[i].finished = 0;
                     mongodb_threads[i].busy = 0;
@@ -960,20 +966,18 @@ void *backends_main(void *ptr) {
             }
 
             size_t buffer_len = buffer_strlen(b);
-            size_t sent = 0;
 
             if(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED) {
                 error("BACKEND: failed to write data to database backend '%s'. All available threads are busy. Willing to write %zu bytes, wrote %zu bytes.",
                               mongodb_uri, buffer_len, 0UL);
 
-                chart_transmission_failures++;
                 chart_data_lost_events++;
                 chart_lost_bytes += buffer_len;
                 chart_lost_metrics += (collected_number)chart_buffered_metrics;
 
                 buffer_flush(b);
 
-                continue;
+                goto update_charts;
             }
 
             int i = mongodb_thread_index;
@@ -986,10 +990,6 @@ void *backends_main(void *ptr) {
 
             if(!netdata_thread_create(&mongodb_threads[i].thread, "BACKENDS[mongodb]", NETDATA_THREAD_OPTION_DONT_LOG, mongodb_insert, (void *)&mongodb_threads[i])) {
                 mongodb_threads[i].busy = 1;
-
-                sent += buffer_len;
-                chart_transmission_successes++;
-                chart_receptions++;
             }
             else {
                 // oops! we couldn't send (all or some of the) data
@@ -997,7 +997,6 @@ void *backends_main(void *ptr) {
                       mongodb_uri, mongodb_threads[i].n_bytes, 0UL);
 
                 chart_transmission_failures++;
-                chart_data_lost_events++;
                 chart_lost_bytes += buffer_len;
                 chart_lost_metrics += (collected_number)chart_buffered_metrics;
 
@@ -1006,9 +1005,7 @@ void *backends_main(void *ptr) {
 
             if(unlikely(netdata_exit)) break;
 
-            chart_sent_bytes += sent;
-            if(likely(sent == buffer_len))
-                chart_sent_metrics = chart_buffered_metrics;
+            goto update_charts;
         } else
 #endif /* HAVE_MONGOC */
 
@@ -1225,6 +1222,7 @@ void *backends_main(void *ptr) {
         // ------------------------------------------------------------------------
         // update the monitoring charts
 
+update_charts:
         if(likely(chart_ops->counter_done)) rrdset_next(chart_ops);
         rrddim_set(chart_ops, "read",         chart_receptions);
         rrddim_set(chart_ops, "write",        chart_transmission_successes);
