@@ -491,7 +491,7 @@ void *backends_main(void *ptr) {
     struct mongodb_thread *mongodb_threads = NULL;
 
     // set the default socket timeout in ms
-    int32_t mongodb_default_socket_timeout = (int32_t)(global_backend_update_every < 60)?(global_backend_update_every * 10 * MSEC_PER_SEC):600 * MSEC_PER_SEC;
+    int32_t mongodb_default_socket_timeout = (int32_t)(global_backend_update_every < 30)?(global_backend_update_every * 10 * MSEC_PER_SEC):300 * MSEC_PER_SEC;
 
 #endif
 
