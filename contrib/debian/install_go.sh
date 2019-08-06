@@ -89,7 +89,7 @@ install_go() {
 		# Install files
 		tar -xf "${tmp}/config.tar.gz" -C "${LIB_DIR}/conf.d/"
 		tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
-		mv "${tmp}/${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${LIBEXEC_DIR}/plugins.d/go.d.plugin"
+		mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${LIBEXEC_DIR}/plugins.d/go.d.plugin"
 
 		rm -rf "${tmp}"
 	fi
