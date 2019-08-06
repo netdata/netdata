@@ -1,4 +1,4 @@
-# Registering for and signing in to Netdata Cloud
+# Registration and signing in
 
 
 To use the features of [Netdata Cloud](README.md), you must first register an account with Netdata Cloud and associate your first Netdata node with the Netdata Cloud [registry](../../registry/README.md). **Netdata Cloud is entirely free for all Netdata users**, and does not store any metrics created by your machines. You keep your data—Netdata Cloud just connects it all together.
@@ -9,26 +9,26 @@ To use the features of [Netdata Cloud](README.md), you must first register an ac
 
 ## Registering a Netdata Cloud account
 
-There is only one prerequisite to using Netdata Cloud: A working Netdata agent. If you don't have a running Netdata agent yet, be sure to check out the [quick start](https://docs.netdata.cloud/#quick-start) or [installation guides](https://docs.netdata.cloud/packaging/installer/) for more information.
+There is only one prerequisite to using Netdata Cloud: A working Netdata agent. If you don't have a running Netdata agent yet, check out the [installation guides](../../packaging/installer/) for more information.
 
 To begin, visit the web dashboard of your Netdata agent by navigating your browser of choice to `http://SERVER-IP:19999`. You’ll see a dashboard much like this:
 
 ![A screenshot of Netdata's web interface](https://user-images.githubusercontent.com/1153921/59644657-b7330300-9122-11e9-9dda-ea784422f3f2.png)
 
-From here, you need to register for a Netdata Cloud account. Click on the `Sign in` button on the top-right corner of the dashboard's view.
+From here, you need to register for a Netdata Cloud account. Click on the **Sign in** button on the top-right corner of the dashboard's view.
 
 ![A screenshot of the Sign in button in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/59782688-6252d200-9273-11e9-9975-52be0d6714bf.png)
 
 ??? note "Alternative registration routes"
-    While we recommend the `Sign in` button, the Netdata dashboard has one other direct route registering for or signing in to a Netdata Cloud account.
+    While we recommend the **Sign in** button, the Netdata dashboard has one other direct route registering for or signing in to a Netdata Cloud account.
 
-    The text `Please sign in to netdata.cloud to view your nodes!` contains a link to access Netdata Cloud.
+    The text **Please sign in to netdata.cloud to view your nodes!** contains a link to access Netdata Cloud.
     
     ![A screenshot of the Netdata Cloud sign in link](https://user-images.githubusercontent.com/1153921/59644958-2f4df880-9124-11e9-946c-bb30c8735e0a.png)
 
     Two other routes exist, but they are more directly related to accessing the Nodes View. They will, however, require either registration or sign in and thus are valid routes to access Netdata Cloud.
 
-    One route can be found in the `Nodes<sup>Beta</sup>` button the left side of the navigation menu:
+    One route can be found in the **Nodes Beta** button the left side of the navigation menu:
 
     ![A screenshot of a link to the Nodes View in Netdata Cloud](https://user-images.githubusercontent.com/1153921/59644663-c1ed9800-9122-11e9-9ebc-d67e7db229a7.png)
 
@@ -38,25 +38,25 @@ From here, you need to register for a Netdata Cloud account. Click on the `Sign 
 
 
 ??? note "Registration route when using a private registry"
-    If you're using a private registry, clicking the `Sign in` button will display a modal window warning you about the process of migrating away from your private registry and to Netdata Cloud's registry.
+    If you're using a private registry, clicking the **Sign in** button will display a modal window warning you about the process of migrating away from your private registry and to Netdata Cloud's registry.
 
     ![A screenshot of the private registry warning modal](https://user-images.githubusercontent.com/1153921/59782901-ca091d00-9273-11e9-9f9a-0cb18f78ca26.png)
 
-    If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store), you should click the `Sign in` button again. If not, click the `Cancel` button to continue using your private registry.
+    If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store), you should click the **Sign in** button again. If not, click the **Cancel** button to continue using your private registry.
     
 
 ### Choosing your registration or sign in method
 
-After clicking the `Sign in` button, you'll be directed to the Netdata Cloud registration/sign in page. Choose to authorize with your Google account, GitHub account, or email.
+After clicking the **Sign in** button, you'll be directed to the Netdata Cloud registration/sign in page. Choose to authorize with your Google account, GitHub account, or email.
 
 !!! attention
-    Be consistent with the sign in method you use, whether GitHub, Google, or email. If you sign in via different methods, the system may accidentally create multiple Netdata Accounts. We are currently working on a fix for this inconsistent behavior.
+    Be consistent with the sign in method you use, whether GitHub, Google, or email. If you sign in via different methods, the system will create multiple Netdata Cloud accounts, one for each sign-in method used. We plan to offer multiple authentication methods for the same account in the future.
 
 ![Screenshot of the registration/sign in view for Netdata Cloud](https://user-images.githubusercontent.com/1153921/59783226-8bc02d80-9274-11e9-8bbc-4718759b3145.png)
 
 ### Registration via Google
 
-Click the `Authorize with Google` button to begin registration. You will be redirected to a Google authentication form where you confirm you will "share your name, email address, language preference, and profile picture with netdata.cloud." 
+Click the **Authorize with Google** button to begin registration. You will be redirected to a Google authentication form where you confirm you will "share your name, email address, language preference, and profile picture with netdata.cloud." 
 
 ![Screenshot of the Google authentication screen for Netdata Cloud](https://user-images.githubusercontent.com/1153921/59786094-50752d00-927b-11e9-9411-5d7ce2b71ab0.png)
 
@@ -64,19 +64,19 @@ Click on the account you would like to connect to Netdata Cloud to continue and 
 
 ### Registration via GitHub
 
-Click the `Authorize with GitHub` button to begin registration. You will be redirected to a GitHub authentication form where you confirm to share your email address with Netdata Cloud to create your account.
+Click the **Authorize with GitHub** button to begin registration. You will be redirected to a GitHub authentication form where you confirm to share your email address with Netdata Cloud to create your account.
 
 ![Screenshot of the GitHub authentication screen for Netdata Cloud](https://user-images.githubusercontent.com/1153921/59786227-a2b64e00-927b-11e9-939b-6fc51ef453b0.png)
 
-Click the `Authorize Netdata` button to continue and then skip down to [Visiting Netdata Cloud for the first time](#visiting-the-nodes-view-for-the-first-time) for further instructions.
+Click the **Authorize Netdata** button to continue and then skip down to [Visiting Netdata Cloud for the first time](#visiting-the-nodes-view-for-the-first-time) for further instructions.
 
 ### Registration via email
 
-Enter your preferred email into the field and click the `Authorize` button. 
+Enter your preferred email into the field and click the **Authorize** button. 
 
-Open your email account and check for the verification email—it should arrive in less than a minute. If it doesn't show up, check your spam folder or click the `Resend email` button in the Netdata Cloud interface.
+Open your email account and check for the verification email—it should arrive in less than a minute. If it doesn't show up, check your spam folder or click the **Resend email** button in the Netdata Cloud interface.
 
-When the email arrives, open it and click on the green `Sign in` button and then skip down to [Visiting Netdata Cloud for the first time](#visiting-the-nodes-view-for-the-first-time) for further instructions.
+When the email arrives, open it and click on the green **Sign in** button and then skip down to [Visiting Netdata Cloud for the first time](#visiting-the-nodes-view-for-the-first-time) for further instructions.
 
 ![Screenshot of the verification email](https://user-images.githubusercontent.com/1153921/59783969-338a2b00-9276-11e9-84b8-a4f678de1242.png)
 
@@ -90,30 +90,34 @@ Regardless of which sign in method you used, you'll now be redirected back to yo
 
 ## Signing in to your Netdata Cloud account
 
-The process of signing in to an existing Netdata Cloud account the same as [registering for a new account](#registering-a-netdata-cloud-account). The recommended method is to use the `Sign in` button at the top-right corner of a Netdata nodes's dashboard. Choose the method you used to register for your Netdata Cloud account and complete the process.
+The process of signing in to an existing Netdata Cloud account the same as [registering for a new account](#registering-a-netdata-cloud-account). The recommended method is to use the **Sign in** button at the top-right corner of a Netdata nodes's dashboard. Choose the method you used to register for your Netdata Cloud account and complete the process.
 
 ![A screenshot of the Sign in button in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/59782688-6252d200-9273-11e9-9975-52be0d6714bf.png)
 
 
 ## Adding additional nodes to your Netdata Cloud account
 
-There is currently only one way to associate additional Netdata nodes with your Netdata Cloud account: You must visit the web dashboard for each node and click the `Sign in` button and complete the [sign in process](#signing-in-to-your-netdata-cloud-account).
+There is currently only one way to associate additional Netdata nodes with your Netdata Cloud account: You must visit the web dashboard for each node and click the **Sign in** button and complete the [sign in process](#signing-in-to-your-netdata-cloud-account).
 
 !!! note ""
-    We are aware that the process of registering each node individually is cumbersome for those who want to implement Netdata Cloud's features across a large infrastructure. We have plans [on our roadmap](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to greatly improve this registration process as soon as possible.
+    We are aware that the process of registering each node individually is cumbersome for those who want to implement Netdata Cloud's features across a large infrastructure. 
+
+    Please view [this comment on issue #6318](https://github.com/netdata/netdata/issues/6318#issuecomment-504106329) for how we plan on improving the process for adding additional nodes to your Netdata Cloud account.
+    
+    We have plans [on our roadmap](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to greatly improve this registration process as soon as possible.
 
 
 ## Private registries and Netdata Cloud
 
-Users of [private registries](../../registry/README.md#run-your-own-registry) should be aware that after signing in to Netdata Cloud, they will be using the Netdata Cloud registry instead of their private registry.
+If you use a [private registry](../../registry/README.md#run-your-own-registry), and sign in to Netdata Cloud, you'll be using the Netdata Cloud registry in addition to your private registry.
 
-If you're using a private registry, clicking the `Sign in` button will display a modal window warning you about the process of migrating away from your private registry and to Netdata Cloud's registry.
+Clicking the **Sign in** button on the Netdata dashboard will display a modal window warning you about the synchronization of your private registry's entries to the Netdata Cloud's registry.
 
 ![A screenshot of the private registry warning modal](https://user-images.githubusercontent.com/1153921/59807493-fd1bd280-92ac-11e9-8017-98efb2cbbed8.png)
 
-If your company's data policies do not allow associating nodes with the Netdata Cloud registry, you should click the `Cancel` button and continue using your private registry. You will be able to access the Nodes List in the top-left corner of a Netdata dashboard, but you will not be able to use the [Nodes View](nodes-view.md) feature within Netdata Cloud, or any of the [additional features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/#what-features-will-netdata-cloud-offer) on our roadmap.
+If your company's data policies don't allow storing information about your nodes on the Netdata Cloud registry, you should click the **Cancel** button and continue using your private registry. You'll be able to access the Nodes List in the top-left corner of a Netdata dashboard, but you won't be able to use the [Nodes View](nodes-view.md) feature within Netdata Cloud, or any of the [additional features](https://blog.netdata.cloud/posts/netdata-cloud-announcement/#what-features-will-netdata-cloud-offer) on our roadmap. You can also sign up for the waiting list for the [hosted and/or on-premises versions of Netdata Cloud](README.md#running-netdata-cloud-on-premises-or-as-a-hosted-instance) that we're working on.
 
-If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store), you should click the `Sign in` button again to continue the registration/sign in process.
+If you agree to use Netdata Cloud over your private registry, and opt-in to let Netdata Cloud receive and store the information described [here](../../registry/README.md#what-data-does-the-registry-store), you should click the **Sign in** button again to continue the registration/sign in process.
 
 
 ### Returning to your private registry
@@ -122,8 +126,8 @@ If you register for or sign in to Netdata Cloud from a node previously associate
 
 You can sign out in two ways:
 
-1. **From a node's dashboard**: In the top-right corner you will find a dropdown menu with your email address. Click that and then click the `Sign Out` button.
-2. **From Netdata Cloud**: Click on your profile picture in the top-right corner and then click on the `Sign Out` button.
+1. **From a node's dashboard**: In the top-right corner you will find a dropdown menu with your email address. Click that and then click the **Sign Out** button.
+2. **From Netdata Cloud**: Click on your profile picture in the top-right corner and then click on the **Sign Out** button.
 
 Signing out from Netdata Cloud and returning to your private registry *does not remove* the [information stored](../../registry/README.md#what-data-does-the-registry-store) about your nodes or account details.
 

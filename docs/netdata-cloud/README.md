@@ -45,9 +45,9 @@ Again, we expect that the vast majority of Netdata's users won't need these feat
 
 ## Running Netdata without Netdata Cloud
 
-Netdata Cloud is entirely optional—the application will never force you to create a Netdata Cloud account or associate nodes with the public registries. But, if you choose not to use Netdata Cloud, you will be missing out on the [Nodes View](nodes-view.md) and other upcoming features.
+Netdata Cloud is entirely optional. The application will never force you to create a Netdata Cloud account or associate nodes with the public registries. But, if you choose not to use Netdata Cloud, you will be missing out on the [Nodes View](nodes-view.md) and other upcoming features.
 
 
 ## Running Netdata Cloud on-premises or as a hosted instance
 
-We plan on making both on-premises and hosted instances of Netdata Cloud available to enterprises. Until then, we are creating a list of people and businesses interested in either of these options. To add yourself or your organization to this list, email us at [info@netdata.cloud](mailto:netdata.cloud).
+We plan on making both on-premises and hosted instances of Netdata Cloud available to enterprises. Until then, we are creating a list of people and businesses interested in either of these options. To add yourself or your organization to this list, email us at [info@netdata.cloud](mailto:info@netdata.cloud).
