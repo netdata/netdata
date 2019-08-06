@@ -601,6 +601,33 @@ CHARTS = {
 }
 
 
+def slave_status_chart_template(channel_name):
+    order = [
+        'slave_behind_{0}'.format(channel_name),
+        'slave_status_{0}'.format(channel_name)
+    ]
+
+    charts = {
+        order[0]: {
+            'options': [None, 'Slave Behind Seconds Channel {0}'.format(channel_name),
+                        'seconds', 'slave', 'mysql.slave_behind', 'line'],
+            'lines': [
+                ['Seconds_Behind_Master_{0}'.format(channel_name), 'seconds', 'absolute']
+            ]
+        },
+        order[1]: {
+            'options': [None, 'Slave Status Channel {0}'.format(channel_name),
+                        'status', 'slave', 'mysql.slave_status', 'line'],
+            'lines': [
+                ['Slave_SQL_Running_{0}'.format(channel_name), 'sql_running', 'absolute'],
+                ['Slave_IO_Running_{0}'.format(channel_name), 'io_running', 'absolute']
+            ]
+        },
+    }
+
+    return order, charts
+
+
 def userstats_chart_template(name):
     order = [
         'userstats_rows_{0}'.format(name),
@@ -632,6 +659,10 @@ def userstats_chart_template(name):
     return order, charts
 
 
+# https://dev.mysql.com/doc/refman/8.0/en/replication-channels.html
+DEFAULT_REPL_CHANNEL = ''
+
+
 class Service(MySQLService):
     def __init__(self, configuration=None, name=None):
         MySQLService.__init__(self, configuration=configuration, name=name)
@@ -643,6 +674,7 @@ class Service(MySQLService):
             variables=QUERY_VARIABLES,
             user_statistics=QUERY_USER_STATISTICS,
         )
+        self.repl_channels = [DEFAULT_REPL_CHANNEL]
 
     def _get_data(self):
 
@@ -651,29 +683,25 @@ class Service(MySQLService):
         if not raw_data:
             return None
 
-        to_netdata = dict()
+        data = dict()
 
         if 'global_status' in raw_data:
             global_status = dict(raw_data['global_status'][0])
             for key in GLOBAL_STATS:
                 if key in global_status:
-                    to_netdata[key] = global_status[key]
-            if 'Threads_created' in to_netdata and 'Connections' in to_netdata:
-                to_netdata['Thread_cache_misses'] = round(int(to_netdata['Threads_created'])
-                                                          / float(to_netdata['Connections']) * 10000)
+                    data[key] = global_status[key]
+            if 'Threads_created' in data and 'Connections' in data:
+                data['Thread_cache_misses'] = round(int(data['Threads_created']) / float(data['Connections']) * 10000)
 
         if 'slave_status' in raw_data:
-            if raw_data['slave_status'][0]:
-                slave_raw_data = dict(zip([e[0] for e in raw_data['slave_status'][1]], raw_data['slave_status'][0][0]))
-                for key, func in SLAVE_STATS:
-                    if key in slave_raw_data:
-                        to_netdata[key] = func(slave_raw_data[key])
-            else:
-                self.queries.pop('slave_status')
+            status = self.get_slave_status(raw_data['slave_status'])
+            data.update(status)
+        else:
+            self.queries.pop('slave_status')
 
         if 'user_statistics' in raw_data:
             if raw_data['user_statistics'][0]:
-                to_netdata.update(self.get_userstats(raw_data))
+                data.update(self.get_userstats(raw_data))
             else:
                 self.queries.pop('user_statistics')
 
@@ -681,46 +709,75 @@ class Service(MySQLService):
             variables = dict(raw_data['variables'][0])
             for key in VARIABLES:
                 if key in variables:
-                    to_netdata[key] = variables[key]
+                    data[key] = variables[key]
 
-        return to_netdata or None
+        return data or None
 
-    # raw_data['user_statistics'] contains the following data structure:
-    #   (
-    #       (
-    #           ('netdata', 42L, 0L, 1264L, 3.111252999999968, 2.968510299999994, 110267L, 19741424L, 0L, 0L, 1265L, 0L,
-    #           0L, 0L, 3L, 0L, 1301L, 0L, 0L, 7633L, 0L, 83L, 44L, 0L, 0L),
-    #           ('root', 60L, 0L, 184L, 0.22856499999999966, 0.1601419999999998, 11605L, 1516513L, 0L, 9L, 220L, 0L, 2L, 1L,
-    #           6L, 4L,127L, 0L, 0L, 45L, 0L, 45L, 0L, 0L, 0L)
-    #        ),
-    #    (
-    #        ('User', 253, 9, 128, 128, 0, 0),
-    #        ('Total_connections', 3, 2, 11, 11, 0, 0),
-    #        ('Concurrent_connections', 3, 1, 11, 11, 0, 0),
-    #        ('Connected_time', 3, 4, 11, 11, 0, 0),
-    #        ('Busy_time', 5, 21, 21, 21, 31, 0),
-    #        ('Cpu_time', 5, 18, 21, 21, 31, 0),
-    #        ('Bytes_received', 8, 6, 21, 21, 0, 0),
-    #        ('Bytes_sent', 8, 8, 21, 21, 0, 0),
-    #        ('Binlog_bytes_written', 8, 1, 21, 21, 0, 0),
-    #        ('Rows_read', 8, 1, 21, 21, 0, 0),
-    #        ('Rows_sent', 8, 4, 21, 21, 0, 0),
-    #        ('Rows_deleted', 8, 1, 21, 21, 0, 0),
-    #        ('Rows_inserted', 8, 1, 21, 21, 0, 0),
-    #        ('Rows_updated', 8, 1, 21, 21, 0, 0),
-    #        ('Select_commands', 8, 1, 21, 21, 0, 0),
-    #        ('Update_commands', 8, 1, 21, 21, 0, 0),
-    #        ('Other_commands', 8, 4, 21, 21, 0, 0),
-    #        ('Commit_transactions', 8, 1, 21, 21, 0, 0),
-    #        ('Rollback_transactions', 8, 1, 21, 21, 0, 0),
-    #        ('Denied_connections', 8, 4, 21, 21, 0, 0),
-    #        ('Lost_connections', 8, 1, 21, 21, 0, 0),
-    #        ('Access_denied', 8, 2, 21, 21, 0, 0),
-    #        ('Empty_queries', 8, 2, 21, 21, 0, 0),
-    #        ('Total_ssl_connections', 8, 1, 21, 21, 0, 0),
-    #        ('Max_statement_time_exceeded', 8, 1, 21, 21, 0, 0)),
-    #   )
+    def get_slave_status(self, slave_status_data):
+        rows, description = slave_status_data[0], slave_status_data[1]
+        description_keys = [v[0] for v in description]
+        if not rows:
+            return
+
+        data = dict()
+        for row in rows:
+            slave_data = dict(zip(description_keys, row))
+            channel_name = slave_data.get('Channel_Name', DEFAULT_REPL_CHANNEL)
+
+            if channel_name not in self.repl_channels and len(self.charts) > 0:
+                self.add_repl_channel_charts(channel_name)
+                self.repl_channels.append(channel_name)
+
+            for key, func in SLAVE_STATS:
+                if key not in slave_data:
+                    continue
+
+                value = slave_data[key]
+                if channel_name:
+                    key = '{0}_{1}'.format(key, channel_name)
+                data[key] = func(value)
+
+        return data
+
+    def add_repl_channel_charts(self, name):
+        self.add_new_charts(slave_status_chart_template, name)
+
     def get_userstats(self, raw_data):
+        # raw_data['user_statistics'] contains the following data structure:
+        #   (
+        #       (
+        #           ('netdata', 42L, 0L, 1264L, 3.111252999999968, 2.968510299999994, 110267L, 19741424L, 0L, 0L, 1265L, 0L,
+        #           0L, 0L, 3L, 0L, 1301L, 0L, 0L, 7633L, 0L, 83L, 44L, 0L, 0L),
+        #           ('root', 60L, 0L, 184L, 0.22856499999999966, 0.1601419999999998, 11605L, 1516513L, 0L, 9L, 220L, 0L, 2L, 1L,
+        #           6L, 4L,127L, 0L, 0L, 45L, 0L, 45L, 0L, 0L, 0L)
+        #        ),
+        #    (
+        #        ('User', 253, 9, 128, 128, 0, 0),
+        #        ('Total_connections', 3, 2, 11, 11, 0, 0),
+        #        ('Concurrent_connections', 3, 1, 11, 11, 0, 0),
+        #        ('Connected_time', 3, 4, 11, 11, 0, 0),
+        #        ('Busy_time', 5, 21, 21, 21, 31, 0),
+        #        ('Cpu_time', 5, 18, 21, 21, 31, 0),
+        #        ('Bytes_received', 8, 6, 21, 21, 0, 0),
+        #        ('Bytes_sent', 8, 8, 21, 21, 0, 0),
+        #        ('Binlog_bytes_written', 8, 1, 21, 21, 0, 0),
+        #        ('Rows_read', 8, 1, 21, 21, 0, 0),
+        #        ('Rows_sent', 8, 4, 21, 21, 0, 0),
+        #        ('Rows_deleted', 8, 1, 21, 21, 0, 0),
+        #        ('Rows_inserted', 8, 1, 21, 21, 0, 0),
+        #        ('Rows_updated', 8, 1, 21, 21, 0, 0),
+        #        ('Select_commands', 8, 1, 21, 21, 0, 0),
+        #        ('Update_commands', 8, 1, 21, 21, 0, 0),
+        #        ('Other_commands', 8, 4, 21, 21, 0, 0),
+        #        ('Commit_transactions', 8, 1, 21, 21, 0, 0),
+        #        ('Rollback_transactions', 8, 1, 21, 21, 0, 0),
+        #        ('Denied_connections', 8, 4, 21, 21, 0, 0),
+        #        ('Lost_connections', 8, 1, 21, 21, 0, 0),
+        #        ('Access_denied', 8, 2, 21, 21, 0, 0),
+        #        ('Empty_queries', 8, 2, 21, 21, 0, 0),
+        #        ('Total_ssl_connections', 8, 1, 21, 21, 0, 0),
+        #        ('Max_statement_time_exceeded', 8, 1, 21, 21, 0, 0)),
+        #   )
         data = dict()
         userstats_vars = [e[0] for e in raw_data['user_statistics'][1]]
         for i, _ in enumerate(raw_data['user_statistics'][0]):
@@ -742,7 +799,10 @@ class Service(MySQLService):
         self.charts['userstats_cpu'].add_dimension(['userstats_{0}_Cpu_time'.format(name), name, 'incremental', 100, 1])
 
     def create_new_userstats_charts(self, tube):
-        order, charts = userstats_chart_template(tube)
+        self.add_new_charts(userstats_chart_template, tube)
+
+    def add_new_charts(self, template, *params):
+        order, charts = template(*params)
 
         for chart_name in order:
             params = [chart_name] + charts[chart_name]['options']
