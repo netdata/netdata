@@ -103,8 +103,6 @@ There is currently only one way to associate additional Netdata nodes with your 
     We are aware that the process of registering each node individually is cumbersome for those who want to implement Netdata Cloud's features across a large infrastructure. 
 
     Please view [this comment on issue #6318](https://github.com/netdata/netdata/issues/6318#issuecomment-504106329) for how we plan on improving the process for adding additional nodes to your Netdata Cloud account.
-    
-    We have plans [on our roadmap](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to greatly improve this registration process as soon as possible.
 
 
 ## Private registries and Netdata Cloud

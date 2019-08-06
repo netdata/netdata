@@ -17,7 +17,7 @@ This view, powered by Netdata Cloud, provides an aggregated view of the Netdata 
 
 To access the Nodes View, you must first be signed in to Netdata Cloud. To register for an account, or sign in to an existing account, visit our [signing in guide](signing-in.md) for details.
 
-Once you're signed in to Netdata Cloud, clicking on any of the `Nodes beta` buttons in the node's web dashboard will lead you to the Nodes View. Find one (`1`) in the dropdown menu in the upper-right corner, a second (`2`) in the top navigation bar, and a third (`3`) in the dropdown menu in the top-left corner of the Netdata dashboard.
+Once you're signed in to Netdata Cloud, clicking on any of the **Nodes Beta** buttons in the node's web dashboard will lead you to the Nodes View. Find one (`1`) in the dropdown menu in the upper-right corner, a second (`2`) in the top navigation bar, and a third (`3`) in the dropdown menu in the top-left corner of the Netdata dashboard.
 
 ![Annotated screenshot showing where to access Nodes View](https://user-images.githubusercontent.com/1153921/60359236-4fd04b00-998d-11e9-9e4c-f35ad2551a54.png)
 
@@ -131,9 +131,9 @@ The view mode button lets you switch between three view modes:
 
 ## Sorting, and grouping
 
-The `Sort by` dropdown allows you to choose between sorting *alphabetically by hostname*, most *recently-viewed* nodes, and most *frequently-view* nodes.
+The **Sort by** dropdown allows you to choose between sorting *alphabetically by hostname*, most *recently-viewed* nodes, and most *frequently-view* nodes.
 
-The `Group by` dropdown lets you switch between *alarm status*, *running services*, or *online status*.
+The **Group by** dropdown lets you switch between *alarm status*, *running services*, or *online status*.
 
 For example, the following screenshot represents the Nodes list with the following options: *detailed list*, *frequently visited*, and *alarm status*.
 
@@ -144,10 +144,12 @@ Play around with the options until you find a setup that works for you.
 
 ## Adding more agents to the Nodes View
 
-There is currently only one way to associate additional Netdata nodes with your Netdata Cloud account. You must visit the web dashboard for each node and click the `Sign in` button and complete the [sign in process](signing-in.md#signing-in-to-your-netdata-cloud-account).
+There is currently only one way to associate additional Netdata nodes with your Netdata Cloud account. You must visit the web dashboard for each node and click the **Sign in** button and complete the [sign in process](signing-in.md#signing-in-to-your-netdata-cloud-account).
 
 !!! note ""
-    We are aware that the process of registering each node individually is cumbersome for those who want to implement Netdata Cloud's features across a large infrastructure. We have plans [on our roadmap](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) to greatly improve this registration process as soon as possible.
+    We are aware that the process of registering each node individually is cumbersome for those who want to implement Netdata Cloud's features across a large infrastructure. 
+
+    Please view [this comment on issue #6318](https://github.com/netdata/netdata/issues/6318#issuecomment-504106329) for how we plan on improving the process for adding additional nodes to your Netdata Cloud account.
 
 
 ## Services available in the Nodes View

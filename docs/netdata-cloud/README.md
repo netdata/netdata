@@ -2,13 +2,9 @@
 
 Netdata Cloud is core to our ongoing mission to provide real-time, distributed health monitoring and performance troubleshooting. It's the foundation of an ecosystem of tools that will help you build more extraordinary infrastructures.
 
-Here's a quote from the [post where we announced](https://blog.netdata.cloud/posts/netdata-cloud-announcement/) the future of Netdata:
-
-> We think of Netdata's distributed nature as a feature, not a limitation. At the same time, we know that developers, system administrators, and DevOps engineers are always looking for better ways to access all their monitoring data without having to spend an inordinate amount of time on configuration.
->
-> We're building Netdata Cloud to give users a way to bridge the gap between many distributed agents running concurrently. We want to improve how they view and take action on slowdowns, anomalies, or outages in their systems and applications. And we want to offer a single application that helps you navigate your infrastructure faster while maintaining the strength of our distributed agent.
-
 Netdata Cloud is also the next iteration of our global Netdata registry. For technical information about how our registries work, what information they store, and how your web browser "talks" to both, visit our [registry documentation](../../registry).
+
+Learn more about the future of Netdata Cloud on our [announcement post](https://blog.netdata.cloud/posts/netdata-cloud-announcement/).
 
 
 ## Registering for or signing in to Netdata Cloud
@@ -21,7 +17,7 @@ Netdata Cloud is also the next iteration of our global Netdata registry. For tec
 
 ## Netdata Cloud features
 
-Netdata Cloud currently enables two features: the **Nodes List** in the top-left corner of the Netdata dashboard, and the [**Nodes View**](nodes-view.md).
+Netdata Cloud currently enables two features: the **My nodes** in the top-left corner of the Netdata dashboard, and the [**Nodes View**](nodes-view.md).
 
 We have an aggressive roadmap of new features, such as Workspaces for different parts of your infrastructure, Rooms to collaborate with colleagues, and the ability to receive alarms from any number of distributed Netdata agents in a single place. Read more about our proposed features [here](https://blog.netdata.cloud/posts/netdata-cloud-announcement/#what-features-will-netdata-cloud-offer).
 
