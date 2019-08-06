@@ -833,7 +833,7 @@ install_go() {
 		run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
 		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-		run tar xf "${GO_PACKAGE_BASENAME}" -C "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/"
+		run tar xf "${tmp}/${GO_PACKAGE_BASENAME}" -C "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/"
 		if [ "${UID}" -eq 0 ]; then
 			run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		fi
