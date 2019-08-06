@@ -193,7 +193,7 @@ Requires: cups
 
 # Prometheus remote write dependencies
 BuildRequires: snappy-devel
-BuildRequires: protobuf-devel
+BuildRequires: protobuf-devel >= 3
 %if 0%{?suse_version}
 BuildRequires: libprotobuf-c-devel
 %else
@@ -207,7 +207,7 @@ Requires: libprotobuf15
 %else
 Requires: snappy
 Requires: protobuf-c
-Requires: protobuf
+Requires: protobuf >= 3
 %endif
 # end - prometheus remote write dependencies
 
