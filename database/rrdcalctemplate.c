@@ -47,8 +47,6 @@ inline void rrdcalctemplate_create_alarms(RRDHOST *host, RRDCALCTEMPLATE *rt, RR
             usename = NULL;
         }
 
-
-        fprintf(stderr,"KILLME %s\n",rt->name);
         RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
         if(unlikely(!rc))
             info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
