@@ -44,7 +44,8 @@ else
 			if [ "${NAME}" = "unknown" ]; then NAME="${DISTRIB_ID}"; fi
 			if [ "${VERSION}" = "unknown" ]; then VERSION="${DISTRIB_RELEASE}"; fi
 			if [ "${ID}" = "unknown" ]; then ID="${DISTRIB_CODENAME}"; fi
-		elif [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+		fi
+		if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
 			if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="lsb_release"; else OS_DETECTION="Mixed"; fi
 			if [ "${NAME}" = "unknown" ]; then NAME="$(lsb_release -is 2>/dev/null)"; fi
 			if [ "${VERSION}" = "unknown" ]; then VERSION="$(lsb_release -rs 2>/dev/null)"; fi
