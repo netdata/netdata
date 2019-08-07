@@ -259,7 +259,7 @@ export const unitsConversion = {
     return `${((days > 0) ? `${days.toString()}d:` : "").toString()
       + zeropad(hours)}:${
       zeropad(minutes)}:${
-      zeropad(seconds)
+      zeropad(secondsReturn)
     }${msTxt}`
   },
 
