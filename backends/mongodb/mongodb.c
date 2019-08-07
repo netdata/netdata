@@ -61,7 +61,34 @@ void free_bson(bson_t **insert, size_t n_documents) {
     free(insert);
 }
 
+struct objects_to_clean {
+    struct mongodb_thread **thread_data;
+
+    mongoc_client_t **client;
+    mongoc_collection_t **collection;
+
+    bson_t ***insert;
+    size_t *n_documents;
+};
+
+static void mongodb_insert_cleanup(void *objects_to_clean) {
+    struct objects_to_clean *objects = (struct objects_to_clean *)objects_to_clean;
+
+    free_bson(*objects->insert, *objects->n_documents);
+    mongoc_collection_destroy(*objects->collection);
+    mongoc_client_pool_push(mongodb_client_pool, *objects->client);
+
+    buffer_flush((*objects->thread_data)->buffer);
+
+    netdata_mutex_lock(&(*objects->thread_data)->mutex);
+    (*objects->thread_data)->finished = 1;
+    netdata_mutex_unlock(&(*objects->thread_data)->mutex);
+}
+
 void *mongodb_insert(void *mongodb_thread) {
+    struct objects_to_clean objects_to_clean;
+    netdata_thread_cleanup_push(mongodb_insert_cleanup, (void *)&objects_to_clean);
+
     struct mongodb_thread *thread_data = (struct mongodb_thread *)mongodb_thread;
     mongoc_client_t *client;
     mongoc_collection_t *collection;
@@ -70,6 +97,13 @@ void *mongodb_insert(void *mongodb_thread) {
     char *start = (char *)buffer_tostring(thread_data->buffer);
     char *end = start;
     size_t n_documents = 0;
+
+    objects_to_clean.thread_data = &thread_data;
+    objects_to_clean.client = &client;
+    objects_to_clean.collection = &collection;
+    objects_to_clean.insert = &insert;
+    objects_to_clean.n_documents = &n_documents;
+
 
     client = mongoc_client_pool_pop(mongodb_client_pool);
     if(unlikely(!client)) {
@@ -113,15 +147,7 @@ void *mongodb_insert(void *mongodb_thread) {
     }
 
 cleanup:
-    free_bson(insert, n_documents);
-    mongoc_collection_destroy(collection);
-    mongoc_client_pool_push(mongodb_client_pool, client);
-
-    buffer_flush(thread_data->buffer);
-
-    netdata_mutex_lock(&thread_data->mutex);
-    thread_data->finished = 1;
-    netdata_mutex_unlock(&thread_data->mutex);
+    netdata_thread_cleanup_pop(1);
 
     return NULL;
 }
