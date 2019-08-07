@@ -132,7 +132,7 @@ iptables -t filter -A netdata -j DROP
 iptables -t filter -D INPUT -p tcp --dport ${NETDATA_PORT} -m conntrack --ctstate NEW -j netdata 2>/dev/null
 
 # add the input chain hook (again)
-# to send all new netdata connections to our filtering chain
+# to send all new Netdata connections to our filtering chain
 iptables -t filter -I INPUT -p tcp --dport ${NETDATA_PORT} -m conntrack --ctstate NEW -j netdata
 ```
 _script to allow access to Netdata only from a number of hosts_

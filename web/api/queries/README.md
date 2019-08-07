@@ -54,7 +54,7 @@ There are 2 uses that enable this feature:
   For example, for a time-frame of 10 minutes, the database has 600 points (1/sec),
   while the caller requested these 10 minutes to be expressed in 200 points.
   
-  This feature is used by netdata dashboards when you zoom-out the charts.
+  This feature is used by Netdata dashboards when you zoom-out the charts.
   The dashboard is requesting the number of points the user's screen has.
   This saves bandwidth and speeds up the browser (fewer points to evaluate for drawing the charts).
   
@@ -69,7 +69,7 @@ an integer. Keep in mind the query engine may shift `after` if required. See als
 
 #### Time-frame Alignment
 
-Alignment is a very important aspect of netdata queries. Without it, the animated
+Alignment is a very important aspect of Netdata queries. Without it, the animated
 charts on the dashboards would constantly [change shape](#example) during incremental updates.
 
 To provide consistent grouping through time, the query engine (by default) aligns
@@ -111,7 +111,7 @@ and they group the values every `group points`.
 - ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=des&after=-60&label=des&value_color=blue) applies Holt-Winters double exponential smoothing
 - ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.response_statuses&options=unaligned&dimensions=success&group=incremental_sum&after=-60&label=incremental_sum&value_color=red) finds the difference of the last vs the first value
 
-The examples shown above, are live information from the `successful` web requests of the global netdata registry.
+The examples shown above, are live information from the `successful` web requests of the global Netdata registry.
 
 ## Further processing
 
@@ -129,7 +129,7 @@ the result.
 
 ## Example
 
-When netdata is reducing metrics, it tries to return always the same boundaries. So, if we want 10s averages, it will always return points starting at a `unix timestamp % 10 = 0`.
+When Netdata is reducing metrics, it tries to return always the same boundaries. So, if we want 10s averages, it will always return points starting at a `unix timestamp % 10 = 0`.
 
 Let's see why this is needed, by looking at the error case.
 
@@ -143,7 +143,7 @@ Assume we have 5 points:
 | 00:04 | 4 |
 | 00:05 | 5 |
 
-At 00:04 you ask for 2 points for 4 seconds in the past. So `group = 2`. netdata would return:
+At 00:04 you ask for 2 points for 4 seconds in the past. So `group = 2`. Netdata would return:
 
 | point | time | value |
 | :-: | :-: | :-: |
@@ -159,9 +159,9 @@ A second later the chart is to be refreshed, and makes again the same request at
 
 **Wait a moment!** The chart was shifted just one point and it changed value! Point 2 was 3.5 and when shifted to point 1 is 2.5! If you see this in a chart, it's a mess. The charts change shape constantly.
 
-For this reason, netdata always aligns the data it returns to the `group`.
+For this reason, Netdata always aligns the data it returns to the `group`.
 
-When you request `points=1`, netdata understands that you need 1 point for the whole database, so `group = 3600`. Then it tries to find the starting point which would be `timestamp % 3600 = 0` Within a database of 3600 seconds, there is one such point for sure. Then it tries to find the average of 3600 points. But, most probably it will not find 3600 of them (for just 1 out of 3600 seconds this query will return something).
+When you request `points=1`, Netdata understands that you need 1 point for the whole database, so `group = 3600`. Then it tries to find the starting point which would be `timestamp % 3600 = 0` Within a database of 3600 seconds, there is one such point for sure. Then it tries to find the average of 3600 points. But, most probably it will not find 3600 of them (for just 1 out of 3600 seconds this query will return something).
 
 So, the proper way to query the database is to also set at least `after`. The following call will returns 1 point for the last complete 10-second duration (it starts at `timestamp % 10 = 0`):
 

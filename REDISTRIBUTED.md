@@ -10,7 +10,7 @@ Individual licenses referenced in the tags are available on the [SPDX project si
 
 netdata redistributes the following third-party software.
 We have decided to redistribute all these, instead of using them
-through a CDN, to allow netdata to work in cases where Internet
+through a CDN, to allow Netdata to work in cases where Internet
 connectivity is not available.
 
 - [Dygraphs](http://dygraphs.com/)

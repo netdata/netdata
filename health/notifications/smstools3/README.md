@@ -2,7 +2,7 @@
 
 The [SMS Server Tools 3](http://smstools3.kekekasvi.com/) is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.
 
-To have netdata send notifications via SMS Server Tools 3, you'll first need to [install](http://smstools3.kekekasvi.com/index.php?p=compiling) and [configure](http://smstools3.kekekasvi.com/index.php?p=configure) smsd.
+To have Netdata send notifications via SMS Server Tools 3, you'll first need to [install](http://smstools3.kekekasvi.com/index.php?p=compiling) and [configure](http://smstools3.kekekasvi.com/index.php?p=configure) smsd.
 
 Ensure that the user `netdata` can execute `sendsms`. Any user executing `sendsms` needs to:
 

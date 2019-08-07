@@ -298,7 +298,7 @@ postfix|BASH<br/>Shell Script|Charts the postfix queue size.<br/><br/>DEPRECATED
 application|language|notes|
 :---------:|:------:|:----|
 NFS Client|`C`|This is handled entirely by the Netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfs]`.
-NFS Server|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
+NFS Server|`C`|This is handled entirely by the `netdata` daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
 samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&nbsp;<br/>documentation page: [python.d.plugin module samba](../collectors/python.d.plugin/samba)<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [samba.chart.py](../collectors/python.d.plugin/samba)<br/>configuration file: [python.d/samba.conf](../collectors/python.d.plugin/samba)|
 
 ---

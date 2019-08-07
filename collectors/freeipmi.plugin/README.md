@@ -8,11 +8,11 @@ Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
 1. install `libipmimonitoring-dev` or `libipmimonitoring-devel` (`freeipmi-devel` on RHEL based OS) using the package manager of your system.
 
-2. re-install netdata from source. The installer will detect that the required libraries are now available and will also build `freeipmi.plugin`.
+2. re-install Netdata from source. The installer will detect that the required libraries are now available and will also build `freeipmi.plugin`.
 
 Keep in mind IPMI requires root access, so the plugin is setuid to root.
 
-If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the netdata plugin will be able to work.
+If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the Netdata plugin will be able to work.
 
 ## Netdata use
 

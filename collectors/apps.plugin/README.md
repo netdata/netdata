@@ -5,7 +5,7 @@
 To achieve this task, it iterates through the whole process tree, collecting resource usage information
 for every process found running.
 
-Since netdata needs to present this information in charts and track them through time,
+Since Netdata needs to present this information in charts and track them through time,
 instead of presenting a `top` like list, `apps.plugin` uses a pre-defined list of **process groups**
 to which it assigns all running processes. This list is [customizable](apps_groups.conf) and netdata
 ships with a good default for most cases (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
@@ -26,9 +26,9 @@ that fork/spawn other short lived processes hundreds of times per second.
 
 `apps.plugin` provides charts for 3 sections:
 
-1. Per application charts as **Applications** at netdata dashboards
-2. Per user charts as **Users** at netdata dashboards
-3. Per user group charts as **User Groups** at netdata dashboards
+1. Per application charts as **Applications** at Netdata dashboards
+2. Per user charts as **Users** at Netdata dashboards
+3. Per user group charts as **User Groups** at Netdata dashboards
 
 Each of these sections provides the same number of charts:
 
@@ -64,7 +64,7 @@ The above are reported:
 `apps.plugin` is a complex piece of software and has a lot of work to do
 We are proud that `apps.plugin` is a lot faster compared to any other similar tool,
 while collecting a lot more information for the processes, however the fact is that
-this plugin requires more CPU resources than the netdata daemon itself.
+this plugin requires more CPU resources than the `netdata` daemon itself.
 
 Under Linux, for each process running, `apps.plugin` reads several `/proc` files
 per process. Doing this work per-second, especially on hosts with several thousands
@@ -135,14 +135,14 @@ The order of the entries in this list is important: the first that matches a pro
 ones at the top. Processes not matched by any row, will inherit it from their parents or children.
 
 The order also controls the order of the dimensions on the generated charts (although applications started
-after apps.plugin is started, will be appended to the existing list of dimensions the netdata daemon maintains).
+after apps.plugin is started, will be appended to the existing list of dimensions the `netdata` daemon maintains).
 
 ## Permissions
 
 `apps.plugin` requires additional privileges to collect all the information it needs.
 The problem is described in issue #157.
 
-When netdata is installed, `apps.plugin` is given the capabilities `cap_dac_read_search,cap_sys_ptrace+ep`.
+When Netdata is installed, `apps.plugin` is given the capabilities `cap_dac_read_search,cap_sys_ptrace+ep`.
 If this fails (i.e. `setcap` fails), `apps.plugin` is setuid to `root`.
 
 #### linux capabilities in containers
@@ -166,7 +166,7 @@ You will have to run these, every time you update netdata.
 iterating forever, collecting metrics for each running process and sending them to netdata.
 This is a one-way communication, from `apps.plugin` to netdata.
 
-So, since `apps.plugin` cannot be instructed by netdata for the actions it performs,
+So, since `apps.plugin` cannot be instructed by Netdata for the actions it performs,
 we think it is pretty safe to allow it have these increased privileges.
 
 Keep in mind that `apps.plugin` will still run without escalated permissions,
@@ -210,7 +210,7 @@ For more information about badges check [Generating Badges](../../web/api/badges
 
 ## Comparison with console tools
 
-Ssh to a server running netdata and execute this:
+SSH to a server running Netdata and execute this:
 
 ```sh
 while true; do ls -l /var/run >/dev/null; done
@@ -318,14 +318,14 @@ FILE SYS    Used  Total      0.3   2.1  7009 netdata      0 S /usr/sbin/netdata
 / (vda1)   1.56G  29.5G      0.0   0.0    17 root         0 S oom_reaper
 ```
 
-#### why this happens?
+#### why does this happen?
 
 All the console tools report usage based on the processes found running *at the moment they
 examine the process tree*. So, they see just one `ls` command, which is actually very quick
 with minor CPU utilization. But the shell, is spawning hundreds of them, one after another
 (much like shell scripts do).
 
-#### what netdata reports?
+#### What does Netdata report?
 
 The total CPU utilization of the system:
 
@@ -344,7 +344,7 @@ Why `ssh`?
 `apps.plugin` groups all processes based on its configuration file
 [`/etc/netdata/apps_groups.conf`](apps_groups.conf)
 (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
-The default configuration has nothing for `bash`, but it has for `sshd`, so netdata accumulates
+The default configuration has nothing for `bash`, but it has for `sshd`, so Netdata accumulates
 all ssh sessions to a dimension on the charts, called `ssh`. This includes all the processes in
 the process tree of `sshd`, **including the exited children**.
 
@@ -353,7 +353,7 @@ the process tree of `sshd`, **including the exited children**.
 > `apps.plugin` does not use these mechanisms. The process grouping made by `apps.plugin` works
 > on any Linux, `systemd` based or not.
 
-#### a more technical description of how netdata works
+#### a more technical description of how Netdata works
 
 netdata reads `/proc/<pid>/stat` for all processes, once per second and extracts `utime` and
 `stime` (user and system cpu utilization), much like all the console tools do.
@@ -369,7 +369,7 @@ been reported for it prior to this iteration.
 
 It is even trickier, because walking through the entire process tree takes some time itself. So,
 if you sum the CPU utilization of all processes, you might have more CPU time than the reported
-total cpu time of the system. netdata solves this, by adapting the per process cpu utilization to
+total cpu time of the system. Netdata solves this, by adapting the per process cpu utilization to
 the total of the system. [Netdata adds charts that document this normalization](https://london.my-netdata.io/default.html#menu_netdata_submenu_apps_plugin).
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fapps.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

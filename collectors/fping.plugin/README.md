@@ -90,7 +90,7 @@ cd /usr/libexec/netdata/plugins.d
 ln -s fping.plugin fping2.plugin
 ```
 
-That's it. netdata will detect the new plugin and start it.
+That's it. Netdata will detect the new plugin and start it.
 
 You can name the new plugin any name you like.
 Just make sure the plugin and the configuration file have the same name.

@@ -6,7 +6,7 @@ netdata will send warning messages with priority `0` and critical messages with 
 
 You need:
 
-1. APP TOKEN. You can use the same on all your netdata servers.
+1. APP TOKEN. You can use the same on all your Netdata servers.
 2. USER TOKEN for each user you are going to send notifications to. This is the actual recipient of the notification.
 
 The configuration is like above (slack messages).

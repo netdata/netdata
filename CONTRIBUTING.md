@@ -57,7 +57,7 @@ Netdata delivers alarms via various [notification methods](health/notifications)
 
 ### Help other users
 
-As the project grows, an increasing share of our time is spent on supporting this community of users in terms of answering questions, of helping users understand how netdata works and find their way with it. Helping other users is crucial. It allows the developers and maintainers of the project to focus on improving it.
+As the project grows, an increasing share of our time is spent on supporting this community of users in terms of answering questions, of helping users understand how Netdata works and find their way with it. Helping other users is crucial. It allows the developers and maintainers of the project to focus on improving it.
 
 ### Improve documentation
 
@@ -84,7 +84,7 @@ We expect all contributors to abide by the [Contributor Covenant Code of Conduct
 
 #### Performance and efficiency
 
-Everything on Netdata is about efficiency. We need netdata to always be the most lightweight monitoring solution available. We will reject to merge PRs that are not optimal in resource utilization and efficiency.
+Everything on Netdata is about efficiency. We need Netdata to always be the most lightweight monitoring solution available. We will reject to merge PRs that are not optimal in resource utilization and efficiency.
 
 Of course there are cases that such technical excellence is either not reasonable or not feasible. In these cases, we may require the feature or code submitted to be by disabled by default.
 
@@ -92,9 +92,9 @@ Of course there are cases that such technical excellence is either not reasonabl
 
 Unlike other monitoring solutions, Netdata requires all metrics collected to have some structure attached to them. So, Netdata metrics have a name, units, belong to a chart that has a title, a family, a context, belong to an application, etc.
 
-This structure is what makes netdata different. Most other monitoring solution collect bulk metrics in terms of name-value pairs and then expect their users to give meaning to these metrics during visualization. This does not work. It is neither practical nor reasonable to give to someone 2000 metrics and let him/her visualize them in a meaningful way.
+This structure is what makes Netdata different. Most other monitoring solution collect bulk metrics in terms of name-value pairs and then expect their users to give meaning to these metrics during visualization. This does not work. It is neither practical nor reasonable to give to someone 2000 metrics and let him/her visualize them in a meaningful way.
 
-So, netdata requires all metrics to have a meaning at the time they are collected.  We will reject to merge PRs that loosely collect just a "bunch of metrics", but we are very keen to help you fix this.
+So, Netdata requires all metrics to have a meaning at the time they are collected.  We will reject to merge PRs that loosely collect just a "bunch of metrics", but we are very keen to help you fix this.
 
 #### Automated Testing
 

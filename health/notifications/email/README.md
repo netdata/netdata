@@ -16,7 +16,7 @@ You can configure recipients in [`/etc/netdata/health_alarm_notify.conf`](https:
 
 You can also configure per role recipients [in the same file, a few lines below](https://github.com/netdata/netdata/blob/99d44b7d0c4e006b11318a28ba4a7e7d3f9b3bae/conf.d/health_alarm_notify.conf#L313).
 
-Changes to this file do not require netdata restart.
+Changes to this file do not require a Netdata restart.
 
 You can test your configuration by issuing the commands:
 

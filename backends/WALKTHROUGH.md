@@ -41,7 +41,7 @@ visibility into your application and systems performance.
 
 ## Getting Started - Netdata
 To begin let’s create our container which we will install Netdata on. We need
-to run a container, forward the necessary port that netdata listens on, and
+to run a container, forward the necessary port that Netdata listens on, and
 attach a tty so we can interact with the bash shell on the container. But
 before we do this we want name resolution between the two containers to work.
 In order to accomplish this we will create a user-defined network and attach
