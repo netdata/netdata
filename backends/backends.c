@@ -295,14 +295,17 @@ static void backends_objects_cleanup(void *objects_to_clean) {
         freez(*objects->mongodb_collection);
 
         for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
-            if((*objects->mongodb_threads)[i].busy)
-                netdata_thread_cancel((*objects->mongodb_threads)[i].thread);
+            if((*objects->mongodb_threads)[i].busy) {
+                netdata_mutex_lock(&(*objects->mongodb_threads)[i].mutex);
+                if(!(*objects->mongodb_threads)[i].finished)
+                    netdata_thread_cancel((*objects->mongodb_threads)[i].thread);
+                netdata_mutex_unlock(&(*objects->mongodb_threads)[i].mutex);
+            }
             buffer_free((*objects->mongodb_threads)[i].buffer);
         }
 sleep(1);
         freez(*objects->mongodb_threads);
 
-info("BACKEND: mongodb_cleanup");
         mongodb_cleanup();
     }
 #endif
@@ -555,6 +558,7 @@ void *backends_main(void *ptr) {
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
+    objects_to_clean.sock = &sock;
     objects_to_clean.default_buffer = &default_buffer;
     objects_to_clean.response = &response;
 
