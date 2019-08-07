@@ -81,6 +81,7 @@ static void mongodb_insert_cleanup(void *objects_to_clean) {
     buffer_flush((*objects->thread_data)->buffer);
 
     netdata_mutex_lock(&(*objects->thread_data)->mutex);
+info("BACKEND: finished = %zu", (*objects->thread_data)->thread);
     (*objects->thread_data)->finished = 1;
     netdata_mutex_unlock(&(*objects->thread_data)->mutex);
 }
@@ -153,8 +154,11 @@ cleanup:
 }
 
 void mongodb_cleanup() {
-    mongoc_client_pool_destroy(mongodb_client_pool);
+// info("MONFODB: pool destroy");
+//     mongoc_client_pool_destroy(mongodb_client_pool);
+info("MONFODB: cleanup");
     mongoc_cleanup();
+info("MONFODB: end of cleanup");
 
     return;
 }
