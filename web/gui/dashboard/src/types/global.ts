@@ -30,6 +30,7 @@ interface NETDATA {
     pixels_per_point: number
     fill_luminance: number
   }
+  colorHex2Rgb: (hex: string) => { r: string, g: string, b: string }
   options: {
     current: {
       units: string

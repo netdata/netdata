@@ -92,6 +92,7 @@
 
 import { updateChartDataAction, updateChartDetailsAction } from './domains/chart/actions';
 import { unitsConversion } from './utils/unitsConversion';
+import { seconds4human } from './domains/chart/utils/seconds4human';
 
 let reduxStore
 NETDATA.name2id = function (s) {
@@ -130,6 +131,7 @@ NETDATA.zeropad = function (x) {
     }
 };
 
+// cannot remove it right now because it's used by main.js
 NETDATA.seconds4human = function (seconds, options) {
     let defaultOptions = {
         now: 'now',
@@ -3179,7 +3181,7 @@ NETDATA.d3pieSetContent = function (state, data, index) {
 
 NETDATA.d3pieDateRange = function (state, data, index) {
     let dt = Math.round((data.before - data.after + 1) / data.points);
-    let dt_str = NETDATA.seconds4human(dt);
+    let dt_str = seconds4human(dt);
 
     let before = data.result.data[index].time;
     let after = before - (dt * 1000);
@@ -6550,7 +6552,7 @@ let chartState = function (element, chartIndex) {
             _unitsConversionLastMin = min;
             _unitsConversionLastMax = max;
 
-            _unitsConversion = NETDATA.unitsConversion.get(this.uuid, min, max, this.units, this.units_desired, this.units_common, function (units) {
+            _unitsConversion = unitsConversion.get(this.uuid, min, max, this.units, this.units_desired, this.units_common, function (units) {
                 // console.log('switching units from ' + that.units.toString() + ' to ' + units.toString());
                 that.units_current = units;
                 that.legendSetUnitsString(that.units_current);
@@ -6932,10 +6934,10 @@ let chartState = function (element, chartIndex) {
         let viewed = (this.data) ? this.data.view_update_every : collected;
 
         if (collected === viewed) {
-            return "resolution " + NETDATA.seconds4human(collected);
+            return "resolution " + seconds4human(collected);
         }
 
-        return "resolution " + NETDATA.seconds4human(viewed) + ", collected every " + NETDATA.seconds4human(collected);
+        return "resolution " + seconds4human(viewed) + ", collected every " + seconds4human(collected);
     };
 
     this.legendUpdateDOM = function () {
@@ -7727,11 +7729,11 @@ let chartState = function (element, chartIndex) {
         }
 
         if (this.foreignElementDuration !== null) {
-            this.foreignElementDuration.innerText = NETDATA.seconds4human(Math.floor((this.view_before - this.view_after) / 1000) + 1);
+            this.foreignElementDuration.innerText = seconds4human(Math.floor((this.view_before - this.view_after) / 1000) + 1);
         }
 
         if (this.foreignElementUpdateEvery !== null) {
-            this.foreignElementUpdateEvery.innerText = NETDATA.seconds4human(Math.floor(this.data_update_every / 1000));
+            this.foreignElementUpdateEvery.innerText = seconds4human(Math.floor(this.data_update_every / 1000));
         }
     };
 
@@ -8648,7 +8650,6 @@ NETDATA.globalReset = function () {
     NETDATA.commonMin.globalReset();
     NETDATA.commonMax.globalReset();
     NETDATA.commonColors.globalReset();
-    NETDATA.unitsConversion.globalReset();
     NETDATA.options.targets = [];
     NETDATA.parseDom();
     NETDATA.unpause();

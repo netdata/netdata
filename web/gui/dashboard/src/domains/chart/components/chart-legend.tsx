@@ -1,13 +1,18 @@
-import React from "react"
+import React, { Fragment } from "react"
 import classNames from "classnames"
 
 import { seconds4human } from "../utils/seconds4human"
+import { Attributes } from "../utils/transformDataAttributes"
 import { ChartData, ChartDetails } from "../chart-types"
 
 interface Props {
+  attributes: Attributes
   chartData: ChartData
   chartDetails: ChartDetails
   chartLibrary: string
+  colors: {
+    [key: string]: string
+  }
 }
 
 export const legendPluginModuleString = (withContext: boolean, chartDetails: ChartDetails) => {
@@ -41,7 +46,7 @@ export const legendPluginModuleString = (withContext: boolean, chartDetails: Cha
 
 const legendResolutionTooltip = (chartData: ChartData, chartDetails: ChartDetails) => {
   const collected = chartDetails.update_every
-  // todo if there's no data (maybe there wont be situation like this), then use "collected"
+  // todo if there's no data (but maybe there wont be situation like this), then use "collected"
   const viewed = chartData.view_update_every
   if (collected === viewed) {
     return `resolution ${seconds4human(collected)}`
@@ -51,9 +56,11 @@ const legendResolutionTooltip = (chartData: ChartData, chartDetails: ChartDetail
 }
 
 export const ChartLegend = ({
+  attributes,
   chartData,
   chartDetails,
   chartLibrary,
+  colors,
 }: Props) => {
   const netdataLast = chartData.last_entry * 1000
   // todo lift before/after to the state (when doing highlighting/pan/zoom)
@@ -61,11 +68,23 @@ export const ChartLegend = ({
   const viewBefore = chartData.before * 1000
   const dataUpdateEvery = chartData.view_update_every * 1000
 
-  // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
   const showUndefined = Math.abs(netdataLast - viewBefore) > dataUpdateEvery
+  console.log("showUndefined", showUndefined) // eslint-disable-line no-console
   // todo make separate case for showUndefined
 
   const legendDate = new Date(viewBefore)
+
+  const {
+    // todo take into account units_current from unitsConversionSetup()
+    units = chartDetails.units,
+  } = attributes
+  // todo make a possibility to add chartLegened when there's not chartData
+  // (if this situation is possible)
+
+  // @ts-ignore ignoring because options.current has inconsistent structure
+  const colorFillOpacity = window.NETDATA.options.current[
+    `color_fill_opacity_${chartDetails.chart_type}`
+  ]
   return (
     <div className={classNames(
       "netdata-chart-legend",
@@ -86,9 +105,59 @@ export const ChartLegend = ({
         {window.NETDATA.dateTime.localeTimeString(legendDate)}
       </span>
       <br />
-      {/* title_units */}
+      <span className="netdata-legend-title-units">{units}</span>
       <br />
       {/* perfect_scroller */}
+      <div className="netdata-legend-series-content">
+        {chartData.dimension_names.map((dimensionName, i) => {
+          const color = colors[dimensionName]
+          const rgb = window.NETDATA.colorHex2Rgb(color)
+          const isSelected = true // todo lift to state
+          return (
+            <Fragment key={dimensionName}>
+              {i !== 0 && <br />}
+              <span
+                title={dimensionName}
+                className={classNames(
+                  "netdata-legend-name",
+                  { "netdata-legend-name": isSelected },
+                )}
+                style={{ color }} // omitted !important during refractor (react doesn't support it)
+              >
+                <table
+                  className={`netdata-legend-name-table-${chartDetails.chart_type}`}
+                  style={{
+                    backgroundColor: `rgba(${rgb.r},${rgb.g},${rgb.b},${colorFillOpacity})`,
+                  }}
+                >
+                  <tbody>
+                    <tr className="netdata-legend-name-tr">
+                      <td className="netdata-legend-name-td" />
+                    </tr>
+                  </tbody>
+                </table>
+                {" "}
+                {dimensionName}
+              </span>
+              <span
+                title={dimensionName}
+                className={classNames(
+                  "netdata-legend-value",
+                  { selected: isSelected },
+                )}
+                style={{ color }} // omitted !important during refractor (react doesn't support it)
+                // value was set in dashboard.js by this.legendSetLabelValue
+                // this.legendSetLabelValue could be called by: legendFormatter (dygraph internal
+                // function), legendShowUndefined (clearing), or this.legendShowLatestValues
+                // todo this needs to be further formatted using this.legendFormatValue()
+                // (but first, charts needs to be configured)
+              >
+                {chartData.view_latest_values[i]}
+              </span>
+            </Fragment>
+          )
+        })}
+      </div>
       {/* content */}
     </div>
   )

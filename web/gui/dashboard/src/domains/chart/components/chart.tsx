@@ -113,6 +113,7 @@ export const Chart = ({
           chartData={chartData}
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}
+          colors={colors}
         />
       )}
       {shouldDisplayToolbox && (
