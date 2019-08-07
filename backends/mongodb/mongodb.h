@@ -5,6 +5,9 @@
 
 #include "backends/backends.h"
 
+#define MONGODB_THREADS_NUMBER 3
+#define MONGODB_THREAD_INDEX_UNDEFINED -1
+
 struct mongodb_thread {
     netdata_thread_t thread;
     netdata_mutex_t mutex;

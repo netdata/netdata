@@ -237,6 +237,91 @@ inline BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPT
     return backend_options;
 }
 
+static struct objects_to_clean {
+#if HAVE_KINESIS
+    int *do_kinesis;
+    char **kinesis_auth_key_id;
+    char **kinesis_secure_key;
+    char **kinesis_stream_name;
+#endif
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    int *do_prometheus_remote_write;
+    BUFFER **http_request_header;
+#endif
+
+#if HAVE_MONGOC
+    int *do_mongodb;
+    char **mongodb_uri;
+    char **mongodb_database;
+    char **mongodb_collection;
+    struct mongodb_thread **mongodb_threads;
+#endif
+
+    int *sock;
+    BUFFER **default_buffer;
+    BUFFER **response;
+
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl *opentsdb_ssl;
+#endif
+} objects_to_clean;
+
+static void backends_objects_cleanup(void *objects_to_clean) {
+    struct objects_to_clean *objects = (struct objects_to_clean *)objects_to_clean;
+
+    info("cleaning up dynamic objects...");
+
+#if HAVE_KINESIS
+    if(*objects->do_kinesis) {
+        kinesis_shutdown();
+        freez(*objects->kinesis_auth_key_id);
+        freez(*objects->kinesis_secure_key);
+        freez(*objects->kinesis_stream_name);
+    }
+#endif
+
+#if ENABLE_PROMETHEUS_REMOTE_WRITE
+    if(*objects->do_prometheus_remote_write) {
+        buffer_free(*objects->http_request_header);
+        protocol_buffers_shutdown();
+    }
+#endif
+
+#if HAVE_MONGOC
+    if(*objects->do_mongodb) {
+        freez(*objects->mongodb_uri);
+        freez(*objects->mongodb_database);
+        freez(*objects->mongodb_collection);
+
+        for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+            if((*objects->mongodb_threads)[i].busy)
+                netdata_thread_cancel((*objects->mongodb_threads)[i].thread);
+            buffer_free((*objects->mongodb_threads)[i].buffer);
+        }
+sleep(1);
+        freez(*objects->mongodb_threads);
+
+info("BACKEND: mongodb_cleanup");
+        mongodb_cleanup();
+    }
+#endif
+
+    if(*objects->sock != -1)
+        close(*objects->sock);
+
+    buffer_free(*objects->default_buffer);
+    buffer_free(*objects->response);
+
+#ifdef ENABLE_HTTPS
+    if(netdata_opentsdb_ctx) {
+        if(objects->opentsdb_ssl->conn) {
+            SSL_free(objects->opentsdb_ssl->conn);
+        }
+    }
+#endif
+}
+
 static void backends_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
@@ -461,27 +546,37 @@ BACKEND_TYPE backend_select_type(const char *type) {
  */
 void *backends_main(void *ptr) {
     netdata_thread_cleanup_push(backends_main_cleanup, ptr);
+    netdata_thread_cleanup_push(backends_objects_cleanup, (void *)&objects_to_clean);
 
     int default_port = 0;
     int sock = -1;
-    BUFFER *default_buffer = buffer_create(1), *response = buffer_create(1);
+    BUFFER *default_buffer = buffer_create(1);
+    BUFFER *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
+
+    objects_to_clean.default_buffer = &default_buffer;
+    objects_to_clean.response = &response;
 
 #if HAVE_KINESIS
     int do_kinesis = 0;
     char *kinesis_auth_key_id = NULL, *kinesis_secure_key = NULL, *kinesis_stream_name = NULL;
+
+    objects_to_clean.do_kinesis = &do_kinesis;
+    objects_to_clean.kinesis_auth_key_id = &kinesis_auth_key_id;
+    objects_to_clean.kinesis_secure_key = &kinesis_secure_key;
+    objects_to_clean.kinesis_stream_name = &kinesis_stream_name;
 #endif
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
     int do_prometheus_remote_write = 0;
     BUFFER *http_request_header = NULL;
+
+    objects_to_clean.do_prometheus_remote_write = &do_prometheus_remote_write;
+    objects_to_clean.http_request_header = &http_request_header;
 #endif
 
 #if HAVE_MONGOC
-
-#define MONGODB_THREADS_NUMBER 3
-#define MONGODB_THREAD_INDEX_UNDEFINED -1
 
     int do_mongodb = 0;
     char *mongodb_uri = NULL;
@@ -490,13 +585,21 @@ void *backends_main(void *ptr) {
 
     struct mongodb_thread *mongodb_threads = NULL;
 
+    objects_to_clean.do_mongodb = &do_mongodb;
+    objects_to_clean.mongodb_uri = &mongodb_uri;
+    objects_to_clean.mongodb_database = &mongodb_database;
+    objects_to_clean.mongodb_collection = &mongodb_collection;
+    objects_to_clean.mongodb_threads = &mongodb_threads;
+
     // set the default socket timeout in ms
     int32_t mongodb_default_socket_timeout = (int32_t)(global_backend_update_every < 30)?(global_backend_update_every * 10 * MSEC_PER_SEC):300 * MSEC_PER_SEC;
 
 #endif
 
 #ifdef ENABLE_HTTPS
-            struct netdata_ssl opentsdb_ssl = {NULL , NETDATA_SSL_START};
+    struct netdata_ssl opentsdb_ssl = {NULL , NETDATA_SSL_START};
+
+    objects_to_clean.opentsdb_ssl = &opentsdb_ssl;
 #endif
 
     // ------------------------------------------------------------------------
@@ -1262,51 +1365,8 @@ update_charts:
     }
 
 cleanup:
-#if HAVE_KINESIS
-    if(do_kinesis) {
-        kinesis_shutdown();
-        freez(kinesis_auth_key_id);
-        freez(kinesis_secure_key);
-        freez(kinesis_stream_name);
-    }
-#endif
-
-#if ENABLE_PROMETHEUS_REMOTE_WRITE
-    buffer_free(http_request_header);
-    if(do_prometheus_remote_write)
-        protocol_buffers_shutdown();
-#endif
-
-#if HAVE_MONGOC
-    if(do_mongodb) {
-        mongodb_cleanup();
-        freez(mongodb_uri);
-        freez(mongodb_database);
-        freez(mongodb_collection);
-
-        for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
-            if(mongodb_threads[i].busy)
-                netdata_thread_cancel(mongodb_threads[i].thread);
-            buffer_free(mongodb_threads[i].buffer);
-        }
-        freez(mongodb_threads);
-    }
-#endif
-
-    if(sock != -1)
-        close(sock);
-
-    buffer_free(default_buffer);
-    buffer_free(response);
-
-#ifdef ENABLE_HTTPS
-    if(netdata_opentsdb_ctx) {
-        if(opentsdb_ssl.conn) {
-            SSL_free(opentsdb_ssl.conn);
-        }
-    }
-#endif
-
     netdata_thread_cleanup_pop(1);
+    netdata_thread_cleanup_pop(1);
+
     return NULL;
 }
