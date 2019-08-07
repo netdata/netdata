@@ -1884,9 +1884,11 @@ int test_dbengine(void)
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", st[i]->name);
             ++errors;
         } else {
+            long c;
+
             assert(r->st == st[i]);
             // test current region values only, since they must be left unchanged
-            for (long c = point_offset ; c < point_offset + rrdr_rows(r) / REGIONS / 2 ; ++c) {
+            for (c = point_offset ; c < point_offset + rrdr_rows(r) / REGIONS / 2 ; ++c) {
                 RRDDIM *d;
                 time_t time_now = time_start[current_region] + (c - point_offset + 2) * update_every;
                 time_t time_retrieved = r->t[c];

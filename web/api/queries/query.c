@@ -1172,6 +1172,7 @@ static RRDR *rrd2rrdr_fixedstep(
     return r;
 }
 
+#ifdef ENABLE_DBENGINE
 static RRDR *rrd2rrdr_variablestep(
         RRDSET *st
         , long points_requested
@@ -1567,6 +1568,7 @@ static RRDR *rrd2rrdr_variablestep(
     freez(region_info_array);
     return r;
 }
+#endif //#ifdef ENABLE_DBENGINE
 
 RRDR *rrd2rrdr(
         RRDSET *st

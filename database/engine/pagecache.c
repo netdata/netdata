@@ -654,7 +654,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
         Index = (Word_t)(descr->start_time / USEC_PER_SEC);
     }
     if (page_info_arrayp) {
-        page_info_array_max_size = PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(*page_info_arrayp);
+        page_info_array_max_size = PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(struct rrdeng_page_info);
         *page_info_arrayp = mallocz(page_info_array_max_size);
     }
 
@@ -667,8 +667,8 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
         if (unlikely(0 == descr->page_length))
             continue;
         if (page_info_arrayp) {
-            if (unlikely(count >= page_info_array_max_size)) {
-                page_info_array_max_size += PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(*page_info_arrayp);
+            if (unlikely(count >= page_info_array_max_size / sizeof(struct rrdeng_page_info))) {
+                page_info_array_max_size += PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(struct rrdeng_page_info);
                 *page_info_arrayp = reallocz(*page_info_arrayp, page_info_array_max_size);
             }
             (*page_info_arrayp)[count].start_time = descr->start_time;
@@ -750,8 +750,10 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
         /* no such page */
         debug(D_RRDENGINE, "%s: No page was eligible to attempt preload.", __func__);
     }
-    if (unlikely(0 == count && page_info_arrayp))
+    if (unlikely(0 == count && page_info_arrayp)) {
         freez(*page_info_arrayp);
+        *page_info_arrayp = NULL;
+    }
     return count;
 }
 

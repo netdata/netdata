@@ -272,6 +272,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     ctx = st->rrdhost->rrdeng_ctx;
     regions = 1;
     *max_intervalp = max_interval = 0;
+    region_info_array = NULL;
     *region_info_arrayp = NULL;
     page_info_array = NULL;
 
@@ -297,8 +298,10 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
     }
     pages_nr = pg_cache_preload(ctx, rd->state->rrdeng_uuid, start_time * USEC_PER_SEC, end_time * USEC_PER_SEC,
                                 &page_info_array, &page_index);
-    /* conservative allocation, will reduce the size later if necessary */
-    region_info_array = mallocz(sizeof(*region_info_array) * pages_nr);
+    if (pages_nr) {
+        /* conservative allocation, will reduce the size later if necessary */
+        region_info_array = mallocz(sizeof(*region_info_array) * pages_nr);
+    }
     is_first_region_initialized = 0;
     region_points = 0;
 
@@ -318,7 +321,9 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
         assert(0 != page_entries);
         if (likely(1 != page_entries)) {
             dt = (curr->end_time - curr->start_time) / (page_entries - 1);
-            *pginfo_to_dt(curr) = dt / USEC_PER_SEC;
+            *pginfo_to_dt(curr) = ROUND_USEC_TO_SEC(dt);
+            if (unlikely(0 == *pginfo_to_dt(curr)))
+                *pginfo_to_dt(curr) = 1;
         } else {
             dt = 0;
         }
@@ -381,15 +386,18 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
 
                     db_entries = db_page_info.page_length / sizeof(storage_number);
                     db_dt = (db_page_info.end_time - db_page_info.start_time) / (db_entries - 1);
-                    *pginfo_to_dt(curr) = db_dt / USEC_PER_SEC;
+                    *pginfo_to_dt(curr) = ROUND_USEC_TO_SEC(db_dt);
+                    if (unlikely(0 == *pginfo_to_dt(curr)))
+                        *pginfo_to_dt(curr) = 1;
+
                 }
             }
         }
         if (likely(prev) && unlikely(*pginfo_to_dt(curr) != *pginfo_to_dt(prev))) {
             info("Data collection interval change detected in query: %"PRIu32" -> %"PRIu32,
                  *pginfo_to_dt(prev), *pginfo_to_dt(curr));
-            ++regions;
-            region_points = 0;
+            region_info_array[regions++ - 1].points -= page_points;
+            region_info_array[regions - 1].points = region_points = page_points;
             region_info_array[regions - 1].start_time = first_valid_time_in_page;
         }
         if (*pginfo_to_dt(curr) > max_interval)
