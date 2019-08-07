@@ -6,25 +6,17 @@ We then leverage a number of dashboards, both configured by the Netdata communit
 
 There are two primary ways to view Netdata's dashboards:
 
-1. The [Netdata web dashboard](#default-web-dashboard) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`.
+1. The [Netdata web dashboard](#netdata-web-dashboard) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`.
 
-2. The [`dashboard.js` JavaScript library](#dashboard-js) that helps you create custom dashboards using plain HTML.
+2. The `dashboard.js` JavaScript library, which helps you create [custom dashboards](#customizing-the-standard-dashboards) using plain HTML.
 
 You can also view all the data Netdata collects through the [REST API v1](api/).
 
 ## Netdata web dashboard
 
+By default, Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and navigate to `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`.
 
-
-The default port is 19999; for example, to access the dashboard on localhost, use: http://localhost:19999
-
-To view Netdata collected data you access its **[REST API v1](api/)**.
-
-For our convenience, Netdata provides 2 more layers:
-
-1.  The `dashboard.js` javascript library that allows us to design custom dashboards using plain HTML. For information on creating custom dashboards, see **[Custom Dashboards](gui/custom/)** and **[Atlassian Confluence Dashboards](gui/confluence/)**
-
-2.  Ready to be used web dashboards that render all the charts a Netdata server maintains.
+**IMAGE GOES HERE**
 
 
 ## Charts, contexts, families
