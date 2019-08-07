@@ -7,7 +7,7 @@ Prometheus is a distributed monitoring system which offers a very simple setup a
 
 ## Installing Netdata and prometheus
 
-### Installing netdata
+### Installing Netdata
 
 There are number of ways to install Netdata according to [Installation](../../packaging/installer/#installation)  
 The suggested way of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
@@ -22,11 +22,11 @@ At this point we should have Netdata listening on port 19999. Attempt to take yo
 http://your.netdata.ip:19999
 ```
 
-*(replace `your.netdata.ip` with the IP or hostname of the server running netdata)*
+*(replace `your.netdata.ip` with the IP or hostname of the server running Netdata)*
 
 ### Installing Prometheus
 
-In order to install prometheus we are going to introduce our own systemd startup script along with an example of prometheus.yaml configuration. Prometheus needs to be pointed to your server at a specific target url for it to scrape netdata's api. Prometheus is always a pull model meaning Netdata is the passive client within this architecture. Prometheus always initiates the connection with netdata.
+In order to install prometheus we are going to introduce our own systemd startup script along with an example of prometheus.yaml configuration. Prometheus needs to be pointed to your server at a specific target url for it to scrape Netdata's api. Prometheus is always a pull model meaning Netdata is the passive client within this architecture. Prometheus always initiates the connection with Netdata.
 
 #### Download Prometheus
 
@@ -57,7 +57,7 @@ sudo tar -xvf /tmp/prometheus-2.3.2.linux-amd64.tar.gz -C /opt/prometheus --stri
 
 We will use the following `prometheus.yml` file. Save it at `/opt/prometheus/prometheus.yml`.
 
-Make sure to replace `your.netdata.ip` with the IP or hostname of the host running netdata. 
+Make sure to replace `your.netdata.ip` with the IP or hostname of the host running Netdata. 
 
 ```yaml
 # my global config
@@ -214,7 +214,7 @@ Then each Netdata chart contains metrics called `dimensions`. All the dimensions
 
 Netdata can send metrics to prometheus from 3 data sources:
 
-- `as collected` or `raw` - this data source sends the metrics to prometheus as they are collected. No conversion is done by netdata. The latest value for each metric is just given to prometheus. This is the most preferred method by prometheus, but it is also the harder to work with. To work with this data source, you will need to understand how to get meaningful values out of them.
+- `as collected` or `raw` - this data source sends the metrics to prometheus as they are collected. No conversion is done by Netdata. The latest value for each metric is just given to prometheus. This is the most preferred method by prometheus, but it is also the harder to work with. To work with this data source, you will need to understand how to get meaningful values out of them.
 
    The format of the metrics is: `CONTEXT{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
@@ -226,7 +226,7 @@ Netdata can send metrics to prometheus from 3 data sources:
 
    The format of the metrics is: `CONTEXT_UNITS_average{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
-   When this source is used, Netdata keeps track of the last access time for each prometheus server fetching the metrics. This last access time is used at the subsequent queries of the same prometheus server to identify the time-frame the `average` will be calculated. So, no matter how frequently prometheus scrapes netdata, it will get all the database data. To identify each prometheus server, Netdata uses by default the IP of the client fetching the metrics. If there are multiple prometheus servers fetching data from the same netdata, using the same IP, each prometheus server can append `server=NAME` to the URL. Netdata will use this `NAME` to uniquely identify the prometheus server.
+   When this source is used, Netdata keeps track of the last access time for each prometheus server fetching the metrics. This last access time is used at the subsequent queries of the same prometheus server to identify the time-frame the `average` will be calculated. So, no matter how frequently prometheus scrapes Netdata, it will get all the database data. To identify each prometheus server, Netdata uses by default the IP of the client fetching the metrics. If there are multiple prometheus servers fetching data from the same Netdata, using the same IP, each prometheus server can append `server=NAME` to the URL. Netdata will use this `NAME` to uniquely identify the prometheus server.
 
 - `sum` or `volume`, is like `average` but instead of averaging the values, it sums them.
 
