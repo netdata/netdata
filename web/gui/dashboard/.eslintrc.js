@@ -2,6 +2,7 @@ module.exports = {
   "parser": "@typescript-eslint/parser",
   "plugins": [
     "@typescript-eslint",
+    "react-hooks",
   ],
   "env": {
     "browser": true,
@@ -24,7 +25,9 @@ module.exports = {
     ],
     "no-underscore-dangle": ["error", { "allow": ["__REDUX_DEVTOOLS_EXTENSION__"] }],
     "import/prefer-default-export": 0,
-    "@typescript-eslint/no-unused-vars": "error"
+    "@typescript-eslint/no-unused-vars": "error",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn"
   },
   "settings": {
     "import/resolver": {

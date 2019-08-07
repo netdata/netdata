@@ -31,7 +31,8 @@
     "@types/redux-saga": "^0.10.5",
     "@typescript-eslint/eslint-plugin": "^1.13.0",
     "@typescript-eslint/parser": "^1.13.0",
-    "eslint-config-airbnb": "^17.1.1"
+    "eslint-config-airbnb": "^17.1.1",
+    "eslint-plugin-react-hooks": "^1.6.1"
   },
   "scripts": {
     "start": "react-scripts start",
