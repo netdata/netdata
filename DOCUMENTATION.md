@@ -26,6 +26,8 @@ Welcome! You've arrived at the documentation for Netdata. Use the links below to
 
 </div>
 
+**Netdata Cloud**: Use [Netdata Cloud](docs/netdata-cloud/) and the [Nodes View](docs/netdata-cloud/nodes-view.md) to view real-time, distributed health monitoring and performance troubleshooting data for all your systems in one place. Add as many nodes as you'd like!
+
 **Advanced users**: For those who already understand how to access a Netdata dashboard and perform basic configuration, feel free to see what's behind any of these other doors.
 
   - [Netdata Behind Nginx](docs/Running-behind-nginx.md): Use an Nginx web server instead of Netdata's built-in server to enable TLS, HTTPS, and basic authentication.
