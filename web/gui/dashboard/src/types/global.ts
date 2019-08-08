@@ -2,7 +2,7 @@
 // @ts-ignore isolated-modules
 
 interface Theme {
-  ackground: string
+  background: string
   foreground: string
   grid: string
   axis: string

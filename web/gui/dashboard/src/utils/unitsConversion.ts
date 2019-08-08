@@ -232,6 +232,7 @@ interface Latest {
   }
 }
 export const unitsConversion = {
+  // todo lift the state
   keys: {} as Keys, // keys for data-common-units
   latest: {} as Latest, // latest selected units for data-common-units
 

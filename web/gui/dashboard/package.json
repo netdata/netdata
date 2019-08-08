@@ -5,6 +5,7 @@
   "dependencies": {
     "bootstrap": "3.3.7",
     "classnames": "^2.2.6",
+    "dygraphs": "2.1.0",
     "jquery": "^2.2.4",
     "perfect-scrollbar": "0.6.15",
     "ramda": "^0.26.1",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@types/bootstrap": "^3",
     "@types/classnames": "^2.2.9",
+    "@types/dygraphs": "^1.1.8",
     "@types/jest": "24.0.15",
     "@types/jquery": "^3.3.30",
     "@types/node": "12.6.8",

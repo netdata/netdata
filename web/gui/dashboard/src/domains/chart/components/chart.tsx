@@ -1,5 +1,5 @@
+import { __, prop } from "ramda"
 import React, { useEffect } from "react"
-import classNames from "classnames"
 import { useDispatch, useSelector } from "react-redux"
 
 import { requestCommonColorsAction } from "domains/global/actions"
@@ -11,6 +11,7 @@ import { chartLibrariesSettings, ChartLibraryConfig } from "../utils/chartLibrar
 import { ChartData, ChartDetails } from "../chart-types"
 import { LegendToolbox } from "./legend-toolbox"
 import { ResizeHandler } from "./resize-handler"
+import { AbstractChart } from "./abstract-chart"
 
 interface Props {
   chartData: ChartData
@@ -55,8 +56,6 @@ export const Chart = ({
   },
   attributes,
 }: Props) => {
-  const chartElemId = `${chartLibrary}-${chartUuid}-chart`
-
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
 
@@ -88,24 +87,21 @@ export const Chart = ({
   if (!colors) {
     return null
   }
+  const orderedColors = chartData.dimension_names.map(prop(__, colors))
 
   return (
     <div
       style={getStyles(attributes, chartSettings)}
       className={hasLegend ? "netdata-container-with-legend" : "netdata-container"}
     >
-      <div
-        id={chartElemId}
-        className={hasLegend
-          ? classNames(
-            "netdata-chart-with-legend-right",
-            `netdata-${chartLibrary}-chart-with-legend-right`,
-          )
-          : classNames(
-            "netdata-chart",
-            `netdata-${chartLibrary}-chart`,
-          )
-        }
+      <AbstractChart
+        attributes={attributes}
+        chartData={chartData}
+        chartDetails={chartDetails}
+        chartLibrary={chartLibrary}
+        colors={colors}
+        chartUuid={chartUuid}
+        orderedColors={orderedColors}
       />
       {hasLegend && (
         <ChartLegend

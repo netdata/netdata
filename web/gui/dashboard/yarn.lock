@@ -1296,10 +1296,22 @@
   resolved "https://registry.yarnpkg.com/@types/classnames/-/classnames-2.2.9.tgz#d868b6febb02666330410fe7f58f3c4b8258be7b"
   integrity sha512-MNl+rT5UmZeilaPxAVs6YaPC2m6aA8rofviZbhbxpPpl61uKodfdQVsBtgJGTqGizEf02oW3tsVe7FYB8kK14A==
 
+"@types/dygraphs@^1.1.8":
+  version "1.1.8"
+  resolved "https://registry.yarnpkg.com/@types/dygraphs/-/dygraphs-1.1.8.tgz#e32b6aa367a86f469888e0c34cc62343fc3ffcbb"
+  integrity sha512-qoSvrmDb83ll0hM3ANs6x5Xa163osIKrstX6Vgg1l9A8HPz72IHEOY+4EPb6jW+B25i6NCR+Dv7O9D0p2m4b6A==
+  dependencies:
+    "@types/google.visualization" "*"
+
 "@types/eslint-visitor-keys@^1.0.0":
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/@types/eslint-visitor-keys/-/eslint-visitor-keys-1.0.0.tgz#1ee30d79544ca84d68d4b3cdb0af4f205663dd2d"
   integrity sha512-OCutwjDZ4aFS6PB1UZ988C4YgwlBHJd6wCeQqaLdmadZ/7e+w79+hbMUFC1QXDNCmdyoRfAFdm0RypzwR+Qpag==
+
+"@types/google.visualization@*":
+  version "0.0.48"
+  resolved "https://registry.yarnpkg.com/@types/google.visualization/-/google.visualization-0.0.48.tgz#9848e0cf0046784209f97615abd7f5621595f40c"
+  integrity sha512-dK6g23tPWwlWr4W50bk1cv0qhOes/GfPAqadnWdtA96GMqjXeDtb+sTIM3pCd0LxFuXtm4hTgGUOl9xuOoCDnA==
 
 "@types/hoist-non-react-statics@^3.3.0":
   version "3.3.1"
@@ -3541,6 +3553,11 @@ duplexify@^3.4.2, duplexify@^3.6.0:
     inherits "^2.0.1"
     readable-stream "^2.0.0"
     stream-shift "^1.0.0"
+
+dygraphs@2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/dygraphs/-/dygraphs-2.1.0.tgz#2fbfd2c803ead02307df3faf8d4dd3ef55cb2075"
+  integrity sha1-L7/SyAPq0CMH3z+vjU3T71XLIHU=
 
 ecc-jsbn@~0.1.1:
   version "0.1.2"
