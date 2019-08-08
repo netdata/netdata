@@ -294,29 +294,7 @@ static void backends_objects_cleanup(void *objects_to_clean) {
         freez(*objects->mongodb_database);
         freez(*objects->mongodb_collection);
 
-        // clean up mongodb threads
         for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
-            if((*objects->mongodb_threads)[i].busy) {
-                netdata_mutex_lock(&(*objects->mongodb_threads)[i].mutex);
-                if(!(*objects->mongodb_threads)[i].finished) {
-info("BACKEND: cancelled = %zu", (*objects->mongodb_threads)[i].thread);
-                    netdata_thread_cancel((*objects->mongodb_threads)[i].thread);
-                }
-                netdata_mutex_unlock(&(*objects->mongodb_threads)[i].mutex);
-            }
-        }
-        for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
-            if((*objects->mongodb_threads)[i].busy) {
-                netdata_mutex_lock(&(*objects->mongodb_threads)[i].mutex);
-                for(int j = 0; j < 10 && !(*objects->mongodb_threads)[i].finished; j++) {
-                    netdata_mutex_unlock(&(*objects->mongodb_threads)[i].mutex);
-info("BACKEND: locked = %zu", (*objects->mongodb_threads)[i].thread);
-                    sleep_usec(100);
-                    netdata_mutex_lock(&(*objects->mongodb_threads)[i].mutex);
-                }
-                netdata_mutex_unlock(&(*objects->mongodb_threads)[i].mutex);
-            }
-info("BACKEND: lock finished = %zu", (*objects->mongodb_threads)[i].thread);
             buffer_free((*objects->mongodb_threads)[i].buffer);
         }
 info("BACKEND: free threads");
@@ -324,7 +302,7 @@ info("BACKEND: free threads");
 
 info("BACKEND: mongodb_cleanup");
         mongodb_cleanup();
-info("BACKEND: END");
+info("BACKEND: End of cleanup");
     }
 #endif
 
