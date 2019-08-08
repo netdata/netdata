@@ -252,7 +252,9 @@ If you have ephemeral monitoring setup ([More info here](../../../streaming/#mon
 
 ### Chart library
 
-The default chart library is `dygraph`. You set a different chart library per chart using this:
+Netdata supports a number of chart libraries. The default is Dygraph, but the standard dashboard also uses Gauge.js and EasyPieChart frequently to create overviews of essential metrics.
+
+The default chart library is `dygraph`, but you can set a different chart library per chart using `data-chart-library`:
 
 ```html
 <div data-netdata="unique.id"
@@ -260,7 +262,35 @@ The default chart library is `dygraph`. You set a different chart library per ch
      ></div>
 ```
 
-Each chart library may support more chart-library specific settings. Please refer to the documentation of the chart library you are interested, in this wiki or the source code:
+Each chart library has a number of specific settings. To learn more about them, you should investigate the documentation of the given chart library, or visit the appropriate section in `dashboard.js`:
+
+- Dygraph
+    - [Dygraph documentation](http://dygraphs.com/tutorial.html)
+    - [`data-dygraph-XXX` options in `dashboard.js`](https://github.com/netdata/netdata/blob/master/web/gui/dashboard.js#L2034)
+- jQuery Sparkline
+    - [jQuery Sparkline documentation]()
+    - [`data-sparkline-XXX` options in `dashboard.js`]()
+- Peity
+    - [Dygraph documentation]()
+    - [`data-peity-XXX` options in `dashboard.js`]()
+- Google Charts
+    - [Dygraph documentation]()
+    - [`data-dygraph-XXX` options in `dashboard.js`]()
+- Morris
+    - [Dygraph documentation]()
+    - [`data-dygraph-XXX` options in `dashboard.js`]()
+- EasyPieChart
+    - [Dygraph documentation]()
+    - [`data-dygraph-XXX` options in `dashboard.js`]()
+- Gauge.js
+    - [Dygraph documentation]()
+    - [`data-dygraph-XXX` options in `dashboard.js`]()
+- D3
+    - [Dygraph documentation]()
+    - [`data-dygraph-XXX` options in `dashboard.js`]()
+- C3
+    - [Dygraph documentation]()
+    - [`data-dygraph-XXX` options in `dashboard.js`]()
 
 -   options `data-dygraph-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L6251-L6361)
 -   options `data-easypiechart-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L7954-L7966)

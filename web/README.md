@@ -6,9 +6,9 @@ We then leverage a number of dashboards, both configured by the Netdata communit
 
 There are two primary ways to view Netdata's dashboards:
 
-1. The [standard web dashboard](#netdata-web-dashboard) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. This dashboard can be [customized using JavaScript](#customizing-the-standard-dashboards).
+1. The [standard web dashboard](gui/#the-standard-web-dashboard) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. This dashboard can be [customized using JavaScript](gui/#customizing-the-standard-dashboards).
 
-2. The `dashboard.js` JavaScript library, which helps you [customize the standard dashboards](#customizing-the-standard-dashboards) using JavaScript, or create entirely new [custom dashboards](gui/custom/) and **[Atlassian Confluence dashboards](gui/confluence/).
+2. The `dashboard.js` JavaScript library, which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboards) using JavaScript, or create entirely new [custom dashboards](gui/custom/) and [Atlassian Confluence dashboards](gui/confluence/).
 
 You can also view all the data Netdata collects through the [REST API v1](api/).
 
@@ -23,7 +23,7 @@ A **chart** is an individual, interactive, always-updating graphic displaying on
 
 Here's the system CPU chart, the first chart displayed on the standard dashboard:
 
-> > > screenshot of system.cpu goes here
+![Screenshot of the system CPU chart in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62720972-0b8a8e80-b9c0-11e9-930b-4829f7b17cfd.png)
 
 A chart's name is displayed in parentheses above the chart. For example, if you navigate to the system CPU chart, , you'll see the label: **Total CPU utilization (system.cpu)**. In this case, the chart's name is `system.cpu`. The name is derived from the chart's [context](#contexts)
 
@@ -33,7 +33,7 @@ A **dimension** is a value that gets shows on a chart. The value can be raw data
 
 Charts are capable of showing more than one dimension. All of these dimensions will be shown on the right side of the chart, beneath the date and time. Again, the `system.cpu` chart will serve as a good example.
 
-> > > Add screenshot here showing the system.cpu dimensions selections
+![Screenshot of the dimensions shown in the system CPU chart in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62721031-2bba4d80-b9c0-11e9-9dca-32403617ce72.png)
 
 Here, the `system.cpu` chart is showing many dimensions, such as `user`, `system`, `softirq`, `irq`, and more.
 
@@ -43,38 +43,41 @@ Note that other applications sometimes use the word *series* instead of dimensio
 
 A **family** is *one* instance of a monitored hardware or software resource that needs to be monitored and displayed separately from similar instances. 
 
-For example, if your system has multiple network interfaces at `eth0` and `eth1`, Netdata will put each interface into their own family. Same goes for software resoruces, like multiple MySQL instances. We call these instances "families" because the charts associated with a single network interface instance, for example, are often related to each other. Relatives, family... get it?
+For example, if your system has multiple disk drives at `sda` and `sdb`, Netdata will put each interface into their own family. Same goes for software resoruces, like multiple MySQL instances. We call these instances "families" because the charts associated with a single disk instance, for example, are often related to each other. Relatives, family... get it?
 
-When relevant, Netdata prefers to organize charts by family. When you visit the **Network Interfaces** section, you will see your network interfaces organized into families, and each family will have one or more charts. In the screenshot below, each family of interface has a `net`, `net_packets`, and `net_errors` chart.
+When relevant, Netdata prefers to organize charts by family. When you visit the **Disks** section, you will see your disk drives organized into families, and each family will have one or more charts: `disk`, `disk_ops`, `disk_backlog`, `disk_util`, `disk_await`, `disk_avgsz`, `disk_svctm`, `disk_mops`, and `disk_iotime`.
 
-> > > screenshot showing the net, net_packets, and net_errors charts
+In the screenshot below, the disk family `sdb` shows a few gauges, followed by a few of the associated charts:
 
-Netdata also creates separate submenu entries for each family in the right navigation page so you can easily navigate to the instance you're interested in. Here, Netdata has made a number of submenus under the **Network Interface** menu.
+![Screenshot of a disk drive family and associated charts in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62721362-e34f5f80-b9c0-11e9-8d2e-9a3bec48e920.png)
 
-> > > screenshot showing the network interfaces menu
+Netdata also creates separate submenu entries for each family in the right navigation page so you can easily navigate to the instance you're interested in. Here, Netdata has made a number of submenus under the **Disk** menu.
+
+![Screenshot of the disks menu and submenus](https://user-images.githubusercontent.com/1153921/62721531-3cb78e80-b9c1-11e9-89c2-fdd736aec7d4.png)
 
 ### Contexts
 
 A **context** is a way of grouping charts by the types of metrics collected and dimensions displayed. Different charts with the same context will show exactly the same dimensions, but for different instances (families) of hardware/software resources.
 
-For example, the **Network Interfaces** section uses four contexts (`net.drops`, `net.fifo`, `net.net`, and `net.packets`) and creates four charts for each family. If you have two families, `eth0` and `eth1`, Netdata will create two charts for each of those four contexts:
+For example, the **Disks** section will often use a number of contexts (`disk.io`, `disk.ops`, `disk.backlog`, `disk.util`, and so on). Netdata then creates an individual chart for each context, and groups them by family.
 
-Netdata names charts according to their context according to the following structure: `[context].[family]`. A chart with the `net.packets` context, in the `eth0` family, gets the name `net_packets.eth0`. Netdata shows that name in the top-left corner of a chart.
+Netdata names charts according to their context according to the following structure: `[context].[family]`. A chart with the `disk.util` context, in the `sdb` family, gets the name `disk_util.sdb`. Netdata shows that name in the top-left corner of a chart.
 
-You then end up with the following charts:
+Given the four example contexts, and two families of `sdb` and `sdd`, Netdata will create the following charts and their names:
 
-Context | `eth0` family | `eth1` family
+Context | `sdb` family | `sdd` family
 ---  | ---    | ---
-`net.drops` | `net_drops.eth0` | `net_drops.eth1`
-`net.fifo` | `net_fifo.eth0` | `net_fifo.eth1`
-`net.net` | `net_net.eth0` | `net_net.eth1`
-`net.packets` | `net_packets.eth0` | `net_packets.eth1`
+`disk.io` | `disk_io.sdb` | `disk_io.sdd`
+`disk.ops` | `disk_ops.sdb` | `disk_ops.sdd`
+`disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd`
+`disk.util` | `disk_util.sdb` | `disk_util.sdd`
 
-And here's what it looks like on the Netdata dashboard:
+And here's what two of those charts in the `disk.io` context look like under `sdb` and `sdd` families:
 
-> > > screenshot of context
+![context_01](https://user-images.githubusercontent.com/1153921/62728232-177e4c80-b9d0-11e9-9e29-2a6c59d4d873.png)
+![context_02](https://user-images.githubusercontent.com/1153921/62728234-1b11d380-b9d0-11e9-8904-07befd8ac592.png)
 
-You can view the context of a chart if you hover over the date above the list of dimensions. A tooltip will appear that shows you two pieces of information: the collector that produces the chart, and the chart's context.
+As you can see in the screenshot, you can view the context of a chart if you hover over the date above the list of dimensions. A tooltip will appear that shows you two pieces of information: the collector that produces the chart, and the chart's context.
 
 Contexts are also used for alarm templates. You can create an alarm for the `net.packets` context to receive alerts for any chart with that context, no matter which family it's attached to.
 
