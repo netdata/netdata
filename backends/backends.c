@@ -658,7 +658,8 @@ void *backends_main(void *ptr) {
         size_t count_dims_total = 0;
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-        clear_write_request();
+        if(do_prometheus_remote_write)
+            clear_write_request();
 #endif
         rrd_rdlock();
         RRDHOST *host;
@@ -1027,14 +1028,14 @@ void *backends_main(void *ptr) {
 
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-        if(failures) {
+        if(do_prometheus_remote_write && failures) {
             (void) buffer_on_failures;
             failures = 0;
             chart_lost_bytes = chart_buffered_bytes = get_write_request_size(); // estimated write request size
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
-        }
-#else
+        } else
+#endif
         if(failures > buffer_on_failures) {
             // too bad! we are going to lose data
             chart_lost_bytes += buffer_strlen(b);
@@ -1044,7 +1045,6 @@ void *backends_main(void *ptr) {
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
         }
-#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
         if(unlikely(netdata_exit)) break;
 
@@ -1101,10 +1101,9 @@ cleanup:
 #endif
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-    if(do_prometheus_remote_write) {
-        buffer_free(http_request_header);
+    buffer_free(http_request_header);
+    if(do_prometheus_remote_write)
         protocol_buffers_shutdown();
-    }
 #endif
 
     if(sock != -1)
