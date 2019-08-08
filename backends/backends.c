@@ -866,9 +866,9 @@ void *backends_main(void *ptr) {
 #if HAVE_MONGOC
         int mongodb_thread_index = MONGODB_THREAD_INDEX_UNDEFINED;
 
-        chart_buffered_metrics = 0;
-
         if(do_mongodb) {
+            chart_buffered_metrics = 0;
+
             for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
                 if(mongodb_threads[i].busy == 0) {
                     mongodb_thread_index = i;
@@ -880,10 +880,11 @@ void *backends_main(void *ptr) {
                 b = default_buffer;
             else
                 b = mongodb_threads[mongodb_thread_index].buffer;
-        }
-#else
-        b = default_buffer;
+        } else
 #endif
+        {
+            b = default_buffer;
+        }
 
         rrd_rdlock();
         RRDHOST *host;
