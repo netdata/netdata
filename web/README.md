@@ -6,12 +6,35 @@ We then leverage a number of dashboards, both configured by the Netdata communit
 
 There are two primary ways to view Netdata's dashboards:
 
-1. The [standard web dashboard](gui/#the-standard-web-dashboard) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. This dashboard can be [customized using JavaScript](gui/#customizing-the-standard-dashboards).
+1. The [standard web dashboard](gui/) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. You can customize the contents and colors of the standard dashboard [using JavaScript](gui/#customizing-the-standard-dashboards).
 
-2. The `dashboard.js` JavaScript library, which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboards) using JavaScript, or create entirely new [custom dashboards](gui/custom/) and [Atlassian Confluence dashboards](gui/confluence/).
+2. The [`dashboard.js` JavaScript library](#dashboard-js), which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboards) using JavaScript, or create entirely new [custom dashboards](gui/custom/) or [Atlassian Confluence dashboards](gui/confluence/).
 
 You can also view all the data Netdata collects through the [REST API v1](api/).
 
+No matter where you use Netdata's charts, you'll want to know how to [manipulate](#manipulating-charts) them. You'll also want to understand how Netdata defines [charts](#charts), [dimensions](#dimensions), [families](#families), and [contexts](#contexts).
+
+## Manipulating charts
+
+One of the most important functions of the standard web dashboard—and all Netdata-created dashboards—is the ability to manipulate charts.
+
+Netdata synchronizes manipulations across all its charts. If you zoom into one, the rest will zoom as well. If you select a timeframe, Netdata will select that timeframe across all charts. This even works across different Netdata agents, and their respective dashboards, if you connect them together using the [node menu](registry#registry)!
+
+The dashboard includes a number of ways to manipulate charts, each of which can be initiated using one or more methods:
+
+| Manipulation | Method #1 | Method #2 | Method #3
+| --- | --- | --- | --- | ---
+| **Reset** charts to default auto-refreshing state | `double click` | `double tap` (touchpad/touchscreen)
+| **Select** a certain timeframe | `ALT` + `mouse selection` | `⌘` + `mouse selection` (macOS)
+| **Pan** forward or back in time | `click and drag` | `touch and drag` (touchpad/touchscreen)
+| **Zoom** to a specific timeframe | `SHIFT` + `mouse selection`
+| **Zoom** in/out | `SHIFT`/`ALT` + `mouse scrollwheel` | `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen) | `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen)
+
+Here's how the chart synchronziation looks while zooming and panning:
+
+![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing charts](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
+
+You can also perform all these actions using the small rewind/play/fast-forward/zoom-in/zoom-out buttons that appear in the bottom-right corner of each chart.
 
 ## Charts, contexts, families
 
@@ -81,5 +104,37 @@ As you can see in the screenshot, you can view the context of a chart if you hov
 
 Contexts are also used for alarm templates. You can create an alarm for the `net.packets` context to receive alerts for any chart with that context, no matter which family it's attached to.
 
+### Positive and negative values on charts
+
+To improve clarity on charts, Netdata dashboards present **positive** values for metrics representing `read`, `input`, `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
+
+![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
+
+*Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is negative.*
+
+### Autoscaled y-axis
+
+Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible time-frame.
+
+![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
+
+*A zero based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
+
+
+
+## dashboard.js
+
+Netdata uses the `dashboards.js` file to define, configure, create, and update all the charts and other visualizations that appear on any Netdata dashboard. It's required on any HTML page that is going to render Netdata charts.
+
+### Generating dashboard.js
+
+We build the `dashboards.js` file by concatenating all the source files located in the `web/gui/src/dashboard.js/` directory. That's done using the provided build script:
+
+```sh
+cd web/gui
+make
+```
+
+If you make any changes to the `src` directory when developing Netdata, you should regenerate the `dashboard.js` file before you commit to the Netdata repository.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
