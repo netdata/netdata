@@ -250,6 +250,23 @@ struct variable2json_helper {
     size_t counter;
 };
 
+static int single_custom_variable2json(void *entry, void *data) {
+    struct variable2json_helper *helper = (struct variable2json_helper *)data;
+    RRDVAR *rv = (RRDVAR *)entry;
+    calculated_number value = rrdvar2number(rv);
+
+    if(rv->options & RRDVAR_OPTION_CUSTOM_CHART_VAR) {
+        if(unlikely(isnan(value) || isinf(value)))
+            buffer_sprintf(helper->buf, "%s\n\t\t\t\t\"%s\": null", helper->counter?",":"", rv->name);
+        else
+            buffer_sprintf(helper->buf, "%s\n\t\t\t\t\"%s\": %0.5" LONG_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (LONG_DOUBLE)value);
+    }
+
+    helper->counter++;
+
+    return 0;
+}
+
 static int single_variable2json(void *entry, void *data) {
     struct variable2json_helper *helper = (struct variable2json_helper *)data;
     RRDVAR *rv = (RRDVAR *)entry;
@@ -263,6 +280,17 @@ static int single_variable2json(void *entry, void *data) {
     helper->counter++;
 
     return 0;
+}
+
+void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf) {
+    struct variable2json_helper helper = {
+            .buf = buf,
+            .counter = 0
+    };
+
+    buffer_sprintf(buf, "{");
+    avl_traverse_lock(&st->rrdvar_root_index, single_custom_variable2json, (void *)&helper);
+    buffer_strcat(buf, "\n\t\t\t}");
 }
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {

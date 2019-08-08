@@ -182,9 +182,11 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     rrdr_buffer_print_format(wb, format);
 
-    buffer_sprintf(wb, "%s,\n"
+    buffer_sprintf(wb, "%s,\n   %schart_variables%s: ", kq, kq, kq);
+    health_api_v1_chart_custom_variables2json(r->st, wb);
+
+    buffer_sprintf(wb, ",\n"
                        "   %sresult%s: "
-                   , sq
                    , kq, kq
     );
 
