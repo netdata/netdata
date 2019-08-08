@@ -54,7 +54,7 @@ To provide a sane default for this setting, Netdata uses the following pattern l
 	search for cgroups in subpaths matching =  !*/init.scope  !*-qemu  !/init.scope  !/system  !/systemd  !/user  !/user.slice  *
 ```
 
-So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by netdata](#monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
+So, we disable checking for **child cgroups** in systemd internal cgroups ([systemd services are monitored by Netdata](#monitoring-systemd-services)), user cgroups (normally used for desktop and remote user sessions), qemu virtual machines (child cgroups of virtual machines) and `init.scope`. All others are enabled.
 
 ### unified cgroups (cgroups v2) support
 
@@ -205,7 +205,7 @@ netdata prior to v1.6 had 2 issues when such containers were monitored:
 2. charts were never cleaned up, so after some time dozens of containers were showing up on the dashboard, and they were occupying memory.
 
 
-### the current netdata
+### the current Netdata
 
 network interfaces and cgroups (containers) are now self-cleaned.
 
@@ -216,7 +216,7 @@ So, when a network interface or container stops, Netdata might log a few errors 
 3. it will mark their charts as obsolete
 4. obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
 5. existing dashboard sessions will continue to see them, but of course they will not refresh
-6. obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable with `[global].cleanup obsolete charts after seconds = 3600` (at netdata.conf).
+6. obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
 7. when obsolete charts are removed from memory they are also deleted from disk (configurable with `[global].delete obsolete charts files = yes`)
 
 

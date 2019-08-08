@@ -38,7 +38,7 @@ Currently Netdata supports 6 memory modes:
    same algorithm it uses for its swap memory. Check below for additional information on running a
    dedicated central Netdata server. This mode uses `mmap()` but does not support [KSM](#ksm).
 
-4. `none`, without a database (collected metrics can only be streamed to another netdata).
+4. `none`, without a database (collected metrics can only be streamed to another Netdata).
 
 5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the
    fallback for all others except `none`.
@@ -49,7 +49,7 @@ Currently Netdata supports 6 memory modes:
    but depends on the configured disk space and the effective compression ratio of the data stored.
    For more details see [here](engine/).
 
-You can select the memory mode by editing netdata.conf and setting:
+You can select the memory mode by editing `netdata.conf` and setting:
 
 ```
 [global]
@@ -74,7 +74,7 @@ second updates.
 
 If you set `update every = 2` and `history = 1800`, you will still have an hour of data, but
 collected once every 2 seconds. This will **cut in half** both CPU and RAM resources consumed
-by netdata. Of course experiment a bit. On very weak devices you might have to use
+by Netdata. Of course experiment a bit. On very weak devices you might have to use
 `update every = 5` and `history = 720` (still 1 hour of data, but 1/5 of the CPU and RAM resources).
 
 You can also disable [data collection plugins](../collectors) you don't need.
@@ -82,11 +82,11 @@ Disabling such plugins will also free both CPU and RAM resources.
 
 ## Running a dedicated central Netdata server
 
-Netdata allows streaming data between Netdata nodes. This allows us to have a central netdata
+Netdata allows streaming data between Netdata nodes. This allows us to have a central Netdata
 server that will maintain the entire database for all nodes, and will also run health checks/alarms
 for all nodes.
 
-For this central netdata, memory size can be a problem. Fortunately, Netdata supports several
+For this central Netdata, memory size can be a problem. Fortunately, Netdata supports several
 memory modes. **One interesting option** for this setup is `memory mode = map`.
 
 ### map
@@ -148,7 +148,7 @@ There are 2 more options to tweak:
 
 These control the amount of memory that should be dirty for disk syncing to be triggered.
 On dedicated Netdata servers, you can use: `80` and `90` respectively, so that all RAM is given
-to netdata.
+to Netdata.
 
 With these settings, you can expect a little `iowait` spike once every 10 minutes and in case
 of system crash, data on disk will be up to 10 minutes old.
@@ -190,7 +190,7 @@ Although this is true when KSM is used for deduplicating certain applications, i
 netdata, since the Netdata memory is written very infrequently (if you have 24 hours of metrics in
 netdata, each byte at the in-memory database will be updated just once per day).
 
-KSM is a solution that will provide 60+% memory savings to netdata.
+KSM is a solution that will provide 60+% memory savings to Netdata.
 
 ### Enable KSM in kernel
 

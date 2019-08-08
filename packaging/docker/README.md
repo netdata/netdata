@@ -57,7 +57,7 @@ If you don't want to use the apps.plugin functionality, you can remove the mount
 
 ### Docker container names resolution
 
-There are a few options for resolving container names within netdata. Some methods of doing so will allow root access to your machine from within the container. Please read the following carefully.
+There are a few options for resolving container names within Netdata. Some methods of doing so will allow root access to your machine from within the container. Please read the following carefully.
 
 #### Docker socket proxy (safest option)
 

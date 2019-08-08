@@ -17,7 +17,7 @@ developers and the users.
 
 So, we did this:
 
-1. No configuration is required to run netdata
+1. No configuration is required to run Netdata
 2. There are plenty of options to tweak
 3. There is minimal documentation (or no at all)
 

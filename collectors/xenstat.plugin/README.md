@@ -25,7 +25,7 @@ Domain:
 
 ## Configuration
 
-If you need to disable xenstat for netdata, edit /etc/netdata/netdata.conf and set:
+If you need to disable xenstat for Netdata, edit /etc/netdata/netdata.conf and set:
 
 ```
 [plugins]

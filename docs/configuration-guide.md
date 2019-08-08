@@ -92,11 +92,11 @@ You have several options under the [netdata.conf [web]](../web/server/#access-li
 
 ##### Stop sending info to registry.my-netdata.io
 
-You will need to configure the [registry] section in netdata.conf. First read the [registry documentation](../registry/). In it, are instructions on how to [run your own registry](../registry/#run-your-own-registry).
+You will need to configure the [registry] section in `netdata.conf`. First read the [registry documentation](../registry/). In it, are instructions on how to [run your own registry](../registry/#run-your-own-registry).
 
 ##### Change the IP address/port Netdata listens to
 
-The settings are under netdata.conf [web]. Look at the [web server documentation](../web/server/#binding-netdata-to-multiple-ports) for more info.
+The settings are under `netdata.conf` [web]. Look at the [web server documentation](../web/server/#binding-netdata-to-multiple-ports) for more info.
 
 ### System resource usage
 
@@ -110,7 +110,7 @@ The page on [Netdata performance](Performance.md) has an excellent guide on how 
 
 ##### Prevent Netdata from getting immediately killed when my server runs out of memory
 
-You can change the Netdata [OOM score](../daemon/#oom-score) in netdata.conf [global]. 
+You can change the Netdata [OOM score](../daemon/#oom-score) in `netdata.conf` [global]. 
 
 ### Other
 

@@ -7,7 +7,7 @@ for every process found running.
 
 Since Netdata needs to present this information in charts and track them through time,
 instead of presenting a `top` like list, `apps.plugin` uses a pre-defined list of **process groups**
-to which it assigns all running processes. This list is [customizable](apps_groups.conf) and netdata
+to which it assigns all running processes. This list is [customizable](apps_groups.conf) and Netdata
 ships with a good default for most cases (to edit it on your system run `/etc/netdata/edit-config apps_groups.conf`).
 
 So, `apps.plugin` builds a process tree (much like `ps fax` does in Linux), and groups
@@ -15,7 +15,7 @@ processes together (evaluating both child and parent processes) so that the resu
 a predefined set of members (of course, only process groups found running are reported).
 
 > If you find that `apps.plugin` categorizes standard applications as `other`, we would be
-> glad to accept pull requests improving the [defaults](apps_groups.conf) shipped with netdata.
+> glad to accept pull requests improving the [defaults](apps_groups.conf) shipped with Netdata.
 
 Unlike traditional process monitoring tools (like `top`), `apps.plugin` is able to account the resource
 utilization of exit processes. Their utilization is accounted at their currently running parents.
@@ -158,13 +158,13 @@ chown root:netdata /usr/libexec/netdata/plugins.d/apps.plugin
 chmod 4750 /usr/libexec/netdata/plugins.d/apps.plugin
 ```
 
-You will have to run these, every time you update netdata.
+You will have to run these, every time you update Netdata.
 
 ## Security
 
 `apps.plugin` performs a hard-coded function of building the process tree in memory,
-iterating forever, collecting metrics for each running process and sending them to netdata.
-This is a one-way communication, from `apps.plugin` to netdata.
+iterating forever, collecting metrics for each running process and sending them to Netdata.
+This is a one-way communication, from `apps.plugin` to Netdata.
 
 So, since `apps.plugin` cannot be instructed by Netdata for the actions it performs,
 we think it is pretty safe to allow it have these increased privileges.
@@ -330,12 +330,12 @@ with minor CPU utilization. But the shell, is spawning hundreds of them, one aft
 The total CPU utilization of the system:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/21076212/9198e5a6-bf2e-11e6-9bc0-6bdea25befb2.png)
-<br/>_**Figure 1**: The system overview section at netdata, just a few seconds after the command was run_
+<br/>_**Figure 1**: The system overview section at Netdata, just a few seconds after the command was run_
 
 And at the applications `apps.plugin` breaks down CPU usage per application:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/21076220/c9687848-bf2e-11e6-8d81-348592c5aca2.png)
-<br/>_**Figure 2**: The Applications section at netdata, just a few seconds after the command was run_
+<br/>_**Figure 2**: The Applications section at Netdata, just a few seconds after the command was run_
 
 So, the `ssh` session is using 95% CPU time.
 

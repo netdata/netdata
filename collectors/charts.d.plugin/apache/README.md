@@ -106,7 +106,7 @@ apache_curl_opts=
 apache_update_every=
 ```
 
-The default `apache_update_every` is configured in netdata.
+The default `apache_update_every` is configured in Netdata.
 
 ## Auto-detection
 

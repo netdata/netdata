@@ -11,7 +11,7 @@ You can still get the node menu, but not the cloud features, if you [run your ow
 
 Netdata provides distributed monitoring.
 
-Traditional monitoring solutions centralize all the data to provide unified dashboards across all servers. Before netdata, this was the standard practice. However it has a few issues:
+Traditional monitoring solutions centralize all the data to provide unified dashboards across all servers. Before Netdata, this was the standard practice. However it has a few issues:
 
 1. due to the resources required, the number of metrics collected is limited.
 1. for the same reason, the data collection frequency is not that high, at best it will be once every 10 or 15 seconds, at worst every 5 or 10 mins.
@@ -26,7 +26,7 @@ Netdata follows a different approach:
 1. Netdata servers do not talk to each other
 1. your browser connects all the Netdata servers
 
-Using netdata, your monitoring infrastructure is embedded on each server, limiting significantly the need of additional resources. Netdata is blazingly fast, very resource efficient and utilizes server resources that already exist and are spare (on each server). This allows **scaling out** the monitoring infrastructure.
+Using Netdata, your monitoring infrastructure is embedded on each server, limiting significantly the need of additional resources. Netdata is blazingly fast, very resource efficient and utilizes server resources that already exist and are spare (on each server). This allows **scaling out** the monitoring infrastructure.
 
 However, the Netdata approach introduces a few new issues that need to be addressed, one being **the list of Netdata we have installed**, i.e. the URLs our Netdata servers are listening.
 
@@ -140,7 +140,7 @@ Both files are machine readable text files.
 
 ## The future
 
-The registry opens a whole world of new possibilities for netdata. Check here what we think: https://github.com/netdata/netdata/issues/416
+The registry opens a whole world of new possibilities for Netdata. Check here what we think: https://github.com/netdata/netdata/issues/416
 
 ## Troubleshooting the registry
 

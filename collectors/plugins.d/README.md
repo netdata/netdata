@@ -31,7 +31,7 @@ This plugin allows Netdata to use **external plugins** for data collection:
 2. external data collection plugins may use O/S capabilities or `setuid` to
    run with escalated privileges (compared to the `netdata` daemon).
    The communication between the external plugin and Netdata is unidirectional
-   (from the plugin to netdata), so that Netdata cannot manipulate an external
+   (from the plugin to Netdata), so that Netdata cannot manipulate an external
    plugin running with escalated privileges.
 
 ## Operation
@@ -40,7 +40,7 @@ Each of the external plugins is expected to run forever.
 Netdata will start it when it starts and stop it when it exits.
 
 If the external plugin exits or crashes, Netdata will log an error.
-If the external plugin exits or crashes without pushing metrics to netdata, Netdata will not start it again.
+If the external plugin exits or crashes without pushing metrics to Netdata, Netdata will not start it again.
 - Plugins that exit with any value other than zero, will be disabled. Plugins that exit with zero, will be restarted after some time.
 - Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
 
@@ -129,7 +129,7 @@ Charts can be added any time (not just the beginning).
 ### command line parameters
 
 The plugin **MUST** accept just **one** parameter: **the number of seconds it is
-expected to update the values for its charts**. The value passed by netdata
+expected to update the values for its charts**. The value passed by Netdata
 to the plugin is controlled via its configuration file (so there is no need
 for the plugin to handle this configuration option).
 
@@ -149,7 +149,7 @@ variable|description
 `NETDATA_PLUGINS_DIR`|The directory where all Netdata plugins are stored.
 `NETDATA_WEB_DIR`|The directory where the web files of Netdata are saved.
 `NETDATA_CACHE_DIR`|The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.
-`NETDATA_LOG_DIR`|The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of netdata.
+`NETDATA_LOG_DIR`|The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.
 `NETDATA_HOST_PREFIX`|This is used in environments where system directories like `/sys` and `/proc` have to be accessed at a different path.
 `NETDATA_DEBUG_FLAGS`|This is a number (probably in hex starting with `0x`), that enables certain Netdata debugging features. Check **[[Tracing Options]]** for more information.
 `NETDATA_UPDATE_EVERY`|The minimum number of seconds between chart refreshes. This is like the **internal clock** of Netdata (it is user configurable, defaulting to `1`). There is no meaning for a plugin to update its values more frequently than this number of seconds.
@@ -331,10 +331,10 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
     Under heavy system load, the system may have some latency transferring
     data from the plugins to Netdata via the pipe. This number improves
     accuracy significantly, since the plugin is able to calculate the
-    duration between its iterations better than netdata.
+    duration between its iterations better than Netdata.
 
     The first time the plugin is started, no microseconds should be given
-    to netdata.
+    to Netdata.
 
 > SET id = value
 
@@ -364,7 +364,7 @@ it can issue a `FLUSH`. The `FLUSH` command will instruct Netdata to ignore
 all the values collected since the last `BEGIN` command.
 
 If a plugin does not behave properly (outputs invalid lines, or does not
-follow these guidelines), will be disabled by netdata.
+follow these guidelines), will be disabled by Netdata.
 
 ### collected values
 

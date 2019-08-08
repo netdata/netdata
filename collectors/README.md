@@ -42,7 +42,7 @@ plugin|lang|O/S|runs as|modular|description
 [plugins.d](plugins.d/)|`C`|any|internal|-|implements the **external plugins** API and serves external plugins
 [proc.plugin](proc.plugin/)|`C`|linux|internal|yes|collects resource usage and performance data on Linux systems
 [python.d.plugin](python.d.plugin/)|`python` v2+|any|external|yes|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
-[statsd.plugin](statsd.plugin/)|`C`|any|internal|-|implements a high performance **statsd** server for netdata
+[statsd.plugin](statsd.plugin/)|`C`|any|internal|-|implements a high performance **statsd** server for Netdata
 [tc.plugin](tc.plugin/)|`C`|linux|internal|-|collects traffic QoS metrics (`tc`) of Linux network interfaces
 
 ## Enabling and Disabling plugins
@@ -72,7 +72,7 @@ collect_data() {
 
     collected_number collected_value = collect_a_value();
 
-    // give the metrics to netdata
+    // give the metrics to Netdata
 
     static RRDSET *st = NULL; // the chart
     static RRDDIM *rd = NULL; // a dimension attached to this chart

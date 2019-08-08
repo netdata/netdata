@@ -50,7 +50,7 @@ updates first.
 
 Then proceed as the main instructions above.
 
-### Reinstalling netdata
+### Reinstalling Netdata
 
 The recommended way to upgrade Netdata packages built from this
 source is to remove the current package from your system, then

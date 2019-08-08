@@ -25,9 +25,9 @@ These files can be overwritten by copying them and editing them in `/etc/netdata
 (run `/etc/netdata/edit-config` to edit them).
 
 In `/etc/netdata/health.d` you can also put any number of files (in any number of sub-directories)
-with a suffix `.conf` to have them processed by netdata.
+with a suffix `.conf` to have them processed by Netdata.
 
-Health configuration can be reloaded at any time, without restarting netdata.
+Health configuration can be reloaded at any time, without restarting Netdata.
 Just send Netdata the SIGUSR2 signal, like this:
 
 ```sh
@@ -135,7 +135,7 @@ hosts: server1 server2 database* !redis3 redis*
 The above says: use this alarm on all hosts named `server1`, `server2`, `database*`, and
 all `redis*` except `redis3`.
 
-This is useful when you centralize metrics from multiple hosts, to one netdata.
+This is useful when you centralize metrics from multiple hosts, to one Netdata.
 
 ---
 
@@ -289,7 +289,7 @@ Format:
 exec: SCRIPT
 ```
 
-The default `SCRIPT` is netdata's `alarm-notify.sh`, which supports all the notifications
+The default `SCRIPT` is Netdata's `alarm-notify.sh`, which supports all the notifications
 methods Netdata supports, including custom hooks.
 
 ---
@@ -489,7 +489,7 @@ Although the `alarm_variables` link shows you variables for a particular chart, 
 
 Alarms can have the following statuses:
 
-  - `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to netdata
+  - `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to Netdata
      to reload health configuration)
 
   - `UNINITIALIZED` - the alarm is not initialized yet
@@ -507,7 +507,7 @@ The external script will be called for all status changes.
 
 ## Examples
 
-Check the `health/health.d/` directory for all alarms shipped with netdata.
+Check the `health/health.d/` directory for all alarms shipped with Netdata.
 
 Here are a few examples:
 

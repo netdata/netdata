@@ -372,7 +372,7 @@ Using the above, whatever scheduling settings you have set at `netdata.service` 
 
 #### Example 1: Netdata with nice -1 on non-systemd systems
 
-On a system that is not based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all programs), edit netdata.conf and set:
+On a system that is not based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all programs), edit `netdata.conf` and set:
 
 ```
 [global]
@@ -389,7 +389,7 @@ sudo service netdata restart
 
 #### Example 2: Netdata with nice -1 on systemd systems
 
-On a system that is based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all programs), edit netdata.conf and set:
+On a system that is based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all programs), edit `netdata.conf` and set:
 
 ```
 [global]

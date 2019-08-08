@@ -23,7 +23,7 @@ fping="/usr/local/bin/fping"
 # I suggest to use hostnames and put their IPs in /etc/hosts
 hosts="host1 host2 host3"
 
-# override the chart update frequency - the default is inherited from netdata
+# override the chart update frequency - the default is inherited from Netdata
 update_every=1
 
 # time in milliseconds (1 sec = 1000 ms) to ping the hosts

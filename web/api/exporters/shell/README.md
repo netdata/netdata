@@ -1,6 +1,6 @@
 # shell exporter
 
-Shell scripts can now query netdata:
+Shell scripts can now query Netdata:
 
 ```sh
 eval "$(curl -s 'http://localhost:19999/api/v1/allmetrics')"

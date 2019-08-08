@@ -30,7 +30,7 @@ X seconds (though, it can send them per second if you need it to).
 
      metrics are sent to a document db, `JSON` formatted.
 
-   - **prometheus** is described at [prometheus page](prometheus/) since it pulls data from netdata.
+   - **prometheus** is described at [prometheus page](prometheus/) since it pulls data from Netdata.
 
    - **prometheus remote write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
      **Elasticsearch**, **Gnocchi**, **Graphite**, **InfluxDB**, **Kafka**, **OpenTSDB**,
@@ -57,7 +57,7 @@ X seconds (though, it can send them per second if you need it to).
    - `average` sends to backends normalized metrics from the Netdata database.
    In this mode, all metrics are sent as gauges, in the units Netdata uses. This abstracts data collection
    and simplifies visualization, but you will not be able to copy and paste queries from other sources to convert units.
-   For example, CPU utilization percentage is calculated by netdata, so Netdata will convert ticks to percentage and
+   For example, CPU utilization percentage is calculated by Netdata, so Netdata will convert ticks to percentage and
    send the average percentage to the backend.
 
    - `sum` or `volume`: the sum of the interpolated values shown on the Netdata graphs is sent to the backend.
@@ -66,14 +66,14 @@ X seconds (though, it can send them per second if you need it to).
 
 Time-series databases suggest to collect the raw values (`as-collected`). If you plan to invest on building your monitoring around a time-series database and you already know (or you will invest in learning) how to convert units and normalize the metrics in Grafana or other visualization tools, we suggest to use `as-collected`.
 
-If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot simpler. Furthermore, if you use `average`, the charts shown in the back-end will match exactly what you see in Netdata, which is not necessarily true for the other modes of operation.
+If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with Netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot simpler. Furthermore, if you use `average`, the charts shown in the back-end will match exactly what you see in Netdata, which is not necessarily true for the other modes of operation.
 
-5. This code is smart enough, not to slow down netdata, independently of the speed of the backend server.
+5. This code is smart enough, not to slow down Netdata, independently of the speed of the backend server.
 
 ## configuration
 
 In `/etc/netdata/netdata.conf` you should have something like this (if not download the latest version
-of `netdata.conf` from your netdata):
+of `netdata.conf` from your Netdata):
 
 ```
 [backend]
@@ -82,7 +82,7 @@ of `netdata.conf` from your netdata):
     host tags = list of TAG=VALUE
     destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used, or a region for kinesis
     data source = average | sum | as collected
-    prefix = netdata
+    prefix = Netdata
     hostname = my-name
     update every = 10
     buffer on failures = 10
@@ -123,7 +123,7 @@ of `netdata.conf` from your netdata):
 ```
 
    When multiple servers are defined, Netdata will try the next one when the first one fails. This allows
-   you to load-balance different servers: give your backend servers in different order on each netdata.
+   you to load-balance different servers: give your backend servers in different order on each Netdata.
 
    Netdata also ships [`nc-backend.sh`](nc-backend.sh),
    a script that can be used as a fallback backend to save the metrics to disk and push them to the
@@ -138,7 +138,7 @@ of `netdata.conf` from your netdata):
 - `hostname = my-name`, is the hostname to be used for sending data to the backend server. By default
    this is `[global].hostname`.
 
-- `prefix = netdata`, is the prefix to add to all metrics.
+- `prefix = Netdata`, is the prefix to add to all metrics.
 
 - `update every = 10`, is the number of seconds between sending data to the backend. Netdata will add
    some randomness to this number, to prevent stressing the backend server when many Netdata servers send
@@ -193,7 +193,7 @@ netdata provides 5 charts:
    to the O/S - since the backend servers do not ack the reception, Netdata does not have any means
    to measure this properly).
 
-4. **Backend operations**, the number of operations performed by netdata.
+4. **Backend operations**, the number of operations performed by Netdata.
 
 5. **Backend thread CPU usage**, the CPU resources consumed by the Netdata thread, that is responsible
    for sending the metrics to the backend server.
@@ -209,7 +209,7 @@ netdata adds 4 alarms:
 1. `backend_last_buffering`, number of seconds since the last successful buffering of backend data
 2. `backend_metrics_sent`, percentage of metrics sent to the backend server
 3. `backend_metrics_lost`, number of metrics lost due to repeating failures to contact the backend server
-4. ~~`backend_slow`, the percentage of time between iterations needed by the backend time to process the data sent by netdata~~ (this was misleading and has been removed).
+4. ~~`backend_slow`, the percentage of time between iterations needed by the backend time to process the data sent by Netdata~~ (this was misleading and has been removed).
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20463779/a46ed1c2-af43-11e6-91a5-07ca4533cac3.png)
 

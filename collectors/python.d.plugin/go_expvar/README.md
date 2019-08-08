@@ -164,7 +164,7 @@ Will be explained in more detail below.
 **Note: if `collect_memstats` is disabled and no `extra_charts` are defined, the plugin will
 disable itself, as there will be no data to collect!**
 
-Apart from these options, each job supports options inherited from netdata's `python.d.plugin`
+Apart from these options, each job supports options inherited from Netdata's `python.d.plugin`
 and its base `UrlService` class. These are:
 
     update_every: 1          # the job's data collection frequency
@@ -202,7 +202,7 @@ Each line can have the following options:
     # mandatory
     expvar_key: the name of the expvar as present in the JSON output of /debug/vars endpoint
     expvar_type: value type; supported are "float" or "int"
-    id: the id of this line/dimension in netdata
+    id: the id of this line/dimension in Netdata
 
     # optional - Netdata defaults are used if these options are not defined
     name: ''

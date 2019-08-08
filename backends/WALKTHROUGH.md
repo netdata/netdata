@@ -68,7 +68,7 @@ be sitting inside the shell of the container.
 
 After we have entered the shell we can install Netdata. This process could not
 be easier. If you take a look at [this link](../packaging/installer/#installation), the Netdata devs give us
-several one-liners to install netdata. I have not had any issues with these one
+several one-liners to install Netdata. I have not had any issues with these one
 liners and their bootstrapping scripts so far (If you guys run into anything do
 share). Run the following command in your container.
 
@@ -97,7 +97,7 @@ Netdata dashboard.
 ![](https://github.com/ldelossa/NetdataTutorial/raw/master/Screen%20Shot%202017-07-28%20at%204.00.45%20PM.png)
 
 This CHART is called ‘system.cpu’, The FAMILY is cpu, and the DIMENSION we are
-observing is “system”. You can begin to draw links between the charts in netdata
+observing is “system”. You can begin to draw links between the charts in Netdata
 to the prometheus metrics format in this manner.
 
 ## Prometheus

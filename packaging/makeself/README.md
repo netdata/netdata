@@ -12,7 +12,7 @@ The program will:
 1. setup a new docker container with Alpine Linux
 2. install the required alpine packages (the build environment, needed libraries, etc)
 3. download and compile third party apps that are packaged with Netdata (`bash`, `curl`, etc)
-4. compile netdata
+4. compile Netdata
 
 Once finished, a file named `netdata-vX.X.X-gGITHASH-x86_64-DATE-TIME.run` will be created in the current directory. This is the Netdata binary package that can be run to install Netdata on any other computer.
 
@@ -31,7 +31,7 @@ These binaries are not optimized (they are a bit slower), they have certain feat
 
 #### debugging Netdata binaries
 
-Once you have installed a binary package with debugging info, you will need to install `valgrind` and run this command to start netdata:
+Once you have installed a binary package with debugging info, you will need to install `valgrind` and run this command to start Netdata:
 
 ```bash
 PATH="/opt/netdata/bin:${PATH}" valgrind --undef-value-errors=no /opt/netdata/bin/srv/netdata -D
@@ -43,6 +43,6 @@ If Netdata crashes, `valgrind` will print a stack trace of the issue. Open a git
 
 To stop Netdata while it runs under `valgrind`, press Control-C on the console.
 
-> If you omit the parameter `--undef-value-errors=no` to valgrind, you will get hundreds of errors about conditional jumps that depend on uninitialized values. This is normal. Valgrind has heuristics to prevent it from printing such errors for system libraries, but for the static Netdata binary, all the required libraries are built into netdata. So, valgrind cannot appply its heuristics and prints them.
+> If you omit the parameter `--undef-value-errors=no` to valgrind, you will get hundreds of errors about conditional jumps that depend on uninitialized values. This is normal. Valgrind has heuristics to prevent it from printing such errors for system libraries, but for the static Netdata binary, all the required libraries are built into Netdata. So, valgrind cannot appply its heuristics and prints them.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fmakeself%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

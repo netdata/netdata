@@ -3,7 +3,7 @@
 `node.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `node.js`.
 
 1. It runs as an independent process `ps fax` shows it
-2. It is started and stopped automatically by netdata
+2. It is started and stopped automatically by Netdata
 3. It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
 4. Supports any number of data collection **modules**
 5. Allows each **module** to have one or more data collection **jobs**
@@ -93,7 +93,7 @@ Your data collection module should be split in 3 parts:
       so you don't need to do anything about it for http.
 
    - a function to process the fetched/manipulate the data fetched. This function will make a number of calls
-      to create charts and dimensions and pass the collected values to netdata.
+      to create charts and dimensions and pass the collected values to Netdata.
       This is the only function you need to write for collecting http JSON data.
 
    - a `configure` and an `update` function, which take care of your module configuration and data refresh

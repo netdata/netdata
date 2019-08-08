@@ -24,7 +24,7 @@ ioping="/usr/libexec/netdata/plugins.d/ioping"
 # set here the directory/file/device, you need to ping
 destination="destination"
 
-# override the chart update frequency - the default is inherited from netdata
+# override the chart update frequency - the default is inherited from Netdata
 update_every="1s"
 
 # the request size in bytes to ping the destination

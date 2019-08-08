@@ -4,7 +4,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
 
 # Netdata contributors license agreement
 
-**Thank you for contributing to netdata!**
+**Thank you for contributing to Netdata!**
 
 This agreement is part of the legal framework of the open-source ecosystem
 that adds some red tape, but protects both the contributor and the project.
@@ -32,7 +32,7 @@ contributions, to be licensed under the same terms as the rest of the code.
 > We intend to keep the Netdata agent forever FOSS.
 > But open-source licenses have significant differences and in our attempt to
 > help Netdata grow we may have to distribute it under a different license.
-> For example, CNCF, the Cloud Native Computing Foundation, requires netdata
+> For example, CNCF, the Cloud Native Computing Foundation, requires Netdata
 > to be licensed under Apache-2.0 for it to be accepted as a member of the
 > Foundation. We want to be free to do it.*
 
@@ -45,7 +45,7 @@ original creation and that he is legally entitled to grant the above license.
 > license or any other restrictions are also included with your commits.
 > Netdata includes many third party libraries and tools and this is not a
 > problem, provided that the license of the third party code is compatible with
-> the one we use for netdata.*
+> the one we use for Netdata.*
 
 ## signature
 

@@ -188,7 +188,7 @@ These are options dedicated to badges:
 
   Example: `value_color=grey:null|green<10|yellow<100|orange<1000|blue<10000|red`
 
-  The above will set `grey` if no value exists (not collected within the `gap when lost iterations above` in netdata.conf for the chart), `green` if the value is less than 10, `yellow` if the value is less than 100, etc up to `red` which will be used if no other conditions match.
+  The above will set `grey` if no value exists (not collected within the `gap when lost iterations above` in `netdata.conf` for the chart), `green` if the value is less than 10, `yellow` if the value is less than 100, etc up to `red` which will be used if no other conditions match.
 
   The supported operators are `<`, `>`, `<=`, `>=`, `=` (or `:`) and `!=` (or `<>`).
 

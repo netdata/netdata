@@ -39,7 +39,7 @@ The ports to bind are controlled via `[web].bind to`, like this:
 Using the above, Netdata will bind to:
 
 - IPv4 127.0.0.1 at port 19999 (port was used from `default port`). Only the UI (dashboard) and the read API will be accessible on this port. Both HTTP and HTTPS requests will be accepted.
-- IPv4 10.1.1.1 at port 19998. The management API and netdata.conf will be accessible on this port.
+- IPv4 10.1.1.1 at port 19998. The management API and `netdata.conf` will be accessible on this port.
 - All the IPs `hostname` resolves to (both IPv4 and IPv6 depending on the resolved IPs) at port 19997. Only badges will be accessible on this port.
 - All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. slaves also need to be [configured for TLS](../../streaming).
 - All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
@@ -92,7 +92,7 @@ $ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -o
 
 When the certificates are defined and unless any other options are provided, a Netdata server will:
 
-- Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, netdata.conf and badges.
+- Redirect all incoming HTTP web server requests to HTTPS. Applies to the dashboard, the API, `netdata.conf` and badges.
 - Allow incoming slave connections to use both unencrypted and encrypted communications for streaming.
  
 To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
@@ -123,7 +123,7 @@ Netdata will:
 
 - Force all HTTP requests to the default port to be redirected to HTTPS (same port).
 - Refuse unencrypted streaming connections from slaves on the default port.
-- Allow both HTTP and HTTPS requests to port 20000 for netdata.conf
+- Allow both HTTP and HTTPS requests to port 20000 for `netdata.conf`
 - Force HTTP requests to port 20001 to be redirected to HTTPS (same port). Only allow requests for the dashboard, the read API and the registry on port 20001.
 
 #### TLS/SSL errors

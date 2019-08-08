@@ -1,6 +1,6 @@
 # Package Maintainers
 
-This page tracks the package maintainers for netdata, for various operating systems and versions.
+This page tracks the package maintainers for Netdata, for various operating systems and versions.
 
 > Feel free to update it, so that it reflects the current status.
 

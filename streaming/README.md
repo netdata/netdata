@@ -1,10 +1,10 @@
 # Streaming and replication
 
-Each Netdata is able to replicate/mirror its database to another netdata, by streaming collected
+Each Netdata is able to replicate/mirror its database to another Netdata, by streaming collected
 metrics, in real-time to it. This is quite different to [data archiving to third party time-series
 databases](../backends).
 
-When Netdata streams metrics to another netdata, the receiving one is able to perform everything a Netdata instance is capable of:
+When Netdata streams metrics to another Netdata, the receiving one is able to perform everything a Netdata instance is capable of:
 
 - visualize them with a dashboard
 - run health checks that trigger alarms and send alarm notifications
@@ -17,7 +17,7 @@ When Netdata streams metrics to another netdata, the receiving one is able to pe
 Local Netdata (`slave`), **without any database or alarms**, collects metrics and sends them to
 another Netdata (`master`).
 
-The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` netdata. The URL has the form http://master-host:master-port/host/slave-host/.
+The node menu shows a list of all "databases streamed to" the master. Clicking one of those links allows the user to view the full dashboard of the `slave` Netdata. The URL has the form http://master-host:master-port/host/slave-host/.
 
 Alarms for the `slave` are served by the `master`.
 
@@ -106,18 +106,18 @@ this host).
 
 A new file is introduced: [stream.conf](stream.conf) (to edit it on your system run
 `/etc/netdata/edit-config stream.conf`). This file holds streaming configuration for both the
-sending and the receiving netdata.
+sending and the receiving Netdata.
 
-API keys are used to authorize the communication of a pair of sending-receiving netdata.
+API keys are used to authorize the communication of a pair of sending-receiving Netdata.
 Once the communication is authorized, the sending Netdata can push metrics for any number of hosts.
 
 You can generate an API key with the command `uuidgen`. API keys are just random GUIDs.
-You can use the same API key on all your netdata, or use a different API key for any pair of
-sending-receiving netdata.
+You can use the same API key on all your Netdata, or use a different API key for any pair of
+sending-receiving Netdata.
 
 ##### options for the sending node
 
-This is the section for the sending netdata. On the receiving node, `[stream].enabled` can be `no`.
+This is the section for the sending Netdata. On the receiving node, `[stream].enabled` can be `no`.
 If it is `yes`, the receiving node will also stream the metrics to another node (i.e. it will be
 a `proxy`).
 
@@ -171,7 +171,7 @@ You can also add sections like this:
 The above is the receiver configuration of a single host, at the receiver end. `MACHINE_GUID` is
 the unique id the Netdata generating the metrics (i.e. the Netdata that originally collects
 them `/var/lib/netdata/registry/netdata.unique.id`). So, metrics for Netdata `A` that pass through
-any number of other netdata, will have the same `MACHINE_GUID`.
+any number of other Netdata, will have the same `MACHINE_GUID`.
 
 You can also use `default memory mode = dbengine` for an API key or `memory mode = dbengine` for
  a single host. The additional `page cache size` and `dbengine disk space` configuration options
@@ -301,7 +301,7 @@ Yes | -/force/optional | Yes | yes | The master-slave stream is encrypted.
 
 ## Viewing remote host dashboards, using mirrored databases
 
-On any receiving netdata, that maintains remote databases and has its web server enabled,
+On any receiving Netdata, that maintains remote databases and has its web server enabled,
 The node menu will include a list of the mirrored databases.
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/24080824/24cd2d3c-0caf-11e7-909d-a8dd1dbb95d7.png)
@@ -338,7 +338,7 @@ Following the Netdata way of monitoring, we wanted:
 
 ### How it works
 
-All monitoring solutions, including netdata, work like this:
+All monitoring solutions, including Netdata, work like this:
 
 1. `collect metrics`, from the system and the running applications
 2. `store metrics`, in a time-series database
@@ -404,7 +404,7 @@ On each of the slaves, edit `/etc/netdata/stream.conf` (to edit it on your syste
 
 ```bash
 [stream]
-    # stream metrics to another netdata
+    # stream metrics to another Netdata
     enabled = yes
 
     # the IP and PORT of the master
@@ -415,7 +415,7 @@ On each of the slaves, edit `/etc/netdata/stream.conf` (to edit it on your syste
 ```
 *`stream.conf` on slaves, to enable pushing metrics to master at `10.11.12.13:19999`.*
 
-Using just the above configuration, the `slaves` will be pushing their metrics to the `master` netdata, but they will still maintain a local database of the metrics and run health checks. To disable them, edit `/etc/netdata/netdata.conf` and set:
+Using just the above configuration, the `slaves` will be pushing their metrics to the `master` Netdata, but they will still maintain a local database of the metrics and run health checks. To disable them, edit `/etc/netdata/netdata.conf` and set:
 
 ```bash
 [global]
@@ -432,7 +432,7 @@ Keep in mind that setting `memory mode = none` will also force `[health].enabled
 
 #### Netdata unique id
 
-The file `/var/lib/netdata/registry/netdata.public.unique.id` contains a random GUID that **uniquely identifies each netdata**. This file is automatically generated, by netdata, the first time it is started and remains unaltered forever.
+The file `/var/lib/netdata/registry/netdata.public.unique.id` contains a random GUID that **uniquely identifies each Netdata**. This file is automatically generated, by Netdata, the first time it is started and remains unaltered forever.
 
 > If you are building an image to be used for automated provisioning of autoscaled VMs, it important to delete that file from the image, so that each instance of your image will generate its own.
 
@@ -497,7 +497,7 @@ This means a setup like the following is also possible:
 
 ## proxies
 
-A proxy is a Netdata instance that is receiving metrics from a netdata, and streams them to another netdata.
+A proxy is a Netdata instance that is receiving metrics from a Netdata, and streams them to another Netdata.
 
 netdata proxies may or may not maintain a database for the metrics passing through them.
 When they maintain a database, they can also run health checks (alarms and notifications)

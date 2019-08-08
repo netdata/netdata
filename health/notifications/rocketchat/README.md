@@ -22,7 +22,7 @@ Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system r
 SEND_ROCKETCHAT="YES"
 
 # Login to rocket.chat and create an incoming webhook. You need only one for all
-# your Netdata servers (or you can have one for each of your netdata).
+# your Netdata servers (or you can have one for each of your Netdata).
 # Without it, Netdata cannot send rocketchat notifications.
 ROCKETCHAT_WEBHOOK_URL="<your_incoming_webhook_url>"
 

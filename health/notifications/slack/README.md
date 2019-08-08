@@ -29,7 +29,7 @@ DEFAULT_RECIPIENT_SLACK="alarms"
 
 You can define multiple recipients like this: `# #alarms systems @myuser`. 
 This example will send the alarm to:
-- The recipient defined in slack for the webhook (not known to netdata)
+- The recipient defined in slack for the webhook (not known to Netdata)
 - The channel 'alarms'
 - The channel 'systems'
 - The user @myuser

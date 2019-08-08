@@ -107,7 +107,7 @@ This is the statsd configuration at `/etc/netdata/netdata.conf`:
 ### statsd main config options
 - `enabled = yes|no`
 
-   controls if statsd will be enabled for this netdata. The default is enabled.
+   controls if statsd will be enabled for this Netdata. The default is enabled.
 
 - `default port = 8125`
 

@@ -3,7 +3,7 @@
 `charts.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `BASH` v4+.
 
 1. It runs as an independent process `ps fax` shows it
-2. It is started and stopped automatically by netdata
+2. It is started and stopped automatically by Netdata
 3. It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
 4. Supports any number of data collection **modules**
 
@@ -80,7 +80,7 @@ connect to a local mysql database to find out if it can read the values it needs
 
 ### X_create()
 
-The purpose of the BASH function `X_create()` is to create the charts and dimensions using the standard netdata
+The purpose of the BASH function `X_create()` is to create the charts and dimensions using the standard Netdata
 plugin guides (**[External Plugins](../plugins.d/)**).
 
 `X_create()` will be called just once and only after `X_check()` was successful.
@@ -90,7 +90,7 @@ A non-zero return value will disable the collector.
 
 ### X_update()
 
-`X_update()` will be called repeatedly every `X_update_every` seconds, to collect new values and send them to netdata,
+`X_update()` will be called repeatedly every `X_update_every` seconds, to collect new values and send them to Netdata,
 following the Netdata plugin guides (**[External Plugins](../plugins.d/)**).
 
 The function will be called with one parameter: microseconds since the last time it was run. This value should be

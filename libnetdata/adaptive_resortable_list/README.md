@@ -4,7 +4,7 @@
 This library allows Netdata to read a series of `name - value` pairs
 in the **fastest possible way**.
 
-ARLs are used all over netdata, as they are the most
+ARLs are used all over Netdata, as they are the most
 CPU utilization efficient way to process `/proc` files. They are used to
 process both vertical (csv like) and horizontal (one pair per line) `name - value` pairs.
 
