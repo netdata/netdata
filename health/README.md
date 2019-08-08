@@ -373,7 +373,7 @@ For some alarms we need compare two time-frames, to detect anomalies. For exampl
 
 ### Expressions
 
-netdata has an internal [infix expression parser](../libnetdata/eval).
+Netdata has an internal [infix expression parser](../libnetdata/eval).
 This parses expressions and creates an internal structure that allows fast execution of them.
 
 These operators are supported `+`, `-`, `*`, `/`, `<`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`,

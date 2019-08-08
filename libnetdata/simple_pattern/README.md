@@ -30,7 +30,7 @@ RESULT: NOT MATCHED - pattern '*foobar* !foo* !*bar *' does not match 'hello wor
 RESULT: MATCHED - pattern '*foobar* !foo* !*bar *' matches 'hello world foobar'
 ```
 
-netdata stops processing to the first positive or negative match
+Netdata stops processing to the first positive or negative match
 (left to right). If it is not matched by either positive or negative
 patterns, it is denied at the end.
 

@@ -355,7 +355,7 @@ the process tree of `sshd`, **including the exited children**.
 
 #### a more technical description of how Netdata works
 
-netdata reads `/proc/<pid>/stat` for all processes, once per second and extracts `utime` and
+Netdata reads `/proc/<pid>/stat` for all processes, once per second and extracts `utime` and
 `stime` (user and system cpu utilization), much like all the console tools do.
 
 But it [also extracts `cutime` and `cstime`](https://github.com/netdata/netdata/blob/62596cc6b906b1564657510ca9135c08f6d4cdda/src/apps_plugin.c#L636-L642)

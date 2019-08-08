@@ -243,7 +243,7 @@ Fetch with your web browser this URL:
 
 *(replace `your.netdata.ip` with the ip or hostname of your Netdata server)*
 
-netdata will respond with all the metrics it sends to prometheus.
+Netdata will respond with all the metrics it sends to prometheus.
 
 If you search that page for `"system.cpu"` you will find all the metrics Netdata is exporting to prometheus for this chart.  `system.cpu` is the chart name on the Netdata dashboard (on the Netdata dashboard all charts have a text heading such as : `Total CPU utilization (system.cpu)`. What we are interested here in the chart name: `system.cpu`).
 
@@ -272,7 +272,7 @@ netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension=
 # COMMENT netdata_system_cpu_percentage_average: dimension "idle", value is percentage, gauge, dt 1500066653 to 1500066662 inclusive
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="idle"} 92.3630770 1500066662000
 ```
-*(netdata response for `system.cpu` with source=`average`)*
+*(Netdata response for `system.cpu` with source=`average`)*
 
 In `average` or `sum` data sources, all values are normalized and are reported to prometheus as gauges. Now, use the 'expression' text form in prometheus. Begin to type the metrics we are looking for: `netdata_system_cpu`. You should see that the text form begins to auto-fill as prometheus knows about this metric.
 
@@ -302,7 +302,7 @@ netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="iowait"} 233
 netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="idle"} 918470 1500066716438
 ```
 
-*(netdata response for `system.cpu` with source=`as-collected`)*
+*(Netdata response for `system.cpu` with source=`as-collected`)*
 
 For more information check prometheus documentation.
 
@@ -325,7 +325,7 @@ To pass the metrics through prometheus pushgateway, Netdata supports the option 
 
 ## Netdata host variables
 
-netdata collects various system configuration metrics, like the max number of TCP sockets supported, the max number of files allowed system-wide, various IPC sizes, etc. These metrics are not exposed to prometheus by default.
+Netdata collects various system configuration metrics, like the max number of TCP sockets supported, the max number of files allowed system-wide, various IPC sizes, etc. These metrics are not exposed to prometheus by default.
 
 To expose them, append `variables=yes` to the Netdata URL.
 
@@ -335,7 +335,7 @@ To save bandwidth, and because prometheus does not use them anyway, `# TYPE` and
 
 ### Names and IDs
 
-netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names are human friendly labels (also unique).
+Netdata supports names and IDs for charts and dimensions. Usually IDs are unique identifiers as read by the system and names are human friendly labels (also unique).
 
 Most charts and metrics have the same ID and name, but in several cases they are different: disks with device-mapper, interrupts, QoS classes, statsd synthetic charts, etc.
 
@@ -353,7 +353,7 @@ You can overwrite it from prometheus, by appending to the URL:
 
 ### Filtering metrics sent to prometheus
 
-netdata can filter the metrics it sends to prometheus with this setting:
+Netdata can filter the metrics it sends to prometheus with this setting:
 
 ```
 [backend]
@@ -364,7 +364,7 @@ This settings accepts a space separated list of patterns to match the **charts**
 
 ### Changing the prefix of Netdata metrics
 
-netdata sends all metrics prefixed with `netdata_`. You can change this in `netdata.conf`, like this:
+Netdata sends all metrics prefixed with `netdata_`. You can change this in `netdata.conf`, like this:
 
 ```
 [backend]

@@ -2,7 +2,7 @@
 
 You need a working `sendmail` command for email alerts to work. Almost all MTAs provide a `sendmail` interface.
 
-netdata sends all emails as user `netdata`, so make sure your `sendmail` works for local users.
+Netdata sends all emails as user `netdata`, so make sure your `sendmail` works for local users.
 
 email notifications look like this:
 

@@ -6,7 +6,7 @@ Web server log files exist for more than 20 years. All web servers of all kinds,
 
 Yet, after the appearance of google analytics and similar services, and the recent rise of APM (Application Performance Monitoring) with sophisticated time-series databases that collect and analyze metrics at the application level, all these web server log files are mostly just filling our disks, rotated every night without any use whatsoever.
 
-netdata turns this "useless" log file, into a powerful performance and health monitoring tool, capable of detecting, **in real-time**, most common web server problems, such as:
+Netdata turns this "useless" log file, into a powerful performance and health monitoring tool, capable of detecting, **in real-time**, most common web server problems, such as:
 
 - too many redirects (i.e. **oops!** *this should not redirect clients to itself*)
 - too many bad requests (i.e. **oops!** *a few files were not uploaded*)

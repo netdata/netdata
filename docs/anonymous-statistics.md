@@ -26,7 +26,7 @@ To ensure anonymity of the stored information, we have configured GTM's GA varia
 |page|netdata-dashboard
 |hostname|dashboard.my-netdata.io
 |anonymizeIp|true
-|title|netdata dashboard
+|title|Netdata dashboard
 |campaignSource|{{machine_guid}}
 |campaignMedium|web
 |referrer|http://dashboard.my-netdata.io

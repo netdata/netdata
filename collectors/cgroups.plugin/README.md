@@ -34,7 +34,7 @@ Linux exposes resource usage reporting and provides dynamic configuration for cg
 	path to /sys/fs/cgroup/devices = /sys/fs/cgroup/devices
 ```
 
-netdata rescans these directories for added or removed cgroups every `check for new cgroups every` seconds.
+Netdata rescans these directories for added or removed cgroups every `check for new cgroups every` seconds.
 
 ### hierarchical search for cgroups
 
@@ -118,7 +118,7 @@ CPU and memory limits are watched and used to rise alarms. Memory usage for ever
 
 ## Monitoring systemd services
 
-netdata monitors **systemd services**. Example:
+Netdata monitors **systemd services**. Example:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/21964372/20cd7b84-db53-11e6-98a2-b9c986b082c0.png)
 
@@ -196,9 +196,9 @@ Which systemd services are monitored by Netdata is determined by the following p
 
 ## Monitoring ephemeral containers
 
-netdata monitors containers automatically when it is installed at the host, or when it is installed in a container that has access to the `/proc` and `/sys` filesystems of the host.
+Netdata monitors containers automatically when it is installed at the host, or when it is installed in a container that has access to the `/proc` and `/sys` filesystems of the host.
 
-netdata prior to v1.6 had 2 issues when such containers were monitored:
+Netdata prior to v1.6 had 2 issues when such containers were monitored:
 
 1. network interface alarms where triggering when containers were stopped
 

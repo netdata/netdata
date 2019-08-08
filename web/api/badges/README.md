@@ -20,7 +20,7 @@ Similarly, there is [a chart that shows outbound bandwidth per class](http://lon
 
 The right one is a **volume** calculation. Netdata calculated the total of the last 86.400 seconds (a day) which gives `kilobits`, then divided it by 8 to make it KB, then by 1024 to make it MB and then by 1024 to make it GB. Calculations like this are quite accurate, since for every value collected, every second, Netdata interpolates it to second boundary using microsecond calculations.
 
-Let's see a few more badge examples (they come from the [netdata registry](../../../registry/)):
+Let's see a few more badge examples (they come from the [Netdata registry](../../../registry/)):
 
 - **cpu usage of user `root`** (you can pick any user; 100% = 1 core). This will be `green <10%`, `yellow <20%`, `orange <50%`, `blue <100%` (1 core), `red` otherwise (you define thresholds and colors on the URL).
 
@@ -36,7 +36,7 @@ Let's see a few more badge examples (they come from the [netdata registry](../..
 
 ---
 
-> So, every single line on the charts of a [netdata dashboard](http://london.my-netdata.io/), can become a badge and this badge can calculate **average**, **min**, **max**, or **volume** for any time-frame! And you can also vary the badge color using conditions on the calculated value.
+> So, every single line on the charts of a [Netdata dashboard](http://london.my-netdata.io/), can become a badge and this badge can calculate **average**, **min**, **max**, or **volume** for any time-frame! And you can also vary the badge color using conditions on the calculated value.
 
 ---
 

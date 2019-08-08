@@ -36,7 +36,7 @@ fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 
 ## alarms
 
-netdata will automatically attach a few alarms for each host.
+Netdata will automatically attach a few alarms for each host.
 Check the [latest versions of the fping alarms](../../health/health.d/fping.conf)
 
 ## Additional Tips 
@@ -60,7 +60,7 @@ ping_every=5000
 You may need to run multiple fping plugins with different settings for different end points.
 For example, you may need to ping a few hosts 10 times per second, and others once per second.
 
-netdata allows you to add as many `fping` plugins as you like.
+Netdata allows you to add as many `fping` plugins as you like.
 
 Follow this procedure:
 

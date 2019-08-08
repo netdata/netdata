@@ -23,7 +23,7 @@ Is there anything that bothers you about Netdata? Did you experience an issue wh
 
 ### Translate some documentation
 
-The [netdata localization project](https://github.com/netdata/localization) contains instructions on how to provide translations for parts of our documentation. Translating the entire documentation is a daunting task, but you can contribute as much as you like, even a single file. The Chinese translation effort has already begun and we are looking forward to more contributions.
+The [Netdata localization project](https://github.com/netdata/localization) contains instructions on how to provide translations for parts of our documentation. Translating the entire documentation is a daunting task, but you can contribute as much as you like, even a single file. The Chinese translation effort has already begun and we are looking forward to more contributions.
 
 ### Sponsor a part of Netdata
 
@@ -80,7 +80,7 @@ Of course we appreciate contributions for any other part of the NetData agent, i
 
 #### Code of Conduct and CLA
 
-We expect all contributors to abide by the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). For a pull request to be accepted, you will also need to accept the [netdata contributors license agreement](CONTRIBUTORS.md), as part of the PR process.
+We expect all contributors to abide by the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). For a pull request to be accepted, you will also need to accept the [Netdata contributors license agreement](CONTRIBUTORS.md), as part of the PR process.
 
 #### Performance and efficiency
 

@@ -8,11 +8,11 @@ This config file **is not needed by default**. Netdata works fine out of the box
 
 `netdata.conf` has sections stated with `[section]`. You will see the following sections:
 
-1. `[global]` to [configure](#global-section-options) the [netdata daemon](../).
+1. `[global]` to [configure](#global-section-options) the [Netdata daemon](../).
 2. `[web]` to [configure the web server](../../web/server).
 3. `[plugins]` to [configure](#plugins-section-options) which [collectors](../../collectors) to use and PATH settings.
 4. `[health]` to [configure](#health-section-options) general settings for [health monitoring](../../health)
-5. `[registry]` for the [netdata registry](../../registry).
+5. `[registry]` for the [Netdata registry](../../registry).
 6. `[backend]` to set up [streaming and replication](../../streaming) options.
 7. `[statsd]` for the general settings of the [stats.d.plugin](../../collectors/statsd.plugin).
 8. `[plugin:NAME]` sections for each collector plugin, under the comment [Per plugin configuration](#per-plugin-configuration).
@@ -42,7 +42,7 @@ Please note that your data history will be lost if you have modified `history` p
 
 setting | default | info
 :------:|:-------:|:----
-process scheduling policy | `keep` |  See [netdata process scheduling policy](../#netdata-process-scheduling-policy)
+process scheduling policy | `keep` |  See [Netdata process scheduling policy](../#netdata-process-scheduling-policy)
 OOM score | `1000` |  See [OOM score](../#oom-score)
 glibc malloc arena max for plugins | `1` |  See [Virtual memory](../#virtual-memory).
 glibc malloc arena max for Netdata | `1` |  See [Virtual memory](../#virtual-memory).

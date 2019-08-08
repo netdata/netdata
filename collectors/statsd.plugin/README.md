@@ -4,7 +4,7 @@ statsd is a system to collect data from any application. Applications are sendin
 
 There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding statsd metrics to any application framework. This makes statsd quite popular for custom application metrics.
 
-netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards, stream them to other Netdata servers or archive them to backend time-series databases.
+Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards, stream them to other Netdata servers or archive them to backend time-series databases.
 
 Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd ports (tcp and udp 8125 - yes, Netdata statsd server supports both tcp and udp at the same time).
 
@@ -62,15 +62,15 @@ The application may append `|@sampling_rate`, where `sampling_rate` is a number 
 
 #### Overlapping metrics
 
-netdata statsd maintains different indexes for each of the types supported. This means the same metric `name` may exist under different types concurrently.
+Netdata's statsd server maintains different indexes for each of the types supported. This means the same metric `name` may exist under different types concurrently.
 
 #### Multiple metrics per packet
 
-netdata accepts multiple metrics per packet if each is terminated with `\n`.
+Netdata accepts multiple metrics per packet if each is terminated with `\n`.
 
 #### TCP packets
 
-netdata listens for both TCP and UDP packets. For TCP though, is it important to always append `\n` on each metric. Netdata uses this to detect if a metric is split into multiple TCP packets. On disconnect, even the remaining (non terminated with `\n`) buffer, is processed.
+Netdata listens for both TCP and UDP packets. For TCP though, is it important to always append `\n` on each metric. Netdata uses this to detect if a metric is split into multiple TCP packets. On disconnect, even the remaining (non terminated with `\n`) buffer, is processed.
 
 #### UDP packets
 
@@ -125,7 +125,7 @@ The rest of the settings are discussed below.
 
 ## statsd charts
 
-netdata can visualize statsd collected metrics in 2 ways:
+Netdata can visualize statsd collected metrics in 2 ways:
 
 1. Each metric gets its own **private chart**. This is the default and does not require any configuration (although there are a few options to tweak).
 
@@ -147,7 +147,7 @@ The `memory mode` of the round robin database and the `history` of private metri
 
 If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the Netdata dashboard (this is a web browser issue we need to address at the Netdata UI). So, Netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
 
-The metrics above this soft limit are still processed by Netdata and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, Netdata will still generate charts, but they will automatically be created with `memory mode = none` (netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
+The metrics above this soft limit are still processed by Netdata and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, Netdata will still generate charts, but they will automatically be created with `memory mode = none` (Netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
 
 Metrics above the hard limit are still collected, but they can only be used in synthetic charts (once a metric is added to chart, it will be sent to backend servers too).
 
@@ -336,7 +336,7 @@ and this synthetic chart:
 
 The `[dictionary]` section accepts any number of `name = value` pairs.
 
-netdata uses this dictionary as follows:
+Netdata uses this dictionary as follows:
 
 1. When a `dimension` has a non-empty `NAME`, that name is looked up at the dictionary.
 
@@ -355,7 +355,7 @@ In both cases, the dimension will be added with ID `myapp.metric1` and will be n
 
 #### dimension patterns
 
-netdata allows adding multiple dimensions to a chart, by matching the statsd metrics with a Netdata simple pattern.
+Netdata allows adding multiple dimensions to a chart, by matching the statsd metrics with a Netdata simple pattern.
 
 Assume we have an API that provides statsd metrics for each response code per method it supports, like these:
 

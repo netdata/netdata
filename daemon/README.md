@@ -190,7 +190,7 @@ Netdata uses 3 log files:
 
 Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`.
 By default `error.log` and `access.log` are enabled. `debug.log` is only enabled if
-debugging/tracing is also enabled (netdata needs to be compiled with debugging enabled).
+debugging/tracing is also enabled (Netdata needs to be compiled with debugging enabled).
 
 Log files are stored in `/var/log/netdata/` by default.
 
@@ -242,7 +242,7 @@ See [debugging](#debugging).
 
 ## OOM Score
 
-netdata runs with `OOMScore = 1000`. This means Netdata will be the first to be killed when your
+Netdata runs with `OOMScore = 1000`. This means Netdata will be the first to be killed when your
 server runs out of memory.
 
 You can set Netdata OOMScore in `netdata.conf`, like this:
@@ -252,7 +252,7 @@ You can set Netdata OOMScore in `netdata.conf`, like this:
     OOM score = 1000
 ```
 
-netdata logs its OOM score when it starts:
+Netdata logs its OOM score when it starts:
 
 ```sh
 # grep OOM /var/log/netdata/error.log
@@ -261,7 +261,7 @@ netdata logs its OOM score when it starts:
 
 #### OOM score and systemd
 
-netdata will not be able to lower its OOM Score below zero, when it is started as the `netdata`
+Netdata will not be able to lower its OOM Score below zero, when it is started as the `netdata`
 user (systemd case).
 
 To allow Netdata control its OOM Score in such cases, you will need to edit
@@ -337,7 +337,7 @@ When the policy is set to `other`, `nice`, or `batch`, the following will appear
 
 ## scheduling settings and systemd
 
-netdata will not be able to set its scheduling policy and priority to more important values when it is started as the `netdata` user (systemd case).
+Netdata will not be able to set its scheduling policy and priority to more important values when it is started as the `netdata` user (systemd case).
 
 You can set these settings at `/etc/systemd/system/netdata.service`:
 
@@ -442,7 +442,7 @@ to allow you tweak these settings: `glibc malloc arena max for plugins` and `gli
 
 However, even if we instructed the memory allocator to use just one arena, it seems it allocates an arena per thread.
 
-netdata also supports `jemalloc` and `tcmalloc`, however both behave exactly the same to the glibc memory allocator in this aspect.
+Netdata also supports `jemalloc` and `tcmalloc`, however both behave exactly the same to the glibc memory allocator in this aspect.
 
 **Is this a problem?**
 
@@ -459,7 +459,7 @@ accounts the whole pages, even if parts of them are actually used).
 
 When you compile Netdata with debugging:
 
-1. compiler optimizations for your CPU are disabled (netdata will run somewhat slower)
+1. compiler optimizations for your CPU are disabled (Netdata will run somewhat slower)
 
 2. a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find the options supported at [log.h](../libnetdata/log/log.h). They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
 
@@ -515,7 +515,7 @@ Install the package `valgrind` and run:
 valgrind $(which netdata) -D
 ```
 
-netdata will start and it will be a lot slower. Now reproduce the crash and `valgrind` will dump on your console the stack trace. Open a new github issue and post the output.
+Netdata will start and it will be a lot slower. Now reproduce the crash and `valgrind` will dump on your console the stack trace. Open a new github issue and post the output.
 
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

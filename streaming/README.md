@@ -45,8 +45,8 @@ Take a note, that custom chart names, configured on the `slave`, should be in th
 ### Netdata proxies
 
 Local Netdata (`slave`), with or without a database, collects metrics and sends them to another
-netdata (`proxy`), which may or may not maintain a database, which forwards them to another
-netdata (`master`).
+Netdata (`proxy`), which may or may not maintain a database, which forwards them to another
+Netdata (`master`).
 
 Alarms for the slave can be triggered by any of the involved hosts that maintains a database.
 
@@ -86,7 +86,7 @@ monitoring (there cannot be health monitoring without a database).
     accept a streaming request every seconds = 0
 ```
 
-`[web].mode = none` disables the API (netdata will not listen to any ports).
+`[web].mode = none` disables the API (Netdata will not listen to any ports).
 This also disables the registry (there cannot be a registry without an API).
 
 `accept a streaming request every seconds` can be used to set a limit on how often a master Netdata server will accept streaming requests from the slaves. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log entries "... too busy to accept new streaming request. Will be allowed in X secs".
@@ -179,7 +179,7 @@ You can also use `default memory mode = dbengine` for an API key or `memory mode
 
 ##### allow from
 
-`allow from` settings are [netdata simple patterns](../libnetdata/simple_pattern): string matches
+`allow from` settings are [Netdata simple patterns](../libnetdata/simple_pattern): string matches
 that use `*` as wildcard (any number of times) and a `!` prefix for a negative match.
 So: `allow from = !10.1.2.3 10.*` will allow all IPs in `10.*` except `10.1.2.3`. The order is
 important: left to right, the first positive or negative match is used.
@@ -345,7 +345,7 @@ All monitoring solutions, including Netdata, work like this:
 3. `examine metrics` periodically, for triggering alarms and sending alarm notifications
 4. `visualize metrics`, so that users can see what exactly is happening
 
-netdata used to be self-contained, so that all these functions were handled entirely by each server. The changes we made, allow each Netdata to be configured independently for each function. So, each Netdata can now act as:
+Netdata used to be self-contained, so that all these functions were handled entirely by each server. The changes we made, allow each Netdata to be configured independently for each function. So, each Netdata can now act as:
 
 - a `self contained system`, much like it used to be.
 - a `data collector`, that collects metrics from a host and pushes them to another Netdata (with or without a local database and alarms).
@@ -486,7 +486,7 @@ This is how such a solution will work:
 
 ### An advanced setup
 
-netdata also supports `proxies` with and without a local database, and data retention can be different between all nodes.
+Netdata also supports `proxies` with and without a local database, and data retention can be different between all nodes.
 
 This means a setup like the following is also possible:
 
@@ -499,7 +499,7 @@ This means a setup like the following is also possible:
 
 A proxy is a Netdata instance that is receiving metrics from a Netdata, and streams them to another Netdata.
 
-netdata proxies may or may not maintain a database for the metrics passing through them.
+Netdata proxies may or may not maintain a database for the metrics passing through them.
 When they maintain a database, they can also run health checks (alarms and notifications)
 for the remote host that is streaming the metrics.
 

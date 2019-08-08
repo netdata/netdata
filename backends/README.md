@@ -1,6 +1,6 @@
 # Metrics long term archiving
 
-netdata supports backends for archiving the metrics, or providing long term dashboards,
+Netdata supports backends for archiving the metrics, or providing long term dashboards,
 using Grafana or other tools, like this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20649711/29f182ba-b4ce-11e6-97c8-ab2c0ab59833.png)
@@ -147,7 +147,7 @@ of `netdata.conf` from your Netdata):
 
 - `buffer on failures = 10`, is the number of iterations (each iteration is `[backend].update every` seconds)
    to buffer data, when the backend is not available. If the backend fails to receive the data after that
-   many failures, data loss on the backend is expected (netdata will also log it).
+   many failures, data loss on the backend is expected (Netdata will also log it).
 
 - `timeout ms = 20000`, is the timeout in milliseconds to wait for the backend server to process the data.
    By default this is `2 * update_every * 1000`.
@@ -180,7 +180,7 @@ of `netdata.conf` from your Netdata):
 
 ## monitoring operation
 
-netdata provides 5 charts:
+Netdata provides 5 charts:
 
 1. **Buffered metrics**, the number of metrics Netdata added to the buffer for dispatching them to the
    backend server.
@@ -204,7 +204,7 @@ netdata provides 5 charts:
 
 The latest version of the alarms configuration for monitoring the backend is [here](../health/health.d/backend.conf)
 
-netdata adds 4 alarms:
+Netdata adds 4 alarms:
 
 1. `backend_last_buffering`, number of seconds since the last successful buffering of backend data
 2. `backend_metrics_sent`, percentage of metrics sent to the backend server

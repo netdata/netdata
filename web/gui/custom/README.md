@@ -7,7 +7,7 @@ You can:
 - using data from one or more Netdata servers, on the same dashboard
 - host your dashboard HTML page on any web server, anywhere
 
-netdata charts can also be added to existing web pages.
+Netdata charts can also be added to existing web pages.
 
 Check this **[very simple working example of a custom dashboard](http://netdata.firehol.org/demo.html)**, and its **[html source](../demo.html)**.
 
@@ -285,7 +285,7 @@ You can select specific dimensions using this:
      ></div>
 ```
 
-netdata supports coma (` , `) or pipe (` | `) separated [simple patterns](../../../libnetdata/simple_pattern/) for dimensions. By default it searches for both dimension IDs and dimension NAMEs. You can control the target of the match with: `data-append-options="match-ids"` or `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched in the dimension names and IDs.
+Netdata supports coma (` , `) or pipe (` | `) separated [simple patterns](../../../libnetdata/simple_pattern/) for dimensions. By default it searches for both dimension IDs and dimension NAMEs. You can control the target of the match with: `data-append-options="match-ids"` or `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched in the dimension names and IDs.
 
 ### Chart title
 
@@ -389,7 +389,7 @@ The same functionality exists for `data-common-min`.
 
 ### Syncing chart units
 
-netdata dashboards support auto-scaling of units. So, `MB` can become `KB`, `GB`, etc dynamically, based on the value to be shown.
+Netdata dashboards support auto-scaling of units. So, `MB` can become `KB`, `GB`, etc dynamically, based on the value to be shown.
 
 Giving the same `NAME` with `data-common-units="NAME"`, 2+ charts can be forced to always have the same units.
 

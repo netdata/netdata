@@ -225,7 +225,7 @@ the template is:
 
   - `options`
 
-    a space separated list of options, enclosed in quotes. 4 options are currently supported: `obsolete` to mark a chart as obsolete (netdata will hide it and delete it after some time), `detail` to mark a chart as insignificant (this may be used by dashboards to make the charts smaller, or somehow visualize properly a less important chart), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to backends). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
+    a space separated list of options, enclosed in quotes. 4 options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `detail` to mark a chart as insignificant (this may be used by dashboards to make the charts smaller, or somehow visualize properly a less important chart), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to backends). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
 
   - `plugin` and `module`
 
@@ -290,7 +290,7 @@ the template is:
 
   - `options`
 
-    a space separated list of options, enclosed in quotes. Options supported: `obsolete` to mark a dimension as obsolete (netdata will delete it after some time) and `hidden` to make this dimension hidden, it will take part in the calculations but will not be presented in the chart.
+    a space separated list of options, enclosed in quotes. Options supported: `obsolete` to mark a dimension as obsolete (Netdata will delete it after some time) and `hidden` to make this dimension hidden, it will take part in the calculations but will not be presented in the chart.
 
 
 #### VARIABLE
@@ -310,7 +310,7 @@ These variables can be set and updated at any point.
 
 Variable names should use alphanumeric characters, the `.` and the `_`.
 
-The `value` is floating point (netdata used `long double`).
+The `value` is floating point (Netdata used `long double`).
 
 Variables are transferred to upstream Netdata servers (streaming and database replication).
 
@@ -368,7 +368,7 @@ follow these guidelines), will be disabled by Netdata.
 
 ### collected values
 
-netdata will collect any **signed** value in the 64bit range:
+Netdata will collect any **signed** value in the 64bit range:
 `-9.223.372.036.854.775.808` to `+9.223.372.036.854.775.807`
 
 If a value is not collected, leave it empty, like this:

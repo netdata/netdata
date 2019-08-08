@@ -1,6 +1,6 @@
 # Data collection plugins
 
-netdata supports **internal** and **external** data collection plugins:
+Netdata supports **internal** and **external** data collection plugins:
 
 - **internal** plugins are written in `C` and run as threads inside the `netdat`a` daemon.
 

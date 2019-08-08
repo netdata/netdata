@@ -36,7 +36,7 @@ ioping_opts="-T 1000000 -R"
 
 ## alarms
 
-netdata will automatically attach a few alarms for each host.
+Netdata will automatically attach a few alarms for each host.
 Check the [latest versions of the ioping alarms](../../health/health.d/ioping.conf)
 
 ## Multiple ioping Plugins With Different Settings
@@ -44,7 +44,7 @@ Check the [latest versions of the ioping alarms](../../health/health.d/ioping.co
 You may need to run multiple ioping plugins with different settings or different end points.
 For example, you may need to ping one destination once per 10 seconds, and another once per second.
 
-netdata allows you to add as many `ioping` plugins as you like.
+Netdata allows you to add as many `ioping` plugins as you like.
 
 Follow this procedure:
 
