@@ -260,9 +260,9 @@ static int single_custom_variable2json(void *entry, void *data) {
             buffer_sprintf(helper->buf, "%s\n\t\t\t\t\"%s\": null", helper->counter?",":"", rv->name);
         else
             buffer_sprintf(helper->buf, "%s\n\t\t\t\t\"%s\": %0.5" LONG_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (LONG_DOUBLE)value);
-    }
 
-    helper->counter++;
+        helper->counter++;
+    }
 
     return 0;
 }
