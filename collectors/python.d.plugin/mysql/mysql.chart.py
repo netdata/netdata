@@ -695,9 +695,8 @@ class Service(MySQLService):
 
         if 'slave_status' in raw_data:
             status = self.get_slave_status(raw_data['slave_status'])
-            data.update(status)
-        else:
-            self.queries.pop('slave_status')
+            if status:
+                data.update(status)
 
         if 'user_statistics' in raw_data:
             if raw_data['user_statistics'][0]:
