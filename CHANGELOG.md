@@ -4,13 +4,23 @@
 
 **Merged pull requests:**
 
+- Update terms of use for U.S. legal reasons [\#6631](https://github.com/netdata/netdata/pull/6631) ([cakrit](https://github.com/cakrit))
+- netdata: Add cosmix as codeowner, wherever cakrit is [\#6618](https://github.com/netdata/netdata/pull/6618) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- mysql: do not remove `slave\_status` from queries in module [\#6617](https://github.com/netdata/netdata/pull/6617) ([ilyam8](https://github.com/ilyam8))
+- Better system OS detection for RHEL6 and Mac OS X [\#6612](https://github.com/netdata/netdata/pull/6612) ([dex4er](https://github.com/dex4er))
+- update package version requirements for LZ4 and libuv [\#6607](https://github.com/netdata/netdata/pull/6607) ([mfundul](https://github.com/mfundul))
 - netdata/installer: do not enable netdata, if it was previously disabled [\#6606](https://github.com/netdata/netdata/pull/6606) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mysql collector: slave\_status charts per replication channel [\#6597](https://github.com/netdata/netdata/pull/6597) ([ilyam8](https://github.com/ilyam8))
+- netdata/packaging: Expect .tar.gz version of go.d plugin [\#6590](https://github.com/netdata/netdata/pull/6590) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix configure.ac allowing deprecated LZ4 library call [\#6589](https://github.com/netdata/netdata/pull/6589) ([mfundul](https://github.com/mfundul))
 - Fix crash in malloc [\#6583](https://github.com/netdata/netdata/pull/6583) ([thiagoftsm](https://github.com/thiagoftsm))
 - Build DEB and RPM packages in parallel [\#6579](https://github.com/netdata/netdata/pull/6579) ([knatsakis](https://github.com/knatsakis))
 - Fixed typo 'follwing' -\> 'following' [\#6575](https://github.com/netdata/netdata/pull/6575) ([vvanouytsel](https://github.com/vvanouytsel))
+- netdata/packaging: Bare OS validations [\#6574](https://github.com/netdata/netdata/pull/6574) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+-  Documentation style guide & build instructions [\#6563](https://github.com/netdata/netdata/pull/6563) ([joelhans](https://github.com/joelhans))
+- netdata/packaging: Documentation on distribution support matrix and functionality availability [\#6552](https://github.com/netdata/netdata/pull/6552) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
+- Netdata Cloud documentation [\#6476](https://github.com/netdata/netdata/pull/6476) ([joelhans](https://github.com/joelhans))
 - Update plugin\_nfacct.c [\#6098](https://github.com/netdata/netdata/pull/6098) ([fun04wr0ng](https://github.com/fun04wr0ng))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
