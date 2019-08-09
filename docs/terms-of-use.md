@@ -1,7 +1,7 @@
 # Terms of Use
 
 Netdata Master Terms of Use
-Effective as of 25 May 2018
+Effective as of 09 Aug 2019
 
 ## 1. General Information Regarding These Terms of Use
 
