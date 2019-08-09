@@ -62,8 +62,7 @@ process_data() {
 mkdir "$OUTDIR"
 CREATEDIR="$?"
 if [ "$CREATEDIR" -ne "0" ]; then
-  echo  -e "${RED}Cannot create the output directory"
-  exit 1
+  echo  -e "${RED}Cannot create the output directory, it already exists. The test will overwrite previous results."
 fi
 
 change_alarm_file "./0" "system_cpu.conf.unique_alarm" "$HEALTHDIR/dim_double_without_template.conf"

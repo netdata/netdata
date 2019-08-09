@@ -199,7 +199,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
             health_string2json(wb, "\t\t\t", "lookup_dimensions", rc->dimensions, ",\n");
 
         if(rc->foreachdim && *rc->foreachdim)
-            health_string2json(wb, "\t\t\t", "lookup_dimensions", rc->foreachdim, ",\n");
+            health_string2json(wb, "\t\t\t", "foreach", rc->foreachdim, ",\n");
 
         buffer_sprintf(wb,
                 "\t\t\t\"db_after\": %lu,\n"

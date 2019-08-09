@@ -476,10 +476,12 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
  * @param rc is the alarm that will be used as source
  * @param host is the host structure.
  * @param name is the newest chart name.
+ * @param dimension is the current dimension
+ * @param foreachdim the whole list of dimension
  *
  * @return it returns the new alarm changed.
  */
-inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension) {
+inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension,char *foreachdim) {
     RRDCALC *newrc = callocz(1, sizeof(RRDCALC));
 
     newrc->next_event_id = 1;
@@ -490,7 +492,7 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *na
     newrc->hash_chart = simple_hash(rc->chart);
 
     newrc->dimensions = strdupz(dimension);
-    if(rc->foreachdim) newrc->foreachdim = strdupz(rc->foreachdim);
+    if(rc->foreachdim) newrc->foreachdim = strdupz(foreachdim);
 
     newrc->green = rc->green;
     newrc->red = rc->red;
@@ -512,11 +514,11 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *na
     newrc->update_every = rc->update_every;
     newrc->options = rc->options;
 
-    if(newrc->exec) rc->exec = strdupz(rc->exec);
-    if(newrc->recipient) rc->recipient = strdupz(rc->recipient);
-    if(newrc->source) rc->source = strdupz(rc->source);
-    if(newrc->units) rc->units = strdupz(rc->units);
-    if(newrc->info) rc->info = strdupz(rc->info);
+    if(rc->exec) newrc->exec = strdupz(rc->exec);
+    if(rc->recipient) newrc->recipient = strdupz(rc->recipient);
+    if(rc->source) newrc->source = strdupz(rc->source);
+    if(rc->units) newrc->units = strdupz(rc->units);
+    if(rc->info) newrc->info = strdupz(rc->info);
 
     if(rc->calculation) {
         newrc->calculation = expression_parse(rc->calculation->source, NULL, NULL);

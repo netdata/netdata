@@ -535,9 +535,11 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
     char *foreachdim;
     char *tok;
     char *copyname;
+    char *copydim;
     char *move;
     if(rc->foreachdim) {
         foreachdim = rc->foreachdim;
+        copydim = strdupz(foreachdim);
         tok = foreachdim;
         move = tok;
         copyname = rc->name;
@@ -546,6 +548,7 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
         tok = rc->name;
         copyname = NULL;
         move = NULL;
+        copydim = NULL;
     }
 
     RRDCALC *original = rc;
@@ -558,7 +561,7 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
             }
 
             if(!isfirst) { //It is not the first, so I need a new RRDCALC
-                rc = rrdcalc_create_from_rrdcalc(original, host, alarm_name_with_dim(copyname, move), move);
+                rc = rrdcalc_create_from_rrdcalc(original, host, alarm_name_with_dim(copyname, move), move, copydim);
             } else {
                 rc->name = alarm_name_with_dim(copyname, move);
                 rc->hash = simple_hash(rc->name);
@@ -575,14 +578,16 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
             tok = NULL;
         }
 
-        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc))
+        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
             rrdcalc_free(rc);
-
-        if(tok) {
-            *tok++ = ',';
+            break;
         }
 
-        move = tok;
+        if(tok) {
+            *tok = ',';
+            move = (tok+1);
+        }
+
 
         isfirst =0;
     }
@@ -593,6 +598,10 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
     if(rc->foreachdim) {
         if (copyname) {
             freez(copyname);
+        }
+
+        if (copydim) {
+            freez(copydim);
         }
     }
 }

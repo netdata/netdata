@@ -148,7 +148,7 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
-extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension);
+extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension, char *foreachdim);
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
 extern void dimension_remove_pipe(char *str);
 extern char *alarm_name_with_dim(char *name, char *dim);
