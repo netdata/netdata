@@ -10,11 +10,13 @@ import { selectChartData, selectChartDetails } from "../selectors"
 export type Props = {
   attributes: Attributes
   chartUuid: string
+  portalNode: HTMLElement
 }
 
 export const ChartContainer = ({
   attributes,
   chartUuid,
+  portalNode,
 }: Props) => {
   const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
   const chartDetails = useSelector((state: AppStateT) => selectChartDetails(
@@ -29,6 +31,7 @@ export const ChartContainer = ({
       chartData={chartData}
       chartDetails={chartDetails}
       chartUuid={chartUuid}
+      portalNode={portalNode}
     />
   )
 }

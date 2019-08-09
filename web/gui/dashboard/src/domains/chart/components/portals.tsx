@@ -16,6 +16,7 @@ export const Portals = () => (
             attributes={getAttributes(node)}
             // todo change to uuid generator (when we disconnect dashboard.js)
             chartUuid={`${attributesMapped.id}-${index}`}
+            portalNode={(node as HTMLElement)}
           />,
           node,
         )

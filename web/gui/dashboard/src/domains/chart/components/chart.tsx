@@ -1,5 +1,5 @@
-import { __, prop } from "ramda"
-import React, { useEffect } from "react"
+import { __, forEachObjIndexed, prop } from "ramda"
+import React, { useEffect, useLayoutEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
 import { requestCommonColorsAction } from "domains/global/actions"
@@ -18,6 +18,7 @@ interface Props {
   chartDetails: ChartDetails
   chartUuid: string
   attributes: Attributes
+  portalNode: HTMLElement
 }
 
 const getStyles = (attributes: Attributes, chartSettings: ChartLibraryConfig) => {
@@ -29,7 +30,7 @@ const getStyles = (attributes: Attributes, chartSettings: ChartLibraryConfig) =>
     width = `${attributes.width.toString()}px`
   }
   let height
-  if (chartSettings === undefined) {
+  if (chartSettings.aspectRatio === undefined) {
     if (typeof attributes.height === "string") {
       // eslint-disable-next-line prefer-destructuring
       height = attributes.height
@@ -55,6 +56,7 @@ export const Chart = ({
     chartLibrary,
   },
   attributes,
+  portalNode,
 }: Props) => {
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
@@ -77,6 +79,18 @@ export const Chart = ({
     chartData.dimension_names.join(("")),
   ])
 
+  // todo omit this for Cloud/Main Agent app
+  useLayoutEffect(() => {
+    const styles = getStyles(attributes, chartSettings)
+    forEachObjIndexed((value, styleName) => {
+      if (value) {
+        portalNode.style.setProperty(styleName, value)
+      }
+    }, styles)
+    // eslint-disable-next-line no-param-reassign
+    portalNode.className = hasLegend ? "netdata-container-with-legend" : "netdata-container"
+  }, [attributes, chartSettings, hasLegend, portalNode])
+
   const selectAssignedColors = createSelectAssignedColors({
     chartContext: chartDetails.context,
     chartUuid,
@@ -90,10 +104,7 @@ export const Chart = ({
   const orderedColors = chartData.dimension_names.map(prop(__, colors))
 
   return (
-    <div
-      style={getStyles(attributes, chartSettings)}
-      className={hasLegend ? "netdata-container-with-legend" : "netdata-container"}
-    >
+    <>
       <AbstractChart
         attributes={attributes}
         chartData={chartData}
@@ -118,6 +129,6 @@ export const Chart = ({
       {window.NETDATA.options.current.resize_charts && (
         <ResizeHandler />
       )}
-    </div>
+    </>
   )
 }
