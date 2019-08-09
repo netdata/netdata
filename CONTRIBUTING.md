@@ -61,9 +61,13 @@ As the project grows, an increasing share of our time is spent on supporting thi
 
 ### Improve documentation
 
-All of our documentation is in markdown (.md) files inside the netdata GitHub project. All of our [HTML documentation](https://docs.netdata.cloud) is generated from these files. At the top right of each documentation page you will see a pencil, that leads you directly to the markdown file that was used to generated it. Don't be afraid to click it and edit any of these documents and submit a GitHub Pull Request with your corrections/additions. 
+Our documentation is in need of constant improvement and expansion. As Netdata's features grow, we need to clearly explain how each feature works and document all the possible configurations. And as Netdata's community grows, we need to improve existing documentation to make it more accessible to people of all skill levels.
 
-We also need help to [document each chart in the default dashboard](https://github.com/netdata/netdata/issues/279). 
+We also need to produce beginner-level tutorials on using Netdata to monitor common applications, web servers, and more.
+
+Start with the [guide for contributing to documentation](docs/contributing/contributing-documentation.md), and then review the [documentation style guide](docs/contributing/style-guide.md) for specifics on how we write our documentation.
+
+Don't be afraid to submit a pull request with your corrections or additions! We need a lot of help and are willing to guide new contributors through the process.
 
 ## Developers
 

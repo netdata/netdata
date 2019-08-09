@@ -104,7 +104,8 @@ markdown_extensions:
  - pymdownx.details
  - pymdownx.highlight:
     pygments_style: manni
-    noclasses: true
+    css_class: "highlight codehilite"
+    linenums_style: pymdownx-inline
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
@@ -271,10 +272,16 @@ navpart 2 web/api/badges "" "" 2
 navpart 2 web/api/health "" "" 2
 navpart 2 web/api/queries "" "Queries" 2
 
-echo -ne "- Additional Info:
+echo -ne "- Contributing to Netdata:
+    - CONTRIBUTING.md
+    - 'docs/contributing/contributing-documentation.md'
+    - 'docs/contributing/style-guide.md'
     - CODE_OF_CONDUCT.md
     - CONTRIBUTORS.md
     - packaging/maintainers/README.md
+"
+
+echo -ne "- Additional information:
 "
 navpart 2 packaging/makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4
