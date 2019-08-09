@@ -266,7 +266,7 @@ Each chart library has a number of specific settings. To learn more about them, 
 
 - Dygraph
     - [Dygraph documentation](http://dygraphs.com/tutorial.html)
-    - [`data-dygraph-XXX` options in `dashboard.js`](https://github.com/netdata/netdata/blob/master/web/gui/dashboard.js#L2034)
+    - [`data-dygraph-XXX` options in `dashboard.js`]()
 - jQuery Sparkline
     - [jQuery Sparkline documentation]()
     - [`data-sparkline-XXX` options in `dashboard.js`]()

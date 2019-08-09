@@ -20,7 +20,7 @@ Netdata is broken up into multiple **sections**, such as **System Overview**, **
 
 > > > screenshot of a section
 
-All sections and their associated charts appear on a single "page," so all you need to do to view different sections is scroll up and down the page. But it's usually quicker to use the [menu](#menu).
+All sections and their associated charts appear on a single "page," so all you need to do to view different sections is scroll up and down the page. But it's usually quicker to use the [menu](#menus).
 
 ### Menus
 
@@ -44,7 +44,7 @@ Clicking on it will display a drop-down menu of any nodes you might have connect
 
 ![Screenshot of the default (empty) nodes menu](https://user-images.githubusercontent.com/1153921/62741606-5cb27680-b9f0-11e9-9f77-517f321b4dd5.png)
 
-Once you add nodes via [Netdata Cloud](../../docs/netdata-cloud/) or a [private registry](../../registry/#run-your-own-registry), you will see them appear under the **My nodes** heading.
+Once you add nodes via [Netdata Cloud]() or a [private registry](../../registry/#run-your-own-registry), you will see them appear under the **My nodes** heading.
 
 > > > screenshot of a filled my nodes list
 

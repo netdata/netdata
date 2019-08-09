@@ -6,9 +6,9 @@ We then leverage a number of dashboards, both configured by the Netdata communit
 
 There are two primary ways to view Netdata's dashboards:
 
-1. The [standard web dashboard](gui/) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. You can customize the contents and colors of the standard dashboard [using JavaScript](gui/#customizing-the-standard-dashboards).
+1. The [standard web dashboard](gui/) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. You can customize the contents and colors of the standard dashboard [using JavaScript](gui/#customizing-the-standard-dashboard).
 
-2. The [`dashboard.js` JavaScript library](#dashboard-js), which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboards) using JavaScript, or create entirely new [custom dashboards](gui/custom/) or [Atlassian Confluence dashboards](gui/confluence/).
+2. The [`dashboard.js` JavaScript library](#dashboard-js), which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboard) using JavaScript, or create entirely new [custom dashboards](gui/custom/) or [Atlassian Confluence dashboards](gui/confluence/).
 
 You can also view all the data Netdata collects through the [REST API v1](api/).
 
@@ -18,7 +18,7 @@ No matter where you use Netdata's charts, you'll want to know how to [manipulate
 
 One of the most important functions of the standard web dashboard—and all Netdata-created dashboards—is the ability to manipulate charts.
 
-Netdata synchronizes manipulations across all its charts. If you zoom into one, the rest will zoom as well. If you select a timeframe, Netdata will select that timeframe across all charts. This even works across different Netdata agents, and their respective dashboards, if you connect them together using the [node menu](registry#registry)!
+Netdata synchronizes manipulations across all its charts. If you zoom into one, the rest will zoom as well. If you select a timeframe, Netdata will select that timeframe across all charts. This even works across different Netdata agents, and their respective dashboards, if you connect them together using the [node menu](../registry)!
 
 The dashboard includes a number of ways to manipulate charts, each of which can be initiated using one or more methods:
 
