@@ -26,9 +26,11 @@ blind_arch_grep_install() {
 blind_arch_grep_install || echo "Workaround failed, proceed as usual"
 
 running_os="$(cat /etc/os-release |grep '^ID=' | cut -d'=' -f2 | sed -e 's/"//g')"
+# Special case for older centos
+[[ -f /etc/centos-release ]] && [[ -z "${running_os}" ]] && running_os="$(cat /etc/centos-release | grep "CentOS release 6" | cut -d' ' -f 1)"
 
 case "${running_os}" in
-"centos"|"fedora")
+"centos"|"fedora"|"CentOS")
 	echo "Running on CentOS, updating YUM repository.."
 	yum clean all
 	yum update -y

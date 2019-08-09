@@ -322,7 +322,7 @@ download_go() {
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.7.0"
+	GO_PACKAGE_VERSION="v0.8.0"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
@@ -348,7 +348,7 @@ install_go() {
 			fi
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
 
@@ -374,7 +374,9 @@ install_go() {
 
 		# Install files
 		tar -xf "${tmp}/config.tar.gz" -C "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/"
-		mv "${tmp}/$GO_PACKAGE_BASENAME" "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+		tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
+		mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+		rm -rf "${tmp}"
 	fi
 	return 0
 }
