@@ -294,15 +294,18 @@ static void backends_objects_cleanup(void *objects_to_clean) {
         freez(*objects->mongodb_database);
         freez(*objects->mongodb_collection);
 
+    /*
+     * pthread_cancel() should have been called for every mongodb thread on netdata exit, but
+     * mongoc_collection_insert_many() does not work correctly when cancelled while it is running,
+     * at least for libmongoc 1.14
+     */
+
         for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
             buffer_free((*objects->mongodb_threads)[i].buffer);
         }
-info("BACKEND: free threads");
         freez(*objects->mongodb_threads);
 
-info("BACKEND: mongodb_cleanup");
         mongodb_cleanup();
-info("BACKEND: End of cleanup");
     }
 #endif
 
@@ -1092,7 +1095,6 @@ void *backends_main(void *ptr) {
                   buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
             if(!netdata_thread_create(&mongodb_threads[i].thread, "BACKENDS[mongodb]", NETDATA_THREAD_OPTION_DONT_LOG, mongodb_insert, (void *)&mongodb_threads[i])) {
-info("BACKEND: start thread %zu", mongodb_threads[i].thread);
                 mongodb_threads[i].busy = 1;
             }
             else {

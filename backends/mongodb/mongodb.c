@@ -74,16 +74,13 @@ struct objects_to_clean {
 static void mongodb_insert_cleanup(void *objects_to_clean) {
     struct objects_to_clean *objects = (struct objects_to_clean *)objects_to_clean;
 
-info("free bson = %p, documens = %zu", *objects->insert, *objects->n_documents);
     free_bson(*objects->insert, *objects->n_documents);
     mongoc_collection_destroy(*objects->collection);
-info("push client = %p", *objects->client);
     mongoc_client_pool_push(mongodb_client_pool, *objects->client);
 
     buffer_flush((*objects->thread_data)->buffer);
 
     netdata_mutex_lock(&(*objects->thread_data)->mutex);
-info("MONGODB: finished = %zu", (*objects->thread_data)->thread);
     (*objects->thread_data)->finished = 1;
     netdata_mutex_unlock(&(*objects->thread_data)->mutex);
 }
@@ -109,7 +106,6 @@ void *mongodb_insert(void *mongodb_thread) {
 
 
     client = mongoc_client_pool_pop(mongodb_client_pool);
-info("pop client = %p", client);
     if(unlikely(!client)) {
         error("BACKEND: failed to create a new client");
         thread_data->error = 1;
@@ -157,11 +153,12 @@ cleanup:
 }
 
 void mongodb_cleanup() {
-// info("MONFODB: pool destroy");
-//     mongoc_client_pool_destroy(mongodb_client_pool);
-info("MONGODB: cleanup");
+    /*
+     * mongoc_client_pool_destroy(mongodb_client_pool) should have been called on netdata exit,
+     * but netdata_thread_cleanup_push() does not work correctly on pthread_cancel(), at least
+     * for libmongoc 1.14, so we rely on the sole mongoc_cleanup() as a workaround
+     */
     mongoc_cleanup();
-info("MONGODB: end of cleanup");
 
     return;
 }
