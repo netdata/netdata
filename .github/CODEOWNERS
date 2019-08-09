@@ -2,48 +2,48 @@
 # This way we prevent modifications which will be overwriten by automation.
 
 # Global (default) code owner
-* @ktsaou @cakrit
+* @ktsaou @cakrit @cosmix
 
 # Ownership by directory structure
-.travis/ @paulkatsoulakis @cakrit
-.github/ @paulkatsoulakis @cakrit
+.travis/ @paulkatsoulakis @cakrit @cosmix
+.github/ @paulkatsoulakis @cakrit @cosmix
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @paulkatsoulakis @thiagoftsm
-build/ @paulkatsoulakis @cakrit
-collectors/ @vlvkobal @mfundul @cakrit
-collectors/charts.d.plugin/ @paulkatsoulakis @cakrit
-collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cakrit
-collectors/macos.plugin/ @vlvkobal @thiagoftsm @cakrit
-collectors/node.d.plugin/ @VLegakis @cakrit
-collectors/node.d.plugin/fronius/ @ccremer @cakrit
-collectors/node.d.plugin/snmp/ @VLegakis @cakrit
-collectors/node.d.plugin/stiebeleltron/ @ccremer @cakrit
+build/ @paulkatsoulakis @cakrit @cosmix
+collectors/ @vlvkobal @mfundul @cakrit @cosmix
+collectors/charts.d.plugin/ @paulkatsoulakis @cakrit @cosmix
+collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cakrit @cosmix
+collectors/macos.plugin/ @vlvkobal @thiagoftsm @cakrit @cosmix
+collectors/node.d.plugin/ @VLegakis @cakrit @cosmix
+collectors/node.d.plugin/fronius/ @ccremer @cakrit @cosmix
+collectors/node.d.plugin/snmp/ @VLegakis @cakrit @cosmix
+collectors/node.d.plugin/stiebeleltron/ @ccremer @cakrit @cosmix
 collectors/python.d.plugin/ @ilyam8
-collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @cakrit
-daemon/ @thiagoftsm @mfundul @cakrit
-database/ @mfundul @thiagoftsm @cakrit
-docs/ @cakrit @joelhans
-health/ @thiagoftsm @vlvkobal @cakrit
-health/health.d/ @thiagoftsm @vlvkobal @cakrit
-health/notifications/ @Ferroin @thiagoftsm @cakrit
-libnetdata/ @thiagofsm @mfundul @cakrit
-packaging/ @paulkatsoulakis @cakrit
-packaging/installer/ @paulkatsoulakis @cakrit
-packaging/makeself/ @paulkatsoulakis @cakrit
-registry/ @VLegakis @cakrit
-streaming/ @thiagoftsm @vlvkobal @cakrit
-web/ @thiagoftsm @mfundul @vlvkobal @cakrit
-web/gui/ @VLegakis @cakrit
+collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm @cakrit @cosmix
+daemon/ @thiagoftsm @mfundul @cakrit @cosmix
+database/ @mfundul @thiagoftsm @cakrit @cosmix
+docs/ @cakrit @cosmix @joelhans
+health/ @thiagoftsm @vlvkobal @cakrit @cosmix
+health/health.d/ @thiagoftsm @vlvkobal @cakrit @cosmix
+health/notifications/ @Ferroin @thiagoftsm @cakrit @cosmix
+libnetdata/ @thiagofsm @mfundul @cakrit @cosmix
+packaging/ @paulkatsoulakis @cakrit @cosmix
+packaging/installer/ @paulkatsoulakis @cakrit @cosmix
+packaging/makeself/ @paulkatsoulakis @cakrit @cosmix
+registry/ @VLegakis @cakrit @cosmix
+streaming/ @thiagoftsm @vlvkobal @cakrit @cosmix
+web/ @thiagoftsm @mfundul @vlvkobal @cakrit @cosmix
+web/gui/ @VLegakis @cakrit @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
-*.md @cakrit @joelhans
+*.md @cakrit @cosmix @joelhans
 *.am @paulkatsoulakis
 
 # Ownership of specific files
-.gitignore @paulkatsoulakis @cakrit
+.gitignore @paulkatsoulakis @cakrit @cosmix
 .travis.yml @paulkatsoulakis
 .lgtm.yml @paulkatsoulakis
 .eslintrc @paulkatsoulakis
@@ -52,10 +52,10 @@ web/gui/ @VLegakis @cakrit
 .codeclimate.yml @paulkatsoulakis
 .codacy.yml @paulkatsoulakis
 netdata.spec.in @paulkatsoulakis
-netdata-installer.sh @paulkatsoulakis @cakrit
-netlify.toml @cakrit
+netdata-installer.sh @paulkatsoulakis @cakrit @cosmix
+netlify.toml @cakrit @cosmix
 package.json @VLegakis
 packaging/version @netdatabot
 
-LICENSE.md @cakrit @joelhans
+LICENSE.md @cakrit @cosmix @joelhans
 CHANGELOG.md @netdatabot
