@@ -115,7 +115,7 @@ For example, if your Netdata server listens at `http://box:19999/`, you will nee
 <script type="text/javascript" src="http://box:19999/dashboard.js"></script>
 ```
 
-### what dashboard.js does?
+### What does dashboard.js do?
 
 `dashboard.js` will automatically load the following:
 

@@ -22,13 +22,13 @@ Netdata synchronizes manipulations across all its charts. If you zoom into one, 
 
 The dashboard includes a number of ways to manipulate charts, each of which can be initiated using one or more methods:
 
-| Manipulation | Method #1 | Method #2 | Method #3
-| --- | --- | --- | --- | ---
-| **Reset** charts to default auto-refreshing state | `double click` | `double tap` (touchpad/touchscreen)
-| **Select** a certain timeframe | `ALT` + `mouse selection` | `⌘` + `mouse selection` (macOS)
-| **Pan** forward or back in time | `click and drag` | `touch and drag` (touchpad/touchscreen)
-| **Zoom** to a specific timeframe | `SHIFT` + `mouse selection`
-| **Zoom** in/out | `SHIFT`/`ALT` + `mouse scrollwheel` | `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen) | `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen)
+| Manipulation 	| Method #1 	| Method #2 	| Method #3 	|
+|---------------------------------------------------	|-------------------------------------	|-----------------------------------------------------------	|------------------------------------------------------------	|
+| **Reset** charts to default auto-refreshing state 	| `double click` 	| `double tap` (touchpad/touchscreen) 	|  	|
+| **Select** a certain timeframe 	| `ALT` + `mouse selection` 	| `⌘` + `mouse selection` (macOS) 	|  	|
+| **Pan** forward or back in time 	| `click and drag` 	| `touch and drag` (touchpad/touchscreen) 	|  	|
+| **Zoom** to a specific timeframe 	| `SHIFT` + `mouse selection` 	|  	|  	|
+| **Zoom** in/out 	| `SHIFT`/`ALT` + `mouse scrollwheel` 	| `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen) 	| `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen) 	|
 
 Here's how the chart synchronziation looks while zooming and panning:
 

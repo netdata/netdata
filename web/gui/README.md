@@ -1,4 +1,4 @@
-# The standard Netdata web dashboard
+# The standard web dashboard
 
 The standard web dashbboard is the heart of Netdata's performance troubleshooting toolkit. You've probably seen it before:
 
@@ -10,29 +10,35 @@ Netdata uses an [internal, static-threaded web server](../server/) to host the H
 
 ## Navigating the standard dashboard
 
-Beyond charts, the standard dashboard can be broken down into a few key areas: sections, menus/submenus, and the nodes menu.
+Beyond charts, the standard dashboard can be broken down into three key areas:
 
-> > > Annotated screenshot of the dashboard
+1. [**Sections**](#sections)
+2. [**Menus/submenus**](#menus)
+3. [**Nodes menu**](#nodes-menu)
+
+![Annotated screenshot of the dashboard](https://user-images.githubusercontent.com/1153921/62810777-ef681980-bab3-11e9-9310-ec7a0c9f4faa.png)
 
 ### Sections
 
 Netdata is broken up into multiple **sections**, such as **System Overview**, **CPU**, **Disk**, and more. Inside each section you'll find a number of charts, broken down into [contexts](../README.md#contexts) and [families](../README.md#families).
 
-> > > screenshot of a section
+An example of the **Memory** section on a Linux desktop system.
 
-All sections and their associated charts appear on a single "page," so all you need to do to view different sections is scroll up and down the page. But it's usually quicker to use the [menu](#menus).
+![Screenshot of the Memory section of the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62811044-1410c100-bab5-11e9-91cc-414cf6c23985.png)
+
+All sections and their associated charts appear on a single "page," so all you need to do to view different sections is scroll up and down the page. But it's usually quicker to use the [menus](#menus).
 
 ### Menus
 
 **Menus** appears on the right-hand side of the standard dashboard. Netdata generates a menu for each section, and menus link to the section they're associated with.
 
-> > > screenshot of the menu
+![Screenshot of the menu](https://user-images.githubusercontent.com/1153921/62811361-38b96880-bab6-11e9-8d41-4d9b29778e86.png)
 
 Most menu items will contain a number of **submenu** entries, which represent any [families](../README.md#families) from that section. Netdata automatically generates these submenu entries.
 
 Here's a **Disks** menu with a number of submenu entries for each disk drive and partition Netdata recognizes.
 
-> > > screenshot of some submenus
+![Screenshot of some submenus](https://user-images.githubusercontent.com/1153921/62811428-70281500-bab6-11e9-9a61-ecd0a7aba453.png)
 
 ### Nodes menu
 
@@ -40,13 +46,11 @@ The nodes menu appears in the top-left corner of the standard dashboard and is l
 
 Clicking on it will display a drop-down menu of any nodes you might have connected together via the [Netdata registry](../../registry/). By default, you'll find nothing under the **My nodes** heading, but you can try out any of the demo Netdata nodes to see how the nodes menu works.
 
-> > > replace this image
+![Screenshot of the default (empty) nodes menu](https://user-images.githubusercontent.com/1153921/62795508-c3d13900-ba8b-11e9-98ed-f0be1b201340.png)
 
-![Screenshot of the default (empty) nodes menu](https://user-images.githubusercontent.com/1153921/62741606-5cb27680-b9f0-11e9-9f77-517f321b4dd5.png)
+Once you add nodes via [Netdata Cloud](../../docs/netdata-cloud/) or a [private registry](../../registry/#run-your-own-registry), you will see them appear under the **My nodes** heading.
 
-Once you add nodes via [Netdata Cloud]() or a [private registry](../../registry/#run-your-own-registry), you will see them appear under the **My nodes** heading.
-
-> > > screenshot of a filled my nodes list
+![Screenshot of a populated nodes menu](https://user-images.githubusercontent.com/1153921/62795509-c3d13900-ba8b-11e9-8459-e85bf71f7ceb.png)
 
 ## Customizing the standard dashboard
 
@@ -65,13 +69,24 @@ netdataDashboard.menu = {
 
 If you want to customize this information, you should avoid editing `dashboard_info.js` directly. These changes are not persistent; Netdata will overwrite the file when it's updated. Instead, you should create a new file with your customizations.
 
-We created an example file at [`dashboard_info_custom_example.js`](dashboard_info_custom_example.js). You can copy this to a new file with a name of your choice in the `web/` directory.
+We created an example file at [`dashboard_info_custom_example.js`](dashboard_info_custom_example.js). You can copy this to a new file with a name of your choice in the `web/` directory. This directory changes based on your operating system and installation method, but on Linux systems is most often found at `/usr/share/netdata/web/`.
 
 ```
+cd /usr/share/netdata/web/
 sudo cp dashboard_info_custom_example.js your_dashboard_info_file.js
 ```
 
-> > > > FiGURE OUT WHY THIS IS BROKEN. TRY ON LINUX.
+Edit the file with your customizations. For example:
+
+```
+customDashboard.menu = {
+    'system': {
+        title: 'Testing, testing, 1 2 3',
+        icon: '<i class="fas fa-thumbs-up"></i>',
+        info: 'This is overwritten info for the system overview section!'
+    },
+};
+```
 
 Finally, tell Netdata where you've put your customization file by replacing `your_dashboard_info_file.js` below.
 
@@ -79,6 +94,10 @@ Finally, tell Netdata where you've put your customization file by replacing `you
 [web]
    custom dashboard_info.js = your_dashboard_info_file.js
 ```
+
+Once you restart Netdata, refresh the dashboard to find your custom configuration:
+
+![Screenshot of overwritten text from dashboard_info.js file](https://user-images.githubusercontent.com/1153921/62798924-570e6c80-ba94-11e9-9578-869753bec39c.png)
 
 ## Custom dashboards
 
