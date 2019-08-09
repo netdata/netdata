@@ -4,31 +4,61 @@ import classNames from "classnames"
 import Dygraph from "dygraphs"
 
 import { Attributes } from "../../utils/transformDataAttributes"
-import { chartLibrariesSettings, ChartLibraryName } from "../../utils/chartLibrariesSettings"
+import {
+  chartLibrariesSettings,
+  ChartLibraryConfig,
+  ChartLibraryName,
+} from "../../utils/chartLibrariesSettings"
 import { ChartData, ChartDetails } from "../../chart-types"
 
-const getDygraphOptions = (
+import "./dygraph-chart.css"
+
+interface GetDygraphOptions {
   attributes: Attributes,
+  chartData: ChartData,
+  chartDetails: ChartDetails,
+  chartSettings: ChartLibraryConfig,
+  hiddenLabelsElementId: string,
   orderedColors: string[],
-) => {
-  const dygraphChartType = "stacked" // todo
-  const isSparkline = true // todo
+}
+const getDygraphOptions = ({
+  attributes,
+  chartData,
+  chartDetails,
+  chartSettings,
+  hiddenLabelsElementId,
+  orderedColors,
+}: GetDygraphOptions) => {
+  const isSparkline = attributes.dygraphTheme === "sparkline"
   const highlightCircleSize = isSparkline ? 3 : 4
-  // let smooth = NETDATA.dygraph.smooth
-  //   ? (NETDATA.dataAttributeBoolean(state.element, 'dygraph-smooth', (state.tmp.dygraph_chart_type === 'line' && NETDATA.chartLibraries.dygraph.isSparkline(state) === false)))
-  //   : false;
-  const smooth: boolean = false
+
+  const isLogScale = (chartSettings.isLogScale as ((a: Attributes) => boolean))(attributes)
+  const {
+    dygraphType: dygraphRequestedType = chartDetails.chart_type,
+  } = attributes
+  // corresponds to state.tmp.dygraph_chart_type in old app
+  let dygraphChartType = dygraphRequestedType
+  if (dygraphChartType === "stacked" && chartData.dimensions === 1) {
+    dygraphChartType = "area"
+  }
+  if (dygraphChartType === "stacked" && isLogScale) {
+    dygraphChartType = "area"
+  }
+  const {
+    dygraphSmooth = dygraphChartType === "line"
+      && !isSparkline,
+  } = attributes
   const {
     dygraphColors = orderedColors,
     dygraphRightGap = 5,
     dygraphShowRangeSelector = false,
     dygraphShowRoller = false,
-    dygraphTitle = "dygraph title", // todo get from state.title
+    dygraphTitle = attributes.title || chartDetails.title,
     dygraphTitleHeight = 19,
     dygraphLegend = "always",
-    // dygraphLabelsDiv = "labelsdiv", // todo state.element_legend_childs.hidden
-    dygraphLabelsDiv, // todo state.element_legend_childs.hidden
+    dygraphLabelsDiv = hiddenLabelsElementId,
     dygraphLabelsSeparateLine = true,
+    dygraphIncludeZero = dygraphChartType === "stacked",
     dygraphShowZeroValues = true,
     dygraphShowLabelsOnHighLight = true,
     dygraphHideOverlayOnMouseOut = true,
@@ -40,20 +70,22 @@ const getDygraphOptions = (
     dygraphStrokeWidth = dygraphChartType === "stacked"
       ? 0.1
       // @ts-ignore
-      : (smooth === true
+      : (dygraphSmooth === true
         ? 1.5
         : 0.7),
 
     dygraphStrokePattern,
-    // dygraphDrawPoints = false,
+    dygraphDrawPoints = false,
     dygraphDrawGapEdgePoints = true,
-    dygraphConnectSeparatedPoints = false, // todo
+    dygraphConnectSeparatedPoints = false,
     dygraphPointSize = 1,
     dygraphStepPlot = false,
     dygraphStrokeBorderColor = window.NETDATA.themes.current.background,
-    // dygraphStrokeBorderWidth, // todo
-    // dygraphFillGraph, // todo
-    // dygraphFillAlpha // todo
+    dygraphStrokeBorderWidth = 0,
+    dygraphFillGraph = (dygraphChartType === "area" || dygraphChartType === "stacked"),
+    dygraphFillAlpha = dygraphChartType === "stacked"
+      ? window.NETDATA.options.current.color_fill_opacity_stacked
+      : window.NETDATA.options.current.color_fill_opacity_area,
     dygraphStackedGraph = dygraphChartType === "stacked",
     dygraphStackedGraphNanFill = "none",
     dygraphDrawAxis = true,
@@ -71,9 +103,9 @@ const getDygraphOptions = (
     dygraphHighlightSeriesOpts,
     dygraphHighlightSeriesBackgroundAlpha,
   } = attributes
-  const isLogScale = false // todo
-  const includeZero = true // todo
-  const yLabel = "yLabel" // todo (state.unts_current)
+  const yLabel = "percentage" // todo (state.unts_current)
+  // todo lift the state
+  const visibility = chartData.dimension_names.map(() => true)
   return {
     colors: dygraphColors,
 
@@ -84,7 +116,7 @@ const getDygraphOptions = (
     title: dygraphTitle,
     titleHeight: dygraphTitleHeight,
     legend: dygraphLegend, // we need this to get selection events
-    // labels: data.result.labels, // todo
+    labels: chartData.result.labels,
     labelsDiv: dygraphLabelsDiv,
 
     labelsSeparateLines: dygraphLabelsSeparateLine,
@@ -93,7 +125,7 @@ const getDygraphOptions = (
     labelsKMG2: false,
     showLabelsOnHighlight: dygraphShowLabelsOnHighLight,
     hideOverlayOnMouseOut: dygraphHideOverlayOnMouseOut,
-    includeZero,
+    includeZero: dygraphIncludeZero,
     xRangePad: dygraphXRangePad,
     yRangePad: dygraphYRangePad,
     valueRange: dygraphValueRange,
@@ -105,7 +137,6 @@ const getDygraphOptions = (
 
     // The width of the lines connecting data points.
     // This can be used to increase the contrast or some graphs.
-
     strokeWidth: dygraphStrokeWidth,
     strokePattern: dygraphStrokePattern,
 
@@ -113,17 +144,12 @@ const getDygraphOptions = (
     // A dot is always drawn when a point is "isolated",
     // i.e. there is a missing point on either side of it.
     // This also controls the size of those dots.
-    // drawPoints: dygraphDrawPoints,
+    drawPoints: dygraphDrawPoints,
 
     // Draw points at the edges of gaps in the data.
     // This improves visibility of small data segments or other data irregularities.
     drawGapEdgePoints: dygraphDrawGapEdgePoints,
-
-    // todo
-    connectSeparatedPoints: isLogScale
-      ? false
-      : dygraphConnectSeparatedPoints,
-
+    connectSeparatedPoints: isLogScale ? false : dygraphConnectSeparatedPoints,
     pointSize: dygraphPointSize,
 
     // enabling this makes the chart with little square lines
@@ -132,16 +158,9 @@ const getDygraphOptions = (
     // Draw a border around graph lines to make crossing lines more easily
     // distinguishable. Useful for graphs with many lines.
     strokeBorderColor: dygraphStrokeBorderColor,
-
-    // todo
-    // strokeBorderWidth: NETDATA.dataAttribute(state.element, 'dygraph-strokeborderwidth', (state.tmp.dygraph_chart_type === 'stacked') ? 0.0 : 0.0),
-    // todo
-    // fillGraph: NETDATA.dataAttribute(state.element, 'dygraph-fillgraph', (state.tmp.dygraph_chart_type === 'area' || state.tmp.dygraph_chart_type === 'stacked')),
-    // fillAlpha: NETDATA.dataAttribute(state.element, 'dygraph-fillalpha',
-    //   ((state.tmp.dygraph_chart_type === 'stacked')
-    //     ? NETDATA.options.current.color_fill_opacity_stacked
-    //     : NETDATA.options.current.color_fill_opacity_area)
-    // ),
+    strokeBorderWidth: dygraphStrokeBorderWidth,
+    fillGraph: dygraphFillGraph,
+    fillAlpha: dygraphFillAlpha,
     stackedGraph: dygraphStackedGraph,
     stackedGraphNaNFill: dygraphStackedGraphNanFill,
     drawAxis: dygraphDrawAxis,
@@ -155,17 +174,11 @@ const getDygraphOptions = (
     maxNumberWidth: dygraphMaxNumberWidth,
     sigFigs: dygraphSigFigs,
     digitsAfterDecimal: dygraphDigitsAfterDecimal,
-    // removed (because it's a function)
-    // valueFormatter: NETDATA.dataAttribute(state.element, 'dygraph-valueformatter', undefined),
     highlightCircleSize: dygraphHighlighCircleSize,
     highlightSeriesOpts: dygraphHighlightSeriesOpts, // TOO SLOW: { strokeWidth: 1.5 },
     // TOO SLOW: (state.tmp.dygraph_chart_type === 'stacked')?0.7:0.5,
     highlightSeriesBackgroundAlpha: dygraphHighlightSeriesBackgroundAlpha,
-    // removed (because it's a function)
-    // pointClickCallback: NETDATA.dataAttribute(state.element, 'dygraph-pointclickcallback', undefined),
-    // todo
-    // visibility: state.dimensions_visibility.selected2BooleanArray(state.data.dimension_names),
-    // there was a bug previously, value "y" was used instead of true // todo check that
+    visibility,
     logscale: isLogScale,
   }
 }
@@ -175,24 +188,33 @@ interface Props {
   chartData: ChartData
   chartDetails: ChartDetails
   chartLibrary: ChartLibraryName
+  chartUuid: string
   colors: {
     [key: string]: string
   }
-  chartUuid: string
   orderedColors: string[]
 }
 export const DygraphChart = ({
   attributes,
   chartData,
-  // chartDetails,
+  chartDetails,
   chartLibrary,
   // colors,
   chartUuid,
   orderedColors,
 }: Props) => {
   const chartElement = useRef<HTMLDivElement>(null)
+  const chartSettings = chartLibrariesSettings[chartLibrary]
+  const hiddenLabelsElementId = `${chartUuid}-hidden-labels-id`
 
-  const dygraphOptions = getDygraphOptions(attributes, orderedColors)
+  const dygraphOptions = getDygraphOptions({
+    attributes,
+    chartData,
+    chartDetails,
+    chartSettings,
+    hiddenLabelsElementId,
+    orderedColors,
+  })
 
   useLayoutEffect(() => {
     if (chartElement && chartElement.current) {
@@ -201,22 +223,24 @@ export const DygraphChart = ({
     }
   }, [chartData.result.data, dygraphOptions])
   const chartElemId = `${chartLibrary}-${chartUuid}-chart`
-  const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
   return (
-    <div
-      ref={chartElement}
-      id={chartElemId}
-      className={hasLegend
-        ? classNames(
-          "netdata-chart-with-legend-right",
-          `netdata-${chartLibrary}-chart-with-legend-right`,
-        )
-        : classNames(
-          "netdata-chart",
-          `netdata-${chartLibrary}-chart`,
-        )
-      }
-    />
+    <>
+      <div
+        ref={chartElement}
+        id={chartElemId}
+        className={hasLegend
+          ? classNames(
+            "netdata-chart-with-legend-right",
+            `netdata-${chartLibrary}-chart-with-legend-right`,
+          )
+          : classNames(
+            "netdata-chart",
+            `netdata-${chartLibrary}-chart`,
+          )
+        }
+      />
+      <div className="dygraph-chart__labels-hidden" id={hiddenLabelsElementId} />
+    </>
   )
 }

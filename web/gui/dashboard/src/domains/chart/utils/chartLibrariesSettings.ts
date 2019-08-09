@@ -8,6 +8,7 @@ export interface ChartLibraryConfig {
   aspectRatio?: number
   hasLegend: (attributes: Attributes) => boolean
   hasToolboxPanAndZoom: boolean
+  isLogScale?: (attributes: Attributes) => boolean
   trackColors: boolean
   xssRegexIgnore: RegExp
 }
@@ -42,8 +43,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
       // not using __hasLegendCache__ as in old-dashboard, because performance tweaks like this
       // probably won't be needed in react app
       const isSparkline = attributes.dygraphTheme === "sparkline"
-      // return !!isSparkline
-      return !isSparkline && (attributes.legend as boolean)
+      return !isSparkline && attributes.legend
     },
     // autoresize(state) {
     //   void (state)
@@ -57,12 +57,9 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     // pixels_per_point(state) {
     //   return (this.isSparkline(state) === false) ? 3 : 2
     // },
-    // isLogScale(state) {
-    //   if (typeof state.tmp.dygraph_logscale === "undefined") {
-    //     state.tmp.dygraph_logscale = (this.theme(state) === "logscale")
-    //   }
-    //   return state.tmp.dygraph_logscale
-    // },
+    isLogScale(attributes: Attributes) {
+      return attributes.dygraphTheme === "logscale"
+    },
     // container_class(state) {
     //   if (this.legend(state) !== null) {
     //     return "netdata-container-with-legend"

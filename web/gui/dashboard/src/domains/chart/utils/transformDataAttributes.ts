@@ -87,27 +87,30 @@ export interface Attributes {
   colors: string | undefined
   commonColors: string | undefined
 
-  dygraphValueRange: any[]
-  dygraphTheme: string
+  dygraphType: string | undefined
+  dygraphValueRange: any[] | undefined
+  dygraphTheme: string | undefined
+  dygraphSmooth: boolean | undefined
   dygraphColors: string[] | undefined
-  dygraphRightGap: number
-  dygraphShowRangeSelector: boolean
-  dygraphShowRoller: boolean
+  dygraphRightGap: number | undefined
+  dygraphShowRangeSelector: boolean | undefined
+  dygraphShowRoller: boolean | undefined
   dygraphTitle: string | undefined
-  dygraphTitleHeight: number
+  dygraphTitleHeight: number | undefined
   dygraphLegend: "always" | "follow" | "onmouseover" | "never" | undefined
   dygraphLabelsDiv: string | undefined
-  dygraphLabelsSeparateLine: boolean
-  dygraphShowZeroValues: boolean
-  dygraphShowLabelsOnHighLight: boolean
-  dygraphHideOverlayOnMouseOut: boolean
-  dygraphXRangePad: number
-  dygraphYRangePad: number
-  dygraphYLabelWidth: number
+  dygraphLabelsSeparateLine: boolean | undefined
+  dygraphIncludeZero: boolean | undefined
+  dygraphShowZeroValues: boolean | undefined
+  dygraphShowLabelsOnHighLight: boolean | undefined
+  dygraphHideOverlayOnMouseOut: boolean | undefined
+  dygraphXRangePad: number | undefined
+  dygraphYRangePad: number | undefined
+  dygraphYLabelWidth: number | undefined
   dygraphStrokeWidth: number | undefined
   dygraphStrokePattern: number[] | undefined
-  dygraphDrawPoints: boolean
-  dygraphDrawGapEdgePoints: boolean
+  dygraphDrawPoints: boolean | undefined
+  dygraphDrawGapEdgePoints: boolean | undefined
   dygraphConnectSeparatedPoints: boolean | undefined
   dygraphPointSize: number | undefined
   dygraphStepPlot: boolean | undefined
@@ -151,7 +154,7 @@ const getAttributesMap = (): AttributesMap => ({
   // todo try to write above rule in TS
   id: { key: "netdata-react" },
   host: { key: "host", defaultValue: window.NETDATA.serverDefault },
-  title: { key: "title", defaultValue: null },
+  title: { key: "title" },
   chartLibrary: { key: "chart-library", defaultValue: window.NETDATA.chartDefaults.library },
   width: { key: "width", defaultValue: window.NETDATA.chartDefaults.width },
   height: { key: "height", defaultValue: window.NETDATA.chartDefaults.height },
@@ -162,46 +165,32 @@ const getAttributesMap = (): AttributesMap => ({
   colors: { key: "colors" },
   commonColors: { key: "common-colors" },
 
-  // dygraph
   // let's not put the default values here, because they will also be needed by the main Agent page
   // and the Cloud App
-  dygraphValueRange: { key: "dygraph-valuerange", defaultValue: [null, null] },
-  dygraphTheme: { key: "dygraph-theme", defaultValue: "default" },
+  dygraphType: { key: "dygraph-type" },
+  dygraphValueRange: { key: "dygraph-valuerange" },
+  dygraphTheme: { key: "dygraph-theme" },
+  dygraphSmooth: { key: "dygraph-smooth", type: "boolean" },
   dygraphColors: { key: "dygraph-colors" }, // not working in original dashboard
-  dygraphRightGap: { key: "dygraph-rightgap", defaultValue: 5 },
-  dygraphShowRangeSelector: {
-    key: "dygraph-showrangeselector", type: "boolean", defaultValue: false,
-  },
-  dygraphShowRoller: { key: "dygraph-showroller", type: "boolean", defaultValue: false },
+  dygraphRightGap: { key: "dygraph-rightgap" },
+  dygraphShowRangeSelector: { key: "dygraph-showrangeselector", type: "boolean" },
+  dygraphShowRoller: { key: "dygraph-showroller", type: "boolean" },
   dygraphTitle: { key: "dygraph-title" },
-  dygraphTitleHeight: { key: "dygraph-titleheight", defaultValue: 19 },
+  dygraphTitleHeight: { key: "dygraph-titleheight" },
   dygraphLegend: { key: "dygraph-legend" },
   dygraphLabelsDiv: { key: "dygraph-labelsdiv" },
-  dygraphLabelsSeparateLine: {
-    key: "dygraph-labelsseparatelines", type: "boolean", defaultValue: true,
-  },
-  dygraphShowZeroValues: {
-    key: "dygraph-labelsshowzerovalues", type: "boolean", defaultValue: true,
-  },
-  dygraphShowLabelsOnHighLight: {
-    key: "dygraph-showlabelsonhighlight", type: "boolean", defaultValue: true,
-  },
-  dygraphHideOverlayOnMouseOut: {
-    key: "dygraph-hideoverlayonmouseout", type: "boolean", defaultValue: true,
-  },
-  dygraphXRangePad: { key: "dygraph-xrangepad", defaultValue: 0 },
-  dygraphYRangePad: { key: "dygraph-yrangepad", defaultValue: 0 },
-  dygraphYLabelWidth: { key: "dygraph-ylabelwidth", defaultValue: 12 },
+  dygraphLabelsSeparateLine: { key: "dygraph-labelsseparatelines", type: "boolean" },
+  dygraphIncludeZero: { key: "dygraph-includezero", type: "boolean" },
+  dygraphShowZeroValues: { key: "dygraph-labelsshowzerovalues", type: "boolean" },
+  dygraphShowLabelsOnHighLight: { key: "dygraph-showlabelsonhighlight", type: "boolean" },
+  dygraphHideOverlayOnMouseOut: { key: "dygraph-hideoverlayonmouseout", type: "boolean" },
+  dygraphXRangePad: { key: "dygraph-xrangepad" },
+  dygraphYRangePad: { key: "dygraph-yrangepad" },
+  dygraphYLabelWidth: { key: "dygraph-ylabelwidth" },
   dygraphStrokeWidth: { key: "dygraph-strokewidth" },
   dygraphStrokePattern: { key: "dygraph-strokepattern" },
-  dygraphDrawPoints: {
-    key: "dygraph-drawpoints", type: "boolean", defaultValue: false,
-  },
-  dygraphDrawGapEdgePoints: {
-    key: "dygraph-drawgapedgepoints", type: "boolean", defaultValue: true,
-  },
-
-
+  dygraphDrawPoints: { key: "dygraph-drawpoints", type: "boolean" },
+  dygraphDrawGapEdgePoints: { key: "dygraph-drawgapedgepoints", type: "boolean" },
   dygraphConnectSeparatedPoints: { key: "dygraph-connectseparatedpoints", type: "boolean" },
   dygraphPointSize: { key: "dygraph-pointsize" },
   dygraphStepPlot: { key: "dygraph-stepplot", type: "boolean" },
