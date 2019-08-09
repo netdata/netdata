@@ -61,7 +61,7 @@ You agree not to engage in any of the following activities:
 
 ### 1. Violating laws and rights:
 
-You may not (a) use any Service for any illegal purpose or in violation of any local, state, national, or international laws, (b) violate or encourage others to violate any right of or obligation to a third party, including by infringing, misappropriating, or violating intellectual property, confidentiality, or privacy rights.
+You may not (a) use any Service for any illegal purpose or in violation of any local, state, national, or international laws, including without limitation U.S. export controls and economic sanctions regulations, or (b) violate or encourage others to violate any right of or obligation to a third party, including by infringing, misappropriating, or violating intellectual property, confidentiality, or privacy rights.
 
 ### 2. Solicitation:
 
