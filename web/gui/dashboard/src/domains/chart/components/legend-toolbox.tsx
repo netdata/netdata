@@ -8,7 +8,7 @@ interface Props {
 export const LegendToolbox = ({ // eslint-disable-line no-empty-pattern
 
 }: Props) => (
-  <div>
+  <div className="netdata-legend-toolbox">
     <div className="netdata-legend-toolbox-button">
       <Icon iconType="left" />
     </div>
