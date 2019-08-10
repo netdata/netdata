@@ -245,7 +245,7 @@ void health_agregate_alarms(RRDHOST *host, BUFFER *wb, uint32_t hash_context, ch
             status = rc->status;
     }
 
-    buffer_sprintf(wb, "\t{%s:'%s'}", context, rrdcalc_status2string(status));
+    buffer_sprintf(wb, "\t{\"context\": \"%s\", \"status\":\"%s\"}", context, rrdcalc_status2string(status));
     rrdhost_unlock(host);
 }
 

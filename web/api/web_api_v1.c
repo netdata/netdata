@@ -217,7 +217,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     int i = 0;
 
     buffer_flush(w->response.data);
-    buffer_sprintf(w->response.data, "{\n");
+    buffer_sprintf(w->response.data, "[\n");
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -229,16 +229,21 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 
         debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
 
-        if(likely(i))
-            buffer_strcat(w->response.data, ",\n");
-
         if(likely(!strcmp(name, "context"))) {
-            health_agregate_alarms(host, w->response.data, simple_hash(value), value);
-            i++;
+            char *tok;
+            while(value && *value && (tok = mystrsep(&value, ", |"))) {
+                if(!*tok) continue;
+
+                if(likely(i))
+                    buffer_strcat(w->response.data, ",\n");
+
+                health_agregate_alarms(host, w->response.data, simple_hash(tok), tok);
+                i++;
+            }
         }
     }
 
-    buffer_sprintf(w->response.data, "\n}\n");
+    buffer_sprintf(w->response.data, "\n]\n");
     w->response.data->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(w->response.data);
     return 200;

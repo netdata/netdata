@@ -430,6 +430,33 @@ paths:
             type: array
             items:
               $ref: '#/definitions/alarm_log_entry'
+  /alarm_count:
+    get:
+      summary: 'Get an overall status of the chart'
+      description: |
+        Check multiple charts with the same context and aggregate their health statistics into one metric/status. The alarm_count endpoint returns the status with the maximum severity for all charts families in the given context. 
+        
+        The lowest severity for the chart status is REMOVED and the highest is CRITICAL. For example, cpu.cpu context groups as many charts as many cpu cores exists on the system, i.e. cpu.cpu0, cpu.cpu1 etc.  If at least one core is 100% utilized then alarm_count endpoint will return CRITICAL status.
+      parameters:
+        - in: query
+          name: context
+          description: "Specify context which should be checked"
+          required: false
+          allowEmptyValue: true
+          type: array
+          items:
+            type: string
+            collectionFormat: pipes
+          default: ['cpu.cpu']
+      responses:
+        '200':
+          description: 'An object containing a list of contexts and their max severity alarms'
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/alarm_count_entry'
+        '500':
+          description: 'Internal server error. This usually means the server is out of memory.'
   /manage/health:
     get:
       summary: 'Accesses the health management API to control health checks and notifications at runtime.'
@@ -921,6 +948,13 @@ definitions:
                 format: nullable
               value: 
                 type: number
+  alarm_count_entry:
+    type: object
+    properties:
+      context:
+        type: string
+      status:
+        type: string
   alarm_log_entry:
     type: object
     properties: 
