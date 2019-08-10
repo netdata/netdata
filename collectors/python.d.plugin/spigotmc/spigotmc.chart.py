@@ -52,7 +52,7 @@ _TPS_REGEX = re.compile(
     re.X
 )
 _LIST_REGEX = re.compile(
-    r'(\d+)',  # Current user count.
+    r'[^§](\d+)(?:.*?(?=/).*?[^§](\d+))?',  # Current user count.
     re.X
 )
 
@@ -140,7 +140,13 @@ class Service(SimpleService):
                 raw = self.console.command(COMMAND_ONLINE)
                 match = _LIST_REGEX.search(raw)
             if match:
-                data['users'] = int(match.group(1))
+                users = int(match.group(1))
+                hidden_users = match.group(2)
+                if hidden_users:
+                    hidden_users = int(hidden_users)
+                else:
+                    hidden_users = 0
+                data['users'] = users + hidden_users
             else:
                 if not raw:
                     self.error("'{0}' and '{1}' commands returned no value, make sure you set correct password".format(
