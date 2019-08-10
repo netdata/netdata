@@ -85,6 +85,7 @@ class Service(SimpleService):
         self.console.connect(self.host, self.port, self.password)
 
     def reconnect(self):
+        self.error('try reconnect.')
         try:
             try:
                 self.console.disconnect()
@@ -99,7 +100,7 @@ class Service(SimpleService):
         return True
 
     def is_alive(self):
-        if not any(
+        if any(
             [
                 not self.alive,
                 self.console.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1
