@@ -5,7 +5,6 @@ import $ from "jquery"
 
 import { Portals } from "./domains/chart/components/portals"
 import "./types/global"
-import "./App.css"
 
 // with this syntax it loads asynchronously, after window. assignments are done
 // @ts-ignore
@@ -39,17 +38,6 @@ const App: React.FC = () => { // eslint-disable-line arrow-body-style
   return (
     <div className="App">
       <Portals />
-      <header className="App-header">
-        React app
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
     </div>
   )
 }
