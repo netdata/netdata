@@ -112,6 +112,7 @@ interface Window {
   Ps: any // perfect scrollbar
   $: jQuery
   jQuery: jQuery
+  smoothPlotter: () => void
 
   // user configuration options
   netdataNoBootstrap: boolean | undefined

@@ -2,6 +2,7 @@
 import React, { useLayoutEffect, useRef } from "react"
 import classNames from "classnames"
 import Dygraph from "dygraphs"
+import "dygraphs/src/extras/smooth-plotter"
 
 import { Attributes } from "../../utils/transformDataAttributes"
 import {
@@ -69,7 +70,6 @@ const getDygraphOptions = ({
     // eslint-disable-next-line no-nested-ternary
     dygraphStrokeWidth = dygraphChartType === "stacked"
       ? 0.1
-      // @ts-ignore
       : (dygraphSmooth === true
         ? 1.5
         : 0.7),
@@ -133,7 +133,7 @@ const getDygraphOptions = ({
     yLabelWidth: dygraphYLabelWidth,
 
     // the function to plot the chart
-    plotter: null,
+    plotter: (dygraphSmooth && window.NETDATA.options.current) ? window.smoothPlotter : null,
 
     // The width of the lines connecting data points.
     // This can be used to increase the contrast or some graphs.
