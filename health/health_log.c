@@ -78,7 +78,6 @@ inline void health_log_rotate(RRDHOST *host) {
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
 
-    fprintf(stderr,"KILLME ALARM LOG SAVE %s: %d\n",ae->chart, ae->new_status);
     if(likely(host->health_log_fp)) {
         if(unlikely(fprintf(host->health_log_fp
                             , "%c\t%s"
@@ -330,8 +329,6 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
             ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
-            fprintf(stderr,"KILLME HEALTH ALARM LOG READ %s: %d\n",ae->chart, ae->new_status);
-
             // add it to host if not already there
             if(unlikely(*pointers[0] == 'A')) {
                 ae->next = host->health_log.alarms;
@@ -536,7 +533,6 @@ inline void health_alarm_log(
     }
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
-    fprintf(stderr,"KILLME ALARM LOG %s: %d\n",ae->chart, ae->new_status);
     health_alarm_log_save(host, ae);
 }
 
@@ -548,7 +544,6 @@ inline void health_alarm_log(
  * @param ae the alarm entry that will be cleaned.
  */
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    fprintf(stderr,"KILLME ALARM FREE NO CHECKS %s: %d\n", ae->chart, ae->new_status);
     freez(ae->name);
     freez(ae->chart);
     freez(ae->family);
@@ -577,7 +572,6 @@ inline void health_alarm_log_free(RRDHOST *host) {
 
     ALARM_ENTRY *ae;
     while((ae = host->health_log.alarms)) {
-        fprintf(stderr,"KILLME ALARM FREE %s: %d\n", ae->chart, ae->new_status);
         host->health_log.alarms = ae->next;
         health_alarm_log_free_one_nochecks_nounlink(ae);
     }

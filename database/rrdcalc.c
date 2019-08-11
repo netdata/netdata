@@ -83,7 +83,6 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
 
     if(!rrdcalc_isrepeating(rc)) {
         time_t now = now_realtime_sec();
-        fprintf(stderr,"KILLME LINK %s: %s\n",rc->chart, rc->name);
         ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc->id,
@@ -146,7 +145,6 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     if(!rrdcalc_isrepeating(rc)) {
         time_t now = now_realtime_sec();
-        fprintf(stderr,"KILLME UNLINK %s: %s", rc->chart, rc->name);
         ALARM_ENTRY *ae = health_create_alarm_entry(
                 host,
                 rc->id,

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+#The health directory to put the alarms
+HEALTHDIR="@configdir_POST@/health.d/"
+
+#output directory
+OUTDIR="alarms/"
+
+#url to do download
+MURL="http://localhost:19999/api/v1/alarm_log"
+
+#error messages
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NOCOLOR='\033[0m'
+
+change_alarm_file() {
+  if [ -f "$1" ]; then
+    rm "$1"
+  fi
+
+  #copy keeping the permissions
+  cp -a "$2" "$3"
+}
+
+get_the_logs() {
+  curl -v -k --create-dirs -o "$OUTDIR/$1.out" "$MURL" 2> "$OUTDIR/$1.err"
+  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out"
+}
+
+process_data() {
+  netdata
+  echo -e "${NOCOLOR}Sleeping during 120 seconds to create alarm entries"
+  sleep 120
+  killall netdata
+  get_the_logs "$1"
+}
+
+mkdir "$OUTDIR"
+CREATEDIR="$?"
+if [ "$CREATEDIR" -ne "0" ]; then
+  echo  -e "${RED}Cannot create the output directory, it already exists. The test will overwrite previous results."
+fi
+
+
+change_alarm_file "./0" "ram.conf" "$HEALTHDIR/ram.conf"
+#process_data "ram"
+
+echo  -e "${GREEN} all the tests were sucessful"

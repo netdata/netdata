@@ -179,7 +179,6 @@ static inline RRDCALC_STATUS rrdcalc_value2status(calculated_number n) {
 static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
 
-    fprintf(stderr,"KILLME FIFTH ST %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
     if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
         // do not send notifications for internal statuses
         debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (internal statuses)", ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
@@ -193,12 +192,10 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         goto done;
     }
 
-    fprintf(stderr,"KILLME FIFTH ND %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
     // find the previous notification for the same alarm
     // which we have run the exec script
     // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
     if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
-        fprintf(stderr,"KILLME FIFTH ND RD STEP 1 %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
         uint32_t id = ae->alarm_id;
         ALARM_ENTRY *t;
         for(t = ae->next; t ; t = t->next) {
@@ -206,16 +203,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                 break;
         }
 
-        /**
-         * IT IS NECESSARY TO COMPARE THE OLD_STATUS WITH NEW_STATUS TOO
-         *
-         * THE OLDEST CODE SELECT THE FIRST GROUP, BUT THE NEWEST GO DIRECT FOR THE ELSE
-         * THE SYSTEM IS MISSING THE HEALTH_ENTRY_FLAG_EXEC_RUN THAT IS SET IN RC BUT WAS NOT TRANSFER
-         * SO IT IS NECESSARY TO CHECK THE MOTIVE IT IS NOT BEING SET ON IT.
-         * CASE IT IS NOT SET DIRECT IN THE RC, I WILL NEED TO SET IT IN THE AE OR CHANGE THE UNLIKE IN THE ELSE.
-         */
         if(likely(t)) {
-            fprintf(stderr,"KILLME FIFTH ND RD STEP 2 %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
             // we have executed this alarm notification in the past
             if(t && t->new_status == ae->new_status) {
                 // don't send the notification for the same status again
@@ -225,17 +213,15 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             }
         }
         else {
-            fprintf(stderr,"KILLME FIFTH ND RD STEP 3 %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
             // we have not executed this alarm notification in the past
             // so, don't send CLEAR notifications
-            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
+            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR) && ae->old_status < RRDCALC_STATUS_RAISED) {
                 debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
                       , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
                 goto done;
             }
         }
     }
-    fprintf(stderr,"KILLME FIFTH RD %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
 
     // Check if alarm notifications are silenced
     if (ae->flags & HEALTH_ENTRY_FLAG_SILENCED) {
@@ -253,7 +239,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 	RRDCALC *rc;
     EVAL_EXPRESSION *expr=NULL;
 
-    fprintf(stderr,"KILLME FIFTH 4TH %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
 	for(rc = host->alarms; rc ; rc = rc->next) {
 		if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
 			continue;
@@ -272,7 +257,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 		}
 	}
 
-    fprintf(stderr,"KILLME FIFTH 5TH %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status),ae->new_status );
     snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" CALCULATED_NUMBER_FORMAT_ZERO "' '" CALCULATED_NUMBER_FORMAT_ZERO "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d'",
               exec,
               recipient,
@@ -331,7 +315,6 @@ static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) 
          rrdcalc_status2string(ae->new_status)
     );
 
-    fprintf(stderr,"KILLME FOURTH %s :  %s\n", ae->chart, rrdcalc_status2string(ae->new_status));
     health_alarm_execute(host, ae);
 }
 
@@ -351,15 +334,10 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     ALARM_ENTRY *ae;
     for(ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
         if(likely(!alarm_entry_isrepeating(host, ae))) {
-            fprintf(stderr,"KILLME THIRD ST %s: %s %d (%d,%d)\n", ae->chart, rrdcalc_status2string(ae->new_status),likely(!alarm_entry_isrepeating(host, ae)), !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED), !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED) );
             if(unlikely(
                     !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
                     !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
             )) {
-                fprintf(stderr,"KILLME THIRD ND %s: %s %d\n", ae->chart, rrdcalc_status2string(ae->new_status), unlikely(
-                        !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
-                        !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
-                ));
                 if(unlikely(ae->unique_id < first_waiting))
                     first_waiting = ae->unique_id;
 
@@ -871,9 +849,7 @@ void *health_main(void *ptr) {
 						rc->delay_last = delay;
 						rc->delay_up_to_timestamp = now + delay;
 
-						fprintf(stderr,"KILLME FIRST TEST %s: %s (%d %d)\n", rc->chart, rc->name, rc->status, ( (likely(!rrdcalc_isrepeating(rc))) || (rc->status <= RRDCALC_STATUS_CLEAR) ));
-                        if (likely(!rrdcalc_isrepeating(rc)) || rc->status <= RRDCALC_STATUS_CLEAR) {
-                            fprintf(stderr,"KILLME FIRST RUNNING TEST %s: %s %d\n", rc->chart, rc->name , rc->status);
+                        if (likely(!rrdcalc_isrepeating(rc))) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
                                     host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
@@ -902,18 +878,20 @@ void *health_main(void *ptr) {
                 RRDCALC *rc;
                 for(rc = host->alarms; rc ; rc = rc->next) {
                     int repeat_every = 0;
-                    fprintf(stderr,"KILLME SECOND TEST %s: %s %d\n", rc->chart, rc->name,unlikely(rrdcalc_isrepeating(rc)) );
                     if(unlikely(rrdcalc_isrepeating(rc))) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING))
                             repeat_every = rc->warn_repeat_every;
                         else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL))
                             repeat_every = rc->crit_repeat_every;
-
-                        fprintf(stderr,"KILLME SECOND RUNNING TEST %s: %s %d %d\n", rc->chart, rc->name, repeat_every,rc->status);
+                        else if(unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
+                            if(rc->old_status == RRDCALC_STATUS_CRITICAL)
+                                repeat_every = rc->crit_repeat_every;
+                            else if (rc->old_status == RRDCALC_STATUS_WARNING)
+                                repeat_every = rc->warn_repeat_every;
+                        }
                     }
 
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
-                        fprintf(stderr,"KILLME SECOND SENDING TEST %s: %s %d %d\n", rc->chart,rc->name, repeat_every,rc->status);
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                                 host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
