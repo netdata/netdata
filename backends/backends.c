@@ -710,7 +710,7 @@ void *backends_main(void *ptr) {
                 mongodb_threads[i].buffer = buffer_create(1);
             }
 
-            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_socket_timeout))) {
+            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_default_socket_timeout))) {
                 backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
                 do_mongodb = 1;
             }
@@ -853,7 +853,7 @@ void *backends_main(void *ptr) {
                 }
             }
 
-            if(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED)
+            if(unlikely(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED))
                 b = default_buffer;
             else
                 b = mongodb_threads[mongodb_thread_index].buffer;
@@ -1044,7 +1044,7 @@ void *backends_main(void *ptr) {
             for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
                 netdata_mutex_lock(&mongodb_threads[i].mutex);
                 if(mongodb_threads[i].finished) {
-                    if(mongodb_threads[i].error) {
+                    if(unlikely(mongodb_threads[i].error)) {
                         // oops! we couldn't send (all or some of the) data
                         error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
                               mongodb_uri, mongodb_threads[i].n_bytes, 0UL);
@@ -1069,7 +1069,7 @@ void *backends_main(void *ptr) {
 
             size_t buffer_len = buffer_strlen(b);
 
-            if(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED) {
+            if(unlikely(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED)) {
                 error("BACKEND: failed to write data to database backend '%s'. All available threads are busy. Willing to write %zu bytes, wrote %zu bytes.",
                               mongodb_uri, buffer_len, 0UL);
 
@@ -1090,7 +1090,11 @@ void *backends_main(void *ptr) {
             debug(D_BACKEND, "BACKEND: mongodb_insert(): uri = %s, database = %s, collection = %s, \
                   buffer = %zu", mongodb_uri, mongodb_database, mongodb_collection, buffer_len);
 
-            if(!netdata_thread_create(&mongodb_threads[i].thread, "BACKENDS[mongodb]", NETDATA_THREAD_OPTION_DONT_LOG, mongodb_insert, (void *)&mongodb_threads[i])) {
+            if(likely(!netdata_thread_create(&mongodb_threads[i].thread,
+                                             "BACKENDS[mongodb]",
+                                             NETDATA_THREAD_OPTION_DONT_LOG,
+                                             mongodb_insert,
+                                             (void *)&mongodb_threads[i]))) {
                 mongodb_threads[i].busy = 1;
             }
             else {

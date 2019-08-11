@@ -43,7 +43,7 @@ int mongodb_init(const char *uri_string,
     mongoc_client_pool_set_error_api(mongodb_client_pool, MONGOC_ERROR_API_VERSION_2);
 
     const char *appname = mongoc_uri_get_option_as_utf8(uri, MONGOC_URI_APPNAME, "netdata");
-    if(!mongoc_client_pool_set_appname(mongodb_client_pool, appname)) {
+    if(unlikely(!mongoc_client_pool_set_appname(mongodb_client_pool, appname))) {
         error("BACKEND: failed to set client appname");
     };
 

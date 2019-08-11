@@ -5,7 +5,7 @@
 
 #include "backends/backends.h"
 
-#define MONGODB_THREADS_NUMBER 3
+#define MONGODB_THREADS_NUMBER 10
 #define MONGODB_THREAD_INDEX_UNDEFINED -1
 
 struct mongodb_thread {
