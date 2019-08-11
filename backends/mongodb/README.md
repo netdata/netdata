@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-To use MongoDB as a backend `libmongoc` 1.7.0 or higher should be [installed](http://mongoc.org/libmongoc/current/installing.html) first. Next, Netdata should be re-installed from the source. The installer will detect that the required libraries are now available.
+To use MongoDB as a backend, `libmongoc` 1.7.0 or higher should be [installed](http://mongoc.org/libmongoc/current/installing.html) first. Next, Netdata should be re-installed from the source. The installer will detect that the required libraries are now available.
 
 ## Configuration
 
