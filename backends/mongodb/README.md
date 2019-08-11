@@ -13,7 +13,7 @@ To enable data sending to the mongodb backend set the following options in `netd
     type = mongodb
 ```
 
-In the netdata configuration directory run `./edit-config mongodb.conf` and set [MongoDB URI](https://docs.mongodb.com/manual/reference/connection-string/), database name, and collection name:
+In the Netdata configuration directory run `./edit-config mongodb.conf` and set [MongoDB URI](https://docs.mongodb.com/manual/reference/connection-string/), database name, and collection name:
 ```
 # URI
 uri = mongodb://<hostname>
