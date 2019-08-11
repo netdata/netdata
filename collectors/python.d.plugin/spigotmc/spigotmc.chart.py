@@ -52,6 +52,12 @@ _TPS_REGEX = re.compile(
     re.X
 )
 _LIST_REGEX = re.compile(
+    # Examples:
+    # There are 4 of a max 50 players online: player1, player2, player3, player4
+    # §6There are §c4§6 out of maximum §c50§6 players online.
+    # §6There are §c3§6/§c1§6 out of maximum §c50§6 players online.
+    # §6当前有 §c4§6 个玩家在线,最大在线人数为 §c50§6 个玩家.
+    # §c4§6 人のプレイヤーが接続中です。最大接続可能人数\:§c 50
     r'[^§](\d+)(?:.*?(?=/).*?[^§](\d+))?',  # Current user count.
     re.X
 )
