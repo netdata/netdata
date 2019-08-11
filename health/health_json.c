@@ -145,6 +145,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"warn_repeat_every\": \"%u\",\n"
                     "\t\t\t\"crit_repeat_every\": \"%u\",\n"
                     "\t\t\t\"value_string\": \"%s\",\n"
+                    "\t\t\t\"last_repeat\": \"%lu\",\n"
                    , rc->chart, rc->name
                    , (unsigned long)rc->id
                    , rc->name
@@ -172,6 +173,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->warn_repeat_every
                    , rc->crit_repeat_every
                    , value_string
+                   , (unsigned long)rc->last_repeat
     );
 
     if(unlikely(rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)) {

@@ -7,12 +7,15 @@ HEALTHDIR="@configdir_POST@/health.d/"
 OUTDIR="alarms/"
 
 #url to do download
-MURL="http://localhost:19999/api/v1/alarm_log"
+MURL="http://localhost:19999/api/v1/alarms?active"
 
 #error messages
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NOCOLOR='\033[0m'
+
+MYCDIR="$(pwd)"
+CONFFILE="$MYCDIR/netdata.conf"
 
 change_alarm_file() {
   if [ -f "$1" ]; then
@@ -25,15 +28,15 @@ change_alarm_file() {
 
 get_the_logs() {
   curl -v -k --create-dirs -o "$OUTDIR/$1.out" "$MURL" 2> "$OUTDIR/$1.err"
-  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out"
+  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2"
 }
 
 process_data() {
-  netdata
-  echo -e "${NOCOLOR}Sleeping during 120 seconds to create alarm entries"
-  sleep 120
+  netdata -c "$CONFFILE"
+  echo -e "${NOCOLOR}Sleeping during 300 seconds to create alarm entries"
+  sleep 300
+  get_the_logs "$1" "$2"
   killall netdata
-  get_the_logs "$1"
 }
 
 mkdir "$OUTDIR"
@@ -42,8 +45,12 @@ if [ "$CREATEDIR" -ne "0" ]; then
   echo  -e "${RED}Cannot create the output directory, it already exists. The test will overwrite previous results."
 fi
 
+change_alarm_file "./0" "ram_without_repetition.conf" "$HEALTHDIR/ram.conf"
+cp -a netdata.conf_without_repetition netdata.conf
+process_data "ram_without" "0"
 
-change_alarm_file "./0" "ram.conf" "$HEALTHDIR/ram.conf"
-#process_data "ram"
+change_alarm_file "ram_without_repetition.conf" "ram_with_repetition.conf" "$HEALTHDIR/ram.conf"
+cp -a netdata.conf_with_repetition netdata.conf
+process_data "ram_with" "0"
 
 echo  -e "${GREEN} all the tests were sucessful"
