@@ -238,6 +238,8 @@ inline BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPT
 }
 
 static struct objects_to_clean {
+    struct netdata_static_thread *main_thread;
+
 #if HAVE_KINESIS
     int *do_kinesis;
     char **kinesis_auth_key_id;
@@ -267,10 +269,11 @@ static struct objects_to_clean {
 #endif
 } objects_to_clean;
 
-static void backends_objects_cleanup(void *objects_to_clean) {
+static void backends_main_cleanup(void *objects_to_clean) {
     struct objects_to_clean *objects = (struct objects_to_clean *)objects_to_clean;
+    objects->main_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up dynamic objects...");
+    info("cleaning up...");
 
 #if HAVE_KINESIS
     if(*objects->do_kinesis) {
@@ -322,15 +325,8 @@ static void backends_objects_cleanup(void *objects_to_clean) {
         }
     }
 #endif
-}
 
-static void backends_main_cleanup(void *ptr) {
-    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-
-    info("cleaning up...");
-
-    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    objects->main_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 /**
@@ -547,8 +543,7 @@ BACKEND_TYPE backend_select_type(const char *type) {
  * @return It always return NULL.
  */
 void *backends_main(void *ptr) {
-    netdata_thread_cleanup_push(backends_main_cleanup, ptr);
-    netdata_thread_cleanup_push(backends_objects_cleanup, (void *)&objects_to_clean);
+    netdata_thread_cleanup_push(backends_main_cleanup, (void *)&objects_to_clean);
 
     int default_port = 0;
     int sock = -1;
@@ -557,6 +552,7 @@ void *backends_main(void *ptr) {
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
 
+    objects_to_clean.main_thread = ptr;
     objects_to_clean.sock = &sock;
     objects_to_clean.default_buffer = &default_buffer;
     objects_to_clean.response = &response;
@@ -1369,7 +1365,6 @@ update_charts:
     }
 
 cleanup:
-    netdata_thread_cleanup_pop(1);
     netdata_thread_cleanup_pop(1);
 
     return NULL;
