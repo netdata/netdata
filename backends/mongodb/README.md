@@ -6,7 +6,7 @@ To use MongoDB as a backend, `libmongoc` 1.7.0 or higher should be [installed](h
 
 ## Configuration
 
-To enable data sending to the mongodb backend set the following options in `netdata.conf`:
+To enable data sending to the MongoDB backend set the following options in `netdata.conf`:
 ```
 [backend]
     enabled = yes
