@@ -411,6 +411,18 @@ int appconfig_set_boolean(struct config *root, const char *section, const char *
     return value;
 }
 
+/**
+ * APP Config Get duration
+ *
+ * Convert the duration string in seconds.
+ *
+ * @param root a pointer to netdata config structure
+ * @param section the section name where the value is stored in the root.
+ * @param name of the value I am looking for.
+ * @param value the value to convert
+ *
+ * @return It returns the number of seconds on success or 0 otherwise.
+ */
 int appconfig_get_duration(struct config *root, const char *section, const char *name, const char *value)
 {
     int result = 0;

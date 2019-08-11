@@ -67,9 +67,18 @@ inline void health_log_rotate(RRDHOST *host) {
     }
 }
 
+/**
+ * Alarm Log Save
+ *
+ * Save the alarm entry inside the file pointer of the host
+ *
+ * @param host the structure with pointer to the file
+ * @param ae the alarm entry that will be stored.
+ */
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
 
+    fprintf(stderr,"KILLME ALARM LOG SAVE %s: %d\n",ae->chart, ae->new_status);
     if(likely(host->health_log_fp)) {
         if(unlikely(fprintf(host->health_log_fp
                             , "%c\t%s"
@@ -123,6 +132,17 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 }
 
+/**
+ * Alarm log read
+ *
+ * Read the alarms from the file pointer and create alarm entries.
+ *
+ * @param host the structure where we will be stored the alarms
+ * @param fp the file pointer where the data is stored
+ * @param filename the filename used to open fp.
+ *
+ * @return It returns the number of alarms loaded
+ */
 inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     errno = 0;
 
@@ -310,6 +330,8 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
             ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
+            fprintf(stderr,"KILLME HEALTH ALARM LOG READ %s: %d\n",ae->chart, ae->new_status);
+
             // add it to host if not already there
             if(unlikely(*pointers[0] == 'A')) {
                 ae->next = host->health_log.alarms;
@@ -344,6 +366,13 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
     return loaded;
 }
 
+/**
+ * Alarm Log Load
+ *
+ * Load the alarm entries present inside a file.
+ *
+ * @param host  the structure with file the file name where the alarm entries are stored.
+ */
 inline void health_alarm_log_load(RRDHOST *host) {
     health_alarm_log_close(host);
 
@@ -373,6 +402,33 @@ inline void health_alarm_log_load(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // health alarm log management
 
+/**
+ * Create alarm entry
+ *
+ * Allocate the alarm entry setting variable values.
+ *
+ * @param host the main structure where the alarm entries are linked.
+ * @param alarm_id the ID of the alarm that raised the event
+ * @param alarm_event_id the unique ID of this event
+ * @param when the time of the alarm
+ * @param name the alarm name
+ * @param chart the chart where the alarm is associated
+ * @param family the family that the chart is associated
+ * @param exec the command to execute for this entry.
+ * @param recipient the recipient that receives the information
+ * @param duration
+ * @param old_value the previous value
+ * @param new_value the current value
+ * @param old_status the previous status
+ * @param new_status the current status
+ * @param source the file that generated this alarm
+ * @param units the units of an alarm
+ * @param info
+ * @param delay
+ * @param flags the alarm flags
+ *
+ * @return It returns a new alarm entry on success and NULL otherwise
+ */
 inline ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
@@ -480,10 +536,19 @@ inline void health_alarm_log(
     }
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
+    fprintf(stderr,"KILLME ALARM LOG %s: %d\n",ae->chart, ae->new_status);
     health_alarm_log_save(host, ae);
 }
 
+/**
+ * Alarm Log Free One No checks no unlink
+ *
+ * Simple clean of the alarm entry structures.
+ *
+ * @param ae the alarm entry that will be cleaned.
+ */
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
+    fprintf(stderr,"KILLME ALARM FREE NO CHECKS %s: %d\n", ae->chart, ae->new_status);
     freez(ae->name);
     freez(ae->chart);
     freez(ae->family);
@@ -497,6 +562,14 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae);
 }
 
+/**
+ * Alarm log free
+ *
+ * Loop trough all alarms in the health log and clean them and
+ * take care of the link.
+ *
+ * @param host the host structure with the alarms to clean
+ */
 inline void health_alarm_log_free(RRDHOST *host) {
     rrdhost_check_wrlock(host);
 
@@ -504,6 +577,7 @@ inline void health_alarm_log_free(RRDHOST *host) {
 
     ALARM_ENTRY *ae;
     while((ae = host->health_log.alarms)) {
+        fprintf(stderr,"KILLME ALARM FREE %s: %d\n", ae->chart, ae->new_status);
         host->health_log.alarms = ae->next;
         health_alarm_log_free_one_nochecks_nounlink(ae);
     }

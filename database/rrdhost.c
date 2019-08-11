@@ -106,6 +106,32 @@ static inline void rrdhost_init_machine_guid(RRDHOST *host, const char *machine_
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
+/**
+ * RRDHOST Create
+ *
+ * Create the rrdhost structure filling it with initial values, among the values loaded are the health.
+ *
+ * @param hostname
+ * @param registry_hostname
+ * @param guid
+ * @param os
+ * @param timezone
+ * @param tags
+ * @param program_name
+ * @param program_version
+ * @param update_every
+ * @param entries
+ * @param memory_mode
+ * @param health_enabled
+ * @param rrdpush_enabled
+ * @param rrdpush_destination
+ * @param rrdpush_api_key
+ * @param rrdpush_send_charts_matching
+ * @param system_info
+ * @param is_localhost
+ *
+ * @return It returns the RRDHOST on success and NULL otherwise
+ */
 RRDHOST *rrdhost_create(const char *hostname,
                         const char *registry_hostname,
                         const char *guid,
@@ -181,6 +207,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
     host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
+    fprintf(stderr,"KILLME  WARN: %d  CRIT: %d\n",host->health_default_warn_repeat_every,host->health_default_crit_repeat_every);
     avl_init_lock(&(host->alarms_idx_health_log), alarm_compare_id);
     avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
 
