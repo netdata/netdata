@@ -35,7 +35,6 @@ It produces:
 9.  **Static Hits** in hits/s
     -   hits
 
-
 ### configuration
 ```yaml
 local:

@@ -26,38 +26,38 @@ that fork/spawn other short lived processes hundreds of times per second.
 
 `apps.plugin` provides charts for 3 sections:
 
-1. Per application charts as **Applications** at netdata dashboards
-2. Per user charts as **Users** at netdata dashboards
-3. Per user group charts as **User Groups** at netdata dashboards
+1.  Per application charts as **Applications** at netdata dashboards
+2.  Per user charts as **Users** at netdata dashboards
+3.  Per user group charts as **User Groups** at netdata dashboards
 
 Each of these sections provides the same number of charts:
 
-- CPU Utilization
-    - Total CPU usage
-    - User / System CPU usage
-- Disk I/O
-    - Physical Reads / Writes
-    - Logical Reads / Writes
-    - Open Unique Files (if a file is found open multiple times, it is counted just once)
-- Memory
-    - Real Memory Used (non shared)
-    - Virtual Memory Allocated
-    - Minor Page Faults (i.e. memory activity)
-- Processes
-    - Threads Running
-    - Processes Running
-    - Pipes Open
-- Swap Memory
-    - Swap Memory Used
-    - Major Page Faults (i.e. swap activity)
-- Network
-    - Sockets Open
+-   CPU Utilization
+    -   Total CPU usage
+    -   User / System CPU usage
+-   Disk I/O
+    -   Physical Reads / Writes
+    -   Logical Reads / Writes
+    -   Open Unique Files (if a file is found open multiple times, it is counted just once)
+-   Memory
+    -   Real Memory Used (non shared)
+    -   Virtual Memory Allocated
+    -   Minor Page Faults (i.e. memory activity)
+-   Processes
+    -   Threads Running
+    -   Processes Running
+    -   Pipes Open
+-   Swap Memory
+    -   Swap Memory Used
+    -   Major Page Faults (i.e. swap activity)
+-   Network
+    -   Sockets Open
 
 The above are reported:
 
-- For **Applications** per [target configured](apps_groups.conf).
-- For **Users** per username or UID (when the username is not available).
-- For **User Groups** per groupname or GID (when groupname is not available).
+-   For **Applications** per [target configured](apps_groups.conf).
+-   For **Users** per username or UID (when the username is not available).
+-   For **User Groups** per groupname or GID (when groupname is not available).
 
 ## Performance
 
@@ -105,19 +105,19 @@ undesirable, the line `other: *` should be appended to the `apps_groups.conf`.
 
 The process names are the ones returned by:
 
-  - `ps -e` or `cat /proc/PID/stat`
-  - in case of substring mode (see below): `/proc/PID/cmdline`
+-   `ps -e` or `cat /proc/PID/stat`
+-   in case of substring mode (see below): `/proc/PID/cmdline`
 
 To add process names with spaces, enclose them in quotes (single or double)
 example: ` 'Plex Media Serv' ` or ` "my other process" `.
 
 You can add an asterisk ` * ` at the beginning and/or the end of a process:
 
-  - `*name` *suffix* mode: will search for processes ending with `name` (at `/proc/PID/stat`)
-  - `name*` *prefix* mode: will search for processes beginning with `name` (at `/proc/PID/stat`)
-  - `*name*` *substring* mode: will search for `name` in the whole command line (at `/proc/PID/cmdline`)
+-   `*name` _suffix_ mode: will search for processes ending with `name` (at `/proc/PID/stat`)
+-   `name*` _prefix_ mode: will search for processes beginning with `name` (at `/proc/PID/stat`)
+-   `*name*` _substring_ mode: will search for `name` in the whole command line (at `/proc/PID/cmdline`)
 
-If you enter even just one *name* (substring), `apps.plugin` will process
+If you enter even just one _name_ (substring), `apps.plugin` will process
 `/proc/PID/cmdline` for all processes (of course only once per process: when they are first seen).
 
 To add processes with single quotes, enclose them in double quotes: ` "process with this ' single quote" `
@@ -189,22 +189,21 @@ Here is an example for the process group `sql` at `https://registry.my-netdata.i
 Netdata is able give you a lot more badges for your app.
 Examples below for process group `sql`:
 
-- CPU usage: ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
-- Disk Physical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.preads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Disk Physical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Disk Logical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Disk Logical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Open Files ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.files&dimensions=sql&value_color=green%3E30%7Cred)
-- Real Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
-- Virtual Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Swap Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
-- Minor Page Faults ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.minor_faults&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
-- Processes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
-- Threads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
-- Major Faults (swap activity) ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
-- Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pipes&dimensions=sql&value_color=green=0%7Cred)
-- Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.sockets&dimensions=sql&value_color=green%3E=3%7Cred)
-
+-   CPU usage: ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.cpu&dimensions=sql&value_color=green=0%7Corange%3C50%7Cred)
+-   Disk Physical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.preads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+-   Disk Physical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+-   Disk Logical Reads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lreads&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+-   Disk Logical Writes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.lwrites&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+-   Open Files ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.files&dimensions=sql&value_color=green%3E30%7Cred)
+-   Real Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.mem&dimensions=sql&value_color=green%3C100%7Corange%3C200%7Cred)
+-   Virtual Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.vmem&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+-   Swap Memory ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.swap&dimensions=sql&value_color=green=0%7Cred)
+-   Minor Page Faults ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.minor_faults&dimensions=sql&value_color=green%3C100%7Corange%3C1000%7Cred)
+-   Processes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.processes&dimensions=sql&value_color=green%3E0%7Cred)
+-   Threads ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.threads&dimensions=sql&value_color=green%3E=28%7Cred)
+-   Major Faults (swap activity) ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.major_faults&dimensions=sql&value_color=green=0%7Cred)
+-   Open Pipes ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.pipes&dimensions=sql&value_color=green=0%7Cred)
+-   Open Sockets ![image](https://registry.my-netdata.io/api/v1/badge.svg?chart=apps.sockets&dimensions=sql&value_color=green%3E=3%7Cred)
 
 For more information about badges check [Generating Badges](../../web/api/badges)
 
@@ -297,7 +296,6 @@ per process utilization.
 
 Note also, that being a `python` program, `glances` uses 1.6% CPU while it runs.
 
-
 ```
 localhost                                               Uptime: 3 days, 21:42:00
 
@@ -320,8 +318,8 @@ FILE SYS    Used  Total      0.3   2.1  7009 netdata      0 S /usr/sbin/netdata
 
 #### why this happens?
 
-All the console tools report usage based on the processes found running *at the moment they
-examine the process tree*. So, they see just one `ls` command, which is actually very quick
+All the console tools report usage based on the processes found running _at the moment they
+examine the process tree_. So, they see just one `ls` command, which is actually very quick
 with minor CPU utilization. But the shell, is spawning hundreds of them, one after another
 (much like shell scripts do).
 
