@@ -345,7 +345,7 @@ struct pid_stat {
     // int64_t nice;
     int32_t num_threads;
     // int64_t itrealvalue;
-    // kernel_uint_t starttime;
+    kernel_uint_t starttime;
     // kernel_uint_t vsize;
     // kernel_uint_t rss;
     // kernel_uint_t rsslim;
@@ -419,6 +419,8 @@ struct pid_stat {
     usec_t io_collected_usec;
     usec_t last_io_collected_usec;
 
+    kernel_uint_t uptime;
+
     char *fds_dirname;              // the full directory name in /proc/PID/fd
 
     char *stat_filename;
@@ -440,6 +442,7 @@ size_t pagesize;
 #define PID_LOG_CMDLINE 0x00000004
 #define PID_LOG_FDS     0x00000008
 #define PID_LOG_STAT    0x00000010
+#define PID_LOG_UPTIME  0x00000011
 
 static struct pid_stat
         *root_of_pids = NULL,   // global list of all processes running
@@ -1057,6 +1060,10 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status) {
                     case PID_LOG_STAT:
                         break;
 
+                    case PID_LOG_UPTIME:
+                        error("Cannot calculate uptime for pid %d (command '%s')", p->pid, p->comm);
+                        break;
+
                     default:
                         error("unhandled error for pid %d, command '%s'", p->pid, p->comm);
                         break;
@@ -1421,7 +1428,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
-    // p->starttime     = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
+    p->starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
     // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
@@ -1488,6 +1495,40 @@ cleanup:
     p->num_threads      = 0;
     // p->rss              = 0;
     return 0;
+}
+
+// ----------------------------------------------------------------------------
+
+static inline int get_pid_uptime(struct pid_stat *p) {
+    static procfile *global_uptime_ff = NULL;
+
+    if(unlikely(!global_uptime_ff)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
+
+        global_uptime_ff = procfile_reopen(global_uptime_ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    }
+        global_uptime_ff = procfile_readall(global_uptime_ff);
+
+        if(unlikely(!global_uptime_ff)) {
+            error("Cannot read %s/proc/uptime", netdata_configured_host_prefix);
+            return 0;
+        }
+
+    if(unlikely(procfile_lines(global_uptime_ff) < 1)) {
+        error("%s/proc/uptime has no lines", netdata_configured_host_prefix);
+        return 0;
+    }
+    if(unlikely(procfile_linewords(global_uptime_ff, 0) < 1)) {
+        error("%s/proc/uptime has less than 1 word in it", netdata_configured_host_prefix);
+        return 0;
+    }
+
+    kernel_uint_t global_uptime = str2kernel_uint_t(procfile_lineword(global_uptime_ff, 0, 0));
+
+    p->uptime = global_uptime - p->starttime / system_hz;
+
+    return 1;
 }
 
 static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
@@ -2506,6 +2547,12 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
     if(unlikely(!managed_log(p, PID_LOG_STAT, read_proc_pid_stat(p, ptr))))
         // there is no reason to proceed if we cannot get its status
         return 0;
+
+    // --------------------------------------------------------------------
+    // read /proc/uptime and calculate the process uptime
+#ifndef __FreeBSD__
+    managed_log(p, PID_LOG_UPTIME, get_pid_uptime(p));
+#endif
 
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
