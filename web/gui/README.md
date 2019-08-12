@@ -17,15 +17,15 @@ For information on creating custom dashboards, see **[Custom Dashboards](custom/
 
 ## Supported chart libraries
 
-- Dygraph
-- jQuery Sparkline
-- Peity
-- Google Charts
-- Morris
-- EasyPieChart
-- Gauge.js
-- D3
-- C3
+-   Dygraph
+-   jQuery Sparkline
+-   Peity
+-   Google Charts
+-   Morris
+-   EasyPieChart
+-   Gauge.js
+-   D3
+-   C3
 
 ### Dygraph
 
@@ -46,6 +46,7 @@ TBD
 #### Value Range
 
 You can set the max value of the chart using the following snippet:
+
 ```html
 <div data-netdata="unique.id"
      data-chart-library="easypiechart"
@@ -53,13 +54,16 @@ You can set the max value of the chart using the following snippet:
      ></div>
 ```
 Be aware that values that exceed the max value will get expanded (e.g. "41" is still 100%). Similar for the minimum:
+
 ```html
 <div data-netdata="unique.id"
      data-chart-library="easypiechart"
      data-easypiechart-min-value="20"
      ></div>
 ```
-If you specify both minimum and maximum, the rendering behavior changes. Instead of displaying the `value` based from zero, it is now based on the range that is provided by the snippet:
+If you specify both minimum and maximum, the rendering behavior changes.
+ Instead of displaying the `value` based from zero, it is now based on the range that is provided by the snippet:
+
 ```html
 <div data-netdata="unique.id"
      data-chart-library="easypiechart"

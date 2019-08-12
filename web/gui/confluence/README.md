@@ -6,11 +6,11 @@ I see you already asking "why should I do this?"
 
 Well... think a bit of it.... confluence is the perfect place for something like that:
 
-1. All the employees of your company already have access to it.
+1.  All the employees of your company already have access to it.
 
-2. Most probably you have already several spaces on confluence, one for each project or service. Adding live monitoring information there is ideal: everything in one place. Your users will just click on the page and instantly the monitoring page they need will appear with only the information they need to know.
+2.  Most probably you have already several spaces on confluence, one for each project or service. Adding live monitoring information there is ideal: everything in one place. Your users will just click on the page and instantly the monitoring page they need will appear with only the information they need to know.
 
-3. You can create monitoring pages for very specific purposes, hiding all the information that is too detailed for most users, or explaining in detail things that are difficult for them to understand.
+3.  You can create monitoring pages for very specific purposes, hiding all the information that is too detailed for most users, or explaining in detail things that are difficult for them to understand.
 
 So, what can we expect? What can netdata do on confluence?
 
@@ -22,7 +22,7 @@ Let me show you how.
 
 > Let's assume we have 2 web servers we want to monitor. We will create a simple dashboard with key information about them, directly on confluence.
 
-### Before you begin
+## Before you begin
 
 Most likely your confluence is accessible via HTTPS. So, you need to proxy your netdata servers via an apache or nginx to make them HTTPS too. If your Confluence is HTTPS but your netdata are not, you will not be able to fetch the netdata content from the confluence page. The netdata wiki has many examples for proxying netdata through another web server.
 
@@ -30,10 +30,10 @@ Most likely your confluence is accessible via HTTPS. So, you need to proxy your 
 
 For our example, I will use these 2 servers:
 
-server|url
-----|----
-Server 1 | https://london.my-netdata.io
-Server 2 | https://frankfurt.my-netdata.io
+| server    | url                               |
+----        |  ----
+| Server 1  | <https://london.my-netdata.io>    |
+| Server 2  | <https://frankfurt.my-netdata.io> |
 
 I will use the first server for the static dashboard javascript files.
 
@@ -140,7 +140,6 @@ Which gives us this:
 
 Note the color difference. This is because netdata automatically hides dimensions that are just zero (the frankfurt server has only successful requests). To instruct netdata to disable this feature, we need to add another html fragment at the bottom of the page (make sure this is added after loading `dashboard.js`). So we edit the first block we added, and append a new `<script>` section to it:
 
-
 ```html
 <script>
 // don't load bootstrap - confluence does not need this
@@ -189,8 +188,8 @@ Let's now add a few gauges. The chart we added has several dimensions: `success`
 
 Let's say we want to add 2 gauges:
 
-1. `success` and `redirect` together, in blue
-2. `error`, `bad` and `other` together, in orange
+1.  `success` and `redirect` together, in blue
+2.  `error`, `bad` and `other` together, in orange
 
 We will add the following for each server. We have enclosed them in another a `<div>` because Confluence will wrap them if the page width is not enough to fit them. With that additional `<div>` they will always be next to each other.
 
@@ -233,7 +232,6 @@ We will add the following for each server. We have enclosed them in another a `<
 Adding the above will give you this:
 
 ![final-confluence](https://user-images.githubusercontent.com/2662304/34329813-636bb8de-e917-11e7-8cc7-19e197859008.gif)
-
 
 ### Final source - for the confluence source editor
 
