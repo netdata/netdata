@@ -4,50 +4,50 @@ Module monitors one or more postgres servers.
 
 **Requirements:**
 
- * `python-psycopg2` package. You have to install it manually.
+-   `python-psycopg2` package. You have to install it manually.
 
 Following charts are drawn:
 
-1. **Database size** MB
- * size
+1.  **Database size** MB
+    -   size
 
-2. **Current Backend Processes** processes
- * active
+2.  **Current Backend Processes** processes
+    -   active
 
-3. **Write-Ahead Logging Statistics** files/s
- * total
- * ready
- * done
+3.  **Write-Ahead Logging Statistics** files/s
+    -   total
+    -   ready
+    -   done
 
-4. **Checkpoints** writes/s
- * scheduled
- * requested
+4.  **Checkpoints** writes/s
+    -   scheduled
+    -   requested
 
-5. **Current connections to db** count
- * connections
+5.  **Current connections to db** count
+    -   connections
 
-6. **Tuples returned from db** tuples/s
- * sequential
- * bitmap
+6.  **Tuples returned from db** tuples/s
+    -   sequential
+    -   bitmap
 
-7. **Tuple reads from db** reads/s
- * disk
- * cache
+7.  **Tuple reads from db** reads/s
+    -   disk
+    -   cache
 
-8. **Transactions on db** transactions/s
- * committed
- * rolled back
+8.  **Transactions on db** transactions/s
+    -   committed
+    -   rolled back
 
-9. **Tuples written to db** writes/s
- * inserted
- * updated
- * deleted
- * conflicts
+9.  **Tuples written to db** writes/s
+    -   inserted
+    -   updated
+    -   deleted
+    -   conflicts
 
 10. **Locks on db** count per type
- * locks
+    -   locks
 
-### configuration
+## configuration
 
 For all available options please see module [configuration file](postgres.conf).
 
