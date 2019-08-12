@@ -4,7 +4,7 @@
 HEALTHDIR="@configdir_POST@/health.d/"
 
 #output directory
-OUTDIR="alarms/"
+OUTDIR="workdir/"
 
 #url to do download
 MURL="http://localhost:19999/api/v1/alarms?active"
@@ -27,19 +27,40 @@ change_alarm_file() {
 }
 
 netdata_test_download() {
+  OPT="-c"
+  if [ "$3" == "I" ]; then
+    OPT="$OPT -v"
+  fi
 
+  grep "HTTP/1.1 200 OK" "$1" 2>/dev/null 1>/dev/null
+  TEST="$?"
+  if [ "$TEST" -ne "0" ]; then
+    echo -e "${RED} Error to get the alarms"
+    killall netdata
+    exit 1
+  fi
+
+  COUNT=$(grep -w "\"last_repeat\":" "$2" | grep $OPT "\"0\"")
+  if [ $COUNT -eq 0 ]; then
+    echo -e "${RED} Netdata gave an unexpected result when alarm repetition is $4"
+    killall netdata
+    exit 1
+  fi
+
+  echo -e "${GREEN} I got the expected result"
 }
 
 get_the_logs() {
   curl -v -k --create-dirs -o "$OUTDIR/$1.out" "$MURL" 2> "$OUTDIR/$1.err"
-  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2"
+  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2" "$3"
 }
 
 process_data() {
+  SEC=120
   netdata -c "$CONFFILE"
-  echo -e "${NOCOLOR}Sleeping during 300 seconds to create alarm entries"
-  sleep 300
-  get_the_logs "$1" "$2"
+  echo -e "${NOCOLOR}Sleeping during $SEC seconds to create alarm entries"
+  sleep $SEC
+  get_the_logs "$1" "$2" "$3"
   killall netdata
 }
 
@@ -51,10 +72,14 @@ fi
 
 change_alarm_file "./0" "ram_without_repetition.conf" "$HEALTHDIR/ram.conf"
 cp -a netdata.conf_without_repetition netdata.conf
-process_data "ram_without" "0"
+process_data "ram_without" "K" "not activated."
+rm netdata.conf
 
-change_alarm_file "ram_without_repetition.conf" "ram_with_repetition.conf" "$HEALTHDIR/ram.conf"
+change_alarm_file "$HEALTHDIR/ram.conf" "ram_with_repetition.conf" "$HEALTHDIR/ram.conf"
 cp -a netdata.conf_with_repetition netdata.conf
-process_data "ram_with" "0"
+process_data "ram_with" "I" "activated."
+rm netdata.conf
 
 echo  -e "${GREEN} all the tests were sucessful"
+rm "$HEALTHDIR/ram.conf"
+rm -rf $OUTDIR
