@@ -192,6 +192,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         goto done;
     }
 
+    fprintf(stderr,"KILLME ST %s : %s %s\n",ae->name, rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status));
+
     // find the previous notification for the same alarm
     // which we have run the exec script
     // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
@@ -203,6 +205,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                 break;
         }
 
+        fprintf(stderr,"KILLME ND %s : %s %s\n",ae->name, rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status));
         if(likely(t)) {
             // we have executed this alarm notification in the past
             if(t && t->new_status == ae->new_status) {
@@ -215,12 +218,13 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         else {
             // we have not executed this alarm notification in the past
             // so, don't send CLEAR notifications
-            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR) && ae->old_status < RRDCALC_STATUS_RAISED) {
+            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR) && (ae->old_status < RRDCALC_STATUS_RAISED)) {
                 debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
                       , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
                 goto done;
             }
         }
+        fprintf(stderr,"KILLME RD %s : %s %s\n",ae->name, rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status));
     }
 
     // Check if alarm notifications are silenced
@@ -849,7 +853,7 @@ void *health_main(void *ptr) {
 						rc->delay_last = delay;
 						rc->delay_up_to_timestamp = now + delay;
 
-                        if (likely(!rrdcalc_isrepeating(rc))) {
+                        if(likely(!rrdcalc_isrepeating(rc))) {
                             ALARM_ENTRY *ae = health_create_alarm_entry(
                                     host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
@@ -879,15 +883,16 @@ void *health_main(void *ptr) {
                 for(rc = host->alarms; rc ; rc = rc->next) {
                     int repeat_every = 0;
                     if(unlikely(rrdcalc_isrepeating(rc))) {
-                        if(unlikely(rc->status == RRDCALC_STATUS_WARNING))
+                        if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
                             repeat_every = rc->warn_repeat_every;
-                        else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL))
+                        } else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
                             repeat_every = rc->crit_repeat_every;
-                        else if(unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
-                            if(rc->old_status == RRDCALC_STATUS_CRITICAL)
+                        } else if(unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
+                            if(rc->old_status == RRDCALC_STATUS_CRITICAL) {
                                 repeat_every = rc->crit_repeat_every;
-                            else if (rc->old_status == RRDCALC_STATUS_WARNING)
+                            } else if (rc->old_status == RRDCALC_STATUS_WARNING) {
                                 repeat_every = rc->warn_repeat_every;
+                            }
                         }
                     }
 
