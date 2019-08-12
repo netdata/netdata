@@ -16,19 +16,19 @@ But even if all the metrics are collected, an even bigger challenge is revealed:
 
 The existing monitoring solutions, assume the engineers will:
  
-- Design dashboards
-- Configure alarms
-- Use a query language to investigate issues
+-   Design dashboards
+-   Configure alarms
+-   Use a query language to investigate issues
 
 However, all these have to be configured metric by metric.
 
 The monitoring industry believes there is this "IT Operations Hero", a person combining these abilities:
 
-1. Has a deep understanding of IT architectures and is a skillful SysAdmin.
-2. Is a superb Network Administrator (can even read and understand the Linux kernel networking stack).
-3. Is a exceptional database administrator.
-4. Is fluent in software engineering, capable of understanding the internal workings of applications.
-5. Masters Data Science, statistical algorithms and is fluent in writing advanced mathematical queries to reveal the meaning of metrics.
+1.  Has a deep understanding of IT architectures and is a skillful SysAdmin.
+2.  Is a superb Network Administrator (can even read and understand the Linux kernel networking stack).
+3.  Is a exceptional database administrator.
+4.  Is fluent in software engineering, capable of understanding the internal workings of applications.
+5.  Masters Data Science, statistical algorithms and is fluent in writing advanced mathematical queries to reveal the meaning of metrics.
 
 Of course this person does not exist!
 
@@ -46,11 +46,11 @@ So, they collect very limited metrics. Basic dashboards can be created with thes
 
 In Netdata, the meaning of metrics is incorporated into the database:
 
-1. all metrics are converted and stored to human-friendly units. This is a data-collection process, not a visualization process. For example, cpu utilization in Netdata is stored as percentage, not as kernel ticks.
+1.  all metrics are converted and stored to human-friendly units. This is a data-collection process, not a visualization process. For example, cpu utilization in Netdata is stored as percentage, not as kernel ticks.
 
-2. all metrics are organized into human-friendly charts, sharing the same context and units (similar to what other monitoring solutions call `cardinality`). So, when Netdata developer collect metrics, they configure the correlation of the metrics right in data collection, which is stored in the database too.
+2.  all metrics are organized into human-friendly charts, sharing the same context and units (similar to what other monitoring solutions call `cardinality`). So, when Netdata developer collect metrics, they configure the correlation of the metrics right in data collection, which is stored in the database too.
 
-3. all charts are then organized in families, and chart families are organized in applications. These structures are responsible for providing the menu at the right side of Netdata dashboards for exploring the whole database.
+3.  all charts are then organized in families, and chart families are organized in applications. These structures are responsible for providing the menu at the right side of Netdata dashboards for exploring the whole database.
 
 The result is a system that can be browsed by humans, even if the database has 100,000 unique metrics. It is pretty natural for everyone to browse them, understand their meaning and their scope.
 

@@ -10,8 +10,8 @@ Unfortunately, this does not work! Filtering out most metrics is like reading a 
 
 For many people, monitoring is about:
 
-- Detecting outages
-- Capacity planning
+-   Detecting outages
+-   Capacity planning
 
 However, **slowdowns are 10 times more common** compared to outages (check slide 14 of [Online Performance is Business Performance ](https://www.slideshare.net/KenGodskind/alertsitetrac) reported by Trac Research/AlertSite). Designing a monitoring system targeting only outages and capacity planning solves just a tiny part of the operational problems we face. Check also [Downtime vs. Slowtime: Which Hurts More?](https://dzone.com/articles/downtime-vs-slowtime-which-hurts-more).
 
@@ -29,9 +29,9 @@ So, why do monitoring solutions and SaaS providers filter out metrics?
 
 They can't do otherwise!
 
-1. Centralization of metrics depends on metrics filtering, to control monitoring costs. Time-series databases limit the number of metrics collected, because the number of metrics influences their performance significantly. They get congested at scale.
-2. It is a lot easier to provide an illusion of monitoring by using a few basic metrics.
-3. Troubleshooting slowdowns is the hardest IT problem to solve, so most solutions just avoid it.
+1.  Centralization of metrics depends on metrics filtering, to control monitoring costs. Time-series databases limit the number of metrics collected, because the number of metrics influences their performance significantly. They get congested at scale.
+2.  It is a lot easier to provide an illusion of monitoring by using a few basic metrics.
+3.  Troubleshooting slowdowns is the hardest IT problem to solve, so most solutions just avoid it.
 
 ## What does Netdata do?
 
