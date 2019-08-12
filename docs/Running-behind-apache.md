@@ -12,7 +12,7 @@ Below you can find instructions for configuring an apache server to:
 
 Make sure your apache has installed `mod_proxy` and `mod_proxy_http`.
 
-On debian/ubuntu systems, install them with this: 
+On debian/ubuntu systems, install them with this:
 
 ```sh
 sudo apt-get install apache2-bin
@@ -63,7 +63,7 @@ Add the following on top of any existing virtual host. It will allow you to acce
 	#RewriteRule ^/netdata$ https://%{HTTP_HOST}/netdata/ [L,R=301]
 
 	# rest of virtual host config here
-	
+
 </VirtualHost>
 ```
 
@@ -92,7 +92,7 @@ Add the following on top of any existing virtual host. It will allow you to acce
     RewriteRule "^/netdata/([A-Za-z0-9\._-]+)$" https://%{HTTP_HOST}/netdata/$1/ [L,R=301]
 
 	# rest of virtual host config here
-	
+
 </VirtualHost>
 ```
 
