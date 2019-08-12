@@ -2,11 +2,11 @@
 
 Because Netdata is a health monitoring and *performance troubleshooting* system, we put a lot of emphasis on real-time, meaningful, and context-aware charts.
 
-We then leverage a number of dashboards, both configured by the Netdata community and customizeable by you, so you can easily see anomalies, jump between charts to find correlations, and generally make smarter decisions about your systems and applications.
+We then leverage several dashboards, both configured by the Netdata community and customizable by you. These dashboards help you find anomalies, jump between charts to find correlations, and generally make smarter decisions about your systems and applications.
 
 There are two primary ways to view Netdata's dashboards:
 
-1. The [standard web dashboard](gui/) that comes pre-configured with every Netdata installation and is accessed at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. You can customize the contents and colors of the standard dashboard [using JavaScript](gui/#customizing-the-standard-dashboard).
+1. The [standard web dashboard](gui/) that comes pre-configured with every Netdata installation. You can see it at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. You can customize the contents and colors of the standard dashboard [using JavaScript](gui/#customizing-the-standard-dashboard).
 
 2. The [`dashboard.js` JavaScript library](#dashboard-js), which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboard) using JavaScript, or create entirely new [custom dashboards](gui/custom/) or [Atlassian Confluence dashboards](gui/confluence/).
 
@@ -16,21 +16,21 @@ No matter where you use Netdata's charts, you'll want to know how to [manipulate
 
 ## Manipulating charts
 
-One of the most important functions of the standard web dashboard—and all Netdata-created dashboards—is the ability to manipulate charts.
+One of the most useful functions of the standard web dashboard—and all Netdata-created dashboards—is the ability to manipulate charts.
 
-Netdata synchronizes manipulations across all its charts. If you zoom into one, the rest will zoom as well. If you select a timeframe, Netdata will select that timeframe across all charts. This even works across different Netdata agents, and their respective dashboards, if you connect them together using the [node menu](../registry)!
+Netdata synchronizes manipulations across all its charts. If you zoom into one, the rest will zoom as well. If you select a timeframe, Netdata will select that timeframe across all charts. Synchronization even works across different Netdata agents, and their respective dashboards, if you connect them using the [node menu](../registry)!
 
 The dashboard includes a number of ways to manipulate charts, each of which can be initiated using one or more methods:
 
-| Manipulation 	| Method #1 	| Method #2 	| Method #3 	|
-|---------------------------------------------------	|-------------------------------------	|-----------------------------------------------------------	|------------------------------------------------------------	|
-| **Reset** charts to default auto-refreshing state 	| `double click` 	| `double tap` (touchpad/touchscreen) 	|  	|
-| **Select** a certain timeframe 	| `ALT` + `mouse selection` 	| `⌘` + `mouse selection` (macOS) 	|  	|
-| **Pan** forward or back in time 	| `click and drag` 	| `touch and drag` (touchpad/touchscreen) 	|  	|
-| **Zoom** to a specific timeframe 	| `SHIFT` + `mouse selection` 	|  	|  	|
-| **Zoom** in/out 	| `SHIFT`/`ALT` + `mouse scrollwheel` 	| `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen) 	| `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen) 	|
+| Manipulation | Method #1  | Method #2  | Method #3  |
+|---------------------------------------------------  |-------------------------------------  |-----------------------------------------------------------  |------------------------------------------------------------ |
+| **Reset** charts to default auto-refreshing state  | `double click` | `double tap` (touchpad/touchscreen)  | |
+| **Select** a certain timeframe | `ALT` + `mouse selection`  | `⌘` + `mouse selection` (macOS)  | |
+| **Pan** forward or back in time  | `click and drag` | `touch and drag` (touchpad/touchscreen)  | |
+| **Zoom** to a specific timeframe | `SHIFT` + `mouse selection`  | | |
+| **Zoom** in/out  | `SHIFT`/`ALT` + `mouse scrollwheel`  | `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen)  | `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen) |
 
-Here's how the chart synchronziation looks while zooming and panning:
+Here's how the chart synchronization looks while zooming and panning:
 
 ![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing charts](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
@@ -38,7 +38,7 @@ You can also perform all these actions using the small rewind/play/fast-forward/
 
 ## Charts, contexts, families
 
-Before customizing the standard web dashboard, creating a custom dashboard, configuring an alarm, or writing a collector, it's important to understand how Netdata organizes metrics into charts, dimensions, families, and contexts.
+Before customizing the standard web dashboard, creating a custom dashboard, configuring an alarm, or writing a collector, it's crucial to understand how Netdata organizes metrics into charts, dimensions, families, and contexts.
 
 ### Charts
 
@@ -48,25 +48,25 @@ Here's the system CPU chart, the first chart displayed on the standard dashboard
 
 ![Screenshot of the system CPU chart in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62720972-0b8a8e80-b9c0-11e9-930b-4829f7b17cfd.png)
 
-A chart's name is displayed in parentheses above the chart. For example, if you navigate to the system CPU chart, , you'll see the label: **Total CPU utilization (system.cpu)**. In this case, the chart's name is `system.cpu`. The name is derived from the chart's [context](#contexts)
+Netdata displays a chart's name in parentheses above the chart. For example, if you navigate to the system CPU chart, you'll see the label: **Total CPU utilization (system.cpu)**. In this case, the chart's name is `system.cpu`. Netdata derives the name from the chart's [context](#contexts)
 
 ### Dimensions
 
 A **dimension** is a value that gets shows on a chart. The value can be raw data or calculated values, such as percentages, aggregates, and more.
 
-Charts are capable of showing more than one dimension. All of these dimensions will be shown on the right side of the chart, beneath the date and time. Again, the `system.cpu` chart will serve as a good example.
+Charts are capable of showing more than one dimension. Netdata shows these dimensions on the right side of the chart, beneath the date and time. Again, the `system.cpu` chart will serve as a good example.
 
 ![Screenshot of the dimensions shown in the system CPU chart in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62721031-2bba4d80-b9c0-11e9-9dca-32403617ce72.png)
 
 Here, the `system.cpu` chart is showing many dimensions, such as `user`, `system`, `softirq`, `irq`, and more.
 
-Note that other applications sometimes use the word *series* instead of dimension.
+Note that other applications sometimes use the word *series* instead of *dimension*.
 
 ### Families
 
 A **family** is *one* instance of a monitored hardware or software resource that needs to be monitored and displayed separately from similar instances. 
 
-For example, if your system has multiple disk drives at `sda` and `sdb`, Netdata will put each interface into their own family. Same goes for software resoruces, like multiple MySQL instances. We call these instances "families" because the charts associated with a single disk instance, for example, are often related to each other. Relatives, family... get it?
+For example, if your system has multiple disk drives at `sda` and `sdb`, Netdata will put each interface into their own family. Same goes for software resources, like multiple MySQL instances. We call these instances "families" because the charts associated with a single disk instance, for example, are often related to each other. Relatives, family... get it?
 
 When relevant, Netdata prefers to organize charts by family. When you visit the **Disks** section, you will see your disk drives organized into families, and each family will have one or more charts: `disk`, `disk_ops`, `disk_backlog`, `disk_util`, `disk_await`, `disk_avgsz`, `disk_svctm`, `disk_mops`, and `disk_iotime`.
 
@@ -74,22 +74,22 @@ In the screenshot below, the disk family `sdb` shows a few gauges, followed by a
 
 ![Screenshot of a disk drive family and associated charts in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62721362-e34f5f80-b9c0-11e9-8d2e-9a3bec48e920.png)
 
-Netdata also creates separate submenu entries for each family in the right navigation page so you can easily navigate to the instance you're interested in. Here, Netdata has made a number of submenus under the **Disk** menu.
+Netdata also creates separate submenu entries for each family in the right navigation page so you can easily navigate to the instance you're interested in. Here, Netdata has made several submenus under the **Disk** menu.
 
 ![Screenshot of the disks menu and submenus](https://user-images.githubusercontent.com/1153921/62721531-3cb78e80-b9c1-11e9-89c2-fdd736aec7d4.png)
 
 ### Contexts
 
-A **context** is a way of grouping charts by the types of metrics collected and dimensions displayed. Different charts with the same context will show exactly the same dimensions, but for different instances (families) of hardware/software resources.
+A **context** is a way of grouping charts by the types of metrics collected and dimensions displayed. Different charts with the same context will show the same dimensions, but for different instances (families) of hardware/software resources.
 
-For example, the **Disks** section will often use a number of contexts (`disk.io`, `disk.ops`, `disk.backlog`, `disk.util`, and so on). Netdata then creates an individual chart for each context, and groups them by family.
+For example, the **Disks** section will often use many contexts (`disk.io`, `disk.ops`, `disk.backlog`, `disk.util`, and so on). Netdata then creates an individual chart for each context, and groups them by family.
 
 Netdata names charts according to their context according to the following structure: `[context].[family]`. A chart with the `disk.util` context, in the `sdb` family, gets the name `disk_util.sdb`. Netdata shows that name in the top-left corner of a chart.
 
 Given the four example contexts, and two families of `sdb` and `sdd`, Netdata will create the following charts and their names:
 
 Context | `sdb` family | `sdd` family
----  | ---    | ---
+--- | --- | ---
 `disk.io` | `disk_io.sdb` | `disk_io.sdd`
 `disk.ops` | `disk_ops.sdb` | `disk_ops.sdd`
 `disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd`
@@ -102,7 +102,7 @@ And here's what two of those charts in the `disk.io` context look like under `sd
 
 As you can see in the screenshot, you can view the context of a chart if you hover over the date above the list of dimensions. A tooltip will appear that shows you two pieces of information: the collector that produces the chart, and the chart's context.
 
-Contexts are also used for alarm templates. You can create an alarm for the `net.packets` context to receive alerts for any chart with that context, no matter which family it's attached to.
+Netdata also uses contexts for alarm templates. You can create an alarm for the `net.packets` context to receive alerts for any chart with that context, no matter which family it's attached to.
 
 ### Positive and negative values on charts
 
@@ -114,17 +114,17 @@ To improve clarity on charts, Netdata dashboards present **positive** values for
 
 ### Autoscaled y-axis
 
-Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible time-frame.
+Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible timeframe.
 
 ![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
 
-*A zero based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
+*A zero-based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
 
 
 
 ## dashboard.js
 
-Netdata uses the `dashboards.js` file to define, configure, create, and update all the charts and other visualizations that appear on any Netdata dashboard. It's required on any HTML page that is going to render Netdata charts.
+Netdata uses the `dashboards.js` file to define, configure, create, and update all the charts and other visualizations that appear on any Netdata dashboard. You need to put `dashboard.js` on any HTML page that's going to render Netdata charts.
 
 ### Generating dashboard.js
 

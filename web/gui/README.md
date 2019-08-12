@@ -1,12 +1,12 @@
 # The standard web dashboard
 
-The standard web dashbboard is the heart of Netdata's performance troubleshooting toolkit. You've probably seen it before:
+The standard web dashboard is the heart of Netdata's performance troubleshooting toolkit. You've probably seen it before:
 
 ![A GIF of the standard Netdata web dashboard](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
 By default, Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and navigate to `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`.
 
-Netdata uses an [internal, static-threaded web server](../server/) to host the HTML, CSS, and JavaScript files that make up the standard dashboard. You don't have to configure anything to access it, although you can adjust [a number of settings](../server/#other-netdataconf-web-section-options) in the `netdata.conf` file, or run Netdata behind an Nginx proxy, and so on.
+Netdata uses an [internal, static-threaded web server](../server/) to host the HTML, CSS, and JavaScript files that make up the standard dashboard. You don't have to configure anything to access it, although you can adjust [your settings](../server/#other-netdataconf-web-section-options) in the `netdata.conf` file, or run Netdata behind an Nginx proxy, and so on.
 
 ## Navigating the standard dashboard
 
@@ -34,9 +34,9 @@ All sections and their associated charts appear on a single "page," so all you n
 
 ![Screenshot of the menu](https://user-images.githubusercontent.com/1153921/62811361-38b96880-bab6-11e9-8d41-4d9b29778e86.png)
 
-Most menu items will contain a number of **submenu** entries, which represent any [families](../README.md#families) from that section. Netdata automatically generates these submenu entries.
+Most menu items will contain several **submenu** entries, which represent any [families](../README.md#families) from that section. Netdata automatically generates these submenu entries.
 
-Here's a **Disks** menu with a number of submenu entries for each disk drive and partition Netdata recognizes.
+Here's a **Disks** menu with several submenu entries for each disk drive and partition Netdata recognizes.
 
 ![Screenshot of some submenus](https://user-images.githubusercontent.com/1153921/62811428-70281500-bab6-11e9-9a61-ecd0a7aba453.png)
 
@@ -44,7 +44,7 @@ Here's a **Disks** menu with a number of submenu entries for each disk drive and
 
 The nodes menu appears in the top-left corner of the standard dashboard and is labeled with the hostname of the system Netdata is monitoring.
 
-Clicking on it will display a drop-down menu of any nodes you might have connected together via the [Netdata registry](../../registry/). By default, you'll find nothing under the **My nodes** heading, but you can try out any of the demo Netdata nodes to see how the nodes menu works.
+Clicking on it will display a drop-down menu of any nodes you might have connected via the [Netdata registry](../../registry/). By default, you'll find nothing under the **My nodes** heading, but you can try out any of the demo Netdata nodes to see how the nodes menu works.
 
 ![Screenshot of the default (empty) nodes menu](https://user-images.githubusercontent.com/1153921/62795508-c3d13900-ba8b-11e9-98ed-f0be1b201340.png)
 
@@ -54,22 +54,22 @@ Once you add nodes via [Netdata Cloud](../../docs/netdata-cloud/) or a [private 
 
 ## Customizing the standard dashboard
 
-Netdata stores information about individual charts in the `dashboard_info.js` file. This file includes section and subsection headings, descriptions, colors, titles, tooltips, and other information that's rendered on the dashboard.
+Netdata stores information about individual charts in the `dashboard_info.js` file. This file includes section and subsection headings, descriptions, colors, titles, tooltips, and other information for Netdata to render on the dashboard.
 
 For example, here is how `dashboard_info.js` defines the **System Overview** section.
 
 ```
 netdataDashboard.menu = {
-    'system': {
-        title: 'System Overview',
-        icon: '<i class="fas fa-bookmark"></i>',
-        info: 'Overview of the key system metrics.'
-    },
+ 'system': {
+ title: 'System Overview',
+ icon: '<i class="fas fa-bookmark"></i>',
+ info: 'Overview of the key system metrics.'
+ },
 ```
 
 If you want to customize this information, you should avoid editing `dashboard_info.js` directly. These changes are not persistent; Netdata will overwrite the file when it's updated. Instead, you should create a new file with your customizations.
 
-We created an example file at [`dashboard_info_custom_example.js`](dashboard_info_custom_example.js). You can copy this to a new file with a name of your choice in the `web/` directory. This directory changes based on your operating system and installation method, but on Linux systems is most often found at `/usr/share/netdata/web/`.
+We created an example file at [`dashboard_info_custom_example.js`](dashboard_info_custom_example.js). You can copy this to a new file with a name of your choice in the `web/` directory. This directory changes based on your operating system and installation method. If you're on a Linux system, it should be at `/usr/share/netdata/web/`.
 
 ```
 cd /usr/share/netdata/web/
@@ -80,11 +80,11 @@ Edit the file with your customizations. For example:
 
 ```
 customDashboard.menu = {
-    'system': {
-        title: 'Testing, testing, 1 2 3',
-        icon: '<i class="fas fa-thumbs-up"></i>',
-        info: 'This is overwritten info for the system overview section!'
-    },
+ 'system': {
+ title: 'Testing, testing, 1 2 3',
+ icon: '<i class="fas fa-thumbs-up"></i>',
+ info: 'This is overwritten info for the system overview section!'
+ },
 };
 ```
 
@@ -92,7 +92,7 @@ Finally, tell Netdata where you've put your customization file by replacing `you
 
 ```
 [web]
-   custom dashboard_info.js = your_dashboard_info_file.js
+ custom dashboard_info.js = your_dashboard_info_file.js
 ```
 
 Once you restart Netdata, refresh the dashboard to find your custom configuration:
