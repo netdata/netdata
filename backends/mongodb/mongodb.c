@@ -155,18 +155,11 @@ int read_mongodb_conf(const char *path, char **uri_p, char **database_p, char **
             continue;
         }
 
-        if(!value) value = "";
+        if(!value)
+            value = "";
+        else
+            value = strip_quotes(value);
 
-        // strip quotes
-        if(*value == '"' || *value == '\'') {
-            value++;
-
-            s = value;
-            while(*s) s++;
-            if(s != value) s--;
-
-            if(*s == '"' || *s == '\'') *s = '\0';
-        }
         if(name[0] == 'u' && !strcmp(name, "uri")) {
             uri = strdupz(value);
         }

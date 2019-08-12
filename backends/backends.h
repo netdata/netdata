@@ -57,6 +57,22 @@ extern calculated_number backend_calculate_value_from_stored_data(
 extern size_t backend_name_copy(char *d, const char *s, size_t usable);
 extern int discard_response(BUFFER *b, const char *backend);
 
+static inline char *strip_quotes(char *str) {
+    char *s;
+
+    if(*str == '"' || *str == '\'') {
+        str++;
+
+        s = str;
+        while(*s) s++;
+        if(s != str) s--;
+
+        if(*s == '"' || *s == '\'') *s = '\0';
+    }
+
+    return str;
+}
+
 #endif // BACKENDS_INTERNALS
 
 #include "backends/prometheus/backend_prometheus.h"
