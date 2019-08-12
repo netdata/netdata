@@ -192,7 +192,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         goto done;
     }
 
-    fprintf(stderr,"KILLME ST %s : %s %s\n",ae->name, rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status));
 
     // find the previous notification for the same alarm
     // which we have run the exec script
@@ -205,7 +204,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                 break;
         }
 
-        fprintf(stderr,"KILLME ND %s : %s %s\n",ae->name, rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status));
         if(likely(t)) {
             // we have executed this alarm notification in the past
             if(t && t->new_status == ae->new_status) {
@@ -224,7 +222,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                 goto done;
             }
         }
-        fprintf(stderr,"KILLME RD %s : %s %s\n",ae->name, rrdcalc_status2string(ae->old_status), rrdcalc_status2string(ae->new_status));
     }
 
     // Check if alarm notifications are silenced

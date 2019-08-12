@@ -27,9 +27,9 @@ change_alarm_file() {
 }
 
 netdata_test_download() {
-  OPT="-c"
+  OPT="-e"
   if [ "$3" == "I" ]; then
-    OPT="$OPT -v"
+    OPT="-v"
   fi
 
   grep "HTTP/1.1 200 OK" "$1" 2>/dev/null 1>/dev/null
@@ -40,8 +40,8 @@ netdata_test_download() {
     exit 1
   fi
 
-  COUNT=$(grep -w "\"last_repeat\":" "$2" | grep $OPT "\"0\"")
-  if [ $COUNT -eq 0 ]; then
+  COUNT=$(grep -w "\"last_repeat\":" "$2" | grep -c "$OPT" "\"0\"")
+  if [ "$COUNT" -eq "0" ]; then
     echo -e "${RED} Netdata gave an unexpected result when alarm repetition is $4"
     killall netdata
     exit 1
