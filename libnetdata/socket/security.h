@@ -25,7 +25,7 @@
 
 struct netdata_ssl{
     SSL *conn; //SSL connection
-    int flags;
+    int flags; //The flags for SSL connection
 };
 
 extern SSL_CTX *netdata_opentsdb_ctx;
@@ -33,9 +33,8 @@ extern SSL_CTX *netdata_client_ctx;
 extern SSL_CTX *netdata_srv_ctx;
 extern const char *security_key;
 extern const char *security_cert;
-extern int netdata_use_ssl_on_stream;
-extern int netdata_use_ssl_on_http;
 extern int netdata_validate_server;
+extern int security_location_for_context(SSL_CTX *ctx,char *file,char *path);
 
 void security_openssl_library();
 void security_clean_openssl();

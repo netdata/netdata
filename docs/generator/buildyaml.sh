@@ -104,7 +104,8 @@ markdown_extensions:
  - pymdownx.details
  - pymdownx.highlight:
     pygments_style: manni
-    noclasses: true
+    css_class: "highlight codehilite"
+    linenums_style: pymdownx-inline
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
@@ -163,6 +164,7 @@ echo -ne "        - Running behind another web server:
             - 'docs/Running-behind-apache.md'
             - 'docs/Running-behind-lighttpd.md'
             - 'docs/Running-behind-caddy.md'
+        - 'docs/Running-behind-haproxy.md'
 "
 #navpart 2 system
 navpart 2 database
@@ -172,6 +174,13 @@ navpart 2 registry
 echo -ne "    - 'docs/Performance.md'
     - 'docs/netdata-for-IoT.md'
     - 'docs/high-performance-netdata.md'
+"
+
+navpart 1 . netdata-cloud "Netdata Cloud"
+echo -ne "
+    - 'docs/netdata-cloud/README.md'
+    - 'docs/netdata-cloud/signing-in.md'
+    - 'docs/netdata-cloud/nodes-view.md'
 "
 
 navpart 1 collectors "" "Data collection" 1
@@ -263,10 +272,16 @@ navpart 2 web/api/badges "" "" 2
 navpart 2 web/api/health "" "" 2
 navpart 2 web/api/queries "" "Queries" 2
 
-echo -ne "- Additional Info:
+echo -ne "- Contributing to Netdata:
+    - CONTRIBUTING.md
+    - 'docs/contributing/contributing-documentation.md'
+    - 'docs/contributing/style-guide.md'
     - CODE_OF_CONDUCT.md
     - CONTRIBUTORS.md
     - packaging/maintainers/README.md
+"
+
+echo -ne "- Additional information:
 "
 navpart 2 packaging/makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4

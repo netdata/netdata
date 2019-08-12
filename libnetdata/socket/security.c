@@ -7,8 +7,6 @@ SSL_CTX *netdata_client_ctx=NULL;
 SSL_CTX *netdata_srv_ctx=NULL;
 const char *security_key=NULL;
 const char *security_cert=NULL;
-int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
-int netdata_use_ssl_on_http = NETDATA_SSL_FORCE; //We force SSL due safety reasons
 int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
 
 /**
@@ -20,7 +18,7 @@ int netdata_validate_server =  NETDATA_SSL_VALID_CERTIFICATE;
  * @param where the variable with the flags set.
  * @param ret the return of the caller
  */
-static void security_info_callback(const SSL *ssl, int where, int ret) {
+static void security_info_callback(const SSL *ssl, int where, int ret __maybe_unused) {
     (void)ssl;
     if (where & SSL_CB_ALERT) {
         debug(D_WEB_CLIENT,"SSL INFO CALLBACK %s %s", SSL_alert_type_string(ret), SSL_alert_desc_string_long(ret));
@@ -166,7 +164,7 @@ void security_start_ssl(int selector) {
     switch (selector) {
         case NETDATA_SSL_CONTEXT_SERVER: {
             struct stat statbuf;
-            if (stat(security_key,&statbuf) || stat(security_cert,&statbuf)) {
+            if (stat(security_key, &statbuf) || stat(security_cert, &statbuf)) {
                 info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 return;
             }
@@ -176,6 +174,9 @@ void security_start_ssl(int selector) {
         }
         case NETDATA_SSL_CONTEXT_STREAMING: {
             netdata_client_ctx = security_initialize_openssl_client();
+            //This is necessary for the stream, because it is working sometimes with nonblock socket.
+            //It returns the bitmask afte to change, there is not any description of errors in the documentation
+            SSL_CTX_set_mode(netdata_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
             break;
         }
         case NETDATA_SSL_CONTEXT_OPENTSDB: {
@@ -185,6 +186,11 @@ void security_start_ssl(int selector) {
     }
 }
 
+/**
+ * Clean Open SSL
+ *
+ * Clean all the allocated contexts from netdata.
+ */
 void security_clean_openssl() {
 	if (netdata_srv_ctx)
 	{
@@ -206,6 +212,17 @@ void security_clean_openssl() {
 #endif
 }
 
+/**
+ * Process accept
+ *
+ * Process the SSL handshake with the client case it is necessary.
+ *
+ * @param ssl is a pointer for the SSL structure
+ * @param msg is a copy of the first 8 bytes of the initial message received
+ *
+ * @return it returns 0 case it performs the handshake, 8 case it is clean connection
+ *  and another integer power of 2 otherwise.
+ */
 int security_process_accept(SSL *ssl,int msg) {
     int sock = SSL_get_fd(ssl);
     int test;
@@ -250,9 +267,18 @@ int security_process_accept(SSL *ssl,int msg) {
         debug(D_WEB_CLIENT_ACCESS,"SSL Handshake finished %s errno %d on socket fd %d", ERR_error_string((long)SSL_get_error(ssl, test), NULL), errno, sock);
     }
 
-    return 0;
+    return NETDATA_SSL_HANDSHAKE_COMPLETE;
 }
 
+/**
+ * Test Certificate
+ *
+ * Check the certificate of Netdata master
+ *
+ * @param ssl is the connection structure
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
 int security_test_certificate(SSL *ssl) {
     X509* cert = SSL_get_peer_certificate(ssl);
     int ret;
@@ -271,7 +297,48 @@ int security_test_certificate(SSL *ssl) {
     } else {
         ret = 0;
     }
+
     return ret;
+}
+
+/**
+ * Location for context
+ *
+ * Case the user give us a directory with the certificates available and
+ * the Netdata master certificate, we use this function to validate the certificate.
+ *
+ * @param ctx the context where the path will be set.
+ * @param file the file with Netdata master certificate.
+ * @param path the directory where the certificates are stored.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
+    struct stat statbuf;
+    if (stat(file, &statbuf)) {
+        info("Netdata does not have a SSL master certificate, so it will use the default OpenSSL configuration to validate certificates!");
+        return 0;
+    }
+
+    ERR_clear_error();
+    u_long err;
+    char buf[256];
+    if(!SSL_CTX_load_verify_locations(ctx, file, path)) {
+        goto slfc;
+    }
+
+    if(!SSL_CTX_set_default_verify_paths(ctx)) {
+        goto slfc;
+    }
+
+    return 0;
+
+slfc:
+    while ((err = ERR_get_error()) != 0) {
+        ERR_error_string_n(err, buf, sizeof(buf));
+        error("Cannot set the directory for the certificates and the master SSL certificate: %s",buf);
+    }
+    return -1;
 }
 
 #endif

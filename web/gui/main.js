@@ -704,11 +704,11 @@ function restrictMyNetdataMenu() {
     </div>`);
 }
 
-function openAuthenticatedUrl(url) {  
+function openAuthenticatedUrl(url) {
     if (isSignedIn()) {
         window.open(url);
     } else {
-        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`);
+        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}&redirectUrl=${encodeURIComponent(window.location.origin + "/" + url)}`);
     }
 }
 
@@ -1775,8 +1775,6 @@ function renderPage(menus, data) {
                 if (urlOptions.mode === 'print') {
                     chtml += '</div>';
                 }
-
-                // console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
             }
 
             head += '</div>';
@@ -2747,7 +2745,7 @@ function initializeDynamicDashboardWithData(data) {
         }
 
         // update the dashboard hostname
-        document.getElementById('hostname').innerHTML = options.hostname + ((netdataSnapshotData !== null) ? ' (snap)' : '').toString() + '&nbsp;&nbsp;<strong class="caret">';
+        document.getElementById('hostname').innerHTML = '<span id="hostnametext">' + options.hostname + ((netdataSnapshotData !== null) ? ' (snap)' : '').toString() + '</span>&nbsp;&nbsp;<strong class="caret">';
         document.getElementById('hostname').href = NETDATA.serverDefault;
         document.getElementById('netdataVersion').innerHTML = options.version;
 
@@ -4899,6 +4897,9 @@ function handleSignInMessage(e) {
     cloudToken = e.data.token;
 
     netdataRegistryCallback(registryAgents);
+    if (e.data.redirectUrl) {
+        window.location.replace(e.data.redirectUrl);
+    }
 }
 
 function handleSignOutMessage(e) {

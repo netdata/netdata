@@ -2,14 +2,15 @@
 #shellcheck disable=SC2181
 #
 # This is the netdata uninstaller script
+#
 # Variables needed by script and taken from '.environment' file:
 #  - NETDATA_PREFIX
 #  - NETDATA_ADDED_TO_GROUPS
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
-#
+# Author: Paweł Krupa <paulfantom@gmail.com>
+# Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 
 usage="$(basename "$0") [-h] [-f ] -- program to calculate the answer to life, the universe and everything
 

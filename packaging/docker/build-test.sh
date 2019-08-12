@@ -46,27 +46,29 @@ do
 	esac
 done
 
-if [ -n "${REPOSITORY}" ] && [ -n "${VERSION}" ] && [ -n "${DOCKER_USERNAME}" ] && [ -n "${DOCKER_PWD}" ] ; then
+if [ -n "${REPOSITORY}" ]; then
 	if [ $DOBUILD -eq 1 ] ; then
-		echo "Building ${VERSION} of ${REPOSITORY} container"
+		echo "Building ${VERSION:-latest} of ${REPOSITORY} container"
 		docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 		# Build images using multi-arch Dockerfile.
-		eval docker build --build-arg ARCH="amd64" --tag "${REPOSITORY}:${VERSION}" --file packaging/docker/Dockerfile ./
+		eval docker build --build-arg ARCH="amd64" --tag "${REPOSITORY}:${VERSION:-latest}" --file packaging/docker/Dockerfile ./
 
 		# Create temporary docker CLI config with experimental features enabled (manifests v2 need it)
 		mkdir -p /tmp/docker
 		#echo '{"experimental":"enabled"}' > /tmp/docker/config.json
 	fi
 
-	# Login to docker hub to allow futher operations
-	echo "Logging into docker"
-	echo "$DOCKER_PWD" | docker --config /tmp/docker login -u "$DOCKER_USERNAME" --password-stdin
+    if [ -n "${DOCKER_USERNAME}" ] && [ -n "${DOCKER_PWD}" ] ; then
+        # Login to docker hub to allow futher operations
+        echo "Logging into docker"
+        echo "$DOCKER_PWD" | docker --config /tmp/docker login -u "$DOCKER_USERNAME" --password-stdin
 
-	echo "Pushing ${REPOSITORY}:${VERSION}"
-	docker --config /tmp/docker push "${REPOSITORY}:${VERSION}"
+        echo "Pushing ${REPOSITORY}:${VERSION}"
+        docker --config /tmp/docker push "${REPOSITORY}:${VERSION}"
+    fi
 else
-	echo "Missing parameter. REPOSITORY=${REPOSITORY} VERSION=${VERSION} DOCKER_USERNAME=${DOCKER_USERNAME} DOCKER_PWD=${DOCKER_PWD}"
+	echo "Missing parameter. REPOSITORY=${REPOSITORY}"
 	printhelp
 	exit 1
 fi

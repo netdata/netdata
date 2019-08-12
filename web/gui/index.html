@@ -16,23 +16,6 @@
     <link rel="stylesheet" type="text/css" href="main.css?v=5">
 
     <link rel="icon" href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAP9JREFUeNpiYBgFo+A/w34gpiZ8DzWzAYgNiHGAA5UdgA73g+2gcyhgg/0DGQoweB6IBQYyFCCOGOBQwBMd/xnW09ERDtgcoEBHB+zHFQrz6egIBUasocDAcJ9OxWAhE4YQI8MDILmATg7wZ8QRDfQKhQf4Cie6pAVGPA4AhQKo0BCgZRAw4ZSBpIWJNI6CD4wEKikBaFqgVSgcYMIrzcjwgcahcIGRiPYCLUPBkNhWUwP9akVcoQBpatG4MsLviAIqWj6f3Absfdq2igg7IIEKDVQKEzN5ofAenJCp1I8gJRTug5tfkGIdR1FDniMI+QZUjF8Amn5htOdHCAAEGACE6B0cS6mrEwAAAABJRU5ErkJggg==" />
-    <!-- <link rel="apple-touch-icon" sizes="57x57" href="images/apple-icon-57x57.png">
-    <link rel="apple-touch-icon" sizes="60x60" href="images/apple-icon-60x60.png">
-    <link rel="apple-touch-icon" sizes="72x72" href="images/apple-icon-72x72.png">
-    <link rel="apple-touch-icon" sizes="76x76" href="images/apple-icon-76x76.png">
-    <link rel="apple-touch-icon" sizes="114x114" href="images/apple-icon-114x114.png">
-    <link rel="apple-touch-icon" sizes="120x120" href="images/apple-icon-120x120.png">
-    <link rel="apple-touch-icon" sizes="144x144" href="images/apple-icon-144x144.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="images/apple-icon-152x152.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="images/apple-icon-180x180.png">
-    <link rel="icon" type="image/png" sizes="192x192"  href="images/android-icon-192x192.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="96x96" href="images/favicon-96x96.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="images/favicon-16x16.png">
-    <link rel="manifest" href="manifest.json">
-    <meta name="msapplication-TileColor" content="#ffffff">
-    <meta name="msapplication-TileImage" content="images/ms-icon-144x144.png">
-    <meta name="theme-color" content="#ffffff"> -->
 
     <meta property="og:locale"             content="en_US" />
     <meta property="og:url"                content="https://my-netdata.io" />
@@ -80,23 +63,6 @@
     </script>
     <nav class="navbar navbar-default navbar-fixed-top" role="banner">
         <div class="container">
-            <!-- <nav id="mynetdata_nav" class="collapse navbar-collapse navbar-left" role="navigation" style="padding-right: 20px;">
-                <ul class="nav navbar-nav">
-                    <li data-placement="right" style="line-height: 50px; margin-right: 15px" title="Netdata Agent">
-                       <img src="images/netdata-logomark.svg" height="32"/>
-                    </li>
-                    <li class="dropdown" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
-                        <a href="#" id="hostname" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
-                        <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
-                            <div class="agent-item" style="white-space: nowrap">
-                                <i class="fas fa-hourglass-half"></i>
-                                Loading, please wait...
-                                <div></div>
-                            </div>                            
-                        </div>
-                    </li>
-                </ul>
-            </nav> -->
             <div class="navbar-header">
                 <button class="navbar-toggle" type="button" data-toggle="collapse" data-target=".navbar-collapse">
                     <span class="sr-only">Toggle navigation</span>
@@ -104,13 +70,14 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
-                <!-- <a href="/" class="navbar-brand" id="1hostname" title="server hostname<br/>click it to reload the dashboard" data-toggle="tooltip" data-placement="bottom">netdata</a> -->
                 <ul class="nav navbar-nav" style="display: inline-block">
                     <li data-placement="right" class="hidden-xs hidden-sm" style="line-height: 50px; margin-right: 15px" title="Netdata Agent">
                        <img src="images/netdata-logomark.svg" height="32"/>
                     </li>
                     <li class="dropdown" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
-                        <a href="#" id="hostname" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
+                        <a href="#" id="hostname" class="dropdown-toggle" data-toggle="dropdown">
+                        my-netdata
+                        <strong class="caret"></strong></a>
                         <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
                             <div class="agent-item" style="white-space: nowrap">
                                 <i class="fas fa-hourglass-half"></i>
@@ -135,26 +102,6 @@
                     <li title="print this dashboard to PDF" data-toggle="tooltip" data-placement="bottom" id="printButton"><a href="#" class="btn" data-toggle="modal" data-target="#printPreflightModal"><i class="fas fa-print"></i>&nbsp;<span class="hidden-sm hidden-md hidden-lg">Print</span></a></li>
                     <li title="get help on using the charts" data-toggle="tooltip" data-placement="bottom" class="hidden-sm"><a href="#" class="btn" data-toggle="modal" data-target="#helpModal"><i class="fas fa-question-circle"></i>&nbsp;<span class="hidden-sm hidden-md">Help</span></a></li>
                     <li id="account-menu-container" class="dropdown" data-toggle="tooltip"></li>
-                    <!--
-                    <li class="dropdown hidden-sm hidden-md hidden-lg" id="myNetdataDropdownParent" title="your other netdata servers" data-toggle="tooltip" data-placement="right">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">my-netdata <strong class="caret"></strong></a>
-                        <div id="my-netdata-dropdown-content" class="dropdown-menu scrollable-menu inpagemenu">
-                            <div class="agent-item" style="white-space: nowrap">
-                                <i class="fas fa-hourglass-half"></i>
-                                Loading, please wait...
-                                <div></div>
-                            </div>                            
-                        </div>
-                    </li>
-                    -->
-                    <!--
-                    <li class="dropdown hidden-sm hidden-md hidden-lg">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">My Nodes <strong class="caret"></strong></a>
-                        <ul id="mynetdata_servers2" class="dropdown-menu scrollable-menu inpagemenu" role="menu">
-                            <li><a href="#" onclick="return false;" style="color: #999;">loading...</a></li>
-                        </ul>
-                    </li>
-                    -->
                 </ul>
             </nav>
         </div>
