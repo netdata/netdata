@@ -58,9 +58,9 @@ extern size_t backend_name_copy(char *d, const char *s, size_t usable);
 extern int discard_response(BUFFER *b, const char *backend);
 
 static inline char *strip_quotes(char *str) {
-    char *s;
-
     if(*str == '"' || *str == '\'') {
+        char *s;
+
         str++;
 
         s = str;

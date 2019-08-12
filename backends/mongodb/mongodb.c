@@ -9,7 +9,10 @@
 mongoc_client_t *mongodb_client;
 mongoc_collection_t *mongodb_collection;
 
-int mongodb_init(const char *uri_string, const char *database_string, const char *collection_string, int32_t socket_timeout) {
+int mongodb_init(const char *uri_string,
+                 const char *database_string,
+                 const char *collection_string,
+                 int32_t default_socket_timeout) {
     mongoc_uri_t *uri;
     bson_error_t error;
 
@@ -21,7 +24,7 @@ int mongodb_init(const char *uri_string, const char *database_string, const char
         return 1;
     }
 
-    socket_timeout = mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
+    int32_t socket_timeout = mongoc_uri_get_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, default_socket_timeout);
     if(!mongoc_uri_set_option_as_int32(uri, MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout)) {
         error("BACKEND: failed to set %s to the value %d", MONGOC_URI_SOCKETTIMEOUTMS, socket_timeout);
         return 1;

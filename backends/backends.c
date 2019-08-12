@@ -485,7 +485,7 @@ void *backends_main(void *ptr) {
     char *mongodb_collection = NULL;
 
     // set the default socket timeout in ms
-    int32_t mongodb_socket_timeout = (int32_t)(global_backend_update_every >= 2)?(global_backend_update_every * MSEC_PER_SEC - 500):1000;
+    int32_t mongodb_default_socket_timeout = (int32_t)(global_backend_update_every >= 2)?(global_backend_update_every * MSEC_PER_SEC - 500):1000;
 
 #endif
 
@@ -595,7 +595,7 @@ void *backends_main(void *ptr) {
                 goto cleanup;
             }
 
-            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_socket_timeout))) {
+            if(likely(!mongodb_init(mongodb_uri, mongodb_database, mongodb_collection, mongodb_default_socket_timeout))) {
                 backend_set_mongodb_variables(&default_port, &backend_response_checker, &backend_request_formatter);
                 do_mongodb = 1;
             }
