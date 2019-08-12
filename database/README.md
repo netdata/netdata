@@ -25,25 +25,25 @@ use the **[Database Engine](engine/)**.
 
 Currently netdata supports 6 memory modes:
 
-1. `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and
+1.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and
    supports [KSM](#ksm).
 
-2. `save`, (the default) data are only in RAM while netdata runs and are saved to / loaded from
+2.  `save`, (the default) data are only in RAM while netdata runs and are saved to / loaded from
    disk on netdata restart. It also uses `mmap()` and supports [KSM](#ksm).
 
-3. `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this
+3.  `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this
    will have a constant write on your disk. When netdata writes data on its memory, the Linux kernel
    marks the related memory pages as dirty and automatically starts updating them on disk.
    Unfortunately we cannot control how frequently this works. The Linux kernel uses exactly the
    same algorithm it uses for its swap memory. Check below for additional information on running a
    dedicated central netdata server. This mode uses `mmap()` but does not support [KSM](#ksm).
 
-4. `none`, without a database (collected metrics can only be streamed to another netdata).
+4.  `none`, without a database (collected metrics can only be streamed to another netdata).
 
-5. `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the
+5.  `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the
    fallback for all others except `none`.
 
-6. `dbengine`, data are in database files. The [Database Engine](engine/) works like a traditional
+6.  `dbengine`, data are in database files. The [Database Engine](engine/) works like a traditional
    database. There is some amount of RAM dedicated to data caching and indexing and the rest of
    the data reside compressed on disk. The number of history entries is not fixed in this case,
    but depends on the configured disk space and the effective compression ratio of the data stored.
@@ -66,8 +66,8 @@ Embedded devices usually have very limited RAM resources available.
 
 There are 2 settings for you to tweak:
 
-1. `update every`, which controls the data collection frequency
-2. `history`, which controls the size of the database in RAM
+1.  `update every`, which controls the data collection frequency
+2.  `history`, which controls the size of the database in RAM
 
 By default `update every = 1` and `history = 3600`. This gives you an hour of data with per
 second updates.
@@ -105,17 +105,17 @@ explaining them, a brief introduction of how netdata database works is needed.
 
 For each chart, netdata maps the following files:
 
-1. `chart/main.db`, this is the file that maintains chart information. Every time data are collected
+1.  `chart/main.db`, this is the file that maintains chart information. Every time data are collected
    for a chart, this is updated.
    
-2. `chart/dimension_name.db`, this is the file for each dimension. At its beginning there is a
+2.  `chart/dimension_name.db`, this is the file for each dimension. At its beginning there is a
    header, followed by the round robin database where metrics are stored.
 
 So, every time netdata collects data, the following pages will become dirty:
 
-1. the chart file
-2. the header part of all dimension files
-3. if the collected metrics are stored far enough in the dimension file, another page will
+1.  the chart file
+2.  the header part of all dimension files
+3.  if the collected metrics are stored far enough in the dimension file, another page will
    become dirty, for each dimension
 
 Each page in Linux is 4KB. So, with 200 charts and 1000 dimensions, there will be 1200 to 2200 4KB
@@ -143,8 +143,8 @@ get an abnormal shutdown.
 
 There are 2 more options to tweak:
 
-1. `dirty_background_ratio`, by default `10`.
-2. `dirty_ratio`, by default `20`.
+1.  `dirty_background_ratio`, by default `10`.
+2.  `dirty_ratio`, by default `20`.
 
 These control the amount of memory that should be dirty for disk syncing to be triggered.
 On dedicated netdata servers, you can use: `80` and `90` respectively, so that all RAM is given
@@ -155,7 +155,8 @@ of system crash, data on disk will be up to 10 minutes old.
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/23835030/ba4bf506-0768-11e7-9bc6-3b23e080c69f.png)
 
-To have these settings automatically applied on boot, create the file `/etc/sysctl.d/netdata-memory.conf` with these contents:
+To have these settings automatically applied on boot, 
+create the file `/etc/sysctl.d/netdata-memory.conf` with these contents:
 
 ```
 vm.dirty_expire_centisecs = 60000
@@ -202,15 +203,18 @@ CONFIG_KSM=y
 
 When KSM is enabled at the kernel is just available for the user to enable it.
 
-So, if you build a kernel with `CONFIG_KSM=y` you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else happens. There is no performance penalty (apart I guess from the memory this code occupies into the kernel).
+So, if you build a kernel with `CONFIG_KSM=y` you will just get a few files in `/sys/kernel/mm/ksm`. 
+Nothing else happens. 
+There is no performance penalty (apart I guess from the memory this code occupies into the kernel).
 
 The files that `CONFIG_KSM=y` offers include:
 
-- `/sys/kernel/mm/ksm/run` by default `0`. You have to set this to `1` for the kernel to spawn `ksmd`.
-- `/sys/kernel/mm/ksm/sleep_millisecs`, by default `20`. The frequency ksmd should evaluate memory for deduplication.
-- `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages ksmd will evaluate on each run.
+-   `/sys/kernel/mm/ksm/run` by default `0`. You have to set this to `1` for the kernel to spawn `ksmd`.
+-   `/sys/kernel/mm/ksm/sleep_millisecs`, by default `20`. The frequency ksmd should evaluate memory for deduplication.
+-   `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages ksmd will evaluate on each run.
 
-So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources he/she is willing `ksmd` to use.
+So, by default `ksmd` is just disabled. 
+It will not harm performance and the user/admin can control the CPU resources he/she is willing `ksmd` to use.
 
 ### Run `ksmd` kernel daemon
 
