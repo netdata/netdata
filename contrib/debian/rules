@@ -55,7 +55,7 @@ override_dh_install: debian/netdata.postinst
 
 	# Install go
 	#
-	debian/install_go.sh $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/ $(TOP)/usr/libexec/netdata
+	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/ $(TOP)/usr/libexec/netdata
 
 override_dh_installdocs:
 	dh_installdocs
