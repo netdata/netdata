@@ -1,6 +1,6 @@
 # OpenSIPS
 
-*Under construction*
+_Under construction_
 
 Collects OpenSIPS metrics
 
