@@ -84,6 +84,7 @@ dist_healthconfig_DATA = \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
     health.d/varnish.conf \
+    health.d/vsphere.conf \
     health.d/web_log.conf \
     health.d/wmi.conf \
     health.d/x509check.conf \

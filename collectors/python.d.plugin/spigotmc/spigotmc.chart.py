@@ -52,7 +52,13 @@ _TPS_REGEX = re.compile(
     re.X
 )
 _LIST_REGEX = re.compile(
-    r'(\d+)',  # Current user count.
+    # Examples:
+    # There are 4 of a max 50 players online: player1, player2, player3, player4
+    # §6There are §c4§6 out of maximum §c50§6 players online.
+    # §6There are §c3§6/§c1§6 out of maximum §c50§6 players online.
+    # §6当前有 §c4§6 个玩家在线,最大在线人数为 §c50§6 个玩家.
+    # §c4§6 人のプレイヤーが接続中です。最大接続可能人数\:§c 50
+    r'[^§](\d+)(?:.*?(?=/).*?[^§](\d+))?',  # Current user count.
     re.X
 )
 
@@ -85,6 +91,7 @@ class Service(SimpleService):
         self.console.connect(self.host, self.port, self.password)
 
     def reconnect(self):
+        self.error('try reconnect.')
         try:
             try:
                 self.console.disconnect()
@@ -99,7 +106,7 @@ class Service(SimpleService):
         return True
 
     def is_alive(self):
-        if not any(
+        if any(
             [
                 not self.alive,
                 self.console.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1
@@ -139,7 +146,13 @@ class Service(SimpleService):
                 raw = self.console.command(COMMAND_ONLINE)
                 match = _LIST_REGEX.search(raw)
             if match:
-                data['users'] = int(match.group(1))
+                users = int(match.group(1))
+                hidden_users = match.group(2)
+                if hidden_users:
+                    hidden_users = int(hidden_users)
+                else:
+                    hidden_users = 0
+                data['users'] = users + hidden_users
             else:
                 if not raw:
                     self.error("'{0}' and '{1}' commands returned no value, make sure you set correct password".format(

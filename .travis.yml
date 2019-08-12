@@ -1,5 +1,4 @@
 dist: xenial
-sudo: true
 language: c
 services:
   - docker
