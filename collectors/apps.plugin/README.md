@@ -80,7 +80,7 @@ To do this, edit `/etc/netdata/netdata.conf` and find this section:
 	# command options =
 ```
 
-Uncomment the line `update every` and set it to a higher number. If you just set it to ` 2 `,
+Uncomment the line `update every` and set it to a higher number. If you just set it to `2`,
 its CPU resources will be cut in half, and data collection will be once every 2 seconds.
 
 ## Configuration
@@ -109,24 +109,24 @@ The process names are the ones returned by:
 -   in case of substring mode (see below): `/proc/PID/cmdline`
 
 To add process names with spaces, enclose them in quotes (single or double)
-example: ` 'Plex Media Serv' ` or ` "my other process" `.
+example: `'Plex Media Serv'` or `"my other process"`.
 
-You can add an asterisk ` * ` at the beginning and/or the end of a process:
+You can add an asterisk `*` at the beginning and/or the end of a process:
 
--   `*name` _suffix_ mode: will search for processes ending with `name` (at `/proc/PID/stat`)
--   `name*` _prefix_ mode: will search for processes beginning with `name` (at `/proc/PID/stat`)
--   `*name*` _substring_ mode: will search for `name` in the whole command line (at `/proc/PID/cmdline`)
+-   `*name` *suffix* mode: will search for processes ending with `name` (at `/proc/PID/stat`)
+-   `name*` *prefix* mode: will search for processes beginning with `name` (at `/proc/PID/stat`)
+-   `*name*` *substring* mode: will search for `name` in the whole command line (at `/proc/PID/cmdline`)
 
-If you enter even just one _name_ (substring), `apps.plugin` will process
+If you enter even just one *name* (substring), `apps.plugin` will process
 `/proc/PID/cmdline` for all processes (of course only once per process: when they are first seen).
 
-To add processes with single quotes, enclose them in double quotes: ` "process with this ' single quote" `
+To add processes with single quotes, enclose them in double quotes: `"process with this ' single quote"`
 
-To add processes with double quotes, enclose them in single quotes: ` 'process with this " double quote' `
+To add processes with double quotes, enclose them in single quotes: `'process with this " double quote'`
 
-If a group or process name starts with a ` - `, the dimension will be hidden from the chart (cpu chart only).
+If a group or process name starts with a `-`, the dimension will be hidden from the chart (cpu chart only).
 
-If a process starts with a ` + `, debugging will be enabled for it (debugging produces a lot of output - do not enable it in production systems).
+If a process starts with a `+`, debugging will be enabled for it (debugging produces a lot of output - do not enable it in production systems).
 
 You can add any number of groups. Only the ones found running will affect the charts generated.
 However, producing charts with hundreds of dimensions may slow down your web browser.
@@ -318,8 +318,8 @@ FILE SYS    Used  Total      0.3   2.1  7009 netdata      0 S /usr/sbin/netdata
 
 #### why this happens?
 
-All the console tools report usage based on the processes found running _at the moment they
-examine the process tree_. So, they see just one `ls` command, which is actually very quick
+All the console tools report usage based on the processes found running *at the moment they
+examine the process tree*. So, they see just one `ls` command, which is actually very quick
 with minor CPU utilization. But the shell, is spawning hundreds of them, one after another
 (much like shell scripts do).
 
@@ -328,12 +328,12 @@ with minor CPU utilization. But the shell, is spawning hundreds of them, one aft
 The total CPU utilization of the system:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/21076212/9198e5a6-bf2e-11e6-9bc0-6bdea25befb2.png)
-<br/>_**Figure 1**: The system overview section at netdata, just a few seconds after the command was run_
+<br/>***Figure 1**: The system overview section at netdata, just a few seconds after the command was run*
 
 And at the applications `apps.plugin` breaks down CPU usage per application:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/21076220/c9687848-bf2e-11e6-8d81-348592c5aca2.png)
-<br/>_**Figure 2**: The Applications section at netdata, just a few seconds after the command was run_
+<br/>***Figure 2**: The Applications section at netdata, just a few seconds after the command was run*
 
 So, the `ssh` session is using 95% CPU time.
 
@@ -370,4 +370,4 @@ if you sum the CPU utilization of all processes, you might have more CPU time th
 total cpu time of the system. netdata solves this, by adapting the per process cpu utilization to
 the total of the system. [Netdata adds charts that document this normalization](https://london.my-netdata.io/default.html#menu_netdata_submenu_apps_plugin).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fapps.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fapps.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

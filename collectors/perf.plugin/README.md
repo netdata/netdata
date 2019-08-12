@@ -15,6 +15,7 @@ event for every CPU core needs a separate file descriptor to be opened.
 The plugin provides statistics for general hardware and software performance monitoring events:
 
 Hardware events:
+
 1.  CPU cycles
 2.  Instructions
 3.  Branch instructions
@@ -23,11 +24,13 @@ Hardware events:
 6.  Stalled frontend and backend cycles
 
 Software events:
+
 1.  CPU migrations
 2.  Alignment faults
 3.  Emulation faults
 
 Hardware cache events:
+
 1.  L1D cache operations
 2.  L1D prefetch cache operations
 3.  L1I cache operations
@@ -69,4 +72,4 @@ sudo /usr/libexec/netdata/plugins.d/perf.plugin 1 all debug
 
 You will get verbose output on what the plugin does.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fperf.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fperf.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
