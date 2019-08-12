@@ -289,7 +289,7 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_decompress_safe],
+    [LZ4_compress_default],
     [LZ4_LIBS="-llz4"]
 )
 
@@ -441,6 +441,14 @@ if test "${GCC}" = "yes"; then
 else
     AC_DEFINE_UNQUOTED([likely(x)], [(x)], [gcc branch optimization])
     AC_DEFINE_UNQUOTED([unlikely(x)], [(x)], [gcc branch optimization])
+fi
+
+if test "${GCC}" = "yes"; then
+    AC_DEFINE([__always_unused], [__attribute__((unused))], [gcc unused attribute])
+    AC_DEFINE([__maybe_unused], [__attribute__((unused))], [gcc unused attribute])
+else
+    AC_DEFINE([__always_unused], [], [dummy unused attribute])
+    AC_DEFINE([__maybe_unused], [], [dummy unused attribute])
 fi
 
 if test "${enable_pedantic}" = "yes"; then
@@ -880,7 +888,7 @@ AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "ye
 
 PKG_CHECK_MODULES(
     [PROTOBUF],
-    [protobuf],
+    [protobuf >= 3],
     [have_libprotobuf=yes],
     [have_libprotobuf=no]
 )

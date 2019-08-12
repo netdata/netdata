@@ -201,6 +201,7 @@ NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
 RELEASE_CHANNEL="nightly"
+IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
 while [ -n "${1}" ]; do
 	case "${1}" in
 		"--zlib-is-really-here") LIBS_ARE_HERE=1;;
@@ -777,7 +778,7 @@ fi
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.7.0"
+	GO_PACKAGE_VERSION="$(cat packaging/go.d.version)"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
@@ -803,7 +804,7 @@ install_go() {
 			fi
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 
@@ -836,11 +837,13 @@ install_go() {
 		run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
 		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-		run mv "${tmp}/$GO_PACKAGE_BASENAME" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
+		run mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		if [ "${UID}" -eq 0 ]; then
 			run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		fi
 		run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		rm -rf "${tmp}"
 	fi
 	return 0
 }
@@ -988,8 +991,13 @@ fi
 
 # -----------------------------------------------------------------------------
 progress "Copy uninstaller"
-sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > ${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh
-chmod 750 ${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh
+if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-uninstaller.sh ]; then
+	echo >&2 "Removing uninstaller from old location"
+	rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-uninstaller.sh;
+fi
+
+sed "s|ENVIRONMENT_FILE=\"/etc/netdata/.environment\"|ENVIRONMENT_FILE=\"${NETDATA_PREFIX}/etc/netdata/.environment\"|" packaging/installer/netdata-uninstaller.sh > ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh
+chmod 750 ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh
 
 # -----------------------------------------------------------------------------
 progress "Basic netdata instructions"
@@ -1010,19 +1018,24 @@ To start netdata run:
   ${TPUT_YELLOW}${TPUT_BOLD}${NETDATA_START_CMD}${TPUT_RESET}
 
 END
-echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-uninstaller.sh${TPUT_RESET}"
+echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh${TPUT_RESET}"
 echo >&2
 
 progress "Install netdata updater tool"
 
-if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
-	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" || exit 1
-else
-	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" || exit 1
+if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh ]; then
+	echo >&2 "Removing updater from previous location"
+	rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
 fi
 
-chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh
-echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh${TPUT_RESET}"
+if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
+	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || exit 1
+else
+	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || exit 1
+fi
+
+chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh
+echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh${TPUT_RESET}"
 echo >&2
 
 # Figure out the cron directory for the distro
@@ -1046,7 +1059,7 @@ else
 		echo >&2 "Adding to cron"
 
 		rm -f "${crondir}/netdata-updater"
-		ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" "${crondir}/netdata-updater"
+		ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "${crondir}/netdata-updater"
 
 		echo >&2 "Auto-updating has been enabled. Updater script linked to: ${TPUT_RED}${TPUT_BOLD}${crondir}/netdata-update${TPUT_RESET}"
 		echo >&2
@@ -1065,7 +1078,10 @@ else
 	fi
 fi
 
+progress "Wrap up environment set up"
+
 # Save environment variables
+echo >&2 "Preparing .environment file"
 cat <<EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 # Created by installer
 PATH="${PATH}"
@@ -1077,10 +1093,14 @@ INSTALL_UID="${UID}"
 NETDATA_GROUP="${NETDATA_GROUP}"
 REINSTALL_COMMAND="${REINSTALL_COMMAND}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
-# This value is meant to be populated by autoupdater (if enabled)
-NETDATA_TARBALL_CHECKSUM="new_installation"
+IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
+NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
 EOF
 
+echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
+cat <<EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
+new_installation
+EOF
 
 # -----------------------------------------------------------------------------
 echo >&2

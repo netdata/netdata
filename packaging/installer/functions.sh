@@ -380,10 +380,17 @@ install_netdata_service() {
 			fi
 
 			if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
+				ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="run systemctl enable netdata"
+				IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+				if [ "${IS_NETDATA_ENABLED}" == "disabled" ]; then
+					echo >&2 "Netdata was there and disabled, make sure we don't re-enable it ourselves"
+					ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED="true"
+				fi
+
 				echo >&2 "Installing systemd service..."
 				run cp system/netdata.service "${SYSTEMD_DIRECTORY}/netdata.service" &&
 					run systemctl daemon-reload &&
-					run systemctl enable netdata &&
+					${ENABLE_NETDATA_IF_PREVIOUSLY_ENABLED} &&
 					return 0
 			else
 				echo >&2 "no systemd directory; cannot install netdata.service"

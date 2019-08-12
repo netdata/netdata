@@ -1137,7 +1137,7 @@ void *backends_main(void *ptr) {
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
         } else
-#else
+#endif
         if(failures > buffer_on_failures) {
             // too bad! we are going to lose data
             chart_lost_bytes += buffer_strlen(b);
@@ -1147,7 +1147,6 @@ void *backends_main(void *ptr) {
             chart_data_lost_events++;
             chart_lost_metrics = chart_buffered_metrics;
         }
-#endif /* ENABLE_PROMETHEUS_REMOTE_WRITE */
 
         if(unlikely(netdata_exit)) break;
 
@@ -1204,10 +1203,9 @@ cleanup:
 #endif
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
-    if(do_prometheus_remote_write) {
-        buffer_free(http_request_header);
+    buffer_free(http_request_header);
+    if(do_prometheus_remote_write)
         protocol_buffers_shutdown();
-    }
 #endif
 
 #if HAVE_MONGOC

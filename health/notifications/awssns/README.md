@@ -16,7 +16,7 @@ To get this working, you will need:
 * An Amazon SNS topic to send notifications to with one or more subscribers.  The [Getting Started](https://docs.aws.amazon.com/sns/latest/dg/GettingStarted.html) section of the Amazon SNS documentation covers the basics of how to set this up.  Make note of the Topic ARN when you create the topic.
 * While not mandatory, it is highly recommended to create a dedicated IAM user on your account for netdata to send notifications.  This user needs to have programmatic access, and should only allow access to SNS.  If you're really paranoid, you can create one for each system or group of systems.
 
-Once you have all the above, run the follwing command as the user netdata runs under:
+Once you have all the above, run the following command as the user netdata runs under:
 
     aws configure
 

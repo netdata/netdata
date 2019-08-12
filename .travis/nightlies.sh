@@ -10,8 +10,9 @@
 # Author  : Pawel Krupa (paulfantom)
 # Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
 set -e
-
 FAIL=0
+
+source tests/installer/slack.sh || echo "Could not load slack library"
 
 # If we are not in netdata git repo, at the top level directory, fail
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
@@ -38,6 +39,12 @@ if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
 fi
 
 echo "--- Running Changelog generation ---"
-.travis/generate_changelog_for_nightlies.sh "${LAST_TAG}" "${COMMITS_SINCE_RELEASE}" || echo "Changelog generation has failed, this is a soft error, process continues"
+NIGHTLIES_CHANGELOG_FAILED=0
+.travis/generate_changelog_for_nightlies.sh "${LAST_TAG}" "${COMMITS_SINCE_RELEASE}" || NIGHTLIES_CHANGELOG_FAILED=1
+
+if [ ${NIGHTLIES_CHANGELOG_FAILED} -eq 1 ]; then
+	echo "Changelog generation has failed, this is a soft error, process continues"
+	post_message "TRAVIS_MESSAGE" "Changelog generation job for nightlies failed, possibly due to github issues" "${NOTIF_CHANNEL}" || echo "Slack notification failed"
+fi
 
 exit "${FAIL}"
