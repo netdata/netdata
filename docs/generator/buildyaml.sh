@@ -136,7 +136,6 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
-    - CONTRIBUTING.md
     - SECURITY.md
 - Why Netdata:
     - 'docs/why-netdata/README.md'
