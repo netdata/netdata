@@ -328,7 +328,7 @@ cd netdata-* || fatal "Cannot cd to netdata source tree"
 if [ -x netdata-installer.sh ]; then
 	progress "Installing netdata..."
 	run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || fatal "netdata-installer.sh exited with error"
-	if [ -n "${TMPDIR}" ] && [ -d "${TMPDIR}" ] && [ ! "${TMPDIR}" == "/tmp" ] && [ ! "${TMPDIR}" == "/" ]; then
+	if [ -n "${TMPDIR}" ] && [ -d "${TMPDIR}" ] && [ ! "${TMPDIR}" = "/tmp" ] && [ ! "${TMPDIR}" = "/" ]; then
 		run ${sudo} rm -rf "${TMPDIR}" >/dev/null 2>&1
 	fi
 else

@@ -207,7 +207,7 @@ run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} ${inner_opts}
 #shellcheck disable=SC2181
 if [ $? -eq 0 ]; then
 	run ${sudo} rm "${TMPDIR}/netdata-latest.gz.run"
-	if [ ! "${TMPDIR}" == "/tmp" ] && [ ! "${TMPDIR}" == "/" ] && [ -d "${TMPDIR}" ]; then
+	if [ ! "${TMPDIR}" = "/tmp" ] && [ ! "${TMPDIR}" = "/" ] && [ -d "${TMPDIR}" ]; then
 		run ${sudo} rm -rf "${TMPDIR}"
 	fi
 else
