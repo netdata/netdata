@@ -6,7 +6,7 @@
 
 **Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is a highly optimized monitoring agent you install on all your systems and containers.
 
-Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**.  It can run autonomously, without any third party components, or it can be integrated to existing monitoring tool chains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
+Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**. It can run autonomously, without any third party components, or it can be integrated to existing monitoring tool chains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
 
 _Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function._
 
@@ -434,7 +434,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[Netfilter](collectors/proc.plugin/)** - everything about the netfilter connection tracker.
 - **[SynProxy](collectors/proc.plugin/)** - collects performance data about the linux SYNPROXY (DDoS).
 - **[NFacct](collectors/nfacct.plugin/)** - collects accounting data from iptables.
-- **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time
+- **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time.
 - **[FPing](collectors/fping.plugin/)** - to measure latency and packet loss between any number of hosts.
 - **[ISC dhcpd](collectors/python.d.plugin/isc_dhcpd/)** - pools utilization, leases, etc.
 - **[AP](collectors/charts.d.plugin/ap/)** - collects Linux access point performance data (`hostapd`).
@@ -452,7 +452,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[systemd](collectors/cgroups.plugin/)** - monitors systemd services using CGROUPS.
 
 #### Users
-- **[Users and User Groups resource usage](collectors/apps.plugin/)** - by summarizing the process tree per user and group, reporting: CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets
+- **[Users and User Groups resource usage](collectors/apps.plugin/)** - by summarizing the process tree per user and group, reporting: CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets.
 - **[logind](collectors/python.d.plugin/logind/)** - collects sessions, users and seats connected.
 
 #### Containers and VMs
@@ -521,8 +521,8 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[w1sensor](collectors/python.d.plugin/w1sensor/)** - collects data from connected 1-Wire sensors.
 
 #### UPSes
-- **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
-- **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics.
+- **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics.
 - **[Linux Power Supply](collectors/proc.plugin/)** - collects metrics reported by power supply drivers on Linux.
 
 #### Social Sharing Servers
