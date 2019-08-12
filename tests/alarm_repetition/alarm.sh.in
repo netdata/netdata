@@ -26,6 +26,10 @@ change_alarm_file() {
   cp -a "$2" "$3"
 }
 
+netdata_test_download() {
+
+}
+
 get_the_logs() {
   curl -v -k --create-dirs -o "$OUTDIR/$1.out" "$MURL" 2> "$OUTDIR/$1.err"
   netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2"
