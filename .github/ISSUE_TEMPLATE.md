@@ -12,4 +12,3 @@ use this generic template.
 --->
 
 #### Summary
-
