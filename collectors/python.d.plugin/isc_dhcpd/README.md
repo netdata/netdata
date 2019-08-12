@@ -3,20 +3,19 @@
 Module monitor leases database to show all active leases for given pools.
 
 **Requirements:**
- * dhcpd leases file MUST BE readable by netdata
- * pools MUST BE in CIDR format
+-   dhcpd leases file MUST BE readable by netdata
+-   pools MUST BE in CIDR format
 
 It produces:
 
-1. **Pools utilization** Aggregate chart for all pools.
- * utilization in percent
+1.  **Pools utilization** Aggregate chart for all pools.
+    -   utilization in percent
 
-2. **Total leases**
- * leases (overall number of leases for all pools)
+2.  **Total leases**
+    -   leases (overall number of leases for all pools)
 
-3. **Active leases** for every pools
-  * leases (number of active leases in pool)
-
+3.  **Active leases** for every pools
+    -   leases (number of active leases in pool)
 
 ### configuration
 

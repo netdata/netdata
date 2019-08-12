@@ -3,24 +3,23 @@
 Module collects logical and physical devices health metrics.
 
 **Requirements:**
-* `arcconf` program
-* `sudo` program
-* `netdata` user needs to be able to sudo the `arcconf` program without password
+-   `arcconf` program
+-   `sudo` program
+-   `netdata` user needs to be able to sudo the `arcconf` program without password
 
 To grab stats it executes:
- * `sudo -n arcconf GETCONFIG 1 LD`
- * `sudo -n arcconf GETCONFIG 1 PD`
-
+-   `sudo -n arcconf GETCONFIG 1 LD`
+-   `sudo -n arcconf GETCONFIG 1 PD`
 
 It produces:
 
-1. **Logical Device Status**
+1.  **Logical Device Status**
 
-2. **Physical Device State**
+2.  **Physical Device State**
 
-3. **Physical Device S.M.A.R.T warnings**
+3.  **Physical Device S.M.A.R.T warnings**
 
-4. **Physical Device Temperature**
+4.  **Physical Device Temperature**
 
 ### prerequisite
 This module uses `arcconf` which can only be executed by root.  It uses

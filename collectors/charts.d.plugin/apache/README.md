@@ -78,14 +78,14 @@ Scoreboard: ____________________________________________________________________
 
 From the apache status output it collects:
 
- - total accesses (incremental value, rendered as requests/s)
- - total bandwidth (incremental value, rendered as bandwidth/s)
- - requests per second (this appears to be calculated by apache as an average for its lifetime, while the one calculated by netdata using the total accesses counter is real-time)
- - bytes per second (average for the lifetime of the apache server)
- - bytes per request (average for the lifetime of the apache server)
- - workers by status (`busy` and `idle`)
- - total connections (currently active connections - offered by apache 2.4+)
- - async connections per status (`keepalive`, `writing`, `closing` - offered by apache 2.4+)
+-   total accesses (incremental value, rendered as requests/s)
+-   total bandwidth (incremental value, rendered as bandwidth/s)
+-   requests per second (this appears to be calculated by apache as an average for its lifetime, while the one calculated by netdata using the total accesses counter is real-time)
+-   bytes per second (average for the lifetime of the apache server)
+-   bytes per request (average for the lifetime of the apache server)
+-   workers by status (`busy` and `idle`)
+-   total connections (currently active connections - offered by apache 2.4+)
+-   async connections per status (`keepalive`, `writing`, `closing` - offered by apache 2.4+)
 
 ## Configuration
 

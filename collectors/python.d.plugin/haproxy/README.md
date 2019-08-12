@@ -10,21 +10,20 @@ Socket MUST be readable AND writable by netdata user.
 
 It produces:
 
-1. **Frontend** family charts
- * Kilobytes in/s
- * Kilobytes out/s
- * Sessions current
- * Sessions in queue current
+1.  **Frontend** family charts
+    -   Kilobytes in/s
+    -   Kilobytes out/s
+    -   Sessions current
+    -   Sessions in queue current
 
-2. **Backend** family charts
- * Kilobytes in/s
- * Kilobytes out/s
- * Sessions current
- * Sessions in queue current
+2.  **Backend** family charts
+    -   Kilobytes in/s
+    -   Kilobytes out/s
+    -   Sessions current
+    -   Sessions in queue current
 
-3. **Health** chart
- * number of failed servers for every backend (in DOWN state)
-
+3.  **Health** chart
+    -   number of failed servers for every backend (in DOWN state)
 
 ### configuration
 

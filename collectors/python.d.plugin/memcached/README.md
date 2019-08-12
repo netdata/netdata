@@ -2,56 +2,56 @@
 
 Memcached monitoring module. Data grabbed from [stats interface](https://github.com/memcached/memcached/wiki/Commands#stats).
 
-1. **Network** in kilobytes/s
- * read
- * written
+1.  **Network** in kilobytes/s
+    -   read
+    -   written
 
-2. **Connections** per second
- * current
- * rejected
- * total
+2.  **Connections** per second
+    -   current
+    -   rejected
+    -   total
 
-3. **Items** in cluster
- * current
- * total
+3.  **Items** in cluster
+    -   current
+    -   total
 
-4. **Evicted and Reclaimed** items
- * evicted
- * reclaimed
+4.  **Evicted and Reclaimed** items
+    -   evicted
+    -   reclaimed
 
-5. **GET** requests/s
- * hits
- * misses
+5.  **GET** requests/s
+    -   hits
+    -   misses
 
-6. **GET rate** rate in requests/s
- * rate
+6.  **GET rate** rate in requests/s
+    -   rate
 
-7. **SET rate** rate in requests/s
- * rate
+7.  **SET rate** rate in requests/s
+    -   rate
 
-8. **DELETE** requests/s
- * hits
- * misses
+8.  **DELETE** requests/s
+    -   hits
+    -   misses
 
-9. **CAS** requests/s
- * hits
- * misses
- * bad value
+9.  **CAS** requests/s
+    -   hits
+    -   misses
+    -   bad value
 
 10. **Increment** requests/s
- * hits
- * misses
+    -   hits
+    -   misses
 
 11. **Decrement** requests/s
- * hits
- * misses
+    -   hits
+    -   misses
 
 12. **Touch** requests/s
- * hits
- * misses
+    -   hits
+    -   misses
 
 13. **Touch rate** rate in requests/s
- * rate
+    -   rate
 
 ### configuration
 
