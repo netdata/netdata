@@ -189,7 +189,7 @@ done
 
 # ---------------------------------------------------------------------------------------------------------------------
 TMPDIR=$(create_tmp_directory)
-cd "${TMPDIR}" || TMPDIR="/tmp"
+cd "${TMPDIR}" || (export TMPDIR="/tmp" && cd "${TMPDIR}")
 
 set_tarball_urls "${RELEASE_CHANNEL}"
 progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"

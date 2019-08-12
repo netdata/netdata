@@ -304,7 +304,7 @@ if [ "${INTERACTIVE}" = "0" ]; then
 fi
 
 TMPDIR=$(create_tmp_directory)
-cd ${TMPDIR} || TMPDIR="/tmp"
+cd "${TMPDIR}" || (export TMPDIR="/tmp" && cd "${TMPDIR}")
 
 dependencies
 
