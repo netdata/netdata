@@ -4,6 +4,7 @@ import classNames from "classnames"
 import Dygraph from "dygraphs"
 import "dygraphs/src/extras/smooth-plotter"
 
+import { useDateTime } from "utils/date-time"
 import { Attributes } from "../../utils/transformDataAttributes"
 import {
   chartLibrariesSettings,
@@ -21,6 +22,7 @@ interface GetDygraphOptions {
   chartSettings: ChartLibraryConfig,
   hiddenLabelsElementId: string,
   orderedColors: string[],
+  xAxisTimeString: (d: Date) => string,
 }
 const getDygraphOptions = ({
   attributes,
@@ -29,6 +31,7 @@ const getDygraphOptions = ({
   chartSettings,
   hiddenLabelsElementId,
   orderedColors,
+  xAxisTimeString,
 }: GetDygraphOptions) => {
   const isSparkline = attributes.dygraphTheme === "sparkline"
   const highlightCircleSize = isSparkline ? 3 : 4
@@ -102,6 +105,9 @@ const getDygraphOptions = ({
     dygraphHighlighCircleSize = highlightCircleSize,
     dygraphHighlightSeriesOpts,
     dygraphHighlightSeriesBackgroundAlpha,
+
+    dygraphXPixelsPerLabel = 50,
+    dygraphXAxisLabelWidth = 60,
   } = attributes
   const yLabel = "percentage" // todo (state.unts_current)
   // todo lift the state
@@ -180,6 +186,18 @@ const getDygraphOptions = ({
     highlightSeriesBackgroundAlpha: dygraphHighlightSeriesBackgroundAlpha,
     visibility,
     logscale: isLogScale,
+
+    axes: {
+      x: {
+        pixelsPerLabel: dygraphXPixelsPerLabel,
+        // unsufficient typings for Dygraph
+        // @ts-ignore
+        ticker: Dygraph.dateTicker,
+        axisLabelWidth: dygraphXAxisLabelWidth,
+        drawAxis: dygraphDrawAxis,
+        axisLabelFormatter: (d: Date | number) => xAxisTimeString(d as Date),
+      },
+    },
   }
 }
 
@@ -203,6 +221,7 @@ export const DygraphChart = ({
   chartUuid,
   orderedColors,
 }: Props) => {
+  const { xAxisTimeString } = useDateTime()
   const chartElement = useRef<HTMLDivElement>(null)
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const hiddenLabelsElementId = `${chartUuid}-hidden-labels-id`
@@ -214,6 +233,7 @@ export const DygraphChart = ({
     chartSettings,
     hiddenLabelsElementId,
     orderedColors,
+    xAxisTimeString,
   })
 
   useLayoutEffect(() => {
