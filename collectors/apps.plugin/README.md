@@ -46,6 +46,10 @@ Each of these sections provides the same number of charts:
 - Processes
     - Threads Running
     - Processes Running
+    - Carried Over Uptime
+    - Minimum Uptime
+    - Average Uptime
+    - Maximum Uptime
     - Pipes Open
 - Swap Memory
     - Swap Memory Used
