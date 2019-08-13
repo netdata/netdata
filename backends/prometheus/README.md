@@ -312,7 +312,7 @@ For more information check prometheus documentation.
 
 The `format=prometheus` parameter only exports the host's netdata metrics.  If you are using the master/slave functionality of netdata this ignores any upstream hosts - so you should consider using the below in your **prometheus.yml**:
 
-```
+```yaml
     metrics_path: '/api/v1/allmetrics'
     params:
       format: [prometheus_all_hosts]
