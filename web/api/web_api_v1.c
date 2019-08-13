@@ -236,8 +236,8 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
             if (!strcmp("CRITICAL", value)) status = RRDCALC_STATUS_CRITICAL;
             else if (!strcmp("WARNING", value)) status = RRDCALC_STATUS_WARNING;
             else if (!strcmp("UNINITIALIZED", value)) status = RRDCALC_STATUS_UNINITIALIZED;
-            else if (!strcmp("REMOVED", value)) status = RRDCALC_STATUS_REMOVED;
             else if (!strcmp("UNDEFINED", value)) status = RRDCALC_STATUS_UNDEFINED;
+            else if (!strcmp("REMOVED", value)) status = RRDCALC_STATUS_REMOVED;
             else if (!strcmp("CLEAR", value)) status = RRDCALC_STATUS_CLEAR;
         }
         else if(!strcmp(name, "context") || !strcmp(name, "ctx")) {
