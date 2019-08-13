@@ -704,11 +704,11 @@ function restrictMyNetdataMenu() {
     </div>`);
 }
 
-function openAuthenticatedUrl(url) {  
+function openAuthenticatedUrl(url) {
     if (isSignedIn()) {
         window.open(url);
     } else {
-        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}`);
+        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}&redirectUrl=${encodeURIComponent(window.location.origin + "/" + url)}`);
     }
 }
 
@@ -1775,8 +1775,6 @@ function renderPage(menus, data) {
                 if (urlOptions.mode === 'print') {
                     chtml += '</div>';
                 }
-
-                // console.log('         \------- ' + chart.id + ' (' + chart.priority + '): ' + chart.context  + ' height: ' + menus[menu].submenus[submenu].height);
             }
 
             head += '</div>';
@@ -1993,7 +1991,7 @@ function clipboardCopyBadgeEmbed(url) {
 function alarmsUpdateModal() {
     var active = '<h3>Raised Alarms</h3><table class="table">';
     var all = '<h3>All Running Alarms</h3><div class="panel-group" id="alarms_all_accordion" role="tablist" aria-multiselectable="true">';
-    var footer = '<hr/><a href="https://github.com/netdata/netdata/tree/master/web/api/badges#netdata-badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/netdata/netdata/blob/master/health/notifications/health_alarm_notify.conf">this configuration file</a> for more information.';
+    var footer = '<hr/><a href="https://github.com/netdata/netdata/tree/master/web/api/badges#netdata-badges" target="_blank">netdata badges</a> refresh automatically. Their color indicates the state of the alarm: <span style="color: #e05d44"><b>&nbsp;red&nbsp;</b></span> is critical, <span style="color:#fe7d37"><b>&nbsp;orange&nbsp;</b></span> is warning, <span style="color: #4c1"><b>&nbsp;bright green&nbsp;</b></span> is ok, <span style="color: #9f9f9f"><b>&nbsp;light grey&nbsp;</b></span> is undefined (i.e. no data or no status), <span style="color: #000"><b>&nbsp;black&nbsp;</b></span> is not initialized. You can copy and paste their URLs to embed them in any web page.<br/>netdata can send notifications for these alarms. Check <a href="https://github.com/netdata/netdata/blob/master/health/notifications/health_alarm_notify.conf" target="_blank">this configuration file</a> for more information.';
 
     loadClipboard(function () {
     });
@@ -2098,6 +2096,14 @@ function alarmsUpdateModal() {
                     + ((typeof alarm.calc !== 'undefined') ? ('<tr><td width="10%" style="text-align:right">calculation</td><td><span style="font-family: monospace;">' + alarm.calc + '</span></td></tr>') : '')
                     + ((chart.green !== null) ? ('<tr><td width="10%" style="text-align:right">green&nbsp;threshold</td><td><code>' + chart.green + ' ' + units + '</code></td></tr>') : '')
                     + ((chart.red !== null) ? ('<tr><td width="10%" style="text-align:right">red&nbsp;threshold</td><td><code>' + chart.red + ' ' + units + '</code></td></tr>') : '');
+            }
+
+            if (alarm.warn_repeat_every > 0) {
+                html += '<tr><td width="10%" style="text-align:right">repeat&nbsp;warning</td><td>' + NETDATA.seconds4human(alarm.warn_repeat_every) + '</td></tr>';
+            }
+
+            if (alarm.crit_repeat_every > 0) {
+                html += '<tr><td width="10%" style="text-align:right">repeat&nbsp;critical</td><td>' + NETDATA.seconds4human(alarm.crit_repeat_every) + '</td></tr>';
             }
 
             var delay = '';
@@ -2739,7 +2745,7 @@ function initializeDynamicDashboardWithData(data) {
         }
 
         // update the dashboard hostname
-        document.getElementById('hostname').innerHTML = options.hostname + ((netdataSnapshotData !== null) ? ' (snap)' : '').toString() + '&nbsp;&nbsp;<strong class="caret">';
+        document.getElementById('hostname').innerHTML = '<span id="hostnametext">' + options.hostname + ((netdataSnapshotData !== null) ? ' (snap)' : '').toString() + '</span>&nbsp;&nbsp;<strong class="caret">';
         document.getElementById('hostname').href = NETDATA.serverDefault;
         document.getElementById('netdataVersion').innerHTML = options.version;
 
@@ -4891,6 +4897,9 @@ function handleSignInMessage(e) {
     cloudToken = e.data.token;
 
     netdataRegistryCallback(registryAgents);
+    if (e.data.redirectUrl) {
+        window.location.replace(e.data.redirectUrl);
+    }
 }
 
 function handleSignOutMessage(e) {

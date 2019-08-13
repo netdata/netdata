@@ -20,13 +20,9 @@ CLEANFILES= \
 
 EXTRA_DIST = \
 	.gitignore \
-	.codacy.yml \
-	.codeclimate.yml \
 	.csslintrc \
 	.eslintignore \
 	.eslintrc \
-	.lgtm.yml \
-	.travis \
 	.github/CODEOWNERS \
 	build/m4/jemalloc.m4 \
 	build/m4/ax_c___atomic.m4 \
@@ -55,6 +51,7 @@ SUBDIRS = \
 	$(NULL)
 
 dist_noinst_DATA= \
+	CHANGELOG.md \
 	cppcheck.sh \
 	configs.signatures \
 	contrib \
@@ -63,6 +60,7 @@ dist_noinst_DATA= \
 	package.json \
 	docs \
 	packaging/version \
+	packaging/go.d.version \
 	packaging/go.d.checksums \
 	packaging/installer/README.md \
 	packaging/installer/UNINSTALL.md \
@@ -164,6 +162,13 @@ LIBNETDATA_FILES = \
     libnetdata/threads/threads.h \
 	libnetdata/url/url.c \
 	libnetdata/url/url.h \
+	libnetdata/json/json.c \
+	libnetdata/json/json.h \
+	libnetdata/json/jsmn.c \
+	libnetdata/json/jsmn.h \
+	libnetdata/health/health.c \
+	libnetdata/health/health.h \
+    libnetdata/string/utf8.h \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
@@ -237,6 +242,11 @@ XENSTAT_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+PERF_PLUGIN_FILES = \
+    collectors/perf.plugin/perf_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
 PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/ipc.c \
 	collectors/proc.plugin/plugin_proc.c \
@@ -270,6 +280,7 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/proc_vmstat.c \
 	collectors/proc.plugin/proc_uptime.c \
 	collectors/proc.plugin/sys_kernel_mm_ksm.c \
+	collectors/proc.plugin/sys_block_zram.c \
 	collectors/proc.plugin/sys_devices_system_edac_mc.c \
 	collectors/proc.plugin/sys_devices_system_node.c \
 	collectors/proc.plugin/sys_fs_btrfs.c \
@@ -441,6 +452,12 @@ KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis_put_record.h \
     $(NULL)
 
+PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
+    backends/prometheus/remote_write/remote_write.cc \
+    backends/prometheus/remote_write/remote_write.h \
+    backends/prometheus/remote_write/remote_write.proto \
+    $(NULL)
+
 DAEMON_FILES = \
 	daemon/common.c \
 	daemon/common.h \
@@ -504,15 +521,15 @@ NETDATA_COMMON_LIBS = \
 	$(OPTIONAL_LZ4_LIBS) \
 	$(OPTIONAL_JUDY_LIBS) \
 	$(OPTIONAL_SSL_LIBS) \
+	$(OPTIONAL_JSONC_LIBS) \
 	$(NULL)
-# TODO: Find more graceful way to add libs for AWS Kinesis
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
 	$(NETDATA_COMMON_LIBS) \
 	$(NULL)
-if ENABLE_BACKEND_KINESIS
+if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
     netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
@@ -571,7 +588,30 @@ if ENABLE_PLUGIN_XENSTAT
         $(NULL)
 endif
 
+if ENABLE_PLUGIN_PERF
+    plugins_PROGRAMS += perf.plugin
+    perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
+    perf_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
 if ENABLE_BACKEND_KINESIS
     netdata_SOURCES += $(KINESIS_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_KINESIS_LIBS)
+endif
+
+if ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE
+    netdata_SOURCES += $(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS)
+    BUILT_SOURCES = \
+        backends/prometheus/remote_write/remote_write.pb.cc \
+        backends/prometheus/remote_write/remote_write.pb.h \
+        $(NULL)
+    nodist_netdata_SOURCES = $(BUILT_SOURCES)
+
+backends/prometheus/remote_write/remote_write.pb.cc \
+backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
+	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
+
 endif

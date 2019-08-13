@@ -191,6 +191,12 @@ double  utime_fix_ratio = 1.0,
         cminflt_fix_ratio = 1.0,
         cmajflt_fix_ratio = 1.0;
 
+
+struct pid_on_target {
+    int32_t pid;
+    struct pid_on_target *next;
+};
+
 // ----------------------------------------------------------------------------
 // target
 //
@@ -261,6 +267,8 @@ struct target {
     int ends_with;
     int starts_with;        // if set, the compare string matches only the
                             // beginning of the command
+
+    struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
     struct target *target;  // the one that will be reported to netdata
     struct target *next;
@@ -492,6 +500,187 @@ static int
         all_files_size = 0;
 
 // ----------------------------------------------------------------------------
+// read users and groups from files
+
+struct user_or_group_id {
+    avl avl;
+
+    union {
+        uid_t uid;
+        gid_t gid;
+    } id;
+
+    char *name;
+
+    int updated;
+
+    struct user_or_group_id * next;
+};
+
+enum user_or_group_id_type {
+    USER_ID,
+    GROUP_ID
+};
+
+struct user_or_group_ids{
+    enum user_or_group_id_type type;
+
+    avl_tree index;
+    struct user_or_group_id *root;
+
+    char filename[FILENAME_MAX + 1];
+};
+
+int user_id_compare(void* a, void* b) {
+    if(((struct user_or_group_id *)a)->id.uid < ((struct user_or_group_id *)b)->id.uid)
+        return -1;
+
+    else if(((struct user_or_group_id *)a)->id.uid > ((struct user_or_group_id *)b)->id.uid)
+        return 1;
+
+    else
+        return 0;
+}
+
+struct user_or_group_ids all_user_ids = {
+    .type = USER_ID,
+
+    .index = {
+        NULL,
+        user_id_compare
+    },
+
+    .root = NULL,
+
+    .filename = "",
+};
+
+int group_id_compare(void* a, void* b) {
+    if(((struct user_or_group_id *)a)->id.gid < ((struct user_or_group_id *)b)->id.gid)
+        return -1;
+
+    else if(((struct user_or_group_id *)a)->id.gid > ((struct user_or_group_id *)b)->id.gid)
+        return 1;
+
+    else
+        return 0;
+}
+
+struct user_or_group_ids all_group_ids = {
+    .type = GROUP_ID,
+
+    .index = {
+        NULL,
+        group_id_compare
+    },
+
+    .root = NULL,
+
+    .filename = "",
+};
+
+int file_changed(const struct stat *statbuf, struct timespec *last_modification_time) {
+    if(likely(statbuf->st_mtim.tv_sec == last_modification_time->tv_sec &&
+       statbuf->st_mtim.tv_nsec == last_modification_time->tv_nsec)) return 0;
+
+    last_modification_time->tv_sec = statbuf->st_mtim.tv_sec;
+    last_modification_time->tv_nsec = statbuf->st_mtim.tv_nsec;
+
+    return 1;
+}
+
+int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_modification_time) {
+    struct stat statbuf;
+    if(unlikely(stat(ids->filename, &statbuf)))
+        return 1;
+    else
+        if(likely(!file_changed(&statbuf, last_modification_time))) return 0;
+
+    procfile *ff = procfile_open(ids->filename, " :\t", PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) return 1;
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff)) return 1;
+
+    size_t line, lines = procfile_lines(ff);
+
+    for(line = 0; line < lines ;line++) {
+        size_t words = procfile_linewords(ff, line);
+        if(unlikely(words < 3)) continue;
+
+        char *name = procfile_lineword(ff, line, 0);
+        if(unlikely(!name || !*name)) continue;
+
+        char *id_string = procfile_lineword(ff, line, 2);
+        if(unlikely(!id_string || !*id_string)) continue;
+
+
+        struct user_or_group_id *user_or_group_id = callocz(1, sizeof(struct user_or_group_id));
+
+        if(ids->type == USER_ID)
+            user_or_group_id->id.uid = (uid_t)str2ull(id_string);
+        else
+            user_or_group_id->id.gid = (uid_t)str2ull(id_string);
+
+        user_or_group_id->name = strdupz(name);
+        user_or_group_id->updated = 1;
+
+        struct user_or_group_id *existing_user_id = NULL;
+
+        if(likely(ids->root))
+            existing_user_id = (struct user_or_group_id *)avl_search(&ids->index, (avl *) user_or_group_id);
+
+        if(unlikely(existing_user_id)) {
+            freez(existing_user_id->name);
+            existing_user_id->name = user_or_group_id->name;
+            existing_user_id->updated = 1;
+            freez(user_or_group_id);
+        }
+        else {
+            if(unlikely(avl_insert(&ids->index, (avl *) user_or_group_id) != (void *) user_or_group_id)) {
+                error("INTERNAL ERROR: duplicate indexing of id during realloc");
+            };
+
+            user_or_group_id->next = ids->root;
+            ids->root = user_or_group_id;
+        }
+    }
+
+    procfile_close(ff);
+
+    // remove unused ids
+    struct user_or_group_id *user_or_group_id = ids->root, *prev_user_id = NULL;
+
+    while(user_or_group_id) {
+        if(unlikely(!user_or_group_id->updated)) {
+            if(unlikely((struct user_or_group_id *)avl_remove(&ids->index, (avl *) user_or_group_id) != user_or_group_id))
+                error("INTERNAL ERROR: removal of unused id from index, removed a different id");
+
+            if(prev_user_id)
+                prev_user_id->next = user_or_group_id->next;
+            else
+                ids->root = user_or_group_id->next;
+
+            freez(user_or_group_id->name);
+            freez(user_or_group_id);
+
+            if(prev_user_id)
+                user_or_group_id = prev_user_id->next;
+            else
+                user_or_group_id = ids->root;
+        }
+        else {
+            user_or_group_id->updated = 0;
+
+            prev_user_id = user_or_group_id;
+            user_or_group_id = user_or_group_id->next;
+        }
+    }
+
+    return 0;
+}
+
+// ----------------------------------------------------------------------------
 // apps_groups.conf
 // aggregate all processes in groups, to have a limited number of dimensions
 
@@ -508,11 +697,27 @@ static struct target *get_users_target(uid_t uid) {
     snprintfz(w->id, MAX_NAME, "%u", uid);
     w->idhash = simple_hash(w->id);
 
-    struct passwd *pw = getpwuid(uid);
-    if(!pw || !pw->pw_name || !*pw->pw_name)
-        snprintfz(w->name, MAX_NAME, "%u", uid);
-    else
-        snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
+    struct user_or_group_id user_id_to_find, *user_or_group_id = NULL;
+    user_id_to_find.id.uid = uid;
+
+    if(*netdata_configured_host_prefix) {
+        static struct timespec last_passwd_modification_time;
+        int ret = read_user_or_group_ids(&all_user_ids, &last_passwd_modification_time);
+
+        if(likely(!ret && all_user_ids.index.root))
+                user_or_group_id = (struct user_or_group_id *)avl_search(&all_user_ids.index, (avl *) &user_id_to_find);
+    }
+
+    if(user_or_group_id && user_or_group_id->name && *user_or_group_id->name) {
+        snprintfz(w->name, MAX_NAME, "%s", user_or_group_id->name);
+    }
+    else {
+        struct passwd *pw = getpwuid(uid);
+        if(!pw || !pw->pw_name || !*pw->pw_name)
+            snprintfz(w->name, MAX_NAME, "%u", uid);
+        else
+            snprintfz(w->name, MAX_NAME, "%s", pw->pw_name);
+    }
 
     netdata_fix_chart_name(w->name);
 
@@ -540,11 +745,27 @@ struct target *get_groups_target(gid_t gid)
     snprintfz(w->id, MAX_NAME, "%u", gid);
     w->idhash = simple_hash(w->id);
 
-    struct group *gr = getgrgid(gid);
-    if(!gr || !gr->gr_name || !*gr->gr_name)
-        snprintfz(w->name, MAX_NAME, "%u", gid);
-    else
-        snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
+    struct user_or_group_id group_id_to_find, *group_id = NULL;
+    group_id_to_find.id.gid = gid;
+
+    if(*netdata_configured_host_prefix) {
+        static struct timespec last_group_modification_time;
+        int ret = read_user_or_group_ids(&all_group_ids, &last_group_modification_time);
+
+        if(likely(!ret && all_group_ids.index.root))
+                group_id = (struct user_or_group_id *)avl_search(&all_group_ids.index, (avl *) &group_id_to_find);
+    }
+
+    if(group_id && group_id->name && *group_id->name) {
+        snprintfz(w->name, MAX_NAME, "%s", group_id->name);
+    }
+    else {
+        struct group *gr = getgrgid(gid);
+        if(!gr || !gr->gr_name || !*gr->gr_name)
+            snprintfz(w->name, MAX_NAME, "%u", gid);
+        else
+            snprintfz(w->name, MAX_NAME, "%s", gr->gr_name);
+    }
 
     netdata_fix_chart_name(w->name);
 
@@ -2006,7 +2227,7 @@ static inline int debug_print_process_and_parents(struct pid_stat *p, usec_t tim
     return indent + 1;
 }
 
-static inline void debug_print_process_tree(struct pid_stat *p, char *msg) {
+static inline void debug_print_process_tree(struct pid_stat *p, char *msg __maybe_unused) {
     debug_log("%s: process %s (%d, %s) with parents:", msg, p->comm, p->pid, p->updated?"running":"exited");
     debug_print_process_and_parents(p, p->stat_collected_usec);
 }
@@ -2657,6 +2878,18 @@ static size_t zero_all_targets(struct target *root) {
             w->openeventpolls = 0;
             w->openother = 0;
         }
+
+        if(unlikely(w->root_pid)) {
+            struct pid_on_target *pid_on_target_to_free, *pid_on_target = w->root_pid;
+
+            while(pid_on_target) {
+                pid_on_target_to_free = pid_on_target;
+                pid_on_target = pid_on_target->next;
+                free(pid_on_target_to_free);
+            }
+
+            w->root_pid = NULL;
+        }
     }
 
     return count;
@@ -2799,8 +3032,14 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->processes++;
     w->num_threads += p->num_threads;
 
-    if(unlikely(debug_enabled || w->debug_enabled))
+    if(unlikely(debug_enabled || w->debug_enabled)) {
         debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
+
+        struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
+        pid_on_target->pid = p->pid;
+        pid_on_target->next = w->root_pid;
+        w->root_pid = pid_on_target;
+    }
 }
 
 static void calculate_netdata_statistics(void) {
@@ -3321,6 +3560,18 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     for(w = root ; w ; w = w->next) {
         if (w->target) continue;
 
+        if(unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
+            struct pid_on_target *pid_on_target;
+
+            fprintf(stderr, "apps.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes, (w->processes == 1)?"":"es");
+
+            for(pid_on_target = w->root_pid; pid_on_target; pid_on_target = pid_on_target->next) {
+                fprintf(stderr, " %d", pid_on_target->pid);
+            }
+
+            fputc('\n', stderr);
+        }
+
         if (!w->exposed && w->processes) {
             newly_added++;
             w->exposed = 1;
@@ -3787,6 +4038,12 @@ int main(int argc, char **argv) {
     }
 
     info("started on pid %d", getpid());
+
+    snprintfz(all_user_ids.filename, FILENAME_MAX, "%s/etc/passwd", netdata_configured_host_prefix);
+    debug_log("passwd file: '%s'", all_user_ids.filename);
+
+    snprintfz(all_group_ids.filename, FILENAME_MAX, "%s/etc/group", netdata_configured_host_prefix);
+    debug_log("group file: '%s'", all_group_ids.filename);
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
     all_pids_sortlist = callocz(sizeof(pid_t), (size_t)pid_max);

@@ -76,7 +76,12 @@ AC_ARG_ENABLE(
     ,
     [enable_backend_kinesis="detect"]
 )
-
+AC_ARG_ENABLE(
+    [backend-prometheus-remote-write],
+    [AS_HELP_STRING([--enable-backend-prometheus-remote-write], [enable prometheus remote write backend @<:@default autodetect@:>@])],
+    ,
+    [enable_backend_prometheus_remote_write="detect"]
+)
 AC_ARG_ENABLE(
     [pedantic],
     [AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings @<:@default disabled@:>@])],
@@ -142,6 +147,12 @@ AC_ARG_ENABLE(
     [AS_HELP_STRING([--disable-dbengine], [disable netdata dbengine @<:@default autodetect@:>@])],
     ,
     [enable_dbengine="detect"]
+)
+AC_ARG_ENABLE(
+    [jsonc],
+    [AS_HELP_STRING([--enable-jsonc], [Enable JSON-C support @<:@default autodetect@:>@])],
+    ,
+    [enable_jsonc="detect"]
 )
 
 # -----------------------------------------------------------------------------
@@ -272,7 +283,7 @@ OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_decompress_safe],
+    [LZ4_compress_default],
     [LZ4_LIBS="-llz4"]
 )
 
@@ -343,6 +354,20 @@ OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
 OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 
 # -----------------------------------------------------------------------------
+# JSON-C library
+
+PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
+    [json-c],
+    [json_object_get_type],
+    [JSONC_LIBS="-ljson-c"]),AC_CHECK_LIB(
+        [json],
+        [json_object_get_type],
+        [JSONC_LIBS="-ljson"])
+    )
+
+OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
+
+# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
     AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
@@ -377,6 +402,21 @@ AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
+# JSON-C
+test "${enable_jsonc}" = "yes" -a -z "${JSONC_LIBS}" && \
+    AC_MSG_ERROR([JSON-C required but not found. Try installing 'libjson-c-dev' or 'json-c'.])
+
+AC_MSG_CHECKING([if json-c should be used])
+if test "${enable_jsonc}" != "no" -a "${JSONC_LIBS}"; then
+	enable_jsonc="yes"
+	AC_DEFINE([ENABLE_JSONC], [1], [netdata json-c usability])
+else
+	enable_jsonc="no"
+fi
+AC_MSG_RESULT([${enable_jsonc}])
+AM_CONDITIONAL([ENABLE_JSONC], [test "${enable_jsonc}" = "yes"])
+
+# -----------------------------------------------------------------------------
 # compiler options
 
 AC_ARG_VAR([SSE_CANDIDATE], [C compiler flags for SSE])
@@ -395,6 +435,14 @@ if test "${GCC}" = "yes"; then
 else
     AC_DEFINE_UNQUOTED([likely(x)], [(x)], [gcc branch optimization])
     AC_DEFINE_UNQUOTED([unlikely(x)], [(x)], [gcc branch optimization])
+fi
+
+if test "${GCC}" = "yes"; then
+    AC_DEFINE([__always_unused], [__attribute__((unused))], [gcc unused attribute])
+    AC_DEFINE([__maybe_unused], [__attribute__((unused))], [gcc unused attribute])
+else
+    AC_DEFINE([__always_unused], [], [dummy unused attribute])
+    AC_DEFINE([__maybe_unused], [], [dummy unused attribute])
 fi
 
 if test "${enable_pedantic}" = "yes"; then
@@ -567,7 +615,16 @@ AM_CONDITIONAL([ENABLE_PLUGIN_CUPS], [test "${enable_plugin_cups}" = "yes"])
 # -----------------------------------------------------------------------------
 # nfacct.plugin - libmnl, libnetfilter_acct
 
-AC_CHECK_HEADERS_ONCE([linux/netfilter/nfnetlink_conntrack.h])
+AC_CHECK_HEADER(
+    [linux/netfilter/nfnetlink_conntrack.h],
+    [AC_CHECK_DECL(
+        [CTA_STATS_MAX],
+        [have_nfnetlink_conntrack=yes],
+        [have_nfnetlink_conntrack=no],
+        [#include <linux/netfilter/nfnetlink_conntrack.h>]
+    )],
+    [have_nfnetlink_conntrack=no]
+)
 
 PKG_CHECK_MODULES(
     [NFACCT],
@@ -593,6 +650,9 @@ PKG_CHECK_MODULES(
     [have_libmnl=no]
 )
 
+test "${enable_plugin_nfacct}" = "yes" -a "${have_nfnetlink_conntrack}" != "yes" && \
+    AC_MSG_ERROR([nfnetlink_conntrack.h required but not found or too old])
+
 test "${enable_plugin_nfacct}" = "yes" -a "${have_libnetfilter_acct}" != "yes" && \
     AC_MSG_ERROR([netfilter_acct required but not found])
 
@@ -600,7 +660,9 @@ test "${enable_plugin_nfacct}" = "yes" -a "${have_libmnl}" != "yes" && \
     AC_MSG_ERROR([libmnl required but not found. Try installing 'libmnl-dev' or 'libmnl-devel'])
 
 AC_MSG_CHECKING([if nfacct.plugin should be enabled])
-if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" -a "${have_libmnl}" = "yes"; then
+if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes" \
+                                          -a "${have_libmnl}" = "yes" \
+                                          -a "${have_nfnetlink_conntrack}" = "yes"; then
     enable_plugin_nfacct="yes"
     AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
     AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
@@ -681,6 +743,30 @@ AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"
 
 
 # -----------------------------------------------------------------------------
+# perf.plugin
+
+AC_CHECK_HEADER(
+    [linux/perf_event.h],
+    [AC_CHECK_DECL(
+        [PERF_COUNT_HW_REF_CPU_CYCLES],
+        [have_perf_event=yes],
+        [have_perf_event=no],
+        [#include <linux/perf_event.h>]
+    )],
+    [have_perf_event=no]
+)
+
+AC_MSG_CHECKING([if perf.plugin should be enabled])
+if test "${build_target}" == "linux" -a "${have_perf_event}" = "yes"; then
+    enable_plugin_perf="yes"
+else
+    enable_plugin_perf="no"
+fi
+AC_MSG_RESULT([${enable_plugin_perf}])
+AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # AWS Kinesis backend - libaws-cpp-sdk-kinesis, libaws-cpp-sdk-core, libssl, libcrypto, libcurl
 
 PKG_CHECK_MODULES(
@@ -738,17 +824,17 @@ if test "${have_libaws_cpp_sdk_core}" = "yes" -a "${have_libcrypto}" = "yes" -a 
     CXXFLAGS="${CXXFLAGS} -std=c++11"
 
     AC_TRY_LINK(
-    [
-    #include <aws/core/Aws.h>
-    #include <aws/core/client/ClientConfiguration.h>
-    #include <aws/core/auth/AWSCredentials.h>
-    #include <aws/core/utils/Outcome.h>
-    #include <aws/kinesis/KinesisClient.h>
-    #include <aws/kinesis/model/PutRecordRequest.h>
-    ],
-    [Aws::Kinesis::Model::PutRecordRequest request;],
-    [have_libaws_cpp_sdk_kinesis=yes],
-    [have_libaws_cpp_sdk_kinesis=no]
+        [
+            #include <aws/core/Aws.h>
+            #include <aws/core/client/ClientConfiguration.h>
+            #include <aws/core/auth/AWSCredentials.h>
+            #include <aws/core/utils/Outcome.h>
+            #include <aws/kinesis/KinesisClient.h>
+            #include <aws/kinesis/model/PutRecordRequest.h>
+        ],
+        [Aws::Kinesis::Model::PutRecordRequest request;],
+        [have_libaws_cpp_sdk_kinesis=yes],
+        [have_libaws_cpp_sdk_kinesis=no]
     )
 
     LIBS="${save_LIBS}"
@@ -792,6 +878,93 @@ AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "ye
 
 
 # -----------------------------------------------------------------------------
+# Prometheus remote write backend - libprotobuf, libsnappy, protoc
+
+PKG_CHECK_MODULES(
+    [PROTOBUF],
+    [protobuf >= 3],
+    [have_libprotobuf=yes],
+    [have_libprotobuf=no]
+)
+
+AC_MSG_CHECKING([for snappy::RawCompress in -lsnappy])
+
+    AC_LANG_SAVE
+    AC_LANG_CPLUSPLUS
+    save_LIBS="${LIBS}"
+    LIBS="-lsnappy"
+    save_CXXFLAGS="${CXXFLAGS}"
+    CXXFLAGS="${CXXFLAGS} -std=c++11"
+
+    AC_TRY_LINK(
+        [
+            #include <stdlib.h>
+            #include <snappy.h>
+        ],
+        [
+            const char *input = "test";
+            size_t compressed_length;
+            char *buffer = (char *)malloc(5 * sizeof(char));
+            snappy::RawCompress(input, 4, buffer, &compressed_length);
+            free(buffer);
+        ],
+        [
+            have_libsnappy=yes
+            SNAPPY_CFLAGS=""
+            SNAPPY_LIBS="-lsnappy"
+        ],
+        [have_libsnappy=no]
+    )
+
+    LIBS="${save_LIBS}"
+    CXXFLAGS="${save_CXXFLAGS}"
+    AC_LANG_RESTORE
+
+AC_MSG_RESULT([${have_libsnappy}])
+
+AC_PATH_PROG([PROTOC], [protoc], [no])
+AS_IF(
+    [test x"${PROTOC}" == x"no"],
+    [have_protoc=no],
+    [have_protoc=yes]
+)
+
+AC_PATH_PROG([CXX_BINARY], [${CXX}], [no])
+AS_IF(
+    [test x"${CXX_BINARY}" == x"no"],
+    [have_CXX_compiler=no],
+    [have_CXX_compiler=yes]
+)
+
+test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libprotobuf}" != "yes" && \
+    AC_MSG_ERROR([libprotobuf required but not found. try installing protobuf])
+
+test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_libsnappy}" != "yes" && \
+    AC_MSG_ERROR([libsnappy required but not found. try installing snappy])
+
+test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_protoc}" != "yes" && \
+    AC_MSG_ERROR([protoc compiler required but not found. try installing protobuf])
+
+test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler}" != "yes" && \
+    AC_MSG_ERROR([C++ compiler required but not found. try installing g++])
+
+AC_MSG_CHECKING([if prometheus remote write backend should be enabled])
+if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
+                                                           -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
+    enable_backend_prometheus_remote_write="yes"
+    AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS="${PROTOBUF_CFLAGS} ${SNAPPY_CFLAGS}"
+    CXX11FLAG="-std=c++11"
+    OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS="${PROTOBUF_LIBS} ${SNAPPY_LIBS}"
+else
+    enable_backend_prometheus_remote_write="no"
+fi
+
+AC_MSG_RESULT([${enable_backend_prometheus_remote_write}])
+AM_CONDITIONAL([ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE], [test "${enable_backend_prometheus_remote_write}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # check for setns() - cgroup-network
 
 AC_CHECK_FUNC([setns])
@@ -815,7 +988,7 @@ if test "${enable_lto}" != "no"; then
 fi
 if test "${have_lto}" = "yes"; then
     oCFLAGS="${CFLAGS}"
-    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} ${OPTIONAL_KINESIS_CFLAGS}"
+    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS}"
     ac_cv_c_lto_cross_compile="${enable_lto}"
     test "${ac_cv_c_lto_cross_compile}" != "yes" && ac_cv_c_lto_cross_compile="no"
     AC_C_LTO
@@ -835,6 +1008,8 @@ AC_MSG_RESULT([${enable_lto}])
 
 
 # -----------------------------------------------------------------------------
+
+AM_CONDITIONAL([ENABLE_CXX_LINKER], [test "${enable_backend_kinesis}" = "yes" -o "${enable_backend_prometheus_remote_write}" = "yes"])
 
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
@@ -882,6 +1057,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
+AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
 AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
@@ -898,6 +1074,8 @@ AC_SUBST([OPTIONAL_XENSTAT_CFLAGS])
 AC_SUBST([OPTIONAL_XENSTAT_LIBS])
 AC_SUBST([OPTIONAL_KINESIS_CFLAGS])
 AC_SUBST([OPTIONAL_KINESIS_LIBS])
+AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS])
+AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 
 
 AC_CONFIG_FILES([
@@ -908,6 +1086,7 @@ AC_CONFIG_FILES([
     backends/Makefile
     backends/opentsdb/Makefile
     backends/prometheus/Makefile
+    backends/prometheus/remote_write/Makefile
     backends/aws_kinesis/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
@@ -930,6 +1109,7 @@ AC_CONFIG_FILES([
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
+    collectors/perf.plugin/Makefile
     daemon/Makefile
     database/Makefile
     database/engine/Makefile
@@ -954,6 +1134,8 @@ AC_CONFIG_FILES([
     libnetdata/storage_number/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
+    libnetdata/json/Makefile
+    libnetdata/health/Makefile
     registry/Makefile
     streaming/Makefile
     system/Makefile

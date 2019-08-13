@@ -74,6 +74,7 @@ gap when lost iterations above | `1` |
 cleanup orphan hosts after seconds | `3600` |  How long to wait until automatically removing from the DB a remote netdata host (slave) that is no longer sending data.
 delete obsolete charts files | `yes` |  See [monitoring ephemeral containers](../../collectors/cgroups.plugin/#monitoring-ephemeral-containers), also affects the deletion of files for obsolete dimensions
 delete orphan hosts files | `yes` |  Set to `no` to disable non-responsive host removal.
+enable zero metrics | `no` |  Set to `yes` to show charts when all their metrics are zero.
 
 ### [web] section options
 
@@ -105,7 +106,7 @@ setting | default | info
 :------:|:-------:|:----
 enabled | `yes` | Set to `no` to disable all alarms and notifications
 in memory max health log entries | 1000 | Size of the alarm history held in RAM
-script to execute on alarm | `/usr/libexec/netdata/plugins.d/alarm-notify.sh` | The script that sends alarm notifications.
+script to execute on alarm | `/usr/libexec/netdata/plugins.d/alarm-notify.sh` | The script that sends alarm notifications. Note that in versions before 1.16, the plugins.d directory may be installed in a different location in certain OSs (e.g. under `/usr/lib/netdata`).
 stock health configuration directory | `/usr/lib/netdata/conf.d/health.d` | Contains the stock alarm configuration files for each collector
 health configuration directory | `/etc/netdata/health.d` | The directory containing the user alarm configuration files, to override the stock configurations
 run at least every seconds | `10` | Controls how often all alarm conditions should be evaluated.
@@ -127,6 +128,8 @@ The configuration options for plugins appear in sections following the pattern `
 #### Internal plugins
 
 Most internal plugins will provide additional options. Check [Internal Plugins](../../collectors/) for more information.
+
+Please note, that by default Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
 
 #### External plugins
 

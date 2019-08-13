@@ -6,16 +6,13 @@
 
 **Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is a highly optimized monitoring agent you install on all your systems and containers.
 
-Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**.  It can run autonomously, without any third party components, or it can be integrated to existing monitoring tool chains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
+Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**. It can run autonomously, without any third party components, or it can be integrated to existing monitoring tool chains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
 
 _Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function._
 
 Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**.
 
-![cncf](https://www.cncf.io/wp-content/uploads/2016/09/logo_cncf.png)
-
-Netdata is in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars) and it is the 3rd most starred open-source project.
-Check the [CNCF TOC Netdata presentation](https://docs.google.com/presentation/d/18C8bCTbtgKDWqPa57GXIjB2PbjjpjsUNkLtZEz6YK8s/edit?usp=sharing).
+Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars).
 
 ---
 
@@ -53,7 +50,7 @@ The following animated image, shows the top part of a typical Netdata dashboard.
 
 *A typical Netdata dashboard, in 1:1 timing. Charts can be panned by dragging them, zoomed in/out with `SHIFT` + `mouse wheel`, an area can be selected for zoom-in with `SHIFT` + `mouse selection`. Netdata is highly interactive and **real-time**, optimized to get the work done!*
 
-> *We have a few online demos to experience it live: [https://my-netdata.io](https://my-netdata.io)*
+> *We have a few online demos to experience it live: [https://www.netdata.cloud](https://www.netdata.cloud/#live-demo)*
 
 ## User base
 
@@ -77,22 +74,24 @@ When you install multiple Netdata, they are integrated into **one distributed ap
 *in the last 24 hours:*<br/> [![New Users Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
 ## Quick Start
+![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-You can quickly install Netdata on a Linux box (physical, virtual, container, IoT) with the following command:
+To install Netdata from source on any Linux system (physical, virtual, container, IoT, edge) and keep it up to date with our **nightly releases** automatically, run the following:
 
-```sh
+```bash
 # make sure you run `bash` for your shell
 bash
 
-# install Netdata, directly from github sources
+# install Netdata directly from GitHub source
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
-![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+
+To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](packaging/installer/README.md#nightly-vs-stable-releases).
 
 The above command will:
 
-1. install any required packages on your system (it will ask you to confirm before doing so),
-2. compile it, install it and start it
+- Install any required packages on your system (it will ask you to confirm before doing so)
+- Compile it, install it, and start it.
 
 More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
 
@@ -101,6 +100,8 @@ To try Netdata in a docker container, run this:
 ```
 docker run -d --name=netdata \
   -p 19999:19999 \
+  -v /etc/passwd:/host/etc/passwd:ro \
+  -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
   -v /var/run/docker.sock:/var/run/docker.sock:ro \
@@ -148,6 +149,32 @@ It has been designed by **SysAdmins**, **DevOps** and **Developers** for trouble
 not just visualize metrics.
 
 ## News
+
+`Jul 9th, 2019` - **[Netdata v1.16.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.16.0 contains 40 bug fixes, 31 improvements and 20 documentation updates
+
+**Binary distributions.** To improve the security, speed and reliability of new netdata installations, we are delivering our own, industry standard installation method, with binary package distributions. The RPM binaries for the most common OSs are already available on packagecloud and we’ll have the DEB ones available very soon. All distributions are considered in Beta and, as always, we depend on our amazing community for feedback on improvements.
+
+ - Our stable distributions are at [netdata/netdata @ packagecloud.io](https://packagecloud.io/netdata/netdata)
+ - The nightly builds are at [netdata/netdata-edge @ packagecloud.io](https://packagecloud.io/netdata/netdata-edge)
+
+**Netdata now supports TLS encryption!** You can secure the communication to the [web server](https://docs.netdata.cloud/web/server/#enabling-tls-support), the [streaming connections from slaves to the master](https://docs.netdata.cloud/streaming/#securing-the-communication) and the connection to an [openTSDB backend](https://docs.netdata.cloud/backends/opentsdb/#https). 
+
+**This version also brings two long-awaited features to netdata’s health monitoring:**
+
+ - The [health management API](https://docs.netdata.cloud/web/api/health/#health-management-api) introduced in v1.12 allowed you to easily disable alarms and/or notifications while netdata was running. However, those changes were not persisted across netdata restarts. Since part of routine maintenance activities may involve completely restarting a monitoring node, netdata now saves these configurations to disk, every time you issue a command to change the silencer settings. The new [LIST command](https://docs.netdata.cloud/web/api/health/#list-silencers) of the API allows you to view at any time which alarms are currently disabled or silenced.
+ - A way for netdata to [repeatedly send alarm notifications](https://docs.netdata.cloud/health/#alarm-line-repeat) for some, or all active alarms, at a frequency of your choosing. As a result, you will no longer have to worry about missing a notification, forgetting about a raised alarm. The default is still to only send a single notification, so that existing users are not surprised by a different behavior.  
+
+As always, we’ve introduced new collectors, 5 of them this time:
+
+ - Of special interest to people with Windows servers in their infrastructure is the [WMI collector](https://docs.netdata.cloud/collectors/go.d.plugin/modules/wmi/), though we are fully aware that we need to continue our efforts to do a proper port to Windows. 
+ - The new `perf` plugin collects system-wide CPU performance statistics from Performance Monitoring Units (PMU) using the `perf_event_open()` system call. You can read a wonderful article on why this is useful [here](http://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html).
+ - The other three are collectors to monitor [Dnsmasq DHCP leases](https://docs.netdata.cloud/collectors/go.d.plugin/modules/dnsmasq_dhcp/), [Riak KV servers](https://docs.netdata.cloud/collectors/python.d.plugin/riakkv/) and [Pihole instances](https://docs.netdata.cloud/collectors/go.d.plugin/modules/pihole/). 
+
+Finally, the DB Engine introduced in v1.15.0 now uses much less memory and is more robust than before. 
+
+---
 
 `May 21st, 2019` - **[Netdata v1.15.0 released!](https://github.com/netdata/netdata/releases)**
 
@@ -271,7 +298,7 @@ The result is a highly efficient, low latency system, supporting multiple reader
 This is a high level overview of Netdata feature set and architecture.
 Click it to to interact with it (it has direct links to documentation).
 
-[![image](https://user-images.githubusercontent.com/2662304/47672043-a47eb480-dbb9-11e8-92a4-fa422d053309.png)](https://my-netdata.io/infographic.html)
+[![image](https://user-images.githubusercontent.com/43294513/60951037-8ba5d180-a2f8-11e9-906e-e27356f168bc.png)](https://my-netdata.io/infographic.html)
 
 
 ## Features
@@ -297,7 +324,7 @@ This is what you should expect from Netdata:
 - **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [irc](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [prowl](health/notifications/prowl/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [smstools3](health/notifications/smstools3/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/) and [custom notifications](health/notifications/custom/).
 
 ### Integrations
-- **time-series dbs** - can archive its metrics to `graphite`, `opentsdb`, `prometheus`, json document DBs, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected).
+- **time-series dbs** - can archive its metrics to **Graphite**, **OpenTSDB**, **Prometheus**, **AWS Kinesis**, **JSON document DBs**, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected). Netdata also supports **Prometheus remote write API** which allows storing metrics to **Elasticsearch**, **Gnocchi**, **InfluxDB**, **Kafka**, **PostgreSQL/TimescaleDB**, **Splunk**, **VictoriaMetrics** and a lot of other [storage providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
 
 ## Visualization
 
@@ -407,7 +434,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[Netfilter](collectors/proc.plugin/)** - everything about the netfilter connection tracker.
 - **[SynProxy](collectors/proc.plugin/)** - collects performance data about the linux SYNPROXY (DDoS).
 - **[NFacct](collectors/nfacct.plugin/)** - collects accounting data from iptables.
-- **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time
+- **[Network QoS](collectors/tc.plugin/)** - the only tool that visualizes network `tc` classes in real-time.
 - **[FPing](collectors/fping.plugin/)** - to measure latency and packet loss between any number of hosts.
 - **[ISC dhcpd](collectors/python.d.plugin/isc_dhcpd/)** - pools utilization, leases, etc.
 - **[AP](collectors/charts.d.plugin/ap/)** - collects Linux access point performance data (`hostapd`).
@@ -425,7 +452,7 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[systemd](collectors/cgroups.plugin/)** - monitors systemd services using CGROUPS.
 
 #### Users
-- **[Users and User Groups resource usage](collectors/apps.plugin/)** - by summarizing the process tree per user and group, reporting: CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets
+- **[Users and User Groups resource usage](collectors/apps.plugin/)** - by summarizing the process tree per user and group, reporting: CPU, memory, disk reads, disk writes, swap, threads, pipes, sockets.
 - **[logind](collectors/python.d.plugin/logind/)** - collects sessions, users and seats connected.
 
 #### Containers and VMs
@@ -494,8 +521,8 @@ Its [Plugin API](collectors/plugins.d/) supports all programing languages (anyth
 - **[w1sensor](collectors/python.d.plugin/w1sensor/)** - collects data from connected 1-Wire sensors.
 
 #### UPSes
-- **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
-- **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics
+- **[apcupsd](collectors/charts.d.plugin/apcupsd/)** - load, charge, battery voltage, temperature, utility metrics, output metrics.
+- **[NUT](collectors/charts.d.plugin/nut/)** - load, charge, battery voltage, temperature, utility metrics, output metrics.
 - **[Linux Power Supply](collectors/proc.plugin/)** - collects metrics reported by power supply drivers on Linux.
 
 #### Social Sharing Servers

@@ -277,7 +277,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO && (Ip6InOctets || Ip6OutOctets))) {
+    if(do_bandwidth == CONFIG_BOOLEAN_YES || (do_bandwidth == CONFIG_BOOLEAN_AUTO &&
+                                              (Ip6InOctets ||
+                                               Ip6OutOctets ||
+                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_bandwidth = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL,
@@ -311,7 +314,12 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO && (Ip6InReceives || Ip6OutRequests || Ip6InDelivers || Ip6OutForwDatagrams))) {
+    if(do_ip_packets == CONFIG_BOOLEAN_YES || (do_ip_packets == CONFIG_BOOLEAN_AUTO &&
+                                               (Ip6InReceives ||
+                                                Ip6OutRequests ||
+                                                Ip6InDelivers ||
+                                                Ip6OutForwDatagrams ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_ip_packets = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL,
@@ -351,7 +359,11 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO && (Ip6FragOKs || Ip6FragFails || Ip6FragCreates))) {
+    if(do_ip_fragsout == CONFIG_BOOLEAN_YES || (do_ip_fragsout == CONFIG_BOOLEAN_AUTO &&
+                                                (Ip6FragOKs ||
+                                                 Ip6FragFails ||
+                                                 Ip6FragCreates ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_ip_fragsout = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_ok = NULL,
@@ -389,13 +401,12 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_fragsin == CONFIG_BOOLEAN_YES || (do_ip_fragsin == CONFIG_BOOLEAN_AUTO
-        && (
-            Ip6ReasmOKs
-            || Ip6ReasmFails
-            || Ip6ReasmTimeout
-            || Ip6ReasmReqds
-            ))) {
+    if(do_ip_fragsin == CONFIG_BOOLEAN_YES || (do_ip_fragsin == CONFIG_BOOLEAN_AUTO &&
+                                               (Ip6ReasmOKs ||
+                                                Ip6ReasmFails ||
+                                                Ip6ReasmTimeout ||
+                                                Ip6ReasmReqds  ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_ip_fragsin = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -436,17 +447,16 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ip_errors == CONFIG_BOOLEAN_YES || (do_ip_errors == CONFIG_BOOLEAN_AUTO
-        && (
-            Ip6InDiscards
-            || Ip6OutDiscards
-            || Ip6InHdrErrors
-            || Ip6InAddrErrors
-            || Ip6InUnknownProtos
-            || Ip6InTooBigErrors
-            || Ip6InTruncatedPkts
-            || Ip6InNoRoutes
-        ))) {
+    if(do_ip_errors == CONFIG_BOOLEAN_YES || (do_ip_errors == CONFIG_BOOLEAN_AUTO &&
+                                              (Ip6InDiscards ||
+                                               Ip6OutDiscards ||
+                                               Ip6InHdrErrors ||
+                                               Ip6InAddrErrors ||
+                                               Ip6InUnknownProtos ||
+                                               Ip6InTooBigErrors ||
+                                               Ip6InTruncatedPkts ||
+                                               Ip6InNoRoutes ||
+                                               netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_ip_errors = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InDiscards      = NULL,
@@ -502,7 +512,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO && (Udp6InDatagrams || Udp6OutDatagrams))) {
+    if(do_udp_packets == CONFIG_BOOLEAN_YES || (do_udp_packets == CONFIG_BOOLEAN_AUTO &&
+                                                (Udp6InDatagrams ||
+                                                 Udp6OutDatagrams ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_udp_packets = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL,
@@ -536,15 +549,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udp_errors == CONFIG_BOOLEAN_YES || (do_udp_errors == CONFIG_BOOLEAN_AUTO
-        && (
-            Udp6InErrors
-            || Udp6NoPorts
-            || Udp6RcvbufErrors
-            || Udp6SndbufErrors
-            || Udp6InCsumErrors
-            || Udp6IgnoredMulti
-        ))) {
+    if(do_udp_errors == CONFIG_BOOLEAN_YES || (do_udp_errors == CONFIG_BOOLEAN_AUTO &&
+                                               (Udp6InErrors ||
+                                                Udp6NoPorts ||
+                                                Udp6RcvbufErrors ||
+                                                Udp6SndbufErrors ||
+                                                Udp6InCsumErrors ||
+                                                Udp6IgnoredMulti ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_udp_errors = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_RcvbufErrors = NULL,
@@ -591,7 +603,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO && (UdpLite6InDatagrams || UdpLite6OutDatagrams))) {
+    if(do_udplite_packets == CONFIG_BOOLEAN_YES || (do_udplite_packets == CONFIG_BOOLEAN_AUTO &&
+                                                    (UdpLite6InDatagrams ||
+                                                     UdpLite6OutDatagrams ||
+                                                     netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_udplite_packets = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL,
@@ -625,15 +640,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_udplite_errors == CONFIG_BOOLEAN_YES || (do_udplite_errors == CONFIG_BOOLEAN_AUTO
-        && (
-            UdpLite6InErrors
-            || UdpLite6NoPorts
-            || UdpLite6RcvbufErrors
-            || UdpLite6SndbufErrors
-            || Udp6InCsumErrors
-            || UdpLite6InCsumErrors
-        ))) {
+    if(do_udplite_errors == CONFIG_BOOLEAN_YES || (do_udplite_errors == CONFIG_BOOLEAN_AUTO &&
+                                                   (UdpLite6InErrors ||
+                                                    UdpLite6NoPorts ||
+                                                    UdpLite6RcvbufErrors ||
+                                                    UdpLite6SndbufErrors ||
+                                                    Udp6InCsumErrors ||
+                                                    UdpLite6InCsumErrors ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_udplite_errors = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_RcvbufErrors = NULL,
@@ -677,7 +691,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastOctets || Ip6InMcastOctets))) {
+    if(do_mcast == CONFIG_BOOLEAN_YES || (do_mcast == CONFIG_BOOLEAN_AUTO &&
+                                          (Ip6OutMcastOctets ||
+                                           Ip6InMcastOctets ||
+                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_mcast = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_Ip6InMcastOctets  = NULL,
@@ -712,7 +729,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO && (Ip6OutBcastOctets || Ip6InBcastOctets))) {
+    if(do_bcast == CONFIG_BOOLEAN_YES || (do_bcast == CONFIG_BOOLEAN_AUTO &&
+                                          (Ip6OutBcastOctets ||
+                                           Ip6InBcastOctets ||
+                                           netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_bcast = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_Ip6InBcastOctets  = NULL,
@@ -747,7 +767,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO && (Ip6OutMcastPkts || Ip6InMcastPkts))) {
+    if(do_mcast_p == CONFIG_BOOLEAN_YES || (do_mcast_p == CONFIG_BOOLEAN_AUTO &&
+                                            (Ip6OutMcastPkts ||
+                                             Ip6InMcastPkts ||
+                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_mcast_p = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_Ip6InMcastPkts  = NULL,
@@ -782,7 +805,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp == CONFIG_BOOLEAN_YES || (do_icmp == CONFIG_BOOLEAN_AUTO && (Icmp6InMsgs || Icmp6OutMsgs))) {
+    if(do_icmp == CONFIG_BOOLEAN_YES || (do_icmp == CONFIG_BOOLEAN_AUTO &&
+                                         (Icmp6InMsgs ||
+                                          Icmp6OutMsgs ||
+                                          netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_Icmp6InMsgs  = NULL,
@@ -816,7 +842,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_redir == CONFIG_BOOLEAN_YES || (do_icmp_redir == CONFIG_BOOLEAN_AUTO && (Icmp6InRedirects || Icmp6OutRedirects))) {
+    if(do_icmp_redir == CONFIG_BOOLEAN_YES || (do_icmp_redir == CONFIG_BOOLEAN_AUTO &&
+                                               (Icmp6InRedirects ||
+                                                Icmp6OutRedirects ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_redir = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_Icmp6InRedirects  = NULL,
@@ -850,20 +879,19 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_errors == CONFIG_BOOLEAN_YES || (do_icmp_errors == CONFIG_BOOLEAN_AUTO
-        && (
-            Icmp6InErrors
-            || Icmp6OutErrors
-            || Icmp6InCsumErrors
-            || Icmp6InDestUnreachs
-            || Icmp6InPktTooBigs
-            || Icmp6InTimeExcds
-            || Icmp6InParmProblems
-            || Icmp6OutDestUnreachs
-            || Icmp6OutPktTooBigs
-            || Icmp6OutTimeExcds
-            || Icmp6OutParmProblems
-        ))) {
+    if(do_icmp_errors == CONFIG_BOOLEAN_YES || (do_icmp_errors == CONFIG_BOOLEAN_AUTO &&
+                                                (Icmp6InErrors ||
+                                                 Icmp6OutErrors ||
+                                                 Icmp6InCsumErrors ||
+                                                 Icmp6InDestUnreachs ||
+                                                 Icmp6InPktTooBigs ||
+                                                 Icmp6InTimeExcds ||
+                                                 Icmp6InParmProblems ||
+                                                 Icmp6OutDestUnreachs ||
+                                                 Icmp6OutPktTooBigs ||
+                                                 Icmp6OutTimeExcds ||
+                                                 Icmp6OutParmProblems ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_errors = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InErrors        = NULL,
@@ -924,13 +952,12 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_echos == CONFIG_BOOLEAN_YES || (do_icmp_echos == CONFIG_BOOLEAN_AUTO
-        && (
-            Icmp6InEchos
-            || Icmp6OutEchos
-            || Icmp6InEchoReplies
-            || Icmp6OutEchoReplies
-        ))) {
+    if(do_icmp_echos == CONFIG_BOOLEAN_YES || (do_icmp_echos == CONFIG_BOOLEAN_AUTO &&
+                                               (Icmp6InEchos ||
+                                                Icmp6OutEchos ||
+                                                Icmp6InEchoReplies ||
+                                                Icmp6OutEchoReplies ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_echos = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InEchos        = NULL,
@@ -970,15 +997,14 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_groupmemb == CONFIG_BOOLEAN_YES || (do_icmp_groupmemb == CONFIG_BOOLEAN_AUTO
-        && (
-            Icmp6InGroupMembQueries
-            || Icmp6OutGroupMembQueries
-            || Icmp6InGroupMembResponses
-            || Icmp6OutGroupMembResponses
-            || Icmp6InGroupMembReductions
-            || Icmp6OutGroupMembReductions
-        ))) {
+    if(do_icmp_groupmemb == CONFIG_BOOLEAN_YES || (do_icmp_groupmemb == CONFIG_BOOLEAN_AUTO &&
+                                                   (Icmp6InGroupMembQueries ||
+                                                    Icmp6OutGroupMembQueries ||
+                                                    Icmp6InGroupMembResponses ||
+                                                    Icmp6OutGroupMembResponses ||
+                                                    Icmp6InGroupMembReductions ||
+                                                    Icmp6OutGroupMembReductions ||
+                                                    netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_groupmemb = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InQueries     = NULL,
@@ -1023,13 +1049,12 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_router == CONFIG_BOOLEAN_YES || (do_icmp_router == CONFIG_BOOLEAN_AUTO
-        && (
-            Icmp6InRouterSolicits
-            || Icmp6OutRouterSolicits
-            || Icmp6InRouterAdvertisements
-            || Icmp6OutRouterAdvertisements
-        ))) {
+    if(do_icmp_router == CONFIG_BOOLEAN_YES || (do_icmp_router == CONFIG_BOOLEAN_AUTO &&
+                                                (Icmp6InRouterSolicits ||
+                                                 Icmp6OutRouterSolicits ||
+                                                 Icmp6InRouterAdvertisements ||
+                                                 Icmp6OutRouterAdvertisements ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_router = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InSolicits        = NULL,
@@ -1069,13 +1094,12 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_neighbor == CONFIG_BOOLEAN_YES || (do_icmp_neighbor == CONFIG_BOOLEAN_AUTO
-        && (
-            Icmp6InNeighborSolicits
-            || Icmp6OutNeighborSolicits
-            || Icmp6InNeighborAdvertisements
-            || Icmp6OutNeighborAdvertisements
-        ))) {
+    if(do_icmp_neighbor == CONFIG_BOOLEAN_YES || (do_icmp_neighbor == CONFIG_BOOLEAN_AUTO &&
+                                                  (Icmp6InNeighborSolicits ||
+                                                   Icmp6OutNeighborSolicits ||
+                                                   Icmp6InNeighborAdvertisements ||
+                                                   Icmp6OutNeighborAdvertisements ||
+                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_neighbor = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InSolicits        = NULL,
@@ -1115,7 +1139,10 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_mldv2 == CONFIG_BOOLEAN_YES || (do_icmp_mldv2 == CONFIG_BOOLEAN_AUTO && (Icmp6InMLDv2Reports || Icmp6OutMLDv2Reports))) {
+    if(do_icmp_mldv2 == CONFIG_BOOLEAN_YES || (do_icmp_mldv2 == CONFIG_BOOLEAN_AUTO &&
+                                               (Icmp6InMLDv2Reports ||
+                                                Icmp6OutMLDv2Reports ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_mldv2 = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InMLDv2Reports  = NULL,
@@ -1149,19 +1176,18 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_icmp_types == CONFIG_BOOLEAN_YES || (do_icmp_types == CONFIG_BOOLEAN_AUTO
-        && (
-            Icmp6InType1
-            || Icmp6InType128
-            || Icmp6InType129
-            || Icmp6InType136
-            || Icmp6OutType1
-            || Icmp6OutType128
-            || Icmp6OutType129
-            || Icmp6OutType133
-            || Icmp6OutType135
-            || Icmp6OutType143
-        ))) {
+    if(do_icmp_types == CONFIG_BOOLEAN_YES || (do_icmp_types == CONFIG_BOOLEAN_AUTO &&
+                                               (Icmp6InType1 ||
+                                                Icmp6InType128 ||
+                                                Icmp6InType129 ||
+                                                Icmp6InType136 ||
+                                                Icmp6OutType1 ||
+                                                Icmp6OutType128 ||
+                                                Icmp6OutType129 ||
+                                                Icmp6OutType133 ||
+                                                Icmp6OutType135 ||
+                                                Icmp6OutType143 ||
+                                                netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_icmp_types = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InType1    = NULL,
@@ -1219,13 +1245,12 @@ int do_proc_net_snmp6(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ect == CONFIG_BOOLEAN_YES || (do_ect == CONFIG_BOOLEAN_AUTO
-        && (
-            Ip6InNoECTPkts
-            || Ip6InECT1Pkts
-            || Ip6InECT0Pkts
-            || Ip6InCEPkts
-        ))) {
+    if(do_ect == CONFIG_BOOLEAN_YES || (do_ect == CONFIG_BOOLEAN_AUTO &&
+                                        (Ip6InNoECTPkts ||
+                                         Ip6InECT1Pkts ||
+                                         Ip6InECT0Pkts ||
+                                         Ip6InCEPkts ||
+                                         netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_ect = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_InNoECTPkts = NULL,

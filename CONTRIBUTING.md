@@ -61,9 +61,13 @@ As the project grows, an increasing share of our time is spent on supporting thi
 
 ### Improve documentation
 
-All of our documentation is in markdown (.md) files inside the netdata GitHub project. All of our [HTML documentation](https://docs.netdata.cloud) is generated from these files. At the top right of each documentation page you will see a pencil, that leads you directly to the markdown file that was used to generated it. Don't be afraid to click it and edit any of these documents and submit a GitHub Pull Request with your corrections/additions. 
+Our documentation is in need of constant improvement and expansion. As Netdata's features grow, we need to clearly explain how each feature works and document all the possible configurations. And as Netdata's community grows, we need to improve existing documentation to make it more accessible to people of all skill levels.
 
-We also need help to [document each chart in the default dashboard](https://github.com/netdata/netdata/issues/279). 
+We also need to produce beginner-level tutorials on using Netdata to monitor common applications, web servers, and more.
+
+Start with the [guide for contributing to documentation](docs/contributing/contributing-documentation.md), and then review the [documentation style guide](docs/contributing/style-guide.md) for specifics on how we write our documentation.
+
+Don't be afraid to submit a pull request with your corrections or additions! We need a lot of help and are willing to guide new contributors through the process.
 
 ## Developers
 
@@ -119,6 +123,18 @@ Your contributions should be bundled with related documentation to help users un
 #### Maintenance
 
 When you contribute code to Netdata, you are automatically accepting that you will be responsible for maintaining that code in the future. So, if users need help, or report bugs, we will invite you to the related github issues to help them or fix the issues or bugs of your contributions.
+
+#### Code Style
+
+The single most important rule when writing code is this: *check the surrounding code and try to imitate it*. [Reference](https://developer.gnome.org/programming-guidelines/stable/c-coding-style.html.en)
+
+We use several different languages and have had contributions from several people with different styles. When in doubt, you can check similar existing code. 
+
+For C contributions in particular, we try to respect the [Linux kernel style](https://www.kernel.org/doc/html/v4.10/process/coding-style.html), with the following exceptions:
+ - Use 4 space indentation instead of 8
+ - We occassionally have multiple statements on a single line (e.g. `if (a) b;`)
+ - Allow max line length of 120 chars 
+ - Allow opening brace at the end of a function declaration: `function() {`. 
 
 ### Your first pull request
 

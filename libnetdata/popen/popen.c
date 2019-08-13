@@ -45,110 +45,91 @@ static void mypopen_del(FILE *fp) {
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
-FILE *mypopen(const char *command, volatile pid_t *pidptr)
-{
-    int pipefd[2];
-
-    if(pipe(pipefd) == -1) return NULL;
-
-    int pid = fork();
-    if(pid == -1) {
-        close(pipefd[PIPE_READ]);
-        close(pipefd[PIPE_WRITE]);
-        return NULL;
-    }
-    if(pid != 0) {
-        // the parent
-        *pidptr = pid;
-        close(pipefd[PIPE_WRITE]);
-        FILE *fp = fdopen(pipefd[PIPE_READ], "r");
-        /*mypopen_add(fp, pid);*/
-        return(fp);
-    }
-    // the child
-
-    // close all files
-    int i;
-    for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
-        if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
-
-    // move the pipe to stdout
-    if(pipefd[PIPE_WRITE] != STDOUT_FILENO) {
-        dup2(pipefd[PIPE_WRITE], STDOUT_FILENO);
-        close(pipefd[PIPE_WRITE]);
-    }
-
-#ifdef DETACH_PLUGINS_FROM_NETDATA
-    // this was an attempt to detach the child and use the suspend mode charts.d
-    // unfortunatelly it does not work as expected.
-
-    // fork again to become session leader
-    pid = fork();
-    if(pid == -1)
-        error("pre-execution of command '%s' on pid %d: Cannot fork 2nd time.", command, getpid());
-
-    if(pid != 0) {
-        // the parent
-        exit(0);
-    }
-
-    // set a new process group id for just this child
-    if( setpgid(0, 0) != 0 )
-        error("pre-execution of command '%s' on pid %d: Cannot set a new process group.", command, getpid());
-
-    if( getpgid(0) != getpid() )
-        error("pre-execution of command '%s' on pid %d: Cannot set a new process group. Process group set is incorrect. Expected %d, found %d", command, getpid(), getpid(), getpgid(0));
-
-    if( setsid() != 0 )
-        error("pre-execution of command '%s' on pid %d: Cannot set session id.", command, getpid());
-
-    fprintf(stdout, "MYPID %d\n", getpid());
-    fflush(NULL);
-#endif
-
-    // reset all signals
-    signals_unblock();
-    signals_reset();
-
-    debug(D_CHILDS, "executing command: '%s' on pid %d.", command, getpid());
-    execl("/bin/sh", "sh", "-c", command, NULL);
-    exit(1);
-}
-
-FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
-    int pipefd[2];
+static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, char **env) {
+    FILE *fp;
+    int pipefd[2], error;
+    pid_t pid;
+    char *const spawn_argv[] = {
+            "sh",
+            "-c",
+            (char *)command,
+            NULL
+    };
+    posix_spawnattr_t attr;
+    posix_spawn_file_actions_t fa;
 
     if(pipe(pipefd) == -1)
         return NULL;
-
-    int pid = fork();
-    if(pid == -1) {
-        close(pipefd[PIPE_READ]);
-        close(pipefd[PIPE_WRITE]);
-        return NULL;
+    if ((fp = fdopen(pipefd[PIPE_READ], "r")) == NULL) {
+        goto error_after_pipe;
     }
-    if(pid != 0) {
-        // the parent
-        *pidptr = pid;
-        close(pipefd[PIPE_WRITE]);
-        FILE *fp = fdopen(pipefd[PIPE_READ], "r");
-        return(fp);
-    }
-    // the child
 
-    // close all files
+    // Mark all files to be closed by the exec() stage of posix_spawn()
     int i;
     for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
-        if(i != STDIN_FILENO && i != STDERR_FILENO && i != pipefd[PIPE_WRITE]) close(i);
+        if(i != STDIN_FILENO && i != STDERR_FILENO)
+            fcntl(i, F_SETFD, FD_CLOEXEC);
 
-    // move the pipe to stdout
-    if(pipefd[PIPE_WRITE] != STDOUT_FILENO) {
-        dup2(pipefd[PIPE_WRITE], STDOUT_FILENO);
-        close(pipefd[PIPE_WRITE]);
+    if (!posix_spawn_file_actions_init(&fa)) {
+        // move the pipe to stdout in the child
+        if (posix_spawn_file_actions_adddup2(&fa, pipefd[PIPE_WRITE], STDOUT_FILENO)) {
+            error("posix_spawn_file_actions_adddup2() failed");
+            goto error_after_posix_spawn_file_actions_init;
+        }
+    } else {
+        error("posix_spawn_file_actions_init() failed.");
+        goto error_after_pipe;
     }
+    if (!(error = posix_spawnattr_init(&attr))) {
+        // reset all signals in the child
+        sigset_t mask;
 
-    execle("/bin/sh", "sh", "-c", command, NULL, env);
-    exit(1);
+        if (posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF))
+            error("posix_spawnattr_setflags() failed.");
+        sigemptyset(&mask);
+        if (posix_spawnattr_setsigmask(&attr, &mask))
+            error("posix_spawnattr_setsigmask() failed.");
+    } else {
+        error("posix_spawnattr_init() failed.");
+    }
+    if (!posix_spawn(&pid, "/bin/sh", &fa, &attr, spawn_argv, env)) {
+        *pidptr = pid;
+        debug(D_CHILDS, "Spawned command: '%s' on pid %d from parent pid %d.", command, pid, getpid());
+    } else {
+        error("Failed to spawn command: '%s' from parent pid %d.", command, getpid());
+        close(pipefd[PIPE_READ]);
+        fp = NULL;
+    }
+    close(pipefd[PIPE_WRITE]);
+
+    if (!error) {
+        // posix_spawnattr_init() succeeded
+        if (posix_spawnattr_destroy(&attr))
+            error("posix_spawnattr_destroy");
+    }
+    if (posix_spawn_file_actions_destroy(&fa))
+        error("posix_spawn_file_actions_destroy");
+
+    return fp;
+
+error_after_posix_spawn_file_actions_init:
+    if (posix_spawn_file_actions_destroy(&fa))
+        error("posix_spawn_file_actions_destroy");
+error_after_pipe:
+    close(pipefd[PIPE_READ]);
+    close(pipefd[PIPE_WRITE]);
+    return NULL;
+}
+
+// See man environ
+extern char **environ;
+
+FILE *mypopen(const char *command, volatile pid_t *pidptr) {
+    return custom_popene(command, pidptr, environ);
+}
+
+FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
+    return custom_popene(command, pidptr, env);
 }
 
 int mypclose(FILE *fp, pid_t pid) {

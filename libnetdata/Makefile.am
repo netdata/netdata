@@ -11,6 +11,8 @@ SUBDIRS = \
     config \
     dictionary \
     eval \
+    json \
+    health \
     locks \
     log \
     popen \

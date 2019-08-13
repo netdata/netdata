@@ -27,10 +27,9 @@ find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o 
 # Copy Netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
 
-
 # Modify the first line of the main README.md, to enable proper static html generation
 echo "Modifying README header"
-sed -i -e '0,/# Netdata /s//# Introduction\n\n/' ${SRC_DIR}/README.md
+sed -i -e '0,/# Netdata /s//# Netdata Documentation\n\n/' ${SRC_DIR}/README.md
 
 # Remove all GA tracking code
 find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-64295674-3)\]()//g'
@@ -39,7 +38,6 @@ find ${SRC_DIR} -name "*.md" -print0 | xargs -0 sed -i -e 's/\[!\[analytics.*UA-
 declare -a EXCLUDE_LIST=(
 	"HISTORICAL_CHANGELOG.md"
 	"contrib/sles11/README.md"
-	"packaging/maintainers/README.md"
 )
 
 for f in "${EXCLUDE_LIST[@]}"; do
@@ -56,13 +54,12 @@ MKDOCS_CONFIG_FILE="${GENERATOR_DIR}/mkdocs.yml"
 MKDOCS_DIR="doc"
 DOCS_DIR=${GENERATOR_DIR}/${MKDOCS_DIR}
 rm -rf ${DOCS_DIR}
-mkdir ${DOCS_DIR}
 
 prep_html() {
 	lang="${1}"
 	echo "Creating ${lang} mkdocs.yaml"
 
-	if [ "${lang}" = "en" ] ; then
+	if [ "${lang}" == "en" ] ; then
 		SITE_DIR="build"
 	else
 		SITE_DIR="build/${lang}"
@@ -86,16 +83,21 @@ prep_html() {
 	if [ "${lang}" != "en" ] ; then
 		find "${GENERATOR_DIR}/${SITE_DIR}" -name "*.html" -print0 | xargs -0 sed -i -e 's/https:\/\/github.com\/netdata\/netdata\/blob\/master\/\S*md/https:\/\/github.com\/netdata\/localization\//g'
 	fi
+
+	# Replace index.html with DOCUMENTATION/index.html. Since we're moving it up one directory, we need to remove ../ from the links
+	echo "Replacing index.html with DOCUMENTATION/index.html"
+	sed 's/\.\.\///g' ${GENERATOR_DIR}/${SITE_DIR}/DOCUMENTATION/index.html > ${GENERATOR_DIR}/${SITE_DIR}/index.html
+
 }
 
 for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -type d -printf '%f ') ; do
 	echo "Preparing source for $d"
-	cp -a ${SRC_DIR}/* ${DOCS_DIR}/
+	cp -r ${SRC_DIR} ${DOCS_DIR}
 	if [ "${d}" != "en" ] ; then
 		cp -a ${LOC_DIR}/${d}/* ${DOCS_DIR}/
 	fi
 	prep_html $d
-	rm -rf ${DOCS_DIR}/*
+	rm -rf ${DOCS_DIR}
 done
 
 # Remove cloned projects and temp directories

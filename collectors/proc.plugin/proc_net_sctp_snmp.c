@@ -124,7 +124,8 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_associations == CONFIG_BOOLEAN_YES || (do_associations == CONFIG_BOOLEAN_AUTO && SctpCurrEstab)) {
+    if(do_associations == CONFIG_BOOLEAN_YES || (do_associations == CONFIG_BOOLEAN_AUTO &&
+                                                 (SctpCurrEstab || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_associations = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_established = NULL;
@@ -155,7 +156,12 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_transitions == CONFIG_BOOLEAN_YES || (do_transitions == CONFIG_BOOLEAN_AUTO && (SctpActiveEstabs || SctpPassiveEstabs || SctpAborteds || SctpShutdowns))) {
+    if(do_transitions == CONFIG_BOOLEAN_YES || (do_transitions == CONFIG_BOOLEAN_AUTO &&
+                                                (SctpActiveEstabs ||
+                                                 SctpPassiveEstabs ||
+                                                 SctpAborteds ||
+                                                 SctpShutdowns ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_transitions = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_active = NULL,
@@ -195,7 +201,10 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_packets == CONFIG_BOOLEAN_YES || (do_packets == CONFIG_BOOLEAN_AUTO && (SctpInSCTPPacks || SctpOutSCTPPacks))) {
+    if(do_packets == CONFIG_BOOLEAN_YES || (do_packets == CONFIG_BOOLEAN_AUTO &&
+                                            (SctpInSCTPPacks ||
+                                             SctpOutSCTPPacks ||
+                                             netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_packets = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_received = NULL,
@@ -230,7 +239,10 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_packet_errors == CONFIG_BOOLEAN_YES || (do_packet_errors == CONFIG_BOOLEAN_AUTO && (SctpOutOfBlues || SctpChecksumErrors))) {
+    if(do_packet_errors == CONFIG_BOOLEAN_YES || (do_packet_errors == CONFIG_BOOLEAN_AUTO &&
+                                                  (SctpOutOfBlues ||
+                                                   SctpChecksumErrors ||
+                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_packet_errors = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM *rd_invalid = NULL,
@@ -265,7 +277,10 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_fragmentation == CONFIG_BOOLEAN_YES || (do_fragmentation == CONFIG_BOOLEAN_AUTO && (SctpFragUsrMsgs || SctpReasmUsrMsgs))) {
+    if(do_fragmentation == CONFIG_BOOLEAN_YES || (do_fragmentation == CONFIG_BOOLEAN_AUTO &&
+                                                  (SctpFragUsrMsgs ||
+                                                   SctpReasmUsrMsgs ||
+                                                   netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_fragmentation = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st = NULL;
@@ -300,8 +315,14 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_chunk_types == CONFIG_BOOLEAN_YES || (do_chunk_types == CONFIG_BOOLEAN_AUTO
-        && (SctpInCtrlChunks || SctpInOrderChunks || SctpInUnorderChunks || SctpOutCtrlChunks || SctpOutOrderChunks || SctpOutUnorderChunks))) {
+    if(do_chunk_types == CONFIG_BOOLEAN_YES || (do_chunk_types == CONFIG_BOOLEAN_AUTO &&
+                                                (SctpInCtrlChunks ||
+                                                 SctpInOrderChunks ||
+                                                 SctpInUnorderChunks ||
+                                                 SctpOutCtrlChunks ||
+                                                 SctpOutOrderChunks ||
+                                                 SctpOutUnorderChunks ||
+                                                 netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_chunk_types = CONFIG_BOOLEAN_YES;
         static RRDSET *st = NULL;
         static RRDDIM

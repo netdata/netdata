@@ -131,6 +131,15 @@ set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${OPENSSL_LIBRARIES})
 set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
 
 # -----------------------------------------------------------------------------
+# JSON-C used to health
+
+pkg_check_modules(JSON REQUIRED json-c)
+set(NETDATA_COMMON_CFLAGS ${NETDATA_COMMON_CFLAGS} ${JSONC_CFLAGS_OTHER})
+set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} ${JSON_LIBRARIES})
+set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${JSON_INCLUDE_DIRS})
+
+
+# -----------------------------------------------------------------------------
 # Detect libcap
 
 IF(LINUX)
@@ -241,6 +250,27 @@ find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
 # later we use:
 # ${HAVE_KINESIS}
 
+
+# -----------------------------------------------------------------------------
+# Detect libprotobuf
+
+pkg_check_modules(PROTOBUF protobuf)
+# later we use:
+# ${PROTOBUF_LIBRARIES}
+# ${PROTOBUF_CFLAGS_OTHER}
+# ${PROTOBUF_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libsnappy
+
+pkg_check_modules(SNAPPY snappy)
+# later we use:
+# ${SNAPPY_LIBRARIES}
+# ${SNAPPY_CFLAGS_OTHER}
+# ${SNAPPY_INCLUDE_DIRS}
+
+
 # -----------------------------------------------------------------------------
 # netdata files
 
@@ -284,6 +314,13 @@ set(LIBNETDATA_FILES
         libnetdata/threads/threads.h
         libnetdata/url/url.c
         libnetdata/url/url.h
+        libnetdata/json/json.c
+        libnetdata/json/json.h
+        libnetdata/json/jsmn.c
+        libnetdata/json/jsmn.h
+        libnetdata/health/health.c
+        libnetdata/health/health.h
+        libnetdata/string/utf8.h
         libnetdata/socket/security.c
         libnetdata/socket/security.h)
 
@@ -349,6 +386,10 @@ set(XENSTAT_PLUGIN_FILES
         collectors/xenstat.plugin/xenstat_plugin.c
         )
 
+set(PERF_PLUGIN_FILES
+        collectors/perf.plugin/perf_plugin.c
+        )
+
 set(PROC_PLUGIN_FILES
         collectors/proc.plugin/ipc.c
         collectors/proc.plugin/plugin_proc.c
@@ -382,6 +423,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/proc_vmstat.c
         collectors/proc.plugin/proc_uptime.c
         collectors/proc.plugin/sys_kernel_mm_ksm.c
+        collectors/proc.plugin/sys_block_zram.c
         collectors/proc.plugin/sys_devices_system_edac_mc.c
         collectors/proc.plugin/sys_devices_system_node.c
         collectors/proc.plugin/sys_fs_btrfs.c
@@ -547,6 +589,11 @@ set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis_put_record.h
         )
 
+set(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES
+        backends/prometheus/remote_write/remote_write.cc
+        backends/prometheus/remote_write/remote_write.h
+        )
+
 set(DAEMON_FILES
         daemon/common.c
         daemon/common.h
@@ -612,6 +659,29 @@ ELSE()
 ENDIF()
 
 # -----------------------------------------------------------------------------
+# prometheus remote write backend
+
+IF(PROTOBUF_LIBRARIES AND SNAPPY_LIBRARIES)
+    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE True)
+ELSE()
+    SET(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE False)
+ENDIF()
+
+IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
+    message(STATUS "prometheus remote write backend: enabled")
+
+    find_package(Protobuf REQUIRED)
+    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS backends/prometheus/remote_write/remote_write.proto)
+
+    list(APPEND NETDATA_FILES ${PROMETHEUS_REMOTE_WRITE_BACKEND_FILES} ${PROTO_SRCS} ${PROTO_HDRS})
+    list(APPEND NETDATA_COMMON_LIBRARIES ${PROTOBUF_LIBRARIES} ${SNAPPY_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS} ${SNAPPY_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR})
+    list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER} ${SNAPPY_CFLAGS_OTHER})
+ELSE()
+    message(STATUS "prometheus remote write backend: disabled (requires protobuf and snappy libraries)")
+ENDIF()
+
+# -----------------------------------------------------------------------------
 # netdata
 
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} m ${CMAKE_THREAD_LIBS_INIT})
@@ -629,6 +699,7 @@ IF(LINUX)
 
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
     SET(ENABLE_PLUGIN_APPS True)
+    SET(ENABLE_PLUGIN_PERF True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -637,6 +708,7 @@ ELSEIF(FREEBSD)
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS True)
+    SET(ENABLE_PLUGIN_PERF False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -645,10 +717,11 @@ ELSEIF(MACOS)
     target_compile_options(netdata PUBLIC ${NETDATA_COMMON_CFLAGS})
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
+    SET(ENABLE_PLUGIN_PERF False)
 
 ENDIF()
 
-IF(ENABLE_BACKEND_KINESIS)
+IF(ENABLE_BACKEND_KINESIS OR ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     set_property(TARGET netdata PROPERTY CXX_STANDARD 11)
     set_property(TARGET netdata PROPERTY CMAKE_CXX_STANDARD_REQUIRED ON)
 ENDIF()
@@ -725,6 +798,20 @@ IF(ENABLE_PLUGIN_XENSTAT)
     target_compile_options(xenstat.plugin PUBLIC ${NETDATA_COMMON_CFLAGS} ${XENSTAT_CFLAGS_OTHER})
 ELSE()
     message(STATUS "xenstat.plugin: disabled (requires libxenstat)")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# perf.plugin
+
+IF(ENABLE_PLUGIN_PERF)
+    message(STATUS "perf.plugin: enabled")
+    add_executable(perf.plugin config.h ${PERF_PLUGIN_FILES})
+    target_link_libraries (perf.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(perf.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(perf.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "perf.plugin: disabled")
 ENDIF()
 
 

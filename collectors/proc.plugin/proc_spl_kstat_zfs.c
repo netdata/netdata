@@ -124,6 +124,8 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
         dirname = config_get("plugin:proc:" ZFS_PROC_ARCSTATS, "directory to monitor", filename);
 
         show_zero_charts = config_get_boolean_ondemand("plugin:proc:" ZFS_PROC_ARCSTATS, "show zero charts", CONFIG_BOOLEAN_NO);
+        if(show_zero_charts == CONFIG_BOOLEAN_AUTO && netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)
+            show_zero_charts = CONFIG_BOOLEAN_YES;
         if(unlikely(show_zero_charts == CONFIG_BOOLEAN_YES))
             do_zfs_stats = 1;
     }

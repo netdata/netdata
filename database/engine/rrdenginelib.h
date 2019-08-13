@@ -31,6 +31,8 @@ typedef uintptr_t rrdeng_stats_t;
 #define rrd_stat_atomic_add(p, n) do {(void) __sync_fetch_and_add(p, n);} while(0)
 #endif
 
+#define RRDENG_PATH_MAX (4096)
+
 /* returns old *ptr value */
 static inline unsigned long ulong_compare_and_swap(volatile unsigned long *ptr,
                                                    unsigned long oldval, unsigned long newval)
@@ -93,6 +95,7 @@ static inline void crc32set(void *crcp, uLong crc)
 extern void print_page_cache_descr(struct rrdeng_page_descr *page_cache_descr);
 extern void print_page_descr(struct rrdeng_page_descr *descr);
 extern int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size);
+extern int open_file_direct_io(char *path, int flags, uv_file *file);
 extern char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
 
 #endif /* NETDATA_RRDENGINELIB_H */

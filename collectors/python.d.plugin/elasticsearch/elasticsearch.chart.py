@@ -10,9 +10,9 @@ from collections import namedtuple
 from socket import gethostbyname, gaierror
 
 try:
-        from queue import Queue
+    from queue import Queue
 except ImportError:
-        from Queue import Queue
+    from Queue import Queue
 
 from bases.FrameworkServices.UrlService import UrlService
 
@@ -83,11 +83,11 @@ NODE_STATS = [
 ]
 
 CLUSTER_STATS = [
-    'nodes.count.data_only',
-    'nodes.count.master_data',
+    'nodes.count.data',
+    'nodes.count.master',
     'nodes.count.total',
-    'nodes.count.master_only',
-    'nodes.count.client',
+    'nodes.count.coordinating_only',
+    'nodes.count.ingest',
     'indices.docs.count',
     'indices.query_cache.hit_count',
     'indices.query_cache.miss_count',
@@ -371,7 +371,7 @@ CHARTS = {
     },
     'cluster_health_nodes': {
         'options': [None, 'Nodes Statistics', 'nodes', 'cluster health API',
-                    'elastic.cluster_health_nodes', 'stacked'],
+                    'elastic.cluster_health_nodes', 'area'],
         'lines': [
             ['number_of_nodes', 'nodes', 'absolute'],
             ['number_of_data_nodes', 'data_nodes', 'absolute'],
@@ -417,13 +417,13 @@ CHARTS = {
     },
     'cluster_stats_nodes': {
         'options': [None, 'Nodes Statistics', 'nodes', 'cluster stats API',
-                    'elastic.cluster_nodes', 'stacked'],
+                    'elastic.cluster_nodes', 'area'],
         'lines': [
-            ['nodes_count_data_only', 'data_only', 'absolute'],
-            ['nodes_count_master_data', 'master_data', 'absolute'],
+            ['nodes_count_data', 'data', 'absolute'],
+            ['nodes_count_master', 'master', 'absolute'],
             ['nodes_count_total', 'total', 'absolute'],
-            ['nodes_count_master_only', 'master_only', 'absolute'],
-            ['nodes_count_client', 'client', 'absolute']
+            ['nodes_count_ingest', 'ingest', 'absolute'],
+            ['nodes_count_coordinating_only', 'coordinating_only', 'absolute']
         ]
     },
     'cluster_stats_query_cache': {

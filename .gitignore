@@ -56,8 +56,15 @@ nfacct.plugin
 xenstat.plugin
 !xenstat.plugin/
 
+perf.plugin
+!perf.plugin/
+
 cgroup-network
 !cgroup-network/
+
+# protoc generated files
+*.pb.cc
+*.pb.h
 
 # installation artifacts
 packaging/installer/.environment.sh
@@ -132,8 +139,6 @@ cmake_install.cmake
 .DS_Store
 webcopylocal*
 
-contrib/debian/changelog
-
 # converted diagrams
 diagrams/*.png
 diagrams/*.svg
@@ -161,6 +166,8 @@ callgrind.out.*
 gmon.out
 gmon.txt
 sitespeed-result/
+tests/acls/acl.sh
+tests/urls/request.sh
 
 # tests and temp files
 python.d/python-modules-installer.sh

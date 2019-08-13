@@ -58,9 +58,11 @@ COPY --from=builder /app /
 # Configure system
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
+ENV DOCKER_GRP netdata
+ENV DOCKER_USR netdata
 RUN \
     # provide judy installation to base image
-    apk add make alpine-sdk && \
+    apk add make alpine-sdk shadow && \
     cd /judy-${JUDY_VER} && make install && cd / && \
     # Clean the source stuff once judy is installed
     rm -rf /judy-${JUDY_VER} && apk del make alpine-sdk && \
@@ -69,8 +71,8 @@ RUN \
     chmod 4755 /usr/local/bin/fping && \
     mkdir -p /var/log/netdata && \
     # Add netdata user
-    addgroup -g ${NETDATA_GID} -S netdata && \
-    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G netdata netdata && \
+    addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
+    adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}" && \
     # Apply the permissions as described in
     # https://github.com/netdata/netdata/wiki/netdata-security#netdata-directories
     chown -R root:netdata /etc/netdata && \

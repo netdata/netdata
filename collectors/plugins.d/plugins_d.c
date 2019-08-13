@@ -117,6 +117,103 @@ inline int pluginsd_split_words(char *str, char **words, int max_words) {
     return quoted_strings_splitter(str, words, max_words, pluginsd_space);
 }
 
+#ifdef ENABLE_HTTPS
+/**
+ * Update Buffer
+ *
+ * Update the temporary buffer used to parse data received from slave
+ *
+ * @param output is a pointer to the vector where I will store the data
+ * @param ssl is the connection pointer with the server
+ *
+ * @return it returns the total of bytes read on success and a negative number otherwise
+ */
+int pluginsd_update_buffer(char *output, SSL *ssl) {
+    ERR_clear_error();
+    int bytesleft = SSL_read(ssl, output, PLUGINSD_LINE_MAX_SSL_READ);
+    if(bytesleft <= 0) {
+        int sslerrno = SSL_get_error(ssl, bytesleft);
+        switch(sslerrno) {
+            case SSL_ERROR_WANT_READ:
+            case SSL_ERROR_WANT_WRITE:
+            {
+                break;
+            }
+            default:
+            {
+                u_long err;
+                char buf[256];
+                int counter = 0;
+                while ((err = ERR_get_error()) != 0) {
+                    ERR_error_string_n(err, buf, sizeof(buf));
+                    info("%d SSL Handshake error (%s) on socket %d ", counter++, ERR_error_string((long)SSL_get_error(ssl, bytesleft), NULL), SSL_get_fd(ssl));
+                }
+            }
+
+        }
+    } else {
+        output[bytesleft] = '\0';
+    }
+
+    return bytesleft;
+}
+
+/**
+ *  Get from Buffer
+ *
+ *  Get data to process from buffer
+ *
+ * @param output is the output vector that will be used to parse the string.
+ * @param bytesread the amount of bytes read in the previous iteration.
+ * @param input the input vector where there are data to process
+ * @param ssl a pointer to the connection with the server
+ * @param src the first address of the input, because sometime will be necessary to restart the addr with it.
+ *
+ * @return It returns a pointer for the next iteration on success and NULL otherwise.
+ */
+char * pluginsd_get_from_buffer(char *output, int *bytesread, char *input, SSL *ssl, char *src) {
+    int copying = 1;
+    char *endbuffer;
+    size_t length;
+    while(copying) {
+        if(*bytesread > 0) {
+            endbuffer = strchr(input, '\n');
+            if(endbuffer) {
+                copying = 0;
+                endbuffer++; //Advance due the fact I wanna copy '\n'
+                length = endbuffer - input;
+                *bytesread -= length;
+
+                memcpy(output, input, length);
+                output += length;
+                *output = '\0';
+                input += length;
+            }else {
+                length = strlen(input);
+                memcpy(output, input, length);
+                output += length;
+                input = src;
+
+                *bytesread = pluginsd_update_buffer(input, ssl);
+                if(*bytesread <= 0) {
+                    input = NULL;
+                    copying = 0;
+                }
+            }
+        }else {
+            //reduce sample of bytes read, print the length
+            *bytesread = pluginsd_update_buffer(input, ssl);
+            if(*bytesread <= 0) {
+                input = NULL;
+                copying = 0;
+            }
+        }
+    }
+
+    return input;
+}
+#endif
+
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int trust_durations) {
     int enabled = cd->enabled;
 
@@ -149,12 +246,50 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
         goto cleanup;
     }
 
+#ifdef ENABLE_HTTPS
+    int bytesleft = 0;
+    char tmpbuffer[PLUGINSD_LINE_MAX];
+    char *readfrom;
+#endif
+    char *r = NULL;
     while(!ferror(fp)) {
         if(unlikely(netdata_exit)) break;
 
-        char *r = fgets(line, PLUGINSD_LINE_MAX, fp);
+#ifdef ENABLE_HTTPS
+        int normalread = 1;
+        if(netdata_srv_ctx) {
+            if(host->ssl.conn && !host->ssl.flags) {
+                if(!bytesleft) {
+                    r = line;
+                    readfrom = tmpbuffer;
+                    bytesleft = pluginsd_update_buffer(readfrom, host->ssl.conn);
+                    if(bytesleft <= 0) {
+                        break;
+                    }
+                }
+
+                readfrom =  pluginsd_get_from_buffer(line, &bytesleft, readfrom, host->ssl.conn, tmpbuffer);
+                if(!readfrom) {
+                    r = NULL;
+                }
+
+                normalread = 0;
+            }
+        }
+
+        if(normalread) {
+            r = fgets(line, PLUGINSD_LINE_MAX, fp);
+        }
+#else
+        r = fgets(line, PLUGINSD_LINE_MAX, fp);
+#endif
         if(unlikely(!r)) {
-            error("read failed");
+            if(feof(fp))
+                error("read failed: end of file");
+            else if(ferror(fp))
+                error("read failed: input error");
+            else
+                error("read failed: unknown error");
             break;
         }
 
@@ -521,6 +656,70 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
     }
 }
 
+#define SERIAL_FAILURES_THRESHOLD 10
+static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
+    if (likely(cd->successful_collections)) {
+        sleep((unsigned int) cd->update_every);
+        return;
+    }
+
+    if(likely(cd->serial_failures <= SERIAL_FAILURES_THRESHOLD)) {
+        info("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
+            cd->fullfilename, cd->pid,
+            cd->enabled ?
+                "Waiting a bit before starting it again." :
+                "Will not start it again - it is now disabled.");
+        sleep((unsigned int) (cd->update_every * 10));
+        return;
+    }
+
+    if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
+        error("'%s' (pid %d) does not generate useful output, although it reports success (exits with 0)."
+            "We have tried to collect something %zu times - unsuccessfully. Disabling it.",
+            cd->fullfilename, cd->pid, cd->serial_failures);
+        cd->enabled = 0;
+        return;
+    }
+
+    return;
+}
+
+static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_ret_code) {
+    if (worker_ret_code == -1) {
+        info("'%s' (pid %d) was killed with SIGTERM. Disabling it.", cd->fullfilename, cd->pid);
+        cd->enabled = 0;
+        return;
+    }
+
+    if (!cd->successful_collections) {
+        error("'%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
+            cd->fullfilename, cd->pid, worker_ret_code);
+        cd->enabled = 0;
+        return;
+    }
+
+    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
+        error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
+            cd->fullfilename, cd->pid, worker_ret_code, cd->successful_collections,
+            cd->enabled ?
+                "Waiting a bit before starting it again." :
+                "Will not start it again - it is disabled.");
+        sleep((unsigned int) (cd->update_every * 10));
+        return;
+    }
+
+    if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
+        error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
+            "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
+            cd->fullfilename, cd->pid, worker_ret_code, cd->successful_collections, cd->serial_failures);
+        cd->enabled = 0;
+        return;
+    }
+
+    return;
+}
+#undef SERIAL_FAILURES_THRESHOLD
+
 void *pluginsd_worker_thread(void *arg) {
     netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
@@ -541,50 +740,14 @@ void *pluginsd_worker_thread(void *arg) {
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
         killpid(cd->pid, SIGTERM);
 
-        // get the return code
-        int code = mypclose(fp, cd->pid);
+        int worker_ret_code = mypclose(fp, cd->pid);
 
-        if(code != 0) {
-            // the plugin reports failure
+        if (likely(worker_ret_code == 0))
+            pluginsd_worker_thread_handle_success(cd);
+        else
+            pluginsd_worker_thread_handle_error(cd, worker_ret_code);
 
-            if(likely(!cd->successful_collections)) {
-                // nothing collected - disable it
-                error("'%s' (pid %d) exited with error code %d. Disabling it.", cd->fullfilename, cd->pid, code);
-                cd->enabled = 0;
-            }
-            else {
-                // we have collected something
-
-                if(likely(cd->serial_failures <= 10)) {
-                    error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s", cd->fullfilename, cd->pid, code, cd->successful_collections, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is disabled.");
-                    sleep((unsigned int) (cd->update_every * 10));
-                }
-                else {
-                    error("'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). We tried %zu times to restart it, but it failed to generate data. Disabling it.", cd->fullfilename, cd->pid, code, cd->successful_collections, cd->serial_failures);
-                    cd->enabled = 0;
-                }
-            }
-        }
-        else {
-            // the plugin reports success
-
-            if(unlikely(!cd->successful_collections)) {
-                // we have collected nothing so far
-
-                if(likely(cd->serial_failures <= 10)) {
-                    error("'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.", cd->fullfilename, cd->pid, cd->enabled?"Waiting a bit before starting it again.":"Will not start it again - it is now disabled.");
-                    sleep((unsigned int) (cd->update_every * 10));
-                }
-                else {
-                    error("'%s' (pid %d) does not generate useful output, although it reports success (exits with 0), but we have tried %zu times to collect something. Disabling it.", cd->fullfilename, cd->pid, cd->serial_failures);
-                    cd->enabled = 0;
-                }
-            }
-            else
-                sleep((unsigned int) cd->update_every);
-        }
         cd->pid = 0;
-
         if(unlikely(!cd->enabled)) break;
     }
 

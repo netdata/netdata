@@ -48,6 +48,11 @@ unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
+#ifdef ENABLE_HTTPS
+int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
+char *netdata_ssl_ca_path = NULL;
+char *netdata_ssl_ca_file = NULL;
+#endif
 
 static void load_stream_conf() {
     errno = 0;
@@ -89,13 +94,17 @@ int rrdpush_init() {
             }
         }
     }
+
     char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
     if ( !strcmp(invalid_certificate,"yes")){
         if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
-            info("The Netdata is configured to accept invalid certificate.");
+            info("Netdata is configured to accept invalid SSL certificate.");
             netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
         }
     }
+
+    netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", "/etc/ssl/certs/");
+    netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/certs.pem");
 #endif
 
     return default_rrdpush_enabled;
@@ -463,10 +472,10 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
 
 #ifdef ENABLE_HTTPS
-    if( netdata_cli_ctx ){
+    if( netdata_client_ctx ){
         host->ssl.flags = NETDATA_SSL_START;
         if (!host->ssl.conn){
-            host->ssl.conn = SSL_new(netdata_cli_ctx);
+            host->ssl.conn = SSL_new(netdata_client_ctx);
             if(!host->ssl.conn){
                 error("Failed to allocate SSL structure.");
                 host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
@@ -651,7 +660,8 @@ void *rrdpush_sender_thread(void *ptr) {
 
 #ifdef ENABLE_HTTPS
     if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
-        security_start_ssl(1);
+        security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
+        security_location_for_context(netdata_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
     }
 #endif
 
@@ -801,7 +811,17 @@ void *rrdpush_sender_thread(void *ptr) {
                         rrdpush_buffer_lock(host);
 
                         debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", begin, buffer_strlen(host->rrdpush_sender_buffer));
-                        ssize_t ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+                        ssize_t ret;
+#ifdef ENABLE_HTTPS
+                        SSL *conn = host->ssl.conn ;
+                        if(conn && !host->ssl.flags) {
+                            ret = SSL_write(conn,&host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin);
+                        } else {
+                            ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+                        }
+#else
+                        ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+#endif
                         if (unlikely(ret == -1)) {
                             if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
                                 debug(D_STREAM, "STREAM: Send failed - closing socket...");
@@ -1059,6 +1079,8 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
 #ifdef ENABLE_HTTPS
+    host->ssl.conn = ssl->conn;
+    host->ssl.flags = ssl->flags;
     if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
@@ -1210,7 +1232,9 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
+#ifdef ENABLE_HTTPS
 	    , &rpt->ssl
+#endif
     );
 
     netdata_thread_cleanup_pop(1);

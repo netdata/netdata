@@ -8,11 +8,6 @@ from socket import getaddrinfo, gaierror
 from threading import Thread
 
 try:
-    from time import monotonic as time
-except ImportError:
-    from time import time
-
-try:
     import dns.message
     import dns.query
     import dns.name
@@ -89,13 +84,15 @@ def dns_request(server_list, timeout, domains):
         request = dns.message.make_query(domain, dns.rdatatype.A)
 
         try:
-            dns_start = time()
-            dns.query.udp(request, ns, timeout=t)
-            dns_end = time()
-            query_time = round((dns_end - dns_start) * 1000)
-            q.put({'_'.join(['ns', ns.replace('.', '_')]): query_time})
+            resp = dns.query.udp(request, ns, timeout=t)
+            if (resp.rcode() == dns.rcode.NOERROR and resp.answer):
+                query_time = resp.time * 1000
+            else:
+                query_time = -100
         except dns.exception.Timeout:
-            q.put({'_'.join(['ns', ns.replace('.', '_')]): -100})
+            query_time = -100
+        finally:
+            q.put({'_'.join(['ns', ns.replace('.', '_')]): query_time})
 
     for server in server_list:
         th = Thread(target=dns_req, args=(server, timeout, que))

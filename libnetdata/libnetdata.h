@@ -81,6 +81,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
+#include <spawn.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -298,7 +299,9 @@ extern char *netdata_configured_host_prefix;
 #include "clocks/clocks.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
-#include "socket/security.h"
+#ifdef ENABLE_HTTPS
+# include "socket/security.h"
+#endif
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/log.h"
@@ -308,5 +311,8 @@ extern char *netdata_configured_host_prefix;
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
 #include "url/url.h"
+#include "json/json.h"
+#include "health/health.h"
+#include "string/utf8.h"
 
 #endif // NETDATA_LIB_H

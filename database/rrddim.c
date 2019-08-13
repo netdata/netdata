@@ -60,7 +60,7 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", st->id, rd->name, rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
     rd->exposed = 0;
-    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
@@ -72,7 +72,7 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, collected_number multip
     debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->multiplier, multiplier);
     rd->multiplier = multiplier;
     rd->exposed = 0;
-    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
@@ -84,7 +84,7 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
     debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from " COLLECTED_NUMBER_FORMAT " to " COLLECTED_NUMBER_FORMAT, st->id, rd->name, rd->divisor, divisor);
     rd->divisor = divisor;
     rd->exposed = 0;
-    rrdset_flag_set(st, RRDSET_FLAG_HOMEGENEOUS_CHECK);
+    rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
     return 1;
 }
@@ -466,7 +466,7 @@ inline void rrddim_is_obsolete(RRDSET *st, RRDDIM *rd) {
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
 }
 
-inline void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd) {
+inline void rrddim_isnot_obsolete(RRDSET *st __maybe_unused, RRDDIM *rd) {
     debug(D_RRD_CALLS, "rrddim_isnot_obsolete() for chart %s, dimension %s", st->name, rd->name);
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
@@ -475,7 +475,7 @@ inline void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd) {
 // ----------------------------------------------------------------------------
 // RRDDIM - collect values for a dimension
 
-inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value) {
+inline collected_number rrddim_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, collected_number value) {
     debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, st->name, rd->name, value);
 
     now_realtime_timeval(&rd->last_collected_time);
