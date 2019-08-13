@@ -2,7 +2,7 @@
 
 Because Netdata is a health monitoring and *performance troubleshooting* system, we put a lot of emphasis on real-time, meaningful, and context-aware charts.
 
-We then leverage several dashboards, both configured by the Netdata community and customizable by you. These dashboards help you find anomalies, jump between charts to find correlations, and generally make smarter decisions about your systems and applications.
+We bundle Netdata with a dashboard and hundreds of charts, designed by both our team and the community, but you can also customize them yourself.
 
 There are two primary ways to view Netdata's dashboards:
 
@@ -12,15 +12,21 @@ There are two primary ways to view Netdata's dashboards:
 
 You can also view all the data Netdata collects through the [REST API v1](api/).
 
-No matter where you use Netdata's charts, you'll want to know how to [manipulate](#manipulating-charts) them. You'll also want to understand how Netdata defines [charts](#charts), [dimensions](#dimensions), [families](#families), and [contexts](#contexts).
+No matter where you use Netdata's charts, you'll want to know how to [use](#using-charts) them. You'll also want to understand how Netdata defines [charts](#charts), [dimensions](#dimensions), [families](#families), and [contexts](#contexts).
 
-## Manipulating charts
+## Using charts
 
-One of the most useful functions of the standard web dashboard—and all Netdata-created dashboards—is the ability to manipulate charts.
+Netdata's chart's are far from static. They're interactive, real-time, and work with your mouse, touchpad, or touchscreen!
 
-Netdata synchronizes manipulations across all its charts. If you zoom into one, the rest will zoom as well. If you select a timeframe, Netdata will select that timeframe across all charts. Synchronization even works across different Netdata agents, and their respective dashboards, if you connect them using the [node menu](../registry)!
+Hover over any chart to temporarily pause it and see the exact values presented as different [dimensions](#dimensions). Click or tap to lock the chart.
 
-The dashboard includes a number of ways to manipulate charts, each of which can be initiated using one or more methods:
+![Animated GIF of hovering over a chart to see values](https://user-images.githubusercontent.com/1153921/62968279-9227dd00-bdbf-11e9-9112-1d21444d0f31.gif)
+
+You can change how charts show their metrics by zooming in or out, moving forward or backward in time, or selecting a specific timeframe for more in-depth analysis.
+
+Whenever you use a chart in this way, Netdata synchronizes all the other charts to match it. This even applies across different Netdata agents if you connect them using the [node menu](../registry)!
+
+You can change how charts show their metrics in a few different ways, each of which have a few methods:
 
 | Manipulation | Method #1 | Method #2 | Method #3 |
 |--- |--- |--- |--- |
@@ -30,7 +36,7 @@ The dashboard includes a number of ways to manipulate charts, each of which can 
 | **Zoom** to a specific timeframe | `SHIFT` + `mouse selection`  |  |  |
 | **Zoom** in/out  | `SHIFT`/`ALT` + `mouse scrollwheel`  | `SHIFT`/`ALT` + `two-finger pinch` (touchpad/touchscreen)  | `SHIFT`/`ALT` + `two-finger scroll` (touchpad/touchscreen) |
 
-Here's how the chart synchronization looks while zooming and panning:
+Here's how chart synchronization looks while zooming and panning:
 
 ![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing charts](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
@@ -48,11 +54,11 @@ Here's the system CPU chart, the first chart displayed on the standard dashboard
 
 ![Screenshot of the system CPU chart in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62720972-0b8a8e80-b9c0-11e9-930b-4829f7b17cfd.png)
 
-Netdata displays a chart's name in parentheses above the chart. For example, if you navigate to the system CPU chart, you'll see the label: **Total CPU utilization (system.cpu)**. In this case, the chart's name is `system.cpu`. Netdata derives the name from the chart's [context](#contexts)
+Netdata displays a chart's name in parentheses above the chart. For example, if you navigate to the system CPU chart, you'll see the label: **Total CPU utilization (system.cpu)**. In this case, the chart's name is `system.cpu`. Netdata derives the name from the chart's [context](#contexts).
 
 ### Dimensions
 
-A **dimension** is a value that gets shows on a chart. The value can be raw data or calculated values, such as percentages, aggregates, and more.
+A **dimension** is a value that gets shown on a chart. The value can be raw data or calculated values, such as percentages, aggregates, and more.
 
 Charts are capable of showing more than one dimension. Netdata shows these dimensions on the right side of the chart, beneath the date and time. Again, the `system.cpu` chart will serve as a good example.
 
