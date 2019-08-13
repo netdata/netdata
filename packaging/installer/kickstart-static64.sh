@@ -189,7 +189,7 @@ done
 
 # ---------------------------------------------------------------------------------------------------------------------
 TMPDIR=$(create_tmp_directory)
-cd "${TMPDIR}" || (export TMPDIR="/tmp" && cd "${TMPDIR}")
+cd "${TMPDIR}"
 
 set_tarball_urls "${RELEASE_CHANNEL}"
 progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
@@ -207,7 +207,7 @@ run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} ${inner_opts}
 #shellcheck disable=SC2181
 if [ $? -eq 0 ]; then
 	run ${sudo} rm "${TMPDIR}/netdata-latest.gz.run"
-	if [ ! "${TMPDIR}" = "/tmp" ] && [ ! "${TMPDIR}" = "/" ] && [ -d "${TMPDIR}" ]; then
+	if [ ! "${TMPDIR}" = "/" ] && [ -d "${TMPDIR}" ]; then
 		run ${sudo} rm -rf "${TMPDIR}"
 	fi
 else
