@@ -3716,25 +3716,25 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
 
 #ifndef __FreeBSD__
-    fprintf(stdout, "CHART %s.uptime '' '%s Carried over uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.uptime '' '%s Carried Over Uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.uptime_avg '' '%s Average uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
-    fprintf(stdout, "CHART %s.uptime_max '' '%s Maxium uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
+    fprintf(stdout, "CHART %s.uptime_max '' '%s Maxium Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
