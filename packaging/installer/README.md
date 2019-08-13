@@ -371,7 +371,7 @@ To enable the Netdata service:
 service netdata config set enable=true
 ```
 
-To start the netdata service:
+To start the Netdata service:
 ```
 service netdata start
 ```

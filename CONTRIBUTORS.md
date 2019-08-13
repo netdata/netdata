@@ -2,9 +2,9 @@
 SPDX-License-Identifier: GPL-3.0-or-later
 -->
 
-# netdata contributors license agreement
+# Netdata contributors license agreement
 
-**Thank you for contributing to netdata!**
+**Thank you for contributing to Netdata!**
 
 This agreement is part of the legal framework of the open-source ecosystem
 that adds some red tape, but protects both the contributor and the project.
@@ -17,22 +17,22 @@ contributions for any other purpose.
 
 ## copyright license
 
-The Contributor (*you*) grants netdata Inc. a perpetual, worldwide, non-exclusive,
+The Contributor (*you*) grants Netdata Inc. a perpetual, worldwide, non-exclusive,
 no-charge, royalty-free, irrevocable copyright license to reproduce,
 prepare derivative works of, publicly display, publicly perform, sublicense,
 and distribute his contributions and such derivative works.
 
 ## copyright transfer
 
-The Contributor (*you*) hereby assigns netdata Inc. copyright in his
+The Contributor (*you*) hereby assigns Netdata Inc. copyright in his
 contributions, to be licensed under the same terms as the rest of the code.
 
-> *Note: this means we may re-license netdata (your contributions included)
+> *Note: this means we may re-license Netdata (your contributions included)
 > any way we see fit, without asking your permission. 
-> We intend to keep the netdata agent forever FOSS.
+> We intend to keep the Netdata agent forever FOSS.
 > But open-source licenses have significant differences and in our attempt to
-> help netdata grow we may have to distribute it under a different license.
-> For example, CNCF, the Cloud Native Computing Foundation, requires netdata
+> help Netdata grow we may have to distribute it under a different license.
+> For example, CNCF, the Cloud Native Computing Foundation, requires Netdata
 > to be licensed under Apache-2.0 for it to be accepted as a member of the
 > Foundation. We want to be free to do it.*
 
@@ -43,9 +43,9 @@ original creation and that he is legally entitled to grant the above license.
 
 > *Note: if you are committing third party code, please make sure the third party
 > license or any other restrictions are also included with your commits.
-> netdata includes many third party libraries and tools and this is not a
+> Netdata includes many third party libraries and tools and this is not a
 > problem, provided that the license of the third party code is compatible with
-> the one we use for netdata.*
+> the one we use for Netdata.*
 
 ## signature
 
@@ -66,7 +66,7 @@ are subject to this agreement.
 > 1. add your github username and name in this file
 > 2. commit it to the repo with a PR, using the same github username, or include this change in your first PR.
 
-# netdata contributors
+# Netdata contributors
 
 This is the list of contributors that have signed this agreement:
 

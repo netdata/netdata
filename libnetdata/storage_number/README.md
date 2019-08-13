@@ -1,4 +1,4 @@
-# netdata storage number
+# Netdata storage number
 
 Although `netdata` does all its calculations using `long double`, it stores all values using
 a **custom-made 32-bit number**.

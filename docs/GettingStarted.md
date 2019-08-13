@@ -32,9 +32,9 @@ If still Netdata does not receive the requests, something is blocking them. A fi
 
 </details>&nbsp;<br/>
 
-When you install multiple Netdata servers, all your servers will appear at the node menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your netdata servers.
+When you install multiple Netdata servers, all your servers will appear at the node menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your Netdata servers.
 
-The node menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other netdata server:
+The node menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other Netdata server:
 
 - the current charts panning (drag the charts left or right),
 - the current charts zooming (`SHIFT` + mouse wheel over a chart),

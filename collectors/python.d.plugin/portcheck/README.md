@@ -28,7 +28,7 @@ server:
 ### notes
 
  * The error chart is intended for alarms, badges or for access via API.
- * A system/service/firewall might block netdata's access if a portscan or
+ * A system/service/firewall might block Netdata's access if a portscan or
    similar is detected.
  * Currently, the accuracy of the latency is low and should be used as reference only.
 

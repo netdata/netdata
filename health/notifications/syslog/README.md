@@ -18,7 +18,7 @@ Targets are defined as follows:
 
 `prefix` defines what the log messages are prefixed with.  By default, all lines are prefixed with 'netdata'.
 
-The `facility` and `level` are the standard syslog facility and level options, for more info on them see your local `logger` and `syslog` documentation.  By default, netdata will log to the `local6` facility, with a log level dependent on the type of message (`crit` for CRITICAL, `warning` for WARNING, and `info` for everything else).
+The `facility` and `level` are the standard syslog facility and level options, for more info on them see your local `logger` and `syslog` documentation.  By default, Netdata will log to the `local6` facility, with a log level dependent on the type of message (`crit` for CRITICAL, `warning` for WARNING, and `info` for everything else).
 
 You can configure sending directly to remote log servers by specifying a host (and optionally a port).  However, this has a somewhat high overhead, so it is much preferred to use your local syslog daemon to handle the forwarding of messages to remote systems (pretty much all of them allow at least simple forwarding, and most of the really popular ones support complex queueing and routing of messages to remote log servers).
 

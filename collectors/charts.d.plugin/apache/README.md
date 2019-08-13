@@ -7,7 +7,7 @@
 
 The `apache` collector visualizes key performance data for an apache web server.
 
-## Example netdata charts
+## Example Netdata charts
 
 For apache 2.2:
 
@@ -80,7 +80,7 @@ From the apache status output it collects:
 
  - total accesses (incremental value, rendered as requests/s)
  - total bandwidth (incremental value, rendered as bandwidth/s)
- - requests per second (this appears to be calculated by apache as an average for its lifetime, while the one calculated by netdata using the total accesses counter is real-time)
+ - requests per second (this appears to be calculated by apache as an average for its lifetime, while the one calculated by Netdata using the total accesses counter is real-time)
  - bytes per second (average for the lifetime of the apache server)
  - bytes per request (average for the lifetime of the apache server)
  - workers by status (`busy` and `idle`)
@@ -106,7 +106,7 @@ apache_curl_opts=
 apache_update_every=
 ```
 
-The default `apache_update_every` is configured in netdata.
+The default `apache_update_every` is configured in Netdata.
 
 ## Auto-detection
 
@@ -122,7 +122,7 @@ If you are able to run successfully, by hand this command:
 curl "http://127.0.0.1:80/server-status?auto"
 ```
 
-netdata will be able to do it too.
+Netdata will be able to do it too.
 
 Notice: You may need to have the default `000-default.conf ` website enabled in order for the status mod to work.
 

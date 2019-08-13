@@ -2,7 +2,7 @@
 
 The `ap` collector visualizes data related to access points.
 
-## Example netdata charts
+## Example Netdata charts
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/12377654/9f566e88-bd2d-11e5-855a-e0ba96b8fd98.png)
 

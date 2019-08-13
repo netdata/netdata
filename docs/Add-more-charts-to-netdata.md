@@ -187,7 +187,7 @@ rethinkdb|python<br/>v2 or v3|Connects to multiple rethinkdb servers (local or r
 
 application|language|notes|
 :---------:|:------:|:----|
-retroshare|python<br/>v2 or v3|Connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [retroshare.chart.py](../collectors/python.d.plugin/retroshare)<br/>configuration file: [python.d/retroshare.conf](../collectors/python.d.plugin/retroshare)|
+retroshare|python<br/>v2 or v3|Connects to multiple retroshare servers (local or remote) to collect real-time performance metrics.<br/>&nbsp;<br/>Netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [retroshare.chart.py](../collectors/python.d.plugin/retroshare)<br/>configuration file: [python.d/retroshare.conf](../collectors/python.d.plugin/retroshare)|
 
 
 ---
@@ -196,7 +196,7 @@ retroshare|python<br/>v2 or v3|Connects to multiple retroshare servers (local or
 
 application|language|notes|
 :---------:|:------:|:----|
-squid|python<br/>v2 or v3|Connects to multiple squid servers (local or remote) to collect real-time performance metrics.<br/>&nbsp;<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [squid.chart.py](../collectors/python.d.plugin/squid)<br/>configuration file: [python.d/squid.conf](../collectors/python.d.plugin/squid)|
+squid|python<br/>v2 or v3|Connects to multiple squid servers (local or remote) to collect real-time performance metrics.<br/>&nbsp;<br/>Netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [squid.chart.py](../collectors/python.d.plugin/squid)<br/>configuration file: [python.d/squid.conf](../collectors/python.d.plugin/squid)|
 squid|BASH<br/>Shell Script|Connects to a squid server (local or remote) to collect real-time performance metrics.<br/><br/>DEPRECATED IN FAVOR OF THE PYTHON ONE. It is still supplied only as an example module to shell scripting plugins.<br/>&nbsp;<br/>Netdata plugin: [charts.d.plugin](../collectors/charts.d.plugin#chartsdplugin)<br/>plugin module: [squid.chart.sh](../collectors/charts.d.plugin/squid)<br/>configuration file: [charts.d/squid.conf](../collectors/charts.d.plugin/squid)|
 
 
@@ -298,8 +298,8 @@ postfix|BASH<br/>Shell Script|Charts the postfix queue size.<br/><br/>DEPRECATED
 application|language|notes|
 :---------:|:------:|:----|
 NFS Client|`C`|This is handled entirely by the Netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfs]`.
-NFS Server|`C`|This is handled entirely by the netdata daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
-samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&nbsp;<br/>documentation page: [python.d.plugin module samba](../collectors/python.d.plugin/samba)<br/>netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [samba.chart.py](../collectors/python.d.plugin/samba)<br/>configuration file: [python.d/samba.conf](../collectors/python.d.plugin/samba)|
+NFS Server|`C`|This is handled entirely by the `netdata` daemon.<br/>&nbsp;<br/>Configuration: `netdata.conf`, section `[plugin:proc:/proc/net/rpc/nfsd]`.
+samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&nbsp;<br/>documentation page: [python.d.plugin module samba](../collectors/python.d.plugin/samba)<br/>Netdata plugin: [python.d.plugin](../collectors/python.d.plugin)<br/>plugin module: [samba.chart.py](../collectors/python.d.plugin/samba)<br/>configuration file: [python.d/samba.conf](../collectors/python.d.plugin/samba)|
 
 ---
 
@@ -307,7 +307,7 @@ samba|python<br/>v2 or v3|Performance metrics of Samba SMB2 file sharing.<br/>&n
 
 application|language|notes|
 :---------:|:------:|:----|
-CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>netdata plugin: [cups.plugin](../collectors/cups.plugin)
+CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<br/>Netdata plugin: [cups.plugin](../collectors/cups.plugin)
 
 ---
 
@@ -315,7 +315,7 @@ CUPS|C|Charts metrics of printers, jobs and other cups destinations.<br/>&nbsp;<
 
 application|language|notes|
 :---------:|:------:|:----|
-xenstat|C|Collects host and domain statistics for XenServer or XCP-ng hypervisors.<br/>&nbsp;<br/>netdata plugin: [xenstat.plugin](../collectors/xenstat.plugin)
+xenstat|C|Collects host and domain statistics for XenServer or XCP-ng hypervisors.<br/>&nbsp;<br/>Netdata plugin: [xenstat.plugin](../collectors/xenstat.plugin)
 
 ---
 

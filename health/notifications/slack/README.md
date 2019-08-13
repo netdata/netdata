@@ -5,7 +5,7 @@ This is what you will get:
 
 You need:
 
-1. The **incoming webhook URL** as given by slack.com. You can use the same on all your netdata servers (or you can have multiple if you like - your decision).
+1. The **incoming webhook URL** as given by slack.com. You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
 2. One or more channels to post the messages to.
 
 To get a webhook that works on multiple channels, you will need to login to your slack.com workspace and create an incoming webhook using the [Incoming Webhooks App](https://slack.com/apps/A0F7XDUAZ-incoming-webhooks).
@@ -29,7 +29,7 @@ DEFAULT_RECIPIENT_SLACK="alarms"
 
 You can define multiple recipients like this: `# #alarms systems @myuser`. 
 This example will send the alarm to:
-- The recipient defined in slack for the webhook (not known to netdata)
+- The recipient defined in slack for the webhook (not known to Netdata)
 - The channel 'alarms'
 - The channel 'systems'
 - The user @myuser

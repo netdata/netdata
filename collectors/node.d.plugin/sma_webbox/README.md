@@ -3,7 +3,7 @@
 
 [SMA Sunny Webbox](http://files.sma.de/dl/4253/WEBBOX-DUS131916W.pdf)
 
-Example netdata configuration for node.d/sma_webbox.conf
+Example Netdata configuration for node.d/sma_webbox.conf
 
 The module supports any number of name servers, like this:
 

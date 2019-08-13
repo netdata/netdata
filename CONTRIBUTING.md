@@ -15,15 +15,15 @@ This is the minimum open-source users should contribute back to the projects the
 
 ### Spread the word
 
-Community growth allows the project to attract new talent willing to contribute. This talent is then developing new features and improves the project. These new features and improvements attract more users and so on. It is a loop. So, post about netdata, present it to local meetups you attend, let your online social network or twitter, facebook, reddit, etc. know you are using it. **The more people involved, the faster the project evolves**.
+Community growth allows the project to attract new talent willing to contribute. This talent is then developing new features and improves the project. These new features and improvements attract more users and so on. It is a loop. So, post about Netdata, present it to local meetups you attend, let your online social network or twitter, facebook, reddit, etc. know you are using it. **The more people involved, the faster the project evolves**.
 
 ### Provide feedback
 
-Is there anything that bothers you about netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to you need? Let us know. [Open a github issue](https://github.com/netdata/netdata/issues) to discuss it. Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences our road-map significantly. **We rely on your feedback to make Netdata better**.
+Is there anything that bothers you about Netdata? Did you experience an issue while installing it or using it? Would you like to see it evolve to you need? Let us know. [Open a github issue](https://github.com/netdata/netdata/issues) to discuss it. Feedback is very important for open-source projects. We can't commit we will do everything, but your feedback influences our road-map significantly. **We rely on your feedback to make Netdata better**.
 
 ### Translate some documentation
 
-The [netdata localization project](https://github.com/netdata/localization) contains instructions on how to provide translations for parts of our documentation. Translating the entire documentation is a daunting task, but you can contribute as much as you like, even a single file. The Chinese translation effort has already begun and we are looking forward to more contributions.
+The [Netdata localization project](https://github.com/netdata/localization) contains instructions on how to provide translations for parts of our documentation. Translating the entire documentation is a daunting task, but you can contribute as much as you like, even a single file. The Chinese translation effort has already begun and we are looking forward to more contributions.
 
 ### Sponsor a part of Netdata
 
@@ -57,7 +57,7 @@ Netdata delivers alarms via various [notification methods](health/notifications)
 
 ### Help other users
 
-As the project grows, an increasing share of our time is spent on supporting this community of users in terms of answering questions, of helping users understand how netdata works and find their way with it. Helping other users is crucial. It allows the developers and maintainers of the project to focus on improving it.
+As the project grows, an increasing share of our time is spent on supporting this community of users in terms of answering questions, of helping users understand how Netdata works and find their way with it. Helping other users is crucial. It allows the developers and maintainers of the project to focus on improving it.
 
 ### Improve documentation
 
@@ -80,11 +80,11 @@ Of course we appreciate contributions for any other part of the NetData agent, i
 
 #### Code of Conduct and CLA
 
-We expect all contributors to abide by the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). For a pull request to be accepted, you will also need to accept the [netdata contributors license agreement](CONTRIBUTORS.md), as part of the PR process.
+We expect all contributors to abide by the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). For a pull request to be accepted, you will also need to accept the [Netdata contributors license agreement](CONTRIBUTORS.md), as part of the PR process.
 
 #### Performance and efficiency
 
-Everything on Netdata is about efficiency. We need netdata to always be the most lightweight monitoring solution available. We will reject to merge PRs that are not optimal in resource utilization and efficiency.
+Everything on Netdata is about efficiency. We need Netdata to always be the most lightweight monitoring solution available. We will reject to merge PRs that are not optimal in resource utilization and efficiency.
 
 Of course there are cases that such technical excellence is either not reasonable or not feasible. In these cases, we may require the feature or code submitted to be by disabled by default.
 
@@ -92,9 +92,9 @@ Of course there are cases that such technical excellence is either not reasonabl
 
 Unlike other monitoring solutions, Netdata requires all metrics collected to have some structure attached to them. So, Netdata metrics have a name, units, belong to a chart that has a title, a family, a context, belong to an application, etc.
 
-This structure is what makes netdata different. Most other monitoring solution collect bulk metrics in terms of name-value pairs and then expect their users to give meaning to these metrics during visualization. This does not work. It is neither practical nor reasonable to give to someone 2000 metrics and let him/her visualize them in a meaningful way.
+This structure is what makes Netdata different. Most other monitoring solution collect bulk metrics in terms of name-value pairs and then expect their users to give meaning to these metrics during visualization. This does not work. It is neither practical nor reasonable to give to someone 2000 metrics and let him/her visualize them in a meaningful way.
 
-So, netdata requires all metrics to have a meaning at the time they are collected.  We will reject to merge PRs that loosely collect just a "bunch of metrics", but we are very keen to help you fix this.
+So, Netdata requires all metrics to have a meaning at the time they are collected.  We will reject to merge PRs that loosely collect just a "bunch of metrics", but we are very keen to help you fix this.
 
 #### Automated Testing
 
@@ -106,7 +106,7 @@ Of course, manual testing is always required.
 
 #### Netdata is a distributed application
 
-Netdata is a distributed monitoring application. A few basic features can become quite complicated for such applications. We may reject features that alter or influence the nature of netdata, though we usually discuss the requirements with contributors and help them adapt their code to be better suited for Netdata.
+Netdata is a distributed monitoring application. A few basic features can become quite complicated for such applications. We may reject features that alter or influence the nature of Netdata, though we usually discuss the requirements with contributors and help them adapt their code to be better suited for Netdata.
 
 #### Operating systems supported
 

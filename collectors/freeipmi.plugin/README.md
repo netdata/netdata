@@ -8,11 +8,11 @@ Netdata has a [freeipmi](https://www.gnu.org/software/freeipmi/) plugin.
 
 1. install `libipmimonitoring-dev` or `libipmimonitoring-devel` (`freeipmi-devel` on RHEL based OS) using the package manager of your system.
 
-2. re-install netdata from source. The installer will detect that the required libraries are now available and will also build `freeipmi.plugin`.
+2. re-install Netdata from source. The installer will detect that the required libraries are now available and will also build `freeipmi.plugin`.
 
 Keep in mind IPMI requires root access, so the plugin is setuid to root.
 
-If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the netdata plugin will be able to work.
+If you just installed the required IPMI tools, please run at least once the command `ipmimonitoring` and verify it returns sensors information. This command initialises IPMI configuration, so that the Netdata plugin will be able to work.
 
 ## Netdata use
 
@@ -111,7 +111,7 @@ Append to `command options = ` the settings you need. The minimum `update every`
 
 ## Ignoring specific sensors
 
-Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`. **However this file is not used by `libipmimonitoring`** (the library used by netdata's `freeipmi.plugin`).
+Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`. **However this file is not used by `libipmimonitoring`** (the library used by Netdata's `freeipmi.plugin`).
 
 So, `freeipmi.plugin` supports the option `ignore` that accepts a comma separated list of sensor IDs to ignore. To configure it, edit `/etc/netdata/netdata.conf` and set:
 
@@ -180,7 +180,7 @@ options ipmi_si kipmid_max_busy_us=10
 
 This instructs the kernel IPMI module to pause for a tick between checking IPMI. Querying IPMI will be a lot slower now (e.g. several seconds for IPMI to respond), but `kipmi` will not use any noticeable CPU. You can also use a higher number (this is the number of microseconds to poll IPMI for a response, before waiting for a tick).
 
-If you need to disable IPMI for netdata, edit `/etc/netdata/netdata.conf` and set:
+If you need to disable IPMI for Netdata, edit `/etc/netdata/netdata.conf` and set:
 
 ```
 [plugins]

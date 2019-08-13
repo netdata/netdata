@@ -6,7 +6,7 @@ Web server log files exist for more than 20 years. All web servers of all kinds,
 
 Yet, after the appearance of google analytics and similar services, and the recent rise of APM (Application Performance Monitoring) with sophisticated time-series databases that collect and analyze metrics at the application level, all these web server log files are mostly just filling our disks, rotated every night without any use whatsoever.
 
-netdata turns this "useless" log file, into a powerful performance and health monitoring tool, capable of detecting, **in real-time**, most common web server problems, such as:
+Netdata turns this "useless" log file, into a powerful performance and health monitoring tool, capable of detecting, **in real-time**, most common web server problems, such as:
 
 - too many redirects (i.e. **oops!** *this should not redirect clients to itself*)
 - too many bad requests (i.e. **oops!** *a few files were not uploaded*)
@@ -18,7 +18,7 @@ netdata turns this "useless" log file, into a powerful performance and health mo
 
 ## Usage
 
-If netdata is installed on a system running a web server, it will detect it and it will automatically present a series of charts, with information obtained from the web server API, like these (*these do not come from the web server log file*):
+If Netdata is installed on a system running a web server, it will detect it and it will automatically present a series of charts, with information obtained from the web server API, like these (*these do not come from the web server log file*):
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/22900686/e283f636-f237-11e6-93d2-cbdf63de150c.png)
 *[**netdata**](https://my-netdata.io/) charts based on metrics collected by querying the `nginx` API (i.e. `/stub_status`).*
@@ -197,7 +197,7 @@ alarm|description|minimum<br/>requests|warning|critical
 
 The column `minimum requests` state the minimum number of requests required for the alarm to be evaluated. We found that when the site is receiving requests above this rate, these alarms are pretty accurate (i.e. no false-positives).
 
-[**netdata**](https://my-netdata.io/) alarms are user configurable. Sample config files can be found under directory `health/health.d` of the netdata github repository. So, even [`web_log` alarms can be adapted to your needs](../../../health/health.d/web_log.conf).
+[**netdata**](https://my-netdata.io/) alarms are user configurable. Sample config files can be found under directory `health/health.d` of the [Netdata GitHub repository](https://github.com/netdata/netdata/). So, even [`web_log` alarms can be adapted to your needs](../../../health/health.d/web_log.conf).
 
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fweb_log%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
