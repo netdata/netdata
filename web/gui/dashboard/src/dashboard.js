@@ -91,7 +91,7 @@
 // *** src/dashboard.js/utils.js
 
 import { updateChartDataAction, updateChartDetailsAction } from './domains/chart/actions';
-import { unitsConversion } from './utils/unitsConversion';
+import { unitsConversion } from './utils/units-conversion';
 import { seconds4human } from './domains/chart/utils/seconds4human';
 
 let reduxStore
