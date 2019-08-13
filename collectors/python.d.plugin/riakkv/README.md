@@ -4,8 +4,7 @@ Monitors one or more Riak KV servers.
 
 **Requirements:**
 
-* An accessible `/stats` endpoint. See [the Riak KV configuration reference]
-  documentation](https://docs.riak.com/riak/kv/2.2.3/configuring/reference/#client-interfaces)
+* An accessible `/stats` endpoint. See [the Riak KV configuration reference documentation](<https://docs.riak.com/riak/kv/2.2.3/configuring/reference/#client-interfaces>)
   for how to enable this.
 
 The following charts are included, which are mostly derived from the metrics
