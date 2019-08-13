@@ -128,7 +128,7 @@ This should get prometheus installed into the container. Let’s test that we ca
 prometheus and connect to it’s web interface. This will look similar to what
 follows:
 
-```
+```sh
 [root@prometheus prometheus]# /opt/prometheus/prometheus
 INFO[0000] Starting prometheus (version=1.7.1, branch=master, revision=3afb3fffa3a29c3de865e1172fb740442e9d0133) 
  source="main.go:88"

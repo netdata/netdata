@@ -30,7 +30,10 @@ In order to install prometheus we are going to introduce our own systemd startup
 #### Download Prometheus
 
 ```sh
-wget -O /tmp/prometheus-2.3.2.linux-amd64.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.11.1/prometheus-2.11.1.linux-amd64.tar.gz 
+cd /tmp && curl -s https://api.github.com/repos/prometheus/prometheus/releases/latest \
+| grep "browser_download_url.*linux-amd64.tar.gz" \
+| cut -d '"' -f 4 \
+| wget -qi -
 ```
 
 #### Create prometheus system user
@@ -49,7 +52,7 @@ sudo chown prometheus:prometheus /opt/prometheus
 #### Untar prometheus directory
 
 ```sh
-sudo tar -xvf /tmp/prometheus-2.3.2.linux-amd64.tar.gz -C /opt/prometheus --strip=1
+sudo tar -xvf /tmp/prometheus-*linux-amd64.tar.gz -C /opt/prometheus --strip=1
 ```
 
 #### Install prometheus.yml
@@ -111,7 +114,7 @@ scrape_configs:
 #### Install nodes.yml
 
 The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
-```
+```yaml
 groups:
 - name: nodes
 
@@ -172,7 +175,7 @@ WantedBy=multi-user.target
 ```
 ##### Start Prometheus
 
-```
+```sh
 sudo systemctl start prometheus
 sudo systemctl enable prometheus
 ```
