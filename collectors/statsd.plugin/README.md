@@ -4,7 +4,7 @@ statsd is a system to collect data from any application. Applications are sendin
 
 There is a [plethora of client libraries](https://github.com/etsy/statsd/wiki#client-implementations) for embedding statsd metrics to any application framework. This makes statsd quite popular for custom application metrics.
 
-netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards, stream them to other netdata servers or archive them to backend time-series databases.
+Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards, stream them to other Netdata servers or archive them to backend time-series databases.
 
 Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd ports (tcp and udp 8125 - yes, Netdata statsd server supports both tcp and udp at the same time).
 
@@ -62,19 +62,19 @@ The application may append `|@sampling_rate`, where `sampling_rate` is a number 
 
 #### Overlapping metrics
 
-netdata statsd maintains different indexes for each of the types supported. This means the same metric `name` may exist under different types concurrently.
+Netdata's statsd server maintains different indexes for each of the types supported. This means the same metric `name` may exist under different types concurrently.
 
 #### Multiple metrics per packet
 
-netdata accepts multiple metrics per packet if each is terminated with `\n`.
+Netdata accepts multiple metrics per packet if each is terminated with `\n`.
 
 #### TCP packets
 
-netdata listens for both TCP and UDP packets. For TCP though, is it important to always append `\n` on each metric. netdata uses this to detect if a metric is split into multiple TCP packets. On disconnect, even the remaining (non terminated with `\n`) buffer, is processed.
+Netdata listens for both TCP and UDP packets. For TCP though, is it important to always append `\n` on each metric. Netdata uses this to detect if a metric is split into multiple TCP packets. On disconnect, even the remaining (non terminated with `\n`) buffer, is processed.
 
 #### UDP packets
 
-When sending multiple packets over UDP, it is important not to exceed the network MTU (usually 1500 bytes minus a few bytes for the headers). netdata will accept UDP packets up to 9000 bytes, but the underlying network will not exceed MTU. 
+When sending multiple packets over UDP, it is important not to exceed the network MTU (usually 1500 bytes minus a few bytes for the headers). Netdata will accept UDP packets up to 9000 bytes, but the underlying network will not exceed MTU. 
 
 ## configuration
 
@@ -107,7 +107,7 @@ This is the statsd configuration at `/etc/netdata/netdata.conf`:
 ### statsd main config options
 - `enabled = yes|no`
 
-   controls if statsd will be enabled for this netdata. The default is enabled.
+   controls if statsd will be enabled for this Netdata. The default is enabled.
 
 - `default port = 8125`
 
@@ -117,15 +117,15 @@ This is the statsd configuration at `/etc/netdata/netdata.conf`:
 
    is a space separated list of IPs and ports to listen to. The format is `PROTOCOL:IP:PORT` - if `PORT` is omitted, the `default port` will be used. If `IP` is IPv6, it needs to be enclosed in `[]`. `IP` can also be ` * ` (to listen on all IPs) or even a hostname.
 
-- `update every (flushInterval) = 1` seconds, controls the frequency statsd will push the collected metrics to netdata charts.
+- `update every (flushInterval) = 1` seconds, controls the frequency statsd will push the collected metrics to Netdata charts.
 
-- `decimal detail = 1000` controls the number of fractional digits in gauges and histograms. netdata collects metrics using signed 64 bit integers and their fractional detail is controlled using multipliers and divisors. This setting is used to multiply all collected values to convert them to integers and is also set as the divisors, so that the final data will be a floating point number with this fractional detail (1000 = X.0 - X.999, 10000 = X.0 - X.9999, etc).
+- `decimal detail = 1000` controls the number of fractional digits in gauges and histograms. Netdata collects metrics using signed 64 bit integers and their fractional detail is controlled using multipliers and divisors. This setting is used to multiply all collected values to convert them to integers and is also set as the divisors, so that the final data will be a floating point number with this fractional detail (1000 = X.0 - X.999, 10000 = X.0 - X.9999, etc).
 
 The rest of the settings are discussed below.
 
 ## statsd charts
 
-netdata can visualize statsd collected metrics in 2 ways:
+Netdata can visualize statsd collected metrics in 2 ways:
 
 1. Each metric gets its own **private chart**. This is the default and does not require any configuration (although there are a few options to tweak).
 
@@ -143,11 +143,11 @@ create private charts for metrics matching = !myapp.*.badmetric myapp.*
 
 The default is to render private charts for all metrics.
 
-The `memory mode` of the round robin database and the `history` of private metric charts are controlled with `private charts memory mode` and `private charts history`. The defaults for both settings is to use the global netdata settings. So, you need to edit them only when you want statsd to use different settings compared to the global ones.
+The `memory mode` of the round robin database and the `history` of private metric charts are controlled with `private charts memory mode` and `private charts history`. The defaults for both settings is to use the global Netdata settings. So, you need to edit them only when you want statsd to use different settings compared to the global ones.
 
-If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the netdata dashboard (this is a web browser issue we need to address at the netdata UI). So, netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
+If you have thousands of metrics, each with its own private chart, you may notice that your web browser becomes slow when you view the Netdata dashboard (this is a web browser issue we need to address at the Netdata UI). So, Netdata has a protection to stop creating charts when `max private charts allowed = 200` (soft limit) is reached.
 
-The metrics above this soft limit are still processed by netdata and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, netdata will still generate charts, but they will automatically be created with `memory mode = none` (netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
+The metrics above this soft limit are still processed by Netdata and will be available to be sent to backend time-series databases, up to `max private charts hard limit = 1000`. So, between 200 and 1000 charts, Netdata will still generate charts, but they will automatically be created with `memory mode = none` (Netdata will not maintain a database for them). These metrics will be sent to backend time series databases, if the backend configuration is set to `as collected`.
 
 Metrics above the hard limit are still collected, but they can only be used in synthetic charts (once a metric is added to chart, it will be sent to backend servers too).
 
@@ -217,7 +217,7 @@ Using synthetic charts, you can create dedicated sections on the dashboard to re
 
 Synthetic charts are organized in
 
-- **applications** (i.e. entries at the main menu of the netdata dashboard)
+- **applications** (i.e. entries at the main menu of the Netdata dashboard)
 - **charts for each application** (grouped in families - i.e. submenus at the dashboard menu)
 - **statsd metrics for each chart** (i.e. dimensions of the charts)
 
@@ -257,11 +257,11 @@ Using the above configuration `myapp` should get its own section on the dashboar
 `[app]` starts a new application definition. The supported settings in this section are:
 
 - `name` defines the name of the app.
-- `metrics` is a netdata simple pattern (space separated patterns, using `*` for wildcard, possibly starting with `!` for negative match). This pattern should match all the possible statsd metrics that will be participating in the application `myapp`.
+- `metrics` is a Netdata simple pattern (space separated patterns, using `*` for wildcard, possibly starting with `!` for negative match). This pattern should match all the possible statsd metrics that will be participating in the application `myapp`.
 - `private charts = yes|no`, enables or disables private charts for the metrics matched.
 - `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application, when metrics are not collected.
-- `memory mode` sets the memory mode for all charts of the application. The default is the global default for netdata (not the global default for statsd private charts).
-- `history` sets the size of the round robin database for this application. The default is the global default for netdata (not the global default for statsd private charts).
+- `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for statsd private charts).
+- `history` sets the size of the round robin database for this application. The default is the global default for Netdata (not the global default for statsd private charts).
 
 `[dictionary]` defines name-value associations. These are used to renaming metrics, when added to synthetic charts. Metric names are also defined at each `dimension` line. However, using the dictionary dimension names can be declared globally, for each app and is the only way to rename dimensions when using patterns. Of course the dictionary can be empty or missing.
 
@@ -281,7 +281,7 @@ So, the format is this:
 dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS
 ```
 
-`pattern` is a keyword. When set, `METRIC` is expected to be a netdata simple pattern that will be used to match all the statsd metrics to be added to the chart. So, `pattern` automatically matches any number of statsd metrics, all of which will be added as separate chart dimensions.
+`pattern` is a keyword. When set, `METRIC` is expected to be a Netdata simple pattern that will be used to match all the statsd metrics to be added to the chart. So, `pattern` automatically matches any number of statsd metrics, all of which will be added as separate chart dimensions.
 
 `TYPE`, `MUTLIPLIER`, `DIVIDER` and `OPTIONS` are optional.
 
@@ -336,13 +336,13 @@ and this synthetic chart:
 
 The `[dictionary]` section accepts any number of `name = value` pairs.
 
-netdata uses this dictionary as follows:
+Netdata uses this dictionary as follows:
 
 1. When a `dimension` has a non-empty `NAME`, that name is looked up at the dictionary.
 
 2. If the above lookup gives nothing, or the `dimension` has an empty `NAME`, the original statsd metric name is looked up at the dictionary.
 
-3. If any of the above succeeds, netdata uses the `value` of the dictionary, to set the name of the dimension. The dimensions will have as ID the original statsd metric name, and as name, the dictionary value.
+3. If any of the above succeeds, Netdata uses the `value` of the dictionary, to set the name of the dimension. The dimensions will have as ID the original statsd metric name, and as name, the dictionary value.
 
 So, you can use the dictionary in 2 ways:
 
@@ -351,11 +351,11 @@ So, you can use the dictionary in 2 ways:
 
 In both cases, the dimension will be added with ID `myapp.metric1` and will be named `metric1 name`. So, in alarms you can use either of the 2 as `${myapp.metric1}` or `${metric1 name}`.
 
-> keep in mind that if you add multiple times the same statsd metric to a chart, netdata will append `TYPE` to the dimension ID, so `myapp.metric1` will be added as `myapp.metric1_last` or `myapp.metric1_events`, etc. If you add multiple times the same metric with the same `TYPE` to a chart, netdata will also append an incremental counter to the dimension ID, i.e. `myapp.metric1_last1`, `myapp.metric1_last2`, etc.
+> keep in mind that if you add multiple times the same statsd metric to a chart, Netdata will append `TYPE` to the dimension ID, so `myapp.metric1` will be added as `myapp.metric1_last` or `myapp.metric1_events`, etc. If you add multiple times the same metric with the same `TYPE` to a chart, Netdata will also append an incremental counter to the dimension ID, i.e. `myapp.metric1_last1`, `myapp.metric1_last2`, etc.
 
 #### dimension patterns
 
-netdata allows adding multiple dimensions to a chart, by matching the statsd metrics with a netdata simple pattern.
+Netdata allows adding multiple dimensions to a chart, by matching the statsd metrics with a Netdata simple pattern.
 
 Assume we have an API that provides statsd metrics for each response code per method it supports, like these:
 
@@ -382,7 +382,7 @@ To add all response codes of `myapp.api.get` to a chart use this:
    dimension = pattern 'myapp.api.get.* '' last 1 1
 ```
 
-The above will add dimension named `200`, `400` and `500` (yes, netdata extracts the wildcarded part of the metric name - so the dimensions will be named with whatever the `*` matched). You can rename the dimensions with this:
+The above will add dimension named `200`, `400` and `500` (yes, Netdata extracts the wildcarded part of the metric name - so the dimensions will be named with whatever the `*` matched). You can rename the dimensions with this:
 
 ```
 [dictionary]
@@ -435,17 +435,17 @@ Using the above, the dimensions will be added as `GET`, `ADD` and `DELETE`.
 
 ## interpolation
 
-~~If you send just one value to statsd, you will notice that the chart is created but no value is shown. The reason is that netdata interpolates all values at second boundaries. For incremental values (`counters` and `meters` in statsd terminology), if you send 10 at 00:00:00.500, 20 at 00:00:01.500 and 30 at 00:00:02.500, netdata will show 15 at 00:00:01 and 25 at 00:00:02.~~
+~~If you send just one value to statsd, you will notice that the chart is created but no value is shown. The reason is that Netdata interpolates all values at second boundaries. For incremental values (`counters` and `meters` in statsd terminology), if you send 10 at 00:00:00.500, 20 at 00:00:01.500 and 30 at 00:00:02.500, Netdata will show 15 at 00:00:01 and 25 at 00:00:02.~~
 
-~~This interpolation is automatic and global in netdata for all charts, for incremental values. This means that for the chart to start showing values you need to send 2 values across 2 flush intervals.~~
+~~This interpolation is automatic and global in Netdata for all charts, for incremental values. This means that for the chart to start showing values you need to send 2 values across 2 flush intervals.~~
 
-~~(although this is required for incremental values, netdata allows mixing incremental and absolute values on the same charts, so this little limitation [i.e. 2 values to start visualization], is applied on all netdata dimensions).~~
+~~(although this is required for incremental values, Netdata allows mixing incremental and absolute values on the same charts, so this little limitation [i.e. 2 values to start visualization], is applied on all Netdata dimensions).~~
 
 (statsd metrics do not loose their first data collection due to interpolation anymore - fixed with [PR #2411](https://github.com/netdata/netdata/pull/2411))
 
 ## sending statsd metrics from shell scripts
 
-You can send/update statsd metrics from shell scripts. You can use this feature, to visualize in netdata automated jobs you run on your servers.
+You can send/update statsd metrics from shell scripts. You can use this feature, to visualize in Netdata automated jobs you run on your servers.
 
 The command you need to run is:
 

@@ -22,7 +22,7 @@
  - `/sys/class/power_supply` (power supply properties)
  - `ipc` (IPC semaphores and message queues)
  - `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
- - `netdata` (internal netdata resources utilization)
+ - `netdata` (internal Netdata resources utilization)
 
 
 ---
@@ -59,35 +59,35 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
 - **Total I/O time**
   The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
 - **Space usage**
-  For mounted disks, netdata will provide a chart for their space, with 3 dimensions:
+  For mounted disks, Netdata will provide a chart for their space, with 3 dimensions:
   1. free
   2. used
   3. reserved for root
 - **inode usage**
-  For mounted disks, netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
+  For mounted disks, Netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
   1. free
   2. used
   3. reserved for root
 
 ### disk names
 
-netdata will automatically set the name of disks on the dashboard, from the mount point they are mounted, of course only when they are mounted. Changes in mount points are not currently detected (you will have to restart netdata to change the name of the disk). To use disk IDs provided by `/dev/disk/by-id`, the `name disks by id` option should be enabled. The `preferred disk ids` simple pattern allows choosing disk IDs to be used in the first place.
+Netdata will automatically set the name of disks on the dashboard, from the mount point they are mounted, of course only when they are mounted. Changes in mount points are not currently detected (you will have to restart Netdata to change the name of the disk). To use disk IDs provided by `/dev/disk/by-id`, the `name disks by id` option should be enabled. The `preferred disk ids` simple pattern allows choosing disk IDs to be used in the first place.
 
 ### performance metrics
 
-By default, Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a chart instead of `auto` to enable it permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
+By default, Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a chart instead of `auto` to enable it permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
 
-netdata categorizes all block devices in 3 categories:
+Netdata categorizes all block devices in 3 categories:
 
 1. physical disks (i.e. block devices that does not have slaves and are not partitions)
 2. virtual disks (i.e. block devices that have slaves - like RAID devices)
 3. disk partitions (i.e. block devices that are part of a physical disk)
 
-Performance metrics are enabled by default for all disk devices, except partitions and not-mounted virtual disks. Of course, you can enable/disable monitoring any block device by editing the netdata configuration file.
+Performance metrics are enabled by default for all disk devices, except partitions and not-mounted virtual disks. Of course, you can enable/disable monitoring any block device by editing the Netdata configuration file.
 
-### netdata configuration
+### Netdata configuration
 
-You can get the running netdata configuration using this:
+You can get the running Netdata configuration using this:
 
 ```sh
 cd /etc/netdata
@@ -150,7 +150,7 @@ For all configuration options:
 
 Of course, to set options, you will have to uncomment them. The comments show the internal defaults.
 
-After saving `/etc/netdata/netdata.conf`, restart your netdata to apply them.
+After saving `/etc/netdata/netdata.conf`, restart your Netdata to apply them.
 
 #### Disabling performance metrics for individual device and to multiple devices by device type
 You can pretty easy disable performance metrics for individual device, for ex.:
@@ -278,7 +278,7 @@ each state.
 - **Network Interface Events (events/s)**
   The number of packet framing errors, collisions detected on the interface, and carrier losses detected by the device driver.
 
-By default netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
+By default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
 
 #### alarms
 
@@ -340,7 +340,7 @@ Netdata does not enable SYNPROXY. It just uses the SYNPROXY metrics exposed by y
 
 ### Real-time monitoring of Linux Anti-DDoS
 
-netdata is able to monitor in real-time (per second updates) the operation of the Linux Anti-DDoS protection.
+Netdata is able to monitor in real-time (per second updates) the operation of the Linux Anti-DDoS protection.
 
 It visualizes 4 charts:
 
@@ -353,7 +353,7 @@ Example image:
 
 ![ddos](https://cloud.githubusercontent.com/assets/2662304/14398891/6016e3fc-fdf0-11e5-942b-55de6a52cb66.gif)
 
-See Linux Anti-DDoS in action at: **[netdata demo site (with SYNPROXY enabled)](https://registry.my-netdata.io/#menu_netfilter_submenu_synproxy)**
+See Linux Anti-DDoS in action at: **[Netdata demo site (with SYNPROXY enabled)](https://registry.my-netdata.io/#menu_netfilter_submenu_synproxy)**
 
 ## Linux power supply
 

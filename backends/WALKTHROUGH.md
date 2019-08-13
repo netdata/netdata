@@ -41,7 +41,7 @@ visibility into your application and systems performance.
 
 ## Getting Started - Netdata
 To begin let’s create our container which we will install Netdata on. We need
-to run a container, forward the necessary port that netdata listens on, and
+to run a container, forward the necessary port that Netdata listens on, and
 attach a tty so we can interact with the bash shell on the container. But
 before we do this we want name resolution between the two containers to work.
 In order to accomplish this we will create a user-defined network and attach
@@ -68,7 +68,7 @@ be sitting inside the shell of the container.
 
 After we have entered the shell we can install Netdata. This process could not
 be easier. If you take a look at [this link](../packaging/installer/#installation), the Netdata devs give us
-several one-liners to install netdata. I have not had any issues with these one
+several one-liners to install Netdata. I have not had any issues with these one
 liners and their bootstrapping scripts so far (If you guys run into anything do
 share). Run the following command in your container.
 
@@ -97,7 +97,7 @@ Netdata dashboard.
 ![](https://github.com/ldelossa/NetdataTutorial/raw/master/Screen%20Shot%202017-07-28%20at%204.00.45%20PM.png)
 
 This CHART is called ‘system.cpu’, The FAMILY is cpu, and the DIMENSION we are
-observing is “system”. You can begin to draw links between the charts in netdata
+observing is “system”. You can begin to draw links between the charts in Netdata
 to the prometheus metrics format in this manner.
 
 ## Prometheus

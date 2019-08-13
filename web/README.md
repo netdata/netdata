@@ -18,7 +18,7 @@ If you change that file, your changes will be overwritten when Netdata is update
 
 You have to copy the example file under a new name, so that it will not be overwritten with Netdata updates.
 
-To configure your info file set in netdata.conf:
+To configure your info file set in `netdata.conf`:
 
 ```
 [web]

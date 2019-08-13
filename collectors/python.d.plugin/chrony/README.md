@@ -14,7 +14,7 @@ It produces:
 * system time
 
 **Requirements:**
-Verify that user netdata can execute `chronyc tracking`. If necessary, update `/etc/chrony.conf`, `cmdallow`.
+Verify that user Netdata can execute `chronyc tracking`. If necessary, update `/etc/chrony.conf`, `cmdallow`.
 
 ### Configuration
 

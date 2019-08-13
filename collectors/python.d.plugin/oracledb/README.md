@@ -42,7 +42,7 @@ To use the Oracle module do the following:
 
 2. Install Oracle Client libraries ([link](https://cx-oracle.readthedocs.io/en/latest/installation.html#install-oracle-client)).
 
-3. Create a read-only netdata user with proper access to your Oracle Database Server.
+3. Create a read-only `netdata` user with proper access to your Oracle Database Server.
 
 Connect to your Oracle database with an administrative user and execute:
 

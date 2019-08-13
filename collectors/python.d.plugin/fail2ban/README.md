@@ -3,7 +3,7 @@
 Module monitor fail2ban log file to show all bans for all active jails
 
 **Requirements:**
- * fail2ban.log file MUST BE readable by netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at logrotate.d)
+ * fail2ban.log file MUST BE readable by Netdata (A good idea is to add  **create 0640 root netdata** to fail2ban conf at logrotate.d)
 
 It produces one chart with multiple lines (one line per jail)
 

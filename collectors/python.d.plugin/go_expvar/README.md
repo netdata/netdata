@@ -104,7 +104,7 @@ number of currently running Goroutines and updates these stats every second.
 In the next section, we will cover how to monitor and chart these exposed stats with
 the use of `netdata`s ```go_expvar``` module.
 
-### Using netdata go_expvar module
+### Using Netdata go_expvar module
 
 The `go_expvar` module is disabled by default. To enable it, edit [`python.d.conf`](../python.d.conf)
 (to edit it on your system run `/etc/netdata/edit-config python.d.conf`), and change the `go_expvar`
@@ -143,7 +143,7 @@ Let's go over each of the defined options:
 
     name: 'app1'
 
-This is the job name that will appear at the netdata dashboard.
+This is the job name that will appear at the Netdata dashboard.
 If not defined, the job_name (top level key) will be used.
 
     url: 'http://127.0.0.1:8080/debug/vars'
@@ -164,7 +164,7 @@ Will be explained in more detail below.
 **Note: if `collect_memstats` is disabled and no `extra_charts` are defined, the plugin will
 disable itself, as there will be no data to collect!**
 
-Apart from these options, each job supports options inherited from netdata's `python.d.plugin`
+Apart from these options, each job supports options inherited from Netdata's `python.d.plugin`
 and its base `UrlService` class. These are:
 
     update_every: 1          # the job's data collection frequency
@@ -174,21 +174,21 @@ and its base `UrlService` class. These are:
 
 ### Monitoring custom vars with go_expvar
 
-Now, memory stats might be useful, but what if you want netdata to monitor some custom values
+Now, memory stats might be useful, but what if you want Netdata to monitor some custom values
 that your Go application exposes? The `go_expvar` module can do that as well with the use of
 the `extra_charts` configuration variable.
 
-The `extra_charts` variable is a YaML list of netdata chart definitions.
+The `extra_charts` variable is a YaML list of Netdata chart definitions.
 Each chart definition has the following keys:
 
-    id:         netdata chart ID
+    id:         Netdata chart ID
     options:    a key-value mapping of chart options
     lines:      a list of line definitions
 
 **Note: please do not use dots in the chart or line ID field.
 See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-284494195) for explanation.**
 
-Please see these two links to the official netdata documentation for more information about the values:
+Please see these two links to the official Netdata documentation for more information about the values:
 
 - [External plugins - charts](../../plugins.d/#chart)
 - [Chart variables](../#global-variables-order-and-chart)
@@ -202,9 +202,9 @@ Each line can have the following options:
     # mandatory
     expvar_key: the name of the expvar as present in the JSON output of /debug/vars endpoint
     expvar_type: value type; supported are "float" or "int"
-    id: the id of this line/dimension in netdata
+    id: the id of this line/dimension in Netdata
 
-    # optional - netdata defaults are used if these options are not defined
+    # optional - Netdata defaults are used if these options are not defined
     name: ''
     algorithm: absolute
     multiplier: 1
@@ -267,7 +267,7 @@ app1:
 
 **Netdata charts example**
 
-The images below show how do the final charts in netdata look.
+The images below show how do the final charts in Netdata look.
 
 ![Memory stats charts](https://cloud.githubusercontent.com/assets/15180106/26762052/62b4af58-493b-11e7-9e69-146705acfc2c.png)
 

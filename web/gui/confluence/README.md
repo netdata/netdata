@@ -1,6 +1,6 @@
 # Atlassian Confluence dashboards
 
-With netdata you can build **live, interactive, monitoring dashboards** directly on Atlassian's **Confluence** pages.
+With Netdata you can build **live, interactive, monitoring dashboards** directly on Atlassian's **Confluence** pages.
 
 I see you already asking "why should I do this?"
 
@@ -12,9 +12,9 @@ Well... think a bit of it.... confluence is the perfect place for something like
 
 3. You can create monitoring pages for very specific purposes, hiding all the information that is too detailed for most users, or explaining in detail things that are difficult for them to understand.
 
-So, what can we expect? What can netdata do on confluence?
+So, what can we expect? What can Netdata do on confluence?
 
-You will be surprised! **Everything a netdata dashboard does!**. Example:
+You will be surprised! **Everything a Netdata dashboard does!**. Example:
 
 ![final-confluence4](https://user-images.githubusercontent.com/2662304/34366214-767fa4b8-eaa1-11e7-83af-0b9b9b72aa73.gif)
 
@@ -24,9 +24,9 @@ Let me show you how.
 
 ### Before you begin
 
-Most likely your confluence is accessible via HTTPS. So, you need to proxy your netdata servers via an apache or nginx to make them HTTPS too. If your Confluence is HTTPS but your netdata are not, you will not be able to fetch the netdata content from the confluence page. The netdata wiki has many examples for proxying netdata through another web server.
+Most likely your confluence is accessible via HTTPS. So, you need to proxy your Netdata servers via an apache or nginx to make them HTTPS too. If your Confluence is HTTPS but your Netdata are not, you will not be able to fetch the Netdata content from the confluence page. The Netdata wiki has many examples for proxying Netdata through another web server.
 
-> So, make sure netdata and confluence can be accessed with the same protocol (**http**, or **https**).
+> So, make sure Netdata and Confluence can be accessed with the same protocol (**http**, or **https**).
 
 For our example, I will use these 2 servers:
 
@@ -64,7 +64,7 @@ like this (type `{html` for the html box to appear - you need the confluence htm
 
 ### Add a few badges
 
-Then, go to your netdata and copy an alarm badge (the `<embed>` version of it):
+Then, go to your Netdata and copy an alarm badge (the `<embed>` version of it):
 
 ![copy-embed-badge](https://user-images.githubusercontent.com/2662304/34329562-dddea37e-e90d-11e7-9830-041a9f6a5984.gif)
 
@@ -78,7 +78,7 @@ Hit **update** and you will get this:
 
 This badge is now auto-refreshing. It will update itself based on the update frequency of the alarm.
 
-> Keep in mind you can add badges with custom netdata queries too. netdata automatically creates badges for all the alarms, but every chart, every dimension on every chart, can be used for a badge. And netdata badges are quite powerful! Check [Creating Badges](../../api/badges/) for more information on badges.
+> Keep in mind you can add badges with custom Netdata queries too. Netdata automatically creates badges for all the alarms, but every chart, every dimension on every chart, can be used for a badge. And Netdata badges are quite powerful! Check [Creating Badges](../../api/badges/) for more information on badges.
 
 So, let's create a table and add this badge for both our web servers:
 
@@ -88,7 +88,7 @@ Now we get this:
 
 ![screenshot from 2017-12-25 01-07-10](https://user-images.githubusercontent.com/2662304/34329615-f7dea286-e90f-11e7-9b6f-600215494f96.png)
 
-### Add a netdata chart
+### Add a Netdata chart
 
 The simplest form of a chart is this (it adds the chart `web_log_nginx_netdata.response_statuses`, using 100% of the width, 150px height, and the last 10 minutes of data):
 
@@ -110,7 +110,7 @@ And you will get this:
 
 ![screenshot from 2017-12-25 01-14-09](https://user-images.githubusercontent.com/2662304/34329640-efd15574-e910-11e7-9004-94487dcde154.png)
 
-> This chart is **alive**, fully interactive. You can drag it, pan it, zoom it, etc like you do on netdata dashboards!
+> This chart is **alive**, fully interactive. You can drag it, pan it, zoom it, etc like you do on Netdata dashboards!
 
 Of course this too big. We need something smaller to add inside the table. Let's try this:
 
@@ -128,7 +128,7 @@ Of course this too big. We need something smaller to add inside the table. Let's
 ></div>
 ```
 
-The chart name is shown on all netdata charts, so just copy it from a netdata dashboard.
+The chart name is shown on all Netdata charts, so just copy it from a Netdata dashboard.
 
 We will fetch the same chart from both servers. To define the server we also added `data-host=` with the URL of each server, like this (we also added `<br/>` for a newline between the badge and the chart):
 
@@ -138,7 +138,7 @@ Which gives us this:
 
 ![screenshot from 2017-12-25 01-26-04](https://user-images.githubusercontent.com/2662304/34329700-989f0f2e-e912-11e7-8ac9-c78f82cfbdb0.png)
 
-Note the color difference. This is because netdata automatically hides dimensions that are just zero (the frankfurt server has only successful requests). To instruct netdata to disable this feature, we need to add another html fragment at the bottom of the page (make sure this is added after loading `dashboard.js`). So we edit the first block we added, and append a new `<script>` section to it:
+Note the color difference. This is because Netdata automatically hides dimensions that are just zero (the frankfurt server has only successful requests). To instruct Netdata to disable this feature, we need to add another html fragment at the bottom of the page (make sure this is added after loading `dashboard.js`). So we edit the first block we added, and append a new `<script>` section to it:
 
 
 ```html
@@ -165,7 +165,7 @@ Now they match:
 
 #### more options
 
-If you want to change the colors append `data-colors="#001122 #334455 #667788"`. The colors will be used for the dimensions top to bottom, as shown on a netdata dashboard. Keep in mind the default netdata dashboards hide by default all dimensions that are just zero, so enable them at the dashboard settings to see them all.
+If you want to change the colors append `data-colors="#001122 #334455 #667788"`. The colors will be used for the dimensions top to bottom, as shown on a Netdata dashboard. Keep in mind the default Netdata dashboards hide by default all dimensions that are just zero, so enable them at the dashboard settings to see them all.
 
 You can get a percentage chart, by adding these on these charts:
 
@@ -177,7 +177,7 @@ You can get a percentage chart, by adding these on these charts:
 	data-units="%"
 ```
 
-The first line instructs netdata to calculate the percentage of each dimension, the second strips any fractional digits, the third instructs the charting library to size the chart from 0 to 100, the next one instructs it to include 0 in the chart and the last changes the units of the chart to `%`. This is how it will look:
+The first line instructs Netdata to calculate the percentage of each dimension, the second strips any fractional digits, the third instructs the charting library to size the chart from 0 to 100, the next one instructs it to include 0 in the chart and the last changes the units of the chart to `%`. This is how it will look:
 
 ![screenshot from 2017-12-25 01-45-39](https://user-images.githubusercontent.com/2662304/34329774-570ef990-e915-11e7-899f-eee939564aaf.png)
 

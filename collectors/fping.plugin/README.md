@@ -23,7 +23,7 @@ fping="/usr/local/bin/fping"
 # I suggest to use hostnames and put their IPs in /etc/hosts
 hosts="host1 host2 host3"
 
-# override the chart update frequency - the default is inherited from netdata
+# override the chart update frequency - the default is inherited from Netdata
 update_every=1
 
 # time in milliseconds (1 sec = 1000 ms) to ping the hosts
@@ -36,7 +36,7 @@ fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 
 ## alarms
 
-netdata will automatically attach a few alarms for each host.
+Netdata will automatically attach a few alarms for each host.
 Check the [latest versions of the fping alarms](../../health/health.d/fping.conf)
 
 ## Additional Tips 
@@ -60,7 +60,7 @@ ping_every=5000
 You may need to run multiple fping plugins with different settings for different end points.
 For example, you may need to ping a few hosts 10 times per second, and others once per second.
 
-netdata allows you to add as many `fping` plugins as you like.
+Netdata allows you to add as many `fping` plugins as you like.
 
 Follow this procedure:
 
@@ -90,7 +90,7 @@ cd /usr/libexec/netdata/plugins.d
 ln -s fping.plugin fping2.plugin
 ```
 
-That's it. netdata will detect the new plugin and start it.
+That's it. Netdata will detect the new plugin and start it.
 
 You can name the new plugin any name you like.
 Just make sure the plugin and the configuration file have the same name.

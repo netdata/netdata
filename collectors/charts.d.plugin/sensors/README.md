@@ -13,7 +13,7 @@ The plugin will provide charts for all configured system sensors
 > kernel provided values, this plugin will not perform.
 > So, the values graphed, are the raw hardware values of the sensors.
 
-The plugin will create netdata charts for:
+The plugin will create Netdata charts for:
 
 1. **Temperature**
 2. **Voltage**

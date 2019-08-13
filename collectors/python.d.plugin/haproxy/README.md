@@ -6,7 +6,7 @@ And health metrics such as backend servers status (server check should be used).
 Plugin can obtain data from url **OR** unix socket.
 
 **Requirement:**
-Socket MUST be readable AND writable by netdata user.
+Socket MUST be readable AND writable by the `netdata` user.
 
 It produces:
 

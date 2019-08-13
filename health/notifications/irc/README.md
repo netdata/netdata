@@ -10,7 +10,7 @@ Irssi terminal client:
 
 
 You need:
-1. The `nc` utility. If you do not set the path, netdata will search for it in your system `$PATH`.
+1. The `nc` utility. If you do not set the path, Netdata will search for it in your system `$PATH`.
 
 Set the path for `nc` in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
 

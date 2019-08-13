@@ -6,11 +6,11 @@ Netdata can generate badges for any chart and any dimension at any time-frame. B
 
 **Netdata badges are powerful**!
 
-Given that netdata collects from **1.000** to **5.000** metrics per server (depending on the number of network interfaces, disks, cpu cores, applications running, users logged in, containers running, etc) and that netdata already has data reduction/aggregation functions embedded, the badges can be quite powerful.
+Given that Netdata collects from **1.000** to **5.000** metrics per server (depending on the number of network interfaces, disks, cpu cores, applications running, users logged in, containers running, etc) and that Netdata already has data reduction/aggregation functions embedded, the badges can be quite powerful.
 
 For each metric/dimension and for arbitrary time-frames badges can show **min**, **max** or **average** value, but also **sum** or **incremental-sum** to have their **volume**.
 
-For example, there is [a chart in netdata that shows the current requests/s of nginx](http://london.my-netdata.io/#nginx_local_nginx). Using this chart alone we can show the following badges (we could add more time-frames, like **today**, **yesterday**, etc):
+For example, there is [a chart in Netdata that shows the current requests/s of nginx](http://london.my-netdata.io/#nginx_local_nginx). Using this chart alone we can show the following badges (we could add more time-frames, like **today**, **yesterday**, etc):
 
 <a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&value_color=grey:null%7Cblue&label=nginx%20active%20connections%20now&units=null&precision=0"/></a>  <a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&after=-3600&value_color=orange&label=last%20hour%20average&units=null&options=unaligned&precision=0"/></a> <a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&group=max&after=-3600&value_color=red&label=last%20hour%20max&units=null&options=unaligned&precision=0"/></a>
 
@@ -18,9 +18,9 @@ Similarly, there is [a chart that shows outbound bandwidth per class](http://lon
 
 <a href="https://registry.my-netdata.io/#tc_eth0"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&value_color=green&label=web%20server%20sends%20now&units=kbps"/></a> <a href="https://registry.my-netdata.io/#tc_eth0"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&after=-86400&options=unaligned&group=sum&divide=8388608&value_color=blue&label=web%20server%20sent%20today&units=GB"/></a>
 
-The right one is a **volume** calculation. Netdata calculated the total of the last 86.400 seconds (a day) which gives `kilobits`, then divided it by 8 to make it KB, then by 1024 to make it MB and then by 1024 to make it GB. Calculations like this are quite accurate, since for every value collected, every second, netdata interpolates it to second boundary using microsecond calculations.
+The right one is a **volume** calculation. Netdata calculated the total of the last 86.400 seconds (a day) which gives `kilobits`, then divided it by 8 to make it KB, then by 1024 to make it MB and then by 1024 to make it GB. Calculations like this are quite accurate, since for every value collected, every second, Netdata interpolates it to second boundary using microsecond calculations.
 
-Let's see a few more badge examples (they come from the [netdata registry](../../../registry/)):
+Let's see a few more badge examples (they come from the [Netdata registry](../../../registry/)):
 
 - **cpu usage of user `root`** (you can pick any user; 100% = 1 core). This will be `green <10%`, `yellow <20%`, `orange <50%`, `blue <100%` (1 core), `red` otherwise (you define thresholds and colors on the URL).
 
@@ -36,7 +36,7 @@ Let's see a few more badge examples (they come from the [netdata registry](../..
 
 ---
 
-> So, every single line on the charts of a [netdata dashboard](http://london.my-netdata.io/), can become a badge and this badge can calculate **average**, **min**, **max**, or **volume** for any time-frame! And you can also vary the badge color using conditions on the calculated value.
+> So, every single line on the charts of a [Netdata dashboard](http://london.my-netdata.io/), can become a badge and this badge can calculate **average**, **min**, **max**, or **volume** for any time-frame! And you can also vary the badge color using conditions on the calculated value.
 
 ---
 
@@ -44,13 +44,13 @@ Let's see a few more badge examples (they come from the [netdata registry](../..
 
 The basic URL is `http://your.netdata:19999/api/v1/badge.svg?option1&option2&option3&...`.
 
-Here is what you can put for `options` (these are standard netdata API options):
+Here is what you can put for `options` (these are standard Netdata API options):
 
 - `chart=CHART.NAME`
 
   The chart to get the values from.
 
-  **This is the only parameter required** and with just this parameter, netdata will return the sum of the latest values of all chart dimensions.
+  **This is the only parameter required** and with just this parameter, Netdata will return the sum of the latest values of all chart dimensions.
 
   Example:
 
@@ -76,7 +76,7 @@ Here is what you can put for `options` (these are standard netdata API options):
 
 - `dimensions=DIMENSION1|DIMENSION2|...`
 
-  The dimensions of the chart to use. If you don't set any dimension, all will be used. When multiple dimensions are used, netdata will sum their values. You can append `options=absolute` if you want this sum to convert all values to positive before adding them.
+  The dimensions of the chart to use. If you don't set any dimension, all will be used. When multiple dimensions are used, Netdata will sum their values. You can append `options=absolute` if you want this sum to convert all values to positive before adding them.
 
   Pipes in HTML have to escaped with `%7C`.
 
@@ -132,7 +132,7 @@ Here is what you can put for `options` (these are standard netdata API options):
 
 - `group=min` or `group=max` or `group=average` (the default) or `group=sum` or `group=incremental-sum`
 
-  If netdata will have to reduce (aggregate) the data to calculate the value, which aggregation method to use.
+  If Netdata will have to reduce (aggregate) the data to calculate the value, which aggregation method to use.
 
   - `max` will find the max value for the timeframe. This works on both positive and negative dimensions. It will find the most extreme value.
 
@@ -156,7 +156,7 @@ Here is what you can put for `options` (these are standard netdata API options):
 
   - `min2max`, when multiple dimensions are given, do not sum them, but take their `max - min`.
 
-  - `unaligned`, when data are reduced / aggregated (e.g. the request is about the average of the last minute, or hour), netdata by default aligns them so that the charts will have a constant shape (so average per minute returns always XX:XX:00 - XX:XX:59). Setting the `unaligned` option, netdata will aggregate data without any alignment, so if the request is for 60 seconds, it will aggregate the latest 60 seconds of collected data.
+  - `unaligned`, when data are reduced / aggregated (e.g. the request is about the average of the last minute, or hour), Netdata by default aligns them so that the charts will have a constant shape (so average per minute returns always XX:XX:00 - XX:XX:59). Setting the `unaligned` option, Netdata will aggregate data without any alignment, so if the request is for 60 seconds, it will aggregate the latest 60 seconds of collected data.
 
 These are options dedicated to badges:
 
@@ -166,9 +166,9 @@ These are options dedicated to badges:
 
 - `units=TEXT`
 
-  The units of the badge. If you want to put a `/`, please put a `\`. This is because netdata allows badges parameters to be given as path in URL, instead of query string. You can also use `null` or `empty` to show it without any units.
+  The units of the badge. If you want to put a `/`, please put a `\`. This is because Netdata allows badges parameters to be given as path in URL, instead of query string. You can also use `null` or `empty` to show it without any units.
 
-  The units `seconds`, `minutes` and `hours` trigger special formatting. The value has to be in this unit, and netdata will automatically change it to show a more pretty duration.
+  The units `seconds`, `minutes` and `hours` trigger special formatting. The value has to be in this unit, and Netdata will automatically change it to show a more pretty duration.
 
 - `multiply=NUMBER`
 
@@ -180,7 +180,7 @@ These are options dedicated to badges:
 
 - `label_color=COLOR`
 
-  The color of the label (the left part). You can use any HTML color, include `#NNN` and `#NNNNNN`. The following colors are defined in netdata (and you can use them by name): `green`, `brightgreen`, `yellow`, `yellowgreen`, `orange`, `red`, `blue`, `grey`, `gray`, `lightgrey`, `lightgray`. These are taken from https://github.com/badges/shields so they are compatible with standard badges.
+  The color of the label (the left part). You can use any HTML color, include `#NNN` and `#NNNNNN`. The following colors are defined in Netdata (and you can use them by name): `green`, `brightgreen`, `yellow`, `yellowgreen`, `orange`, `red`, `blue`, `grey`, `gray`, `lightgrey`, `lightgray`. These are taken from https://github.com/badges/shields so they are compatible with standard badges.
 
 - `value_color=COLOR:null|COLOR<VALUE|COLOR>VALUE|COLOR>=VALUE|COLOR<=VALUE|...`
 
@@ -188,13 +188,13 @@ These are options dedicated to badges:
 
   Example: `value_color=grey:null|green<10|yellow<100|orange<1000|blue<10000|red`
 
-  The above will set `grey` if no value exists (not collected within the `gap when lost iterations above` in netdata.conf for the chart), `green` if the value is less than 10, `yellow` if the value is less than 100, etc up to `red` which will be used if no other conditions match.
+  The above will set `grey` if no value exists (not collected within the `gap when lost iterations above` in `netdata.conf` for the chart), `green` if the value is less than 10, `yellow` if the value is less than 100, etc up to `red` which will be used if no other conditions match.
 
   The supported operators are `<`, `>`, `<=`, `>=`, `=` (or `:`) and `!=` (or `<>`).
 
 - `precision=NUMBER`
 
-  The number of decimal digits of the value. By default netdata will add:
+  The number of decimal digits of the value. By default Netdata will add:
 
   - no decimal digits for values > 1000
   - 1 decimal digit for values > 100
@@ -217,7 +217,7 @@ These are options dedicated to badges:
 
 - `refresh=auto` or `refresh=SECONDS`
 
-  This option enables auto-refreshing of images. netdata will send the HTTP header `Refresh: SECONDS` to the web browser, thus requesting automatic refresh of the images at regular intervals.
+  This option enables auto-refreshing of images. Netdata will send the HTTP header `Refresh: SECONDS` to the web browser, thus requesting automatic refresh of the images at regular intervals.
 
   `auto` will calculate the proper `SECONDS` to avoid unnecessary refreshes. If `SECONDS` is zero, this feature is disabled (it is also disabled by default).
 
@@ -227,7 +227,7 @@ These are options dedicated to badges:
 <embed src="BADGE_URL" type="image/svg+xml" height="20" />
 ```
 
-  Another way is to use javascript to auto-refresh them. You can auto-refresh all the netdata badges on a page using javascript. You have to add a class to all the netdata badges, like this `<img class="netdata-badge" src="..."/>`. Then add this javascript code to your page (it requires jquery):
+  Another way is to use javascript to auto-refresh them. You can auto-refresh all the Netdata badges on a page using javascript. You have to add a class to all the Netdata badges, like this `<img class="netdata-badge" src="..."/>`. Then add this javascript code to your page (it requires jquery):
 
 ```html
 <script>
@@ -264,9 +264,9 @@ character|name|escape sequence
 ## FAQ
 
 #### Is it fast?
-On modern hardware, netdata can generate about **2.000 badges per second per core**, before noticing any delays. It generates a badge in about half a millisecond!
+On modern hardware, Netdata can generate about **2.000 badges per second per core**, before noticing any delays. It generates a badge in about half a millisecond!
 
-Of course these timing are for badges that use recent data. If you need badges that do calculations over long durations (a day, or more), timing will differ. netdata logs its timings at its `access.log`, so take a look there before adding a heavy badge on a busy web site. Of course, you can cache such badges or have a cron job get them from netdata and save them at your web server at regular intervals.
+Of course these timing are for badges that use recent data. If you need badges that do calculations over long durations (a day, or more), timing will differ. Netdata logs its timings at its `access.log`, so take a look there before adding a heavy badge on a busy web site. Of course, you can cache such badges or have a cron job get them from Netdata and save them at your web server at regular intervals.
 
 
 #### Embedding badges in github

@@ -32,7 +32,7 @@ SEND_TWILIO="YES"
 # Then just set the recipients' phone numbers.
 # The trial account is only allowed to use the number specified when set up.
 
-# Without an account sid and token, netdata cannot send Twilio text messages.
+# Without an account sid and token, Netdata cannot send Twilio text messages.
 TWILIO_ACCOUNT_SID="xxxxxxxxx"
 TWILIO_ACCOUNT_TOKEN="xxxxxxxxxx"
 TWILIO_NUMBER="xxxxxxxxxxx"

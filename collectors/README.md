@@ -1,20 +1,20 @@
 # Data collection plugins
 
-netdata supports **internal** and **external** data collection plugins:
+Netdata supports **internal** and **external** data collection plugins:
 
-- **internal** plugins are written in `C` and run as threads inside the netdata daemon.
+- **internal** plugins are written in `C` and run as threads inside the `netdat`a` daemon.
 
-- **external** plugins may be written in any computer language and are spawn as independent long-running processes by the netdata daemon.
-   They communicate with the netdata daemon via `pipes` (`stdout` communication).
+- **external** plugins may be written in any computer language and are spawn as independent long-running processes by the `netdata` daemon.
+   They communicate with the `netdata` daemon via `pipes` (`stdout` communication).
 
-To minimize the number of processes spawn for data collection, netdata also supports **plugin orchestrators**.
+To minimize the number of processes spawn for data collection, Netdata also supports **plugin orchestrators**.
 
 - **plugin orchestrators** are external plugins that do not collect any data by themeselves.
    Instead they support data collection **modules** written in the language of the orchestrator.
    Usually the orchestrator provides a higher level abstraction, making it ideal for writing new
    data collection modules with the minimum of code.
 
-   Currently netdata provides plugin orchestrators
+   Currently Netdata provides plugin orchestrators
    BASH v4+ [charts.d.plugin](charts.d.plugin/),
    node.js [node.d.plugin](node.d.plugin/) and
    python v2+ (including v3) [python.d.plugin](python.d.plugin/).
@@ -42,7 +42,7 @@ plugin|lang|O/S|runs as|modular|description
 [plugins.d](plugins.d/)|`C`|any|internal|-|implements the **external plugins** API and serves external plugins
 [proc.plugin](proc.plugin/)|`C`|linux|internal|yes|collects resource usage and performance data on Linux systems
 [python.d.plugin](python.d.plugin/)|`python` v2+|any|external|yes|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
-[statsd.plugin](statsd.plugin/)|`C`|any|internal|-|implements a high performance **statsd** server for netdata
+[statsd.plugin](statsd.plugin/)|`C`|any|internal|-|implements a high performance **statsd** server for Netdata
 [tc.plugin](tc.plugin/)|`C`|linux|internal|-|collects traffic QoS metrics (`tc`) of Linux network interfaces
 
 ## Enabling and Disabling plugins
@@ -59,7 +59,7 @@ All **external plugins** are managed by [plugins.d](plugins.d/), which provides 
 
 ### Internal Plugins
 
-Each of the internal plugins runs as a thread inside the netdata daemon.
+Each of the internal plugins runs as a thread inside the `netdata` daemon.
 Once this thread has started, the plugin may spawn additional threads according to its design.
 
 #### Internal Plugins API
@@ -72,7 +72,7 @@ collect_data() {
 
     collected_number collected_value = collect_a_value();
 
-    // give the metrics to netdata
+    // give the metrics to Netdata
 
     static RRDSET *st = NULL; // the chart
     static RRDDIM *rd = NULL; // a dimension attached to this chart
@@ -100,20 +100,19 @@ collect_data() {
     }
     else {
         // this chart is already created
-        // let netdata know we start a new iteration on it
+        // let Netdata know we start a new iteration on it
         rrdset_next(st);
     }
 
     // give the collected value(s) to the chart
     rrddim_set_by_pointer(st, rd, collected_value);
 
-    // signal netdata we are done with this iteration
+    // signal Netdata we are done with this iteration
     rrdset_done(st);
 }
 ```
 
-Of course netdata has a lot of libraries to help you also in collecting the metrics.
-The best way to find your way through this, is to examine what other similar plugins do.
+Of course, Netdata has a lot of libraries to help you also in collecting the metrics. The best way to find your way through this, is to examine what other similar plugins do.
 
 
 ### External Plugins

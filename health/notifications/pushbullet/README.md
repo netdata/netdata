@@ -36,7 +36,7 @@ SEND_PUSHBULLET="YES"
 # not have a pushbullet account, the pushbullet service will send an email
 # to that address instead
 
-# Without an access token, netdata cannot send pushbullet notifications.
+# Without an access token, Netdata cannot send pushbullet notifications.
 PUSHBULLET_ACCESS_TOKEN="o.Sometokenhere"
 DEFAULT_RECIPIENT_PUSHBULLET="admin1@example.com admin3@somemail.com"
 ```
