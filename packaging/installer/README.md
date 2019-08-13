@@ -45,7 +45,7 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 Verify the integrity of the script with this:
 
 ``` bash
-[ "d7982e4a80794e4d4d8f48d50ce3a38b" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "b6d16c171ccad073b86327246151d875" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 *It should print `OK, VALID` if the script is the one we ship.*
 
@@ -101,7 +101,7 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 Verify the integrity of the script with this:
 
 ```bash
-[ "d3c20a89a87d178dbf5cf6a4ce4b9568" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "4415e8c13e529a795abb953a9be14ad5" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
