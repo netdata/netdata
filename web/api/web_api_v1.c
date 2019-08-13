@@ -218,7 +218,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     BUFFER *contexts = NULL;
 
     buffer_flush(w->response.data);
-    buffer_sprintf(w->response.data, "[\n");
+    buffer_sprintf(w->response.data, "[");
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -249,7 +249,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 
     health_aggregate_alarms(host, w->response.data, contexts, status);
 
-    buffer_sprintf(w->response.data, "\n]\n");
+    buffer_sprintf(w->response.data, "]\n");
     w->response.data->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(w->response.data);
 
