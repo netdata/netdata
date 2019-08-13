@@ -141,7 +141,7 @@ INFO[0000] Starting target manager... source="targetmanager.go:63"
 INFO[0000] Listening on :9090 source="web.go:259"
 ```
 
-Now attempt to go to http://localhost:9090/. You should be presented with the
+Now attempt to go to <http://localhost:9090/>. You should be presented with the
 prometheus homepage. This is a good point to talk about Prometheus’s data model
 which can be viewed here: <https://prometheus.io/docs/concepts/data_model/>  As
 explained we have two key elements in Prometheus metrics. We have the ‘metric’
@@ -249,7 +249,7 @@ can send metrics “as-collected” by specifying the ‘source=as-collected’ 
 parameter like so.
 http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected
 If you choose to use this method you will need to use Prometheus's set of
-functions here: https://prometheus.io/docs/querying/functions/ to obtain useful
+functions here: <https://prometheus.io/docs/querying/functions/> to obtain useful
 metrics as you are now dealing with raw counters from the system. For example
 you will have to use the `irate()` function over a counter to get that metric's
 rate per second. If your graphing needs are met by using the metrics returned by
