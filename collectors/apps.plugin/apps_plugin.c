@@ -1433,7 +1433,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
-    p->starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
+    p->starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
     // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
@@ -1531,7 +1531,7 @@ static inline int get_pid_uptime(struct pid_stat *p) {
 
     kernel_uint_t global_uptime = str2kernel_uint_t(procfile_lineword(global_uptime_ff, 0, 0));
 
-    p->uptime = (global_uptime > p->starttime / system_hz)?(global_uptime - p->starttime / system_hz):0;
+    p->uptime = (global_uptime > p->starttime)?(global_uptime - p->starttime):0;
 
     return 1;
 }
@@ -3526,6 +3526,36 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
             send_SET(w->name, w->processes);
     }
     send_END();
+
+#ifndef __FreeBSD__
+    send_BEGIN(type, "uptime", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, now_monotonic_sec() - w->starttime);
+    }
+    send_END();
+
+    send_BEGIN(type, "uptime_min", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->uptime_min);
+    }
+    send_END();
+
+    send_BEGIN(type, "uptime_avg", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->processes?(w->uptime_sum / w->processes):0);
+    }
+    send_END();
+
+    send_BEGIN(type, "uptime_max", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->uptime_max);
+    }
+    send_END();
+#endif
 
     send_BEGIN(type, "mem", dt);
     for (w = root; w ; w = w->next) {
