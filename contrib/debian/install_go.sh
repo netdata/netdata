@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-LIB_DIR="$1"
-LIBEXEC_DIR="$2"
+GO_PACKAGE_VERSION="$1"
+LIB_DIR="$2"
+LIBEXEC_DIR="$3"
 
 # ############################################################
 # Package Go within netdata (TBD: Package it separately)
@@ -35,8 +36,6 @@ download_go() {
 }
 
 install_go() {
-	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.8.0"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
