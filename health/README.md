@@ -1,9 +1,9 @@
 # Health monitoring
 
-Each netdata node runs an independent thread evaluating health monitoring checks.
+Each Netdata node runs an independent thread evaluating health monitoring checks.
 This thread has lock free access to the database, so that it can operate as a watchdog.
 
-Health checks (alarms) are attached to netdata charts, allowing netdata to automatically
+Health checks (alarms) are attached to Netdata charts, allowing Netdata to automatically
 activate an alarm as soon as a chart is created. This is very important for
 netdata, since many charts are dynamically created during runtime (for example, the
 chart tracking network interface packet drops, is automatically created on the first
@@ -20,15 +20,15 @@ use expressions combining the latest value of any number of metrics.
 
 ## Health configuration reference
 
-Stock netdata health configuration is in `/usr/lib/netdata/conf.d/health.d`.
+Stock Netdata health configuration is in `/usr/lib/netdata/conf.d/health.d`.
 These files can be overwritten by copying them and editing them in `/etc/netdata/health.d`
 (run `/etc/netdata/edit-config` to edit them).
 
 In `/etc/netdata/health.d` you can also put any number of files (in any number of sub-directories)
-with a suffix `.conf` to have them processed by netdata.
+with a suffix `.conf` to have them processed by Netdata.
 
-Health configuration can be reloaded at any time, without restarting netdata.
-Just send netdata the SIGUSR2 signal, like this:
+Health configuration can be reloaded at any time, without restarting Netdata.
+Just send Netdata the SIGUSR2 signal, like this:
 
 ```sh
 killall -USR2 netdata
@@ -50,7 +50,7 @@ The only difference is the label `alarm` or `template`.
 Netdata supports overriding **templates** with **alarms**.
 For example, when a template is defined for a set of charts, an alarm with exactly the
 same name attached to the same chart the template matches, will have higher precedence
-(i.e. netdata will use the alarm on this chart and prevent the template from being applied
+(i.e. Netdata will use the alarm on this chart and prevent the template from being applied
 to it).
 
 ### The format
@@ -135,7 +135,7 @@ hosts: server1 server2 database* !redis3 redis*
 The above says: use this alarm on all hosts named `server1`, `server2`, `database*`, and
 all `redis*` except `redis3`.
 
-This is useful when you centralize metrics from multiple hosts, to one netdata.
+This is useful when you centralize metrics from multiple hosts, to one Netdata.
 
 ---
 
@@ -187,7 +187,7 @@ Everything is the same with [badges](../web/api/badges/). In short:
 
 - `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
    by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
-   have spaces in their names). This accepts netdata simple patterns and the `match-ids` and
+   have spaces in their names). This accepts Netdata simple patterns and the `match-ids` and
    `match-names` options affect the searches for dimensions.
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions.
@@ -289,8 +289,8 @@ Format:
 exec: SCRIPT
 ```
 
-The default `SCRIPT` is netdata's `alarm-notify.sh`, which supports all the notifications
-methods netdata supports, including custom hooks.
+The default `SCRIPT` is Netdata's `alarm-notify.sh`, which supports all the notifications
+methods Netdata supports, including custom hooks.
 
 ---
 
@@ -373,19 +373,17 @@ For some alarms we need compare two time-frames, to detect anomalies. For exampl
 
 ### Expressions
 
-netdata has an internal [infix expression parser](../libnetdata/eval).
+Netdata has an internal [infix expression parser](../libnetdata/eval).
 This parses expressions and creates an internal structure that allows fast execution of them.
 
 These operators are supported `+`, `-`, `*`, `/`, `<`, `<=`, `<>`, `!=`, `>`, `>=`, `&&`, `||`,
 `!`, `AND`, `OR`, `NOT`. Boolean operators result in either `1` (true) or `0` (false).
 
-The conditional evaluation operator `?` is supported too. Using this operator IF-THEN-ELSE
-conditional statements can be specified. The format is: `(condition) ? (true expression) :
-(false expression)`. So, netdata will first evaluate the `condition` and based on the result
-will either evaluate `true expression` or `false expression`.
+The conditional evaluation operator `?` is supported too. Using this operator IF-THEN-ELSE conditional statements can be specified. The format is: `(condition) ? (true expression) :(false expression)`. So, Netdata will first evaluate the `condition` and based on the result will either evaluate `true expression` or `false expression`.
+
 Example: `($this > 0) ? ($avail * 2) : ($used / 2)`.
-Nested such expressions are also supported (i.e. `true expression` and `false expression` can
-contain conditional evaluations).
+
+Nested such expressions are also supported (i.e. `true expression` and `false expression` can contain conditional evaluations).
 
 Expressions also support the `abs()` function.
 
@@ -407,7 +405,7 @@ or warning thresholds.  This usage helps to avoid bogus messages resulting from 
 variations in the value when it is varying regularly but staying close to the threshold
 value, without needing to delay sending messages at all.
 
-An example of such usage from the default CPU usage alarms bundled with netdata is:
+An example of such usage from the default CPU usage alarms bundled with Netdata is:
 
 ```
 warn: $this > (($status >= $WARNING)  ? (75) : (85))
@@ -491,7 +489,7 @@ Although the `alarm_variables` link shows you variables for a particular chart, 
 
 Alarms can have the following statuses:
 
-  - `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to netdata
+  - `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to Netdata
      to reload health configuration)
 
   - `UNINITIALIZED` - the alarm is not initialized yet
@@ -509,7 +507,7 @@ The external script will be called for all status changes.
 
 ## Examples
 
-Check the `health/health.d/` directory for all alarms shipped with netdata.
+Check the `health/health.d/` directory for all alarms shipped with Netdata.
 
 Here are a few examples:
 
@@ -526,7 +524,7 @@ template: apache_last_collected_secs
     crit: $this > (10 * $update_every)
 ```
 
-The above checks that netdata is able to collect data from apache. In detail:
+The above checks that Netdata is able to collect data from apache. In detail:
 
 ```
 template: apache_last_collected_secs
@@ -653,12 +651,12 @@ The `lookup` line will calculate the sum of the all dropped packets in the last 
 The `crit` line will issue a critical alarm if even a single packet has been dropped.
 
 Note that the drops chart does not exist if a network interface has never dropped a single packet.
-When netdata detects a dropped packet, it will add the chart and it will automatically attach this
+When Netdata detects a dropped packet, it will add the chart and it will automatically attach this
 alarm to it.
 
 ## Troubleshooting
 
-You can compile netdata with [debugging](../daemon#debugging) and then set in `netdata.conf`:
+You can compile Netdata with [debugging](../daemon#debugging) and then set in `netdata.conf`:
 
 ```
 [global]
@@ -671,7 +669,7 @@ Important: this will generate a lot of output in debug.log.
 You can find the context of charts by looking up the chart in either
 `http://your.netdata:19999/netdata.conf` or `http://your.netdata:19999/api/v1/charts`.
 
-You can find how netdata interpreted the expressions by examining the alarm at `http://your.netdata:19999/api/v1/alarms?all`. For each expression, netdata will return the expression as given in its config file, and the same expression with additional parentheses added to indicate the evaluation flow of the expression.
+You can find how Netdata interpreted the expressions by examining the alarm at `http://your.netdata:19999/api/v1/alarms?all`. For each expression, Netdata will return the expression as given in its config file, and the same expression with additional parentheses added to indicate the evaluation flow of the expression.
 
 ## Disabling health checks or silencing notifications at runtime
 

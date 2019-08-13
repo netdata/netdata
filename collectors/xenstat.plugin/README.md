@@ -6,7 +6,7 @@
 
 1. install `xen-dom0-libs-devel` and `yajl-devel` using the package manager of your system.
 
-2. re-install netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
+2. re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
 
 Keep in mind that `libxenstat` requires root access, so the plugin is setuid to root.
 
@@ -25,7 +25,7 @@ Domain:
 
 ## Configuration
 
-If you need to disable xenstat for netdata, edit /etc/netdata/netdata.conf and set:
+If you need to disable xenstat for Netdata, edit /etc/netdata/netdata.conf and set:
 
 ```
 [plugins]

@@ -42,7 +42,7 @@ QoS is about 2 features:
 
 1. **Monitoring the bandwidth used by services**
 
-   netdata provides wonderful real-time charts, like this one (wait to see the orange `rsync` part):
+   Netdata provides wonderful real-time charts, like this one (wait to see the orange `rsync` part):
 
    ![qos3](https://cloud.githubusercontent.com/assets/2662304/14474189/713ede84-0104-11e6-8c9c-8dca5c2abd63.gif)
 
@@ -62,7 +62,7 @@ QoS is about 2 features:
 
    When your system is under a DDoS attack, it will get a lot more bandwidth compared to the one it can handle and probably your applications will crash. Setting a limit on the inbound traffic using QoS, will protect your servers (throttle the requests) and depending on the size of the attack may allow your legitimate users to access the server, while the attack is taking place.
 
-   Using QoS together with a [SYNPROXY](../proc.plugin/README.md#linux-anti-ddos) will provide a great degree of protection against most DDoS attacks. Actually when I wrote that article, a few folks tried to DDoS the netdata demo site to see in real-time the SYNPROXY operation. They did not do it right, but anyway a great deal of requests reached the netdata server. What saved netdata was QoS. The netdata demo server has QoS installed, so the requests were throttled and the server did not even reach the point of resource starvation. Read about it [here](../proc.plugin/README.md#linux-anti-ddos).
+   Using QoS together with a [SYNPROXY](../proc.plugin/README.md#linux-anti-ddos) will provide a great degree of protection against most DDoS attacks. Actually when I wrote that article, a few folks tried to DDoS the Netdata demo site to see in real-time the SYNPROXY operation. They did not do it right, but anyway a great deal of requests reached the Netdata server. What saved Netdata was QoS. The Netdata demo server has QoS installed, so the requests were throttled and the server did not even reach the point of resource starvation. Read about it [here](../proc.plugin/README.md#linux-anti-ddos).
 
 On top of all these, QoS is extremely light. You will configure it once, and this is it. It will not bother you again and it will not use any noticeable CPU resources, especially on application and database servers.
 
@@ -72,7 +72,7 @@ On top of all these, QoS is extremely light. You will configure it once, and thi
 
 	- ensure each end-user connection will get a fair cut of the available bandwidth.
 
-Once **traffic classification** is applied, we can use **[netdata](https://github.com/netdata/netdata)** to visualize the bandwidth consumption per class in real-time (no configuration is needed for netdata - it will figure it out).
+Once **traffic classification** is applied, we can use **[netdata](https://github.com/netdata/netdata)** to visualize the bandwidth consumption per class in real-time (no configuration is needed for Netdata - it will figure it out).
 
 QoS, is extremely light. You will configure it once, and this is it. It will not bother you again and it will not use any noticeable CPU resources, especially on application and database servers.
 
@@ -115,10 +115,10 @@ To do it the hard way, you can go through the [tc configuration steps](#qos-conf
 
 The **[FireHOL](https://firehol.org/)** package already distributes **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**. Check the **[FireQOS tutorial](https://firehol.org/tutorial/fireqos-new-user/)** to learn how to write your own QoS configuration.
 
-With **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, it is **really simple for everyone to use QoS in Linux**. Just install the package `firehol`. It should already be available for your distribution. If not, check the **[FireHOL Installation Guide](https://firehol.org/installing/)**. After that, you will have the `fireqos` command which uses a configuration like the following `/etc/firehol/fireqos.conf`, used at the netdata demo site:
+With **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, it is **really simple for everyone to use QoS in Linux**. Just install the package `firehol`. It should already be available for your distribution. If not, check the **[FireHOL Installation Guide](https://firehol.org/installing/)**. After that, you will have the `fireqos` command which uses a configuration like the following `/etc/firehol/fireqos.conf`, used at the Netdata demo site:
 
 ```sh
-    # configure the netdata ports
+    # configure the Netdata ports
     server_netdata_ports="tcp/19999"
 
     interface eth0 world bidirectional ethernet balanced rate 50Mbit
@@ -155,7 +155,7 @@ With **[FireQOS](https://firehol.org/tutorial/fireqos-new-user/)**, it is **real
           match input src 10.2.3.5
 ```
 
-Nothing more is needed. You just run `fireqos start` to apply this configuration, restart netdata and you have real-time visualization of the bandwidth consumption of your applications. FireQOS is not a daemon. It will just convert the configuration to `tc` commands. It will run them and it will exit.
+Nothing more is needed. You just run `fireqos start` to apply this configuration, restart Netdata and you have real-time visualization of the bandwidth consumption of your applications. FireQOS is not a daemon. It will just convert the configuration to `tc` commands. It will run them and it will exit.
 
 **IMPORTANT**: If you copy this configuration to apply it to your system, please adapt the speeds - experiment in non-production environments to learn the tool, before applying it on your servers.
 
@@ -191,7 +191,7 @@ Add the following configuration option in `/etc/netdata.conf`:
 Finally, create `/etc/netdata/tc-qos-helper.conf` with this content:
 ```tc_show="class"```
 
-Please note, that by default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a chart instead of `auto` to enable it permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
+Please note, that by default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a chart instead of `auto` to enable it permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
 
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Ftc.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

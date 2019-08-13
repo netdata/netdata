@@ -14,7 +14,7 @@ The software is known for its low impact on memory resources, high scalability, 
 
 - Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
 
-- A proxy was necessary to encrypt the communication to netdata, until v1.16.0, which provided TLS (HTTPS) support.
+- A proxy was necessary to encrypt the communication to Netdata, until v1.16.0, which provided TLS (HTTPS) support.
 
 ## Nginx configuration file
 

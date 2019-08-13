@@ -4,7 +4,7 @@ This is what you will get:
 ![Netdata on RocketChat](https://i.imgur.com/Zu4t3j3.png)
 You need:
 
-1. The **incoming webhook URL** as given by RocketChat. You can use the same on all your netdata servers (or you can have multiple if you like - your decision).
+1. The **incoming webhook URL** as given by RocketChat. You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
 2. One or more channels to post the messages to.
 
 Get them here: https://rocket.chat/docs/administrator-guides/integrations/index.html#how-to-create-a-new-incoming-webhook
@@ -22,8 +22,8 @@ Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system r
 SEND_ROCKETCHAT="YES"
 
 # Login to rocket.chat and create an incoming webhook. You need only one for all
-# your netdata servers (or you can have one for each of your netdata).
-# Without it, netdata cannot send rocketchat notifications.
+# your Netdata servers (or you can have one for each of your Netdata).
+# Without it, Netdata cannot send rocketchat notifications.
 ROCKETCHAT_WEBHOOK_URL="<your_incoming_webhook_url>"
 
 # if a role's recipients are not configured, a notification will be send to

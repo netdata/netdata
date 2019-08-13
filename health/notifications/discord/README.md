@@ -6,7 +6,7 @@ This is what you will get:
 
 You need:
 
-1. The **incoming webhook URL** as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your netdata servers (or you can have multiple if you like - your decision).
+1. The **incoming webhook URL** as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
 2. One or more Discord channels to post the messages to.
 
 Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:

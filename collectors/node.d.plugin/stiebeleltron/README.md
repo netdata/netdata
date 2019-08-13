@@ -3,7 +3,7 @@
 This module collects metrics from the configured heat pump and hot water installation from Stiebel Eltron ISG web.
 
 **Requirements**
- * Configuration file `stiebeleltron.conf` in the node.d netdata config dir (default: `/etc/netdata/node.d/stiebeleltron.conf`)
+ * Configuration file `stiebeleltron.conf` in the node.d Netdata config dir (default: `/etc/netdata/node.d/stiebeleltron.conf`)
  * Stiebel Eltron ISG web with network access (http), without password login
 
 The charts are configurable, however, the provided default configuration collects the following:

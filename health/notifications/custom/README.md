@@ -46,7 +46,7 @@ Variables available to the custom_sender:
  - `${alarm_id}`           the unique id of the alarm that generated this event
  - `${event_id}`           the incremental id of the event, for this alarm id
  - `${when}`               the timestamp this event occurred
- - `${name}`               the name of the alarm, as given in netdata health.d entries
+ - `${name}`               the name of the alarm, as given in Netdata health.d entries
  - `${url_name}`           same as `${name}` but URL encoded
  - `${chart}`              the name of the chart (type.id)
  - `${url_chart}`          same as `${chart}` but URL encoded
@@ -67,7 +67,7 @@ Variables available to the custom_sender:
  - `${old_value_string}`   friendly old value (with units)
  - `${image}`              the URL of an image to represent the status of the alarm
  - `${color}`              a color in #AABBCC format for the alarm
- - `${goto_url}`           the URL the user can click to see the netdata dashboard
+ - `${goto_url}`           the URL the user can click to see the Netdata dashboard
  - `${calc_expression}`    the expression evaluated to provide the value for the alarm
  - `${calc_param_values}`  the value of the variables in the evaluated expression
  - `${total_warnings}`     the total number of alarms in WARNING state on the host
