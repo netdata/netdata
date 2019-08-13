@@ -4,6 +4,8 @@ The standard web dashboard is the heart of Netdata's performance troubleshooting
 
 ![A GIF of the standard Netdata web dashboard](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
+Learn more about how dashboards work and how they're populated using the `dashboards.js` file in our [web dashboards overview](../README.md).
+
 By default, Netdata starts a web server for its dashboard at port `19999`. Open up your web browser of choice and navigate to `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`.
 
 Netdata uses an [internal, static-threaded web server](../server/) to host the HTML, CSS, and JavaScript files that make up the standard dashboard. You don't have to configure anything to access it, although you can adjust [your settings](../server/#other-netdataconf-web-section-options) in the `netdata.conf` file, or run Netdata behind an Nginx proxy, and so on.
@@ -50,7 +52,11 @@ Clicking on it will display a drop-down menu of any nodes you might have connect
 
 Once you add nodes via [Netdata Cloud](../../docs/netdata-cloud/) or a [private registry](../../registry/#run-your-own-registry), you will see them appear under the **My nodes** heading.
 
-![Screenshot of a populated nodes menu](https://user-images.githubusercontent.com/1153921/62795509-c3d13900-ba8b-11e9-8459-e85bf71f7ceb.png)
+![Screenshot of a nodes menu populated by registry agents](https://user-images.githubusercontent.com/1153921/62795509-c3d13900-ba8b-11e9-8459-e85bf71f7ceb.png)
+
+The nodes menu will also show the master netdata node and all slave nodes streaming to that master, if you have [configured streaming](../../streaming).
+
+![Screenshot of a nodes menu populated by streaming agents.](https://user-images.githubusercontent.com/1153921/62965774-90a7e600-bdba-11e9-8b80-495f35b29ecb.png)
 
 ## Customizing the standard dashboard
 

@@ -8,7 +8,7 @@ There are two primary ways to view Netdata's dashboards:
 
 1. The [standard web dashboard](gui/) that comes pre-configured with every Netdata installation. You can see it at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. You can customize the contents and colors of the standard dashboard [using JavaScript](gui/#customizing-the-standard-dashboard).
 
-2. The [`dashboard.js` JavaScript library](#dashboard-js), which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboard) using JavaScript, or create entirely new [custom dashboards](gui/custom/) or [Atlassian Confluence dashboards](gui/confluence/).
+2. The [`dashboard.js` JavaScript library](#dashboardjs), which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboard) using JavaScript, or create entirely new [custom dashboards](gui/custom/) or [Atlassian Confluence dashboards](gui/confluence/).
 
 You can also view all the data Netdata collects through the [REST API v1](api/).
 
@@ -102,9 +102,9 @@ And here's what two of those charts in the `disk.io` context look like under `sd
 
 As you can see in the screenshot, you can view the context of a chart if you hover over the date above the list of dimensions. A tooltip will appear that shows you two pieces of information: the collector that produces the chart, and the chart's context.
 
-Netdata also uses contexts for alarm templates. You can create an alarm for the `net.packets` context to receive alerts for any chart with that context, no matter which family it's attached to.
+Netdata also uses [contexts for alarm templates](http://localhost:20000/health/#alarm-line-on). You can create an alarm for the `net.packets` context to receive alerts for any chart with that context, no matter which family it's attached to.
 
-### Positive and negative values on charts
+## Positive and negative values on charts
 
 To improve clarity on charts, Netdata dashboards present **positive** values for metrics representing `read`, `input`, `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
 
@@ -112,7 +112,7 @@ To improve clarity on charts, Netdata dashboards present **positive** values for
 
 *Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is negative.*
 
-### Autoscaled y-axis
+## Autoscaled y-axis
 
 Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible timeframe.
 
@@ -120,11 +120,11 @@ Netdata charts automatically zoom vertically, to visualize the variation of each
 
 *A zero-based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
 
-
-
 ## dashboard.js
 
 Netdata uses the `dashboards.js` file to define, configure, create, and update all the charts and other visualizations that appear on any Netdata dashboard. You need to put `dashboard.js` on any HTML page that's going to render Netdata charts.
+
+The [custom dashboards documentation](gui/custom/) contains examples of such custom HTML pages.
 
 ### Generating dashboard.js
 
