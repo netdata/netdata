@@ -3,7 +3,6 @@ import { createReducer } from "redux-act"
 import { requestCommonColorsAction, setTimezoneAction } from "./actions"
 
 export type StateT = {
-  isCloudEnabled: boolean,
   commonColorsKeys: {
     [key: string]: { // key can be uuid, chart's context or commonColors attribute
       assigned: { // name-value of dimensions and their colors
@@ -19,7 +18,6 @@ export type StateT = {
 }
 
 const initialState = {
-  isCloudEnabled: false,
   commonColorsKeys: {},
   timezone: window.NETDATA.options.current.timezone,
 }
@@ -28,11 +26,6 @@ export const globalReducer = createReducer<StateT>(
   {},
   initialState,
 )
-
-globalReducer.on(isCloudEnabled, (state, payload) => ({
-  ...state,
-  isCloudEnabled: payload,
-}))
 
 
 export interface GetKeyArguments {
