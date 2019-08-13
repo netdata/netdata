@@ -231,21 +231,39 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
 //
 //}
 
-void health_agregate_alarms(RRDHOST *host, BUFFER *wb, uint32_t hash_context, char* context) {
-    int status = RRDCALC_STATUS_REMOVED;
+void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCALC_STATUS status) {
     RRDCALC *rc;
+    int numberOfAlarms = 0;
+    char *tok = NULL;
+    char *p = NULL;
 
     rrdhost_rdlock(host);
-    for(rc = host->alarms; rc ; rc = rc->next) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-            continue;
 
-        if(unlikely(rc->rrdset && rc->rrdset->hash_context == hash_context
-                    && !strcmp(rc->rrdset->context, context) && rc->status > status))
-            status = rc->status;
+    if (contexts) {
+        p = buffer_tostring(contexts);
+        while(p && *p && (tok = mystrsep(&p, ", |"))) {
+            if(!*tok) continue;
+
+            for(rc = host->alarms; rc ; rc = rc->next) {
+                if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                    continue;
+                if(unlikely(rc->rrdset && rc->rrdset->hash_context == simple_hash(tok)
+                            && !strcmp(rc->rrdset->context, tok) && rc->status == status))
+                    numberOfAlarms++;
+            }
+        }
+    }
+    else {
+        for(rc = host->alarms; rc ; rc = rc->next) {
+            if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+                continue;
+
+            if(unlikely(rc->status == status))
+                numberOfAlarms++;
+        }
     }
 
-    buffer_sprintf(wb, "\t{\"context\": \"%s\", \"status\":\"%s\"}", context, rrdcalc_status2string(status));
+    buffer_sprintf(wb, "%d", numberOfAlarms);
     rrdhost_unlock(host);
 }
 

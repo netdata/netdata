@@ -433,10 +433,7 @@ paths:
   /alarm_count:
     get:
       summary: 'Get an overall status of the chart'
-      description: |
-        Check multiple charts with the same context and aggregate their health statistics into one metric/status. The alarm_count endpoint returns the status with the maximum severity for all charts families in the given context. 
-        
-        The lowest severity for the chart status is REMOVED and the highest is CRITICAL. For example, cpu.cpu context groups as many charts as many cpu cores exists on the system, i.e. cpu.cpu0, cpu.cpu1 etc.  If at least one core is 100% utilized then alarm_count endpoint will return CRITICAL status.
+      description: "Checks multiple charts with the same context and counts number of alarms with given status."
       parameters:
         - in: query
           name: context
@@ -447,14 +444,22 @@ paths:
           items:
             type: string
             collectionFormat: pipes
-          default: ['cpu.cpu']
+          default: ['system.cpu']
+        - in: query
+          name: status
+          description: "Specify alarm status to count"
+          required: false
+          allowEmptyValue: true
+          type: string
+          enum: ['REMOVED', 'UNDEFINED', 'UNINITIALIZED', 'CLEAR', 'RAISED', 'WARNING', 'CRITICAL']
+          default: 'RAISED'
       responses:
         '200':
-          description: 'An object containing a list of contexts and their max severity alarms'
+          description: 'An object containing a count of alarms with given status for given contexts'
           schema:
             type: array
-            items:
-              $ref: '#/definitions/alarm_count_entry'
+            items: 
+              type: number
         '500':
           description: 'Internal server error. This usually means the server is out of memory.'
   /manage/health:
@@ -948,13 +953,6 @@ definitions:
                 format: nullable
               value: 
                 type: number
-  alarm_count_entry:
-    type: object
-    properties:
-      context:
-        type: string
-      status:
-        type: string
   alarm_log_entry:
     type: object
     properties: 

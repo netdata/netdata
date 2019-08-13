@@ -214,7 +214,8 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
 }
 
 inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
-    int i = 0;
+    RRDCALC_STATUS status = RRDCALC_STATUS_RAISED;
+    BUFFER *contexts = NULL;
 
     buffer_flush(w->response.data);
     buffer_sprintf(w->response.data, "[\n");
@@ -229,23 +230,30 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
 
         debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
 
-        if(likely(!strcmp(name, "context"))) {
-            char *tok;
-            while(value && *value && (tok = mystrsep(&value, ", |"))) {
-                if(!*tok) continue;
-
-                if(likely(i))
-                    buffer_strcat(w->response.data, ",\n");
-
-                health_agregate_alarms(host, w->response.data, simple_hash(tok), tok);
-                i++;
-            }
+        char* p = value;
+        if(!strcmp(name, "status")) {
+            while ((*p = toupper(*p))) p++;
+            if (!strcmp("CRITICAL", value)) status = RRDCALC_STATUS_CRITICAL;
+            else if (!strcmp("WARNING", value)) status = RRDCALC_STATUS_WARNING;
+            else if (!strcmp("UNINITIALIZED", value)) status = RRDCALC_STATUS_UNINITIALIZED;
+            else if (!strcmp("REMOVED", value)) status = RRDCALC_STATUS_REMOVED;
+            else if (!strcmp("UNDEFINED", value)) status = RRDCALC_STATUS_UNDEFINED;
+            else if (!strcmp("CLEAR", value)) status = RRDCALC_STATUS_CLEAR;
+        }
+        else if(!strcmp(name, "context") || !strcmp(name, "ctx")) {
+            if(!contexts) contexts = buffer_create(255);
+            buffer_strcat(contexts, "|");
+            buffer_strcat(contexts, value);
         }
     }
+
+    health_aggregate_alarms(host, w->response.data, contexts, status);
 
     buffer_sprintf(w->response.data, "\n]\n");
     w->response.data->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(w->response.data);
+
+    buffer_free(contexts);
     return 200;
 }
 
