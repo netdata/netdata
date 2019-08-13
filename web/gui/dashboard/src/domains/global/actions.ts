@@ -10,3 +10,4 @@ interface RequestCommonColors {
 export const requestCommonColorsAction = createAction<RequestCommonColors>("globalRequestCommonColors")
 
 export const setTimezoneAction = createAction<{timezone: string}>("globalSetTmezone")
+window.TEMPORARY_setTimezoneAction = setTimezoneAction

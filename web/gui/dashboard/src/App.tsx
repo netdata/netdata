@@ -27,6 +27,12 @@ const App: React.FC = () => { // eslint-disable-line arrow-body-style
       // give working-dashboard module access to the store
       // (just for refractoring purposes)
       dashboard.startModule(store)
+
+      // for use by main.js
+      // we cannot make main.js a module yet, because index.html uses window onclick handlers
+      // like onclick="saveSnapshotSetCompression('none'); return false;"
+      window.reduxStore = store
+
       setHasStarted(true)
     })
   }, [store])

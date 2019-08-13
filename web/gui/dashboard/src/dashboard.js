@@ -93,6 +93,7 @@
 import { updateChartDataAction, updateChartDetailsAction } from './domains/chart/actions';
 import { unitsConversion } from './utils/units-conversion';
 import { seconds4human } from './domains/chart/utils/seconds4human';
+import { setTimezoneAction } from './domains/global/actions';
 
 let reduxStore
 NETDATA.name2id = function (s) {
@@ -953,6 +954,9 @@ NETDATA.resetOptions = function () {
         }
     }
 
+    // new way
+    dispatch(setTimezoneAction(NETDATA.options.current.timzeone));
+    // old way
     NETDATA.dateTime.init(NETDATA.options.current.timezone);
 };
 

@@ -965,7 +965,7 @@ function gotoServerModalHandler(guid) {
 
     if (!isSignedIn()) {
         // When the registry is enabled, if the user's known URLs are not working
-        // we consult the registry to get additional URLs.  
+        // we consult the registry to get additional URLs.
         setTimeout(function () {
             if (gotoServerStop === false) {
                 document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
@@ -4554,6 +4554,28 @@ var selected_server_timezone = function (timezone, status) {
         // the user selected a timezone from the menu
 
         NETDATA.setOption('user_set_server_timezone', timezone);
+        // this should be uncommented and it should replace dateTime.init() when dashboard.js will
+        // stop using NETDATA.dateTime at all
+        // if (window.TEMPORARY_isProperTimezone(timezone)) {
+        //     window.reduxStore.dispatch(
+        //       TEMPORARY_setTimezoneAction({ timezone })
+        //     )
+        //     if ($('#local_timezone').prop('checked')) {
+        //         $('#local_timezone').bootstrapToggle('off');
+        //     }
+        // } else {
+        //     window.reduxStore.dispatch(
+        //       TEMPORARY_setTimezoneAction({ timezone: "default" })
+        //     )
+        //
+        //     if (!$('#local_timezone').prop('checked')) {
+        //         $('#local_timezone').bootstrapToggle('on');
+        //     }
+        //
+        //     document.getElementById('timezone_error_message').innerHTML = 'Ooops! That timezone was not accepted by your browser. Please open a github issue to help us fix it.';
+        //     NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
+        //
+        // }
 
         if (NETDATA.dateTime.init(timezone) === false) {
             NETDATA.dateTime.init();
@@ -4573,6 +4595,9 @@ var selected_server_timezone = function (timezone, status) {
         // the user wants the browser default timezone to be activated
 
         NETDATA.dateTime.init();
+        // window.reduxStore.dispatch(
+        //   TEMPORARY_setTimezoneAction({ timezone: "default" })
+        // )
     } else {
         // the user wants the server default timezone to be activated
         //console.log('found ' + NETDATA.options.current.user_set_server_timezone);
@@ -4583,6 +4608,19 @@ var selected_server_timezone = function (timezone, status) {
 
         timezone = NETDATA.options.current.user_set_server_timezone;
 
+        // if (!window.TEMPORARY_isProperTimezone(timezone)) {
+        //     window.reduxStore.dispatch(
+        //       TEMPORARY_setTimezoneAction({ timezone: "default" })
+        //     )
+        //
+        //     if (!$('#local_timezone').prop('checked')) {
+        //         $('#local_timezone').bootstrapToggle('on');
+        //     }
+        //
+        //     document.getElementById('timezone_error_message').innerHTML = 'Sorry. The timezone "' + timezone.toString() + '" is not accepted by your browser. Please select one from the list.';
+        //     NETDATA.setOption('user_set_server_timezone', NETDATA.options.server_timezone);
+        // }
+        // }
         if (NETDATA.dateTime.init(timezone) === false) {
             NETDATA.dateTime.init();
 
@@ -5126,7 +5164,7 @@ function netdataRegistryCallback(machinesArray) {
     registryAgents = machinesArray;
 
     if (isSignedIn()) {
-        // We call getCloudAccountAgents() here because it requires that 
+        // We call getCloudAccountAgents() here because it requires that
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
         getCloudAccountAgents().then((agents) => {
@@ -5152,8 +5190,8 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// If we know the cloudBaseURL and agentID from local storage render (eagerly) 
-// the account ui before receiving the definitive response from the web server. 
+// If we know the cloudBaseURL and agentID from local storage render (eagerly)
+// the account ui before receiving the definitive response from the web server.
 // This improves the perceived performance.
 function tryFastInitCloud() {
     const baseURL = localStorage.getItem("cloud.baseURL");
