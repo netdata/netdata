@@ -1,6 +1,6 @@
 import { init, last, mergeAll } from "ramda"
 import { createReducer } from "redux-act"
-import { isCloudEnabled, requestCommonColorsAction } from "./actions"
+import { requestCommonColorsAction, setTimezoneAction } from "./actions"
 
 export type StateT = {
   isCloudEnabled: boolean,
@@ -15,11 +15,13 @@ export type StateT = {
       copyTheme: boolean
     }
   }
+  timezone: string | undefined
 }
 
 const initialState = {
   isCloudEnabled: false,
   commonColorsKeys: {},
+  timezone: window.NETDATA.options.current.timezone,
 }
 
 export const globalReducer = createReducer<StateT>(
@@ -120,5 +122,10 @@ globalReducer.on(requestCommonColorsAction, (state, {
     },
   }
 })
+
+globalReducer.on(setTimezoneAction, (state, { timezone = "default" }) => ({
+  ...state,
+  timezone,
+}))
 
 export const globalKey = "global"

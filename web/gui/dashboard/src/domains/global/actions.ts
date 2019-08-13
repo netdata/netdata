@@ -9,4 +9,6 @@ interface RequestCommonColors {
   commonColorsAttribute: string | undefined
   dimensionNames: string[]
 }
-export const requestCommonColorsAction = createAction<RequestCommonColors>("requestCommonColors")
+export const requestCommonColorsAction = createAction<RequestCommonColors>("globalRequestCommonColors")
+
+export const setTimezoneAction = createAction<{timezone: string}>("globalSetTmezone")

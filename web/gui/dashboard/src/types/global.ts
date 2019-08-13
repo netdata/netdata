@@ -36,7 +36,7 @@ interface NETDATA {
       units: string
       temperature: string
       seconds_as_time: boolean
-      timezone: string
+      timezone: string | undefined
       user_set_server_timezone: string
 
       legend_toolbox: boolean
