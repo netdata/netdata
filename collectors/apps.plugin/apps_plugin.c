@@ -3685,6 +3685,32 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
 
+#ifndef __FreeBSD__
+    fprintf(stdout, "CHART %s.uptime '' '%s Carried over uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+
+    fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+
+    fprintf(stdout, "CHART %s.uptime_avg '' '%s Average uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+
+    fprintf(stdout, "CHART %s.uptime_max '' '%s Maxium uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+#endif
+
     fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed))
