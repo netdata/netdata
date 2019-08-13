@@ -8,13 +8,13 @@ The software is known for its low impact on memory resources, high scalability, 
 
 ## Why Nginx
 
-- By default, Nginx is fast and lightweight out of the box.
+-   By default, Nginx is fast and lightweight out of the box.
 
-- Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
+-   Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
 
-- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
+-   Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
 
-- A proxy was necessary to encrypt the communication to netdata, until v1.16.0, which provided TLS (HTTPS) support.
+-   A proxy was necessary to encrypt the communication to netdata, until v1.16.0, which provided TLS (HTTPS) support.
 
 ## Nginx configuration file
 
@@ -28,9 +28,9 @@ You can edit the Nginx configuration file with Nano, Vim or any other text edito
 
 After making changes to the configuration files:
 
-- Test Nginx configuration with `nginx -t`.
+-   Test Nginx configuration with `nginx -t`.
 
-- Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
+-   Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
 ## Ways to access Netdata via Nginx
 
@@ -38,7 +38,7 @@ After making changes to the configuration files:
 
 With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
 
-```
+```conf
 upstream backend {
     # the Netdata server
     server 127.0.0.1:19999;
@@ -69,7 +69,7 @@ server {
 This method is recommended when Netdata is to be served from a subfolder (or directory). 
 In this case, the virtual host `netdata.example.com` already exists and Netdata has to be accessed via `netdata.example.com/netdata/`.
 
-```
+```conf
 upstream netdata {
     server 127.0.0.1:19999;
     keepalive 64;
@@ -159,7 +159,7 @@ Using the above, you access Netdata on the backend servers, like this:
 
 In case Netdata's web server has been [configured to use TLS](../web/server/#enabling-tls-support), it is necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append the following parameters in your `nginx.conf`
 
-```
+```conf
 proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
