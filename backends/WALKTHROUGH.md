@@ -47,14 +47,14 @@ before we do this we want name resolution between the two containers to work.
 In order to accomplish this we will create a user-defined network and attach
 both containers to this network. The first command we should run is: 
 
-```
+```sh
 docker network create --driver bridge netdata-tutorial
 ```
 
 With this user-defined network created we can now launch our container we will
 install Netdata on and point it to this network.
 
-```
+```sh
 docker run -it --name netdata --hostname netdata --network=netdata-tutorial -p 19999:19999  centos:latest '/bin/bash'
 ```
 
@@ -72,19 +72,19 @@ several one-liners to install netdata. I have not had any issues with these one
 liners and their bootstrapping scripts so far (If you guys run into anything do
 share). Run the following command in your container.
 
-```
+```sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait
 ```
 
 After the install completes you should be able to hit the Netdata dashboard at
-http://localhost:19999/ (replace localhost if you’re doing this on a VM or have
+<http://localhost:19999/> (replace localhost if you’re doing this on a VM or have
 the docker container hosted on a machine not on your local system). If this is
 your first time using Netdata I suggest you take a look around. The amount of
 time I’ve spent digging through /proc and calculating my own metrics has been
 greatly reduced by this tool. Take it all in.
 
 Next I want to draw your attention to a particular endpoint. Navigate to
-http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes In your
+<http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes> In your
 browser. This is the endpoint which publishes all the metrics in a format which
 Prometheus understands. Let’s take a look at one of these metrics.
 `netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="system"}
@@ -113,11 +113,11 @@ drop you into a shell once again. Once there quickly install your favorite
 editor as we will be editing files later in this tutorial. `yum install vim -y`
 
 Prometheus provides a tarball of their latest stable versions here:
-https://prometheus.io/download/. Let’s download the latest version and install
+<https://prometheus.io/download/>. Let’s download the latest version and install
 into your container.
 
-```
-curl -L 'https://github.com/prometheus/prometheus/releases/download/v1.7.1/prometheus-1.7.1.linux-amd64.tar.gz' -o /tmp/prometheus.tar.gz
+```sh
+curl -L 'https://github.com/prometheus/prometheus/releases/download/v2.11.1/prometheus-2.11.1.linux-amd64.tar.gz' -o /tmp/prometheus.tar.gz
 
 mkdir /opt/prometheus
 
@@ -143,7 +143,7 @@ INFO[0000] Listening on :9090 source="web.go:259"
 
 Now attempt to go to http://localhost:9090/. You should be presented with the
 prometheus homepage. This is a good point to talk about Prometheus’s data model
-which can be viewed here: https://prometheus.io/docs/concepts/data_model/  As
+which can be viewed here: <https://prometheus.io/docs/concepts/data_model/>  As
 explained we have two key elements in Prometheus metrics. We have the ‘metric’
 and its ‘labels’. Labels allow for granularity between metrics. Let’s use our
 previous example to further explain.
@@ -162,7 +162,7 @@ Let’s move our attention to Prometheus’s configuration. Prometheus gets it
 config from the file located (in our example) at
 `/opt/prometheus/prometheus.yml`. I won’t spend an extensive amount of time
 going over the configuration values documented here:
-https://prometheus.io/docs/operating/configuration/. We will be adding a new
+<https://prometheus.io/docs/operating/configuration/>. We will be adding a new
 “job” under the “scrape_configs”. Let’s make the “scrape_configs” section look
 like this (we can use the dns name Netdata due to the custom user-defined
 network we created in docker beforehand).
@@ -189,7 +189,7 @@ scrape_configs:
 ```
 
 Let’s start prometheus once again by running `/opt/prometheus/prometheus`. If we
-now navigate to prometheus at ‘http://localhost:9090/targets’ we should see our
+now navigate to prometheus at ‘<http://localhost:9090/targets>’ we should see our
 target being successfully scraped. If we now go back to the Prometheus’s
 homepage and begin to type ‘netdata_’  Prometheus should auto complete metrics
 it is now scraping.
@@ -206,7 +206,7 @@ the following:
 
 Our NetData cpu graph should be showing some activity. Let’s represent this in
 Prometheus. In order to do this let’s keep our metrics page open for reference:
-http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes  We are
+<http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes>  We are
 setting out to graph the data in the CPU chart so let’s search for “system.cpu”
 in the metrics page above. We come across a section of metrics with the first
 comments  `# COMMENT homogeneous chart "system.cpu", context "system.cpu", family
@@ -266,7 +266,7 @@ we need to do is done via the GUI. Let’s run the following command:
 docker run -i -p 3000:3000 --network=netdata-tutorial grafana/grafana
 ```
 
-This will get grafana running at ‘http://localhost:3000/’ Let’s go there and
+This will get grafana running at ‘<http://localhost:3000/>’ Let’s go there and
 login using the credentials Admin:Admin.
 
 The first thing we want to do is click ‘Add data source’. Let’s make it look

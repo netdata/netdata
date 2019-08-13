@@ -12,7 +12,7 @@ Prometheus is a distributed monitoring system which offers a very simple setup a
 There are number of ways to install netdata according to [Installation](../../packaging/installer/#installation)  
 The suggested way of installing the latest netdata and keep it upgrade automatically. Using one line installation:
 
-```
+```sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
@@ -31,7 +31,7 @@ In order to install prometheus we are going to introduce our own systemd startup
 #### Download Prometheus
 
 ```sh
-wget -O /tmp/prometheus-2.3.2.linux-amd64.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.3.2/prometheus-2.3.2.linux-amd64.tar.gz
+wget -O /tmp/prometheus-2.3.2.linux-amd64.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.11.1/prometheus-2.11.1.linux-amd64.tar.gz 
 ```
 
 #### Create prometheus system user
