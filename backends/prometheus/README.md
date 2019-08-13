@@ -4,7 +4,6 @@
 
 Prometheus is a distributed monitoring system which offers a very simple setup along with a robust data model. Recently netdata added support for Prometheus. I'm going to quickly show you how to install both netdata and prometheus on the same server. We can then use grafana pointed at Prometheus to obtain long term metrics netdata offers. I'm assuming we are starting at a fresh ubuntu shell (whether you'd like to follow along in a VM or a cloud instance is up to you).
 
-
 ## Installing netdata and prometheus
 
 ### Installing netdata
@@ -12,7 +11,7 @@ Prometheus is a distributed monitoring system which offers a very simple setup a
 There are number of ways to install netdata according to [Installation](../../packaging/installer/#installation)  
 The suggested way of installing the latest netdata and keep it upgrade automatically. Using one line installation:
 
-```
+```sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
@@ -22,7 +21,7 @@ At this point we should have netdata listening on port 19999. Attempt to take yo
 http://your.netdata.ip:19999
 ```
 
-*(replace `your.netdata.ip` with the IP or hostname of the server running netdata)*
+_(replace `your.netdata.ip` with the IP or hostname of the server running netdata)_
 
 ### Installing Prometheus
 
@@ -31,7 +30,7 @@ In order to install prometheus we are going to introduce our own systemd startup
 #### Download Prometheus
 
 ```sh
-wget -O /tmp/prometheus-2.3.2.linux-amd64.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.3.2/prometheus-2.3.2.linux-amd64.tar.gz
+wget -O /tmp/prometheus-2.3.2.linux-amd64.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.11.1/prometheus-2.11.1.linux-amd64.tar.gz 
 ```
 
 #### Create prometheus system user
@@ -111,7 +110,7 @@ scrape_configs:
 
 #### Install nodes.yml
 
-The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and add a *- "nodes.yml"* entry under the *rule_files:* section in the example prometheus.yml file above.
+The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
 ```
 groups:
 - name: nodes
@@ -192,21 +191,21 @@ Before explaining the changes, we have to understand the key differences between
 
 ### understanding netdata metrics
 
-##### charts
+#### charts
 
 Each chart in netdata has several properties (common to all its metrics):
 
-- `chart_id` - uniquely identifies a chart.
+-   `chart_id` - uniquely identifies a chart.
 
-- `chart_name` - a more human friendly name for `chart_id`, also unique.
+-   `chart_name` - a more human friendly name for `chart_id`, also unique.
 
-- `context` - this is the template of the chart. All disk I/O charts have the same context, all mysql requests charts have the same context, etc. This is used for alarm templates to match all the charts they should be attached to.
+-   `context` - this is the template of the chart. All disk I/O charts have the same context, all mysql requests charts have the same context, etc. This is used for alarm templates to match all the charts they should be attached to.
 
-- `family` groups a set of charts together. It is used as the submenu of the dashboard.
+-   `family` groups a set of charts together. It is used as the submenu of the dashboard.
 
-- `units` is the units for all the metrics attached to the chart.
+-   `units` is the units for all the metrics attached to the chart.
 
-##### dimensions
+#### dimensions
 
 Then each netdata chart contains metrics called `dimensions`. All the dimensions of a chart have the same units of measurement, and are contextually in the same category (ie. the metrics for disk bandwidth are `read` and `write` and they are both in the same chart).
 
@@ -214,7 +213,7 @@ Then each netdata chart contains metrics called `dimensions`. All the dimensions
 
 Netdata can send metrics to prometheus from 3 data sources:
 
-- `as collected` or `raw` - this data source sends the metrics to prometheus as they are collected. No conversion is done by netdata. The latest value for each metric is just given to prometheus. This is the most preferred method by prometheus, but it is also the harder to work with. To work with this data source, you will need to understand how to get meaningful values out of them.
+-   `as collected` or `raw` - this data source sends the metrics to prometheus as they are collected. No conversion is done by netdata. The latest value for each metric is just given to prometheus. This is the most preferred method by prometheus, but it is also the harder to work with. To work with this data source, you will need to understand how to get meaningful values out of them.
 
    The format of the metrics is: `CONTEXT{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
@@ -222,13 +221,13 @@ Netdata can send metrics to prometheus from 3 data sources:
 
    Unlike prometheus, netdata allows each dimension of a chart to have a different algorithm and conversion constants (`multiplier` and `divisor`). In this case, that the dimensions of a charts are heterogeneous, netdata will use this format: `CONTEXT_DIMENSION{chart="CHART",family="FAMILY"}`
 
-- `average` - this data source uses the netdata database to send the metrics to prometheus as they are presented on the netdata dashboard. So, all the metrics are sent as gauges, at the units they are presented in the netdata dashboard charts. This is the easiest to work with.
+-   `average` - this data source uses the netdata database to send the metrics to prometheus as they are presented on the netdata dashboard. So, all the metrics are sent as gauges, at the units they are presented in the netdata dashboard charts. This is the easiest to work with.
 
    The format of the metrics is: `CONTEXT_UNITS_average{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
    When this source is used, netdata keeps track of the last access time for each prometheus server fetching the metrics. This last access time is used at the subsequent queries of the same prometheus server to identify the time-frame the `average` will be calculated. So, no matter how frequently prometheus scrapes netdata, it will get all the database data. To identify each prometheus server, netdata uses by default the IP of the client fetching the metrics. If there are multiple prometheus servers fetching data from the same netdata, using the same IP, each prometheus server can append `server=NAME` to the URL. Netdata will use this `NAME` to uniquely identify the prometheus server.
 
-- `sum` or `volume`, is like `average` but instead of averaging the values, it sums them.
+-   `sum` or `volume`, is like `average` but instead of averaging the values, it sums them.
 
    The format of the metrics is: `CONTEXT_UNITS_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
    All the other operations are the same with `average`. 
@@ -241,7 +240,7 @@ Fetch with your web browser this URL:
 
 `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes`
 
-*(replace `your.netdata.ip` with the ip or hostname of your netdata server)*
+_(replace `your.netdata.ip` with the ip or hostname of your netdata server)_
 
 netdata will respond with all the metrics it sends to prometheus.
 
@@ -272,7 +271,7 @@ netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension=
 # COMMENT netdata_system_cpu_percentage_average: dimension "idle", value is percentage, gauge, dt 1500066653 to 1500066662 inclusive
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="idle"} 92.3630770 1500066662000
 ```
-*(netdata response for `system.cpu` with source=`average`)*
+_(netdata response for `system.cpu` with source=`average`)_
 
 In `average` or `sum` data sources, all values are normalized and are reported to prometheus as gauges. Now, use the 'expression' text form in prometheus. Begin to type the metrics we are looking for: `netdata_system_cpu`. You should see that the text form begins to auto-fill as prometheus knows about this metric.
 
@@ -302,7 +301,7 @@ netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="iowait"} 233
 netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="idle"} 918470 1500066716438
 ```
 
-*(netdata response for `system.cpu` with source=`as-collected`)*
+_(netdata response for `system.cpu` with source=`as-collected`)_
 
 For more information check prometheus documentation.
 
@@ -348,8 +347,8 @@ The default is controlled in `netdata.conf`:
 
 You can overwrite it from prometheus, by appending to the URL:
 
-* `&names=no` to get IDs (the old behaviour)
-* `&names=yes` to get names
+-   `&names=no` to get IDs (the old behaviour)
+-   `&names=yes` to get names
 
 ### Filtering metrics sent to prometheus
 
