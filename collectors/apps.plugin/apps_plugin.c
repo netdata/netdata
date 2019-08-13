@@ -260,6 +260,11 @@ struct target {
     kernel_uint_t openeventpolls;
     kernel_uint_t openother;
 
+    kernel_uint_t starttime;
+    kernel_uint_t uptime_min;
+    kernel_uint_t uptime_sum;
+    kernel_uint_t uptime_max;
+
     unsigned int processes; // how many processes have been merged to this
     int exposed;            // if set, we have sent this to netdata
     int hidden;             // if set, we set the hidden flag on the dimension
@@ -1526,7 +1531,7 @@ static inline int get_pid_uptime(struct pid_stat *p) {
 
     kernel_uint_t global_uptime = str2kernel_uint_t(procfile_lineword(global_uptime_ff, 0, 0));
 
-    p->uptime = global_uptime - p->starttime / system_hz;
+    p->uptime = (global_uptime > p->starttime / system_hz)?(global_uptime - p->starttime / system_hz):0;
 
     return 1;
 }
@@ -2926,6 +2931,19 @@ static size_t zero_all_targets(struct target *root) {
             w->openother = 0;
         }
 
+        static kernel_uint_t prev_starttime = 0;
+        if(w->starttime) {
+            if(prev_starttime < w->starttime) prev_starttime = w->starttime;
+        }
+        else {
+            prev_starttime = 0;
+        }
+
+        w->starttime = 0;
+        w->uptime_min = 0;
+        w->uptime_sum = 0;
+        w->uptime_max = 0;
+
         if(unlikely(w->root_pid)) {
             struct pid_on_target *pid_on_target_to_free, *pid_on_target = w->root_pid;
 
@@ -3078,6 +3096,11 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
 
     w->processes++;
     w->num_threads += p->num_threads;
+
+    if(!w->starttime || p->starttime < w->starttime) w->starttime = p->starttime;
+    if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
+    w->uptime_sum += p->uptime;
+    if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
 
     if(unlikely(debug_enabled || w->debug_enabled)) {
         debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
