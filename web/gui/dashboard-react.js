@@ -116,7 +116,10 @@ NETDATA.options = {
 
   last_page_scroll: 0,            // the timestamp the last time the page was scrolled
 
-  browser_timezone: 'unknown',    // timezone detected by javascript
+  browser_timezone: (Intl && Intl.DateTimeFormat)
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone // timezone detected by javascript
+    : "cannot-detect-it",
+
   server_timezone: 'unknown',     // timezone reported by the server
 
   force_data_points: 0,           // force the number of points to be returned for charts
