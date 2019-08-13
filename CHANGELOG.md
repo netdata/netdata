@@ -2,14 +2,23 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
+**Fixed bugs:**
+
+- netdata/packaging: put go.d version in one place [\#6557](https://github.com/netdata/netdata/pull/6557) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+
 **Merged pull requests:**
 
+- fix spigotmc plugin bugs [\#6635](https://github.com/netdata/netdata/pull/6635) ([Cat7373](https://github.com/Cat7373))
+- Fix 'None' in left nav [\#6632](https://github.com/netdata/netdata/pull/6632) ([joelhans](https://github.com/joelhans))
 - Update terms of use for U.S. legal reasons [\#6631](https://github.com/netdata/netdata/pull/6631) ([cakrit](https://github.com/cakrit))
+- Fix a segmentation fault in backends [\#6627](https://github.com/netdata/netdata/pull/6627) ([vlvkobal](https://github.com/vlvkobal))
+- .travis.yml: Remove 'sudo: true' as it is now deprecated [\#6624](https://github.com/netdata/netdata/pull/6624) ([knatsakis](https://github.com/knatsakis))
 - netdata: Add cosmix as codeowner, wherever cakrit is [\#6618](https://github.com/netdata/netdata/pull/6618) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mysql: do not remove `slave\_status` from queries in module [\#6617](https://github.com/netdata/netdata/pull/6617) ([ilyam8](https://github.com/ilyam8))
 - Better system OS detection for RHEL6 and Mac OS X [\#6612](https://github.com/netdata/netdata/pull/6612) ([dex4er](https://github.com/dex4er))
 - update package version requirements for LZ4 and libuv [\#6607](https://github.com/netdata/netdata/pull/6607) ([mfundul](https://github.com/mfundul))
 - netdata/installer: do not enable netdata, if it was previously disabled [\#6606](https://github.com/netdata/netdata/pull/6606) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Fix typos in: 'README.md' file. [\#6604](https://github.com/netdata/netdata/pull/6604) ([coffeina](https://github.com/coffeina))
 - mysql collector: slave\_status charts per replication channel [\#6597](https://github.com/netdata/netdata/pull/6597) ([ilyam8](https://github.com/ilyam8))
 - netdata/packaging: Expect .tar.gz version of go.d plugin [\#6590](https://github.com/netdata/netdata/pull/6590) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix configure.ac allowing deprecated LZ4 library call [\#6589](https://github.com/netdata/netdata/pull/6589) ([mfundul](https://github.com/mfundul))
@@ -17,10 +26,12 @@
 - Build DEB and RPM packages in parallel [\#6579](https://github.com/netdata/netdata/pull/6579) ([knatsakis](https://github.com/knatsakis))
 - Fixed typo 'follwing' -\> 'following' [\#6575](https://github.com/netdata/netdata/pull/6575) ([vvanouytsel](https://github.com/vvanouytsel))
 - netdata/packaging: Bare OS validations [\#6574](https://github.com/netdata/netdata/pull/6574) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- vsphere collector: charts descritpion and alarms [\#6572](https://github.com/netdata/netdata/pull/6572) ([ilyam8](https://github.com/ilyam8))
 -  Documentation style guide & build instructions [\#6563](https://github.com/netdata/netdata/pull/6563) ([joelhans](https://github.com/joelhans))
 - netdata/packaging: Documentation on distribution support matrix and functionality availability [\#6552](https://github.com/netdata/netdata/pull/6552) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
 - Netdata Cloud documentation [\#6476](https://github.com/netdata/netdata/pull/6476) ([joelhans](https://github.com/joelhans))
+- \(re-open\) ZRAM info collector module \(proc.plugin\) [\#6424](https://github.com/netdata/netdata/pull/6424) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
 - Update plugin\_nfacct.c [\#6098](https://github.com/netdata/netdata/pull/6098) ([fun04wr0ng](https://github.com/fun04wr0ng))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)

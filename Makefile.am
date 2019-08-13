@@ -60,6 +60,7 @@ dist_noinst_DATA= \
 	package.json \
 	docs \
 	packaging/version \
+	packaging/go.d.version \
 	packaging/go.d.checksums \
 	packaging/installer/README.md \
 	packaging/installer/UNINSTALL.md \
@@ -279,6 +280,7 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/proc_vmstat.c \
 	collectors/proc.plugin/proc_uptime.c \
 	collectors/proc.plugin/sys_kernel_mm_ksm.c \
+	collectors/proc.plugin/sys_block_zram.c \
 	collectors/proc.plugin/sys_devices_system_edac_mc.c \
 	collectors/proc.plugin/sys_devices_system_node.c \
 	collectors/proc.plugin/sys_fs_btrfs.c \
