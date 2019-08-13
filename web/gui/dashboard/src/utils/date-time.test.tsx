@@ -45,6 +45,37 @@ describe("useDateTime", () => {
     expect(typeof xAxisTimeString(date)).toBe("string")
   })
 
+  it("uses old formatters when Intl.DateTimeFormat is not available", () => {
+    // some tweaks to force re-running the date-time module
+    // (with overriden window.Intl property)
+    jest.resetModules()
+
+    // turn off Intl (simulate older browsers)
+    const windowIntl = Intl
+    // @ts-ignore
+    window.Intl = undefined
+    const newInstance = require("./date-time")
+    const { testHook: testHookNewInstance } = require("utils/test-utils")
+
+    const { configure } = require("enzyme")
+    const Adapter = require("enzyme-adapter-react-16")
+
+    configure({ adapter: new Adapter() })
+
+    testHookNewInstance(() => {
+      dateTime = newInstance.useDateTime()
+    })
+    const {
+      localeDateString, localeTimeString, xAxisTimeString,
+    } = dateTime
+    expect(localeDateString).toBe(newInstance.localeDateStringNative)
+    expect(localeTimeString).toBe(newInstance.localeTimeStringNative)
+    expect(xAxisTimeString).toBe(newInstance.xAxisTimeStringNative)
+    expect(typeof localeDateString).toBe("function")
+    // @ts-ignore
+    window.Intl = windowIntl
+  })
+
   it("formats dates", () => {
     const {
       localeDateString, localeTimeString, xAxisTimeString,
