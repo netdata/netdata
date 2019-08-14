@@ -8,6 +8,7 @@
 
 **Merged pull requests:**
 
+- Prometheus version update [\#6652](https://github.com/netdata/netdata/pull/6652) ([prhomhyse](https://github.com/prhomhyse))
 - Accept \<\> around links in markdown [\#6646](https://github.com/netdata/netdata/pull/6646) ([cakrit](https://github.com/cakrit))
 - netdata/installer: Fix error running kickstart as a non-privileged user [\#6642](https://github.com/netdata/netdata/pull/6642) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - fix spigotmc plugin bugs [\#6635](https://github.com/netdata/netdata/pull/6635) ([Cat7373](https://github.com/Cat7373))
@@ -33,6 +34,7 @@
 -  Documentation style guide & build instructions [\#6563](https://github.com/netdata/netdata/pull/6563) ([joelhans](https://github.com/joelhans))
 - netdata/packaging: Documentation on distribution support matrix and functionality availability [\#6552](https://github.com/netdata/netdata/pull/6552) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
+- Add MongoDB backend [\#6524](https://github.com/netdata/netdata/pull/6524) ([vlvkobal](https://github.com/vlvkobal))
 - Netdata Cloud documentation [\#6476](https://github.com/netdata/netdata/pull/6476) ([joelhans](https://github.com/joelhans))
 - \(re-open\) ZRAM info collector module \(proc.plugin\) [\#6424](https://github.com/netdata/netdata/pull/6424) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
 - Update plugin\_nfacct.c [\#6098](https://github.com/netdata/netdata/pull/6098) ([fun04wr0ng](https://github.com/fun04wr0ng))
