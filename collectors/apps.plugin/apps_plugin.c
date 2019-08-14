@@ -447,7 +447,7 @@ size_t pagesize;
 #define PID_LOG_CMDLINE 0x00000004
 #define PID_LOG_FDS     0x00000008
 #define PID_LOG_STAT    0x00000010
-#define PID_LOG_UPTIME  0x00000011
+#define PID_LOG_UPTIME  0x00000020
 
 static struct pid_stat
         *root_of_pids = NULL,   // global list of all processes running
