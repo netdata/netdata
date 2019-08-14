@@ -7,7 +7,7 @@ This is what you will get:
 
 You need:
 
-The **incoming webhook URL** as given by flock.com. You can use the same on all your netdata servers (or you can have multiple if you like - your decision).
+The **incoming webhook URL** as given by flock.com. You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
 
 Get them here: https://admin.flock.com/webhooks
 
@@ -21,8 +21,8 @@ Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system r
 SEND_FLOCK="YES"
 
 # Login to flock.com and create an incoming webhook.
-# You need only one for all your netdata servers.
-# Without it, netdata cannot send flock notifications.
+# You need only one for all your Netdata servers.
+# Without it, Netdata cannot send flock notifications.
 FLOCK_WEBHOOK_URL="https://api.flock.com/hooks/sendMessage/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
 # if a role recipient is not configured, no notification will be sent

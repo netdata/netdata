@@ -9,7 +9,7 @@ Module isn't compatible with new statistic api (v2.3), but you are still able to
 by following [upgrading steps.](https://wiki2.dovecot.org/Upgrading/2.3).
 
 **Requirement:**
-Dovecot UNIX socket with R/W permissions for user netdata or Dovecot with configured TCP/IP socket.
+Dovecot UNIX socket with R/W permissions for user `netdata` or Dovecot with configured TCP/IP socket.
 
 Module gives information with following charts:
 

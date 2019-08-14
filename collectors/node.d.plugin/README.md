@@ -1,10 +1,10 @@
 # node.d.plugin
 
-`node.d.plugin` is a netdata external plugin. It is an **orchestrator** for data collection modules written in `node.js`.
+`node.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `node.js`.
 
 1. It runs as an independent process `ps fax` shows it
-2. It is started and stopped automatically by netdata
-3. It communicates with netdata via a unidirectional pipe (sending data to the netdata daemon)
+2. It is started and stopped automatically by Netdata
+3. It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
 4. Supports any number of data collection **modules**
 5. Allows each **module** to have one or more data collection **jobs**
 6. Each **job** is collecting one or more metrics from a single data source
@@ -28,7 +28,7 @@ At minimum, to be buildable and testable, the PR needs to include:
 Node.js is perfect for asynchronous operations. It is very fast and quite common (actually the whole web is based on it).
 Since data collection is not a CPU intensive task, node.js is an ideal solution for it.
 
-`node.d.plugin` is a netdata plugin that provides an abstraction layer to allow easy and quick development of data
+`node.d.plugin` is a Netdata plugin that provides an abstraction layer to allow easy and quick development of data
 collectors in node.js. It also manages all its data collectors (placed in `/usr/libexec/netdata/node.d`) using a single
 instance of node, thus lowering the memory footprint of data collection.
 
@@ -54,7 +54,7 @@ For more information check the **[[Installation]]** guide.
 Unfortunately, `JSON` files do not accept comments. So, the best way to describe them is to have markdown text files
 with instructions.
 
-`JSON` has a very strict formatting. If you get errors from netdata at `/var/log/netdata/error.log` that a certain
+`JSON` has a very strict formatting. If you get errors from Netdata at `/var/log/netdata/error.log` that a certain
 configuration file cannot be loaded, we suggest to verify it at [http://jsonlint.com/](http://jsonlint.com/).
 
 The files in this directory, provide usable examples for configuring each `node.d.plugin` module.
@@ -93,7 +93,7 @@ Your data collection module should be split in 3 parts:
       so you don't need to do anything about it for http.
 
    - a function to process the fetched/manipulate the data fetched. This function will make a number of calls
-      to create charts and dimensions and pass the collected values to netdata.
+      to create charts and dimensions and pass the collected values to Netdata.
       This is the only function you need to write for collecting http JSON data.
 
    - a `configure` and an `update` function, which take care of your module configuration and data refresh
@@ -127,7 +127,7 @@ netdata.processors.myprocessor = {
 var mymodule = {
 	processResponse: function(service, data) {
 
-		/* send information to the netdata server here */
+		/* send information to the Netdata server here */
 
 	},
 
@@ -221,7 +221,7 @@ The configuration file `/etc/netdata/node.d/mymodule.conf` may contain whatever 
 
 `data` may be `null` or whatever the processor specified in the `service` returned.
 
-The `service` object defines a set of functions to allow you send information to the netdata core about:
+The `service` object defines a set of functions to allow you send information to the Netdata core about:
 
 1. Charts and dimension definitions
 2. Updated values, from the collected values

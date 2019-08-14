@@ -16,13 +16,14 @@ typedef enum backend_options {
 } BACKEND_OPTIONS;
 
 typedef enum backend_types {
-    BACKEND_TYPE_UNKNOWN,                   //Invalid type
-    BACKEND_TYPE_GRAPHITE,                  //Send plain text to Graphite
-    BACKEND_TYPE_OPENTSDB_USING_TELNET,     //Send data to OpenTSDB using telnet API
-    BACKEND_TYPE_OPENTSDB_USING_HTTP,       //Send data to OpenTSDB using HTTP API
-    BACKEND_TYPE_JSON,                      //Stores the data using JSON.
-    BACKEND_TYPE_PROMETEUS,                 //The user selected to use Prometheus backend
-    BACKEND_TYPE_KINESIS                    //Send message to AWS Kinesis
+    BACKEND_TYPE_UNKNOWN,                   // Invalid type
+    BACKEND_TYPE_GRAPHITE,                  // Send plain text to Graphite
+    BACKEND_TYPE_OPENTSDB_USING_TELNET,     // Send data to OpenTSDB using telnet API
+    BACKEND_TYPE_OPENTSDB_USING_HTTP,       // Send data to OpenTSDB using HTTP API
+    BACKEND_TYPE_JSON,                      // Stores the data using JSON.
+    BACKEND_TYPE_PROMETEUS,                 // The user selected to use Prometheus backend
+    BACKEND_TYPE_KINESIS,                   // Send message to AWS Kinesis
+    BACKEND_TYPE_MONGODB                    // Send data to MongoDB collection
 } BACKEND_TYPE;
 
 
@@ -56,6 +57,22 @@ extern calculated_number backend_calculate_value_from_stored_data(
 extern size_t backend_name_copy(char *d, const char *s, size_t usable);
 extern int discard_response(BUFFER *b, const char *backend);
 
+static inline char *strip_quotes(char *str) {
+    if(*str == '"' || *str == '\'') {
+        char *s;
+
+        str++;
+
+        s = str;
+        while(*s) s++;
+        if(s != str) s--;
+
+        if(*s == '"' || *s == '\'') *s = '\0';
+    }
+
+    return str;
+}
+
 #endif // BACKENDS_INTERNALS
 
 #include "backends/prometheus/backend_prometheus.h"
@@ -69,6 +86,10 @@ extern int discard_response(BUFFER *b, const char *backend);
 
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
 #include "backends/prometheus/remote_write/remote_write.h"
+#endif
+
+#if HAVE_MONGOC
+#include "backends/mongodb/mongodb.h"
 #endif
 
 #endif /* NETDATA_BACKENDS_H */

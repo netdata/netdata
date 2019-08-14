@@ -227,7 +227,7 @@ checklinks () {
 	while read -r l ; do
 		for word in $l ; do
 			if [[ $word =~ .*\]\(([^\(\) ]*)\).* ]] ; then
-				lnk="${BASH_REMATCH[1]}"
+				lnk=$(echo "${BASH_REMATCH[1]}" | tr -d '<>')
 				if [ -z "$lnk" ] ; then continue ; fi
 				dbg "-$lnk"
 				case "$lnk" in

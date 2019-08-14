@@ -31,7 +31,7 @@ SEND_MESSAGEBIRD="YES"
 # to get the API key, click on 'API' in the sidebar, then 'API Access (REST)' 
 # click 'Add access key' and fill in data (you want a live key to send SMS)
 
-# Without an access key, netdata cannot send Messagebird text messages.
+# Without an access key, Netdata cannot send Messagebird text messages.
 MESSAGEBIRD_ACCESS_KEY="XXXXXXXX"
 MESSAGEBIRD_NUMBER="XXXXXXX"
 DEFAULT_RECIPIENT_MESSAGEBIRD="XXXXXXX"

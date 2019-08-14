@@ -45,11 +45,11 @@ The following will return an SVG badge of the alarm named `NAME`, attached to th
 ## Health Management API
 
 Netdata v1.12 and beyond provides a command API to control health checks and notifications at runtime. The feature is especially useful for maintenance periods, during which you receive meaningless alarms.
-From Netdata v1.16.0 and beyond, the configuration controlled via the API commands is [persisted across netdata restarts](#persistence).
+From Netdata v1.16.0 and beyond, the configuration controlled via the API commands is [persisted across Netdata restarts](#persistence).
 
 Specifically, the API allows you to:
  - Disable health checks completely. Alarm conditions will not be evaluated at all and no entries will be added to the alarm log.
- - Silence alarm notifications. Alarm conditions will be evaluated, the alarms will appear in the log and the netdata UI will show the alarms as active, but no notifications will be sent.
+ - Silence alarm notifications. Alarm conditions will be evaluated, the alarms will appear in the log and the Netdata UI will show the alarms as active, but no notifications will be sent.
  - Disable or Silence specific alarms that match selectors on alarm/template name, chart, context, host and family.
 
 The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://localhost:19999/netdata.conf`:
@@ -65,9 +65,9 @@ You can access the API via GET requests, by adding the bearer token to an `Autho
 curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
 ```
 
-By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in netdata.conf within the [web] section. See [web server access lists](../../server/#access-lists) for more information.
+By default access to the health management API is only allowed from `localhost`. Accessing the API from anything else will return a 403 error with the message `You are not allowed to access this resource.`. You can change permissions by editing the `allow management from` variable in `netdata.conf` within the [web] section. See [web server access lists](../../server/#access-lists) for more information.
 
-The command `RESET` just returns netdata to the default operation, with all health checks and notifications enabled.
+The command `RESET` just returns Netdata to the default operation, with all health checks and notifications enabled.
 If you've configured and entered your token correclty, you should see the plain text response `All health checks and notifications are enabled`.
 
 ### Disable or silence all alarms
@@ -85,7 +85,7 @@ If you want the health checks to be running but to not receive any notifications
 curl "http://myserver/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: Mytoken"
 ```
 
-Alarms may then still be raised and logged in netdata, so you'll be able to see them via the UI.  
+Alarms may then still be raised and logged in Netdata, so you'll be able to see them via the UI.  
 
 Regardless of the option you choose, at the end of your maintenance period you revert to the normal state via the RESET command.
 
@@ -118,7 +118,7 @@ curl "http://myserver/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Auth-
 
 #### Selection criteria
 
-The `selection criteria` are key/value pairs, in the format `key : value`, where value is a netdata [simple pattern](../../../libnetdata/simple_pattern/). This means that you can create very powerful selectors (you will rarely need more than one or two).
+The `selection criteria` are key/value pairs, in the format `key : value`, where value is a Netdata [simple pattern](../../../libnetdata/simple_pattern/). This means that you can create very powerful selectors (you will rarely need more than one or two).
 
 The accepted keys for the `selection criteria` are the following:
 - `alarm`    : The expression provided will match both `alarm` and `template` names.
@@ -149,7 +149,7 @@ http://localhost/api/v1/manage/health?families=cpu1 cpu2
 
 ### List silencers
 
-The command `LIST` was added in netdata v1.16.0 and returns a JSON with the current status of the silencers.
+The command `LIST` was added in Netdata v1.16.0 and returns a JSON with the current status of the silencers.
 
 ```
  curl "http://myserver/api/v1/manage/health?cmd=LIST" -H "X-Auth-Token: Mytoken"
@@ -200,7 +200,7 @@ json
 
 ### Persistence
 
-From netdata v1.16.0 and beyond, the silencers configuration is persisted to disk and loaded when netdata starts.
+From Netdata v1.16.0 and beyond, the silencers configuration is persisted to disk and loaded when Netdata starts.
 The JSON string returned by the [LIST command](#list-silencers) is automatically saved to the `silencers file`, every time a command alters the silencers configuration.
 The file's location is configurable in `netdata.conf`. The default is shown below:
 

@@ -1,10 +1,10 @@
 
 # Adaptive Re-sortable List (ARL)
 
-This library allows netdata to read a series of `name - value` pairs
+This library allows Netdata to read a series of `name - value` pairs
 in the **fastest possible way**.
 
-ARLs are used all over netdata, as they are the most
+ARLs are used all over Netdata, as they are the most
 CPU utilization efficient way to process `/proc` files. They are used to
 process both vertical (csv like) and horizontal (one pair per line) `name - value` pairs.
 
@@ -82,7 +82,7 @@ test|code|string comparison|number parsing|duration
 
 Compared to unoptimized code (test No 1: 4.6sec):
  
- - before ARL netdata was using test No **7** with hashing and a custom `str2ull()` to achieve 602ms.
+ - before ARL Netdata was using test No **7** with hashing and a custom `str2ull()` to achieve 602ms.
  - the current ARL implementation is test No **9** that needs only 157ms (29 times faster vs unoptimized code, about 4 times faster vs optimized code).
 
 [Check the source code of this test](../../tests/profile/benchmark-value-pairs.c).

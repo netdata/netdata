@@ -83,6 +83,12 @@ AC_ARG_ENABLE(
     [enable_backend_prometheus_remote_write="detect"]
 )
 AC_ARG_ENABLE(
+    [backend-mongodb],
+    [AS_HELP_STRING([--enable-backend-mongodb], [enable mongodb backend @<:@default autodetect@:>@])],
+    ,
+    [enable_backend_mongodb="detect"]
+)
+AC_ARG_ENABLE(
     [pedantic],
     [AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings @<:@default disabled@:>@])],
     ,
@@ -965,6 +971,33 @@ AM_CONDITIONAL([ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE], [test "${enable_backend
 
 
 # -----------------------------------------------------------------------------
+# MongoDB backend - libmongoc
+
+PKG_CHECK_MODULES(
+    [LIBMONGOC],
+    [libmongoc-1.0 >= 1.7],
+    [have_libmongoc=yes],
+    [have_libmongoc=no]
+)
+
+test "${enable_backend_mongodb}" = "yes" -a "${have_libmongoc}" != "yes" && \
+    AC_MSG_ERROR([libmongoc required but not found. Try installing `mongoc`.])
+
+AC_MSG_CHECKING([if mongodb backend should be enabled])
+if test "${enable_backend_mongodb}" != "no" -a "${have_libmongoc}" = "yes"; then
+    enable_backend_mongodb="yes"
+    AC_DEFINE([HAVE_MONGOC], [1], [libmongoc usability])
+    OPTIONAL_MONGOC_CFLAGS="${LIBMONGOC_CFLAGS}"
+    OPTIONAL_MONGOC_LIBS="${LIBMONGOC_LIBS}"
+else
+    enable_backend_mongodb="no"
+fi
+
+AC_MSG_RESULT([${enable_backend_mongodb}])
+AM_CONDITIONAL([ENABLE_BACKEND_MONGODB], [test "${enable_backend_mongodb}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # check for setns() - cgroup-network
 
 AC_CHECK_FUNC([setns])
@@ -988,7 +1021,7 @@ if test "${enable_lto}" != "no"; then
 fi
 if test "${have_lto}" = "yes"; then
     oCFLAGS="${CFLAGS}"
-    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS}"
+    CFLAGS="${CFLAGS} -flto"
     ac_cv_c_lto_cross_compile="${enable_lto}"
     test "${ac_cv_c_lto_cross_compile}" != "yes" && ac_cv_c_lto_cross_compile="no"
     AC_C_LTO
@@ -1037,6 +1070,10 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
+CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+    ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS}"
+
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
 CPPFLAGS="\
@@ -1076,6 +1113,8 @@ AC_SUBST([OPTIONAL_KINESIS_CFLAGS])
 AC_SUBST([OPTIONAL_KINESIS_LIBS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
+AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
+AC_SUBST([OPTIONAL_MONGOC_LIBS])
 
 
 AC_CONFIG_FILES([
@@ -1088,6 +1127,7 @@ AC_CONFIG_FILES([
     backends/prometheus/Makefile
     backends/prometheus/remote_write/Makefile
     backends/aws_kinesis/Makefile
+    backends/mongodb/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile

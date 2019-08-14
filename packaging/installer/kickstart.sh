@@ -304,7 +304,7 @@ if [ "${INTERACTIVE}" = "0" ]; then
 fi
 
 TMPDIR=$(create_tmp_directory)
-cd ${TMPDIR} || :
+cd "${TMPDIR}"
 
 dependencies
 
@@ -328,7 +328,9 @@ cd netdata-* || fatal "Cannot cd to netdata source tree"
 if [ -x netdata-installer.sh ]; then
 	progress "Installing netdata..."
 	run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || fatal "netdata-installer.sh exited with error"
-	rm -rf "${TMPDIR}" >/dev/null 2>&1
+	if [ -d "${TMPDIR}" ] && [ ! "${TMPDIR}" = "/" ]; then
+		run ${sudo} rm -rf "${TMPDIR}" >/dev/null 2>&1
+	fi
 else
 	fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${TMPDIR}"
 fi

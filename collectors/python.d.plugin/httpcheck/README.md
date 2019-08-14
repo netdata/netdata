@@ -33,7 +33,7 @@ server:
 ### notes
 
  * The status chart is primarily intended for alarms, badges or for access via API.
- * A system/service/firewall might block netdata's access if a portscan or
+ * A system/service/firewall might block Netdata's access if a portscan or
    similar is detected.
  * This plugin is meant for simple use cases. Currently, the accuracy of the
    response time is low and should be used as reference only.

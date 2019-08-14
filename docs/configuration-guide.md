@@ -59,7 +59,7 @@ Entire plugins can be turned off from the [netdata.conf [plugins]](../daemon/con
 
 ##### Show charts with zero metrics
 
-By default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
+By default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
 
 ### Modify alarms and notifications
 
@@ -92,11 +92,11 @@ You have several options under the [netdata.conf [web]](../web/server/#access-li
 
 ##### Stop sending info to registry.my-netdata.io
 
-You will need to configure the [registry] section in netdata.conf. First read the [registry documentation](../registry/). In it, are instructions on how to [run your own registry](../registry/#run-your-own-registry).
+You will need to configure the [registry] section in `netdata.conf`. First read the [registry documentation](../registry/). In it, are instructions on how to [run your own registry](../registry/#run-your-own-registry).
 
 ##### Change the IP address/port Netdata listens to
 
-The settings are under netdata.conf [web]. Look at the [web server documentation](../web/server/#binding-netdata-to-multiple-ports) for more info.
+The settings are under `netdata.conf` [web]. Look at the [web server documentation](../web/server/#binding-netdata-to-multiple-ports) for more info.
 
 ### System resource usage
 
@@ -110,7 +110,7 @@ The page on [Netdata performance](Performance.md) has an excellent guide on how 
 
 ##### Prevent Netdata from getting immediately killed when my server runs out of memory
 
-You can change the Netdata [OOM score](../daemon/#oom-score) in netdata.conf [global]. 
+You can change the Netdata [OOM score](../daemon/#oom-score) in `netdata.conf` [global]. 
 
 ### Other
 

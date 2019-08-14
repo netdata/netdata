@@ -6,7 +6,7 @@
 
 1. install `libmnl-dev` and `libnetfilter_acct-dev` using the package manager of your system.
 
-2. re-install netdata from source. The installer will detect that the required libraries are now available and will also build netdata.plugin.
+2. re-install Netdata from source. The installer will detect that the required libraries are now available and will also build `netdata.plugin`.
 
 Keep in mind that NFACCT requires root access, so the plugin is setuid to root.
 
@@ -27,7 +27,7 @@ Netfilter accounting:
 
 ## Configuration
 
-If you need to disable NFACCT for netdata, edit /etc/netdata/netdata.conf and set:
+If you need to disable NFACCT for Netdata, edit /etc/netdata/netdata.conf and set:
 
 ```
 [plugins]

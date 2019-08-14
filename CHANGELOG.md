@@ -8,11 +8,14 @@
 
 **Merged pull requests:**
 
+- Accept \<\> around links in markdown [\#6646](https://github.com/netdata/netdata/pull/6646) ([cakrit](https://github.com/cakrit))
+- netdata/installer: Fix error running kickstart as a non-privileged user [\#6642](https://github.com/netdata/netdata/pull/6642) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - fix spigotmc plugin bugs [\#6635](https://github.com/netdata/netdata/pull/6635) ([Cat7373](https://github.com/Cat7373))
 - Fix 'None' in left nav [\#6632](https://github.com/netdata/netdata/pull/6632) ([joelhans](https://github.com/joelhans))
 - Update terms of use for U.S. legal reasons [\#6631](https://github.com/netdata/netdata/pull/6631) ([cakrit](https://github.com/cakrit))
 - Fix a segmentation fault in backends [\#6627](https://github.com/netdata/netdata/pull/6627) ([vlvkobal](https://github.com/vlvkobal))
 - .travis.yml: Remove 'sudo: true' as it is now deprecated [\#6624](https://github.com/netdata/netdata/pull/6624) ([knatsakis](https://github.com/knatsakis))
+-  Change "netdata" to "Netdata" in all docs [\#6621](https://github.com/netdata/netdata/pull/6621) ([joelhans](https://github.com/joelhans))
 - netdata: Add cosmix as codeowner, wherever cakrit is [\#6618](https://github.com/netdata/netdata/pull/6618) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mysql: do not remove `slave\_status` from queries in module [\#6617](https://github.com/netdata/netdata/pull/6617) ([ilyam8](https://github.com/ilyam8))
 - Better system OS detection for RHEL6 and Mac OS X [\#6612](https://github.com/netdata/netdata/pull/6612) ([dex4er](https://github.com/dex4er))

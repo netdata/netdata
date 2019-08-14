@@ -4,7 +4,7 @@
 
 With Telegram, you can send messages, photos, videos and files of any type (doc, zip, mp3, etc), as well as create groups for up to 30,000 people or channels for broadcasting to unlimited audiences. You can write to your phone contacts and find people by their usernames. As a result, Telegram is like SMS and email combined — and can take care of all your personal or business messaging needs.
 
-netdata will send warning messages without vibration.
+Netdata will send warning messages without vibration.
 
 You need:
 

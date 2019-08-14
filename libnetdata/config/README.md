@@ -1,6 +1,6 @@
-# netdata ini config files
+# Netdata ini config files
 
-Configuration files `netdata.conf` and `stream.conf` are netdata ini files.
+Configuration files `netdata.conf` and `stream.conf` are Netdata ini files.
 
 ## Motivation
 
@@ -17,7 +17,7 @@ developers and the users.
 
 So, we did this:
 
-1. No configuration is required to run netdata
+1. No configuration is required to run Netdata
 2. There are plenty of options to tweak
 3. There is minimal documentation (or no at all)
 
@@ -35,9 +35,9 @@ file, the default is used. The lookup is made using B-Trees and hashes
 settings can be `my super duper setting that once set to yes, will turn the world upside down = no`
 - so goodbye to most of the documentation involved.
 
-Next, netdata can generate a valid configuration for the user to edit.
+Next, Netdata can generate a valid configuration for the user to edit.
 No need to remember anything or copy and paste settings. Just get the
-configuration from the server (`/netdata.conf` on your netdata server),
+configuration from the server (`/netdata.conf` on your Netdata server),
 edit it and save it.
 
 Last, what about options you believe you have set, but you misspelled?

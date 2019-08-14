@@ -1,18 +1,18 @@
 # shell exporter
 
-Shell scripts can now query netdata:
+Shell scripts can now query Netdata:
 
 ```sh
 eval "$(curl -s 'http://localhost:19999/api/v1/allmetrics')"
 ```
 
-after this command, all the netdata metrics are exposed to shell. Check:
+after this command, all the Netdata metrics are exposed to shell. Check:
 
 ```sh
 # source the metrics
 eval "$(curl -s 'http://localhost:19999/api/v1/allmetrics')"
 
-# let's see if there are variables exposed by netdata for system.cpu
+# let's see if there are variables exposed by Netdata for system.cpu
 set | grep "^NETDATA_SYSTEM_CPU"
 
 NETDATA_SYSTEM_CPU_GUEST=0
@@ -50,7 +50,7 @@ user  0m0,000s
 sys   0m0,007s
 
 # it is...
-# 0.07 seconds for curl to be loaded, connect to netdata and fetch the response back...
+# 0.07 seconds for curl to be loaded, connect to Netdata and fetch the response back...
 ```
 
 The `_VISIBLETOTAL` variable sums up all the dimensions of each chart.

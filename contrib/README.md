@@ -1,4 +1,4 @@
-# netdata contrib
+# Netdata contrib
 
 ## Building .deb packages
 
@@ -7,8 +7,8 @@ Debian package.  It has been tested on Debian Jessie and Wheezy,
 but should work, possibly with minor changes, if you have other
 dpkg-based systems such as Ubuntu or Mint.
 
-To build netdata for a Debian Jessie system, the debian directory
-has to be available in the root of the netdata source. The easiest
+To build Netdata for a Debian Jessie system, the debian directory
+has to be available in the root of the Netdata source. The easiest
 way to do this is with a symlink:
 
     ~/netdata$ ln -s contrib/debian
@@ -50,9 +50,9 @@ updates first.
 
 Then proceed as the main instructions above.
 
-### Reinstalling netdata
+### Reinstalling Netdata
 
-The recommended way to upgrade netdata packages built from this
+The recommended way to upgrade Netdata packages built from this
 source is to remove the current package from your system, then
 install the new package. Upgrading on wheezy is known to not
 work cleanly; Jessie may behave as expected.
