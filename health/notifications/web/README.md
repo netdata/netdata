@@ -9,7 +9,7 @@ Such web notifications look like this:
 
 The netdata GUI has a link for the alarms raised in the system on top menu, when the user access it, (s)he will have the following options:
 
-- Active : The active alarms of the Netdata. This option does not include the alarms that were not raised.
+- Active : The active alarms of Netdata. This option does not include the alarms that were not raised.
 - All : In this option the user will have alarms that are monitored by netdata and did not raise an alarm and we will also have the alarms raised.
 - Log : This option shows the last 1000 alarms raised by the host.
 
