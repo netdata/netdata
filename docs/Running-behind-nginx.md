@@ -8,13 +8,13 @@ The software is known for its low impact on memory resources, high scalability, 
 
 ## Why Nginx
 
-- By default, Nginx is fast and lightweight out of the box.
+-   By default, Nginx is fast and lightweight out of the box.
 
-- Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
+-   Nginx is used and useful in cases when you want to access different instances of Netdata from a single server.
 
-- Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
+-   Password-protect access to Netdata, until distributed authentication is implemented via the Netdata cloud Sign In mechanism.
 
-- A proxy was necessary to encrypt the communication to Netdata, until v1.16.0, which provided TLS (HTTPS) support.
+-   A proxy was necessary to encrypt the communication to Netdata, until v1.16.0, which provided TLS (HTTPS) support.
 
 ## Nginx configuration file
 
@@ -28,9 +28,9 @@ You can edit the Nginx configuration file with Nano, Vim or any other text edito
 
 After making changes to the configuration files:
 
-- Test Nginx configuration with `nginx -t`.
+-   Test Nginx configuration with `nginx -t`.
 
-- Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
+-   Restart Nginx to effect the change with `/etc/init.d/nginx restart` or `service nginx restart`.
 
 ## Ways to access Netdata via Nginx
 
@@ -38,7 +38,7 @@ After making changes to the configuration files:
 
 With this method instead of `SERVER_IP_ADDRESS:19999`, the Netdata dashboard can be accessed via a human-readable URL such as `netdata.example.com` used in the configuration below. 
 
-```
+```conf
 upstream backend {
     # the Netdata server
     server 127.0.0.1:19999;
@@ -64,12 +64,13 @@ server {
     }
 }
 ```
+
 ### As a subfolder to an existing virtual host
 
 This method is recommended when Netdata is to be served from a subfolder (or directory). 
 In this case, the virtual host `netdata.example.com` already exists and Netdata has to be accessed via `netdata.example.com/netdata/`.
 
-```
+```conf
 upstream netdata {
     server 127.0.0.1:19999;
     keepalive 64;
@@ -109,7 +110,7 @@ server {
 
 This is the recommended configuration when one Nginx will be used to manage multiple Netdata servers via subfolders. 
 
-```
+```conf
 upstream backend-server1 {
     server 10.1.1.103:19999;
     keepalive 64;
@@ -152,14 +153,14 @@ Of course you can add as many backend servers as you like.
 
 Using the above, you access Netdata on the backend servers, like this:
 
-- `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
-- `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
+-   `http://netdata.example.com/netdata/server1/` to reach `backend-server1`
+-   `http://netdata.example.com/netdata/server2/` to reach `backend-server2`
 
 ### Encrypt the communication between Nginx and Netdata
 
 In case Netdata's web server has been [configured to use TLS](../web/server/#enabling-tls-support), it is necessary to specify inside the Nginx configuration that the final destination is using TLS. To do this, please, append the following parameters in your `nginx.conf`
 
-```
+```conf
 proxy_set_header X-Forwarded-Proto https;
 proxy_pass https://localhost:19999;
 ```
@@ -174,13 +175,13 @@ Create an authentication file to enable basic authentication via Nginx, this sec
 
 If you don't have an authentication file, you can use the following command:
 
-```
+```sh
 printf "yourusername:$(openssl passwd -apr1)" > /etc/nginx/passwords
 ```
 
 And then enable the authentication inside your server directive:
 
-```
+```conf
 server {
     # ...
     auth_basic "Protected";
@@ -206,11 +207,12 @@ You can also use a unix domain socket. This will also provide a faster route bet
 [web]
     bind to = unix:/tmp/netdata.sock
 ```
-_note: Netdata v1.8+ support unix domain sockets_
+
+*note: Netdata v1.8+ support unix domain sockets*
 
 At the Nginx side, use something like this to use the same unix domain socket:
 
-```
+```conf
 upstream backend {
     server unix:/tmp/netdata.sock;
     keepalive 64;
@@ -227,7 +229,7 @@ If your Nginx server is not on localhost, you can set:
     allow connections from = IP_OF_NGINX_SERVER
 ```
 
-_note: Netdata v1.9+ support `allow connections from`_
+*note: Netdata v1.9+ support `allow connections from`*
 
 `allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
@@ -251,5 +253,4 @@ If you get an 502 Bad Gateway error you might check your Nginx error log:
 
 If you see something like the above, chances are high that SELinux prevents nginx from connecting to the backend server. To fix that, just use this policy: `setsebool -P httpd_can_network_connect true`.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-nginx&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-nginx&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

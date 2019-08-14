@@ -4,16 +4,16 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
 
 **Table of Contents**
 
-1. [Your data are safe with Netdata](#your-data-are-safe-with-netdata)
-2. [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
-3. [Netdata is read-only](#netdata-is-read-only)
-4. [Netdata viewers authentication](#netdata-viewers-authentication)
-	- [Why Netdata should be protected](#why-netdata-should-be-protected)
-	- [Protect Netdata from the internet](#protect-netdata-from-the-internet)
-		- [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
-		- [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
-		- [Other methods](#other-methods)
-5. [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
+1.  [Your data are safe with Netdata](#your-data-are-safe-with-netdata)
+2.  [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
+3.  [Netdata is read-only](#netdata-is-read-only)
+4.  [Netdata viewers authentication](#netdata-viewers-authentication)
+    -   [Why Netdata should be protected](#why-netdata-should-be-protected)
+    -   [Protect Netdata from the internet](#protect-netdata-from-the-internet)
+        		\- [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
+        		\- [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
+        		\- [Other methods](#other-methods)
+5.  [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
 
 ## Your data are safe with Netdata
 
@@ -86,7 +86,6 @@ In Netdata v1.9+ there is also access list support, like this:
 	allow connections from = localhost 10.* 192.168.*
 ```
 
-
 #### Use an authenticating web server in proxy mode
 
 Use one web server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Instructions are provided on how to set the proxy configuration to have Netdata run behind [nginx](Running-behind-nginx.md), [Apache](Running-behind-apache.md), [lighthttpd](Running-behind-lighttpd.md#netdata-via-lighttpd-v14x) and [Caddy](Running-behind-caddy.md#netdata-via-caddy).
@@ -97,7 +96,8 @@ To use this method, you should firewall protect all your Netdata servers, so tha
 PROXY_IP="1.2.3.4"
 iptables -t filter -I INPUT -p tcp --dport 19999 \! -s ${PROXY_IP} -m conntrack --ctstate NEW -j DROP
 ```
-_commands to allow direct access to Netdata from a web server proxy_
+
+*commands to allow direct access to Netdata from a web server proxy*
 
 The above will prevent anyone except your web server to access a Netdata dashboard running on the host.
 
@@ -135,6 +135,7 @@ iptables -t filter -D INPUT -p tcp --dport ${NETDATA_PORT} -m conntrack --ctstat
 # to send all new Netdata connections to our filtering chain
 iptables -t filter -I INPUT -p tcp --dport ${NETDATA_PORT} -m conntrack --ctstate NEW -j netdata
 ```
+
 _script to allow access to Netdata only from a number of hosts_
 
 You can run the above any number of times. Each time it runs it refreshes the list of allowed hosts.
@@ -143,19 +144,20 @@ You can run the above any number of times. Each time it runs it refreshes the li
 
 Of course, there are many more methods you could use to protect Netdata:
 
-- bind Netdata to localhost and use `ssh -L 19998:127.0.0.1:19999 remote.netdata.ip` to forward connections of local port 19998 to remote port 19999. This way you can ssh to a Netdata server and then use `http://127.0.0.1:19998/` on your computer to access the remote Netdata dashboard.
+-   bind Netdata to localhost and use `ssh -L 19998:127.0.0.1:19999 remote.netdata.ip` to forward connections of local port 19998 to remote port 19999. This way you can ssh to a Netdata server and then use `http://127.0.0.1:19998/` on your computer to access the remote Netdata dashboard.
 
-- If you are always under a static IP, you can use the script given above to allow direct access to your Netdata servers without authentication, from all your static IPs.
+-   If you are always under a static IP, you can use the script given above to allow direct access to your Netdata servers without authentication, from all your static IPs.
 
-- install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a master Netdata server, which will be protected with authentication using an nginx server running locally at the master Netdata server. This requires more resources (you will need a bigger master Netdata server), but does not require any firewall changes, since all the slave Netdata servers will not be listening for incoming connections.
+-   install all your Netdata in **headless data collector** mode, forwarding all metrics in real-time to a master Netdata server, which will be protected with authentication using an nginx server running locally at the master Netdata server. This requires more resources (you will need a bigger master Netdata server), but does not require any firewall changes, since all the slave Netdata servers will not be listening for incoming connections.
 
 ## Anonymous Statistics
 
 ### Registry or how to not send any information to a third party server
 
 The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit the following information to a third party server: 
-- The url where you open the web-ui in the browser (via http request referer)
-- The hostnames of the Netdata servers
+
+-   The url where you open the web-ui in the browser (via http request referer)
+-   The hostnames of the Netdata servers
 
 If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](../registry/#run-your-own-registry).
 
@@ -163,21 +165,21 @@ If sending this information to the central Netdata registry violates your securi
 
 Starting with v1.12 Netdata also collects [anonymous statistics](anonymous-statistics.md) on certain events for: 
 
-1. **Quality assurance**, to help us understand if Netdata behaves as expected and help us identify repeating issues for certain distributions or environments.
+1.  **Quality assurance**, to help us understand if Netdata behaves as expected and help us identify repeating issues for certain distributions or environments.
 
-2. **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extent our development decisions influence the community.
+2.  **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extent our development decisions influence the community.
 
 To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). 
 
 ## Netdata directories
 
-path|owner|permissions| Netdata |comments|
-:---|:----|:----------|:--------|:-------|
-`/etc/netdata`|user&nbsp;`root`<br/>group&nbsp;`netdata`|dirs `0755`<br/>files `0640`|reads|**Netdata config files**<br/>may contain sensitive information, so group `netdata` is allowed to read them.
-`/usr/libexec/netdata`|user&nbsp;`root`<br/>group&nbsp;`root`|executable by anyone<br/>dirs `0755`<br/>files `0644` or `0755`|executes|**Netdata plugins**<br/>permissions depend on the file - not all of them should have the executable flag.<br/>there are a few plugins that run with escalated privileges (Linux capabilities or `setuid`) - these plugins should be executable only by group `netdata`.
-`/usr/share/netdata`|user&nbsp;`root`<br/>group&nbsp;`netdata`|readable by anyone<br/>dirs `0755`<br/>files `0644`|reads and sends over the network|**Netdata web static files**<br/>these files are sent over the network to anyone that has access to the Netdata web server. Netdata checks the ownership of these files (using settings at the `[web]` section of `netdata.conf`) and refuses to serve them if they are not properly owned. Symbolic links are not supported. Netdata also refuses to serve URLs with `..` in their name.
-`/var/cache/netdata`|user&nbsp;`netdata`<br/>group&nbsp;`netdata`|dirs `0750`<br/>files `0660`|reads, writes, creates, deletes|**Netdata ephemeral database files**<br/>Netdata stores its ephemeral real-time database here.
-`/var/lib/netdata`|user&nbsp;`netdata`<br/>group&nbsp;`netdata`|dirs `0750`<br/>files `0660`|reads, writes, creates, deletes|**Netdata permanent database files**<br/>Netdata stores here the registry data, health alarm log db, etc.
-`/var/log/netdata`|user&nbsp;`netdata`<br/>group&nbsp;`root`|dirs `0755`<br/>files `0644`|writes, creates|**Netdata log files**<br/>all the Netdata applications, logs their errors or other informational messages to files in this directory. These files should be log rotated.
+| path|owner|permissions|Netdata|comments|
+|:---|:----|:----------|:------|:-------|
+| `/etc/netdata`|user `root`<br/>group `netdata`|dirs `0755`<br/>files `0640`|reads|**Netdata config files**<br/>may contain sensitive information, so group `netdata` is allowed to read them.|
+| `/usr/libexec/netdata`|user `root`<br/>group `root`|executable by anyone<br/>dirs `0755`<br/>files `0644` or `0755`|executes|**Netdata plugins**<br/>permissions depend on the file - not all of them should have the executable flag.<br/>there are a few plugins that run with escalated privileges (Linux capabilities or `setuid`) - these plugins should be executable only by group `netdata`.|
+| `/usr/share/netdata`|user `root`<br/>group `netdata`|readable by anyone<br/>dirs `0755`<br/>files `0644`|reads and sends over the network|**Netdata web static files**<br/>these files are sent over the network to anyone that has access to the Netdata web server. Netdata checks the ownership of these files (using settings at the `[web]` section of `netdata.conf`) and refuses to serve them if they are not properly owned. Symbolic links are not supported. Netdata also refuses to serve URLs with `..` in their name.|
+| `/var/cache/netdata`|user `netdata`<br/>group `netdata`|dirs `0750`<br/>files `0660`|reads, writes, creates, deletes|**Netdata ephemeral database files**<br/>Netdata stores its ephemeral real-time database here.|
+| `/var/lib/netdata`|user `netdata`<br/>group `netdata`|dirs `0750`<br/>files `0660`|reads, writes, creates, deletes|**Netdata permanent database files**<br/>Netdata stores here the registry data, health alarm log db, etc.|
+| `/var/log/netdata`|user `netdata`<br/>group `root`|dirs `0755`<br/>files `0644`|writes, creates|**Netdata log files**<br/>all the Netdata applications, logs their errors or other informational messages to files in this directory. These files should be log rotated.|
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fnetdata-security&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fnetdata-security&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
