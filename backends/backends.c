@@ -267,7 +267,7 @@ static struct objects_to_clean {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl *opentsdb_ssl;
 #endif
-} objects_to_clean;
+};
 
 static void backends_main_cleanup(void *objects_to_clean) {
     struct objects_to_clean *objects = (struct objects_to_clean *)objects_to_clean;
@@ -543,6 +543,8 @@ BACKEND_TYPE backend_select_type(const char *type) {
  * @return It always return NULL.
  */
 void *backends_main(void *ptr) {
+    struct objects_to_clean objects_to_clean;
+
     netdata_thread_cleanup_push(backends_main_cleanup, (void *)&objects_to_clean);
 
     int default_port = 0;
@@ -1328,7 +1330,9 @@ void *backends_main(void *ptr) {
         // ------------------------------------------------------------------------
         // update the monitoring charts
 
+#if HAVE_MONGOC
 update_charts:
+#endif
         if(likely(chart_ops->counter_done)) rrdset_next(chart_ops);
         rrddim_set(chart_ops, "read",         chart_receptions);
         rrddim_set(chart_ops, "write",        chart_transmission_successes);
