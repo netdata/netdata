@@ -57,11 +57,12 @@ get_the_logs() {
 
 process_data() {
   SEC=120
-  netdata -c "$CONFFILE"
+  netdata -c "$CONFFILE" -D &
+  NETDATAPID=$!
   echo -e "${NOCOLOR}Sleeping during $SEC seconds to create alarm entries"
   sleep $SEC
   get_the_logs "$1" "$2" "$3"
-  killall netdata
+  kill $NETDATAPID
 }
 
 mkdir "$OUTDIR"
