@@ -18,14 +18,14 @@ journalfile-1-0000000002.njf
 datafile-1-0000000003.ndf
 journalfile-1-0000000003.njf
 ...
-``` 
+```
 
 They are located under their host's cache directory in the directory `./dbengine`
 (e.g. for localhost the default location is `/var/cache/netdata/dbengine/*`). The higher
 numbered filenames contain more recent metric data. The user can safely delete some pairs
 of files when Netdata is stopped to manually free up some space.
 
-*Users should* **back up** *their `./dbengine` folders if they consider this data to be important.*
+_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._
 
 ## Configuration
 
@@ -94,14 +94,14 @@ is much larger than the available memory.
 There are explicit memory requirements **per** DB engine **instance**, meaning **per** Netdata 
 **node** (e.g. localhost and streaming recipient nodes):
 
-- `page cache size` must be at least `#dimensions-being-collected x 4096 x 2` bytes.
+-   `page cache size` must be at least `#dimensions-being-collected x 4096 x 2` bytes.
 
-- an additional `#pages-on-disk x 4096 x 0.03` bytes of RAM are allocated for metadata.
+-   an additional `#pages-on-disk x 4096 x 0.03` bytes of RAM are allocated for metadata.
 
-    - roughly speaking this is 3% of the uncompressed disk space taken by the DB files.
+    -   roughly speaking this is 3% of the uncompressed disk space taken by the DB files.
 
-    - for very highly compressible data (compression ratio > 90%) this RAM overhead
-      is comparable to the disk space footprint.
+    -   for very highly compressible data (compression ratio > 90%) this RAM overhead
+        is comparable to the disk space footprint.
 
 An important observation is that RAM usage depends on both the `page cache size` and the 
 `dbengine disk space` options. 
@@ -128,18 +128,24 @@ LimitNOFILE=65536
 ```
 
 For other types of services one can add the line:
+
 ```
 ulimit -n 65536
 ```
+
 at the beginning of the service file. Alternatively you can change the system-wide limits of the kernel by changing `/etc/sysctl.conf`. For linux that would be:
+
 ```
 fs.file-max = 65536
 ```
+
 In FreeBSD and OS X you change the lines like this:
+
 ```
 kern.maxfilesperproc=65536
 kern.maxfiles=65536
 ```
+
 You can apply the settings by running `sysctl -p` or by rebooting.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdatabase%2Fengine%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdatabase%2Fengine%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
