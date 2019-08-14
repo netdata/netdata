@@ -17,7 +17,7 @@ VERSION="$1"
 declare -A ARCH_MAP
 ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
-ARCHS="${!ARCH_MAP[@]}"
+[ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[@]}" # Use default ARCHS unless ARCHS are externally provided
 
 if [ -z ${REPOSITORY} ]; then
 	REPOSITORY="${TRAVIS_REPO_SLUG}"

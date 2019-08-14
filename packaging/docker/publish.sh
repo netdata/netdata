@@ -19,7 +19,7 @@ VERSION="$1"
 declare -A ARCH_MAP
 ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
-ARCHS="${!ARCH_MAP[@]}"
+[ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[@]}" # Use default ARCHS unless ARCHS are externally provided
 DOCKER_CMD="docker --config ${WORKDIR}"
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
@@ -87,20 +87,19 @@ echo "Waiting for images publishing to complete"
 wait
 
 # Recreate docker manifest list
+echo "Getting tag list for version '${VERSION}'.."
+TAGS=($(curl -s https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/tags/ | jq -r '.results[]["name"]' | grep "^${VERSION}-"))
+
 echo "Creating manifest list.."
-$DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" \
-                                    "${MANIFEST_LIST}-i386" \
-                                    "${MANIFEST_LIST}-armhf" \
-                                    "${MANIFEST_LIST}-aarch64" \
-                                    "${MANIFEST_LIST}-amd64"
+$DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" "${TAGS[@]/#/${REPOSITORY}:}"
 
 # Annotate manifest with CPU architecture information
 
 echo "Executing manifest annotate.."
-for ARCH in ${ARCHS[@]}; do
-     TAG="${MANIFEST_LIST}-${ARCH}"
-     echo "Annotating manifest for $ARCH, with TAG: ${TAG} (Manifest list: ${MANIFEST_LIST})"
-     $DOCKER_CMD manifest annotate "${MANIFEST_LIST}" "${TAG}" --os linux --arch "${ARCH_MAP[$ARCH]}"
+for TAG in "${TAGS[@]}"; do
+     ARCH="${TAG#${VERSION}-}"
+     echo "Annotating manifest for $ARCH, with TAG: ${REPOSITORY}:${TAG} (Manifest list: ${MANIFEST_LIST})"
+     $DOCKER_CMD manifest annotate "${MANIFEST_LIST}" "${REPOSITORY}:${TAG}" --os linux --arch "${ARCH_MAP[$ARCH]}"
 done
 
 # Push manifest to docker hub
