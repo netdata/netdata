@@ -1,6 +1,7 @@
 # Netdata, Prometheus, Grafana stack
 
 ## Intro
+
 In this article I will walk you through the basics of getting Netdata,
 Prometheus and Grafana all working together and monitoring your application
 servers. This article will be using docker on your local workstation. We will be
@@ -11,6 +12,7 @@ without cloud accounts or access to VMs can try this out and for it’s speed of
 deployment.
 
 ## Why Netdata, Prometheus, and Grafana
+
 Some time ago I was introduced to Netdata by a coworker. We were attempting to
 troubleshoot python code which seemed to be bottlenecked. I was instantly
 impressed by the amount of metrics Netdata exposes to you. I quickly added
@@ -40,6 +42,7 @@ together to create a modern monitoring stack. This stack will offer you
 visibility into your application and systems performance.
 
 ## Getting Started - Netdata
+
 To begin let’s create our container which we will install Netdata on. We need
 to run a container, forward the necessary port that Netdata listens on, and
 attach a tty so we can interact with the bash shell on the container. But
@@ -77,14 +80,14 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait
 ```
 
 After the install completes you should be able to hit the Netdata dashboard at
-http://localhost:19999/ (replace localhost if you’re doing this on a VM or have
+<http://localhost:19999/> (replace localhost if you’re doing this on a VM or have
 the docker container hosted on a machine not on your local system). If this is
 your first time using Netdata I suggest you take a look around. The amount of
 time I’ve spent digging through /proc and calculating my own metrics has been
 greatly reduced by this tool. Take it all in.
 
 Next I want to draw your attention to a particular endpoint. Navigate to
-http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes In your
+<http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes> In your
 browser. This is the endpoint which publishes all the metrics in a format which
 Prometheus understands. Let’s take a look at one of these metrics.
 `netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="system"}
@@ -101,6 +104,7 @@ observing is “system”. You can begin to draw links between the charts in Net
 to the prometheus metrics format in this manner.
 
 ## Prometheus
+
 We will be installing prometheus in a container for purpose of demonstration.
 While prometheus does have an official container I would like to walk through
 the install process and setup on a fresh container. This will allow anyone
@@ -113,7 +117,7 @@ drop you into a shell once again. Once there quickly install your favorite
 editor as we will be editing files later in this tutorial. `yum install vim -y`
 
 Prometheus provides a tarball of their latest stable versions here:
-https://prometheus.io/download/. Let’s download the latest version and install
+<https://prometheus.io/download/>. Let’s download the latest version and install
 into your container.
 
 ```
@@ -141,9 +145,9 @@ INFO[0000] Starting target manager... source="targetmanager.go:63"
 INFO[0000] Listening on :9090 source="web.go:259"
 ```
 
-Now attempt to go to http://localhost:9090/. You should be presented with the
+Now attempt to go to <http://localhost:9090/>. You should be presented with the
 prometheus homepage. This is a good point to talk about Prometheus’s data model
-which can be viewed here: https://prometheus.io/docs/concepts/data_model/  As
+which can be viewed here: <https://prometheus.io/docs/concepts/data_model/>  As
 explained we have two key elements in Prometheus metrics. We have the ‘metric’
 and its ‘labels’. Labels allow for granularity between metrics. Let’s use our
 previous example to further explain.
@@ -162,7 +166,7 @@ Let’s move our attention to Prometheus’s configuration. Prometheus gets it
 config from the file located (in our example) at
 `/opt/prometheus/prometheus.yml`. I won’t spend an extensive amount of time
 going over the configuration values documented here:
-https://prometheus.io/docs/operating/configuration/. We will be adding a new
+<https://prometheus.io/docs/operating/configuration/>. We will be adding a new
 “job” under the “scrape_configs”. Let’s make the “scrape_configs” section look
 like this (we can use the dns name Netdata due to the custom user-defined
 network we created in docker beforehand).
@@ -189,9 +193,9 @@ scrape_configs:
 ```
 
 Let’s start prometheus once again by running `/opt/prometheus/prometheus`. If we
-now navigate to prometheus at ‘http://localhost:9090/targets’ we should see our
+now navigate to prometheus at ‘<http://localhost:9090/targets’> we should see our
 target being successfully scraped. If we now go back to the Prometheus’s
-homepage and begin to type ‘netdata_’  Prometheus should auto complete metrics
+homepage and begin to type ‘netdata\_’  Prometheus should auto complete metrics
 it is now scraping.
 
 ![](https://github.com/ldelossa/NetdataTutorial/raw/master/Screen%20Shot%202017-07-28%20at%205.13.43%20PM.png)
@@ -206,7 +210,7 @@ the following:
 
 Our NetData cpu graph should be showing some activity. Let’s represent this in
 Prometheus. In order to do this let’s keep our metrics page open for reference:
-http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes  We are
+<http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes>  We are
 setting out to graph the data in the CPU chart so let’s search for “system.cpu”
 in the metrics page above. We come across a section of metrics with the first
 comments  `# COMMENT homogeneous chart "system.cpu", context "system.cpu", family
@@ -247,9 +251,9 @@ this point to read [this page](../backends/prometheus/#using-netdata-with-promet
 The key point here is that NetData can export metrics from its internal DB or
 can send metrics “as-collected” by specifying the ‘source=as-collected’ url
 parameter like so.
-http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected
+<http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected>
 If you choose to use this method you will need to use Prometheus's set of
-functions here: https://prometheus.io/docs/querying/functions/ to obtain useful
+functions here: <https://prometheus.io/docs/querying/functions/> to obtain useful
 metrics as you are now dealing with raw counters from the system. For example
 you will have to use the `irate()` function over a counter to get that metric's
 rate per second. If your graphing needs are met by using the metrics returned by
@@ -258,6 +262,7 @@ that. If you find limitations then consider re-writing your queries using the
 raw data and using Prometheus functions to get the desired chart.
 
 ## Grafana
+
 Finally we make it to grafana. This is the easiest part in my opinion. This time
 we will actually run the official grafana docker container as all configuration
 we need to do is done via the GUI. Let’s run the following command:
@@ -266,7 +271,7 @@ we need to do is done via the GUI. Let’s run the following command:
 docker run -i -p 3000:3000 --network=netdata-tutorial grafana/grafana
 ```
 
-This will get grafana running at ‘http://localhost:3000/’ Let’s go there and
+This will get grafana running at ‘<http://localhost:3000/’> Let’s go there and
 login using the credentials Admin:Admin.
 
 The first thing we want to do is click ‘Add data source’. Let’s make it look
@@ -291,4 +296,4 @@ about the monitoring system until Prometheus cannot keep up with your scale.
 Once this happens there are options presented in the Prometheus documentation
 for solving this. Hope this was helpful, happy monitoring.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

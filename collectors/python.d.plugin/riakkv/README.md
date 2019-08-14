@@ -4,94 +4,97 @@ Monitors one or more Riak KV servers.
 
 **Requirements:**
 
-* An accessible `/stats` endpoint. See [the Riak KV configuration reference documentation](<https://docs.riak.com/riak/kv/2.2.3/configuring/reference/#client-interfaces>)
-  for how to enable this.
+-   An accessible `/stats` endpoint. See [the Riak KV configuration reference documentation](https://docs.riak.com/riak/kv/2.2.3/configuring/reference/#client-interfaces)
+    for how to enable this.
 
 The following charts are included, which are mostly derived from the metrics
 listed
 [here](https://docs.riak.com/riak/kv/latest/using/reference/statistics-monitoring/index.html#riak-metrics-to-graph).
 
-1. **Throughput** in operations/s
-  * **KV operations**
-    * gets
-    * puts
+1.  **Throughput** in operations/s
 
-  * **Data type updates**
-    * counters
-    * sets
-    * maps
+-   **KV operations**
+    -   gets
+    -   puts
 
-  * **Search queries**
-    * queries
+-   **Data type updates**
+    -   counters
+    -   sets
+    -   maps
 
-  * **Search documents**
-    * indexed
+-   **Search queries**
+    -   queries
 
-  * **Strong consistency operations**
-    * gets
-    * puts
+-   **Search documents**
+    -   indexed
 
-2. **Latency** in milliseconds
-  * **KV latency** of the past minute
-    * get (mean, median, 95th / 99th / 100th percentile)
-    * put (mean, median, 95th / 99th / 100th percentile)
+-   **Strong consistency operations**
+    -   gets
+    -   puts
 
-  * **Data type latency** of the past minute
-    * counter_merge (mean, median, 95th / 99th / 100th percentile)
-    * set_merge (mean, median, 95th / 99th / 100th percentile)
-    * map_merge (mean, median, 95th / 99th / 100th percentile)
+2.  **Latency** in milliseconds
 
-  * **Search latency** of the past minute
-    * query (median, min, max, 95th / 99th percentile)
-    * index (median, min, max, 95th / 99th percentile)
+-   **KV latency** of the past minute
+    -   get (mean, median, 95th / 99th / 100th percentile)
+    -   put (mean, median, 95th / 99th / 100th percentile)
 
-  * **Strong consistency latency** of the past minute
-    * get (mean, median, 95th / 99th / 100th percentile)
-    * put (mean, median, 95th / 99th / 100th percentile)
+-   **Data type latency** of the past minute
+    -   counter_merge (mean, median, 95th / 99th / 100th percentile)
+    -   set_merge (mean, median, 95th / 99th / 100th percentile)
+    -   map_merge (mean, median, 95th / 99th / 100th percentile)
 
-3. **Erlang VM metrics**
-  * **System counters**
-    * processes
+-   **Search latency** of the past minute
+    -   query (median, min, max, 95th / 99th percentile)
+    -   index (median, min, max, 95th / 99th percentile)
 
-  * **Memory allocation** in MB
-    * processes.allocated
-    * processes.used
+-   **Strong consistency latency** of the past minute
+    -   get (mean, median, 95th / 99th / 100th percentile)
+    -   put (mean, median, 95th / 99th / 100th percentile)
 
-4. **General load / health metrics**
-  * **Siblings encountered in KV operations** during the past minute
-    * get (mean, median, 95th / 99th / 100th percentile)
+3.  **Erlang VM metrics**
 
-  * **Object size in KV operations** during the past minute in KB
-    * get (mean, median, 95th / 99th / 100th percentile)
+-   **System counters**
+    -   processes
 
-  * **Message queue length** in unprocessed messages
-    * vnodeq_size (mean, median, 95th / 99th / 100th percentile)
+-   **Memory allocation** in MB
+    -   processes.allocated
+    -   processes.used
 
-  * **Index operations** encountered by Search
-    * errors
+4.  **General load / health metrics**
 
-  * **Protocol buffer connections**
-    * active
+-   **Siblings encountered in KV operations** during the past minute
+    -   get (mean, median, 95th / 99th / 100th percentile)
 
-  * **Repair operations coordinated by this node**
-    * read
+-   **Object size in KV operations** during the past minute in KB
+    -   get (mean, median, 95th / 99th / 100th percentile)
 
-  * **Active finite state machines by kind**
-    * get
-    * put
-    * secondary_index
-    * list_keys
+-   **Message queue length** in unprocessed messages
+    -   vnodeq_size (mean, median, 95th / 99th / 100th percentile)
 
-  * **Rejected finite state machines**
-    * get
-    * put
+-   **Index operations** encountered by Search
+    -   errors
 
-  * **Number of writes to Search failed due to bad data format by reason**
-    * bad_entry
-    * extract_fail
+-   **Protocol buffer connections**
+    -   active
 
+-   **Repair operations coordinated by this node**
+    -   read
 
-### configuration
+-   **Active finite state machines by kind**
+    -   get
+    -   put
+    -   secondary_index
+    -   list_keys
+
+-   **Rejected finite state machines**
+    -   get
+    -   put
+
+-   **Number of writes to Search failed due to bad data format by reason**
+    -   bad_entry
+    -   extract_fail
+
+## configuration
 
 The module needs to be passed the full URL to Riak's stats endpoint.
 For example:
