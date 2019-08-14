@@ -44,6 +44,10 @@ X seconds (though, it can send them per second if you need it to).
 
      metrics are sent to the service in `JSON` format.
 
+   - **MongoDB**
+
+     metrics are sent to the database in `JSON` format.
+
 2. Only one backend may be active at a time.
 
 3. Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
@@ -78,7 +82,7 @@ of `netdata.conf` from your Netdata):
 ```
 [backend]
     enabled = yes | no
-    type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | prometheus_remote_write | json | kinesis
+    type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | prometheus_remote_write | json | kinesis | mongodb
     host tags = list of TAG=VALUE
     destination = space separated list of [PROTOCOL:]HOST[:PORT] - the first working will be used, or a region for kinesis
     data source = average | sum | as collected
@@ -94,7 +98,7 @@ of `netdata.conf` from your Netdata):
 
 - `enabled = yes | no`, enables or disables sending data to a backend
 
-- `type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis`, selects the backend type
+- `type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis | mongodb`, selects the backend type
 
 - `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames,
    IPs (IPv4 and IPv6) and ports to connect to.
@@ -131,6 +135,9 @@ of `netdata.conf` from your Netdata):
    the metrics Netdata generates.
 
    For kinesis backend `destination` should be set to an AWS region (for example, `us-east-1`).
+
+   The MongoDB backend doesn't use the `destination` option for its configuration. It uses the `mongodb.conf`
+   [configuration file](mongodb/README.md) instead.
 
 - `data source = as collected`, or `data source = average`, or `data source = sum`, selects the kind of
    data that will be sent to the backend.
