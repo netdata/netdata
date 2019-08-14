@@ -32,7 +32,7 @@ SEND_KAVENEGAR="YES"
 # copy your api key. You can generate new API Key too.
 # You can find and select kevenegar sender number from this place.
 
-# Without an API key, netdata cannot send KAVENEGAR text messages.
+# Without an API key, Netdata cannot send KAVENEGAR text messages.
 KAVENEGAR_API_KEY=""
 KAVENEGAR_SENDER=""
 DEFAULT_RECIPIENT_KAVENEGAR=""

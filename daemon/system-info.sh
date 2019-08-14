@@ -22,8 +22,8 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
 	OIFS="$IFS"
 	IFS=$'\n'
 	set $(sw_vers) > /dev/null
-	NAME=$(echo $1 | tr "\n" ' ' | sed 's/ProductName:[ ]*//')
-	VERSION=$(echo $2 | tr "\n" ' ' | sed 's/ProductVersion:[ ]*//')
+	NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
+	VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
 	ID="mac"
 	ID_LIKE="mac"
 	OS_DETECTION="sw_vers"
@@ -44,7 +44,8 @@ else
 			if [ "${NAME}" = "unknown" ]; then NAME="${DISTRIB_ID}"; fi
 			if [ "${VERSION}" = "unknown" ]; then VERSION="${DISTRIB_RELEASE}"; fi
 			if [ "${ID}" = "unknown" ]; then ID="${DISTRIB_CODENAME}"; fi
-		elif [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+		fi
+		if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
 			if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="lsb_release"; else OS_DETECTION="Mixed"; fi
 			if [ "${NAME}" = "unknown" ]; then NAME="$(lsb_release -is 2>/dev/null)"; fi
 			if [ "${VERSION}" = "unknown" ]; then VERSION="$(lsb_release -rs 2>/dev/null)"; fi

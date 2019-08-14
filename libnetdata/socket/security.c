@@ -164,7 +164,7 @@ void security_start_ssl(int selector) {
     switch (selector) {
         case NETDATA_SSL_CONTEXT_SERVER: {
             struct stat statbuf;
-            if (stat(security_key,&statbuf) || stat(security_cert,&statbuf)) {
+            if (stat(security_key, &statbuf) || stat(security_cert, &statbuf)) {
                 info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
                 return;
             }
@@ -186,6 +186,11 @@ void security_start_ssl(int selector) {
     }
 }
 
+/**
+ * Clean Open SSL
+ *
+ * Clean all the allocated contexts from netdata.
+ */
 void security_clean_openssl() {
 	if (netdata_srv_ctx)
 	{
@@ -265,6 +270,15 @@ int security_process_accept(SSL *ssl,int msg) {
     return NETDATA_SSL_HANDSHAKE_COMPLETE;
 }
 
+/**
+ * Test Certificate
+ *
+ * Check the certificate of Netdata master
+ *
+ * @param ssl is the connection structure
+ *
+ * @return It returns 0 on success and -1 otherwise
+ */
 int security_test_certificate(SSL *ssl) {
     X509* cert = SSL_get_peer_certificate(ssl);
     int ret;
@@ -283,7 +297,48 @@ int security_test_certificate(SSL *ssl) {
     } else {
         ret = 0;
     }
+
     return ret;
+}
+
+/**
+ * Location for context
+ *
+ * Case the user give us a directory with the certificates available and
+ * the Netdata master certificate, we use this function to validate the certificate.
+ *
+ * @param ctx the context where the path will be set.
+ * @param file the file with Netdata master certificate.
+ * @param path the directory where the certificates are stored.
+ *
+ * @return It returns 0 on success and -1 otherwise.
+ */
+int security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
+    struct stat statbuf;
+    if (stat(file, &statbuf)) {
+        info("Netdata does not have a SSL master certificate, so it will use the default OpenSSL configuration to validate certificates!");
+        return 0;
+    }
+
+    ERR_clear_error();
+    u_long err;
+    char buf[256];
+    if(!SSL_CTX_load_verify_locations(ctx, file, path)) {
+        goto slfc;
+    }
+
+    if(!SSL_CTX_set_default_verify_paths(ctx)) {
+        goto slfc;
+    }
+
+    return 0;
+
+slfc:
+    while ((err = ERR_get_error()) != 0) {
+        ERR_error_string_n(err, buf, sizeof(buf));
+        error("Cannot set the directory for the certificates and the master SSL certificate: %s",buf);
+    }
+    return -1;
 }
 
 #endif

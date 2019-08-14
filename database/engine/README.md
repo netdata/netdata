@@ -23,13 +23,13 @@ journalfile-1-0000000003.njf
 They are located under their host's cache directory in the directory `./dbengine`
 (e.g. for localhost the default location is `/var/cache/netdata/dbengine/*`). The higher
 numbered filenames contain more recent metric data. The user can safely delete some pairs
-of files when netdata is stopped to manually free up some space.
+of files when Netdata is stopped to manually free up some space.
 
 *Users should* **back up** *their `./dbengine` folders if they consider this data to be important.*
 
 ## Configuration
 
-There is one DB engine instance per netdata host/node. That is, there is one `./dbengine` folder
+There is one DB engine instance per Netdata host/node. That is, there is one `./dbengine` folder
 per node, and all charts of `dbengine` memory mode in such a host share the same storage space
 and DB engine instance memory state. You can select the memory mode for localhost by editing
 netdata.conf and setting:
@@ -59,10 +59,10 @@ quota. Both numbers are in **MiB**. All DB engine instances will allocate the co
 separately.
 
 The `page cache size` option determines the amount of RAM in **MiB** that is dedicated to caching
-netdata metric values themselves.
+Netdata metric values themselves.
 
 The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated
-to storing netdata metric values and all related metadata describing them.
+to storing Netdata metric values and all related metadata describing them.
 
 ## Operation
 
@@ -72,7 +72,7 @@ the **Page Cache**.
 
 When those pages fill up they are slowly compressed and flushed to disk.
 It can take `4096 / 4 = 1024 seconds = 17 minutes`, for a chart dimension that is being collected
-every 1 second, to fill a page. Pages can be cut short when we stop netdata or the DB engine
+every 1 second, to fill a page. Pages can be cut short when we stop Netdata or the DB engine
 instance so as to not lose the data. When we query the DB engine for data we trigger disk read
 I/O requests that fill the Page Cache with the requested pages and potentially evict cold
 (not recently used) pages. 
@@ -91,7 +91,7 @@ applications.
 Using memory mode `dbengine` we can overcome most memory restrictions and store a dataset that
 is much larger than the available memory.
 
-There are explicit memory requirements **per** DB engine **instance**, meaning **per** netdata 
+There are explicit memory requirements **per** DB engine **instance**, meaning **per** Netdata 
 **node** (e.g. localhost and streaming recipient nodes):
 
 - `page cache size` must be at least `#dimensions-being-collected x 4096 x 2` bytes.
@@ -115,11 +115,11 @@ file descriptors available per `dbengine` instance.
 Netdata allocates 25% of the available file descriptors to its Database Engine instances. This means that only 25%
 of the file descriptors that are available to the Netdata service are accessible by dbengine instances.
 You should take that into account when configuring your service
-or system-wide file descriptor limits. You can roughly estimate that the netdata service needs 2048 file
+or system-wide file descriptor limits. You can roughly estimate that the Netdata service needs 2048 file
 descriptors for every 10 streaming slave hosts when streaming is configured to use `memory mode = dbengine`.
 
-If for example one wants to allocate 65536 file descriptors to the netdata service on a systemd system
-one needs to override the netdata service by running `sudo systemctl edit netdata` and creating a
+If for example one wants to allocate 65536 file descriptors to the Netdata service on a systemd system
+one needs to override the Netdata service by running `sudo systemctl edit netdata` and creating a
 file with contents:
 
 ```

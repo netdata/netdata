@@ -3,7 +3,7 @@
 This module collects metrics from the configured solar power installation from Fronius Symo.
 
 **Requirements**
- * Configuration file `fronius.conf` in the node.d netdata config dir (default: `/etc/netdata/node.d/fronius.conf`)
+ * Configuration file `fronius.conf` in the node.d Netdata config dir (default: `/etc/netdata/node.d/fronius.conf`)
  * Fronius Symo with network access (http)
 
 It produces per server:
@@ -61,7 +61,7 @@ The plugin has been tested with a single inverter, namely Fronius Symo 8.2-3-M:
 
 Other products and versions may work, but without any guarantees.
 
-Example netdata configuration for node.d/fronius.conf. Copy this section to fronius.conf and change name/ip.
+Example Netdata configuration for node.d/fronius.conf. Copy this section to fronius.conf and change name/ip.
 The module supports any number of servers. Sometimes there is a lag when collecting every 3 seconds, so 5 should be okay too. You can modify this per server.
 ```json
 {

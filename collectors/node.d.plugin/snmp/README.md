@@ -1,6 +1,6 @@
 # SNMP Data Collector
 
-Using this collector, netdata can collect data from any SNMP device.
+Using this collector, Netdata can collect data from any SNMP device.
 
 This collector supports:
 
@@ -88,7 +88,7 @@ In this example:
 
 `update_every` is the update frequency for each server, in seconds.
 
-`max_request_size` limits the maximum number of OIDs that will be requested in a single call. The default is 50. Lower this number of you get `TooBig` errors in netdata error.log.
+`max_request_size` limits the maximum number of OIDs that will be requested in a single call. The default is 50. Lower this number of you get `TooBig` errors in Netdata's `error.log`.
 
 `family` sets the name of the submenu of the dashboard each chart will appear under.
 
@@ -177,9 +177,9 @@ To test it, you can run:
 /usr/libexec/netdata/plugins.d/node.d.plugin 1 snmp
 ```
 
-The above will run it on your console and you will be able to see what netdata sees, but also errors. You can get a very detailed output by appending `debug` to the command line.
+The above will run it on your console and you will be able to see what Netdata sees, but also errors. You can get a very detailed output by appending `debug` to the command line.
 
-If it works, restart netdata to activate the snmp collector and refresh the dashboard (if your SNMP device responds with a delay, you may need to refresh the dashboard in a few seconds).
+If it works, restart Netdata to activate the snmp collector and refresh the dashboard (if your SNMP device responds with a delay, you may need to refresh the dashboard in a few seconds).
 
 ## Data collection speed
 

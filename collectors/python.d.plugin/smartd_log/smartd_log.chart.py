@@ -750,5 +750,4 @@ class Service(SimpleService):
             if not chart_id or chart_id not in self.charts:
                 continue
 
-            # TODO: can't delete dimension
-            self.charts[chart_id].hide_dimension('{0}_{1}'.format(disk.name, attr.name))
+            self.charts[chart_id].del_dimension('{0}_{1}'.format(disk.name, attr.name))

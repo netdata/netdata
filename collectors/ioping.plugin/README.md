@@ -10,7 +10,7 @@ The supplied plugin can install it, by running:
 /usr/libexec/netdata/plugins.d/ioping.plugin install
 ```
 
-The `-e` option can be supplied to indicate where the netdata environment file is installed. The default path is `/etc/netdata/.environment`.
+The `-e` option can be supplied to indicate where the Netdata environment file is installed. The default path is `/etc/netdata/.environment`.
 
 The above will download, build and install the right version as `/usr/libexec/netdata/plugins.d/ioping`.
 
@@ -24,7 +24,7 @@ ioping="/usr/libexec/netdata/plugins.d/ioping"
 # set here the directory/file/device, you need to ping
 destination="destination"
 
-# override the chart update frequency - the default is inherited from netdata
+# override the chart update frequency - the default is inherited from Netdata
 update_every="1s"
 
 # the request size in bytes to ping the destination
@@ -36,7 +36,7 @@ ioping_opts="-T 1000000 -R"
 
 ## alarms
 
-netdata will automatically attach a few alarms for each host.
+Netdata will automatically attach a few alarms for each host.
 Check the [latest versions of the ioping alarms](../../health/health.d/ioping.conf)
 
 ## Multiple ioping Plugins With Different Settings
@@ -44,7 +44,7 @@ Check the [latest versions of the ioping alarms](../../health/health.d/ioping.co
 You may need to run multiple ioping plugins with different settings or different end points.
 For example, you may need to ping one destination once per 10 seconds, and another once per second.
 
-netdata allows you to add as many `ioping` plugins as you like.
+Netdata allows you to add as many `ioping` plugins as you like.
 
 Follow this procedure:
 
@@ -74,7 +74,7 @@ cd /usr/libexec/netdata/plugins.d
 ln -s ioping.plugin ioping2.plugin
 ```
 
-That's it. netdata will detect the new plugin and start it.
+That's it. Netdata will detect the new plugin and start it.
 
 You can name the new plugin any name you like.
 Just make sure the plugin and the configuration file have the same name.

@@ -3,7 +3,7 @@
 Module monitor leases database to show all active leases for given pools.
 
 **Requirements:**
- * dhcpd leases file MUST BE readable by netdata
+ * dhcpd leases file MUST BE readable by Netdata
  * pools MUST BE in CIDR format
 
 It produces:

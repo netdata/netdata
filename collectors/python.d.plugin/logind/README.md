@@ -19,7 +19,7 @@ It provides the following charts:
 
 ### configuration
 
-This module needs no configuration.  Just make sure the netdata user
+This module needs no configuration.  Just make sure the `netdata` user
 can run the `loginctl` command and get a session list without having to
 specify a path.
 

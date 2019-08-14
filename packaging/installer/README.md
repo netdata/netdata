@@ -45,7 +45,7 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 Verify the integrity of the script with this:
 
 ``` bash
-[ "8a2b054081a108dff915994ce77f2f2d" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "b6d16c171ccad073b86327246151d875" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 *It should print `OK, VALID` if the script is the one we ship.*
 
@@ -101,7 +101,7 @@ $ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 Verify the integrity of the script with this:
 
 ```bash
-[ "8779d8717ccaa8dac18d599502eef591" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "4415e8c13e529a795abb953a9be14ad5" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -255,10 +255,10 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 
 |package|description|
 |:-----:|-----------|
-|`libuv`|multi-platform support library with a focus on asynchronous I/O|
-|`liblz4`|Extremely Fast Compression algorithm|
+|`libuv`|Multi-platform support library with a focus on asynchronous I/O, version 1 or greater|
+|`liblz4`|Extremely fast compression algorithm, version r129 or greater|
 |`Judy`|General purpose dynamic array|
-|`openssl`|Cryptography and SSL/TLS Toolkit|
+|`openssl`|Cryptography and SSL/TLS toolkit|
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
@@ -371,7 +371,7 @@ To enable the Netdata service:
 service netdata config set enable=true
 ```
 
-To start the netdata service:
+To start the Netdata service:
 ```
 service netdata start
 ```
