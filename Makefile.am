@@ -458,6 +458,11 @@ PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
     backends/prometheus/remote_write/remote_write.proto \
     $(NULL)
 
+MONGODB_BACKEND_FILES = \
+    backends/mongodb/mongodb.c \
+    backends/mongodb/mongodb.h \
+    $(NULL)
+
 DAEMON_FILES = \
 	daemon/common.c \
 	daemon/common.h \
@@ -614,4 +619,9 @@ backends/prometheus/remote_write/remote_write.pb.cc \
 backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
 	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
 
+endif
+
+if ENABLE_BACKEND_MONGODB
+    netdata_SOURCES += $(MONGODB_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif

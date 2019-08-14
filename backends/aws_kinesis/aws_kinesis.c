@@ -63,18 +63,11 @@ int read_kinesis_conf(const char *path, char **access_key_id_p, char **secret_ac
             continue;
         }
 
-        if(!value) value = "";
+        if(!value)
+            value = "";
+        else
+            value = strip_quotes(value);
 
-        // strip quotes
-        if(*value == '"' || *value == '\'') {
-            value++;
-
-            s = value;
-            while(*s) s++;
-            if(s != value) s--;
-
-            if(*s == '"' || *s == '\'') *s = '\0';
-        }
         if(name[0] == 'a' && name[4] == 'a' && !strcmp(name, "aws_access_key_id")) {
             access_key_id = strdupz(value);
         }
