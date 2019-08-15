@@ -347,10 +347,20 @@ Note first three packages are downloaded from the pfSense repository for maintai
 pkg install pkgconf
 pkg install bash
 pkg install e2fsprogs-libuuid
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.8_2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.13.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.9.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/libuv-1.31.0.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.15.0.txz
 ```
+
+Edit
+```
+vi /usr/local/etc/netdata/netdata.conf
+```
+change "bind to = 127.0.0.1" to "bind to = 0.0.0.0"
+
 To start Netdata manually run `service netdata onestart`
+
+Check its working -> http://<pfsenseIP>:19999  Note: not done yet!
 
 To start Netdata automatically at each boot add `service netdata onestart` as a Shellcmd within the pfSense web interface (under **Services/Shellcmd**, which you need to install beforehand under **System/Package Manager/Available Packages**).
 Shellcmd Type should be set to `Shellcmd`.
