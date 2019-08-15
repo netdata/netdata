@@ -360,8 +360,10 @@ change "bind to = 127.0.0.1" to "bind to = 0.0.0.0"
 
 To start Netdata manually run `service netdata onestart`
 
-Check its working -> http://<pfsenseIP>:19999  Note: not done yet!
-
+Check its working:
+```
+http://<pfsenseIP>:19999
+```
 To start Netdata automatically at each boot add `service netdata onestart` as a Shellcmd within the pfSense web interface (under **Services/Shellcmd**, which you need to install beforehand under **System/Package Manager/Available Packages**).
 Shellcmd Type should be set to `Shellcmd`.
 ![](https://i.imgur.com/wcKiPe1.png)
