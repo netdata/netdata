@@ -985,6 +985,10 @@ netdataDashboard.context = {
         height: 2.0
     },
 
+    'apps.uptime': {
+        info: 'Carried over process group uptime. The period of time within which at least one process in the group was running.'
+    },
+
     // ------------------------------------------------------------------------
     // USERS
 
@@ -1008,6 +1012,10 @@ netdataDashboard.context = {
         height: 2.0
     },
 
+    'users.uptime': {
+        info: 'Carried over process group uptime. The period of time within which at least one process in the group was running.'
+    },
+
     // ------------------------------------------------------------------------
     // GROUPS
 
@@ -1029,6 +1037,10 @@ netdataDashboard.context = {
 
     'groups.pwrites': {
         height: 2.0
+    },
+
+    'groups.uptime': {
+        info: 'Carried over process group uptime. The period of time within which at least one process in the group was running.'
     },
 
     // ------------------------------------------------------------------------
