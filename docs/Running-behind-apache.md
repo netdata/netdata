@@ -217,6 +217,16 @@ Specify `Location /` if Netdata is running on dedicated virtual host.
 
 Note: Changes are applied by reloading or restarting Apache.
 
+## Configuration of Content Security Policy
+
+If you want to enable CSP within your Apache, you should consider some special requirements of the headers. Modify your configuration like that:
+
+```
+	Header always set Content-Security-Policy "default-src http: 'unsafe-inline' 'self' 'unsafe-eval'; script-src http: 'unsafe-inline' 'self' 'unsafe-eval'; style-src http: 'self' 'unsafe-inline'"
+```
+
+Note: Changes are applied by reloading or restarting Apache.
+
 # Netdata configuration
 
 You might edit `/etc/netdata/netdata.conf` to optimize your setup a bit. For applying these changes you need to restart Netdata.
