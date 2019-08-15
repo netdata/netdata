@@ -237,7 +237,7 @@ inline BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPT
     return backend_options;
 }
 
-static struct objects_to_clean {
+struct objects_to_clean {
     struct netdata_static_thread *main_thread;
 
 #if HAVE_KINESIS
@@ -303,7 +303,8 @@ static void backends_main_cleanup(void *objects_to_clean) {
      * at least for libmongoc 1.14
      */
 
-        for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+        int i;
+        for(i = 0; i < MONGODB_THREADS_NUMBER; i++) {
             buffer_free((*objects->mongodb_threads)[i].buffer);
         }
         freez(*objects->mongodb_threads);
@@ -707,7 +708,8 @@ void *backends_main(void *ptr) {
 
             mongodb_threads = callocz(MONGODB_THREADS_NUMBER, sizeof(struct mongodb_thread));
 
-            for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+            int i;
+            for(i = 0; i < MONGODB_THREADS_NUMBER; i++) {
                 netdata_mutex_init(&mongodb_threads[i].mutex);
                 mongodb_threads[i].buffer = buffer_create(1);
             }
@@ -848,7 +850,8 @@ void *backends_main(void *ptr) {
         if(do_mongodb) {
             chart_buffered_metrics = 0;
 
-            for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+            int i;
+            for(i = 0; i < MONGODB_THREADS_NUMBER; i++) {
                 if(mongodb_threads[i].busy == 0) {
                     mongodb_thread_index = i;
                     break;
@@ -1043,13 +1046,15 @@ void *backends_main(void *ptr) {
 
 #if HAVE_MONGOC
         if(do_mongodb) {
-            for(int i = 0; i < MONGODB_THREADS_NUMBER; i++) {
+            int i;
+
+            for(i = 0; i < MONGODB_THREADS_NUMBER; i++) {
                 netdata_mutex_lock(&mongodb_threads[i].mutex);
                 if(mongodb_threads[i].finished) {
                     if(unlikely(mongodb_threads[i].error)) {
                         // oops! we couldn't send (all or some of the) data
-                        error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                              mongodb_uri, mongodb_threads[i].n_bytes, 0UL);
+                        error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote 0 bytes.",
+                              mongodb_uri, mongodb_threads[i].n_bytes);
 
                         chart_transmission_failures++;
                         chart_lost_bytes += mongodb_threads[i].n_bytes;
@@ -1072,8 +1077,8 @@ void *backends_main(void *ptr) {
             size_t buffer_len = buffer_strlen(b);
 
             if(unlikely(mongodb_thread_index == MONGODB_THREAD_INDEX_UNDEFINED)) {
-                error("BACKEND: failed to write data to database backend '%s'. All available threads are busy. Willing to write %zu bytes, wrote %zu bytes.",
-                              mongodb_uri, buffer_len, 0UL);
+                error("BACKEND: failed to write data to database backend '%s'. All available threads are busy. Willing to write %zu bytes, wrote 0 bytes.",
+                              mongodb_uri, buffer_len);
 
                 chart_data_lost_events++;
                 chart_lost_bytes += buffer_len;
@@ -1084,7 +1089,7 @@ void *backends_main(void *ptr) {
                 goto update_charts;
             }
 
-            int i = mongodb_thread_index;
+            i = mongodb_thread_index;
 
             mongodb_threads[i].n_bytes = buffer_len;
             mongodb_threads[i].n_metrics = chart_buffered_metrics;
@@ -1101,8 +1106,8 @@ void *backends_main(void *ptr) {
             }
             else {
                 // oops! we couldn't send (all or some of the) data
-                error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote %zu bytes.",
-                      mongodb_uri, mongodb_threads[i].n_bytes, 0UL);
+                error("BACKEND: failed to write data to database backend '%s'. Willing to write %zu bytes, wrote 0 bytes.",
+                      mongodb_uri, mongodb_threads[i].n_bytes);
 
                 chart_transmission_failures++;
                 chart_lost_bytes += buffer_len;
