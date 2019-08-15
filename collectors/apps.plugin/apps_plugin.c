@@ -2655,7 +2655,7 @@ static int collect_data_for_all_processes(void) {
     if(*uptime_filename == '\0')
         snprintfz(uptime_filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
 
-    global_uptime = (kernel_uint_t)(get_uptime(uptime_filename) / MSEC_PER_SEC);
+    global_uptime = (kernel_uint_t)(uptime_msec(uptime_filename) / MSEC_PER_SEC);
 
     char dirname[FILENAME_MAX + 1];
 

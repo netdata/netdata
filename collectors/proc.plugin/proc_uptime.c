@@ -38,7 +38,7 @@ int do_proc_uptime(int update_every, usec_t dt) {
     else
         rrdset_next(st);
 
-    rrddim_set_by_pointer(st, rd, get_uptime(uptime_filename));
+    rrddim_set_by_pointer(st, rd, uptime_msec(uptime_filename));
 
     rrdset_done(st);
 

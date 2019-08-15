@@ -242,7 +242,7 @@ static inline collected_number read_proc_uptime(char *filename) {
     return (collected_number)(strtold(procfile_lineword(read_proc_uptime_ff, 0, 0), NULL) * 1000.0);
 }
 
-inline collected_number get_uptime(char *filename){
+inline collected_number uptime_msec(char *filename){
     static int use_boottime = -1;
 
     if(unlikely(use_boottime == -1)) {
