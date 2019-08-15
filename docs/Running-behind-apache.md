@@ -2,11 +2,10 @@
 
 Below you can find instructions for configuring an apache server to:
 
-1. proxy a single Netdata via an HTTP and HTTPS virtual host
-2. dynamically proxy any number of Netdata servers
-3. add user authentication
-4. adjust Netdata settings to get optimal results
-
+1.  proxy a single Netdata via an HTTP and HTTPS virtual host
+2.  dynamically proxy any number of Netdata servers
+3.  add user authentication
+4.  adjust Netdata settings to get optimal results
 
 ## Requirements
 
@@ -20,14 +19,14 @@ sudo apt-get install apache2-bin
 
 Also make sure they are enabled:
 
-```
+```sh
 sudo a2enmod proxy
 sudo a2enmod proxy_http
 ```
 
 Ensure your rewrite module is enabled:
 
-```
+```sh
 sudo a2enmod rewrite
 ```
 
@@ -41,7 +40,7 @@ On any **existing** and already **working** apache virtual host, you can redirec
 
 Add the following on top of any existing virtual host. It will allow you to access Netdata as `http://virtual.host/netdata/`.
 
-```
+```conf
 <VirtualHost *:80>
 
 	RewriteEngine On
@@ -71,7 +70,7 @@ Add the following on top of any existing virtual host. It will allow you to acce
 
 Add the following on top of any existing virtual host. It will allow you to access multiple Netdata as `http://virtual.host/netdata/HOSTNAME/`, where `HOSTNAME` is the hostname of any other Netdata server you have (to access the `localhost` Netdata, use `http://virtual.host/netdata/localhost/`).
 
-```
+```conf
 <VirtualHost *:80>
 
 	RewriteEngine On
@@ -117,7 +116,7 @@ nano /etc/apache2/sites-available/netdata.conf
 
 with this content:
 
-```
+```conf
 <VirtualHost *:80>
 	RewriteEngine On
 	ProxyRequests Off
@@ -144,19 +143,20 @@ sudo a2ensite netdata.conf && service apache2 reload
 ```
 
 ## Netdata proxy in Plesk
+
 _Assuming the main goal is to make Netdata running in HTTPS._
 
-1. Make a subdomain for Netdata on which you enable and force HTTPS - You can use a free Let's Encrypt certificate
-2. Go to "Apache & nginx Settings", and in the following section, add:
+1.  Make a subdomain for Netdata on which you enable and force HTTPS - You can use a free Let's Encrypt certificate
+2.  Go to "Apache & nginx Settings", and in the following section, add:
 
-```
+```conf
 RewriteEngine on
 RewriteRule (.*) http://localhost:19999/$1 [P,L]
 ```
-3. Optional: If your server is remote, then just replace "localhost" with your actual hostname or IP, it just works.  
+
+3.  Optional: If your server is remote, then just replace "localhost" with your actual hostname or IP, it just works.  
 
 Repeat the operation for as many servers as you need.
-
 
 ## Enable Basic Auth
 
@@ -166,10 +166,10 @@ Install the package `apache2-utils`. On debian / ubuntu run `sudo apt-get instal
 
 Then, generate password for user `netdata`, using `htpasswd -c /etc/apache2/.htpasswd netdata`
 
-**Apache 2.2 Example:**  
+**Apache 2.2 Example:**\
 Modify the virtual host with these:
 
-```
+```conf
 	# replace the <Proxy *> section
 	<Proxy *>
 		Order deny,allow
@@ -189,11 +189,9 @@ Modify the virtual host with these:
 
 Specify `Location /` if Netdata is running on dedicated virtual host.
 
-
-
 **Apache 2.4 (dedicated virtual host) Example:**  
 
-```
+```conf
 <VirtualHost *:80>
 	RewriteEngine On
 	ProxyRequests Off
@@ -242,12 +240,16 @@ You would also need to instruct Netdata to listen only on `localhost`, `127.0.0.
 [web]
     bind to = localhost
 ```
+
 or  
+
 ```
 [web]
     bind to = 127.0.0.1
 ```
+
 or  
+
 ```
 [web]
     bind to = ::1
@@ -286,7 +288,8 @@ If your apache server is not on localhost, you can set:
     bind to = *
     allow connections from = IP_OF_APACHE_SERVER
 ```
-_note: Netdata v1.9+ support `allow connections from`_
+
+*note: Netdata v1.9+ support `allow connections from`*
 
 `allow connections from` accepts [Netdata simple patterns](../libnetdata/simple_pattern/) to match against the connection IP address.
 
@@ -303,7 +306,7 @@ apache logs accesses and Netdata logs them too. You can prevent Netdata from gen
 
 Make sure the requests reach Netdata, by examing `/var/log/netdata/access.log`.
 
-1. if the requests do not reach Netdata, your apache does not forward them.
-2. if the requests reach Netdata but the URLs are wrong, you have not re-written them properly.
+1.  if the requests do not reach Netdata, your apache does not forward them.
+2.  if the requests reach Netdata but the URLs are wrong, you have not re-written them properly.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-apache&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-apache&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

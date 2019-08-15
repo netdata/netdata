@@ -48,9 +48,10 @@ Netdata v1.12 and beyond provides a command API to control health checks and not
 From Netdata v1.16.0 and beyond, the configuration controlled via the API commands is [persisted across Netdata restarts](#persistence).
 
 Specifically, the API allows you to:
- - Disable health checks completely. Alarm conditions will not be evaluated at all and no entries will be added to the alarm log.
- - Silence alarm notifications. Alarm conditions will be evaluated, the alarms will appear in the log and the Netdata UI will show the alarms as active, but no notifications will be sent.
- - Disable or Silence specific alarms that match selectors on alarm/template name, chart, context, host and family.
+
+-   Disable health checks completely. Alarm conditions will not be evaluated at all and no entries will be added to the alarm log.
+-   Silence alarm notifications. Alarm conditions will be evaluated, the alarms will appear in the log and the Netdata UI will show the alarms as active, but no notifications will be sent.
+-   Disable or Silence specific alarms that match selectors on alarm/template name, chart, context, host and family.
 
 The API is available by default, but it is protected by an `api authorization token` that is stored in the file you will see in the following entry of `http://localhost:19999/netdata.conf`:
 
@@ -74,14 +75,14 @@ If you've configured and entered your token correclty, you should see the plain 
 
 If all you need is temporarily disable all health checks, then you issue the following before your maintenance period starts:
 
-```
+```sh
 curl "http://myserver/api/v1/manage/health?cmd=DISABLE ALL" -H "X-Auth-Token: Mytoken"
 ```
 
 The effect of disabling health checks is that the alarm criteria are not evaluated at all and nothing is written in the alarm log.
 If you want the health checks to be running but to not receive any notifications during your maintenance period, you can instead use this:
 
-```
+```sh
 curl "http://myserver/api/v1/manage/health?cmd=SILENCE ALL" -H "X-Auth-Token: Mytoken"
 ```
 
@@ -89,7 +90,7 @@ Alarms may then still be raised and logged in Netdata, so you'll be able to see 
 
 Regardless of the option you choose, at the end of your maintenance period you revert to the normal state via the RESET command.
 
-```
+```sh
  curl "http://myserver/api/v1/manage/health?cmd=RESET" -H "X-Auth-Token: Mytoken"
 ```
 
@@ -97,8 +98,9 @@ Regardless of the option you choose, at the end of your maintenance period you r
 
 If you do not wish to disable/silence all alarms, then the `DISABLE ALL` and `SILENCE ALL` commands can't be used.
 Instead, the following commands expect that one or more alarm selectors will be added, so that only alarms that match the selectors are disabled or silenced.  
-- `DISABLE` : Set the mode to disable health checks.
-- `SILENCE` : Set the mode to silence notifications.
+
+-   `DISABLE` : Set the mode to disable health checks.
+-   `SILENCE` : Set the mode to silence notifications.
 
 You will normally put one of these commands in the same request with your first alarm selector, but it's possible to issue them separately as well.
 You will get a warning in the response, if a selector was added without a SILENCE/DISABLE command, or vice versa.
@@ -121,11 +123,12 @@ curl "http://myserver/api/v1/manage/health?cmd=SILENCE&context=load" -H "X-Auth-
 The `selection criteria` are key/value pairs, in the format `key : value`, where value is a Netdata [simple pattern](../../../libnetdata/simple_pattern/). This means that you can create very powerful selectors (you will rarely need more than one or two).
 
 The accepted keys for the `selection criteria` are the following:
-- `alarm`    : The expression provided will match both `alarm` and `template` names.
-- `chart`    : Chart ids/names, as shown on the dashboard. These will match the `on` entry of a configured `alarm`.
-- `context`  : Chart context, as shown on the dashboard. These will match the `on` entry of a configured `template`.
-- `hosts`    : The hostnames that will need to match.
-- `families` : The alarm families.
+
+-   `alarm`    : The expression provided will match both `alarm` and `template` names.
+-   `chart`    : Chart ids/names, as shown on the dashboard. These will match the `on` entry of a configured `alarm`.
+-   `context`  : Chart context, as shown on the dashboard. These will match the `on` entry of a configured `template`.
+-   `hosts`    : The hostnames that will need to match.
+-   `families` : The alarm families.
 
 You can add any of the selection criteria you need on the request, to ensure that only the alarms you are interested in are matched and disabled/silenced. e.g. there is no reason to add `hosts: *`, if you want the criteria to be applied to alarms for all hosts.
 
@@ -187,16 +190,16 @@ json
 
 ### Responses
 
-- "Auth Error" : Token authentication failed
-- "All alarm notifications are silenced" : Successful response to cmd=SILENCE ALL
-- "All health checks are disabled" : Successful response to cmd=DISABLE ALL
-- "All health checks and notifications are enabled" : Successful response to cmd=RESET
-- "Health checks disabled for alarms matching the selectors" : Added to the response for a cmd=DISABLE
-- "Alarm notifications silenced for alarms matching the selectors" : Added to the response for a cmd=SILENCE
-- "Alarm selector added" : Added to the response when a new selector is added
-- "Invalid key. Ignoring it." : Wrong name of a parameter. Added to the response and ignored.
-- "WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command." : Added to the response if a selector is added without a selector-specific command.
-- "WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors." : Added to the response if a selector-specific command is issued without a selector.
+-   "Auth Error" : Token authentication failed
+-   "All alarm notifications are silenced" : Successful response to cmd=SILENCE ALL
+-   "All health checks are disabled" : Successful response to cmd=DISABLE ALL
+-   "All health checks and notifications are enabled" : Successful response to cmd=RESET
+-   "Health checks disabled for alarms matching the selectors" : Added to the response for a cmd=DISABLE
+-   "Alarm notifications silenced for alarms matching the selectors" : Added to the response for a cmd=SILENCE
+-   "Alarm selector added" : Added to the response when a new selector is added
+-   "Invalid key. Ignoring it." : Wrong name of a parameter. Added to the response and ignored.
+-   "WARNING: Added alarm selector to silence/disable alarms without a SILENCE or DISABLE command." : Added to the response if a selector is added without a selector-specific command.
+-   "WARNING: SILENCE or DISABLE command is ineffective without defining any alarm selectors." : Added to the response if a selector-specific command is issued without a selector.
 
 ### Persistence
 
@@ -213,5 +216,4 @@ The file's location is configurable in `netdata.conf`. The default is shown belo
 
 The test script under [tests/health_mgmtapi](../../../tests/health_mgmtapi) contains a series of tests that you can either run or read through to understand the various calls and responses better.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

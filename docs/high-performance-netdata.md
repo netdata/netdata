@@ -10,13 +10,13 @@ If you plan to have your Netdata public on the internet, this strategy wastes re
 
 In the following nginx configuration we do the following:
 
-- allow nginx to maintain up to 1024 idle connections to Netdata (so Netdata will have up to 1024 threads waiting for requests)
+-   allow nginx to maintain up to 1024 idle connections to Netdata (so Netdata will have up to 1024 threads waiting for requests)
 
-- allow nginx to compress the responses of Netdata (later we will disable gzip compression at Netdata)
+-   allow nginx to compress the responses of Netdata (later we will disable gzip compression at Netdata)
 
-- we disable wordpress pingback attacks and allow only GET, HEAD and OPTIONS requests.
+-   we disable wordpress pingback attacks and allow only GET, HEAD and OPTIONS requests.
 
-```
+```conf
 upstream backend {
     server 127.0.0.1:19999;
     keepalive 1024;
@@ -65,25 +65,25 @@ Then edit `/etc/netdata/netdata.conf` and set these config options:
 
 These options:
 
-- `[global].bind socket to IP = 127.0.0.1` makes Netdata listen only for requests from localhost (nginx).
-- `[global].access log = none` disables the access.log of Netdata. It is not needed since Netdata only listens for requests on 127.0.0.1 and thus only nginx can access it. nginx has its own access.log for your record.
-- `[global].disconnect idle web clients after seconds = 3600` will kill inactive web threads after an hour of inactivity.
-- `[global].enable web responses gzip compression = no` disables gzip compression at Netdata (nginx will compress the responses).
+-   `[global].bind socket to IP = 127.0.0.1` makes Netdata listen only for requests from localhost (nginx).
+-   `[global].access log = none` disables the access.log of Netdata. It is not needed since Netdata only listens for requests on 127.0.0.1 and thus only nginx can access it. nginx has its own access.log for your record.
+-   `[global].disconnect idle web clients after seconds = 3600` will kill inactive web threads after an hour of inactivity.
+-   `[global].enable web responses gzip compression = no` disables gzip compression at Netdata (nginx will compress the responses).
 
 ## 2. increase open files limit (non-systemd)
 
 By default Linux limits open file descriptors per process to 1024. This means that less than half of this number of client connections can be accepted by both nginx and Netdata. To increase them, create 2 new files:
 
-1. `/etc/security/limits.d/nginx.conf`, with these contents:
+1.  `/etc/security/limits.d/nginx.conf`, with these contents:
 
-  ```
+```
 nginx   soft    nofile  10000
 nginx   hard    nofile  30000
 ```
 
-2. `/etc/security/limits.d/netdata.conf`, with these contents:
+2.  `/etc/security/limits.d/netdata.conf`, with these contents:
 
-  ```
+```
 netdata   soft    nofile  10000
 netdata   hard    nofile  30000
 ```
@@ -98,25 +98,25 @@ sysctl -p
 
 Thanks to [@leleobhz](https://github.com/netdata/netdata/issues/655#issue-163932584), this is what you need to raise the limits using systemd:
 
-This is based on https://ma.ttias.be/increase-open-files-limit-in-mariadb-on-centos-7-with-systemd/ and here worked as following:
+This is based on <https://ma.ttias.be/increase-open-files-limit-in-mariadb-on-centos-7-with-systemd/> and here worked as following:
 
-1. Create the folders in /etc:
+1.  Create the folders in /etc:
 
-  ```
+```
 mkdir -p /etc/systemd/system/netdata.service.d
 mkdir -p /etc/systemd/system/nginx.service.d
 ```
 
-2. Create limits.conf in each folder as following:
+2.  Create limits.conf in each folder as following:
 
-  ```
+```
 [Service]
 LimitNOFILE=30000
 ```
 
-3. Reload systemd daemon list and restart services:
+3.  Reload systemd daemon list and restart services:
 
-  ```sh
+```sh
 systemctl daemon-reload
 systemctl restart netdata.service
 systemctl restart nginx.service
@@ -145,7 +145,6 @@ Max open files            30000                30000                files
 
 # cat /proc/$(ps aux | grep "netdata" | head -n1 | grep -v grep | awk '{print $2}')/limits | grep "Max open files"
 Max open files            30000                30000                files     
-
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fhigh-performance-netdata&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fhigh-performance-netdata&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
