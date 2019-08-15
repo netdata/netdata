@@ -6,6 +6,7 @@
 
 from bases.FrameworkServices.SocketService import SocketService
 from copy import deepcopy
+import collections
 
 priority = 60500
 
@@ -112,15 +113,14 @@ class Service(SocketService):
         try:
             raw = self._get_raw_data()
         except (ValueError, AttributeError):
-            return
+            return []
 
         if raw is None:
             self.debug("Gearman returned no data")
-            return
+            return []
 
         job_lines = raw.splitlines()[:-1]
-        job_lines = [job.split() for job in job_lines]
-        job_lines.sort(key=lambda line: line[0])
+        job_lines = [job.split() for job in sorted(job_lines)]
 
         for line in job_lines:
             line[1:] = map(int, line[1:])
@@ -129,14 +129,7 @@ class Service(SocketService):
 
     def process_jobs(self, active_jobs):
 
-        # There is no way to get an accurate total idle count because
-        # a worker can be assigned to more than one job.
-        output = {
-            'total_pending': 0,
-            'total_idle': 0,
-            'total_running': 0,
-        }
-
+        output = collections.defaultdict(int)
         found_jobs = set()
 
         for parsed_job in active_jobs:
