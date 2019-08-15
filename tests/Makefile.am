@@ -5,11 +5,8 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
 	health_mgmtapi/health-cmdapi-test.sh \
-<<<<<<< HEAD
 	acls/acl.sh \
-=======
 	urls/request.sh \
->>>>>>> 63a4cadd346df71255d2350128eebcf317e81d0f
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
