@@ -1,11 +1,11 @@
 # charts.d.plugin
 
-`charts.d.plugin` is a netdata external plugin. It is an **orchestrator** for data collection modules written in `BASH` v4+.
+`charts.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `BASH` v4+.
 
-1. It runs as an independent process `ps fax` shows it
-2. It is started and stopped automatically by netdata
-3. It communicates with netdata via a unidirectional pipe (sending data to the netdata daemon)
-4. Supports any number of data collection **modules**
+1.  It runs as an independent process `ps fax` shows it
+2.  It is started and stopped automatically by Netdata
+3.  It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
+4.  Supports any number of data collection **modules**
 
 `charts.d.plugin` has been designed so that the actual script that will do data collection will be permanently in
 memory, collecting data with as little overheads as possible
@@ -39,35 +39,35 @@ A `charts.d.plugin` module is a BASH script defining a few functions.
 
 For a module called `X`, the following criteria must be met:
 
-1. The module script must be called `X.chart.sh` and placed in `/usr/libexec/netdata/charts.d`.
+1.  The module script must be called `X.chart.sh` and placed in `/usr/libexec/netdata/charts.d`.
 
-2. If the module needs a configuration, it should be called `X.conf` and placed in `/etc/netdata/charts.d`.
-   The configuration file `X.conf` is also a BASH script itself.
-   To edit the default files supplied by netdata run `/etc/netdata/edit-config charts.d/X.conf`,
-   where `X` is the name of the module.
+2.  If the module needs a configuration, it should be called `X.conf` and placed in `/etc/netdata/charts.d`.
+    The configuration file `X.conf` is also a BASH script itself.
+    To edit the default files supplied by Netdata, run `/etc/netdata/edit-config charts.d/X.conf`,
+    where `X` is the name of the module.
 
-3. All functions and global variables defined in the script and its configuration, must begin with `X_`.
+3.  All functions and global variables defined in the script and its configuration, must begin with `X_`.
 
-4. The following functions must be defined:
+4.  The following functions must be defined:
 
-   - `X_check()` - returns 0 or 1 depending on whether the module is able to run or not
-      (following the standard Linux command line return codes: 0 = OK, the collector can operate and 1 = FAILED,
-      the collector cannot be used).
+    -   `X_check()` - returns 0 or 1 depending on whether the module is able to run or not
+         (following the standard Linux command line return codes: 0 = OK, the collector can operate and 1 = FAILED,
+         the collector cannot be used).
 
-   - `X_create()` - creates the netdata charts, following the standard netdata plugin guides as described in
-      **[External Plugins](../plugins.d/)** (commands `CHART` and `DIMENSION`).
-      The return value does matter: 0 = OK, 1 = FAILED.
+    -   `X_create()` - creates the Netdata charts, following the standard Netdata plugin guides as described in
+         **[External Plugins](../plugins.d/)** (commands `CHART` and `DIMENSION`).
+         The return value does matter: 0 = OK, 1 = FAILED.
 
-   - `X_update()` - collects the values for the defined charts, following the standard netdata plugin guides
-      as described in **[External Plugins](../plugins.d/)** (commands `BEGIN`, `SET`, `END`).
-      The return value also matters: 0 = OK, 1 = FAILED.
+    -   `X_update()` - collects the values for the defined charts, following the standard Netdata plugin guides
+         as described in **[External Plugins](../plugins.d/)** (commands `BEGIN`, `SET`, `END`).
+         The return value also matters: 0 = OK, 1 = FAILED.
 
-5. The following global variables are available to be set:
-   - `X_update_every` - is the data collection frequency for the module script, in seconds.
+5.  The following global variables are available to be set:
+    -   `X_update_every` - is the data collection frequency for the module script, in seconds.
 
 The module script may use more functions or variables. But all of them must begin with `X_`.
 
-The standard netdata plugin variables are also available (check **[External Plugins](../plugins.d/)**). 
+The standard Netdata plugin variables are also available (check **[External Plugins](../plugins.d/)**). 
 
 ### X_check()
 
@@ -80,7 +80,7 @@ connect to a local mysql database to find out if it can read the values it needs
 
 ### X_create()
 
-The purpose of the BASH function `X_create()` is to create the charts and dimensions using the standard netdata
+The purpose of the BASH function `X_create()` is to create the charts and dimensions using the standard Netdata
 plugin guides (**[External Plugins](../plugins.d/)**).
 
 `X_create()` will be called just once and only after `X_check()` was successful.
@@ -90,8 +90,8 @@ A non-zero return value will disable the collector.
 
 ### X_update()
 
-`X_update()` will be called repeatedly every `X_update_every` seconds, to collect new values and send them to netdata,
-following the netdata plugin guides (**[External Plugins](../plugins.d/)**).
+`X_update()` will be called repeatedly every `X_update_every` seconds, to collect new values and send them to Netdata,
+following the Netdata plugin guides (**[External Plugins](../plugins.d/)**).
 
 The function will be called with one parameter: microseconds since the last time it was run. This value should be
 appended to the `BEGIN` statement of every chart updated by the collector script.
@@ -167,8 +167,7 @@ Keep in mind that if your configs are not in `/etc/netdata`, you should do the f
 export NETDATA_USER_CONFIG_DIR="/path/to/etc/netdata"
 ```
 
-Also, remember that netdata runs `chart.d.plugin` as user `netdata` (or any other user netdata is configured to run as).
-
+Also, remember that Netdata runs `chart.d.plugin` as user `netdata` (or any other user the `netdata` process is configured to run as).
 
 ## Running multiple instances of charts.d.plugin
 
@@ -179,17 +178,16 @@ You can have multiple `charts.d.plugin` running to overcome this problem.
 
 This is what you need to do:
 
-1. Decide a new name for the new charts.d instance: example `charts2.d`.
+1.  Decide a new name for the new charts.d instance: example `charts2.d`.
 
-2. Create/edit the files `/etc/netdata/charts.d.conf` and `/etc/netdata/charts2.d.conf` and enable / disable the
-   module you want each to run. Remember to set `enable_all_charts="no"` to both of them, and enable the individual
-   modules for each.
-   
-3. link `/usr/libexec/netdata/plugins.d/charts.d.plugin` to `/usr/libexec/netdata/plugins.d/charts2.d.plugin`.
-   Netdata will spawn a new charts.d process.
+2.  Create/edit the files `/etc/netdata/charts.d.conf` and `/etc/netdata/charts2.d.conf` and enable / disable the
+    module you want each to run. Remember to set `enable_all_charts="no"` to both of them, and enable the individual
+    modules for each.
 
-Execute the above in this order, since netdata will (by default) attempt to start new plugins soon after they are
+3.  link `/usr/libexec/netdata/plugins.d/charts.d.plugin` to `/usr/libexec/netdata/plugins.d/charts2.d.plugin`.
+    Netdata will spawn a new charts.d process.
+
+Execute the above in this order, since Netdata will (by default) attempt to start new plugins soon after they are
 created in `/usr/libexec/netdata/plugins.d/`.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcharts.d.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcharts.d.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

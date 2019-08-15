@@ -2,26 +2,26 @@
 
 The CSV formatter presents [results of database queries](../../queries) in the following formats:
 
-format|content type|description
-:---:|:---:|:-----
-`json`|application/json|return the query result as a json object
-`jsonp`|application/json|return the query result as a JSONP javascript callback
-`datatable`|application/json|return the query result as a Google `datatable`
-`datasource`|application/json|return the query result as a Google Visualization Provider `datasource` javascript callback
+| format       | content type     | description|
+|:----:|:----------:|:----------|
+| `json`       | application/json | return the query result as a json object|
+| `jsonp`      | application/json | return the query result as a JSONP javascript callback|
+| `datatable`  | application/json | return the query result as a Google `datatable`|
+| `datasource` | application/json | return the query result as a Google Visualization Provider `datasource` javascript callback|
 
 The CSV formatter respects the following API `&options=`:
 
-option|supported|description
-:---:|:---:|:---
-`google_json`|yes|enable the Google flavor of JSON (using double quotes for strings and `Date()` function for dates
-`objectrows`|yes|return each row as an object, instead of an array
-`nonzero`|yes|to return only the dimensions that have at least a non-zero value
-`flip`|yes|to return the rows older to newer (the default is newer to older)
-`seconds`|yes|to return the date and time in unix timestamp
-`ms`|yes|to return the date and time in unit timestamp as milliseconds
-`percent`|yes|to replace all values with their percentage over the row total
-`abs`|yes|to turn all values positive
-`null2zero`|yes|to replace gaps with zeros (the default prints the string `null`
+| option        | supported | description|
+|:----:|:-------:|:----------|
+| `google_json` | yes       | enable the Google flavor of JSON (using double quotes for strings and `Date()` function for dates|
+| `objectrows`  | yes       | return each row as an object, instead of an array|
+| `nonzero`     | yes       | to return only the dimensions that have at least a non-zero value|
+| `flip`        | yes       | to return the rows older to newer (the default is newer to older)|
+| `seconds`     | yes       | to return the date and time in unix timestamp|
+| `ms`          | yes       | to return the date and time in unit timestamp as milliseconds|
+| `percent`     | yes       | to replace all values with their percentage over the row total|
+| `abs`         | yes       | to turn all values positive|
+| `null2zero`   | yes       | to replace gaps with zeros (the default prints the string `null`|
 
 ## Examples
 
@@ -148,5 +148,4 @@ google.visualization.Query.setResponse({version:'0.6',reqId:'0',status:'ok',sig:
 }});
 ```
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fformatters%2Fjson%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fformatters%2Fjson%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -8,13 +8,12 @@ We also ask you to read our [documentation style guide](style-guide.md), which, 
 
 All our documentation uses the Markdown syntax. If you're not familiar with how it works, please read the [Markdown introduction post](https://daringfireball.net/projects/markdown/) by its creator, followed by [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub.
 
-
 ## How contributing to the documentation works
 
 There are two ways to contribute to Netdata's documentation: 
 
-1. Edit documentation [directly in GitHub](#edit-documentation-directly-on-gitHub).
-2. Download the repository and [edit documentation locally](#edit-documentation-locally).
+1.  Edit documentation [directly in GitHub](#edit-documentation-directly-on-gitHub).
+2.  Download the repository and [edit documentation locally](#edit-documentation-locally).
 
 Editing in GitHub is a simpler process and is perfect for quick edits to a single document, such as fixing a typo or clarifying a confusing sentence.
 
@@ -24,9 +23,8 @@ In both cases, you'll finish by submitting a pull request (PR). Once you submit 
 
 To continue, follow one of the paths below:
 
-- [Edit documentation directly in GitHub](#edit-documentation-directly-on-github)
-- [Edit documentation locally](#edit-documentation-locally)
-
+-   [Edit documentation directly in GitHub](#edit-documentation-directly-on-github)
+-   [Edit documentation locally](#edit-documentation-locally)
 
 ## Edit documentation directly on GitHub
 
@@ -47,7 +45,6 @@ After you've hit that button, jump down to our instructions on [pull requests an
 !!! note
     This process will create a branch directly on the `netdata/netdata` repository, which then requires manual cleanup. If you're going to make significant documentation contributions, or contribute often, we recommend the local editing process just below.
 
-
 ## Edit documentation locally
 
 Editing documentation locally is the preferred method for complex changes, PRs that span across multiple documents, or those that change the styling or underlying functionality of the documentation.
@@ -63,7 +60,6 @@ $ git clone https://github.com/YOUR-GITHUB-USERNAME/netdata.git
 ```
 
 You can now jump into the directory and explore Netdata's structure for yourself.
-
 
 ### Understanding the structure of Netdata's documentation
 
@@ -81,7 +77,6 @@ At the root of the Netdata repository is a `docs/` folder. Inside this folder we
 
 If the documentation you're working on doesn't have a direct relaionship to a component of Netdata, it can be placed in this `docs/` folder.
 
-
 ### Make your edits
 
 Now that you're set up and understand where to find or create your `.md` file, you can now begin to make your edits. Just use your favorite editor and keep in mind our [style guide](style-guide.md) as you work.
@@ -89,7 +84,6 @@ Now that you're set up and understand where to find or create your `.md` file, y
 If you add a new file to the documentation, you may need to modify the `buildyaml.sh` file to ensure it's added to the site's navigation. This is true for any file added to the `docs/` folder.
 
 Be sure to periodically add/commit your edits so that you don't lose your work! We use version control software for a reason.
-
 
 ### Build the documentation
 
@@ -104,7 +98,7 @@ Follow the [Python installation instructions](https://www.python.org/downloads/)
 
 Use `pip`, which was installed alongside Python, to install `mkdocs` and `mkdocs-material`. Your operating system might force you to use `pip2` or `pip3` instead, dependin on which version of Python you have installed.
 
-``` bash
+```bash
 $ pip install mkdocs mkdocs-material
 ```
 
@@ -113,12 +107,11 @@ $ pip install mkdocs mkdocs-material
 
 When `pip` is finished installing, navigate to the root directory of the Netdata repository and run the documentation generator script.
 
-``` bash
+```bash
 $ sh docs/generator/buildhtml.sh
 ```
 
 This process will take some time. Once finished, the built documentation site will be located at `docs/generator/build/`.
-
 
 ### Run a local web server to test documentation
 
@@ -133,14 +126,12 @@ Feel free to replace the port number you want this web server to listen on (port
 
 Open your web browser and navigate to `http://localhost:20000`. If you replaced the port earlier, change it here as well. You can now navigate through the documentation as you would on the live site!
 
-
 ## Pull requests and final steps
 
 When you're finished with your changes, add and commit them to your fork of the Netdata repository. Head over to GitHub to create your pull request (PR).
 
 Once we receive your pull request (PR), we'll take time to read through it and assess it for correctness, conciseness, and overall quality. We may point to specific sections and ask for additional information or other fixes.
 
-
 ## What's next
 
-- Read up on the Netdata documentation [style guide](style-guide.md).
+-   Read up on the Netdata documentation [style guide](style-guide.md).

@@ -115,6 +115,7 @@ set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${LIBLZ4_INCLUDE_
 #set(NETDATA_COMMON_INCLUDE_DIRS ${NETDATA_COMMON_INCLUDE_DIRS} ${JUDY_INCLUDE_DIRS})
 set(NETDATA_COMMON_LIBRARIES ${NETDATA_COMMON_LIBRARIES} "-lJudy")
 set(CMAKE_REQUIRED_LIBRARIES "Judy")
+include(CheckSymbolExists)
 check_symbol_exists("JudyLLast" "Judy.h" HAVE_JUDY)
 IF(HAVE_JUDY)
     message(STATUS "Judy library found")
@@ -269,6 +270,15 @@ pkg_check_modules(SNAPPY snappy)
 # ${SNAPPY_LIBRARIES}
 # ${SNAPPY_CFLAGS_OTHER}
 # ${SNAPPY_INCLUDE_DIRS}
+
+
+# -----------------------------------------------------------------------------
+# Detect libmongoc
+
+find_package(libmongoc-1.0)
+# later we use:
+# ${MONGOC_LIBRARIES}
+# ${MONGOC_INCLUDE_DIRS}
 
 
 # -----------------------------------------------------------------------------
@@ -594,6 +604,11 @@ set(PROMETHEUS_REMOTE_WRITE_BACKEND_FILES
         backends/prometheus/remote_write/remote_write.h
         )
 
+set(MONGODB_BACKEND_FILES
+        backends/mongodb/mongodb.c
+        backends/mongodb/mongodb.h
+        )
+
 set(DAEMON_FILES
         daemon/common.c
         daemon/common.h
@@ -679,6 +694,19 @@ IF(ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE)
     list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER} ${SNAPPY_CFLAGS_OTHER})
 ELSE()
     message(STATUS "prometheus remote write backend: disabled (requires protobuf and snappy libraries)")
+ENDIF()
+
+# -----------------------------------------------------------------------------
+# mongodb backend
+
+IF(libmongoc-1.0_FOUND)
+    message(STATUS "mongodb backend: enabled")
+
+    list(APPEND NETDATA_FILES ${MONGODB_BACKEND_FILES})
+    list(APPEND NETDATA_COMMON_LIBRARIES ${MONGOC_LIBRARIES})
+    list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${MONGOC_INCLUDE_DIRS})
+ELSE()
+    message(STATUS "mongodb backend: disabled (requires mongoc library)")
 ENDIF()
 
 # -----------------------------------------------------------------------------

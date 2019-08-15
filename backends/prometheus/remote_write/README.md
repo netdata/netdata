@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-To use the prometheus remote write API with [storage providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage) [protobuf](https://developers.google.com/protocol-buffers/) and [snappy](https://github.com/google/snappy) libraries should be installed first. Next, netdata should be re-installed from the source. The installer will detect that the required libraries and utilities are now available.
+To use the prometheus remote write API with [storage providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage) [protobuf](https://developers.google.com/protocol-buffers/) and [snappy](https://github.com/google/snappy) libraries should be installed first. Next, Netdata should be re-installed from the source. The installer will detect that the required libraries and utilities are now available.
 
 ## Configuration
 
@@ -27,4 +27,4 @@ The default value is `/receive`. `remote write URL path` is used to set an endpo
 
 The remote write backend does not support `buffer on failures`
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2Fprometheus%2Fremote_write%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2Fprometheus%2Fremote_write%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

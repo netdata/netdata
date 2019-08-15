@@ -4,14 +4,13 @@ This in-progress style guide establishes editorial guidelines for anyone who wan
 
 ## Table of contents
 
-- [Welcome!](#welcome)
-- [Goals of the Netdata style guide](#goals-of-the-Netdata-style-guide)
-- [General principles](#general-principles)
-- [Tone and content](#tone-and-content)
-- [Language and grammar](#language-and-grammar)
-- [Markdown syntax](#markdown-syntax)
-- [Accessibility](#accessibility)
-
+-   [Welcome!](#welcome)
+-   [Goals of the Netdata style guide](#goals-of-the-Netdata-style-guide)
+-   [General principles](#general-principles)
+-   [Tone and content](#tone-and-content)
+-   [Language and grammar](#language-and-grammar)
+-   [Markdown syntax](#markdown-syntax)
+-   [Accessibility](#accessibility)
 
 ## Welcome
 
@@ -21,15 +20,14 @@ We’re here to make developers, sysadmins, and DevOps engineers better at their
 
 We welcome contributions to Netdata's documentation. Begin with the [contributing to documentation guide](contributing-documentation.md), followed by this style guide.
 
-
 ## Goals of the Netdata style guide
 
 An editorial style guide establishes standards for writing and maintaining documentation. At Netdata, we focus on the following principles:
 
-- Consistency
-- High-quality writing
-- Conciseness
-- Accessibility
+-   Consistency
+-   High-quality writing
+-   Conciseness
+-   Accessibility
 
 These principles will make documentation better for everyone who wants to use Netdata, whether they're a beginner or an expert.
 
@@ -47,26 +45,26 @@ Here's a few key points to start with. Where relevant, they link to more in-dept
 
 **[Tone and content](#tone-and-content)**:
 
-- Be [conversational and friendly](#conversational-and-friendly-tone).
-- Write [concisely](#write-concisely).
-- Don't use words like **here** when [creating hyperlinks](#use-informational-hyperlinks).
-- Don't mention [future releases or features](#mentioning-future-releases-or-features) in documentation.
+-   Be [conversational and friendly](#conversational-and-friendly-tone).
+-   Write [concisely](#write-concisely).
+-   Don't use words like **here** when [creating hyperlinks](#use-informational-hyperlinks).
+-   Don't mention [future releases or features](#mentioning-future-releases-or-features) in documentation.
 
 **[Language and grammar](#language-and-grammar)**:
 
-- [Capitalize words](#capitalization) at the beginning of sentences, for proper nouns, and at the beginning of document titles and section headers.
-- Use [second person](#second-person)—"you" rather than "we"—when giving instructions.
-- Use [active voice](#active-voice) to make clear who or what is performing an action.
-- Always employ an [Oxford comma](#oxford-comma) on lists.
+-   [Capitalize words](#capitalization) at the beginning of sentences, for proper nouns, and at the beginning of document titles and section headers.
+-   Use [second person](#second-person)—"you" rather than "we"—when giving instructions.
+-   Use [active voice](#active-voice) to make clear who or what is performing an action.
+-   Always employ an [Oxford comma](#oxford-comma) on lists.
 
 **[Markdown syntax](#markdown-syntax)**:
 
-- [Reference UI elements](#references-to-ui-elements) with bold text.
-- Use our [built-in syntax highlighter](#language-specific-syntax-highlighting-in-code-blocks) to improve the readability and usefulness of code blocks.
+-   [Reference UI elements](#references-to-ui-elements) with bold text.
+-   Use our [built-in syntax highlighter](#language-specific-syntax-highlighting-in-code-blocks) to improve the readability and usefulness of code blocks.
 
 **[Accessibility](#accessibility)**:
 
-- Include [alt tags on images](#images).
+-   Include [alt tags on images](#images).
 
 ---
 
@@ -134,10 +132,10 @@ Netdata's documentation should be consistent in the way it uses certain words, p
 
 In text, follow the general [English standards](https://owl.purdue.edu/owl/general_writing/mechanics/help_with_capitals.html) for capitalization. In summary:
 
-- Capitalize the first word of every new sentence.
-- Don't use uppercase for emphasis. (Netdata is the BEST!)
-- Capitalize the names of brands, software, products, and companies according to their official guidelines. (Netdata, Docker, Apache, Nginx)
-- Avoid camel case (NetData) or all caps (NETDATA).
+-   Capitalize the first word of every new sentence.
+-   Don't use uppercase for emphasis. (Netdata is the BEST!)
+-   Capitalize the names of brands, software, products, and companies according to their official guidelines. (Netdata, Docker, Apache, Nginx)
+-   Avoid camel case (NetData) or all caps (NETDATA).
 
 #### Capitalization of 'Netdata' and 'netdata'
 
@@ -163,11 +161,11 @@ Also, don't put a period (`.`) or colon (`:`) at the end of a title or header.
 
 **Document titles**:
 
-| Capitalization | Not recommended | Recommended 
+| Capitalization  | Not recommended | Recommended 
 | --- | --- | --- 
 | Document titles | Getting Started Guide | Getting started guide 
-| Page headings | Service Discovery and Auto-Detection: | Service discovery and auto-detection
-| Proper nouns | Install netdata with docker | Install Netdata with Docker
+| Page headings   | Service Discovery and Auto-Detection: | Service discovery and auto-detection
+| Proper nouns    | Install netdata with docker | Install Netdata with Docker
 
 ### Second person
 
@@ -234,7 +232,6 @@ Netdata can monitor RAM, disk I/O, MySQL queries per second and lm-sensors.
 Netdata can monitor RAM, disk I/O, MySQL queries per second, and lm-sensors.
 ```
 
-
 ## Markdown syntax
 
 The Netdata documentation uses the Markdown syntax for styling and formatting. If you're not familiar with how it works, please read the [Markdown introduction post](https://daringfireball.net/projects/markdown/) by its creator, followed by [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub.
@@ -254,10 +251,11 @@ Click on the **Sign in** button.
 !!! note
     Whenever possible, avoid using directional language to orient readers, because not every reader can use instructions like "look at the top-left corner" to find their way around an interface.
 
-    If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
+```
+If you feel that you must use directional language, perhaps use an [image](#images) (with proper alt text) instead.
 
-    We're also working to establish standards for how we refer to certain elements of the Netdata's web interface. We'll include that in this style guide as soon as it's complete.
-
+We're also working to establish standards for how we refer to certain elements of the Netdata's web interface. We'll include that in this style guide as soon as it's complete.
+```
 
 ### Language-specific syntax highlighting in code blocks
 
@@ -265,7 +263,7 @@ Our documentation uses the [Highlight extension](https://facelessuser.github.io/
 
 For a full list of languages, see [Pygment's supported languages](http://pygments.org/languages/). Netdata documentation will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`, and `go`. If no language is specified, the Highlight extension doesn't apply syntax highlighting.
 
-Include the language directly after the three backticks (`` ``` ``) that start the code block. For highlighting C code, for example:
+Include the language directly after the three backticks (```` ``` ````) that start the code block. For highlighting C code, for example:
 
 ````
 ```c
@@ -297,7 +295,6 @@ Display line numbers by appending `linenums="1"` after the language declaration,
 ## Accessibility
 
 Netdata's documentation should be as accessible as possible to as many people as possible. While the rules about [tone and content](#tone-and-content) and [language and grammar](#language-and-grammar) are helpful to an extent, we also need some additional rules to improve the reading experience for all readers.
-
 
 ### Images
 
