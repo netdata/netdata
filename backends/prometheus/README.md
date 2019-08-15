@@ -11,7 +11,7 @@ Prometheus is a distributed monitoring system which offers a very simple setup a
 There are number of ways to install Netdata according to [Installation](../../packaging/installer/#installation)\
 The suggested way of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
 
-```
+```sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
@@ -21,7 +21,7 @@ At this point we should have Netdata listening on port 19999. Attempt to take yo
 http://your.netdata.ip:19999
 ```
 
-*(replace `your.netdata.ip` with the IP or hostname of the server running Netdata)*
+_(replace `your.netdata.ip` with the IP or hostname of the server running Netdata)_
 
 ### Installing Prometheus
 
@@ -30,7 +30,10 @@ In order to install prometheus we are going to introduce our own systemd startup
 #### Download Prometheus
 
 ```sh
-wget -O /tmp/prometheus-2.3.2.linux-amd64.tar.gz https://github.com/prometheus/prometheus/releases/download/v2.3.2/prometheus-2.3.2.linux-amd64.tar.gz
+cd /tmp && curl -s https://api.github.com/repos/prometheus/prometheus/releases/latest \
+| grep "browser_download_url.*linux-amd64.tar.gz" \
+| cut -d '"' -f 4 \
+| wget -qi -
 ```
 
 #### Create prometheus system user
@@ -49,7 +52,7 @@ sudo chown prometheus:prometheus /opt/prometheus
 #### Untar prometheus directory
 
 ```sh
-sudo tar -xvf /tmp/prometheus-2.3.2.linux-amd64.tar.gz -C /opt/prometheus --strip=1
+sudo tar -xvf /tmp/prometheus-*linux-amd64.tar.gz -C /opt/prometheus --strip=1
 ```
 
 #### Install prometheus.yml
@@ -110,9 +113,8 @@ scrape_configs:
 
 #### Install nodes.yml
 
-The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and add a *- "nodes.yml"* entry under the *rule_files:* section in the example prometheus.yml file above.
-
-```
+The following is completely optional, it will enable Prometheus to generate alerts from some NetData sources. Tweak the values to your own needs. We will use the following `nodes.yml` file below. Save it at `/opt/prometheus/nodes.yml`, and add a _- "nodes.yml"_ entry under the _rule_files:_ section in the example prometheus.yml file above.
+```yaml
 groups:
 - name: nodes
 
@@ -174,7 +176,7 @@ WantedBy=multi-user.target
 
 ##### Start Prometheus
 
-```
+```sh
 sudo systemctl start prometheus
 sudo systemctl enable prometheus
 ```
@@ -193,7 +195,7 @@ Before explaining the changes, we have to understand the key differences between
 
 ### understanding Netdata metrics
 
-##### charts
+#### charts
 
 Each chart in Netdata has several properties (common to all its metrics):
 
@@ -207,7 +209,7 @@ Each chart in Netdata has several properties (common to all its metrics):
 
 -   `units` is the units for all the metrics attached to the chart.
 
-##### dimensions
+#### dimensions
 
 Then each Netdata chart contains metrics called `dimensions`. All the dimensions of a chart have the same units of measurement, and are contextually in the same category (ie. the metrics for disk bandwidth are `read` and `write` and they are both in the same chart).
 
@@ -242,7 +244,7 @@ Fetch with your web browser this URL:
 
 `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes`
 
-*(replace `your.netdata.ip` with the ip or hostname of your Netdata server)*
+_(replace `your.netdata.ip` with the ip or hostname of your Netdata server)_
 
 Netdata will respond with all the metrics it sends to prometheus.
 
@@ -274,7 +276,7 @@ netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension=
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="idle"} 92.3630770 1500066662000
 ```
 
-*(Netdata response for `system.cpu` with source=`average`)*
+_(Netdata response for `system.cpu` with source=`average`)_
 
 In `average` or `sum` data sources, all values are normalized and are reported to prometheus as gauges. Now, use the 'expression' text form in prometheus. Begin to type the metrics we are looking for: `netdata_system_cpu`. You should see that the text form begins to auto-fill as prometheus knows about this metric.
 
@@ -304,7 +306,7 @@ netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="iowait"} 233
 netdata_system_cpu_total{chart="system.cpu",family="cpu",dimension="idle"} 918470 1500066716438
 ```
 
-*(Netdata response for `system.cpu` with source=`as-collected`)*
+_(Netdata response for `system.cpu` with source=`as-collected`)_
 
 For more information check prometheus documentation.
 
@@ -312,7 +314,7 @@ For more information check prometheus documentation.
 
 The `format=prometheus` parameter only exports the host's Netdata metrics.  If you are using the master/slave functionality of Netdata this ignores any upstream hosts - so you should consider using the below in your **prometheus.yml**:
 
-```
+```yaml
     metrics_path: '/api/v1/allmetrics'
     params:
       format: [prometheus_all_hosts]
