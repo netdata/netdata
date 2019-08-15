@@ -1,6 +1,5 @@
 # Using the Nodes View
 
-
 ## Introduction
 
 As of v1.15.0 of Netdata, and in conjunction with our announcement post about the [future of Netdata](https://blog.netdata.cloud/posts/netdata-cloud-announcement/), we have enabled an entirely new way to view your infrastructure using the open-source Netdata agent in conjunction with Netdata Cloud: the **Nodes View**. 
@@ -10,8 +9,9 @@ This view, powered by Netdata Cloud, provides an aggregated view of the Netdata 
 !!! attention "Nodes View is beta software!"
     The Nodes View is currently in beta, so all typical warnings about beta software apply. You may come across bugs or inconsistencies.
 
-    The current version of Nodes uses the API available on each Netdata agent to check for new alarms and the machine's overall health/availability. In the future, we will offer both polling via the API and real-time streaming of health status/metrics.
-
+```
+The current version of Nodes uses the API available on each Netdata agent to check for new alarms and the machine's overall health/availability. In the future, we will offer both polling via the API and real-time streaming of health status/metrics.
+```
 
 ## The Nodes View
 
@@ -20,7 +20,6 @@ To access the Nodes View, you must first be signed in to Netdata Cloud. To regis
 Once you're signed in to Netdata Cloud, clicking on any of the **Nodes Beta** buttons in the node's web dashboard will lead you to the Nodes View. Find one (`1`) in the dropdown menu in the upper-right corner, a second (`2`) in the top navigation bar, and a third (`3`) in the dropdown menu in the top-left corner of the Netdata dashboard.
 
 ![Annotated screenshot showing where to access Nodes View](https://user-images.githubusercontent.com/1153921/60359236-4fd04b00-998d-11e9-9e4c-f35ad2551a54.png)
-
 
 ### Nodes
 
@@ -41,23 +40,22 @@ The background color of each Node entry is an indication of its health status:
 | **Red**       | 1 or more active critical alerts                                                                  |
 | **Grey**      | Node is unreachable (server unreachable [due to network conditions], server down, or changed URL) |
 
-
 ### Node overview
 
 When you click on any of the Nodes, an overview sidebar will appear on the right-hand side of the Nodes View.
 
 This overview contains the following:
 
--  An icon (`1`) representing the operating system installed on that machine
-- The hostname (`2`) of the machine
-- A link (`3`) to the URL at which the web dashboard is available
-- Three tabs (`4`) for **System** metrics, **Services** metrics, and **Alarms**
-- A number of selectors (`5`) to choose which metrics/alarms are shown in the overview
-    - **System** tab: *Overview*, *Disks*, and *Network* selectors
-    - **Services** tab: *Databases*, *Web*, and *Messaging* selectors
-    - **Alarms** tab: *Critical* and *Warning* selectors
-- The visualizations and/or alarms (`6`) supported under the chosen tab and selector
-- Any other available URLS (`7`) associated with that node under the **Node URLs** header.
+-   An icon (`1`) representing the operating system installed on that machine
+-   The hostname (`2`) of the machine
+-   A link (`3`) to the URL at which the web dashboard is available
+-   Three tabs (`4`) for **System** metrics, **Services** metrics, and **Alarms**
+-   A number of selectors (`5`) to choose which metrics/alarms are shown in the overview
+    -   **System** tab: _Overview_, _Disks_, and _Network_ selectors
+    -   **Services** tab: _Databases_, _Web_, and _Messaging_ selectors
+    -   **Alarms** tab: _Critical_ and _Warning_ selectors
+-   The visualizations and/or alarms (`6`) supported under the chosen tab and selector
+-   Any other available URLS (`7`) associated with that node under the **Node URLs** header.
 
 ![A screenshot of the system overview area in the Netdata Cloud web interface](https://user-images.githubusercontent.com/1153921/60361418-f834de00-9992-11e9-9998-ab3da4b8b559.png)
 
@@ -69,24 +67,23 @@ By default, clicking on a Node will display the sidebar with the **System** tab 
 
 The **System** tab has three sections: *Overview*, *Disks*, and *Network*.
 
-*Overview* displays visualizations for `CPU`, `System Load Average` `Disk I/O`, `System RAM`, `System Swap`, `Physical Network Interfaces Aggregated Bandwidth`, and the URL of the node. 
+_Overview_ displays visualizations for `CPU`, `System Load Average` `Disk I/O`, `System RAM`, `System Swap`, `Physical Network Interfaces Aggregated Bandwidth`, and the URL of the node. 
 
-*Disks* displays visualizations for `Disk Utilization Time`, and `Disk Space Usage` for every available disk.
+_Disks_ displays visualizations for `Disk Utilization Time`, and `Disk Space Usage` for every available disk.
 
-*Network* displays visualizations for `Bandwidth` for every available networking device.
+_Network_ displays visualizations for `Bandwidth` for every available networking device.
 
 #### Services tab
 
-The **Services** tab will show visualizations for any [supported services](#Services-available-in-the-Nodes-View) that are running on that node. Three selectors are available: *Databases*, *Web*, and *Messaging*. If there are no services under any of these categories, the selector will not be clickable.
+The **Services** tab will show visualizations for any [supported services](#Services-available-in-the-Nodes-View) that are running on that node. Three selectors are available: _Databases_, _Web_, and _Messaging_. If there are no services under any of these categories, the selector will not be clickable.
 
 #### Alarms tab
 
-The **Alarms** tab contains two selectors: *Critical* and *Warning*. If there are no alarms under either of these categories, the selector will not be clickable.
+The **Alarms** tab contains two selectors: _Critical_ and _Warning_. If there are no alarms under either of these categories, the selector will not be clickable.
 
 Both of these tabs will display alarms information when available, along with the relevant visualization with metrics from your Netdata agent. The `view` link redirects you to the web dashboard for the selected node and automatically shows the appropriate visualization and timeframe.
 
 ![A screenshot of the alarms area in the Netdata Cloud web interface](https://user-images.githubusercontent.com/1153921/59883273-55180f00-9369-11e9-8895-f74f6c66e038.png)
-
 
 ### Filtering field
 
@@ -98,7 +95,6 @@ The filtering field will offer you autocomplete suggestions. For example, the op
 
 If you select multiple filters, results will display according to an `OR` operator. 
 
-
 ### View modes
 
 To the right of the filtering field is three functions that will help you organize your Visited Nodes according to your preferences.
@@ -107,39 +103,38 @@ To the right of the filtering field is three functions that will help you organi
 
 The view mode button lets you switch between three view modes:
 
-- **Full** mode, which displays the following information in a large squares for each connected Node:
-    - Operating system
-    - Critical/warning alerts in two separate indicators
-    - Hostname
-    - Icons for [supported services](#services-available-in-the-nodes-view)
+-   **Full** mode, which displays the following information in a large squares for each connected Node:
+    -   Operating system
+    -   Critical/warning alerts in two separate indicators
+    -   Hostname
+    -   Icons for [supported services](#services-available-in-the-nodes-view)
 
 ![Annotated screenshot of the full view mode](https://user-images.githubusercontent.com/1153921/60219885-15e63400-9829-11e9-8654-b49f119efb9a.png)
 
-- **Compact** mode, which displays the following information in small squares for each connected Node:
-    - Operating system
+-   **Compact** mode, which displays the following information in small squares for each connected Node:
+    -   Operating system
 
 ![Annotated screenshot of the compact view mode](https://user-images.githubusercontent.com/1153921/60220570-547cee00-982b-11e9-9caf-9dd449184f3a.png)
 
-- **Detailed** mode, which displays the following information in large horizontal rectangles for each connected Node:
-    - Operating system
-    - Critical/warning alerts in two separate indicators
-    - Hostname
-    - Icons for [supported services](#services-available-in-the-nodes-view) 
+-   **Detailed** mode, which displays the following information in large horizontal rectangles for each connected Node:
+    -   Operating system
+    -   Critical/warning alerts in two separate indicators
+    -   Hostname
+    -   Icons for [supported services](#services-available-in-the-nodes-view) 
 
 ![Annotated screenshot of the detailed view mode](https://user-images.githubusercontent.com/1153921/60220574-56df4800-982b-11e9-8300-aa9190bbf09f.png)
 
 ## Sorting, and grouping
 
-The **Sort by** dropdown allows you to choose between sorting *alphabetically by hostname*, most *recently-viewed* nodes, and most *frequently-view* nodes.
+The **Sort by** dropdown allows you to choose between sorting _alphabetically by hostname_, most _recently-viewed_ nodes, and most _frequently-view_ nodes.
 
-The **Group by** dropdown lets you switch between *alarm status*, *running services*, or *online status*.
+The **Group by** dropdown lets you switch between _alarm status_, _running services_, or _online status_.
 
-For example, the following screenshot represents the Nodes list with the following options: *detailed list*, *frequently visited*, and *alarm status*.
+For example, the following screenshot represents the Nodes list with the following options: _detailed list_, _frequently visited_, and _alarm status_.
 
 ![A screenshot of sorting, grouping, and view modes in the Netdata Cloud web interface](https://user-images.githubusercontent.com/1153921/59883300-68c37580-9369-11e9-8d6e-ce0a8147fc1d.png)
 
 Play around with the options until you find a setup that works for you.
-
 
 ## Adding more agents to the Nodes View
 
@@ -148,35 +143,36 @@ There is currently only one way to associate additional Netdata nodes with your 
 !!! note ""
     We are aware that the process of registering each node individually is cumbersome for those who want to implement Netdata Cloud's features across a large infrastructure. 
 
-    Please view [this comment on issue #6318](https://github.com/netdata/netdata/issues/6318#issuecomment-504106329) for how we plan on improving the process for adding additional nodes to your Netdata Cloud account.
-
+```
+Please view [this comment on issue #6318](https://github.com/netdata/netdata/issues/6318#issuecomment-504106329) for how we plan on improving the process for adding additional nodes to your Netdata Cloud account.
+```
 
 ## Services available in the Nodes View
 
-The following tables elaborate on which services will appear in the Nodes View. Alerts from [other collectors](../../collectors/README.md), when entered an alarm status, will show up in the *Alarms* tab despite not appearing 
+The following tables elaborate on which services will appear in the Nodes View. Alerts from [other collectors](../../collectors/README.md), when entered an alarm status, will show up in the _Alarms_ tab despite not appearing 
 
 ### Databases
 
-These services will appear under the *Databases* selector beneath the *Services* tab.
+These services will appear under the _Databases_ selector beneath the _Services_ tab.
 
-| Service  	| Collectors  	| Context #1  	| Context #2  	| Context #3   	|
+| Service  	      | Collectors  	                | Context #1  	| Context #2  	| Context #3   	|
 |---	|---	|---	|---	|---	|
-| MySQL  	  | `python.d.plugin:mysql`, `go.d.plugin:mysql`  	| `mysql.queries`  	|  `mysql.net` 	| `mysql.connections`   	|
-| MariaDB  	| `python.d.plugin:mysql`, `go.d.plugin:mysql`  	| `mysql.queries`  	| `mysql.net`  	| `mysql.connections`  	|
-| Oracle Database  	| `python.d.plugin:oracledb`  	| `oracledb.session_count`  	| `oracledb.physical_disk_read_writes ` 	| `oracledb.tablespace_usage_in_percent`   	|
-| PostgreSQL  	| `python.d.plugin:postgres`  	| `postgres.checkpointer`  	| `postgres.archive_wal`  	| `postgres.db_size`  	|
-| MongoDB  	| `python.d.plugin:mongodb`  	| `mongodb.active_clients`  	| `mongodb.read_operations`  	| `mongodb.write_operations`  	|
-| ElasticSearch  	| `python.d.plugin:elasticsearch`  	| `elastic.search_performance_total`  	| `elastic.index_performance_total`  	| `elastic.index_segments_memory`  	|
-| CouchDB  	| `python.d.plugin:couchdb`  	| `couchdb.activity`  	| `couchdb.response_codes`  	|   	|
-| Proxy SQL  	| `python.d.plugin:proxysql`  	| `proxysql.questions`  	| `proxysql.pool_status`  	| `proxysql.pool_overall_net`  	|
-| Redis  	| `python.d.plugin:redis`  	| `redis.operations`  	| `redis.net`  	| `redis.connections`  	|
-| MemCached  	| `python.d.plugin:memcached`  	| `memcached.cache`  	| `memcached.net`  	| `memcached.connections`  	|
-| RethinkDB  	| `python.d.plugin:rethinkdbs`  	| `rethinkdb.cluster_queries`  	| `rethinkdb.cluster_clients_active`  	| `rethinkdb.cluster_connected_servers`  	|
-| Solr  	| `go.d.plugin:solr`  	| `solr.search_requests`  	| `solr.update_requests`  	|   	|
+| MySQL  	      | `python.d.plugin:mysql`, `go.d.plugin:mysql`  	| `mysql.queries`  	|  `mysql.net` 	| `mysql.connections`   	|
+| MariaDB  	      | `python.d.plugin:mysql`, `go.d.plugin:mysql`  	| `mysql.queries`  	| `mysql.net`  	| `mysql.connections`  	|
+| Oracle Database | `python.d.plugin:oracledb`  	| `oracledb.session_count`  	| `oracledb.physical_disk_read_writes ` 	| `oracledb.tablespace_usage_in_percent`   	|
+| PostgreSQL  	  | `python.d.plugin:postgres`  	| `postgres.checkpointer`  	| `postgres.archive_wal`  	| `postgres.db_size`  	|
+| MongoDB  	      | `python.d.plugin:mongodb`  	    | `mongodb.active_clients`  	| `mongodb.read_operations`  	| `mongodb.write_operations`  	|
+| ElasticSearch   | `python.d.plugin:elasticsearch` | `elastic.search_performance_total`  	| `elastic.index_performance_total`  	| `elastic.index_segments_memory`  	|
+| CouchDB  	      | `python.d.plugin:couchdb`  	    | `couchdb.activity`  	| `couchdb.response_codes`  	|   	|
+| Proxy SQL  	  | `python.d.plugin:proxysql`  	| `proxysql.questions`  	| `proxysql.pool_status`  	| `proxysql.pool_overall_net`  	|
+| Redis  	      | `python.d.plugin:redis`  	    | `redis.operations`  	| `redis.net`  	| `redis.connections`  	|
+| MemCached  	  | `python.d.plugin:memcached`  	| `memcached.cache`  	| `memcached.net`  	| `memcached.connections`  	|
+| RethinkDB  	  | `python.d.plugin:rethinkdbs`  	| `rethinkdb.cluster_queries`  	| `rethinkdb.cluster_clients_active`  	| `rethinkdb.cluster_connected_servers`  	|
+| Solr  	      | `go.d.plugin:solr`  	        | `solr.search_requests`  	| `solr.update_requests`  	|   	|
 
 ### Web services
 
-These services will appear under the *Web* selector beneath the *Services* tab. These also include proxies, load balancers (LB), and streaming services.
+These services will appear under the _Web_ selector beneath the _Services_ tab. These also include proxies, load balancers (LB), and streaming services.
 
 | Service  	| Collectors  	| Context #1  	| Context #2  	| Context #3   	|
 |---	|---	|---	|---	|---	|
@@ -195,18 +191,16 @@ These services will appear under the *Web* selector beneath the *Services* tab. 
 | IPVS  	| `proc.plugin:/proc/net/ip_vs_stats`  	| `ipvs.sockets`  	| `ipvs.packets`  	|   	|
 | Web Log  	| `python.d.plugin:web_log`, `go.d.plugin:web_log`  	| `web_log.response_codes`  	| `web_log.bandwidth`  	|   	|
 | IPFS  	| `python.d.plugin:ipfs`  	| `ipfs.bandwidth`  	|  `ipfs.peers` 	|   	|
-| IceCast Media Streaming  	| `python.d.plugin:icecast`  	| `icecast.listeners`  	|   	|   	|
-| RetroShare  	| `python.d.plugin:retroshare`  	| `retroshare.bandwidth`  	| `retroshare.peers`  	|   	|
-| HTTP Check  	|  `python.d.plugin:httpcheck`, `go.d.plugin:httpcheck` 	| `httpcheck.responsetime`  	| `httpcheck.status`  	|   	|
-| x509 Check  	| `go.d.plugin:x509check`  	| `x509check.time_until_expiration`  	|   	|   	|
+| IceCast Media Streaming | `python.d.plugin:icecast`  	| `icecast.listeners`  	|   	|   	|
+| RetroShare  	          | `python.d.plugin:retroshare`  	| `retroshare.bandwidth`  	| `retroshare.peers`  	|   	|
+| HTTP Check  	          |  `python.d.plugin:httpcheck`, `go.d.plugin:httpcheck` 	| `httpcheck.responsetime`  	| `httpcheck.status`  	|   	|
+| x509 Check  	          | `go.d.plugin:x509check`  	| `x509check.time_until_expiration`  	|   	|   	|
 
 ### Messaging
 
-These services will appear under the *Messaging* selector beneath the *Services* tab.
+These services will appear under the _Messaging_ selector beneath the _Services_ tab.
 
-| Service  	| Collectors  	| Context #1  	| Context #2  	| Context #3   	|
+| Service  	 | Collectors  	                                      | Context #1  	            | Context #2  	               | Context #3   	           |
 | ---	| ---	| ---	| ---	| ---	|
-| RabbitMQ  	| `python.d.plugin:rabbitmq`, `go.d.plugin:rabbitmq`  	| `rabbitmq.queued_messages`  	| `rabbitmq.erlang_run_queue`  	| 
-| Beanstalkd  	| `python.d.plugin:beanstalk`  	| `beanstalk.total_jobs_rate`  	| `beanstalk.connections_rate`  	| `beanstalk.current_tubes`  	|
-
-
+| RabbitMQ   | `python.d.plugin:rabbitmq`, `go.d.plugin:rabbitmq` | `rabbitmq.queued_messages`  | `rabbitmq.erlang_run_queue`  |            
+| Beanstalkd | `python.d.plugin:beanstalk`  	                  | `beanstalk.total_jobs_rate` | `beanstalk.connections_rate` | `beanstalk.current_tubes` |

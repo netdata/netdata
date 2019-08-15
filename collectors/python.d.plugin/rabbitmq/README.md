@@ -4,42 +4,51 @@ Module monitor rabbitmq performance and health metrics.
 
 Following charts are drawn:
 
-1. **Queued Messages**
- * ready
- * unacknowledged
+1.  **Queued Messages**
 
-2. **Message Rates**
- * ack
- * redelivered
- * deliver
- * publish
+    -   ready
+    -   unacknowledged
 
-3. **Global Counts**
- * channels
- * consumers
- * connections
- * queues
- * exchanges
+2.  **Message Rates**
 
-4. **File Descriptors**
- * used descriptors
+    -   ack
+    -   redelivered
+    -   deliver
+    -   publish
 
-5. **Socket Descriptors**
- * used descriptors
+3.  **Global Counts**
 
-6. **Erlang processes**
- * used processes
+    -   channels
+    -   consumers
+    -   connections
+    -   queues
+    -   exchanges
 
-7. **Erlang run queue**
- * Erlang run queue
+4.  **File Descriptors**
 
-8. **Memory**
- * free memory in megabytes
+    -   used descriptors
 
-9. **Disk Space**
- * free disk space in gigabytes
+5.  **Socket Descriptors**
 
-### configuration
+    -   used descriptors
+
+6.  **Erlang processes**
+
+    -   used processes
+
+7.  **Erlang run queue**
+
+    -   Erlang run queue
+
+8.  **Memory**
+
+    -   free memory in megabytes
+
+9.  **Disk Space**
+
+    -   free disk space in gigabytes
+
+## configuration
 
 ```yaml
 socket:
@@ -48,11 +57,10 @@ socket:
   port     :  15672
   user     : 'guest'
   pass     : 'guest'
-
 ```
 
 When no configuration file is found, module tries to connect to: `localhost:15672`.
 
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Frabbitmq%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Frabbitmq%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

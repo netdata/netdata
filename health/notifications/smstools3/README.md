@@ -6,8 +6,8 @@ To have Netdata send notifications via SMS Server Tools 3, you'll first need to 
 
 Ensure that the user `netdata` can execute `sendsms`. Any user executing `sendsms` needs to:
 
-* Have write permissions to `/tmp` and `/var/spool/sms/outgoing`
-* Be a member of group `smsd`
+-   Have write permissions to `/tmp` and `/var/spool/sms/outgoing`
+-   Be a member of group `smsd`
 
 To ensure that the steps above are successful, just `su netdata` and execute `sendsms phone message`.
 
@@ -36,4 +36,4 @@ Netdata uses the script `sendsms` that is installed by `smstools3` and just pass
 sendsms=""
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fsmstools3%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fsmstools3%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

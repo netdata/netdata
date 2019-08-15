@@ -5,7 +5,7 @@ Effective as of 09 Aug 2019
 
 ## 1. General Information Regarding These Terms of Use
 
-Master terms: Welcome, and thank you for your interest in Netdata (“Netdata, Inc.” “ND,” “we,” “our,” or “us”). Unless otherwise noted on a particular site or service, these master terms of use (“Master Terms”) apply to your use of all of the websites that Netdata Corporation operates. These include https://my-netdata.io and https://netdata.cloud, together with all other subdomains thereof, (collectively, the “Websites”). The Master Terms also apply to all products, information, and services provided through the Websites, such as the NDID Login Service.
+Master terms: Welcome, and thank you for your interest in Netdata (“Netdata, Inc.” “ND,” “we,” “our,” or “us”). Unless otherwise noted on a particular site or service, these master terms of use (“Master Terms”) apply to your use of all of the websites that Netdata Corporation operates. These include <https://my-netdata.io> and <https://netdata.cloud>, together with all other subdomains thereof, (collectively, the “Websites”). The Master Terms also apply to all products, information, and services provided through the Websites, such as the NDID Login Service.
 
 Additional terms: In addition to the Master Terms, your use of any Services may also be subject to specific terms applicable to a particular Service (“Additional Terms”). If there is any conflict between the Additional Terms and the Master Terms, then the Additional Terms apply in relation to the relevant Service.
 
@@ -158,4 +158,4 @@ Integration: These Master Terms and any applicable Additional Terms constitute t
 
 Human-readable summary of Sec 15: If there is a lawsuit arising from these terms, it should be in Delaware and governed by Delaware law. We are glad you use our sites, but this agreement does not mean we are partners.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fterms-of-use&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fterms-of-use&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

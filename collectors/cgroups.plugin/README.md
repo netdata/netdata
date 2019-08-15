@@ -68,7 +68,6 @@ Basic unified cgroups metrics are supported. To use them instead of v1 cgroups a
 
 Unified cgroups use same name pattern matching as v1 cgroups. `cgroup_enable_systemd_services_detailed_memory` is currently unsupported when using unified cgroups.
 
-
 ### enabled cgroups
 
 To check if the cgroup is enabled, Netdata uses this setting:
@@ -124,20 +123,20 @@ Netdata monitors **systemd services**. Example:
 
 Support per distribution:
 
-system|systemd services<br/>charts shown|`tree`<br/>`/sys/fs/cgroup`|comments
-:-------:|:-------:|:-------:|:------------
-Arch Linux|YES| |
-Gentoo|NO| |can be enabled, see below
-Ubuntu 16.04 LTS|YES| |
-Ubuntu 16.10|YES|[here](http://pastebin.com/PiWbQEXy)|
-Fedora 25|YES|[here](http://pastebin.com/ax0373wF)|
-Debian 8|NO| |can be enabled, see below
-AMI|NO|[here](http://pastebin.com/FrxmptjL)|not a systemd system
-Centos 7.3.1611|NO|[here](http://pastebin.com/SpzgezAg)|can be enabled, see below
+|system|systemd services<br/>charts shown|`tree`<br/>`/sys/fs/cgroup`|comments|
+|:----:|:-------------------------------:|:-------------------------:|:-------|
+|Arch Linux|YES|||
+|Gentoo|NO||can be enabled, see below|
+|Ubuntu 16.04 LTS|YES|||
+|Ubuntu 16.10|YES|[here](http://pastebin.com/PiWbQEXy)||
+|Fedora 25|YES|[here](http://pastebin.com/ax0373wF)||
+|Debian 8|NO||can be enabled, see below|
+|AMI|NO|[here](http://pastebin.com/FrxmptjL)|not a systemd system|
+|Centos 7.3.1611|NO|[here](http://pastebin.com/SpzgezAg)|can be enabled, see below|
 
-#### how to enable cgroup accounting on systemd systems that is by default disabled
+### how to enable cgroup accounting on systemd systems that is by default disabled
 
-You can verify there is no accounting enabled, by running `systemd-cgtop`. The program will show only resources for cgroup ` / `, but all services will show nothing.
+You can verify there is no accounting enabled, by running `systemd-cgtop`. The program will show only resources for cgroup `/`, but all services will show nothing.
 
 To enable cgroup accounting, execute this:
 
@@ -192,7 +191,7 @@ Which systemd services are monitored by Netdata is determined by the following p
 	cgroups to match as systemd services =  !/system.slice/*/*.service  /system.slice/*.service
 ```
 
----
+- - -
 
 ## Monitoring ephemeral containers
 
@@ -200,10 +199,9 @@ Netdata monitors containers automatically when it is installed at the host, or w
 
 Netdata prior to v1.6 had 2 issues when such containers were monitored:
 
-1. network interface alarms where triggering when containers were stopped
+1.  network interface alarms where triggering when containers were stopped
 
-2. charts were never cleaned up, so after some time dozens of containers were showing up on the dashboard, and they were occupying memory.
-
+2.  charts were never cleaned up, so after some time dozens of containers were showing up on the dashboard, and they were occupying memory.
 
 ### the current Netdata
 
@@ -211,13 +209,12 @@ network interfaces and cgroups (containers) are now self-cleaned.
 
 So, when a network interface or container stops, Netdata might log a few errors in error.log complaining about files it cannot find, but immediately:
 
-1. it will detect this is a removed container or network interface
-2. it will freeze/pause all alarms for them
-3. it will mark their charts as obsolete
-4. obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
-5. existing dashboard sessions will continue to see them, but of course they will not refresh
-6. obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
-7. when obsolete charts are removed from memory they are also deleted from disk (configurable with `[global].delete obsolete charts files = yes`)
+1.  it will detect this is a removed container or network interface
+2.  it will freeze/pause all alarms for them
+3.  it will mark their charts as obsolete
+4.  obsolete charts are not be offered on new dashboard sessions (so hit F5 and the charts are gone)
+5.  existing dashboard sessions will continue to see them, but of course they will not refresh
+6.  obsolete charts will be removed from memory, 1 hour after the last user viewed them (configurable with `[global].cleanup obsolete charts after seconds = 3600` (at `netdata.conf`).
+7.  when obsolete charts are removed from memory they are also deleted from disk (configurable with `[global].delete obsolete charts files = yes`)
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcgroups.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcgroups.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

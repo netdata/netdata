@@ -224,26 +224,25 @@ Here is a sample of the output this command produces.
 }
 ```
 
-
 From this output it collects:
 
-- Global Received Requests by IP version (IPv4, IPv6)
-- Global Successful Queries
-- Current Recursive Clients
-- Global Queries by IP Protocol (TCP, UDP)
-- Global Queries Analysis
-- Global Received Updates
-- Global Query Failures
-- Global Query Failures Analysis
-- Other Global Server Statistics
-- Global Incoming Requests by OpCode
-- Global Incoming Requests by Query Type
-- Global Socket Statistics (will only work if the url is `http://127.0.0.1:8888/json/v1`, i.e. without `/server`, but keep in mind this produces a very long output and probably will account for 0.5% CPU overhead alone, per bind server added)
-- Per View Statistics (the following set will be added for each bind view):
-   - View, Resolver Active Queries
-   - View, Resolver Statistics
-   - View, Resolver Round Trip Timings
-   - View, Requests by Query Type
+-   Global Received Requests by IP version (IPv4, IPv6)
+-   Global Successful Queries
+-   Current Recursive Clients
+-   Global Queries by IP Protocol (TCP, UDP)
+-   Global Queries Analysis
+-   Global Received Updates
+-   Global Query Failures
+-   Global Query Failures Analysis
+-   Other Global Server Statistics
+-   Global Incoming Requests by OpCode
+-   Global Incoming Requests by Query Type
+-   Global Socket Statistics (will only work if the url is `http://127.0.0.1:8888/json/v1`, i.e. without `/server`, but keep in mind this produces a very long output and probably will account for 0.5% CPU overhead alone, per bind server added)
+-   Per View Statistics (the following set will be added for each bind view):
+    -   View, Resolver Active Queries
+    -   View, Resolver Statistics
+    -   View, Resolver Round Trip Timings
+    -   View, Requests by Query Type
 
 ## Configuration
 
@@ -286,9 +285,9 @@ Only `xml` and `v3` has been tested.
 
 Keep in mind though, that XML parsing is done using javascript code, which requires a triple conversion:
 
-1. from XML to JSON using a javascript XML parser (**CPU intensive**),
-2. which is then transformed to emulate the output of the JSON output of bind (**CPU intensive** - and yes the converted JSON from XML is different to the native JSON - even bind produces different names for various attributes),
-3. which is then processed to generate the data for the charts (this will happen even if bind is producing JSON).
+1.  from XML to JSON using a javascript XML parser (**CPU intensive**),
+2.  which is then transformed to emulate the output of the JSON output of bind (**CPU intensive** - and yes the converted JSON from XML is different to the native JSON - even bind produces different names for various attributes),
+3.  which is then processed to generate the data for the charts (this will happen even if bind is producing JSON).
 
 In general, expect XML parsing to be 2 to 3 times more CPU intensive than JSON.
 
@@ -340,5 +339,4 @@ Verify it works by running the following command (the collector is written in no
 curl "http://localhost:8888/json/v1/server"
 ```
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fnode.d.plugin%2Fnamed%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fnode.d.plugin%2Fnamed%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

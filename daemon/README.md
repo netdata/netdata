@@ -2,17 +2,17 @@
 
 ## Starting netdata
 
-- You can start Netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
+-   You can start Netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
 
-- You can stop Netdata by killing it with `killall netdata`.
-    You can stop and start Netdata at any point. Netdata saves on exit its round robbin
-    database to `/var/cache/netdata` so that it will continue from where it stopped the last time.
+-   You can stop Netdata by killing it with `killall netdata`.
+      You can stop and start Netdata at any point. Netdata saves on exit its round robbin
+      database to `/var/cache/netdata` so that it will continue from where it stopped the last time.
 
 Access to the web site, for all graphs, is by default on port `19999`, so go to:
 
- ```
- http://127.0.0.1:19999/
- ```
+```
+http://127.0.0.1:19999/
+```
 
 You can get the running config file at any time, by accessing `http://127.0.0.1:19999/netdata.conf`.
 
@@ -77,7 +77,7 @@ chmod +x /etc/init.d/netdata
 chkconfig --add netdata
 ```
 
-_There have been some recent work on the init script, see PR https://github.com/netdata/netdata/pull/403_
+_There have been some recent work on the init script, see PR <https://github.com/netdata/netdata/pull/403>_
 
 #### other systems
 
@@ -98,8 +98,8 @@ netdata -h
 The program will print the supported command line parameters.
 
 The command line options of the Netdata 1.10.0 version are the following:
-```
 
+```
  ^
  |.-.   .-.   .-.   .-.   .  netdata                                         
  |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   
@@ -184,9 +184,9 @@ The command line options of the Netdata 1.10.0 version are the following:
 
 Netdata uses 3 log files:
 
-1. `error.log`
-2. `access.log`
-3. `debug.log`
+1.  `error.log`
+2.  `access.log`
+3.  `debug.log`
 
 Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`.
 By default `error.log` and `access.log` are enabled. `debug.log` is only enabled if
@@ -204,11 +204,11 @@ it will appear in `error.log`.
 For most Netdata programs (including standard external plugins shipped by netdata), the
 following lines may appear:
 
-tag|description
-:---:|:----
-`INFO`|Something important the user should know.
-`ERROR`|Something that might disable a part of netdata.<br/>The log line includes `errno` (if it is not zero).
-`FATAL`|Something prevented a program from running.<br/>The log line includes `errno` (if it is not zero) and the program exited.
+| tag|description|
+|:-:|:----------|
+| `INFO`|Something important the user should know.|
+| `ERROR`|Something that might disable a part of netdata.<br/>The log line includes `errno` (if it is not zero).|
+| `FATAL`|Something prevented a program from running.<br/>The log line includes `errno` (if it is not zero) and the program exited.|
 
 So, when auto-detection of data collection fail, `ERROR` lines are logged and the relevant modules
 are disabled, but the program continues to run.
@@ -225,20 +225,18 @@ DATE: ID: (sent/all = SENT_BYTES/ALL_BYTES bytes PERCENT_COMPRESSION%, prep/sent
 
 where:
 
- - `ID` is the client ID. Client IDs are auto-incremented every time a client connects to netdata.
- - `SENT_BYTES` is the number of bytes sent to the client, without the HTTP response header.
- - `ALL_BYTES` is the number of bytes of the response, before compression.
- - `PERCENT_COMPRESSION` is the percentage of traffic saved due to compression.
- - `PREP_TIME` is the time in milliseconds needed to prepared the response.
- - `SENT_TIME` is the time in milliseconds needed to sent the response to the client.
- - `TOTAL_TIME` is the total time the request was inside Netdata (from the first byte of the request to the last byte of the response).
- - `ACTION` can be `filecopy`, `options` (used in CORS), `data` (API call).
-
+-   `ID` is the client ID. Client IDs are auto-incremented every time a client connects to netdata.
+-   `SENT_BYTES` is the number of bytes sent to the client, without the HTTP response header.
+-   `ALL_BYTES` is the number of bytes of the response, before compression.
+-   `PERCENT_COMPRESSION` is the percentage of traffic saved due to compression.
+-   `PREP_TIME` is the time in milliseconds needed to prepared the response.
+-   `SENT_TIME` is the time in milliseconds needed to sent the response to the client.
+-   `TOTAL_TIME` is the total time the request was inside Netdata (from the first byte of the request to the last byte of the response).
+-   `ACTION` can be `filecopy`, `options` (used in CORS), `data` (API call).
 
 #### debug.log
 
 See [debugging](#debugging).
-
 
 ## OOM Score
 
@@ -290,7 +288,6 @@ If you want to control it entirely via systemd, you can set in `netdata.conf`:
 
 Using the above, whatever OOM Score you have set at `netdata.service` will be maintained by netdata.
 
-
 ## Netdata process scheduling policy
 
 By default Netdata runs with the `idle` process scheduling policy, so that it uses CPU resources, only when there is idle CPU to spare. On very busy servers (or weak servers), this can lead to gaps on the charts.
@@ -304,14 +301,14 @@ You can set Netdata scheduling policy in `netdata.conf`, like this:
 
 You can use the following:
 
-policy|description
-:-----:|:--------
-`idle`|use CPU only when there is spare - this is lower than nice 19 - it is the default for Netdata and it is so low that Netdata will run in "slow motion" under extreme system load, resulting in short (1-2 seconds) gaps at the charts.
-`other`<br/>or<br/>`nice`|this is the default policy for all processes under Linux. It provides dynamic priorities based on the `nice` level of each process. Check below for setting this `nice` level for netdata.
-`batch`|This policy is similar to `other` in that it schedules the thread according to its dynamic priority (based on the `nice` value).  The difference is that this policy will cause the scheduler to always assume that the thread is CPU-intensive.  Consequently, the scheduler will  apply a small scheduling penalty with respect to wake-up behavior, so that this thread is mildly disfavored in scheduling decisions.
-`fifo`|`fifo` can be used only with static priorities higher than 0, which means that when a `fifo` threads becomes runnable, it will always  immediately  preempt  any  currently running  `other`, `batch`, or `idle` thread.  `fifo` is a simple scheduling algorithm without time slicing.
-`rr`|a simple enhancement of `fifo`.  Everything described above for `fifo` also applies to `rr`, except that each thread is allowed to run only for a  maximum time quantum.
-`keep`<br/>or<br/>`none`|do not set scheduling policy, priority or nice level - i.e. keep running with whatever it is set already (e.g. by systemd).
+| policy|description|
+|:----:|:----------|
+| `idle`|use CPU only when there is spare - this is lower than nice 19 - it is the default for Netdata and it is so low that Netdata will run in "slow motion" under extreme system load, resulting in short (1-2 seconds) gaps at the charts.|
+| `other`<br/>or<br/>`nice`|this is the default policy for all processes under Linux. It provides dynamic priorities based on the `nice` level of each process. Check below for setting this `nice` level for netdata.|
+| `batch`|This policy is similar to `other` in that it schedules the thread according to its dynamic priority (based on the `nice` value).  The difference is that this policy will cause the scheduler to always assume that the thread is CPU-intensive.  Consequently, the scheduler will  apply a small scheduling penalty with respect to wake-up behavior, so that this thread is mildly disfavored in scheduling decisions.|
+| `fifo`|`fifo` can be used only with static priorities higher than 0, which means that when a `fifo` threads becomes runnable, it will always  immediately  preempt  any  currently running  `other`, `batch`, or `idle` thread.  `fifo` is a simple scheduling algorithm without time slicing.|
+| `rr`|a simple enhancement of `fifo`.  Everything described above for `fifo` also applies to `rr`, except that each thread is allowed to run only for a  maximum time quantum.|
+| `keep`<br/>or<br/>`none`|do not set scheduling policy, priority or nice level - i.e. keep running with whatever it is set already (e.g. by systemd).|
 
 For more information see `man sched`.
 
@@ -369,7 +366,6 @@ Now, tell Netdata to keep these settings, as set by systemd, by editing `netdata
 
 Using the above, whatever scheduling settings you have set at `netdata.service` will be maintained by netdata.
 
-
 #### Example 1: Netdata with nice -1 on non-systemd systems
 
 On a system that is not based on systemd, to make Netdata run with nice level -1 (a little bit higher to the default for all programs), edit `netdata.conf` and set:
@@ -385,7 +381,6 @@ then execute this to restart netdata:
 ```sh
 sudo service netdata restart
 ```
-
 
 #### Example 2: Netdata with nice -1 on systemd systems
 
@@ -454,14 +449,13 @@ only the 4KB pages that are actually used are reserving physical RAM. The **real
 on Netdata application section, shows the amount of physical memory these pages occupy(it
 accounts the whole pages, even if parts of them are actually used).
 
-
 ## Debugging
 
 When you compile Netdata with debugging:
 
-1. compiler optimizations for your CPU are disabled (Netdata will run somewhat slower)
+1.  compiler optimizations for your CPU are disabled (Netdata will run somewhat slower)
 
-2. a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find the options supported at [log.h](../libnetdata/log/log.h). They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
+2.  a lot of code is added all over netdata, to log debug messages to `/var/log/netdata/debug.log`. However, nothing is printed by default. Netdata allows you to select which sections of Netdata you want to trace. Tracing is activated via the config option `debug flags`. It accepts a hex number, to enable or disable specific sections. You can find the options supported at [log.h](../libnetdata/log/log.h). They are the `D_*` defines. The value `0xffffffffffffffff` will enable all possible debug flags.
 
 Once Netdata is compiled with debugging and tracing is enabled for a few sections, the file `/var/log/netdata/debug.log` will contain the messages.
 
@@ -489,9 +483,9 @@ To provide stack traces, **you need to have Netdata compiled with debugging**. T
 
 Then you need to be in one of the following 2 cases:
 
-1. Netdata crashes and you have a core dump
+1.  Netdata crashes and you have a core dump
 
-2. you can reproduce the crash
+2.  you can reproduce the crash
 
 If you are not on these cases, you need to find a way to be (i.e. if your system does not produce core dumps, check your distro documentation to enable them).
 
@@ -517,5 +511,4 @@ valgrind $(which netdata) -D
 
 Netdata will start and it will be a lot slower. Now reproduce the crash and `valgrind` will dump on your console the stack trace. Open a new github issue and post the output.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -17,9 +17,9 @@ developers and the users.
 
 So, we did this:
 
-1. No configuration is required to run Netdata
-2. There are plenty of options to tweak
-3. There is minimal documentation (or no at all)
+1.  No configuration is required to run Netdata
+2.  There are plenty of options to tweak
+3.  There is minimal documentation (or no at all)
 
 ## Why this works?
 
@@ -33,7 +33,8 @@ In all places, in the code, there are both the `names` and their
 file, the default is used. The lookup is made using B-Trees and hashes
 (no string comparisons), so they are super fast. Also the `names` of the
 settings can be `my super duper setting that once set to yes, will turn the world upside down = no`
-- so goodbye to most of the documentation involved.
+
+-   so goodbye to most of the documentation involved.
 
 Next, Netdata can generate a valid configuration for the user to edit.
 No need to remember anything or copy and paste settings. Just get the
@@ -45,4 +46,4 @@ When you get the configuration file from the server, there will be a
 comment above all `name = value` pairs the server does not use.
 So you know that whatever you wrote there, is not used.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Flibnetdata%2Fconfig%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Flibnetdata%2Fconfig%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

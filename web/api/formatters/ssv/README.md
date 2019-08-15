@@ -5,21 +5,21 @@ to a single value and returns a list of such values showing how it changes throu
 
 It supports the following formats:
 
-format|content type|description
-:---:|:---:|:-----
-`ssv`|text/plain|a space separated list of values
-`ssvcomma`|text/plain|a comma separated list of values
-`array`|application/json|a JSON array
+| format     | content type     | description                      |
+|:----:|:----------:|:----------|
+| `ssv`      | text/plain       | a space separated list of values |
+| `ssvcomma` | text/plain       | a comma separated list of values |
+| `array`    | application/json | a JSON array                     |
 
 The CSV formatter respects the following API `&options=`:
 
-option|supported|description
-:---:|:---:|:---
-`nonzero`|yes|to return only the dimensions that have at least a non-zero value
-`flip`|yes|to return the numbers older to newer (the default is newer to older)
-`percent`|yes|to replace all values with their percentage over the row total
-`abs`|yes|to turn all values positive, before using them
-`min2max`|yes|to return the delta from the minimum value to the maximum value (across dimensions)
+| option    | supported | description                                                                         |
+| :----:|:-------:|:----------|
+| `nonzero` | yes       | to return only the dimensions that have at least a non-zero value                   |
+| `flip`    | yes       | to return the numbers older to newer (the default is newer to older)                |
+| `percent` | yes       | to replace all values with their percentage over the row total                      |
+| `abs`     | yes       | to turn all values positive, before using them                                      |
+| `min2max` | yes       | to return the delta from the minimum value to the maximum value (across dimensions) |
 
 ## Examples
 
@@ -51,4 +51,4 @@ in a JSON array:
 [278,258,268,239,259,260,243,266,278,318,264,258]
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fformatters%2Fssv%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fformatters%2Fssv%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

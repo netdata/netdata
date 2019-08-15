@@ -36,12 +36,12 @@ When you install multiple Netdata servers, all your servers will appear at the n
 
 The node menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other Netdata server:
 
-- the current charts panning (drag the charts left or right),
-- the current charts zooming (`SHIFT` + mouse wheel over a chart),
-- the highlighted time-frame (`ALT` + select an area on a chart),
-- the scrolling position of the dashboard,
-- the theme you use,
-- etc.
+-   the current charts panning (drag the charts left or right),
+-   the current charts zooming (`SHIFT` + mouse wheel over a chart),
+-   the highlighted time-frame (`ALT` + select an area on a chart),
+-   the scrolling position of the dashboard,
+-   the theme you use,
+-   etc.
 
 are all sent over to other Netdata server, to allow you troubleshoot cross-server performance issues easily.
 
@@ -51,9 +51,9 @@ Netdata installer integrates Netdata to your init / systemd environment.
 
 To start/stop Netdata, depending on your environment, you should use:
 
-- `systemctl start netdata` and `systemctl stop netdata`
-- `service netdata start` and `service netdata stop`
-- `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
+-   `systemctl start netdata` and `systemctl stop netdata`
+-   `service netdata start` and `service netdata stop`
+-   `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
 
 Once Netdata is installed, the installer configures it to start at boot and stop at shutdown.
 
@@ -89,10 +89,10 @@ Netdata supports auto-detection of data collection sources. It auto-detects almo
 
 This auto-detection process happens **only once**, when Netdata starts. To have Netdata re-discover data sources, you need to restart it. There are a few exceptions to this:
 
-- containers and VMs are auto-detected forever (when Netdata is running at the host).
-- many data sources are collected but are silenced by default, until there is useful information to collect (for example network interface dropped packet, will appear after a packet has been dropped).
-- services that are not optimal to collect on all systems, are disabled by default.
-- services we received feedback from users that caused issues when monitored, are also disabled by default (for example, `chrony` is disabled by default, because CentOS ships a version of it that uses 100% CPU when queried for statistics).
+-   containers and VMs are auto-detected forever (when Netdata is running at the host).
+-   many data sources are collected but are silenced by default, until there is useful information to collect (for example network interface dropped packet, will appear after a packet has been dropped).
+-   services that are not optimal to collect on all systems, are disabled by default.
+-   services we received feedback from users that caused issues when monitored, are also disabled by default (for example, `chrony` is disabled by default, because CentOS ships a version of it that uses 100% CPU when queried for statistics).
 
 Once a data collection source is detected, Netdata will never quit trying to collect data from it, until Netdata is restarted. So, if you stop your web server, Netdata will pick it up automatically when it is started again.
 
@@ -100,15 +100,15 @@ Since Netdata is installed on all your systems (even inside containers), auto-de
 
 A few well known data collection sources that commonly need to be configured are:
 
-- [systemd services utilization](../collectors/cgroups.plugin/#monitoring-systemd-services) are not exposed by default on most systems, so `systemd` has to be configured to expose those metrics.
+-   [systemd services utilization](../collectors/cgroups.plugin/#monitoring-systemd-services) are not exposed by default on most systems, so `systemd` has to be configured to expose those metrics.
 
 ## Configuration quick start
 
 In Netdata we have:
 
-- **internal** data collection plugins (running inside the Netdata daemon)
-- **external** data collection plugins (independent processes, sending data to Netdata over pipes)
-- modular plugin **orchestrators** (external plugins that have multiple data collection modules)
+-   **internal** data collection plugins (running inside the Netdata daemon)
+-   **external** data collection plugins (independent processes, sending data to Netdata over pipes)
+-   modular plugin **orchestrators** (external plugins that have multiple data collection modules)
 
 You can enable and disable plugins (internal and external) via `netdata.conf` at the section `[plugins]`.
 
@@ -174,9 +174,9 @@ and set `SEND_EMAIL="NO"`.
 
 ## What is next?
 
-- Check [Data Collection](../collectors) for configuring data collection plugins.
-- Check [Health Monitoring](../health) for configuring your own alarms, or setting up alarm notifications.
-- Check [Streaming](../streaming) for centralizing Netdata metrics.
-- Check [Backends](../backends) for long term archiving of Netdata metrics to time-series databases.
+-   Check [Data Collection](../collectors) for configuring data collection plugins.
+-   Check [Health Monitoring](../health) for configuring your own alarms, or setting up alarm notifications.
+-   Check [Streaming](../streaming) for centralizing Netdata metrics.
+-   Check [Backends](../backends) for long term archiving of Netdata metrics to time-series databases.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FGettingStarted&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FGettingStarted&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
