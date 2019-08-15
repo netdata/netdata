@@ -243,7 +243,8 @@
                 "percentage",
                 "unaligned",
                 "match-ids",
-                "match-names"
+                "match-names",
+                "showcustomvars"
               ],
               "collectionFormat": "pipes"
             },
