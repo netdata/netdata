@@ -440,6 +440,8 @@ struct pid_stat {
 
 size_t pagesize;
 
+kernel_uint_t global_uptime;
+
 // log each problem once per process
 // log flood protection flags (log_thrown)
 #define PID_LOG_IO      0x00000001
@@ -1434,6 +1436,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
     p->starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
+    p->uptime           = (global_uptime > p->starttime)?(global_uptime - p->starttime):0;
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
     // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
@@ -1503,38 +1506,6 @@ cleanup:
 }
 
 // ----------------------------------------------------------------------------
-
-static inline int get_pid_uptime(struct pid_stat *p) {
-    static procfile *global_uptime_ff = NULL;
-
-    if(unlikely(!global_uptime_ff)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
-
-        global_uptime_ff = procfile_reopen(global_uptime_ff, filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    }
-        global_uptime_ff = procfile_readall(global_uptime_ff);
-
-        if(unlikely(!global_uptime_ff)) {
-            error("Cannot read %s/proc/uptime", netdata_configured_host_prefix);
-            return 0;
-        }
-
-    if(unlikely(procfile_lines(global_uptime_ff) < 1)) {
-        error("%s/proc/uptime has no lines", netdata_configured_host_prefix);
-        return 0;
-    }
-    if(unlikely(procfile_linewords(global_uptime_ff, 0) < 1)) {
-        error("%s/proc/uptime has less than 1 word in it", netdata_configured_host_prefix);
-        return 0;
-    }
-
-    kernel_uint_t global_uptime = str2kernel_uint_t(procfile_lineword(global_uptime_ff, 0, 0));
-
-    p->uptime = (global_uptime > p->starttime)?(global_uptime - p->starttime):0;
-
-    return 1;
-}
 
 static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
     (void)ptr;
@@ -2553,12 +2524,6 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr) {
         // there is no reason to proceed if we cannot get its status
         return 0;
 
-    // --------------------------------------------------------------------
-    // read /proc/uptime and calculate the process uptime
-#ifndef __FreeBSD__
-    managed_log(p, PID_LOG_UPTIME, get_pid_uptime(p));
-#endif
-
     // check its parent pid
     if(unlikely(p->ppid < 0 || p->ppid > pid_max)) {
         error("Pid %d (command '%s') states invalid parent pid %d. Using 0.", pid, p->comm, p->ppid);
@@ -2686,6 +2651,12 @@ static int collect_data_for_all_processes(void) {
         collect_data_for_pid(pid, &procbase[i]);
     }
 #else
+    static char uptime_filename[FILENAME_MAX + 1] = "";
+    if(*uptime_filename == '\0')
+        snprintfz(uptime_filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
+
+    global_uptime = (kernel_uint_t)(get_uptime(uptime_filename) / MSEC_PER_SEC);
+
     char dirname[FILENAME_MAX + 1];
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
@@ -3531,7 +3502,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "uptime", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, now_monotonic_sec() - w->starttime);
+            send_SET(w->name, (global_uptime > w->starttime)?(global_uptime - w->starttime):0);
     }
     send_END();
 

@@ -136,4 +136,6 @@ extern int sleep_usec(usec_t usec);
  */
 void test_clock_boottime(void);
 
+extern collected_number get_uptime();
+
 #endif /* NETDATA_CLOCKS_H */
