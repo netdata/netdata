@@ -4897,8 +4897,8 @@ function handleSignInMessage(e) {
     cloudToken = e.data.token;
 
     netdataRegistryCallback(registryAgents);
-    if (e.data.redirectUri) {
-        window.location.replace(e.data.redirectUri);
+    if (e.data.redirectURI) {
+        window.location.replace(e.data.redirectURI);
     }
 }
 
