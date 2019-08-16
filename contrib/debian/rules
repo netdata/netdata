@@ -18,7 +18,7 @@ TOP = $(CURDIR)/debian/netdata
 
 override_dh_auto_configure:
 	autoreconf -ivf
-	dh_auto_configure -- --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+	dh_auto_configure -- --prefix=/usr --sysconfdir=/etc --localstatedir=/var --libdir=/usr/lib \
 	--libexecdir=/usr/libexec --with-user=netdata --with-math --with-zlib --with-webdir=/var/lib/netdata/www
 
 debian/%.postinst: debian/%.postinst.in
