@@ -47,7 +47,7 @@ Each of these sections provides the same number of charts:
     -   Threads Running
     -   Processes Running
     -   Pipes Open
-    -   Carried Over Uptime
+    -   Carried Over Uptime (since the Netdata restart)
     -   Minimum Uptime
     -   Average Uptime
     -   Maximum Uptime
