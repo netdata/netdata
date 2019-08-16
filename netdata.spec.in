@@ -6,10 +6,6 @@
 # error.
 %global __os_install_post %{nil}
 
-# There is an issue with build-id over the go.d binary raised on RHEL/fedora distributions
-# We use this workaround as per the https://github.com/rpm-software-management/rpm/issues/367#issuecomment-350131349
-%global _missing_build_ids_terminate_build 0
-
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
 %define _sysconfdir /etc
@@ -379,12 +375,13 @@ install_go() {
 		# Install files
 		tar -xf "${tmp}/config.tar.gz" -C "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/"
 		tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
-		mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+		mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "go.d.plugin"
 		rm -rf "${tmp}"
 	fi
 	return 0
 }
 install_go
+install -m 0750 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
 %pre
 
