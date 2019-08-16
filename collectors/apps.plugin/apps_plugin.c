@@ -261,6 +261,7 @@ struct target {
     kernel_uint_t openother;
 
     kernel_uint_t starttime;
+    kernel_uint_t collected_starttime;
     kernel_uint_t uptime_min;
     kernel_uint_t uptime_sum;
     kernel_uint_t uptime_max;
@@ -350,7 +351,7 @@ struct pid_stat {
     // int64_t nice;
     int32_t num_threads;
     // int64_t itrealvalue;
-    kernel_uint_t starttime;
+    kernel_uint_t collected_starttime;
     // kernel_uint_t vsize;
     // kernel_uint_t rss;
     // kernel_uint_t rsslim;
@@ -1430,8 +1431,8 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
-    p->starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
-    p->uptime           = (global_uptime > p->starttime)?(global_uptime - p->starttime):0;
+    p->collected_starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
+    p->uptime           = (global_uptime > p->collected_starttime)?(global_uptime - p->collected_starttime):0;
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
     // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
@@ -2897,15 +2898,7 @@ static size_t zero_all_targets(struct target *root) {
             w->openother = 0;
         }
 
-        static kernel_uint_t prev_starttime = 0;
-        if(w->starttime) {
-            if(prev_starttime < w->starttime) prev_starttime = w->starttime;
-        }
-        else {
-            prev_starttime = 0;
-        }
-
-        w->starttime = 0;
+        w->collected_starttime = 0;
         w->uptime_min = 0;
         w->uptime_sum = 0;
         w->uptime_max = 0;
@@ -3063,7 +3056,7 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->processes++;
     w->num_threads += p->num_threads;
 
-    if(!w->starttime || p->starttime < w->starttime) w->starttime = p->starttime;
+    if(!w->collected_starttime || p->collected_starttime < w->collected_starttime) w->collected_starttime = p->collected_starttime;
     if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
     w->uptime_sum += p->uptime;
     if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
@@ -3136,6 +3129,13 @@ static void calculate_netdata_statistics(void) {
 
         if(enable_file_charts)
             aggregate_pid_fds_on_targets(p);
+    }
+
+    if(w->collected_starttime) {
+        if(w->starttime < w->collected_starttime) w->starttime = w->collected_starttime;
+    }
+    else {
+        w->starttime = 0;
     }
 
     cleanup_exited_pids();
@@ -3497,7 +3497,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "uptime", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (global_uptime > w->starttime)?(global_uptime - w->starttime):0);
+            send_SET(w->name, (global_uptime > w->collected_starttime)?(global_uptime - w->collected_starttime):0);
     }
     send_END();
 
