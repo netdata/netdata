@@ -45,7 +45,7 @@ push_change
 echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
 sleep "${WAIT_TIME}"
 
-commit_channge "amd64" "RPM"
+commit_change "amd64" "RPM"
 push_change
 
 echo "---- Done! ----"
