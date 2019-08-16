@@ -6,11 +6,11 @@ Will look like this on your Android device:
 
 You will need:
 
-1. Signup and Login to twilio.com
-2. Pick an SMS capable number during sign up.
-3. Get your SID, and Token from <https://www.twilio.com/console>
-3. Fill in TWILIO_ACCOUNT_SID="XXXXXXXX" TWILIO_ACCOUNT_TOKEN="XXXXXXXXX" TWILIO_NUMBER="+XXXXXXXXXXX"
-4. Add the recipient phone numbers to DEFAULT_RECIPIENT_TWILIO="+XXXXXXXXXXX"
+1.  Signup and Login to twilio.com
+2.  Pick an SMS capable number during sign up.
+3.  Get your SID, and Token from <https://www.twilio.com/console>
+4.  Fill in TWILIO_ACCOUNT_SID="XXXXXXXX" TWILIO_ACCOUNT_TOKEN="XXXXXXXXX" TWILIO_NUMBER="+XXXXXXXXXXX"
+5.  Add the recipient phone numbers to DEFAULT_RECIPIENT_TWILIO="+XXXXXXXXXXX"
 
 !!PLEASE NOTE THAT IF YOUR ACCOUNT IS A TRIAL ACCOUNT YOU WILL ONLY BE ABLE TO SEND NOTIFICATIONS TO THE NUMBER YOU SIGNED UP WITH
 
@@ -39,4 +39,4 @@ TWILIO_NUMBER="xxxxxxxxxxx"
 DEFAULT_RECIPIENT_TWILIO="+15555555555"
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Ftwilio%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Ftwilio%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

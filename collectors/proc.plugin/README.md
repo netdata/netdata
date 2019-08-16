@@ -1,31 +1,30 @@
 # proc.plugin
 
- - `/proc/net/dev` (all network interfaces for all their values)
- - `/proc/diskstats` (all disks for all their values)
- - `/proc/mdstat` (status of RAID arrays)
- - `/proc/net/snmp` (total IPv4, TCP and UDP usage)
- - `/proc/net/snmp6` (total IPv6 usage)
- - `/proc/net/netstat` (more IPv4 usage)
- - `/proc/net/stat/nf_conntrack` (connection tracking performance)
- - `/proc/net/stat/synproxy` (synproxy performance)
- - `/proc/net/ip_vs/stats` (IPVS connection statistics)
- - `/proc/stat` (CPU utilization and attributes)
- - `/proc/meminfo` (memory information)
- - `/proc/vmstat` (system performance)
- - `/proc/net/rpc/nfsd` (NFS server statistics for both v3 and v4 NFS servers)
- - `/sys/fs/cgroup` (Control Groups - Linux Containers)
- - `/proc/self/mountinfo` (mount points)
- - `/proc/interrupts` (total and per core hardware interrupts)
- - `/proc/softirqs` (total and per core software interrupts)
- - `/proc/loadavg` (system load and total processes running)
- - `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
- - `/sys/class/power_supply` (power supply properties)
- - `ipc` (IPC semaphores and message queues)
- - `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
- - `netdata` (internal Netdata resources utilization)
+-   `/proc/net/dev` (all network interfaces for all their values)
+-   `/proc/diskstats` (all disks for all their values)
+-   `/proc/mdstat` (status of RAID arrays)
+-   `/proc/net/snmp` (total IPv4, TCP and UDP usage)
+-   `/proc/net/snmp6` (total IPv6 usage)
+-   `/proc/net/netstat` (more IPv4 usage)
+-   `/proc/net/stat/nf_conntrack` (connection tracking performance)
+-   `/proc/net/stat/synproxy` (synproxy performance)
+-   `/proc/net/ip_vs/stats` (IPVS connection statistics)
+-   `/proc/stat` (CPU utilization and attributes)
+-   `/proc/meminfo` (memory information)
+-   `/proc/vmstat` (system performance)
+-   `/proc/net/rpc/nfsd` (NFS server statistics for both v3 and v4 NFS servers)
+-   `/sys/fs/cgroup` (Control Groups - Linux Containers)
+-   `/proc/self/mountinfo` (mount points)
+-   `/proc/interrupts` (total and per core hardware interrupts)
+-   `/proc/softirqs` (total and per core software interrupts)
+-   `/proc/loadavg` (system load and total processes running)
+-   `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
+-   `/sys/class/power_supply` (power supply properties)
+-   `ipc` (IPC semaphores and message queues)
+-   `ksm` Kernel Same-Page Merging performance (several files under `/sys/kernel/mm/ksm`).
+-   `netdata` (internal Netdata resources utilization)
 
-
----
+- - -
 
 ## Monitoring Disks
 
@@ -37,37 +36,37 @@ Hopefully, the Linux kernel provides many metrics that can provide deep insights
 
 ### Monitored disk metrics
 
-- **I/O bandwidth/s (kb/s)**
-  The amount of data transferred from and to the disk.
-- **I/O operations/s**
-  The number of I/O operations completed.
-- **Queued I/O operations**
-  The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
-- **Backlog size (time in ms)**
-  The expected duration of the currently queued I/O operations.
-- **Utilization (time percentage)**
-  The percentage of time the disk was busy with something. This is a very interesting metric, since for most disks, that execute commands sequentially, **this is the key indication of congestion**. A sequential disk that is 100% of the available time busy, has no time to do anything more, so even if the bandwidth or the number of operations executed by the disk is low, its capacity has been reached.
-  Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
-- **Average I/O operation time (ms)**
-  The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
-- **Average I/O operation size (kb)**
-  The average amount of data of the completed I/O operations.
-- **Average Service Time (ms)**
-  The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
-- **Merged I/O operations/s**
-  The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
-- **Total I/O time**
-  The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
-- **Space usage**
-  For mounted disks, Netdata will provide a chart for their space, with 3 dimensions:
-  1. free
-  2. used
-  3. reserved for root
-- **inode usage**
-  For mounted disks, Netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
-  1. free
-  2. used
-  3. reserved for root
+-   **I/O bandwidth/s (kb/s)**
+    The amount of data transferred from and to the disk.
+-   **I/O operations/s**
+    The number of I/O operations completed.
+-   **Queued I/O operations**
+    The number of currently queued I/O operations. For traditional disks that execute commands one after another, one of them is being run by the disk and the rest are just waiting in a queue.
+-   **Backlog size (time in ms)**
+    The expected duration of the currently queued I/O operations.
+-   **Utilization (time percentage)**
+    The percentage of time the disk was busy with something. This is a very interesting metric, since for most disks, that execute commands sequentially, **this is the key indication of congestion**. A sequential disk that is 100% of the available time busy, has no time to do anything more, so even if the bandwidth or the number of operations executed by the disk is low, its capacity has been reached.
+    Of course, for newer disk technologies (like fusion cards) that are capable to execute multiple commands in parallel, this metric is just meaningless.
+-   **Average I/O operation time (ms)**
+    The average time for I/O requests issued to the device to be served. This includes the time spent by the requests in queue and the time spent servicing them.
+-   **Average I/O operation size (kb)**
+    The average amount of data of the completed I/O operations.
+-   **Average Service Time (ms)**
+    The average service time for completed I/O operations. This metric is calculated using the total busy time of the disk and the number of completed operations. If the disk is able to execute multiple parallel operations the reporting average service time will be misleading.
+-   **Merged I/O operations/s**
+    The Linux kernel is capable of merging I/O operations. So, if two requests to read data from the disk are adjacent, the Linux kernel may merge them to one before giving them to disk. This metric measures the number of operations that have been merged by the Linux kernel.
+-   **Total I/O time**
+    The sum of the duration of all completed I/O operations. This number can exceed the interval if the disk is able to execute multiple I/O operations in parallel.
+-   **Space usage**
+    For mounted disks, Netdata will provide a chart for their space, with 3 dimensions:
+    1.  free
+    2.  used
+    3.  reserved for root
+-   **inode usage**
+    For mounted disks, Netdata will provide a chart for their inodes (number of file and directories), with 3 dimensions:
+    1.  free
+    2.  used
+    3.  reserved for root
 
 ### disk names
 
@@ -79,9 +78,9 @@ By default, Netdata will enable monitoring metrics only when they are not zero. 
 
 Netdata categorizes all block devices in 3 categories:
 
-1. physical disks (i.e. block devices that does not have slaves and are not partitions)
-2. virtual disks (i.e. block devices that have slaves - like RAID devices)
-3. disk partitions (i.e. block devices that are part of a physical disk)
+1.  physical disks (i.e. block devices that does not have slaves and are not partitions)
+2.  virtual disks (i.e. block devices that have slaves - like RAID devices)
+3.  disk partitions (i.e. block devices that are part of a physical disk)
 
 Performance metrics are enabled by default for all disk devices, except partitions and not-mounted virtual disks. Of course, you can enable/disable monitoring any block device by editing the Netdata configuration file.
 
@@ -144,21 +143,26 @@ For each virtual disk, physical disk and partition you will have a section like 
 ```
 
 For all configuration options:
-- `auto` = enable monitoring if the collected values are not zero
-- `yes` = enable monitoring
-- `no` = disable monitoring
+
+-   `auto` = enable monitoring if the collected values are not zero
+-   `yes` = enable monitoring
+-   `no` = disable monitoring
 
 Of course, to set options, you will have to uncomment them. The comments show the internal defaults.
 
 After saving `/etc/netdata/netdata.conf`, restart your Netdata to apply them.
 
 #### Disabling performance metrics for individual device and to multiple devices by device type
+
 You can pretty easy disable performance metrics for individual device, for ex.:
+
 ```
 [plugin:proc:/proc/diskstats:sda]
 	enable performance metrics = no
 ```
+
 But sometimes you need disable performance metrics for all devices with the same type, to do it you need to figure out device type from `/proc/diskstats` for ex.:
+
 ```
    7       0 loop0 1651 0 3452 168 0 0 0 0 0 8 168
    7       1 loop1 4955 0 11924 880 0 0 0 0 0 64 880
@@ -168,8 +172,10 @@ But sometimes you need disable performance metrics for all devices with the same
  251       2 zram2 27487 0 219896 188 79953 0 639624 1640 0 1828 1828
  251       3 zram3 27348 0 218784 152 79952 0 639616 1960 0 2060 2104
 ```
+
 All zram devices starts with `251` number and all loop devices starts with `7`.
 So, to disable performance metrics for all loop devices you could add `performance metrics for disks with major 7 = no` to `[plugin:proc:/proc/diskstats]` section.
+
 ```
 [plugin:proc:/proc/diskstats]
        performance metrics for disks with major 7 = no
@@ -179,26 +185,30 @@ So, to disable performance metrics for all loop devices you could add `performan
 
 ### Monitored RAID array metrics
 
-1. **Health** Number of failed disks in every array (aggregate chart).
+1.  **Health** Number of failed disks in every array (aggregate chart).
 
-2. **Disks stats**
- * total (number of devices array ideally would have)
- * inuse (number of devices currently are in use)
+2.  **Disks stats**
 
-3. **Mismatch count**
- * unsynchronized blocks
+-   total (number of devices array ideally would have)
+-   inuse (number of devices currently are in use)
 
-4. **Current status**
- * resync in percent
- * recovery in percent
- * reshape in percent
- * check in percent
+3.  **Mismatch count**
 
-5. **Operation status** (if resync/recovery/reshape/check is active)
- * finish in minutes
- * speed in megabytes/s
+-   unsynchronized blocks
 
-6. **Nonredundant array availability**
+4.  **Current status**
+
+-   resync in percent
+-   recovery in percent
+-   reshape in percent
+-   check in percent
+
+5.  **Operation status** (if resync/recovery/reshape/check is active)
+
+-   finish in minutes
+-   speed in megabytes/s
+
+6.  **Nonredundant array availability**
 
 #### configuration
 
@@ -259,24 +269,29 @@ each state.
 
 ### Monitored network interface metrics
 
-- **Physical Network Interfaces Aggregated Bandwidth (kilobits/s)**
-  The amount of data received and sent through all physical interfaces in the system. This is the source of data for the Net Inbound and Net Outbound dials in the System Overview section.
+-   **Physical Network Interfaces Aggregated Bandwidth (kilobits/s)**
+    The amount of data received and sent through all physical interfaces in the system. This is the source of data for the Net Inbound and Net Outbound dials in the System Overview section.
 
-- **Bandwidth (kilobits/s)**
-  The amount of data received and sent through the interface.
-- **Packets (packets/s)**
-  The number of packets received, packets sent, and multicast packets transmitted through the interface.
+-   **Bandwidth (kilobits/s)**
+    The amount of data received and sent through the interface.
 
-- **Interface Errors (errors/s)**
-  The number of errors for the inbound and outbound traffic on the interface.
-- **Interface Drops (drops/s)**
-  The number of packets dropped for the inbound and outbound traffic on the interface.
-- **Interface FIFO Buffer Errors (errors/s)**
-  The number of FIFO buffer errors encountered while receiving and transmitting data through the interface.
-- **Compressed Packets (packets/s)**
-  The number of compressed packets transmitted or received by the device driver.
-- **Network Interface Events (events/s)**
-  The number of packet framing errors, collisions detected on the interface, and carrier losses detected by the device driver.
+-   **Packets (packets/s)**
+    The number of packets received, packets sent, and multicast packets transmitted through the interface.
+
+-   **Interface Errors (errors/s)**
+    The number of errors for the inbound and outbound traffic on the interface.
+
+-   **Interface Drops (drops/s)**
+    The number of packets dropped for the inbound and outbound traffic on the interface.
+
+-   **Interface FIFO Buffer Errors (errors/s)**
+    The number of FIFO buffer errors encountered while receiving and transmitting data through the interface.
+
+-   **Compressed Packets (packets/s)**
+    The number of compressed packets transmitted or received by the device driver.
+
+-   **Network Interface Events (events/s)**
+    The number of packet framing errors, collisions detected on the interface, and carrier losses detected by the device driver.
 
 By default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
 
@@ -327,6 +342,7 @@ Per interface configuration:
 ![image6](https://cloud.githubusercontent.com/assets/2662304/14253733/53550b16-fa95-11e5-8d9d-4ed171df4735.gif)
 
 ---
+
 SYNPROXY is a TCP SYN packets proxy. It can be used to protect any TCP server (like a web server) from SYN floods and similar DDos attacks.
 
 SYNPROXY is a netfilter module, in the Linux kernel (since version 3.12). It is optimized to handle millions of packets per second utilizing all CPUs available without any concurrency locking between the connections.
@@ -335,8 +351,8 @@ The net effect of this, is that the real servers will not notice any change duri
 
 Netdata does not enable SYNPROXY. It just uses the SYNPROXY metrics exposed by your kernel, so you will first need to configure it. The hard way is to run iptables SYNPROXY commands directly on the console. An easier way is to use [FireHOL](https://firehol.org/), which, is a firewall manager for iptables. FireHOL can configure SYNPROXY using the following setup guides:
 
- - **[Working with SYNPROXY](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY)**
- - **[Working with SYNPROXY and traps](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY-and-traps)**
+-   **[Working with SYNPROXY](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY)**
+-   **[Working with SYNPROXY and traps](https://github.com/firehol/firehol/wiki/Working-with-SYNPROXY-and-traps)**
 
 ### Real-time monitoring of Linux Anti-DDoS
 
@@ -344,10 +360,10 @@ Netdata is able to monitor in real-time (per second updates) the operation of th
 
 It visualizes 4 charts:
 
-1. TCP SYN Packets received on ports operated by SYNPROXY
-2. TCP Cookies (valid, invalid, retransmits)
-3. Connections Reopened
-4. Entries used
+1.  TCP SYN Packets received on ports operated by SYNPROXY
+2.  TCP Cookies (valid, invalid, retransmits)
+3.  Connections Reopened
+4.  Entries used
 
 Example image:
 
@@ -364,29 +380,33 @@ battery capacity.
 Depending on the underlying driver, it may provide the following charts
 and metrics:
 
-1. Capacity: The power supply capacity expressed as a percentage.
-  * capacity\_now
+1.  Capacity: The power supply capacity expressed as a percentage.
 
-2. Charge: The charge for the power supply, expressed as amphours.
-  * charge\_full\_design
-  * charge\_full
-  * charge\_now
-  * charge\_empty
-  * charge\_empty\_design
+    -   capacity_now
 
-3. Energy: The energy for the power supply, expressed as watthours.
-  * energy\_full\_design
-  * energy\_full
-  * energy\_now
-  * energy\_empty
-  * energy\_empty\_design
+2.  Charge: The charge for the power supply, expressed as amphours.
 
-2. Voltage: The voltage for the power supply, expressed as volts.
-  * voltage\_max\_design
-  * voltage\_max
-  * voltage\_now
-  * voltage\_min
-  * voltage\_min\_design
+    -   charge_full_design
+    -   charge_full
+    -   charge_now
+    -   charge_empty
+    -   charge_empty_design
+
+3.  Energy: The energy for the power supply, expressed as watthours.
+
+    -   energy_full_design
+    -   energy_full
+    -   energy_now
+    -   energy_empty
+    -   energy_empty_design
+
+4.  Voltage: The voltage for the power supply, expressed as volts.
+
+    -   voltage_max_design
+    -   voltage_max
+    -   voltage_now
+    -   voltage_min
+    -   voltage_min_design
 
 #### configuration
 
@@ -402,30 +422,30 @@ and metrics:
 
 #### notes
 
-* Most drivers provide at least the first chart. Battery powered ACPI
-compliant systems (like most laptops) provide all but the third, but do
-not provide all of the metrics for each chart.
+-   Most drivers provide at least the first chart. Battery powered ACPI
+    compliant systems (like most laptops) provide all but the third, but do
+    not provide all of the metrics for each chart.
 
-* Current, energy, and voltages are reported with a _very_ high precision
-by the power\_supply framework.  Usually, this is far higher than the
-actual hardware supports reporting, so expect to see changes in these
-charts jump instead of scaling smoothly.
+-   Current, energy, and voltages are reported with a *very* high precision
+    by the power_supply framework.  Usually, this is far higher than the
+    actual hardware supports reporting, so expect to see changes in these
+    charts jump instead of scaling smoothly.
 
-* If `max` or `full` attribute is defined by the driver, but not a
-corresponding `min` or `empty` attribute, then Netdata will still provide
-the corresponding `min` or `empty`, which will then always read as zero.
-This way, alerts which match on these will still work.
+-   If `max` or `full` attribute is defined by the driver, but not a
+    corresponding `min` or `empty` attribute, then Netdata will still provide
+    the corresponding `min` or `empty`, which will then always read as zero.
+    This way, alerts which match on these will still work.
 
 ## IPC
 
 ### Monitored IPC metrics
 
-- **number of messages in message queues**
-- **amount of memory used by message queues**
-- **number of semaphores**
-- **number of semaphore arrays**
-- **number of shared memory segments**
-- **amount of memory used by shared memory segments**
+-   **number of messages in message queues**
+-   **amount of memory used by message queues**
+-   **number of semaphores**
+-   **number of semaphore arrays**
+-   **number of shared memory segments**
+-   **amount of memory used by shared memory segments**
 
 As far as the message queue charts are dynamic, sane limits are applied for the number of dimensions per chart (the limit is configurable).
 
@@ -441,4 +461,4 @@ As far as the message queue charts are dynamic, sane limits are applied for the 
   # max dimensions in memory allowed = 50
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fproc.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fproc.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -28,49 +28,51 @@ One of the features the Linux kernel has, but it is rarely used, is its ability 
 
 QoS is about 2 features:
 
-1. **Classify traffic**
+1.  **Classify traffic**
 
   Classification is the process of organizing traffic in groups, called **classes**. Classification can evaluate every aspect of network packets, like source and destination ports, source and destination IPs, netfilter marks, etc.
 
   When you classify traffic, you just assign a label to it. Of course classes have some properties themselves (like queuing mechanisms), but let's say it is that simple: **a label**. For example **I call `web server` traffic, the traffic from my server's tcp/80, tcp/443 and to my server's tcp/80, tcp/443, while I call `web surfing` all other tcp/80 and tcp/443 traffic**. You can use any combinations you like. There is no limit.
 
-2. **Apply traffic shaping rules to these classes**
+2.  **Apply traffic shaping rules to these classes**
 
   Traffic shaping is used to control how network interface bandwidth should be shared among the classes. Normally, you need to do this, when there is not enough bandwidth to satisfy all the demand, or when you want to control the supply of bandwidth to certain services. Of course classification is sufficient for monitoring traffic, but traffic shaping is also quite important, as we will explain in the next section.
 
 ## Why you want QoS
 
-1. **Monitoring the bandwidth used by services**
+1.  **Monitoring the bandwidth used by services**
 
-   Netdata provides wonderful real-time charts, like this one (wait to see the orange `rsync` part):
+    Netdata provides wonderful real-time charts, like this one (wait to see the orange `rsync` part):
 
-   ![qos3](https://cloud.githubusercontent.com/assets/2662304/14474189/713ede84-0104-11e6-8c9c-8dca5c2abd63.gif)
+    ![qos3](https://cloud.githubusercontent.com/assets/2662304/14474189/713ede84-0104-11e6-8c9c-8dca5c2abd63.gif)
 
-2. **Ensure sensitive administrative tasks will not starve for bandwidth**
+2.  **Ensure sensitive administrative tasks will not starve for bandwidth**
 
-   Have you tried to ssh to a server when the network is congested? If you have, you already know it does not work very well. QoS can guarantee that services like ssh, dns, ntp, etc will always have a small supply of bandwidth. So, no matter what happens, you will be able to ssh to your server and DNS will always work.
+    Have you tried to ssh to a server when the network is congested? If you have, you already know it does not work very well. QoS can guarantee that services like ssh, dns, ntp, etc will always have a small supply of bandwidth. So, no matter what happens, you will be able to ssh to your server and DNS will always work.
 
-3. **Ensure administrative tasks will not monopolize all the bandwidth**
+3.  **Ensure administrative tasks will not monopolize all the bandwidth**
 
-   Services like backups, file copies, database dumps, etc can easily monopolize all the available bandwidth. It is common for example a nightly backup, or a huge file transfer to negatively influence the end-user experience. QoS can fix that.
+    Services like backups, file copies, database dumps, etc can easily monopolize all the available bandwidth. It is common for example a nightly backup, or a huge file transfer to negatively influence the end-user experience. QoS can fix that.
 
-4. **Ensure each end-user connection will get a fair cut of the available bandwidth.**
+4.  **Ensure each end-user connection will get a fair cut of the available bandwidth.**
 
-   Several QoS queuing disciplines in Linux do this automatically, without any configuration from you. The result is that new sockets are favored over older ones, so that users will get a snappier experience, while others are transferring large amounts of traffic.
+    Several QoS queuing disciplines in Linux do this automatically, without any configuration from you. The result is that new sockets are favored over older ones, so that users will get a snappier experience, while others are transferring large amounts of traffic.
 
-5. **Protect the servers from DDoS attacks.**
+5.  **Protect the servers from DDoS attacks.**
 
-   When your system is under a DDoS attack, it will get a lot more bandwidth compared to the one it can handle and probably your applications will crash. Setting a limit on the inbound traffic using QoS, will protect your servers (throttle the requests) and depending on the size of the attack may allow your legitimate users to access the server, while the attack is taking place.
+    When your system is under a DDoS attack, it will get a lot more bandwidth compared to the one it can handle and probably your applications will crash. Setting a limit on the inbound traffic using QoS, will protect your servers (throttle the requests) and depending on the size of the attack may allow your legitimate users to access the server, while the attack is taking place.
 
-   Using QoS together with a [SYNPROXY](../proc.plugin/README.md#linux-anti-ddos) will provide a great degree of protection against most DDoS attacks. Actually when I wrote that article, a few folks tried to DDoS the Netdata demo site to see in real-time the SYNPROXY operation. They did not do it right, but anyway a great deal of requests reached the Netdata server. What saved Netdata was QoS. The Netdata demo server has QoS installed, so the requests were throttled and the server did not even reach the point of resource starvation. Read about it [here](../proc.plugin/README.md#linux-anti-ddos).
+    Using QoS together with a [SYNPROXY](../proc.plugin/README.md#linux-anti-ddos) will provide a great degree of protection against most DDoS attacks. Actually when I wrote that article, a few folks tried to DDoS the Netdata demo site to see in real-time the SYNPROXY operation. They did not do it right, but anyway a great deal of requests reached the Netdata server. What saved Netdata was QoS. The Netdata demo server has QoS installed, so the requests were throttled and the server did not even reach the point of resource starvation. Read about it [here](../proc.plugin/README.md#linux-anti-ddos).
 
 On top of all these, QoS is extremely light. You will configure it once, and this is it. It will not bother you again and it will not use any noticeable CPU resources, especially on application and database servers.
 
-	- ensure administrative tasks (like ssh, dns, etc) will always have a small but guaranteed bandwidth. So, no matter what happens, I will be able to ssh to my server and DNS will work.
+```
+- ensure administrative tasks (like ssh, dns, etc) will always have a small but guaranteed bandwidth. So, no matter what happens, I will be able to ssh to my server and DNS will work.
 
-	- ensure other administrative tasks will not monopolize all the available bandwidth. So, my nightly backup will not hurt my users, a developer that is copying files over the net will not get all the available bandwidth, etc.
+- ensure other administrative tasks will not monopolize all the available bandwidth. So, my nightly backup will not hurt my users, a developer that is copying files over the net will not get all the available bandwidth, etc.
 
-	- ensure each end-user connection will get a fair cut of the available bandwidth.
+- ensure each end-user connection will get a fair cut of the available bandwidth.
+```
 
 Once **traffic classification** is applied, we can use **[netdata](https://github.com/netdata/netdata)** to visualize the bandwidth consumption per class in real-time (no configuration is needed for Netdata - it will figure it out).
 
@@ -78,8 +80,8 @@ QoS, is extremely light. You will configure it once, and this is it. It will not
 
 This is QoS from a home linux router. Check these features:
 
-1. It is real-time (per second updates)
-2. QoS really works in Linux - check that the `background` traffic is squeezed when `surfing` needs it.
+1.  It is real-time (per second updates)
+2.  QoS really works in Linux - check that the `background` traffic is squeezed when `surfing` needs it.
 
 ![test2](https://cloud.githubusercontent.com/assets/2662304/14093004/68966020-f553-11e5-98fe-ffee2086fafd.gif)
 
@@ -168,6 +170,7 @@ And this is what you are going to get:
 First, setup the tc rules in rc.local using commands to assign different DSCP markings to different classids. You can see one such example in [github issue #4563](https://github.com/netdata/netdata/issues/4563#issuecomment-455711973). 
 
 Then, map the classids to names by creating `/etc/iproute2/tc_cls`. For example:
+
 ```
 2:1 Standard
 2:8 LowPriorityData
@@ -184,14 +187,14 @@ Then, map the classids to names by creating `/etc/iproute2/tc_cls`. For example:
 ```
 
 Add the following configuration option in `/etc/netdata.conf`:
-```[plugin:tc]
+
+```\[plugin:tc]
         enable show all classes and qdiscs for all interfaces = yes
 ```
 
 Finally, create `/etc/netdata/tc-qos-helper.conf` with this content:
-```tc_show="class"```
+`tc_show="class"`
 
 Please note, that by default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Set `yes` for a chart instead of `auto` to enable it permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Ftc.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Ftc.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

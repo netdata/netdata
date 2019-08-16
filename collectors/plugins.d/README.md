@@ -5,19 +5,19 @@ from external processes, thus allowing Netdata to use **external plugins**.
 
 ## Provided External Plugins
 
-plugin|language|O/S|description
-:---:|:---:|:---:|:---
-[apps.plugin](../apps.plugin/)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.
-[charts.d.plugin](../charts.d.plugin/)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.
-[cups.plugin](../cups.plugin/)|`C`|all|monitors **CUPS**
-[fping.plugin](../fping.plugin/)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.
-[ioping.plugin](../ioping.plugin/)|`C`|all|measures disk latency.
-[freeipmi.plugin](../freeipmi.plugin/)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.
-[nfacct.plugin](../nfacct.plugin/)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.
-[xenstat.plugin](../xenstat.plugin/)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.
-[perf.plugin](../perf.plugin/)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).
-[node.d.plugin](../node.d.plugin/)|`node.js`|all|a **plugin orchestrator** for data collection modules written in `node.js`.
-[python.d.plugin](../python.d.plugin/)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).
+|plugin|language|O/S|description|
+|:----:|:------:|:-:|:----------|
+|[apps.plugin](../apps.plugin/)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
+|[charts.d.plugin](../charts.d.plugin/)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
+|[cups.plugin](../cups.plugin/)|`C`|all|monitors **CUPS**|
+|[fping.plugin](../fping.plugin/)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.|
+|[ioping.plugin](../ioping.plugin/)|`C`|all|measures disk latency.|
+|[freeipmi.plugin](../freeipmi.plugin/)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
+|[nfacct.plugin](../nfacct.plugin/)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
+|[xenstat.plugin](../xenstat.plugin/)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.|
+|[perf.plugin](../perf.plugin/)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).|
+|[node.d.plugin](../node.d.plugin/)|`node.js`|all|a **plugin orchestrator** for data collection modules written in `node.js`.|
+|[python.d.plugin](../python.d.plugin/)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
 
 Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native Netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator).
 Each of these modular plugins has each own methods for defining modules. Please check the examples and their documentation.
@@ -26,13 +26,13 @@ Each of these modular plugins has each own methods for defining modules. Please 
 
 This plugin allows Netdata to use **external plugins** for data collection:
 
-1. external data collection plugins may be written in any computer language.
+1.  external data collection plugins may be written in any computer language.
 
-2. external data collection plugins may use O/S capabilities or `setuid` to
-   run with escalated privileges (compared to the `netdata` daemon).
-   The communication between the external plugin and Netdata is unidirectional
-   (from the plugin to Netdata), so that Netdata cannot manipulate an external
-   plugin running with escalated privileges.
+2.  external data collection plugins may use O/S capabilities or `setuid` to
+    run with escalated privileges (compared to the `netdata` daemon).
+    The communication between the external plugin and Netdata is unidirectional
+    (from the plugin to Netdata), so that Netdata cannot manipulate an external
+    plugin running with escalated privileges.
 
 ## Operation
 
@@ -41,8 +41,9 @@ Netdata will start it when it starts and stop it when it exits.
 
 If the external plugin exits or crashes, Netdata will log an error.
 If the external plugin exits or crashes without pushing metrics to Netdata, Netdata will not start it again.
-- Plugins that exit with any value other than zero, will be disabled. Plugins that exit with zero, will be restarted after some time.
-- Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
+
+-   Plugins that exit with any value other than zero, will be disabled. Plugins that exit with zero, will be restarted after some time.
+-   Plugins may also be disabled by Netdata if they output things that Netdata does not understand.
 
 The `stdout` of external plugins is connected to Netdata to receive metrics,
 with the API defined below.
@@ -90,9 +91,8 @@ For example, for `apps.plugin` the following section is available:
 	# command options =
 ```
 
-- `update every` controls the granularity of the external plugin.
-- `command options` allows giving additional command line options to the plugin.
-
+-   `update every` controls the granularity of the external plugin.
+-   `command options` allows giving additional command line options to the plugin.
 
 Netdata will provide to the external plugins the environment variable `NETDATA_UPDATE_EVERY`, in seconds (the default is 1). This is the **minimum update frequency** for all charts. A plugin that is updating values more frequently than this, is just wasting resources.
 
@@ -114,13 +114,13 @@ Any program that can print a few values to its standard output can become a Netd
 
 Netdata parses 7 lines starting with:
 
-- `CHART` - create or update a chart
-- `DIMENSION` - add or update a dimension to the chart just created
-- `BEGIN` - initialize data collection for a chart
-- `SET` - set the value of a dimension for the initialized chart
-- `END` - complete data collection for the initialized chart
-- `FLUSH` - ignore the last collected values
-- `DISABLE` - disable this plugin
+-   `CHART` - create or update a chart
+-   `DIMENSION` - add or update a dimension to the chart just created
+-   `BEGIN` - initialize data collection for a chart
+-   `SET` - set the value of a dimension for the initialized chart
+-   `END` - complete data collection for the initialized chart
+-   `FLUSH` - ignore the last collected values
+-   `DISABLE` - disable this plugin
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -142,18 +142,17 @@ every 5 seconds.
 There are a few environment variables that are set by `netdata` and are
 available for the plugin to use.
 
-variable|description
-:------:|:----------
-`NETDATA_USER_CONFIG_DIR`|The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).
-`NETDATA_STOCK_CONFIG_DIR`|The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).
-`NETDATA_PLUGINS_DIR`|The directory where all Netdata plugins are stored.
-`NETDATA_WEB_DIR`|The directory where the web files of Netdata are saved.
-`NETDATA_CACHE_DIR`|The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.
-`NETDATA_LOG_DIR`|The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.
-`NETDATA_HOST_PREFIX`|This is used in environments where system directories like `/sys` and `/proc` have to be accessed at a different path.
-`NETDATA_DEBUG_FLAGS`|This is a number (probably in hex starting with `0x`), that enables certain Netdata debugging features. Check **[[Tracing Options]]** for more information.
-`NETDATA_UPDATE_EVERY`|The minimum number of seconds between chart refreshes. This is like the **internal clock** of Netdata (it is user configurable, defaulting to `1`). There is no meaning for a plugin to update its values more frequently than this number of seconds.
-
+|variable|description|
+|:------:|:----------|
+|`NETDATA_USER_CONFIG_DIR`|The directory where all Netdata-related user configuration should be stored. If the plugin requires custom user configuration, this is the place the user has saved it (normally under `/etc/netdata`).|
+|`NETDATA_STOCK_CONFIG_DIR`|The directory where all Netdata -related stock configuration should be stored. If the plugin is shipped with configuration files, this is the place they can be found (normally under `/usr/lib/netdata/conf.d`).|
+|`NETDATA_PLUGINS_DIR`|The directory where all Netdata plugins are stored.|
+|`NETDATA_WEB_DIR`|The directory where the web files of Netdata are saved.|
+|`NETDATA_CACHE_DIR`|The directory where the cache files of Netdata are stored. Use this directory if the plugin requires a place to store data. A new directory should be created for the plugin for this purpose, inside this directory.|
+|`NETDATA_LOG_DIR`|The directory where the log files are stored. By default the `stderr` output of the plugin will be saved in the `error.log` file of Netdata.|
+|`NETDATA_HOST_PREFIX`|This is used in environments where system directories like `/sys` and `/proc` have to be accessed at a different path.|
+|`NETDATA_DEBUG_FLAGS`|This is a number (probably in hex starting with `0x`), that enables certain Netdata debugging features. Check **\[[Tracing Options]]** for more information.|
+|`NETDATA_UPDATE_EVERY`|The minimum number of seconds between chart refreshes. This is like the **internal clock** of Netdata (it is user configurable, defaulting to `1`). There is no meaning for a plugin to update its values more frequently than this number of seconds.|
 
 ### The output of the plugin
 
@@ -169,31 +168,32 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 
 the template is:
 
-> CHART type.id name title units [family [context [charttype [priority [update_every [options [plugin [module]]]]]]]]
+> CHART type.id name title units \[family \[context \[charttype \[priority \[update_every \[options \[plugin [module]]]]]]]]
 
  where:
-  - `type.id`
+
+-   `type.id`
 
     uniquely identifies the chart,
     this is what will be needed to add values to the chart
 
     the `type` part controls the menu the charts will appear in
 
-  - `name`
+-   `name`
 
     is the name that will be presented to the user instead of `id` in `type.id`. This means that only the `id` part of `type.id` is changed. When a name has been given, the chart is index (and can be referred) as both `type.id` and `type.name`. You can set name to `''`, or `null`, or `(null)` to disable it.
 
-  - `title`
+-   `title`
 
     the text above the chart
 
-  - `units`
+-   `units`
 
     the label of the vertical axis of the chart,
     all dimensions added to a chart should have the same units
     of measurement
 
-  - `family`
+-   `family`
 
     is used to group charts together
     (for example all eth0 charts should say: eth0),
@@ -201,36 +201,35 @@ the template is:
 
     this controls the sub-menu on the dashboard
 
-  - `context`
+-   `context`
 
     the context is giving the template of the chart. For example, if multiple charts present the same information for a different family, they should have the same `context`
 
     this is used for looking up rendering information for the chart (colors, sizes, informational texts) and also apply alarms to it
 
-  - `charttype`
+-   `charttype`
 
     one of `line`, `area` or `stacked`,
     if empty or missing, the `line` will be used
 
-  - `priority`
+-   `priority`
 
     is the relative priority of the charts as rendered on the web page,
     lower numbers make the charts appear before the ones with higher numbers,
     if empty or missing, `1000` will be used
 
-  - `update_every`
+-   `update_every`
 
     overwrite the update frequency set by the server,
     if empty or missing, the user configured value will be used
 
-  - `options`
+-   `options`
 
     a space separated list of options, enclosed in quotes. 4 options are currently supported: `obsolete` to mark a chart as obsolete (Netdata will hide it and delete it after some time), `detail` to mark a chart as insignificant (this may be used by dashboards to make the charts smaller, or somehow visualize properly a less important chart), `store_first` to make Netdata store the first collected value, assuming there was an invisible previous value set to zero (this is used by statsd charts - if the first data collected value of incremental dimensions is not zero based, unrealistic spikes will appear with this option set) and `hidden` to perform all operations on a chart, but do not offer it on dashboards (the chart will be send to backends). `CHART` options have been added in Netdata v1.7 and the `hidden` option was added in 1.10.
 
-  - `plugin` and `module`
+-   `plugin` and `module`
 
     both are just names that are used to let the user identify the plugin and the module that generated the chart. If `plugin` is unset or empty, Netdata will automatically set the filename of the plugin that generated the chart. `module` has not default.
-
 
 #### DIMENSION
 
@@ -238,60 +237,59 @@ the template is:
 
 the template is:
 
-> DIMENSION id [name [algorithm [multiplier [divisor [options]]]]]
+> DIMENSION id \[name \[algorithm \[multiplier \[divisor [options]]]]]
 
  where:
 
-  - `id`
+-   `id`
 
     the `id` of this dimension (it is a text value, not numeric),
     this will be needed later to add values to the dimension
 
     We suggest to avoid using `.` in dimension ids. Backends expect metrics to be `.` separated and people will get confused if a dimension id contains a dot.
 
-  - `name`
+-   `name`
 
     the name of the dimension as it will appear at the legend of the chart,
     if empty or missing the `id` will be used
 
-  - `algorithm`
+-   `algorithm`
 
     one of:
 
-    * `absolute`
+    -   `absolute`
 
-      the value is to drawn as-is (interpolated to second boundary),
-      if `algorithm` is empty, invalid or missing, `absolute` is used
+        the value is to drawn as-is (interpolated to second boundary),
+        if `algorithm` is empty, invalid or missing, `absolute` is used
 
-    * `incremental`
+    -   `incremental`
 
-      the value increases over time,
-      the difference from the last value is presented in the chart,
-      the server interpolates the value and calculates a per second figure
+        the value increases over time,
+        the difference from the last value is presented in the chart,
+        the server interpolates the value and calculates a per second figure
 
-    * `percentage-of-absolute-row`
+    -   `percentage-of-absolute-row`
 
-      the % of this value compared to the total of all dimensions
+        the % of this value compared to the total of all dimensions
 
-    * `percentage-of-incremental-row`
+    -   `percentage-of-incremental-row`
 
-      the % of this value compared to the incremental total of
-      all dimensions
+        the % of this value compared to the incremental total of
+        all dimensions
 
-  - `multiplier`
+-   `multiplier`
 
     an integer value to multiply the collected value,
     if empty or missing, `1` is used
 
-  - `divisor`
+-   `divisor`
 
     an integer value to divide the collected value,
     if empty or missing, `1` is used
 
-  - `options`
+-   `options`
 
     a space separated list of options, enclosed in quotes. Options supported: `obsolete` to mark a dimension as obsolete (Netdata will delete it after some time) and `hidden` to make this dimension hidden, it will take part in the calculations but will not be presented in the chart.
-
 
 #### VARIABLE
 
@@ -301,8 +299,8 @@ the template is:
 
 Variables support 2 scopes:
 
-- `GLOBAL` or `HOST` to define the variable at the host level.
-- `LOCAL` or `CHART` to define the variable at the chart level. Use chart-local variables when the same variable may exist for different charts (i.e. Netdata monitors 2 mysql servers, and you need to set the `max_connections` each server accepts). Using chart-local variables is the ideal to build alarm templates.
+-   `GLOBAL` or `HOST` to define the variable at the host level.
+-   `LOCAL` or `CHART` to define the variable at the chart level. Use chart-local variables when the same variable may exist for different charts (i.e. Netdata monitors 2 mysql servers, and you need to set the `max_connections` each server accepts). Using chart-local variables is the ideal to build alarm templates.
 
 The position of the `VARIABLE` line, sets its default scope (in case you do not specify a scope). So, defining a `VARIABLE` before any `CHART`, or between `END` and `BEGIN` (outside any chart), sets `GLOBAL` scope, while defining a `VARIABLE` just after a `CHART` or a `DIMENSION`, or within the `BEGIN` - `END` block of a chart, sets `LOCAL` scope.
 
@@ -320,11 +318,11 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
 > BEGIN type.id [microseconds]
 
-  - `type.id`
+-   `type.id`
 
     is the unique identification of the chart (as given in `CHART`)
 
-  - `microseconds`
+-   `microseconds`
 
     is the number of microseconds since the last update of the chart. It is optional.
 
@@ -338,13 +336,13 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
 > SET id = value
 
-   - `id`
+-   `id`
 
-     is the unique identification of the dimension (of the chart just began)
+    is the unique identification of the dimension (of the chart just began)
 
-   - `value`
+-   `value`
 
-     is the collected value, only integer values are collected. If you want to push fractional values, multiply this value by 100 or 1000 and set the `DIMENSION` divider to 1000.
+    is the collected value, only integer values are collected. If you want to push fractional values, multiply this value by 100 or 1000 and set the `DIMENSION` divider to 1000.
 
 > END
 
@@ -373,43 +371,43 @@ Netdata will collect any **signed** value in the 64bit range:
 
 If a value is not collected, leave it empty, like this:
 
-`SET id = `
+`SET id =`
 
 or do not output the line at all.
 
 ## Modular Plugins
 
-1. **python**, use `python.d.plugin`, there are many examples in the [python.d directory](../python.d.plugin/)
+1.  **python**, use `python.d.plugin`, there are many examples in the [python.d directory](../python.d.plugin/)
 
-   python is ideal for Netdata plugins. It is a simple, yet powerful way to collect data, it has a very small memory footprint, although it is not the most CPU efficient way to do it.
+    python is ideal for Netdata plugins. It is a simple, yet powerful way to collect data, it has a very small memory footprint, although it is not the most CPU efficient way to do it.
 
-2. **node.js**, use `node.d.plugin`, there are a few examples in the [node.d directory](../node.d.plugin/)
+2.  **node.js**, use `node.d.plugin`, there are a few examples in the [node.d directory](../node.d.plugin/)
 
-   node.js is the fastest scripting language for collecting data. If your plugin needs to do a lot of work, compute values, etc, node.js is probably the best choice before moving to compiled code. Keep in mind though that node.js is not memory efficient; it will probably need more RAM compared to python.
+    node.js is the fastest scripting language for collecting data. If your plugin needs to do a lot of work, compute values, etc, node.js is probably the best choice before moving to compiled code. Keep in mind though that node.js is not memory efficient; it will probably need more RAM compared to python.
 
-3. **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d directory](../charts.d.plugin/)
+3.  **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d directory](../charts.d.plugin/)
 
-   BASH is the simplest scripting language for collecting values. It is the less efficient though in terms of CPU resources. You can use it to collect data quickly, but extensive use of it might use a lot of system resources.
+    BASH is the simplest scripting language for collecting values. It is the less efficient though in terms of CPU resources. You can use it to collect data quickly, but extensive use of it might use a lot of system resources.
 
-4. **C**
+4.  **C**
 
-   Of course, C is the most efficient way of collecting data. This is why Netdata itself is written in C.
+    Of course, C is the most efficient way of collecting data. This is why Netdata itself is written in C.
 
 ## Writing Plugins Properly
 
 There are a few rules for writing plugins properly:
 
-1. Respect system resources
+1.  Respect system resources
 
-   Pay special attention to efficiency:
+    Pay special attention to efficiency:
 
-      - Initialize everything once, at the beginning. Initialization is not an expensive operation. Your plugin will most probably be started once and run forever. So, do whatever heavy operation is needed at the beginning, just once.
-      - Do the absolutely minimum while iterating to collect values repeatedly.
-      - If you need to connect to another server to collect values, avoid re-connects if possible. Connect just once, with keep-alive (for HTTP) enabled and collect values using the same connection.
-      - Avoid any CPU or memory heavy operation while collecting data. If you control memory allocation, avoid any memory allocation while iterating to collect values.
-      - Avoid running external commands when possible. If you are writing shell scripts avoid especially pipes (each pipe is another fork, a very expensive operation).
+    -   Initialize everything once, at the beginning. Initialization is not an expensive operation. Your plugin will most probably be started once and run forever. So, do whatever heavy operation is needed at the beginning, just once.
+    -   Do the absolutely minimum while iterating to collect values repeatedly.
+    -   If you need to connect to another server to collect values, avoid re-connects if possible. Connect just once, with keep-alive (for HTTP) enabled and collect values using the same connection.
+    -   Avoid any CPU or memory heavy operation while collecting data. If you control memory allocation, avoid any memory allocation while iterating to collect values.
+    -   Avoid running external commands when possible. If you are writing shell scripts avoid especially pipes (each pipe is another fork, a very expensive operation).
 
-2. The best way to iterate at a constant pace is this pseudo code:
+2.  The best way to iterate at a constant pace is this pseudo code:
 
 ```js
    var update_every = argv[1] * 1000; /* seconds * 1000 = milliseconds */
@@ -470,9 +468,8 @@ There are a few rules for writing plugins properly:
 
    Netdata interpolates values to second boundaries, so even if your plugin is not perfectly aligned it does not matter. Netdata will find out. When your plugin works in increments of `update_every`, there will be no gaps in the charts due to the possible cumulative micro-delays in data collection. Gaps will only appear if the data collection is really delayed.
 
-3. If you are not sure of memory leaks, exit every one hour. Netdata will re-start your process.
+3.  If you are not sure of memory leaks, exit every one hour. Netdata will re-start your process.
 
-4. If possible, try to autodetect if your plugin should be enabled, without any configuration.
+4.  If possible, try to autodetect if your plugin should be enabled, without any configuration.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fplugins.d%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fplugins.d%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

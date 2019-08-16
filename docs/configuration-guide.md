@@ -7,27 +7,26 @@ Depending on your installation method, Netdata will have been installed either d
 
 Under that directory you will see the following:
 
-- `netdata.conf` is [the main configuration file](../daemon/config/#daemon-configuration) 
-- `edit-config` is an sh script that you can use to easily and safely edit the configuration. Just run it to see its usage.
-- Other directories, initially empty, where your custom configurations for alarms and collector plugins/modules will be copied from the stock configuration, if and when you customize them using `edit-config`. 
-- `orig` is a symbolic link to the directory `/usr/lib/netdata/conf.d`, which contains the stock configurations for everything not included in `netdata.conf`:
-    - `health_alarm_notify.conf` is where you configure how and to who Netdata will send [alarm notifications](../health/notifications/#netdata-alarm-notifications). 
-    - `health.d` is the directory that contains the alarm triggers for [health monitoring](../health/#health-monitoring). It contains one .conf file per collector. 
-    - The [modular plugin orchestrators](../collectors/plugins.d/#external-plugins-overview) have:
-        -  One config file each, mainly to turn their modules on and off: `python.d.conf` for [python](../collectors/python.d.plugin/#pythondplugin), `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin) and `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin) modules.
-        - One directory each, where the module-specific configuration files can be found.
-    - `stream.conf` is where you configure [streaming and replication](../streaming/#streaming-and-replication)
-    - `stats.d` is a directory under which you can add .conf files to add [synthetic charts](../collectors/statsd.plugin/#synthetic-statsd-charts).
-    - Individual collector plugin config files, such as `fping.conf` for the [fping plugin](../collectors/fping.plugin/) and `apps_groups.conf` for the [apps plugin](../collectors/apps.plugin/) 
+-   `netdata.conf` is [the main configuration file](../daemon/config/#daemon-configuration) 
+-   `edit-config` is an sh script that you can use to easily and safely edit the configuration. Just run it to see its usage.
+-   Other directories, initially empty, where your custom configurations for alarms and collector plugins/modules will be copied from the stock configuration, if and when you customize them using `edit-config`. 
+-   `orig` is a symbolic link to the directory `/usr/lib/netdata/conf.d`, which contains the stock configurations for everything not included in `netdata.conf`:
+    -   `health_alarm_notify.conf` is where you configure how and to who Netdata will send [alarm notifications](../health/notifications/#netdata-alarm-notifications). 
+    -   `health.d` is the directory that contains the alarm triggers for [health monitoring](../health/#health-monitoring). It contains one .conf file per collector. 
+    -   The [modular plugin orchestrators](../collectors/plugins.d/#external-plugins-overview) have:
+        -   One config file each, mainly to turn their modules on and off: `python.d.conf` for [python](../collectors/python.d.plugin/#pythondplugin), `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin) and `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin) modules.
+        -   One directory each, where the module-specific configuration files can be found.
+    -   `stream.conf` is where you configure [streaming and replication](../streaming/#streaming-and-replication)
+    -   `stats.d` is a directory under which you can add .conf files to add [synthetic charts](../collectors/statsd.plugin/#synthetic-statsd-charts).
+    -   Individual collector plugin config files, such as `fping.conf` for the [fping plugin](../collectors/fping.plugin/) and `apps_groups.conf` for the [apps plugin](../collectors/apps.plugin/) 
 
 So there are many configuration files to control every aspect of Netdata's behavior. It can be overwhelming at first, but you won't have to deal with any of them, unless you have specific things you need to change. The following HOWTO will guide you on how to customize your Netdata, based on what you want to do. 
-
 
 ## How to
 
 ### Persist my configuration
 
-In http://localhost:19999/netdata.conf, you will see the following two parameters:
+In <http://localhost:19999/netdata.conf>, you will see the following two parameters:
 
 ```bash
 	# config directory = /etc/netdata
@@ -40,22 +39,23 @@ To persist your configurations, don't edit the files under the `stock config dir
 
 ##### Increase the metrics retention period
 
-Increase `history` in [netdata.conf [global]](../daemon/config/#global-section-options). Just ensure you understand [how much memory will be required](../database/)
+Increase `history` in [netdata.conf \[global\]](../daemon/config/#global-section-options). Just ensure you understand [how much memory will be required](../database/)
 
 ##### Reduce the data collection frequency
 
-Increase `update every` in [netdata.conf [global]](../daemon/config/#global-section-options). This is another way to increase your metrics retention period, but at a lower resolution than the default 1s.
+Increase `update every` in [netdata.conf \[global\]](../daemon/config/#global-section-options). This is another way to increase your metrics retention period, but at a lower resolution than the default 1s.
 
 ##### Modify how a chart is displayed
 
-In `netdata.conf` under `# Per chart configuration` you will find several [[CHART_NAME] sections](../daemon/config/#per-chart-configuration), where you can control all aspects of a specific chart. 
+In `netdata.conf` under `# Per chart configuration` you will find several [\[CHART_NAME\] sections](../daemon/config/#per-chart-configuration), where you can control all aspects of a specific chart. 
 
 ##### Disable a collector
 
-Entire plugins can be turned off from the [netdata.conf [plugins]](../daemon/config/#plugins-section-options) section. To disable specific modules of a plugin orchestrator, you need to edit one of the following:
-- `python.d.conf` for [python](../collectors/python.d.plugin/#pythondplugin)
-- `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin)
-- `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
+Entire plugins can be turned off from the [netdata.conf \[plugins\]](../daemon/config/#plugins-section-options) section. To disable specific modules of a plugin orchestrator, you need to edit one of the following:
+
+-   `python.d.conf` for [python](../collectors/python.d.plugin/#pythondplugin)
+-   `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin)
+-   `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
 
 ##### Show charts with zero metrics
 
@@ -69,7 +69,7 @@ You can add a new alarm definition either by editing an existing stock alarm con
 
 ##### Turn off all alarms and notifications
 
-Just set `enabled = no` in the [netdata.conf [health]](../daemon/config/#health-section-options) section
+Just set `enabled = no` in the [netdata.conf \[health\]](../daemon/config/#health-section-options) section
 
 ##### Modify or disable a specific alarm
 
@@ -88,7 +88,7 @@ You only need to configure `health_alarm_notify.conf`. To learn how to do it, re
 
 ##### Change the Netdata web server access lists
 
-You have several options under the [netdata.conf [web]](../web/server/#access-lists) section. 
+You have several options under the [netdata.conf \[web\]](../web/server/#access-lists) section. 
 
 ##### Stop sending info to registry.my-netdata.io
 
@@ -106,7 +106,7 @@ The page on [Netdata performance](Performance.md) has an excellent guide on how 
 
 ##### Change when Netdata saves metrics to disk
 
-[netdata.conf [global]](../daemon/config/#global-section-options) : `memory mode`</details>
+[netdata.conf \[global\]](../daemon/config/#global-section-options) : `memory mode`</details>
 
 ##### Prevent Netdata from getting immediately killed when my server runs out of memory
 
@@ -116,8 +116,7 @@ You can change the Netdata [OOM score](../daemon/#oom-score) in `netdata.conf` [
 
 ##### Move Netdata directories
 
-The various directory paths are in [netdata.conf [global]](../daemon/config/#global-section-options).
-
+The various directory paths are in [netdata.conf \[global\]](../daemon/config/#global-section-options).
 
 ## How Netdata configuration works
 
@@ -135,4 +134,4 @@ Unix prefers regular expressions. But they are just too hard, too cryptic to use
 
 So, Netdata supports [simple patterns](../libnetdata/simple_pattern/). 
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfiguration-guide&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfiguration-guide&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

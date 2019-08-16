@@ -8,10 +8,10 @@ Will look like this on your Android device:
 
 You will need:
 
-1. Signup and Login to kavenegar.com
-2. Get your APIKEY and Sender from http://panel.kavenegar.com/client/setting/account
-3. Fill in KAVENEGAR_API_KEY="" KAVENEGAR_SENDER=""
-4. Add the recipient phone numbers to DEFAULT_RECIPIENT_KAVENEGAR=""
+1.  Signup and Login to kavenegar.com
+2.  Get your APIKEY and Sender from <http://panel.kavenegar.com/client/setting/account>
+3.  Fill in KAVENEGAR_API_KEY="" KAVENEGAR_SENDER=""
+4.  Add the recipient phone numbers to DEFAULT_RECIPIENT_KAVENEGAR=""
 
 Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
 
@@ -38,4 +38,4 @@ KAVENEGAR_SENDER=""
 DEFAULT_RECIPIENT_KAVENEGAR=""
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fkavenegar%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fkavenegar%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
