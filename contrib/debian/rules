@@ -19,7 +19,7 @@ TOP = $(CURDIR)/debian/netdata
 override_dh_auto_configure:
 	autoreconf -ivf
 	dh_auto_configure -- --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
-	--libexecdir=/usr/libexec --with-user=netdata --with-math --with-webdir=/var/lib/netdata/www
+	--libexecdir=/usr/libexec --with-user=netdata --with-math --with-zlib --with-webdir=/var/lib/netdata/www
 
 debian/%.postinst: debian/%.postinst.in
 	sed 's/@DEB_HOST_MULTIARCH@/$(DEB_HOST_MULTIARCH)/g' $< > $@
