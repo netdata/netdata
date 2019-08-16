@@ -147,7 +147,7 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     run_command_in_host(['autoreconf', '-ivf'])
 
     print(".4 Run configure")
-    run_command_in_host(['./configure', '--prefix=/usr', '--sysconfdir=/etc', '--localstatedir=/var', '--libexecdir=/usr/libexec', '--with-math', '--with-zlib', '--with-user=netdata'])
+    run_command_in_host(['./configure', '--prefix=/usr', '--sysconfdir=/etc', '--localstatedir=/var', '--libdir=/usr/lib', '--libexecdir=/usr/libexec', '--with-math', '--with-zlib', '--with-user=netdata'])
 
     print(".5 Run make dist")
     run_command_in_host(['make', 'dist'])
