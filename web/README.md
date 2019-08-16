@@ -1,32 +1,52 @@
 # Web dashboards overview
 
-Because Netdata is a health monitoring and *performance troubleshooting* system, we put a lot of emphasis on real-time, meaningful, and context-aware charts.
+Because Netdata is a health monitoring and _performance troubleshooting_ system,
+we put a lot of emphasis on real-time, meaningful, and context-aware charts.
 
-We bundle Netdata with a dashboard and hundreds of charts, designed by both our team and the community, but you can also customize them yourself.
+We bundle Netdata with a dashboard and hundreds of charts, designed by both our
+team and the community, but you can also customize them yourself.
 
 There are two primary ways to view Netdata's dashboards:
 
-1. The [standard web dashboard](gui/) that comes pre-configured with every Netdata installation. You can see it at `http://SERVER-IP:19999`, or `http://localhost:19999` on `localhost`. You can customize the contents and colors of the standard dashboard [using JavaScript](gui/#customizing-the-standard-dashboard).
+1.  The [standard web dashboard](gui/) that comes pre-configured with every
+   Netdata installation. You can see it at `http://SERVER-IP:19999`, or
+   `http://localhost:19999` on `localhost`. You can customize the contents and
+   colors of the standard dashboard [using
+   JavaScript](gui/#customizing-the-standard-dashboard).
 
-2. The [`dashboard.js` JavaScript library](#dashboardjs), which helps you [customize the standard dashboards](gui/#customizing-the-standard-dashboard) using JavaScript, or create entirely new [custom dashboards](gui/custom/) or [Atlassian Confluence dashboards](gui/confluence/).
+2.  The [`dashboard.js` JavaScript library](#dashboardjs), which helps you
+   [customize the standard dashboards](gui/#customizing-the-standard-dashboard)
+   using JavaScript, or create entirely new [custom dashboards](gui/custom/) or
+   [Atlassian Confluence dashboards](gui/confluence/).
 
 You can also view all the data Netdata collects through the [REST API v1](api/).
 
-No matter where you use Netdata's charts, you'll want to know how to [use](#using-charts) them. You'll also want to understand how Netdata defines [charts](#charts), [dimensions](#dimensions), [families](#families), and [contexts](#contexts).
+No matter where you use Netdata's charts, you'll want to know how to
+[use](#using-charts) them. You'll also want to understand how Netdata defines
+[charts](#charts), [dimensions](#dimensions), [families](#families), and
+[contexts](#contexts).
 
 ## Using charts
 
-Netdata's chart's are far from static. They're interactive, real-time, and work with your mouse, touchpad, or touchscreen!
+Netdata's chart's are far from static. They're interactive, real-time, and work
+with your mouse, touchpad, or touchscreen!
 
-Hover over any chart to temporarily pause it and see the exact values presented as different [dimensions](#dimensions). Click or tap to lock the chart.
+Hover over any chart to temporarily pause it and see the exact values presented
+as different [dimensions](#dimensions). Click or tap to lock the chart.
 
-![Animated GIF of hovering over a chart to see values](https://user-images.githubusercontent.com/1153921/62968279-9227dd00-bdbf-11e9-9112-1d21444d0f31.gif)
+![Animated GIF of hovering over a chart to see
+values](https://user-images.githubusercontent.com/1153921/62968279-9227dd00-bdbf-11e9-9112-1d21444d0f31.gif)
 
-You can change how charts show their metrics by zooming in or out, moving forward or backward in time, or selecting a specific timeframe for more in-depth analysis.
+You can change how charts show their metrics by zooming in or out, moving
+forward or backward in time, or selecting a specific timeframe for more in-depth
+analysis.
 
-Whenever you use a chart in this way, Netdata synchronizes all the other charts to match it. This even applies across different Netdata agents if you connect them using the [node menu](../registry)!
+Whenever you use a chart in this way, Netdata synchronizes all the other charts
+to match it. This even applies across different Netdata agents if you connect
+them using the [node menu](../registry)!
 
-You can change how charts show their metrics in a few different ways, each of which have a few methods:
+You can change how charts show their metrics in a few different ways, each of
+which have a few methods:
 
 | Manipulation | Method #1 | Method #2 | Method #3 |
 |--- |--- |--- |--- |
@@ -38,61 +58,103 @@ You can change how charts show their metrics in a few different ways, each of wh
 
 Here's how chart synchronization looks while zooming and panning:
 
-![Animated GIF of the standard Netdata dashboard being manipulated and synchronizing charts](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
+![Animated GIF of the standard Netdata dashboard being manipulated and
+synchronizing
+charts](https://user-images.githubusercontent.com/2662304/48309003-b4fb3b80-e578-11e8-86f6-f505c7059c15.gif)
 
-You can also perform all these actions using the small rewind/play/fast-forward/zoom-in/zoom-out buttons that appear in the bottom-right corner of each chart.
+You can also perform all these actions using the small
+rewind/play/fast-forward/zoom-in/zoom-out buttons that appear in the
+bottom-right corner of each chart.
 
 ## Charts, contexts, families
 
-Before customizing the standard web dashboard, creating a custom dashboard, configuring an alarm, or writing a collector, it's crucial to understand how Netdata organizes metrics into charts, dimensions, families, and contexts.
+Before customizing the standard web dashboard, creating a custom dashboard,
+configuring an alarm, or writing a collector, it's crucial to understand how
+Netdata organizes metrics into charts, dimensions, families, and contexts.
 
 ### Charts
 
-A **chart** is an individual, interactive, always-updating graphic displaying one or more collected/calculated metrics. Charts are generated by [collectors](../collectors/). 
+A **chart** is an individual, interactive, always-updating graphic displaying
+one or more collected/calculated metrics. Charts are generated by
+[collectors](../collectors/). 
 
-Here's the system CPU chart, the first chart displayed on the standard dashboard:
+Here's the system CPU chart, the first chart displayed on the standard
+dashboard:
 
-![Screenshot of the system CPU chart in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62720972-0b8a8e80-b9c0-11e9-930b-4829f7b17cfd.png)
+![Screenshot of the system CPU chart in the Netdata
+dashboard](https://user-images.githubusercontent.com/1153921/62720972-0b8a8e80-b9c0-11e9-930b-4829f7b17cfd.png)
 
-Netdata displays a chart's name in parentheses above the chart. For example, if you navigate to the system CPU chart, you'll see the label: **Total CPU utilization (system.cpu)**. In this case, the chart's name is `system.cpu`. Netdata derives the name from the chart's [context](#contexts).
+Netdata displays a chart's name in parentheses above the chart. For example, if
+you navigate to the system CPU chart, you'll see the label: **Total CPU
+utilization (system.cpu)**. In this case, the chart's name is `system.cpu`.
+Netdata derives the name from the chart's [context](#contexts).
 
 ### Dimensions
 
-A **dimension** is a value that gets shown on a chart. The value can be raw data or calculated values, such as percentages, aggregates, and more.
+A **dimension** is a value that gets shown on a chart. The value can be raw data
+or calculated values, such as percentages, aggregates, and more.
 
-Charts are capable of showing more than one dimension. Netdata shows these dimensions on the right side of the chart, beneath the date and time. Again, the `system.cpu` chart will serve as a good example.
+Charts are capable of showing more than one dimension. Netdata shows these
+dimensions on the right side of the chart, beneath the date and time. Again, the
+`system.cpu` chart will serve as a good example.
 
-![Screenshot of the dimensions shown in the system CPU chart in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62721031-2bba4d80-b9c0-11e9-9dca-32403617ce72.png)
+![Screenshot of the dimensions shown in the system CPU chart in the Netdata
+dashboard](https://user-images.githubusercontent.com/1153921/62721031-2bba4d80-b9c0-11e9-9dca-32403617ce72.png)
 
-Here, the `system.cpu` chart is showing many dimensions, such as `user`, `system`, `softirq`, `irq`, and more.
+Here, the `system.cpu` chart is showing many dimensions, such as `user`,
+`system`, `softirq`, `irq`, and more.
 
-Note that other applications sometimes use the word *series* instead of *dimension*.
+Note that other applications sometimes use the word _series_ instead of
+_dimension_.
 
 ### Families
 
-A **family** is *one* instance of a monitored hardware or software resource that needs to be monitored and displayed separately from similar instances. 
+A **family** is _one_ instance of a monitored hardware or software resource that
+needs to be monitored and displayed separately from similar instances. 
 
-For example, if your system has multiple disk drives at `sda` and `sdb`, Netdata will put each interface into their own family. Same goes for software resources, like multiple MySQL instances. We call these instances "families" because the charts associated with a single disk instance, for example, are often related to each other. Relatives, family... get it?
+For example, if your system has multiple disk drives at `sda` and `sdb`, Netdata
+will put each interface into their own family. Same goes for software resources,
+like multiple MySQL instances. We call these instances "families" because the
+charts associated with a single disk instance, for example, are often related to
+each other. Relatives, family... get it?
 
-When relevant, Netdata prefers to organize charts by family. When you visit the **Disks** section, you will see your disk drives organized into families, and each family will have one or more charts: `disk`, `disk_ops`, `disk_backlog`, `disk_util`, `disk_await`, `disk_avgsz`, `disk_svctm`, `disk_mops`, and `disk_iotime`.
+When relevant, Netdata prefers to organize charts by family. When you visit the
+**Disks** section, you will see your disk drives organized into families, and
+each family will have one or more charts: `disk`, `disk_ops`, `disk_backlog`,
+`disk_util`, `disk_await`, `disk_avgsz`, `disk_svctm`, `disk_mops`, and
+`disk_iotime`.
 
-In the screenshot below, the disk family `sdb` shows a few gauges, followed by a few of the associated charts:
+In the screenshot below, the disk family `sdb` shows a few gauges, followed by a
+few of the associated charts:
 
-![Screenshot of a disk drive family and associated charts in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/62721362-e34f5f80-b9c0-11e9-8d2e-9a3bec48e920.png)
+![Screenshot of a disk drive family and associated charts in the Netdata
+dashboard](https://user-images.githubusercontent.com/1153921/62721362-e34f5f80-b9c0-11e9-8d2e-9a3bec48e920.png)
 
-Netdata also creates separate submenu entries for each family in the right navigation page so you can easily navigate to the instance you're interested in. Here, Netdata has made several submenus under the **Disk** menu.
+Netdata also creates separate submenu entries for each family in the right
+navigation page so you can easily navigate to the instance you're interested in.
+Here, Netdata has made several submenus under the **Disk** menu.
 
-![Screenshot of the disks menu and submenus](https://user-images.githubusercontent.com/1153921/62721531-3cb78e80-b9c1-11e9-89c2-fdd736aec7d4.png)
+![Screenshot of the disks menu and
+submenus](https://user-images.githubusercontent.com/1153921/62721531-3cb78e80-b9c1-11e9-89c2-fdd736aec7d4.png)
 
 ### Contexts
 
-A **context** is a way of grouping charts by the types of metrics collected and dimensions displayed. Different charts with the same context will show the same dimensions, but for different instances (families) of hardware/software resources.
+A **context** is a way of grouping charts by the types of metrics collected and
+dimensions displayed. Different charts with the same context will show the same
+dimensions, but for different instances (families) of hardware/software
+resources.
 
-For example, the **Disks** section will often use many contexts (`disk.io`, `disk.ops`, `disk.backlog`, `disk.util`, and so on). Netdata then creates an individual chart for each context, and groups them by family.
+For example, the **Disks** section will often use many contexts (`disk.io`,
+`disk.ops`, `disk.backlog`, `disk.util`, and so on). Netdata then creates an
+individual chart for each context, and groups them by family.
 
-Netdata names charts according to their context according to the following structure: `[context].[family]`. A chart with the `disk.util` context, in the `sdb` family, gets the name `disk_util.sdb`. Netdata shows that name in the top-left corner of a chart.
+Netdata names charts according to their context according to the following
+structure: `[context].[family]`. A chart with the `disk.util` context, in the
+`sdb` family, gets the name `disk_util.sdb`. Netdata shows that name in the
+top-left corner of a chart.
 
-Given the four example contexts, and two families of `sdb` and `sdd`, Netdata will create the following charts and their names:
+Given the four example contexts, and two families of `sdb` and `sdd`, Netdata
+will create the following charts and their names:
 
 Context | `sdb` family | `sdd` family
 --- | --- | ---
@@ -101,46 +163,66 @@ Context | `sdb` family | `sdd` family
 `disk.backlog` | `disk_backlog.sdb` | `disk_backlog.sdd`
 `disk.util` | `disk_util.sdb` | `disk_util.sdd`
 
-And here's what two of those charts in the `disk.io` context look like under `sdb` and `sdd` families:
+And here's what two of those charts in the `disk.io` context look like under
+`sdb` and `sdd` families:
 
 ![context_01](https://user-images.githubusercontent.com/1153921/62728232-177e4c80-b9d0-11e9-9e29-2a6c59d4d873.png)
 ![context_02](https://user-images.githubusercontent.com/1153921/62728234-1b11d380-b9d0-11e9-8904-07befd8ac592.png)
 
-As you can see in the screenshot, you can view the context of a chart if you hover over the date above the list of dimensions. A tooltip will appear that shows you two pieces of information: the collector that produces the chart, and the chart's context.
+As you can see in the screenshot, you can view the context of a chart if you
+hover over the date above the list of dimensions. A tooltip will appear that
+shows you two pieces of information: the collector that produces the chart, and
+the chart's context.
 
-Netdata also uses [contexts for alarm templates](http://localhost:20000/health/#alarm-line-on). You can create an alarm for the `net.packets` context to receive alerts for any chart with that context, no matter which family it's attached to.
+Netdata also uses [contexts for alarm
+templates](../health/#alarm-line-on). You can create an
+alarm for the `net.packets` context to receive alerts for any chart with that
+context, no matter which family it's attached to.
 
 ## Positive and negative values on charts
 
-To improve clarity on charts, Netdata dashboards present **positive** values for metrics representing `read`, `input`, `inbound`, `received` and **negative** values for metrics representing `write`, `output`, `outbound`, `sent`.
+To improve clarity on charts, Netdata dashboards present **positive** values for
+metrics representing `read`, `input`, `inbound`, `received` and **negative**
+values for metrics representing `write`, `output`, `outbound`, `sent`.
 
 ![positive-and-negative-values](https://user-images.githubusercontent.com/2662304/48309090-7c5c6180-e57a-11e8-8e03-3a7538c14223.gif)
 
-*Netdata charts showing the bandwidth and packets of a network interface. `received` is positive and `sent` is negative.*
+_Netdata charts showing the bandwidth and packets of a network interface.
+`received` is positive and `sent` is negative._
 
 ## Autoscaled y-axis
 
-Netdata charts automatically zoom vertically, to visualize the variation of each metric within the visible timeframe.
+Netdata charts automatically zoom vertically, to visualize the variation of each
+metric within the visible timeframe.
 
 ![non-zero-based](https://user-images.githubusercontent.com/2662304/48309139-3d2f1000-e57c-11e8-9a44-b91758134b00.gif)
 
-*A zero-based `stacked` chart, automatically switches to an auto-scaled `area` chart when a single dimension is selected.*
+_A zero-based `stacked` chart, automatically switches to an auto-scaled `area`
+chart when a single dimension is selected._
 
 ## dashboard.js
 
-Netdata uses the `dashboards.js` file to define, configure, create, and update all the charts and other visualizations that appear on any Netdata dashboard. You need to put `dashboard.js` on any HTML page that's going to render Netdata charts.
+Netdata uses the `dashboards.js` file to define, configure, create, and update
+all the charts and other visualizations that appear on any Netdata dashboard.
+You need to put `dashboard.js` on any HTML page that's going to render Netdata
+charts.
 
-The [custom dashboards documentation](gui/custom/) contains examples of such custom HTML pages.
+The [custom dashboards documentation](gui/custom/) contains examples of such
+custom HTML pages.
 
 ### Generating dashboard.js
 
-We build the `dashboards.js` file by concatenating all the source files located in the `web/gui/src/dashboard.js/` directory. That's done using the provided build script:
+We build the `dashboards.js` file by concatenating all the source files located
+in the `web/gui/src/dashboard.js/` directory. That's done using the provided
+build script:
 
 ```sh
 cd web/gui
 make
 ```
 
-If you make any changes to the `src` directory when developing Netdata, you should regenerate the `dashboard.js` file before you commit to the Netdata repository.
+If you make any changes to the `src` directory when developing Netdata, you
+should regenerate the `dashboard.js` file before you commit to the Netdata
+repository.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
