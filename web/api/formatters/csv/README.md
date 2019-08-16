@@ -2,28 +2,27 @@
 
 The CSV formatter presents [results of database queries](../../queries) in the following formats:
 
-format|content type|description
-:---:|:---:|:-----
-`csv`|text/plain|a text table, comma separated, with a header line (dimension names) and `\r\n` at the end of the lines
-`csvjsonarray`|application/json|a JSON array, with each row as another array (the first row has the dimension names)
-`tsv`|text/plain|like `csv` but TAB is used instead of comma to separate values (MS Excel flavor)
-`html`|text/html|an html table
-`markdown`|text/plain|markdown table
+| format|content type|description|
+| :----:|:----------:|:----------|
+| `csv`|text/plain|a text table, comma separated, with a header line (dimension names) and `\r\n` at the end of the lines|
+| `csvjsonarray`|application/json|a JSON array, with each row as another array (the first row has the dimension names)|
+| `tsv`|text/plain|like `csv` but TAB is used instead of comma to separate values (MS Excel flavor)|
+| `html`|text/html|an html table|
+| `markdown`|text/plain|markdown table|
 
 In all formats the date and time is the first column.
 
 The CSV formatter respects the following API `&options=`:
 
-option|supported|description
-:---:|:---:|:---
-`nonzero`|yes|to return only the dimensions that have at least a non-zero value
-`flip`|yes|to return the rows older to newer (the default is newer to older)
-`seconds`|yes|to return the date and time in unix timestamp
-`ms`|yes|to return the date and time in unit timestamp as milliseconds
-`percent`|yes|to replace all values with their percentage over the row total
-`abs`|yes|to turn all values positive
-`null2zero`|yes|to replace gaps with zeros (the default prints the string `null`
-
+| option|supported|description|
+|:----:|:-------:|:----------|
+| `nonzero`|yes|to return only the dimensions that have at least a non-zero value|
+| `flip`|yes|to return the rows older to newer (the default is newer to older)|
+| `seconds`|yes|to return the date and time in unix timestamp|
+| `ms`|yes|to return the date and time in unit timestamp as milliseconds|
+| `percent`|yes|to replace all values with their percentage over the row total|
+| `abs`|yes|to turn all values positive|
+| `null2zero`|yes|to replace gaps with zeros (the default prints the string `null`|
 
 ## Examples
 
@@ -82,7 +81,6 @@ This is how it looks when rendered by a web browser:
 
 ![image](https://user-images.githubusercontent.com/2662304/47597887-bafbf480-d99c-11e8-864a-d880bb8d2e5b.png)
 
-
 ---
 
 Get a JSON array with the average bandwidth rate of the mysql server, over the last hour, in 6 values
@@ -101,7 +99,7 @@ Netdata always returns bandwidth rates in `kilobits/s`.
 [1540597200000,0.7499968,120.2807337],
 [1540596600000,0.7499988,120.2810527]
 ]
-``` 
+```
 
 ---
 
@@ -109,33 +107,33 @@ Get the number of processes started per minute, for the last 10 minutes, in `mar
 
 ```bash
 # curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=system.forks&format=markdown&after=-600&points=10&group=sum'
-time|started
-:---:|:---:
-2018-10-27 03:52:00|245.1706149
-2018-10-27 03:51:00|152.6654636
-2018-10-27 03:50:00|163.1755789
-2018-10-27 03:49:00|176.1574766
-2018-10-27 03:48:00|178.0137076
-2018-10-27 03:47:00|183.8306543
-2018-10-27 03:46:00|264.1635621
-2018-10-27 03:45:00|205.001551
-2018-10-27 03:44:00|7026.9852167
-2018-10-27 03:43:00|205.9904794
+time               | started
+:---:              |:---:
+2018-10-27 03:52:00| 245.1706149
+2018-10-27 03:51:00| 152.6654636
+2018-10-27 03:50:00| 163.1755789
+2018-10-27 03:49:00| 176.1574766
+2018-10-27 03:48:00| 178.0137076
+2018-10-27 03:47:00| 183.8306543
+2018-10-27 03:46:00| 264.1635621
+2018-10-27 03:45:00| 205.001551
+2018-10-27 03:44:00| 7026.9852167
+2018-10-27 03:43:00| 205.9904794
 ```
 
 And this is how it looks when formatted:
 
-time|started
-:---:|:---:
-2018-10-27 03:52:00|245.1706149
-2018-10-27 03:51:00|152.6654636
-2018-10-27 03:50:00|163.1755789
-2018-10-27 03:49:00|176.1574766
-2018-10-27 03:48:00|178.0137076
-2018-10-27 03:47:00|183.8306543
-2018-10-27 03:46:00|264.1635621
-2018-10-27 03:45:00|205.001551
-2018-10-27 03:44:00|7026.9852167
-2018-10-27 03:43:00|205.9904794
+| time                | started      |
+|:--:|:-----:|
+| 2018-10-27 03:52:00 | 245.1706149  |
+| 2018-10-27 03:51:00 | 152.6654636  |
+| 2018-10-27 03:50:00 | 163.1755789  |
+| 2018-10-27 03:49:00 | 176.1574766  |
+| 2018-10-27 03:48:00 | 178.0137076  |
+| 2018-10-27 03:47:00 | 183.8306543  |
+| 2018-10-27 03:46:00 | 264.1635621  |
+| 2018-10-27 03:45:00 | 205.001551   |
+| 2018-10-27 03:44:00 | 7026.9852167 |
+| 2018-10-27 03:43:00 | 205.9904794  |
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fformatters%2Fcsv%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fformatters%2Fcsv%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -78,14 +78,14 @@ Scoreboard: ____________________________________________________________________
 
 From the apache status output it collects:
 
- - total accesses (incremental value, rendered as requests/s)
- - total bandwidth (incremental value, rendered as bandwidth/s)
- - requests per second (this appears to be calculated by apache as an average for its lifetime, while the one calculated by Netdata using the total accesses counter is real-time)
- - bytes per second (average for the lifetime of the apache server)
- - bytes per request (average for the lifetime of the apache server)
- - workers by status (`busy` and `idle`)
- - total connections (currently active connections - offered by apache 2.4+)
- - async connections per status (`keepalive`, `writing`, `closing` - offered by apache 2.4+)
+-   total accesses (incremental value, rendered as requests/s)
+-   total bandwidth (incremental value, rendered as bandwidth/s)
+-   requests per second (this appears to be calculated by apache as an average for its lifetime, while the one calculated by Netdata using the total accesses counter is real-time)
+-   bytes per second (average for the lifetime of the apache server)
+-   bytes per request (average for the lifetime of the apache server)
+-   workers by status (`busy` and `idle`)
+-   total connections (currently active connections - offered by apache 2.4+)
+-   async connections per status (`keepalive`, `writing`, `closing` - offered by apache 2.4+)
 
 ## Configuration
 
@@ -124,6 +124,6 @@ curl "http://127.0.0.1:80/server-status?auto"
 
 Netdata will be able to do it too.
 
-Notice: You may need to have the default `000-default.conf ` website enabled in order for the status mod to work.
+Notice: You may need to have the default `000-default.conf` website enabled in order for the status mod to work.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcharts.d.plugin%2Fapache%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fcharts.d.plugin%2Fapache%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

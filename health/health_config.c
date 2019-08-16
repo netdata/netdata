@@ -350,6 +350,26 @@ static inline int health_parse_repeat(
 }
 
 /**
+ * Health pattern from Foreach
+ *
+ * Create a new simple pattern using the user input
+ *
+ * @param s the string that will be used to create the simple pattern.
+ */
+SIMPLE_PATTERN *health_pattern_from_foreach(char *s) {
+    char *convert= strdupz(s);
+    SIMPLE_PATTERN *val = NULL;
+    if(convert) {
+        dimension_remove_pipe_comma(convert);
+        val = simple_pattern_create(convert, NULL, SIMPLE_PATTERN_EXACT);
+
+        freez(convert);
+    }
+
+    return val;
+}
+
+/**
  * Parse DB lookup
  *
  *
@@ -479,7 +499,6 @@ static inline int health_parse_db_lookup(
         }
         else if(!strcasecmp(key, HEALTH_FOREACH_KEY )) {
             *foreachdim = strdupz(s);
-            dimension_remove_pipe(*foreachdim);
             break;
         }
         else {
@@ -577,6 +596,8 @@ static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignor
         } else {
             tok = NULL;
         }
+
+        fprintf(stderr,"KILLME CREATE %s\n",rc->name);
 
         if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
             rrdcalc_free(rc);
@@ -726,7 +747,11 @@ static int health_readfile(const char *filename, void *data) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
-                health_add_alarms_loop(host, rc, ignore_this) ;
+                fprintf(stderr,"KILLME HEALTH %s: %s %s\n",rc->name, rc->chart, rc->foreachdim);
+                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+                    rrdcalc_free(rc);
+                }
+               // health_add_alarms_loop(host, rc, ignore_this) ;
             }
 
             if(rt) {
@@ -757,7 +782,11 @@ static int health_readfile(const char *filename, void *data) {
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
-                health_add_alarms_loop(host, rc, ignore_this) ;
+                fprintf(stderr,"KILLME HEALTH %s: %s %s\n",rc->name, rc->chart, rc->foreachdim);
+//                health_add_alarms_loop(host, rc, ignore_this) ;
+                if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+                    rrdcalc_free(rc);
+                }
 
                 rc = NULL;
             }
@@ -828,8 +857,10 @@ static int health_readfile(const char *filename, void *data) {
             }
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 health_parse_db_lookup(line, filename, value, &rc->group, &rc->after, &rc->before,
-                        &rc->update_every,
-                        &rc->options, &rc->dimensions, &rc->foreachdim);
+                        &rc->update_every, &rc->options, &rc->dimensions, &rc->foreachdim);
+                if(rc->foreachdim) {
+                    rc->spdim = health_pattern_from_foreach(rc->foreachdim);
+                }
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!config_parse_duration(value, &rc->update_every))
@@ -959,6 +990,9 @@ static int health_readfile(const char *filename, void *data) {
             else if(hash == hash_lookup && !strcasecmp(key, HEALTH_LOOKUP_KEY)) {
                 health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,
                         &rt->update_every, &rt->options, &rt->dimensions, &rt->foreachdim);
+                if(rt->foreachdim) {
+                    health_pattern_from_foreach(rt->foreachdim);
+                }
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
                 if(!config_parse_duration(value, &rt->update_every))
@@ -1073,7 +1107,11 @@ static int health_readfile(const char *filename, void *data) {
     }
 
     if(rc) {
-        health_add_alarms_loop(host, rc, ignore_this) ;
+        //health_add_alarms_loop(host, rc, ignore_this) ;
+        fprintf(stderr,"KILLME HEALTH %s: %s %s\n",rc->name, rc->chart, rc->foreachdim);
+        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
+            rrdcalc_free(rc);
+        }
     }
 
     if(rt) {

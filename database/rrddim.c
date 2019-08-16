@@ -370,6 +370,16 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
+    if(host->alarms_with_foreach) {
+        RRDCALC *rrdc;
+        for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
+            if(simple_pattern_matches(rrdc->spdim, rd->id) || simple_pattern_matches(rrdc->spdim, rd->name)) {
+                if(!strcmp(rrdc->chart, st->name)) {
+                    fprintf(stderr,"KILLME DIM ALARM %s,%s: %s %s %s\n",st->name, rd->name, rrdc->chart, rrdc->name, rrdc->foreachdim);
+                }
+            }
+        }
+    }
     rrdset_unlock(st);
     return(rd);
 }

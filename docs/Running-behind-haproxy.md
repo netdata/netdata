@@ -2,7 +2,7 @@
 
 > HAProxy is a free, very fast and reliable solution offering high availability, load balancing, and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic web sites and powers quite a number of the world's most visited ones.
 
-If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name can be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port. This can make it possible to connect to Netdata at https://example.com or https://example.com/netdata/, which is a much nicer experience then http://example.com:19999.
+If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name can be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port. This can make it possible to connect to Netdata at <https://example.com> or <https://example.com/netdata/>, which is a much nicer experience then <http://example.com:19999>.
 
 To proxy requests from [HAProxy](https://github.com/haproxy/haproxy) to Netdata, the following configuration can be used:
 
@@ -17,7 +17,7 @@ defaults
 
 ## Simple Configuration
 
-A simple example where the base URL, say http://example.com, is used with no subpath:
+A simple example where the base URL, say <http://example.com>, is used with no subpath:
 
 ### Frontend
 
@@ -277,4 +277,4 @@ backend netdata_backend
     http-request set-header Connection "keep-alive"
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-haproxy&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FRunning-behind-haproxy&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

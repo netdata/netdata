@@ -696,6 +696,7 @@ struct rrdhost {
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
+    RRDCALC *alarms_with_foreach;
     avl_tree_lock alarms_idx_health_log;
     avl_tree_lock alarms_idx_name;
 

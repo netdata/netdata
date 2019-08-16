@@ -83,7 +83,14 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     for(rt = host->templates; rt ; rt = rt->next) {
         if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
            && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
-            rrdcalctemplate_create_alarms(host, rt, st);
+            RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
+            if(unlikely(!rc))
+                info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
+#ifdef NETDATA_INTERNAL_CHECKS
+            else if(rc->rrdset != st)
+                error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rc->chart?rc->chart:"NOCHART", rc->name, st->id);
+#endif
+ //           rrdcalctemplate_create_alarms(host, rt, st);
         }
     }
 }
@@ -115,6 +122,7 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->info);
     freez(rt->dimensions);
     freez(rt->foreachdim);
+    simple_pattern_free(rt->spdim);
     freez(rt);
 }
 

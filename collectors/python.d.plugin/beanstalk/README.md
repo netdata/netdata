@@ -3,93 +3,107 @@
 Module provides server and tube-level statistics:
 
 **Requirements:**
- * `python-beanstalkc`
+
+-   `python-beanstalkc`
 
 **Server statistics:**
 
-1. **Cpu usage** in cpu time
- * user
- * system
+1.  **Cpu usage** in cpu time
 
-2. **Jobs rate** in jobs/s
- * total
- * timeouts
+    -   user
+    -   system
 
-3. **Connections rate** in connections/s
- * connections
+2.  **Jobs rate** in jobs/s
 
-4. **Commands rate** in commands/s
- * put
- * peek
- * peek-ready
- * peek-delayed
- * peek-buried
- * reserve
- * use
- * watch
- * ignore
- * delete
- * release
- * bury
- * kick
- * stats
- * stats-job
- * stats-tube
- * list-tubes
- * list-tube-used
- * list-tubes-watched
- * pause-tube
+    -   total
+    -   timeouts
 
-5. **Current tubes** in tubes
- * tubes
+3.  **Connections rate** in connections/s
 
-6. **Current jobs** in jobs
- * urgent
- * ready
- * reserved
- * delayed
- * buried
+    -   connections
 
-7. **Current connections** in connections
- * written
- * producers
- * workers
- * waiting
+4.  **Commands rate** in commands/s
 
-8. **Binlog** in records/s
- * written
- * migrated
+    -   put
+    -   peek
+    -   peek-ready
+    -   peek-delayed
+    -   peek-buried
+    -   reserve
+    -   use
+    -   watch
+    -   ignore
+    -   delete
+    -   release
+    -   bury
+    -   kick
+    -   stats
+    -   stats-job
+    -   stats-tube
+    -   list-tubes
+    -   list-tube-used
+    -   list-tubes-watched
+    -   pause-tube
 
-9. **Uptime** in seconds
- * uptime
+5.  **Current tubes** in tubes
+
+    -   tubes
+
+6.  **Current jobs** in jobs
+
+    -   urgent
+    -   ready
+    -   reserved
+    -   delayed
+    -   buried
+
+7.  **Current connections** in connections
+
+    -   written
+    -   producers
+    -   workers
+    -   waiting
+
+8.  **Binlog** in records/s
+
+    -   written
+    -   migrated
+
+9.  **Uptime** in seconds
+
+    -   uptime
 
 **Per tube statistics:**
 
-1. **Jobs rate** in jobs/s
- * jobs
+1.  **Jobs rate** in jobs/s
 
-2. **Jobs** in jobs
- * using
- * ready
- * reserved
- * delayed
- * buried
+    -   jobs
 
-3. **Connections** in connections
- * using
- * waiting
- * watching
+2.  **Jobs** in jobs
 
-4. **Commands** in commands/s
- * deletes
- * pauses
+    -   using
+    -   ready
+    -   reserved
+    -   delayed
+    -   buried
 
-5. **Pause** in seconds
- * since
- * left
+3.  **Connections** in connections
 
+    -   using
+    -   waiting
+    -   watching
 
-### configuration
+4.  **Commands** in commands/s
+
+    -   deletes
+    -   pauses
+
+5.  **Pause** in seconds
+
+    -   since
+    -   left
+
+## configuration
 
 Sample:
 
@@ -102,4 +116,4 @@ If no configuration is given, module will attempt to connect to beanstalkd on `1
 
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fbeanstalk%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fbeanstalk%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

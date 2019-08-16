@@ -1,6 +1,7 @@
 # Netdata, Prometheus, Grafana stack
 
 ## Intro
+
 In this article I will walk you through the basics of getting Netdata,
 Prometheus and Grafana all working together and monitoring your application
 servers. This article will be using docker on your local workstation. We will be
@@ -11,6 +12,7 @@ without cloud accounts or access to VMs can try this out and for it’s speed of
 deployment.
 
 ## Why Netdata, Prometheus, and Grafana
+
 Some time ago I was introduced to Netdata by a coworker. We were attempting to
 troubleshoot python code which seemed to be bottlenecked. I was instantly
 impressed by the amount of metrics Netdata exposes to you. I quickly added
@@ -40,6 +42,7 @@ together to create a modern monitoring stack. This stack will offer you
 visibility into your application and systems performance.
 
 ## Getting Started - Netdata
+
 To begin let’s create our container which we will install Netdata on. We need
 to run a container, forward the necessary port that Netdata listens on, and
 attach a tty so we can interact with the bash shell on the container. But
@@ -101,6 +104,7 @@ observing is “system”. You can begin to draw links between the charts in Net
 to the prometheus metrics format in this manner.
 
 ## Prometheus
+
 We will be installing prometheus in a container for purpose of demonstration.
 While prometheus does have an official container I would like to walk through
 the install process and setup on a fresh container. This will allow anyone
@@ -189,9 +193,11 @@ scrape_configs:
 ```
 
 Let’s start prometheus once again by running `/opt/prometheus/prometheus`. If we
-now navigate to prometheus at ‘<http://localhost:9090/targets>’ we should see our
+
+now navigate to prometheus at ‘<http://localhost:9090/targets’> we should see our
+
 target being successfully scraped. If we now go back to the Prometheus’s
-homepage and begin to type ‘netdata_’  Prometheus should auto complete metrics
+homepage and begin to type ‘netdata\_’  Prometheus should auto complete metrics
 it is now scraping.
 
 ![](https://github.com/ldelossa/NetdataTutorial/raw/master/Screen%20Shot%202017-07-28%20at%205.13.43%20PM.png)
@@ -247,7 +253,7 @@ this point to read [this page](../backends/prometheus/#using-netdata-with-promet
 The key point here is that NetData can export metrics from its internal DB or
 can send metrics “as-collected” by specifying the ‘source=as-collected’ url
 parameter like so.
-http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected
+<http://localhost:19999/api/v1/allmetrics?format=prometheus&help=yes&types=yes&source=as-collected>
 If you choose to use this method you will need to use Prometheus's set of
 functions here: <https://prometheus.io/docs/querying/functions/> to obtain useful
 metrics as you are now dealing with raw counters from the system. For example
@@ -258,6 +264,7 @@ that. If you find limitations then consider re-writing your queries using the
 raw data and using Prometheus functions to get the desired chart.
 
 ## Grafana
+
 Finally we make it to grafana. This is the easiest part in my opinion. This time
 we will actually run the official grafana docker container as all configuration
 we need to do is done via the GUI. Let’s run the following command:
@@ -266,7 +273,8 @@ we need to do is done via the GUI. Let’s run the following command:
 docker run -i -p 3000:3000 --network=netdata-tutorial grafana/grafana
 ```
 
-This will get grafana running at ‘<http://localhost:3000/>’ Let’s go there and
+This will get grafana running at ‘<http://localhost:3000/’> Let’s go there and
+
 login using the credentials Admin:Admin.
 
 The first thing we want to do is click ‘Add data source’. Let’s make it look
@@ -291,4 +299,4 @@ about the monitoring system until Prometheus cannot keep up with your scale.
 Once this happens there are options presented in the Prometheus documentation
 for solving this. Hope this was helpful, happy monitoring.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2FWALKTHROUGH&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

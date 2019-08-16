@@ -4,42 +4,48 @@ Module monitor dnsdist performance and health metrics.
 
 Following charts are drawn:
 
-1. **Response latency**
- * latency-slow
- * latency100-1000
- * latency50-100
- * latency10-50
- * latency1-10
- * latency0-1
+1.  **Response latency**
 
-2. **Cache performance**
- * cache-hits
- * cache-misses
+    -   latency-slow
+    -   latency100-1000
+    -   latency50-100
+    -   latency10-50
+    -   latency1-10
+    -   latency0-1
 
-3. **ACL events**
- * acl-drops
- * rule-drop
- * rule-nxdomain
- * rule-refused
+2.  **Cache performance**
 
-4. **Noncompliant data**
- * empty-queries
- * no-policy
- * noncompliant-queries
- * noncompliant-responses
+    -   cache-hits
+    -   cache-misses
 
-5. **Queries**
- * queries
- * rdqueries
- * rdqueries
+3.  **ACL events**
 
-6. **Health**
- * downstream-send-errors
- * downstream-timeouts
- * servfail-responses
- * trunc-failures
+    -   acl-drops
+    -   rule-drop
+    -   rule-nxdomain
+    -   rule-refused
 
-### configuration
+4.  **Noncompliant data**
+
+    -   empty-queries
+    -   no-policy
+    -   noncompliant-queries
+    -   noncompliant-responses
+
+5.  **Queries**
+
+    -   queries
+    -   rdqueries
+    -   rdqueries
+
+6.  **Health**
+
+    -   downstream-send-errors
+    -   downstream-timeouts
+    -   servfail-responses
+    -   trunc-failures
+
+## configuration
 
 ```yaml
 localhost:
@@ -53,4 +59,4 @@ localhost:
 
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fdnsdist%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fdnsdist%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

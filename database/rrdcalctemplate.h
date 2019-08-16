@@ -36,6 +36,7 @@ struct rrdcalctemplate {
 
     char *dimensions;               // the chart dimensions
     char *foreachdim;               // the group of dimensions that the lookup will be applied.
+    SIMPLE_PATTERN *spdim;          // used if and only if there is a simple pattern for the chart.
     RRDR_GROUPING group;            // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series

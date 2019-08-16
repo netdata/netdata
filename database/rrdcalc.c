@@ -290,15 +290,15 @@ char *alarm_name_with_dim(char *name, char *dim) {
 }
 
 /**
- * Remove pipe
+ * Remove pipe comma
  *
- * Remove the pipes converting them to comma.
+ * Remove the pipes and commas converting to space.
  *
  * @param str the string to change.
  */
-void dimension_remove_pipe(char *str) {
+void dimension_remove_pipe_comma(char *str) {
     while(*str) {
-        if(*str == '|') *str = ',';
+        if(*str == '|' || *str == ',') *str = ' ';
 
         str++;
     }
@@ -348,6 +348,20 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     }
     else {
         host->alarms = rc;
+    }
+
+    //link it case there is a foreach
+    if(rc->foreachdim) {
+        fprintf(stderr,"KILLME LIST FOREACHDIM %s: %s\n",rc->chart, rc->name);
+        if(likely(host->alarms_with_foreach)) {
+            // append it
+            RRDCALC *t;
+            for(t = host->alarms_with_foreach; t && t->next ; t = t->next) ;
+            t->next = rc;
+        }
+        else {
+            host->alarms_with_foreach = rc;
+        }
     }
 
     // link it to its chart
@@ -566,6 +580,7 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->source);
     freez(rc->units);
     freez(rc->info);
+    freez(rc->spdim);
     freez(rc);
 }
 

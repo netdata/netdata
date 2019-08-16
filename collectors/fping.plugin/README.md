@@ -3,7 +3,7 @@
 The fping plugin supports monitoring latency, packet loss and uptime of any number of network end points,
 by pinging them with `fping`.
 
-A recent version of `fping` is required (one that supports option ` -N `).
+A recent version of `fping` is required (one that supports option `-N`).
 The supplied plugin can install it, by running:
 
 ```sh
@@ -39,7 +39,7 @@ fping_opts="-R -b 56 -i 1 -r 0 -t 5000"
 Netdata will automatically attach a few alarms for each host.
 Check the [latest versions of the fping alarms](../../health/health.d/fping.conf)
 
-## Additional Tips 
+## Additional Tips
 
 ### Customizing Amount of Pings Per Second
 
@@ -65,7 +65,6 @@ Netdata allows you to add as many `fping` plugins as you like.
 Follow this procedure:
 
 **1. Create New fping Configuration File**
-
 
 ```sh
 # Step Into Configuration Directory
@@ -95,4 +94,4 @@ That's it. Netdata will detect the new plugin and start it.
 You can name the new plugin any name you like.
 Just make sure the plugin and the configuration file have the same name.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Ffping.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Ffping.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -4,25 +4,29 @@ This module will monitor one or more squid instances depending on configuration.
 
 It produces following charts:
 
-1. **Client Bandwidth** in kilobits/s
- * in
- * out
- * hits
+1.  **Client Bandwidth** in kilobits/s
 
-2. **Client Requests** in requests/s
- * requests
- * hits
- * errors
+    -   in
+    -   out
+    -   hits
 
-3. **Server Bandwidth** in kilobits/s
- * in
- * out
+2.  **Client Requests** in requests/s
 
-4. **Server Requests** in requests/s
- * requests
- * errors
+    -   requests
+    -   hits
+    -   errors
 
-### configuration
+3.  **Server Bandwidth** in kilobits/s
+
+    -   in
+    -   out
+
+4.  **Server Requests** in requests/s
+
+    -   requests
+    -   errors
+
+## configuration
 
 ```yaml
 priority     : 50000
@@ -37,4 +41,4 @@ Without any configuration module will try to autodetect where squid presents its
 
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fsquid%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fsquid%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
