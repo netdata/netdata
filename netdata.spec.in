@@ -6,6 +6,10 @@
 # error.
 %global __os_install_post %{nil}
 
+# There is an issue with build-id over the go.d binary raised on RHEL/fedora distributions
+# We use this workaround as per the https://github.com/rpm-software-management/rpm/issues/367#issuecomment-350131349
+%global _missing_build_ids_terminate_build 0
+
 # Mitigate the cross-distro mayhem by strictly defining the libexec destination
 %define _prefix /usr
 %define _sysconfdir /etc
