@@ -22,7 +22,6 @@ push_change() {
 	local GIT_USER="netdatabot"
 
 	echo "---- Push changes to repository ----"
-	git commit -m "[ci skip] release $GIT_TAG" --author "${GIT_USER} <${GIT_MAIL}>"
 	git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
 }
 

@@ -546,6 +546,8 @@ jobs:
       script:
         - .travis/trigger_package_generation.sh "[Build latest]"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly package generation produced errors" "${NOTIF_CHANNEL}"
+      git:
+        depth: false
 
     - name: Build & Publish docker images
       before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "${NOTIF_CHANNEL}"
