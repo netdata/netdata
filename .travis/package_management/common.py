@@ -15,7 +15,8 @@ def fetch_version(orig_build_version):
     # TODO: Checksum validations
     if str(orig_build_version).count(".latest") == 1:
         version_list=str(orig_build_version).replace('v', '').split('.')
-        friendly_version='.'.join(version_list[0:2]) + "." + version_list[3]
+        minor = version_list[3] if int(version_list[2]) == 0 else (version_list[2] + version_list[3])
+        friendly_version='.'.join(version_list[0:2]) + "." + minor
     else:
         friendly_version = orig_build_version.replace('v', '')
         tag = friendly_version # Go to stable tag
