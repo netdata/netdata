@@ -121,9 +121,9 @@ For example, if your Netdata server listens at `http://box:19999/`, you will nee
 
 1.  `dashboard.css`, required for the Netdata charts
 
-2. `jquery.min.js`, (only if jQuery is not already loaded for this web page)
+2.  `jquery.min.js`, (only if jQuery is not already loaded for this web page)
 
-3. `bootstrap.min.js` (only if Bootstrap is not already loaded) and `bootstrap.min.css`.
+3.  `bootstrap.min.js` (only if Bootstrap is not already loaded) and `bootstrap.min.css`.
 
  You can disable this by adding the following before loading `dashboard.js`:
 
