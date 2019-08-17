@@ -60,6 +60,7 @@ struct rrdcalc {
     char *dimensions;               // the chart dimensions
     char *foreachdim;               // the group of dimensions that the `foreach` will be applied.
     SIMPLE_PATTERN *spdim;          // used if and only if there is a simple pattern for the chart.
+    int foreachcounter;             // the number of alarms created with foreachdim
     RRDR_GROUPING group;            // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
@@ -149,10 +150,10 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
-extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension, char *foreachdim);
+extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension);
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
 extern void dimension_remove_pipe_comma(char *str);
-extern char *alarm_name_with_dim(char *name, char *dim);
+extern char *alarm_name_with_dim(char *name, const char *dim);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {

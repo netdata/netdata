@@ -265,7 +265,7 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
  *
  * @return It returns the new name on success and the old otherwise
  */
-char *alarm_name_with_dim(char *name, char *dim) {
+char *alarm_name_with_dim(char *name, const char *dim) {
     size_t namelen,dimlen;
 
     char *newname,*move;
@@ -339,19 +339,29 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
         rc->critical->rrdcalc = rc;
     }
 
-    // link it to the host
-    if(likely(host->alarms)) {
-        // append it
-        RRDCALC *t;
-        for(t = host->alarms; t && t->next ; t = t->next) ;
-        t->next = rc;
-    }
-    else {
-        host->alarms = rc;
-    }
+    if(!rc->foreachdim) {
+        // link it to the host alarms list
+        fprintf(stderr,"KILLME NORMAL LIST %s: %s\n",rc->chart, rc->name);
+        if(likely(host->alarms)) {
+            // append it
+            RRDCALC *t;
+            for(t = host->alarms; t && t->next ; t = t->next) ;
+            t->next = rc;
+        }
+        else {
+            host->alarms = rc;
+        }
 
-    //link it case there is a foreach
-    if(rc->foreachdim) {
+        // link it to its chart
+        RRDSET *st;
+        rrdset_foreach_read(st, host) {
+            if(rrdcalc_is_matching_this_rrdset(rc, st)) {
+                rrdsetcalc_link(st, rc);
+                break;
+            }
+        }
+    } else {
+        //link it case there is a foreach
         fprintf(stderr,"KILLME LIST FOREACHDIM %s: %s\n",rc->chart, rc->name);
         if(likely(host->alarms_with_foreach)) {
             // append it
@@ -362,15 +372,8 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
         else {
             host->alarms_with_foreach = rc;
         }
-    }
 
-    // link it to its chart
-    RRDSET *st;
-    rrdset_foreach_read(st, host) {
-        if(rrdcalc_is_matching_this_rrdset(rc, st)) {
-            rrdsetcalc_link(st, rc);
-            break;
-        }
+        //I am not linking this alarm direct to the host here, this will be done when the children is created
     }
 }
 
@@ -495,18 +498,18 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
  *
  * @return it returns the new alarm changed.
  */
-inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, char *name, char *dimension,char *foreachdim) {
+inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension) {
     RRDCALC *newrc = callocz(1, sizeof(RRDCALC));
 
     newrc->next_event_id = 1;
     newrc->id = rrdcalc_get_unique_id(host, rc->chart, name, &rc->next_event_id);
-    newrc->name = name;
+    newrc->name = (char *)name;
     newrc->hash = simple_hash(rc->name);
     newrc->chart = strdupz(rc->chart);
     newrc->hash_chart = simple_hash(rc->chart);
 
     newrc->dimensions = strdupz(dimension);
-    if(rc->foreachdim) newrc->foreachdim = strdupz(foreachdim);
+    newrc->foreachdim = NULL;
 
     newrc->green = rc->green;
     newrc->red = rc->red;
@@ -604,6 +607,36 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
         }
         else
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
+    }
+
+    if(rc->foreachdim) {
+        RRDCALC *t;
+        for(t = host->alarms_with_foreach; t ; t = t->next) {
+            fprintf(stderr,"KILLME REMOVE ME %s %s\n",rc->chart, t->chart );
+            if (!strcmp(t->chart,rc->chart)) {
+                fprintf(stderr,"KILLME REMOVE ME UNIQUE %s %d\n",rc->name, rc->foreachcounter );
+            }
+        }
+        /*
+        if(unlikely(rc == host->alarms_with_foreach)) {
+            fprintf(stderr,"KILLME REMOVE ME UNIQUE %s %d\n",rc->name, rc->foreachcounter );
+            rc->foreachcounter--;
+            if(!rc->foreachcounter) {
+                host->alarms_with_foreach = rc->next;
+            }
+        } else {
+            RRDCALC *t;
+            for(t = host->alarms_with_foreach; t && t->next != rc; t = t->next) ;
+            if(t) {
+                t->foreachcounter--;
+                fprintf(stderr,"KILLME REMOVE ME GROUP %s %d\n",t->name, t->foreachcounter );
+                if(!t->foreachcounter) {
+                    t->next = rc->next;
+                    rc->next = NULL;
+                }
+            }
+        }
+         */
     }
 
     if (rc) {

@@ -541,93 +541,6 @@ static inline void strip_quotes(char *s) {
 }
 
 /**
- * Add Alarms Logs
- *
- * Do a loop through the dimensions to add alarms case the "foreach" is present, case it is not
- * it will add the unique alarm.
- *
- * @param host the host structure where it will be stored the alarm.
- * @param rc the alarm structure to be appended to host
- * @param ignore_this an integer that you describe the action to do with rc.
- */
-static inline void health_add_alarms_loop(RRDHOST *host, RRDCALC *rc , int ignore_this) {
-    char *foreachdim;
-    char *tok;
-    char *copyname;
-    char *copydim;
-    char *move;
-    if(rc->foreachdim) {
-        foreachdim = rc->foreachdim;
-        copydim = strdupz(foreachdim);
-        tok = foreachdim;
-        move = tok;
-        copyname = rc->name;
-    } else {
-        foreachdim = NULL;
-        tok = rc->name;
-        copyname = NULL;
-        move = NULL;
-        copydim = NULL;
-    }
-
-    RRDCALC *original = rc;
-    int isfirst = 1;
-    while(tok) {
-        if(foreachdim) {
-            tok = strchr(move, ',');
-            if(tok) { //We have more than one dimension
-                *tok = '\0';
-            }
-
-            if(!isfirst) { //It is not the first, so I need a new RRDCALC
-                rc = rrdcalc_create_from_rrdcalc(original, host, alarm_name_with_dim(copyname, move), move, copydim);
-            } else {
-                rc->name = alarm_name_with_dim(copyname, move);
-                rc->hash = simple_hash(rc->name);
-
-                //We clean the initial dimensions, because we will overwrite it
-                //with the specific dimension of foreach
-                if(rc->dimensions) {
-                    freez(rc->dimensions);
-                    rc->dimensions = NULL;
-                }
-                rc->dimensions = strdupz(move);
-            }
-        } else {
-            tok = NULL;
-        }
-
-        fprintf(stderr,"KILLME CREATE %s\n",rc->name);
-
-        if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
-            rrdcalc_free(rc);
-            break;
-        }
-
-        if(tok) {
-            *tok = ',';
-            move = (tok+1);
-        }
-
-
-        isfirst =0;
-    }
-
-    //The original name is changed when we
-    //have a "foreach", so we release the
-    //original name here.
-    if(rc->foreachdim) {
-        if (copyname) {
-            freez(copyname);
-        }
-
-        if (copydim) {
-            freez(copydim);
-        }
-    }
-}
-
-/**
  * Health Read File
  *
  * Function responsible to parse the conf files.
@@ -747,7 +660,6 @@ static int health_readfile(const char *filename, void *data) {
 
         if(hash == hash_alarm && !strcasecmp(key, HEALTH_ALARM_KEY)) {
             if(rc) {
-                fprintf(stderr,"KILLME HEALTH %s: %s %s\n",rc->name, rc->chart, rc->foreachdim);
                 if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
                 }
@@ -782,7 +694,6 @@ static int health_readfile(const char *filename, void *data) {
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
-                fprintf(stderr,"KILLME HEALTH %s: %s %s\n",rc->name, rc->chart, rc->foreachdim);
 //                health_add_alarms_loop(host, rc, ignore_this) ;
                 if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
                     rrdcalc_free(rc);
@@ -1108,7 +1019,6 @@ static int health_readfile(const char *filename, void *data) {
 
     if(rc) {
         //health_add_alarms_loop(host, rc, ignore_this) ;
-        fprintf(stderr,"KILLME HEALTH %s: %s %s\n",rc->name, rc->chart, rc->foreachdim);
         if(ignore_this || !rrdcalc_add_alarm_from_config(host, rc)) {
             rrdcalc_free(rc);
         }
