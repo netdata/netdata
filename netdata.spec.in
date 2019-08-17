@@ -11,6 +11,7 @@
 %define _sysconfdir /etc
 %define _localstatedir /var
 %define _libexecdir /usr/libexec
+%define _libdir /usr/lib
 
 #
 # Conditional build:
@@ -235,6 +236,7 @@ autoreconf -ivf
 	--sysconfdir="%{_sysconfdir}" \
 	--localstatedir="%{_localstatedir}" \
 	--libexecdir="%{_libexecdir}" \
+        --libdir="%{_libdir}" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
