@@ -370,7 +370,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    if(host->alarms_with_foreach) {
+    if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
         RRDCALC *rrdc;
         rrdhost_wrlock(host);
         for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
@@ -386,17 +386,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
                         RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, usename, rd->name);
                         if(child) {
                             rrdcalc_add_to_host(host, child);
-                            rrdc->foreachcounter++;
                             fprintf(stderr,"KILLME DIM ALARM %s,%s: %s %s %s %d\n",st->name, rd->name, rrdc->chart, rrdc->name, rrdc->foreachdim,rrdc->foreachcounter );
                             RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)child);
                             if (rdcmp != child) {
                                 error("Cannot insert the alarm index ID %s",child->name);
                             }
+                        } else {
+                            error("Cannot allocate a new alarm.");
+                            rrdc->foreachcounter--;
                         }
                     }
                 }
             }
         }
+
         rrdhost_unlock(host);
     }
     rrdset_unlock(st);

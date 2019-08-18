@@ -115,49 +115,70 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
     }
 
     RRDCALCTEMPLATE *t, *last = NULL;
-    for (t = host->templates; t ; last = t, t = t->next) {
-        if(unlikely(t->hash_name == rt->hash_name
-                    && !strcmp(t->name, rt->name)
-                    && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
-        )) {
-            error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
-            return 0;
+    if(!rt->foreachdim) {
+        for (t = host->templates; t ; last = t, t = t->next) {
+            if(unlikely(t->hash_name == rt->hash_name
+                        && !strcmp(t->name, rt->name)
+                        && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
+            )) {
+                error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
+                return 0;
+            }
+        }
+
+        if(likely(last)) {
+            last->next = rt;
+        }
+        else {
+            rt->next = host->templates;
+            host->templates = rt;
+        }
+    } else {
+        for (t = host->alarms_template_with_foreach; t ; last = t, t = t->next) {
+            if(unlikely(t->hash_name == rt->hash_name
+                        && !strcmp(t->name, rt->name)
+                        && !strcmp(t->family_match?t->family_match:"*", rt->family_match?rt->family_match:"*")
+            )) {
+                error("Health configuration template '%s' already exists for host '%s'.", rt->name, host->hostname);
+                return 0;
+            }
+        }
+
+        if(likely(last)) {
+            last->next = rt;
+        }
+        else {
+            rt->next = host->alarms_template_with_foreach;
+            host->alarms_template_with_foreach = rt;
         }
     }
 
     debug(D_HEALTH, "Health configuration adding template '%s': context '%s', exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
-            rt->name,
-            (rt->context)?rt->context:"NONE",
-            (rt->exec)?rt->exec:"DEFAULT",
-            (rt->recipient)?rt->recipient:"DEFAULT",
-            rt->green,
-            rt->red,
-            (int)rt->group,
-            rt->after,
-            rt->before,
-            rt->options,
-            (rt->dimensions)?rt->dimensions:"NONE",
-            (rt->foreachdim)?rt->foreachdim:"NONE",
-            rt->update_every,
-            (rt->calculation)?rt->calculation->parsed_as:"NONE",
-            (rt->warning)?rt->warning->parsed_as:"NONE",
-            (rt->critical)?rt->critical->parsed_as:"NONE",
-            rt->source,
-            rt->delay_up_duration,
-            rt->delay_down_duration,
-            rt->delay_max_duration,
-            rt->delay_multiplier,
-            rt->warn_repeat_every,
-            rt->crit_repeat_every
+          rt->name,
+          (rt->context)?rt->context:"NONE",
+          (rt->exec)?rt->exec:"DEFAULT",
+          (rt->recipient)?rt->recipient:"DEFAULT",
+          rt->green,
+          rt->red,
+          (int)rt->group,
+          rt->after,
+          rt->before,
+          rt->options,
+          (rt->dimensions)?rt->dimensions:"NONE",
+          (rt->foreachdim)?rt->foreachdim:"NONE",
+          rt->update_every,
+          (rt->calculation)?rt->calculation->parsed_as:"NONE",
+          (rt->warning)?rt->warning->parsed_as:"NONE",
+          (rt->critical)?rt->critical->parsed_as:"NONE",
+          rt->source,
+          rt->delay_up_duration,
+          rt->delay_down_duration,
+          rt->delay_max_duration,
+          rt->delay_multiplier,
+          rt->warn_repeat_every,
+          rt->crit_repeat_every
     );
 
-    if(likely(last)) {
-        last->next = rt;
-    }
-    else {
-        rt->next = host->templates;
-        host->templates = rt;
-    }
 
     return 1;
 }

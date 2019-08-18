@@ -404,7 +404,11 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
 
     if(rt->dimensions) rc->dimensions = strdupz(rt->dimensions);
-    if(rt->foreachdim) rc->foreachdim = strdupz(rt->foreachdim);
+    if(rt->foreachdim) {
+        rc->foreachdim = strdupz(rt->foreachdim);
+        rc->spdim = health_pattern_from_foreach(rc->foreachdim);
+    }
+    rc->foreachcounter = rt->foreachcounter;
 
     rc->green = rt->green;
     rc->red = rt->red;
@@ -477,9 +481,11 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     );
 
     rrdcalc_add_to_host(host, rc);
-    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
-    if (rdcmp != rc) {
-        error("Cannot insert the alarm index ID %s",rc->name);
+    if(!rt->foreachdim) {
+        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
+        if (rdcmp != rc) {
+            error("Cannot insert the alarm index ID %s",rc->name);
+        }
     }
 
     return rc;
@@ -510,6 +516,8 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
 
     newrc->dimensions = strdupz(dimension);
     newrc->foreachdim = NULL;
+    rc->foreachcounter++;
+    newrc->foreachcounter = rc->foreachcounter;
 
     newrc->green = rc->green;
     newrc->red = rc->red;
@@ -557,7 +565,6 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
 
     return newrc;
 }
-
 
 /**
  * RRDCALC Free
@@ -609,10 +616,10 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
     }
 
-    if(rc->foreachdim) {
+    fprintf(stderr,"KILLME REMOVE ME %s %d %s\n",rc->chart, rc->foreachcounter, rc->foreachdim);
+    if(rc->foreachcounter) {
         RRDCALC *t;
         for(t = host->alarms_with_foreach; t ; t = t->next) {
-            fprintf(stderr,"KILLME REMOVE ME %s %s\n",rc->chart, t->chart );
             if (!strcmp(t->chart,rc->chart)) {
                 fprintf(stderr,"KILLME REMOVE ME UNIQUE %s %d\n",rc->name, rc->foreachcounter );
             }
