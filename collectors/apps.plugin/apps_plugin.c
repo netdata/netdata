@@ -3071,6 +3071,19 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     }
 }
 
+static inline void post_aggregate_targets(struct target *root) {
+    struct target *w;
+    for (w = root; w ; w = w->next) {
+        if(w->collected_starttime) {
+            if (!w->starttime || w->collected_starttime < w->starttime) {
+                w->starttime = w->collected_starttime;
+            }
+        } else {
+            w->starttime = 0;
+        }
+    }
+}
+
 static void calculate_netdata_statistics(void) {
 
     apply_apps_groups_targets_inheritance();
@@ -3131,12 +3144,9 @@ static void calculate_netdata_statistics(void) {
             aggregate_pid_fds_on_targets(p);
     }
 
-    if(w->collected_starttime) {
-        if(w->starttime < w->collected_starttime) w->starttime = w->collected_starttime;
-    }
-    else {
-        w->starttime = 0;
-    }
+    post_aggregate_targets(apps_groups_root_target);
+    post_aggregate_targets(users_root_target);
+    post_aggregate_targets(groups_root_target);
 
     cleanup_exited_pids();
 }
@@ -3497,7 +3507,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "uptime", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, (global_uptime > w->collected_starttime)?(global_uptime - w->collected_starttime):0);
+            send_SET(w->name, (global_uptime > w->starttime)?(global_uptime - w->starttime):0);
     }
     send_END();
 
