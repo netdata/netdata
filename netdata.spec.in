@@ -192,7 +192,6 @@ Requires: freeipmi
 
 # CUPS plugin dependencies
 BuildRequires: cups-devel
-Requires: cups
 # end - cups plugin dependencies
 
 # Prometheus remote write dependencies
@@ -489,6 +488,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %package plugin-cups
 Summary: The Common Unix Printing System plugin for netdata
 Group: Applications/System
+Requires: cups
+Requires: netdata
 
 %description plugin-cups
  This is the Common Unix Printing System plugin for the netdata daemon.
