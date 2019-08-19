@@ -51,8 +51,10 @@ const getDygraphOptions = ({
   const {
     dygraphSmooth = dygraphChartType === "line"
       && !isSparkline,
+    dygraphDrawAxis = true,
   } = attributes
   const {
+    // destructuring with default values
     dygraphColors = orderedColors,
     dygraphRightGap = 5,
     dygraphShowRangeSelector = false,
@@ -91,7 +93,6 @@ const getDygraphOptions = ({
       : window.NETDATA.options.current.color_fill_opacity_area,
     dygraphStackedGraph = dygraphChartType === "stacked",
     dygraphStackedGraphNanFill = "none",
-    dygraphDrawAxis = true,
     dygraphAxisLabelFontSize = 10,
     dygraphAxisLineColor = window.NETDATA.themes.current.axis,
     dygraphAxisLineWidth = 1.0,
@@ -108,6 +109,10 @@ const getDygraphOptions = ({
 
     dygraphXPixelsPerLabel = 50,
     dygraphXAxisLabelWidth = 60,
+    dygraphDrawXAxis = dygraphDrawAxis,
+    dygraphYPixelsPerLabel = 15,
+    dygraphYAxisLabelWidth = 50,
+    dygraphDrawYAxis = dygraphDrawAxis,
   } = attributes
   const yLabel = "percentage" // todo (state.unts_current)
   // todo lift the state
@@ -194,8 +199,15 @@ const getDygraphOptions = ({
         // @ts-ignore
         ticker: Dygraph.dateTicker,
         axisLabelWidth: dygraphXAxisLabelWidth,
-        drawAxis: dygraphDrawAxis,
+        drawAxis: dygraphDrawXAxis,
         axisLabelFormatter: (d: Date | number) => xAxisTimeString(d as Date),
+      },
+      y: {
+        logscale: isLogScale,
+        pixelsPerLabel: dygraphYPixelsPerLabel,
+        axisLabelWidth: dygraphYAxisLabelWidth,
+        drawAxis: dygraphDrawYAxis,
+        // axisLabelFormatter is added on the updates
       },
     },
   }

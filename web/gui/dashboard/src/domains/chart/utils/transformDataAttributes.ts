@@ -135,7 +135,7 @@ export interface Attributes {
   dygraphHighlightSeriesBackgroundAlpha: number | undefined
   dygraphXPixelsPerLabel: number | undefined
   dygraphXAxisLabelWidth: number | undefined
-  dygraphDygraphDrawXAxis: boolean | undefined
+  dygraphDrawXAxis: boolean | undefined
   dygraphYPixelsPerLabel: number | undefined
   dygraphYAxisLabelWidth: number | undefined
   dygraphDrawYAxis: boolean | undefined
@@ -219,7 +219,7 @@ const getAttributesMap = (): AttributesMap => ({
   // dygraphPointClickCallback: { key: "dygraph-pointclickcallback" },
   dygraphXPixelsPerLabel: { key: "dygraph-xpixelsperlabel" },
   dygraphXAxisLabelWidth: { key: "dygraph-xaxislabelwidth" },
-  dygraphDygraphDrawXAxis: { key: "dygraph-drawxaxis", type: "boolean" },
+  dygraphDrawXAxis: { key: "dygraph-drawxaxis", type: "boolean" },
   dygraphYPixelsPerLabel: { key: "dygraph-ypixelsperlabel" },
   dygraphYAxisLabelWidth: { key: "dygraph-yaxislabelwidth" },
   dygraphDrawYAxis: { key: "dygraph-drawyaxis", type: "boolean" },
