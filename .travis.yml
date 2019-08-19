@@ -231,9 +231,9 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
 
-    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
+#    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
+#      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
+#      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
 
 
