@@ -2,7 +2,7 @@
 
 > :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running Netdata in Docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 >
-> Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with https://github.com/multiarch naming), so **`armv7hf` is not updated** either.
+> Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with <https://github.com/multiarch> naming), so **`armv7hf` is not updated** either.
 
 ## Limitations
 
@@ -16,7 +16,7 @@ For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
 
 ## Run Netdata with the docker command
 
-Quickly start Netdata with the `docker` command. Netdata is then available at http://host:19999
+Quickly start Netdata with the `docker` command. Netdata is then available at <http://host:19999>
 
 This is good for an internal network or to quickly analyse a host.
 
@@ -99,7 +99,7 @@ services:
       - DOCKER_USR=root
 ```
 
-### Pass command line options to Netdata 
+### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide [Netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address Netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
@@ -110,15 +110,16 @@ For a permanent installation on a public server, you should [secure your Netdata
 You can use use the following docker-compose.yml and Caddyfile files to run Netdata with docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
 
 ### Prerequisites
-* [Docker](https://docs.docker.com/install/#server)
-* [Docker Compose](https://docs.docker.com/compose/install/)
-* Domain configured in DNS pointing to host.
+
+-   [Docker](https://docs.docker.com/install/#server)
+-   [Docker Compose](https://docs.docker.com/compose/install/)
+-   Domain configured in DNS pointing to host.
 
 ### Caddyfile
 
 This file needs to be placed in /opt with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Letsencrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
 
-```
+```caddyfile
 netdata.example.org {
   proxy / netdata:19999
   tls admin@example.org
@@ -165,7 +166,7 @@ services:
 
 You can restrict access by following [official caddy guide](https://caddyserver.com/docs/basicauth) and adding lines to Caddyfile.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
 
 ## Publish a test image to your own repository
 
@@ -186,7 +187,7 @@ This is especially useful when testing a Pull Request for Kubernetes, since you 
 
 Example:
 
-We get a local copy of the Helm chart at https://github.com/netdata/helmchart. We modify `values.yaml` to have the following:
+We get a local copy of the Helm chart at <https://github.com/netdata/helmchart>. We modify `values.yaml` to have the following:
 
 ```
 image:
@@ -196,6 +197,7 @@ image:
 ```
 
 We check out PR5576 and run the following:
+
 ```
 ./packaging/docker/build-test.sh -r cakrit/netdata-prs -v PR5576 -u cakrit -p 'XXX'
 ```
@@ -209,20 +211,21 @@ If we make changes to the code, we execute the same `build-test.sh` command, fol
 To enable Travis CI integration on your own repositories (Docker and Github), you need to be part of the Netdata organization.
 Once you have contacted the Netdata owners to setup you up on Github and Travis, execute the following steps
 
-- Preparation
-  - Have Netdata forked on your personal GitHub account
-  - Get a GITHUB token: Go to GitHub settings -> Developer Settings -> Personal access tokens, generate a new token with full access to repo_hook, read only access to admin:org, public_repo, repo_deployment, repo:status and user:email settings enabled. This will be your GITHUB_TOKEN that is described later in the instructions, so keep it somewhere safe until is needed.
-  - Contact the Netdata team and seek for permissions on https://scan.coverity.com should you require Travis to be able to push your forked code to coverity for analysis and report. Once you are setup, you should have your email you used in coverity and a token from them. These will be your COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN that we will refer to later.
-  - Have a valid Docker hub account, the credentials from this account will be your DOCKER_USERNAME and DOCKER_PWD mentioned later
+-   Preparation
+    -   Have Netdata forked on your personal GitHub account
+    -   Get a GITHUB token: Go to GitHub settings -> Developer Settings -> Personal access tokens, generate a new token with full access to repo_hook, read only access to admin:org, public_repo, repo_deployment, repo:status and user:email settings enabled. This will be your GITHUB_TOKEN that is described later in the instructions, so keep it somewhere safe until is needed.
+    -   Contact the Netdata team and seek for permissions on <https://scan.coverity.com> should you require Travis to be able to push your forked code to coverity for analysis and report. Once you are setup, you should have your email you used in coverity and a token from them. These will be your COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN that we will refer to later.
+    -   Have a valid Docker hub account, the credentials from this account will be your DOCKER_USERNAME and DOCKER_PWD mentioned later
 
-- Setting up Travis CI for your own fork (Detailed instructions provided by Travis team [here](https://docs.travis-ci.com/user/tutorial/))
-  - Login to travis with your own GITHUB credentials (There is Open Auth access)
-  - Go to your profile settings, under [repositories](https://travis-ci.com/account/repositories) section and setup your Netdata fork to be built by travis
-  - Once the repository has been setup, go to repository settings within travis (usually under https://travis-ci.com/NETDATA_DEVELOPER/netdata/settings, where "NETDATA_DEVELOPER" is your github handle) and select your desired settings.
-- While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add the following:
-  - DOCKER_USERNAME and DOCKER_PWD variables so that Travis can login to your docker hub account and publish docker images there. 
-  - REPOSITORY variable to "NETDATA_DEVELOPER/netdata" where NETDATA_DEVELOPER is your github handle again.
-  - GITHUB_TOKEN variable with the token generated on the preparation step, for travis workflows to function properly
-  - COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN variables to enable Travis to submit your code for analysis to Coverity.
+-   Setting up Travis CI for your own fork (Detailed instructions provided by Travis team [here](https://docs.travis-ci.com/user/tutorial/))
+    -   Login to travis with your own GITHUB credentials (There is Open Auth access)
+    -   Go to your profile settings, under [repositories](https://travis-ci.com/account/repositories) section and setup your Netdata fork to be built by travis
+    -   Once the repository has been setup, go to repository settings within travis (usually under <https://travis-ci.com/NETDATA_DEVELOPER/netdata/settings>, where "NETDATA_DEVELOPER" is your github handle) and select your desired settings.
+
+-   While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add the following:
+    -   DOCKER_USERNAME and DOCKER_PWD variables so that Travis can login to your docker hub account and publish docker images there. 
+    -   REPOSITORY variable to "NETDATA_DEVELOPER/netdata" where NETDATA_DEVELOPER is your github handle again.
+    -   GITHUB_TOKEN variable with the token generated on the preparation step, for travis workflows to function properly
+    -   COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN variables to enable Travis to submit your code for analysis to Coverity.
 
 Having followed these instructions, your forked repository should be all set up for Travis Integration, happy testing!

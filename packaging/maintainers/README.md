@@ -4,7 +4,6 @@ This page tracks the package maintainers for Netdata, for various operating syst
 
 > Feel free to update it, so that it reflects the current status.
 
-
 ---
 
 ## Official Linux Distributions
@@ -21,27 +20,30 @@ This page tracks the package maintainers for Netdata, for various operating syst
 | SUSE SLE / openSUSE Tumbleweed & Leap |  |  | [netdata @ SUSE OpenBuildService](https://software.opensuse.org/package/netdata) |
 
 ---
+
 ## FreeBSD
 
-| System | Initial PR | Core Developer | Package Maintainer
+| System  | Initial PR | Core Developer | Package Maintainer
 |:-:|:-:|:-:|:-:|
-FreeBSD|#1321|@vlvkobal|@mmokhi
+| FreeBSD | #1321      | @vlvkobal|@mmokhi
 
 ---
+
 ## MacOS
 
 | System | URL | Core Developer | Package Maintainer
 |:-:|:-:|:-:|:-:|
-MacOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb)|@vlvkobal|@rickard-von-essen
+| MacOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/master/Formula/netdata.rb)|@vlvkobal|@rickard-von-essen
 
 ---
+
 ## Unofficial Linux Packages
 
 | Linux Distribution | Netdata Version | Maintainer | Related URL |
 | :-: | :-: | :-: | :-- |
-| Ubuntu | Release | @gslin | [netdata @ gslin ppa](https://launchpad.net/~gslin/+archive/ubuntu/netdata) https://github.com/netdata/netdata/issues/69#issuecomment-217458543 |
-
+| Ubuntu             | Release         | @gslin     | [netdata @ gslin ppa](https://launchpad.net/~gslin/+archive/ubuntu/netdata) https://github.com/netdata/netdata/issues/69#issuecomment-217458543 |
 ---
+
 ## Embedded Linux
 
 | Embedded Linux | Netdata Version | Maintainer | Related URL |
@@ -53,23 +55,26 @@ MacOS Homebrew Formula|[link](https://github.com/Homebrew/homebrew-core/blob/mas
 | DietPi | Release | @Fourdee | https://github.com/Fourdee/DietPi |
 
 ---
+
 ## Linux Containers
 
 | Containers | Netdata Version | Maintainer | Related URL |
 | :-: | :-: | :-: | :-- |
-| Docker | Git | @titpetric | https://github.com/titpetric/netdata |
+| Docker     | Git             | @titpetric | https://github.com/titpetric/netdata |
 
 ---
+
 ## Automation Systems
 
 | Automation Systems | Netdata Version | Maintainer | Related URL |
 | :-: | :-: | :-: | :-- |
-| Ansible | git | @jffz | https://galaxy.ansible.com/jffz/netdata/ |
-| Chef | ? | @sergiopena | https://github.com/sergiopena/netdata-cookbook |
+| Ansible            | git             | @jffz | https://galaxy.ansible.com/jffz/netdata/ |
+| Chef               | ?               | @sergiopena | https://github.com/sergiopena/netdata-cookbook |
 
 ---
+
 ## Packages summary from repology.org
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/netdata.svg)](https://repology.org/metapackage/netdata/versions)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fmaintainers%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fmaintainers%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

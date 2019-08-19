@@ -38,11 +38,11 @@ killall -USR2 netdata
 
 There are 2 entities:
 
-1. **alarms**, which are attached to specific charts, and
+1.  **alarms**, which are attached to specific charts, and
 
-1. **templates**, which define rules that should be applied to all charts having a
-   specific `context`. You can use this feature to apply **alarms** to all disks,
-   all network interfaces, all mysql databases, all nginx web servers, etc.
+2.  **templates**, which define rules that should be applied to all charts having a
+    specific `context`. You can use this feature to apply **alarms** to all disks,
+    all network interfaces, all mysql databases, all nginx web servers, etc.
 
 Both of these entities have exactly the same format and feature set.
 The only difference is the label `alarm` or `template`.
@@ -168,27 +168,27 @@ lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
 
 Everything is the same with [badges](../web/api/badges/). In short:
 
-- `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`.
-   This is required.
+-   `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`.
+     This is required.
 
-- `AFTER` is a relative number of seconds, but it also accepts a single letter for changing
-   the units, like `-1s` = 1 second in the past, `-1m` = 1 minute in the past, `-1h` = 1 hour
-   in the past, `-1d` = 1 day in the past. You need a negative number (i.e. how far in the past
-   to look for the value). **This is required**.
+-   `AFTER` is a relative number of seconds, but it also accepts a single letter for changing
+     the units, like `-1s` = 1 second in the past, `-1m` = 1 minute in the past, `-1h` = 1 hour
+     in the past, `-1d` = 1 day in the past. You need a negative number (i.e. how far in the past
+     to look for the value). **This is required**.
 
-- `at BEFORE` is by default 0 and is not required. Using this you can define the end of the
-   lookup. So data will be evaluated between `AFTER` and `BEFORE`.
+-   `at BEFORE` is by default 0 and is not required. Using this you can define the end of the
+     lookup. So data will be evaluated between `AFTER` and `BEFORE`.
 
-- `every DURATION` sets the updated frequency of the lookup (supports single letter units as
-   above too).
+-   `every DURATION` sets the updated frequency of the lookup (supports single letter units as
+     above too).
 
-- `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
-   `match-ids`, `match-names`. Check the badges documentation for more info.
+-   `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
+     `match-ids`, `match-names`. Check the badges documentation for more info.
 
-- `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
-   by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
-   have spaces in their names). This accepts Netdata simple patterns and the `match-ids` and
-   `match-names` options affect the searches for dimensions.
+-   `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
+     by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
+     have spaces in their names). This accepts Netdata simple patterns and the `match-ids` and
+     `match-names` options affect the searches for dimensions.
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions.
 The timestamps of the timeframe evaluated by the database lookup is available as variables
@@ -259,6 +259,7 @@ Format:
 warn: EXPRESSION
 crit: EXPRESSION
 ```
+
 Check [Expressions](#expressions) for more information.
 
 ---
@@ -306,40 +307,41 @@ Format:
 delay: [[[up U] [down D] multiplier M] max X]
 ```
 
-- `up U` defines the delay to be applied to a notification for an alarm that raised its status
-   (i.e. CLEAR to WARNING, CLEAR to CRITICAL, WARNING to CRITICAL). For example, `up 10s`, the
-   notification for this event will be sent 10 seconds after the actual event. This is used in
-   hope the alarm will get back to its previous state within the duration given. The default `U`
-   is zero.
+-   `up U` defines the delay to be applied to a notification for an alarm that raised its status
+     (i.e. CLEAR to WARNING, CLEAR to CRITICAL, WARNING to CRITICAL). For example, `up 10s`, the
+     notification for this event will be sent 10 seconds after the actual event. This is used in
+     hope the alarm will get back to its previous state within the duration given. The default `U`
+     is zero.
 
-- `down D` defines the delay to be applied to a notification for an alarm that moves to lower
-   state (i.e. CRITICAL to WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
-   will delay the notification by 1 minute. This is used to prevent notifications for flapping
-   alarms. The default `D` is zero.
+-   `down D` defines the delay to be applied to a notification for an alarm that moves to lower
+     state (i.e. CRITICAL to WARNING, CRITICAL to CLEAR, WARNING to CLEAR). For example, `down 1m`
+     will delay the notification by 1 minute. This is used to prevent notifications for flapping
+     alarms. The default `D` is zero.
 
-- `mutliplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
-   delayed. The default multiplier is `1.0`.
+-   `mutliplier M` multiplies `U` and `D` when an alarm changes state, while a notification is
+     delayed. The default multiplier is `1.0`.
 
-- `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
-   is `max(U * M, D * M)` (i.e. the max duration of `U` or `D` multiplied once with `M`).
+-   `max X`  defines the maximum absolute notification delay an alarm may get. The default `X`
+     is `max(U * M, D * M)` (i.e. the max duration of `U` or `D` multiplied once with `M`).
 
-  Example:
+    Example:
 
-  `delay: up 10s down 15m multiplier 2 max 1h`
+    `delay: up 10s down 15m multiplier 2 max 1h`
 
-  The time is `00:00:00` and the status of the alarm is CLEAR.
+    The time is `00:00:00` and the status of the alarm is CLEAR.
 
-  time of event|new status|delay|notification will be sent|why
-  -------------|----------|:---:|-------------------------|---
-  00:00:01 | WARNING | `up 10s` | 00:00:11 |first state switch
-  00:00:05 | CLEAR |  `down 15m x2`| 00:30:05 |the alarm changes state while a notification is delayed, so it was multiplied
-  00:00:06 | WARNING | `up 10s x2 x2` | 00:00:26 |multiplied twice
-  00:00:07|CLEAR|`down 15m x2 x2 x2`|00:45:07|multiplied 3 times.
+    | time of event | new status | delay               | notification will be sent|why|
+    |-------------|----------|:---:|-------------------------|---|
+    | 00:00:01      | WARNING    | `up 10s`            | 00:00:11|first state switch|
+    | 00:00:05      | CLEAR      | `down 15m x2`       | 00:30:05|the alarm changes state while a notification is delayed, so it was multiplied|
+    | 00:00:06      | WARNING    | `up 10s x2 x2`      | 00:00:26|multiplied twice|
+    | 00:00:07      | CLEAR      | `down 15m x2 x2 x2` | 00:45:07|multiplied 3 times.|
 
-  So:
-  -  `U` and `D` are multiplied by `M` every time the alarm changes state (any state, not just
-     their matching one) and a delay is in place.
-  - All are reset to their defaults when the alarm switches state without a delay in place.
+    So:
+
+    -   `U` and `D` are multiplied by `M` every time the alarm changes state (any state, not just
+        their matching one) and a delay is in place.
+    -   All are reset to their defaults when the alarm switches state without a delay in place.
 
 ---
 
@@ -353,9 +355,9 @@ Format:
 repeat: [off] [warning DURATION] [critical DURATION]
 ```
 
-* `off`: Turns off the repeating feature for the current alarm. This is effective when the default repeat settings has been enabled in health configuration.
-* `warning DURATION`: Defines the interval when the alarm is in WARNING state. Use `0s` to turn off the repeating notification for WARNING mode.
-* `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating notification for CRITICAL mode.
+-   `off`: Turns off the repeating feature for the current alarm. This is effective when the default repeat settings has been enabled in health configuration.
+-   `warning DURATION`: Defines the interval when the alarm is in WARNING state. Use `0s` to turn off the repeating notification for WARNING mode.
+-   `critical DURATION`: Defines the interval when the alarm is in CRITICAL state. Use `0s` to turn off the repeating notification for CRITICAL mode.
 
 ---
 
@@ -391,9 +393,9 @@ Expressions can have variables. Variables start with `$`. Check below for more i
 
 There are two special values you can use:
 
-- `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the database lookup failed. All calculations (i.e. addition, multiplication, etc) with a `nan` result in a `nan`.
+-   `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the database lookup failed. All calculations (i.e. addition, multiplication, etc) with a `nan` result in a `nan`.
 
-- `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be infinite if divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
+-   `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be infinite if divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
 
 ---
 
@@ -413,25 +415,27 @@ crit: $this > (($status == $CRITICAL) ? (85) : (95))
 ```
 
 The above say:
-* If the alarm is currently a warning, then the threshold for being considered a warning
-   is 75, otherwise it's 85.
 
-* If the alarm is currently critical, then the threshold for being considered critical
-   is 85, otherwise it's 95.
+-   If the alarm is currently a warning, then the threshold for being considered a warning
+     is 75, otherwise it's 85.
+
+-   If the alarm is currently critical, then the threshold for being considered critical
+     is 85, otherwise it's 95.
 
 Which in turn, results in the following behavior:
-* While the value is rising, it will trigger a warning when it exceeds 85, and a critical
-   alert when it exceeds 95.
 
-* While the value is falling, it will return to a warning state when it goes below 85,
-   and a normal state when it goes below 75.
+-   While the value is rising, it will trigger a warning when it exceeds 85, and a critical
+     alert when it exceeds 95.
 
-* If the value is constantly varying between 80 and 90, then it will trigger a warning the
-   first time it goes above 85, but will remain a warning until it goes below 75 (or goes above 85).
+-   While the value is falling, it will return to a warning state when it goes below 85,
+     and a normal state when it goes below 75.
 
-* If the value is constantly varying between 90 and 100, then it will trigger a critical alert
-   the first time it goes above 95, but will remain a critical alert goes below 85 (at which
-   point it will return to being a warning).
+-   If the value is constantly varying between 80 and 90, then it will trigger a warning the
+     first time it goes above 85, but will remain a warning until it goes below 75 (or goes above 85).
+
+-   If the value is constantly varying between 90 and 100, then it will trigger a critical alert
+     the first time it goes above 95, but will remain a critical alert goes below 85 (at which
+     point it will return to being a warning).
 
 ---
 
@@ -443,21 +447,21 @@ Example: [variables for the `system.cpu` chart of the registry](https://registry
 
 _Hint: If you don't know how to find the CHART_NAME, you can read about it [here](../docs/Charts.md#charts)._
 
-
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
+
 <details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in templates for charts belonging to the same [context](../docs/Charts.md#contexts). The reason is that all charts of a given contexts are essentially identical, with the only difference being the [family](../docs/Charts.md#families) that identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway, unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
 </details>
 
-  - **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of $this for the other configured alarms of the chart also appears, under the name of each configured alarm.
+-   **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of $this for the other configured alarms of the chart also appears, under the name of each configured alarm.
 
      Charts also define a few special variables:
 
-     - `$last_collected_t` is the unix timestamp of the last data collection
-     - `$collected_total_raw` is the sum of all the dimensions (their last collected values)
-     - `$update_every` is the update frequency of the chart
-     - `$green` and `$red` the threshold defined in alarms (these are per chart - the charts
-        inherits them from the the first alarm that defined them)
+    -   `$last_collected_t` is the unix timestamp of the last data collection
+    -   `$collected_total_raw` is the sum of all the dimensions (their last collected values)
+    -   `$update_every` is the update frequency of the chart
+    -   `$green` and `$red` the threshold defined in alarms (these are per chart - the charts
+         inherits them from the the first alarm that defined them)
 
      Chart dimensions define their last calculated (i.e. interpolated) value, exactly as
      shown on the charts, but also a variable with their name and suffix `_raw` that resolves
@@ -465,43 +469,43 @@ Although the `alarm_variables` link shows you variables for a particular chart, 
      that resolves to unix timestamp the dimension was last collected (there may be dimensions
      that fail to be collected while others continue normally).
 
-  - **family variables**. Families are used to group charts together. For example all `eth0`
+-   **family variables**. Families are used to group charts together. For example all `eth0`
      charts, have `family = eth0`. This index includes all local variables, but if there are
      overlapping variables, only the first are exposed.
 
-  - **host variables**. All the dimensions of all charts, including all alarms, in fullname.
+-   **host variables**. All the dimensions of all charts, including all alarms, in fullname.
      Fullname is `CHART.VARIABLE`, where `CHART` is either the chart id or the chart name (both
      are supported).
 
-  - **special variables*** are:
+-   **special variables\*** are:
 
-     - `$this`, which is resolved to the value of the current alarm.
+    -   `$this`, which is resolved to the value of the current alarm.
 
-     - `$status`, which is resolved to the current status of the alarm (the current = the last
-        status, i.e. before the current database lookup and the evaluation of the `calc` line).
-        This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
-        `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAR` works as
-        expected.
+    -   `$status`, which is resolved to the current status of the alarm (the current = the last
+         status, i.e. before the current database lookup and the evaluation of the `calc` line).
+         This values can be compared with `$REMOVED`, `$UNINITIALIZED`, `$UNDEFINED`, `$CLEAR`,
+         `$WARNING`, `$CRITICAL`. These values are incremental, ie. `$status > $CLEAR` works as
+         expected.
 
-     - `$now`, which is resolved to current unix timestamp.
+    -   `$now`, which is resolved to current unix timestamp.
 
 ## Alarm Statuses
 
 Alarms can have the following statuses:
 
-  - `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to Netdata
+-   `REMOVED` - the alarm has been deleted (this happens when a SIGUSR2 is sent to Netdata
      to reload health configuration)
 
-  - `UNINITIALIZED` - the alarm is not initialized yet
+-   `UNINITIALIZED` - the alarm is not initialized yet
 
-  - `UNDEFINED` - the alarm failed to be calculated (i.e. the database lookup failed,
+-   `UNDEFINED` - the alarm failed to be calculated (i.e. the database lookup failed,
      a division by zero occurred, etc)
 
-  - `CLEAR` - the alarm is not armed / raised (i.e. is OK)
+-   `CLEAR` - the alarm is not armed / raised (i.e. is OK)
 
-  - `WARNING` - the warning expression resulted in true or non-zero
+-   `WARNING` - the warning expression resulted in true or non-zero
 
-  - `CRITICAL` - the critical expression resulted in true or non-zero
+-   `CRITICAL` - the critical expression resulted in true or non-zero
 
 The external script will be called for all status changes.
 
@@ -545,10 +549,10 @@ The above applies the **template** to all charts that have `context = apache.req
     calc: $now - $last_collected_t
 ```
 
-- `$now` is a standard variable that resolves to the current timestamp.
+-   `$now` is a standard variable that resolves to the current timestamp.
 
-- `$last_collected_t` is the last data collection timestamp of the chart.
-   So this calculation gives the number of seconds passed since the last data collection.
+-   `$last_collected_t` is the last data collection timestamp of the chart.
+     So this calculation gives the number of seconds passed since the last data collection.
 
 ```
    every: 10s
@@ -563,8 +567,8 @@ The alarm will be evaluated every 10 seconds.
 
 If these result in non-zero or true, they trigger the alarm.
 
-- `$this` refers to the value of this alarm (i.e. the result of the `calc` line.
-   We could also use `$apache_last_collected_secs`.
+-   `$this` refers to the value of this alarm (i.e. the result of the `calc` line.
+     We could also use `$apache_last_collected_secs`.
 
 `$update_every` is the update frequency of the chart, in seconds.
 
@@ -675,4 +679,4 @@ You can find how Netdata interpreted the expressions by examining the alarm at `
 
 It's currently not possible to schedule notifications from within the alarm template. For those scenarios where you need to temporary disable notifications (for instance when running backups triggers a disk alert) you can disable or silence notifications are runtime. The health checks can be controlled at runtime via the [health management api](../web/api/health/#health-management-api).
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

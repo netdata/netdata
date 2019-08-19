@@ -400,6 +400,7 @@ run ./configure \
 	--sysconfdir="${NETDATA_PREFIX}/etc" \
 	--localstatedir="${NETDATA_PREFIX}/var" \
 	--libexecdir="${NETDATA_PREFIX}/usr/libexec" \
+	--libdir="${NETDATA_PREFIX}/usr/lib" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \

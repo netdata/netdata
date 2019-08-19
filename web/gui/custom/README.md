@@ -2,10 +2,10 @@
 
 You can:
 
-- create your own dashboards using simple HTML (no javascript is required for basic dashboards)
-- utilizing any or all of the available chart libraries, on the same dashboard
-- using data from one or more Netdata servers, on the same dashboard
-- host your dashboard HTML page on any web server, anywhere
+-   create your own dashboards using simple HTML (no javascript is required for basic dashboards)
+-   utilizing any or all of the available chart libraries, on the same dashboard
+-   using data from one or more Netdata servers, on the same dashboard
+-   host your dashboard HTML page on any web server, anywhere
 
 Netdata charts can also be added to existing web pages.
 
@@ -17,11 +17,10 @@ If you plan to put the dashboard on TV, check **[tv.html](../tv.html)**. This is
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
 -- 
-  
 
 ## Web directory
 
-All of the mentioned examples are available on your local Netdata installation (e.g. `http://myhost:19999/dashboard.html`). The default web root directory with the HTML and JS code is `/usr/share/netdata/web`. The main dashboard is also in that directory and called `index.html`.  
+All of the mentioned examples are available on your local Netdata installation (e.g. `http://myhost:19999/dashboard.html`). The default web root directory with the HTML and JS code is `/usr/share/netdata/web`. The main dashboard is also in that directory and called `index.html`.\
 Note: index.html has a different syntax. Don't use it as a template for simple custom dashboards.
 
 ## Example empty dashboard
@@ -52,7 +51,6 @@ If you need to create a new dashboard on an empty page, we suggest the following
 </html>
 ```
 
-
 ## dashboard.js
 
 To add Netdata charts to any web page (dedicated to Netdata or not), you need to include the `/dashboard.js` file of a Netdata server.
@@ -67,23 +65,23 @@ For example, if your Netdata server listens at `http://box:19999/`, you will nee
 
 `dashboard.js` will automatically load the following:
 
-1. `dashboard.css`, required for the Netdata charts
+1.  `dashboard.css`, required for the Netdata charts
 
-2. `jquery.min.js`, (only if jquery is not already loaded for this web page)
+2.  `jquery.min.js`, (only if jquery is not already loaded for this web page)
 
-3. `bootstrap.min.js` (only if bootstrap is not already loaded) and `bootstrap.min.css`.
+3.  `bootstrap.min.js` (only if bootstrap is not already loaded) and `bootstrap.min.css`.
 
-   You can disable this by adding the following before loading `dashboard.js`:
+    You can disable this by adding the following before loading `dashboard.js`:
 
 ```html
 <script>var netdataNoBootstrap = true;</script>
 ```
 
-4. `jquery.nanoscroller.min.js`, required for the scrollbar of the chart legends.
+4.  `jquery.nanoscroller.min.js`, required for the scrollbar of the chart legends.
 
-5. `bootstrap-toggle.min.js` and `bootstrap-toggle.min.css`, required for the settings toggle buttons.
+5.  `bootstrap-toggle.min.js` and `bootstrap-toggle.min.css`, required for the settings toggle buttons.
 
-6. `font-awesome.min.css`, for icons.
+6.  `font-awesome.min.css`, for icons.
 
 When `dashboard.js` loads will scan the page for elements that define charts (see below) and immediately start refreshing them. Keep in mind more javascript modules may be loaded (every chart library is a different javascript file, that is loaded on first use).
 
@@ -129,7 +127,7 @@ If you need to set any other URL as the default Netdata server for all charts th
 
 ---
 
-# Adding charts
+## Adding charts
 
 To add charts, you need to add a `div` for each of them. Each of these `div` elements accept a few `data-` attributes:
 
@@ -160,9 +158,9 @@ You can specify the duration of the chart (how much time of data it will show) u
 
 The can be either:
 
-- **absolute** unix timestamps (in javascript terms, they are `new Date().getTime() / 1000`. Using absolute timestamps you can have a chart showing always the same time-frame.
+-   **absolute** unix timestamps (in javascript terms, they are `new Date().getTime() / 1000`. Using absolute timestamps you can have a chart showing always the same time-frame.
 
-- **relative** number of seconds to now. To show the last 10 minutes of data, `AFTER_SECONDS` must be `-600` (relative to now) and `BEFORE_SECONDS` must be `0` (meaning: now). If you want the chart to auto-refresh the current values, you need to specify **relative** values.
+-   **relative** number of seconds to now. To show the last 10 minutes of data, `AFTER_SECONDS` must be `-600` (relative to now) and `BEFORE_SECONDS` must be `0` (meaning: now). If you want the chart to auto-refresh the current values, you need to specify **relative** values.
 
 ### Chart sizes
 
@@ -197,6 +195,7 @@ If you have ephemeral monitoring setup ([More info here](../../../streaming/#mon
      data-host="http://yournetdata.server:19999/host/reported-hostname"
      ></div>
 ```
+
 ### Chart library
 
 The default chart library is `dygraph`. You set a different chart library per chart using this:
@@ -209,13 +208,12 @@ The default chart library is `dygraph`. You set a different chart library per ch
 
 Each chart library may support more chart-library specific settings. Please refer to the documentation of the chart library you are interested, in this wiki or the source code:
 
-- options `data-dygraph-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L6251-L6361)
-- options `data-easypiechart-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L7954-L7966)
-- options `data-gauge-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L8182-L8189)
-- options `data-d3pie-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L7394-L7561)
-- options `data-sparkline-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L5940-L5985)
-- options `data-peity-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L5892)
-
+-   options `data-dygraph-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L6251-L6361)
+-   options `data-easypiechart-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L7954-L7966)
+-   options `data-gauge-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L8182-L8189)
+-   options `data-d3pie-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L7394-L7561)
+-   options `data-sparkline-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L5940-L5985)
+-   options `data-peity-XXX` [here](https://github.com/netdata/netdata/blob/643cfe20a8d8beba0ed31ec6afaade80853fd310/web/dashboard.js#L5892)
 
 ### Data points
 
@@ -270,9 +268,9 @@ Netdata can change the rate of charts on the fly. So a charts that shows values 
 The above will provide the average rate per minute (60 seconds).
 Use 60 for `/minute`, 3600 for `/hour`, 86400 for `/day` (provided you have that many data).
 
-- The `data-gtime` setting does not change the units of the chart. You have to change them yourself with `data-units`.
-- This works only for `data-method="average"`.
-- Netdata may aggregate multiple points to satisfy the `data-points` setting. For example, you request `per minute` but the requested number of points to be returned are not enough to report every single minute. In this case Netdata will sum the `per second` raw data of the database to find the `per minute` for every single minute and then **average** them to find the **average per minute rate of every X minutes**. So, it works as if the data collection frequency was per minute.
+-   The `data-gtime` setting does not change the units of the chart. You have to change them yourself with `data-units`.
+-   This works only for `data-method="average"`.
+-   Netdata may aggregate multiple points to satisfy the `data-points` setting. For example, you request `per minute` but the requested number of points to be returned are not enough to report every single minute. In this case Netdata will sum the `per second` raw data of the database to find the `per minute` for every single minute and then **average** them to find the **average per minute rate of every X minutes**. So, it works as if the data collection frequency was per minute.
 
 ### Selecting dimensions
 
@@ -285,7 +283,7 @@ You can select specific dimensions using this:
      ></div>
 ```
 
-Netdata supports coma (` , `) or pipe (` | `) separated [simple patterns](../../../libnetdata/simple_pattern/) for dimensions. By default it searches for both dimension IDs and dimension NAMEs. You can control the target of the match with: `data-append-options="match-ids"` or `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched in the dimension names and IDs.
+Netdata supports coma (`,`) or pipe (`|`) separated [simple patterns](../../../libnetdata/simple_pattern/) for dimensions. By default it searches for both dimension IDs and dimension NAMEs. You can control the target of the match with: `data-append-options="match-ids"` or `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched in the dimension names and IDs.
 
 ### Chart title
 
@@ -354,10 +352,10 @@ You can append Netdata **[REST API v1](../../api)** data options, using this:
 
 A few useful options are:
 
-- `absolute` to show all values are absolute (i.e. turn negative dimensions to positive)
-- `percentage` to express the values as a percentage of the chart total (so, the values of the dimensions are added, and the sum of them if expressed as a percentage of the sum of all dimensions)
-- `unaligned` to prevent Netdata from aligning the charts (e.g. when requesting 60 seconds aggregation per point, Netdata returns chart data aligned to XX:XX:00 to XX:XX:59 - similarly for hours, days, etc - the `unaligned` option disables this feature)
-- `match-ids` or `match-names` is used to control what `data-dimensions=` will match.
+-   `absolute` to show all values are absolute (i.e. turn negative dimensions to positive)
+-   `percentage` to express the values as a percentage of the chart total (so, the values of the dimensions are added, and the sum of them if expressed as a percentage of the sum of all dimensions)
+-   `unaligned` to prevent Netdata from aligning the charts (e.g. when requesting 60 seconds aggregation per point, Netdata returns chart data aligned to XX:XX:00 to XX:XX:59 - similarly for hours, days, etc - the `unaligned` option disables this feature)
+-   `match-ids` or `match-names` is used to control what `data-dimensions=` will match.
 
 ### Chart library performance
 
@@ -413,5 +411,4 @@ Charts can be scaled to specific units with `data-desired-units="UNITS"`. If the
      ></div>
 ```
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fgui%2Fcustom%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fgui%2Fcustom%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

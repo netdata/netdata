@@ -231,9 +231,9 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
 
-    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
+#    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
+#      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
+#      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
 
 
@@ -285,7 +285,7 @@ jobs:
         depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
       before_deploy:
-        - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
+        - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
       deploy:
         - provider: packagecloud
           repository: "${DEPLOY_REPO}"
@@ -389,7 +389,7 @@ jobs:
         depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
       before_deploy:
-        - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
+        - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
       deploy:
         - provider: packagecloud
           repository: "${DEPLOY_REPO}"
@@ -541,7 +541,15 @@ jobs:
     #
     - stage: Nightly release
 
-      name: Build & Publish docker images
+      name: Trigger .RPM and .DEB package generation
+      before_script: post_message "TRAVIS_MESSAGE" "Starting RPM and DEB package generation for nightlies" "${NOTIF_CHANNEL}"
+      script:
+        - .travis/trigger_package_generation.sh "[Build latest]"
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly package generation produced errors" "${NOTIF_CHANNEL}"
+      git:
+        depth: false
+
+    - name: Build & Publish docker images
       before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch

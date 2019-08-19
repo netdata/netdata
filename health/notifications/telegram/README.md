@@ -8,9 +8,9 @@ Netdata will send warning messages without vibration.
 
 You need:
 
-1. A bot token. To get one, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot`. Follow the instructions.
-2. A chat id for every chat you want to send messages to. Contact the [@myidbot](https://t.me/myidbot) bot and send the command `/getid` to get your personal chat id or invite him into a group and issue the same command to get the group chat id.
-3. Start a conversation with your bot or invite him into a group you want to sent messages to.
+1.  A bot token. To get one, contact the [@BotFather](https://t.me/BotFather) bot and send the command `/newbot`. Follow the instructions.
+2.  A chat id for every chat you want to send messages to. Contact the [@myidbot](https://t.me/myidbot) bot and send the command `/getid` to get your personal chat id or invite him into a group and issue the same command to get the group chat id.
+3.  Start a conversation with your bot or invite him into a group you want to sent messages to.
 
 See slack for configuration.
 
@@ -18,4 +18,4 @@ Telegram messages look like this:
 
 ![image](https://fb.hash.works/ytl/preview.jpg)
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Ftelegram%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Ftelegram%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

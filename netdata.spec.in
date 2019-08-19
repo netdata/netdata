@@ -11,6 +11,7 @@
 %define _sysconfdir /etc
 %define _localstatedir /var
 %define _libexecdir /usr/libexec
+%define _libdir /usr/lib
 
 #
 # Conditional build:
@@ -235,6 +236,7 @@ autoreconf -ivf
 	--sysconfdir="%{_sysconfdir}" \
 	--localstatedir="%{_localstatedir}" \
 	--libexecdir="%{_libexecdir}" \
+        --libdir="%{_libdir}" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
@@ -375,12 +377,13 @@ install_go() {
 		# Install files
 		tar -xf "${tmp}/config.tar.gz" -C "${RPM_BUILD_ROOT}%{_libdir}/%{name}/conf.d/"
 		tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
-		mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+		mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "go.d.plugin"
 		rm -rf "${tmp}"
 	fi
 	return 0
 }
 install_go
+install -m 0750 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
 %pre
 

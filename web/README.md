@@ -1,14 +1,14 @@
 # Web dashboards overview
 
-The default port is 19999; for example, to access the dashboard on localhost, use: http://localhost:19999
+The default port is 19999; for example, to access the dashboard on localhost, use: <http://localhost:19999>
 
 To view Netdata collected data you access its **[REST API v1](api/)**.
 
 For our convenience, Netdata provides 2 more layers:
 
-1. The `dashboard.js` javascript library that allows us to design custom dashboards using plain HTML. For information on creating custom dashboards, see **[Custom Dashboards](gui/custom/)** and **[Atlassian Confluence Dashboards](gui/confluence/)**
+1.  The `dashboard.js` javascript library that allows us to design custom dashboards using plain HTML. For information on creating custom dashboards, see **[Custom Dashboards](gui/custom/)** and **[Atlassian Confluence Dashboards](gui/confluence/)**
 
-2. Ready to be used web dashboards that render all the charts a Netdata server maintains.
+2.  Ready to be used web dashboards that render all the charts a Netdata server maintains.
 
 ## Customizing the standard dashboards
 
@@ -25,4 +25,4 @@ To configure your info file set in `netdata.conf`:
    custom dashboard_info.js = your_file_name.js
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

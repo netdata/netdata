@@ -32,26 +32,29 @@ Netdata is a complex system, with many integrations for the various  collectors,
 #### Sponsor a collector
 
 Netdata is all about simplicity and meaningful presentation. A "sponsor" for a collector does the following:
- - Assists the devs with feedback on the charts.
- - Specifies the alarms that would make sense for each metric.
- - When the implementation passes QA, tests the implementation in production.
- - Uses the charts and alarms in his/her day to day work and provides additional feedback.
- - Requests additional improvements as things change (e.g. new versions of an API are available).
+
+-   Assists the devs with feedback on the charts.
+-   Specifies the alarms that would make sense for each metric.
+-   When the implementation passes QA, tests the implementation in production.
+-   Uses the charts and alarms in his/her day to day work and provides additional feedback.
+-   Requests additional improvements as things change (e.g. new versions of an API are available).
 
 #### Sponsor a backend
 
 We already support various [backends](backends) and we intend to support more. A "sponsor" for a backend: 
-- Suggests ways in which the information in Netdata could best be exposed to the particular backend, to facilitate meaningful presentation.
- - When the implementation passes QA, tests the implementation in production.
-- Uses the backend in his/her day to day work and provides additional feedback, after the backend is delivered.
- - Requests additional improvements as things change (e.g. new versions of the backend API are available).
+
+-   Suggests ways in which the information in Netdata could best be exposed to the particular backend, to facilitate meaningful presentation.
+-   When the implementation passes QA, tests the implementation in production.
+-   Uses the backend in his/her day to day work and provides additional feedback, after the backend is delivered.
+-   Requests additional improvements as things change (e.g. new versions of the backend API are available).
 
 #### Sponsor a notification method
 
 Netdata delivers alarms via various [notification methods](health/notifications). A "sponsor" for a notification method:
-- Points the devs to the documentation for the API and identifies any unusual features of interest (e.g. the ability in Slack to send a notification either to a channel or to a user). 
-- Uses the notification method in production and provides feedback.
-- Requests additional improvements as things change (e.g. new versions of the API are available).
+
+-   Points the devs to the documentation for the API and identifies any unusual features of interest (e.g. the ability in Slack to send a notification either to a channel or to a user). 
+-   Uses the notification method in production and provides feedback.
+-   Requests additional improvements as things change (e.g. new versions of the API are available).
 
 ## Experienced Users
 
@@ -74,7 +77,6 @@ Don't be afraid to submit a pull request with your corrections or additions! We 
 We expect most contributions to be for new data collection plugins. You can read about how external plugins work [here](collectors/plugins.d/). Additional instructions are available for [Node.js plugins](collectors/node.d.plugin) and [Python plugins](collectors/python.d.plugin).
 
 Of course we appreciate contributions for any other part of the NetData agent, including the [daemon](daemon), [backends for long term archiving](backends/), innovative ways of using the [REST API](web/api) to create cool [Custom Dashboards](web/gui/custom/) or to include NetData charts in other applications, similarly to what can be done with [Confluence](web/gui/confluence/).
-
 
 ### Contributions Ground Rules
 
@@ -131,16 +133,18 @@ The single most important rule when writing code is this: *check the surrounding
 We use several different languages and have had contributions from several people with different styles. When in doubt, you can check similar existing code. 
 
 For C contributions in particular, we try to respect the [Linux kernel style](https://www.kernel.org/doc/html/v4.10/process/coding-style.html), with the following exceptions:
- - Use 4 space indentation instead of 8
- - We occassionally have multiple statements on a single line (e.g. `if (a) b;`)
- - Allow max line length of 120 chars 
- - Allow opening brace at the end of a function declaration: `function() {`. 
+
+-   Use 4 space indentation instead of 8
+-   We occassionally have multiple statements on a single line (e.g. `if (a) b;`)
+-   Allow max line length of 120 chars 
+-   Allow opening brace at the end of a function declaration: `function() {`. 
 
 ### Your first pull request
 
 There are several guides for pull requests, such as the following:
-- https://thenewstack.io/getting-legit-with-git-and-github-your-first-pull-request/
-- https://github.com/firstcontributions/first-contributions#first-contributions
+
+-   <https://thenewstack.io/getting-legit-with-git-and-github-your-first-pull-request/>
+-   <https://github.com/firstcontributions/first-contributions#first-contributions>
 
 However, it's not always that simple. Our [PR approval process](#pr-approval-process) and the several merges we do every day may cause your fork to get behind the Netdata master. If you worked on something that has changed in the meantime, you will be required to do a git rebase, to bring your fork to the correct state. A very easy to follow guide on how to do it without learning all the intricacies of GitHub can be found [here](https://medium.com/@ruthmpardee/git-fork-workflow-using-rebase-587a144be470)
 
@@ -154,5 +158,4 @@ We also have a series of automated checks running, such as linters to check code
 
 One special type of automated check is the "WIP" check. You may add "[WIP]" to the title of the PR, to tell us that the particular request is "Work In Progress" and should not be merged. You're still not done with it, you created it to get some feedback. When you're ready to get the final approvals and get it merged, just remove the "[WIP]" string from the title of your PR and the "WIP" check will pass.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FCONTRIBUTING&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2FCONTRIBUTING&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
