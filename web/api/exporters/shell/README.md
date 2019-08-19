@@ -1,18 +1,18 @@
 # shell exporter
 
-Shell scripts can now query netdata:
+Shell scripts can now query Netdata:
 
 ```sh
 eval "$(curl -s 'http://localhost:19999/api/v1/allmetrics')"
 ```
 
-after this command, all the netdata metrics are exposed to shell. Check:
+after this command, all the Netdata metrics are exposed to shell. Check:
 
 ```sh
 # source the metrics
 eval "$(curl -s 'http://localhost:19999/api/v1/allmetrics')"
 
-# let's see if there are variables exposed by netdata for system.cpu
+# let's see if there are variables exposed by Netdata for system.cpu
 set | grep "^NETDATA_SYSTEM_CPU"
 
 NETDATA_SYSTEM_CPU_GUEST=0
@@ -50,7 +50,7 @@ user  0m0,000s
 sys   0m0,007s
 
 # it is...
-# 0.07 seconds for curl to be loaded, connect to netdata and fetch the response back...
+# 0.07 seconds for curl to be loaded, connect to Netdata and fetch the response back...
 ```
 
 The `_VISIBLETOTAL` variable sums up all the dimensions of each chart.
@@ -63,4 +63,4 @@ NETDATA_${chart_id^^}_${dimension_id^^}="${value}"
 
 The value is rounded to the closest integer, since shell script cannot process decimal numbers.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fexporters%2Fshell%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fapi%2Fexporters%2Fshell%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

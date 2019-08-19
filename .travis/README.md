@@ -54,7 +54,7 @@ At this stage, basically, we build :-)
 We do a baseline check of our build artifacts to guarantee they are not broken
 Briefly our activities include:
 - Verify docker builds successfully
-- Run the standard netdata installer, to make sure we build & run properly
+- Run the standard Netdata installer, to make sure we build & run properly
 - Do the same through 'make dist', as this is our stable channel for our kickstart files
 
 ## Artifacts validation
@@ -66,7 +66,7 @@ Briefly we currently evaluate the following activities:
 - Basic software unit testing
 - Non containerized build and install on ubuntu 14.04
 - Non containerized build and install on ubuntu 18.04
-- Running the full netdata lifecycle (install, update, uninstall) on ubuntu 18.04
+- Running the full Netdata lifecycle (install, update, uninstall) on ubuntu 18.04
 - Build and install on CentOS 6
 - Build and install on CentOS 7
 (More to come)

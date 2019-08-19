@@ -168,6 +168,8 @@ USAGE: ${PROGRAM} [options]
   --enable-backend-prometheus-remote-write Enable Prometheus remote write backend. Default: enable it when libprotobuf and
                              libsnappy are available.
   --disable-backend-prometheus-remote-write
+  --enable-backend-mongodb   Enable MongoDB backend. Default: enable it when libmongoc is available.
+  --disable-backend-mongodb
   --enable-lto               Enable Link-Time-Optimization. Default: enabled
   --disable-lto
   --disable-x86-sse          Disable SSE instructions. By default SSE optimizations are enabled.
@@ -218,6 +220,8 @@ while [ -n "${1}" ]; do
 		"--disable-backend-kinesis") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-kinesis/} --disable-backend-kinesis";;
 		"--enable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-prometheus-remote-write/} --enable-backend-prometheus-remote-write";;
 		"--disable-backend-prometheus-remote-write") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-prometheus-remote-write/} --disable-backend-prometheus-remote-write";;
+		"--enable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-backend-mongodb/} --enable-backend-mongodb";;
+		"--disable-backend-mongodb") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-backend-mongodb/} --disable-backend-mongodb";;
 		"--enable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-lto/} --enable-lto";;
 		"--disable-lto") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-lto/} --disable-lto";;
 		"--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-x86-sse/} --disable-x86-sse";;
@@ -396,6 +400,7 @@ run ./configure \
 	--sysconfdir="${NETDATA_PREFIX}/etc" \
 	--localstatedir="${NETDATA_PREFIX}/var" \
 	--libexecdir="${NETDATA_PREFIX}/usr/libexec" \
+	--libdir="${NETDATA_PREFIX}/usr/lib" \
 	--with-zlib \
 	--with-math \
 	--with-user=netdata \
@@ -774,7 +779,7 @@ fi
 
 install_go() {
 	# When updating this value, ensure correct checksums in packaging/go.d.checksums
-	GO_PACKAGE_VERSION="v0.7.0"
+	GO_PACKAGE_VERSION="$(cat packaging/go.d.version)"
 	ARCH_MAP=(
 		'i386::386'
 		'i686::386'
@@ -800,7 +805,7 @@ install_go() {
 			fi
 		done
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
-		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}"
+		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 
 		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
 
@@ -833,11 +838,13 @@ install_go() {
 		run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
 		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
-		run mv "${tmp}/$GO_PACKAGE_BASENAME" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
+		run mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		if [ "${UID}" -eq 0 ]; then
 			run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
 		fi
 		run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"
+		rm -rf "${tmp}"
 	fi
 	return 0
 }

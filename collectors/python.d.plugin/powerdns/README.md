@@ -4,67 +4,78 @@ Module monitor powerdns performance and health metrics.
 
 Powerdns charts:
 
-1. **Queries and Answers**
- * udp-queries
- * udp-answers
- * tcp-queries
- * tcp-answers
+1.  **Queries and Answers**
 
-2. **Cache Usage**
- * query-cache-hit
- * query-cache-miss
- * packetcache-hit
- * packetcache-miss
+    -   udp-queries
+    -   udp-answers
+    -   tcp-queries
+    -   tcp-answers
 
-3. **Cache Size**
- * query-cache-size
- * packetcache-size
- * key-cache-size
- * meta-cache-size
+2.  **Cache Usage**
 
-4. **Latency**
- * latency
+    -   query-cache-hit
+    -   query-cache-miss
+    -   packetcache-hit
+    -   packetcache-miss
+
+3.  **Cache Size**
+
+    -   query-cache-size
+    -   packetcache-size
+    -   key-cache-size
+    -   meta-cache-size
+
+4.  **Latency**
+
+    -   latency
 
  Powerdns Recursor charts:
 
- 1. **Questions In**
- * questions
- * ipv6-questions
- * tcp-queries
+1.  **Questions In**
 
-2. **Questions Out**
- * all-outqueries
- * ipv6-outqueries
- * tcp-outqueries
- * throttled-outqueries
+    -   questions
+    -   ipv6-questions
+    -   tcp-queries
 
-3. **Answer Times**
- * answers-slow
- * answers0-1
- * answers1-10
- * answers10-100
- * answers100-1000
+2.  **Questions Out**
 
-4. **Timeouts**
- * outgoing-timeouts
- * outgoing4-timeouts
- * outgoing6-timeouts
+    -   all-outqueries
+    -   ipv6-outqueries
+    -   tcp-outqueries
+    -   throttled-outqueries
 
-5. **Drops**
- * over-capacity-drops
+3.  **Answer Times**
 
-6. **Cache Usage**
- * cache-hits
- * cache-misses
- * packetcache-hits
- * packetcache-misses
+    -   answers-slow
+    -   answers0-1
+    -   answers1-10
+    -   answers10-100
+    -   answers100-1000
 
-7. **Cache Size**
- * cache-entries
- * packetcache-entries
- * negcache-entries
+4.  **Timeouts**
 
-### configuration
+    -   outgoing-timeouts
+    -   outgoing4-timeouts
+    -   outgoing6-timeouts
+
+5.  **Drops**
+
+    -   over-capacity-drops
+
+6.  **Cache Usage**
+
+    -   cache-hits
+    -   cache-misses
+    -   packetcache-hits
+    -   packetcache-misses
+
+7.  **Cache Size**
+
+    -   cache-entries
+    -   packetcache-entries
+    -   negcache-entries
+
+## configuration
 
 ```yaml
 local:
@@ -76,4 +87,4 @@ local:
 
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fpowerdns%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fpowerdns%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
