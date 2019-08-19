@@ -1,9 +1,12 @@
 /* eslint-disable max-len */
-import React, { useLayoutEffect, useRef } from "react"
+import React, {
+  useLayoutEffect, useRef, useState,
+} from "react"
 import classNames from "classnames"
 import Dygraph from "dygraphs"
 import "dygraphs/src/extras/smooth-plotter"
 
+import { NetdataDygraph } from "types/vendor-overrides"
 import { useDateTime } from "utils/date-time"
 import { Attributes } from "../../utils/transformDataAttributes"
 import {
@@ -222,7 +225,10 @@ interface Props {
   colors: {
     [key: string]: string
   }
+  legendFormatValue: ((v: number) => string) | undefined
   orderedColors: string[]
+
+  setMinMax: (minMax: [number, number]) => void
 }
 export const DygraphChart = ({
   attributes,
@@ -231,10 +237,12 @@ export const DygraphChart = ({
   chartLibrary,
   // colors,
   chartUuid,
+  legendFormatValue,
   orderedColors,
+
+  setMinMax,
 }: Props) => {
   const { xAxisTimeString } = useDateTime()
-  const chartElement = useRef<HTMLDivElement>(null)
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const hiddenLabelsElementId = `${chartUuid}-hidden-labels-id`
 
@@ -248,12 +256,33 @@ export const DygraphChart = ({
     xAxisTimeString,
   })
 
+  const chartElement = useRef<HTMLDivElement>(null)
+  const [dygraphInstance, setDygraphInstance] = useState<Dygraph | null>(null)
+
   useLayoutEffect(() => {
-    if (chartElement && chartElement.current) {
-      // eslint-disable-next-line no-new
-      new Dygraph((chartElement.current), chartData.result.data, dygraphOptions)
+    if (chartElement && chartElement.current && !dygraphInstance) {
+      // todo if any flickering will happen, show the dygraph chart only when it's
+      // updated with proper formatting (toggle visibility with css)
+      const instance = new Dygraph((chartElement.current), chartData.result.data, dygraphOptions)
+      setDygraphInstance(instance)
+
+      const extremes = (instance as NetdataDygraph).yAxisExtremes()[0]
+      setMinMax(extremes)
     }
-  }, [chartData.result.data, dygraphOptions])
+  }, [chartData.result.data, dygraphInstance, dygraphOptions, setMinMax])
+
+  useLayoutEffect(() => {
+    if (dygraphInstance && legendFormatValue) {
+      dygraphInstance.updateOptions({
+        axes: {
+          y: {
+            axisLabelFormatter: (y: Date | number) => legendFormatValue(y as number),
+          },
+        },
+      })
+    }
+  })
+
   const chartElemId = `${chartLibrary}-${chartUuid}-chart`
   const { hasLegend } = chartSettings
   return (

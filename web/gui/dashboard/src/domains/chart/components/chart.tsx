@@ -1,5 +1,5 @@
 import { __, forEachObjIndexed, prop } from "ramda"
-import React, { useEffect, useLayoutEffect } from "react"
+import React, { useEffect, useLayoutEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
 import { requestCommonColorsAction } from "domains/global/actions"
@@ -68,6 +68,8 @@ export const Chart = ({
   const shouldDisplayToolbox = hasLegend(attributes)
     && window.NETDATA.options.current.legend_toolbox
 
+  const [minMax, setMinMax] = useState<[number, number] | null>(null)
+
   const dispatch = useDispatch()
   useEffect(() => {
     dispatch(requestCommonColorsAction({
@@ -107,6 +109,11 @@ export const Chart = ({
   }
   const orderedColors = chartData.dimension_names.map(prop(__, colors))
 
+  let legendFormatValue
+  if (minMax) {
+    legendFormatValue = (a: number) => `${a} ${Math.floor(minMax[1])}`
+  }
+
   return (
     <>
       <AbstractChart
@@ -116,7 +123,9 @@ export const Chart = ({
         chartLibrary={chartLibrary}
         colors={colors}
         chartUuid={chartUuid}
+        legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
+        setMinMax={setMinMax}
       />
       {hasLegend && (
         <ChartLegend
