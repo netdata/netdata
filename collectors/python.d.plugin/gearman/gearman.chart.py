@@ -6,14 +6,11 @@
 
 from bases.FrameworkServices.SocketService import SocketService
 from copy import deepcopy
-import collections
-
-priority = 60500
 
 
 CHARTS = {
     'total_workers': {
-        'options': ['total', 'Total Workers', 'Workers', 'Total Workers', 'gearman.total', 'line'],
+        'options': [None, 'Total Jobs', 'Jobs', 'Total Jobs', 'gearman.total_jobs', 'line'],
         'lines': [
             ['total_pending', 'Pending', 'absolute'],
             ['total_running', 'Running', 'absolute'],
@@ -24,7 +21,7 @@ CHARTS = {
 
 def job_chart_template(job_name):
     return {
-        'options': [job_name, job_name, 'Workers', 'Jobs', 'gearman.job', 'stacked'],
+        'options': [None, job_name, 'Jobs', 'Activity by Job', 'gearman.single_job', 'stacked'],
         'lines': [
             ['{0}_pending'.format(job_name), 'Pending', 'absolute'],
             ['{0}_idle'.format(job_name), 'Idle', 'absolute'],
@@ -58,6 +55,11 @@ def parse_worker_data(job):
         'metrics': job_metrics,
     }
 
+
+class GearmanReadException(BaseException):
+    pass
+
+
 class Service(SocketService):
     def __init__(self, configuration=None, name=None):
         super(Service, self).__init__(configuration=configuration, name=name)
@@ -81,12 +83,13 @@ class Service(SocketService):
         :return: dict
         """
 
-        active_jobs = self.get_active_jobs()
-        found_jobs, job_data = self.process_jobs(active_jobs)
-        self.remove_stale_jobs(found_jobs)
-
-        if job_data:
+        try:
+            active_jobs = self.get_active_jobs()
+            found_jobs, job_data = self.process_jobs(active_jobs)
+            self.remove_stale_jobs(found_jobs)
             return job_data
+        except GearmanReadException:
+            return None
 
     def get_active_jobs(self):
         active_jobs = []
@@ -106,18 +109,30 @@ class Service(SocketService):
 
     def get_worker_data(self):
         """
-        Split the data returned from Gearman into a list of lists
+        Split the data returned from Gearman
+        into a list of lists
+
+        This returns the same output that you
+        would get from a gearadmin --status
+        command.
+
+        Example output returned from
+        _get_raw_data():
+        generic_worker2 78      78      500
+        generic_worker3 0       0       760
+        generic_worker1 0       0       500
+
         :return: list
         """
 
         try:
             raw = self._get_raw_data()
         except (ValueError, AttributeError):
-            return []
+            raise GearmanReadException()
 
         if raw is None:
             self.debug("Gearman returned no data")
-            return []
+            raise GearmanReadException()
 
         job_lines = raw.splitlines()[:-1]
         job_lines = [job.split() for job in sorted(job_lines)]
@@ -129,7 +144,11 @@ class Service(SocketService):
 
     def process_jobs(self, active_jobs):
 
-        output = collections.defaultdict(int)
+        output = {
+            'total_pending': 0,
+            'total_idle': 0,
+            'total_running': 0,
+        }
         found_jobs = set()
 
         for parsed_job in active_jobs:
@@ -207,5 +226,3 @@ class Service(SocketService):
 
         remove_chart(job_name)
         self.active_jobs.remove(job_name)
-
-
