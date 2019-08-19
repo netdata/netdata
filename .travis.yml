@@ -285,7 +285,7 @@ jobs:
         depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
       before_deploy:
-        - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
+        - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
       deploy:
         - provider: packagecloud
           repository: "${DEPLOY_REPO}"
@@ -389,7 +389,7 @@ jobs:
         depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
       before_deploy:
-        - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
+        - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
       deploy:
         - provider: packagecloud
           repository: "${DEPLOY_REPO}"
