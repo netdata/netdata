@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 %global contentdir %{_datadir}/netdata
+%global version @PACKAGE_VERSION@
 
 #TODO: Temporary fix for the build-id error during go.d plugin set up
 %global _missing_build_ids_terminate_build 0
@@ -82,7 +83,7 @@ fi \
 
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
-Version:	@PACKAGE_VERSION@
+Version:	%{version}
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
@@ -489,7 +490,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 Summary: The Common Unix Printing System plugin for netdata
 Group: Applications/System
 Requires: cups
-Requires: netdata
+Requires: netdata = %{version}
 
 %description plugin-cups
  This is the Common Unix Printing System plugin for the netdata daemon.
