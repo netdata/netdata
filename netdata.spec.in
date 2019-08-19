@@ -277,6 +277,10 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
+# Install cups.plugin
+install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
+
+# ###########################################################
 # Install registry directory
 install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/custom-plugins.d"
@@ -482,6 +486,17 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
+
+%package plugin-cups
+Summary: The Common Unix Printing System plugin for netdata
+Group: Applications/System
+
+%description plugin-cups
+ This is the Common Unix Printing System plugin for the netdata daemon.
+Use this plugin to enable metrics collection from cupsd, the daemon running when CUPS is enabled on the system
+
+%files plugin-cups
+%attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 
 
 %changelog
