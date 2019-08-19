@@ -105,9 +105,10 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
         alarms++;
     }
-    buffer_sprintf(wb, "\n\t\t\t}");
 
-    buffer_sprintf(wb, "\n\t\t}");
+    buffer_sprintf(wb,
+            "\n\t\t\t}\n\t\t}"
+    );
 
     rrdset_unlock(st);
 }
