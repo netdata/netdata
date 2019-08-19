@@ -60,6 +60,10 @@ export const Chart = ({
 }: Props) => {
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
+  const {
+    // todo take into account units_current from unitsConversionSetup()
+    units = chartDetails.units,
+  } = attributes
 
   const shouldDisplayToolbox = hasLegend(attributes)
     && window.NETDATA.options.current.legend_toolbox
@@ -121,6 +125,7 @@ export const Chart = ({
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}
           colors={colors}
+          units={units}
         />
       )}
       {shouldDisplayToolbox && (

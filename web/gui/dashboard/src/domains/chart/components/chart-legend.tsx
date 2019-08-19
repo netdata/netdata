@@ -13,6 +13,7 @@ interface Props {
   colors: {
     [key: string]: string
   }
+  units: string
 }
 
 export const legendPluginModuleString = (withContext: boolean, chartDetails: ChartDetails) => {
@@ -56,11 +57,12 @@ const legendResolutionTooltip = (chartData: ChartData, chartDetails: ChartDetail
 }
 
 export const ChartLegend = ({
-  attributes,
+  // attributes,
   chartData,
   chartDetails,
   chartLibrary,
   colors,
+  units,
 }: Props) => {
   const netdataLast = chartData.last_entry * 1000
   // todo lift before/after to the state (when doing highlighting/pan/zoom)
@@ -74,10 +76,6 @@ export const ChartLegend = ({
 
   const legendDate = new Date(viewBefore)
 
-  const {
-    // todo take into account units_current from unitsConversionSetup()
-    units = chartDetails.units,
-  } = attributes
   // todo make a possibility to add chartLegened when there's not chartData
   // (if this situation is possible)
 
