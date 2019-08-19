@@ -2328,7 +2328,7 @@ netdataDashboard.context = {
     },
 
     'spigotmc.users': {
-        info: 'THe number of currently connect users on the monitored Spigot server.'
+        info: 'The number of currently connect users on the monitored Spigot server.'
     },
 
     'unbound.queries': {
