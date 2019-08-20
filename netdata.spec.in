@@ -276,10 +276,6 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
-# Install cups.plugin
-install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
-
-# ###########################################################
 # Install registry directory
 install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/custom-plugins.d"
@@ -499,8 +495,9 @@ Use this plugin to enable metrics collection from cupsd, the daemon running when
 %files plugin-cups
 %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 
-
 %changelog
+* Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdat.acloud> - 0.0.0-8
+- Split CUPS functionality on separate package
 * Fri Jun 28 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-7
 - Raise the path overrides to the spec file level, not just the configure.
 - Adjust tighter permissions on some folders, based on what we did on our installer
