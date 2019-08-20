@@ -508,8 +508,8 @@ class Plugin:
                 self.log.warning("[{0}] error on loading source : {1}, skipping it".format(mod_name, repr(error)))
                 continue
 
-            if src.service() is None:
-                self.log.warning("[{0}] has no Service object, skipping it".format(mod_name))
+            if not (src.service() and callable(src.service())):
+                self.log.warning("[{0}] has no callable Service object, skipping it".format(mod_name))
                 continue
 
             if src.is_disabled_by_default() and not self.config.is_module_explicitly_enabled(mod_name):
