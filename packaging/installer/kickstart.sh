@@ -10,9 +10,10 @@
 # bash <(curl -Ss https://my-netdata.io/kickstart.sh) all
 #
 # Other options:
-#  --dont-wait       do not prompt for user input
-#  --non-interactive do not prompt for user input
-#  --no-updates      do not install script for daily updates
+#  --dont-wait                do not prompt for user input
+#  --non-interactive          do not prompt for user input
+#  --no-updates               do not install script for daily updates
+#  --local-tarball-override   set the full path of the desired tarball to run install with
 #
 # This script will:
 #
@@ -163,6 +164,11 @@ download() {
 }
 
 set_tarball_urls() {
+	if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then
+		progress "Not fetching remote tarballs, local override was given"
+		return
+	fi
+
 	if [ "$1" = "stable" ]; then
 		local latest
 		# Simple version
@@ -293,6 +299,21 @@ while [ -n "${1}" ]; do
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
 		shift 1
+	elif [ "${1}" == "--local-tarball-override" ]; then
+		shift 1
+		if [ -z "${1}" ]; then
+			fatal "Option --local-tarball-override requires extra information. The desired tarball full filename is needed"
+		fi
+
+		NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
+		shift 1
+
+		if [ -z "${1}" ]; then
+			fatal "Option --local-tarball-override requires extra information. The desired tarball and the checksum file"
+		fi
+
+		NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
+		shift 1
 	else
 		break
 	fi
@@ -311,10 +332,17 @@ dependencies
 # ---------------------------------------------------------------------------------------------------------------------
 # download netdata package
 
-set_tarball_urls "${RELEASE_CHANNEL}"
+if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then
+	set_tarball_urls "${RELEASE_CHANNEL}"
 
-download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
-download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
+	download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
+	download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
+else
+	progress "Installation sources were given as input, running installation using \"${NETDATA_LOCAL_TARBALL_OVERRIDE}\""
+	run mv "${NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM}" "${TMPDIR}/sha256sum.txt"
+	run mv "${NETDATA_LOCAL_TARBALL_OVERRIDE}" "${TMPDIR}/netdata-latest.tar.gz"
+fi
+
 if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
 	fatal "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${TMPDIR}"
 fi
