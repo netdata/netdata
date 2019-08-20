@@ -67,7 +67,7 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--local-tarball-override`: Useful for offline installations. Pass four file paths: the netdata tarball, the checksum file, the go.d plugin tarball and the go.d plugin config tarball to force kickstart run the process using those files.
+-   `--local-tarball-override`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
 
 Example using all the above parameters:
 
