@@ -530,7 +530,8 @@ class Plugin:
 
                 was_previously_active = job_statuses and job_statuses.has(job.module_name, job.real_name)
                 if was_previously_active and job.autodetection_retry == 0:
-                    self.log.debug('{0}[{1}] was previously active, applying recovering settings'.format(job.module_name, job.real_name))
+                    self.log.debug('{0}[{1}] was previously active, applying recovering settings'.format(
+                        job.module_name, job.real_name))
                     job.checks = 11
                     job.autodetection_retry = 30
 
