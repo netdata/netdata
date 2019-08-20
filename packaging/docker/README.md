@@ -12,7 +12,7 @@
 
 ## Limitations
 
-Running Netdata in a container is good for an internal network or to quickly analyze a host. 
+Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling Netdata easy.
 
 For monitoring the whole host, this can limit its capabilities. 
 Some data like the host OS performance or status is not accessible or not as detailed as when running Netdata on the host.
