@@ -225,7 +225,7 @@ interface Props {
   colors: {
     [key: string]: string
   }
-  legendFormatValue: ((v: number) => string) | undefined
+  legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
 
   setMinMax: (minMax: [number, number]) => void

@@ -14,7 +14,7 @@ interface Props {
     [key: string]: string
   }
   chartUuid: string
-  legendFormatValue: ((v: number) => string) | undefined
+  legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
   setMinMax: (minMax: [number, number]) => void
 }
