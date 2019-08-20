@@ -132,19 +132,19 @@ def available_modules():
 AVAILABLE_MODULES = available_modules()
 
 JOB_BASE_CONF = {
-        'update_every': os.getenv(ENV_NETDATA_UPDATE_EVERY, 1),
-        'priority': 60000,
-        'autodetection_retry': 0,
-        'chart_cleanup': 10,
-        'penalty': True,
-        'name': str(),
+    'update_every': os.getenv(ENV_NETDATA_UPDATE_EVERY, 1),
+    'priority': 60000,
+    'autodetection_retry': 0,
+    'chart_cleanup': 10,
+    'penalty': True,
+    'name': str(),
 }
 
 PLUGIN_BASE_CONF = {
-        'enabled': True,
-        'default_run': True,
-        'gc_run': True,
-        'gc_interval': 300,
+    'enabled': True,
+    'default_run': True,
+    'gc_run': True,
+    'gc_interval': 300,
 }
 
 
