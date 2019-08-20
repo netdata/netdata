@@ -8,6 +8,15 @@
 
 **Merged pull requests:**
 
+- netdata/packaging: Align libdir in all configure commands [\#6682](https://github.com/netdata/netdata/pull/6682) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- spigotmc module: :pencil2: fix typos. [\#6680](https://github.com/netdata/netdata/pull/6680) ([Cat7373](https://github.com/Cat7373))
+- netdata/packaging: \[ci skip\] Correlate configure command [\#6678](https://github.com/netdata/netdata/pull/6678) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging: Add auto-generation of packages for nightly [\#6675](https://github.com/netdata/netdata/pull/6675) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- add CHANGELOG.md to .remarkignore [\#6671](https://github.com/netdata/netdata/pull/6671) ([prhomhyse](https://github.com/prhomhyse))
+- netdata/packaging: separately identify dependency resolution for HTTPS and DB engine [\#6670](https://github.com/netdata/netdata/pull/6670) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Bugfix 931843 1 [\#6667](https://github.com/netdata/netdata/pull/6667) ([sunflowerbofh](https://github.com/sunflowerbofh))
+- Fix Markdown Lint warnings [\#6664](https://github.com/netdata/netdata/pull/6664) ([prhomhyse](https://github.com/prhomhyse))
+- Remove texts inside tests/Makefile [\#6660](https://github.com/netdata/netdata/pull/6660) ([thiagoftsm](https://github.com/thiagoftsm))
 - Prometheus version update [\#6652](https://github.com/netdata/netdata/pull/6652) ([prhomhyse](https://github.com/prhomhyse))
 - Accept \<\> around links in markdown [\#6646](https://github.com/netdata/netdata/pull/6646) ([cakrit](https://github.com/cakrit))
 - netdata/installer: Fix error running kickstart as a non-privileged user [\#6642](https://github.com/netdata/netdata/pull/6642) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
