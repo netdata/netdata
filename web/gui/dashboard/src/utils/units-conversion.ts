@@ -10,6 +10,7 @@ interface ScalableUnits {
     [unitName: string]: number
   }
 }
+
 const scalableUnits: ScalableUnits = {
   "packets/s": {
     pps: 1,
@@ -158,7 +159,7 @@ const convertibleUnits: ConvertibleUnits = {
       },
       convert(seconds: number) {
         // eslint-disable-next-line no-use-before-define
-        return unitsConversion.seconds2time(seconds)
+        return unitsConversionCreator.seconds2time(seconds)
       },
     },
   },
@@ -231,7 +232,7 @@ interface Latest {
     units: string
   }
 }
-export const unitsConversion = {
+export const unitsConversionCreator = {
   // todo lift the state
   keys: {} as Keys, // keys for data-common-units
   latest: {} as Latest, // latest selected units for data-common-units

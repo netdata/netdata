@@ -91,7 +91,7 @@
 // *** src/dashboard.js/utils.js
 
 import { updateChartDataAction, updateChartDetailsAction } from './domains/chart/actions';
-import { unitsConversion } from './utils/units-conversion';
+import { unitsConversionCreator } from './utils/units-conversion';
 import { seconds4human } from './domains/chart/utils/seconds4human';
 import { setTimezoneAction } from './domains/global/actions';
 
@@ -6556,7 +6556,8 @@ let chartState = function (element, chartIndex) {
             _unitsConversionLastMin = min;
             _unitsConversionLastMax = max;
 
-            _unitsConversion = unitsConversion.get(this.uuid, min, max, this.units, this.units_desired, this.units_common, function (units) {
+            // NETDATA.unitsConversion.get
+            _unitsConversion = unitsConversionCreator.get(this.uuid, min, max, this.units, this.units_desired, this.units_common, function (units) {
                 // console.log('switching units from ' + that.units.toString() + ' to ' + units.toString());
                 that.units_current = units;
                 that.legendSetUnitsString(that.units_current);
@@ -8655,6 +8656,7 @@ NETDATA.globalReset = function () {
     NETDATA.commonMax.globalReset();
     NETDATA.commonColors.globalReset();
     NETDATA.options.targets = [];
+    unitsConversionCreator.globalReset();
     NETDATA.parseDom();
     NETDATA.unpause();
 };
