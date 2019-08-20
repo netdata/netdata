@@ -6,7 +6,10 @@
 
 ## Limitations
 
-Running Netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running Netdata on the host.
+Running Netdata in a container is good for an internal network or to quickly analyze a host. 
+
+For monitoring the whole host, this can limit its capabilities. 
+Some data like the host OS performance or status is not accessible or not as detailed as when running Netdata on the host.
 
 ## Package scrambling in runtime (x86_64 only)
 
@@ -17,8 +20,6 @@ For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
 ## Run Netdata with the docker command
 
 Quickly start Netdata with the `docker` command. Netdata is then available at <http://host:19999>
-
-This is good for an internal network or to quickly analyze a host.
 
 ```bash
 docker run -d --name=netdata \
