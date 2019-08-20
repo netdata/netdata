@@ -103,7 +103,6 @@ def install_common_dependendencies(container):
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
-        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "protobuf-c-devel"])
@@ -123,7 +122,6 @@ def install_common_dependendencies(container):
     else:
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "gcc-c++"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups-devel"])
-        run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "cups"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "freeipmi-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "json-c-devel"])
         run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "snappy-devel"])
