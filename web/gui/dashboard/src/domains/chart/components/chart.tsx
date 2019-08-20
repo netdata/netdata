@@ -139,7 +139,7 @@ export const Chart = ({
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}
           colors={colors}
-          units={units}
+          unitsCurrent={unitsCurrent}
         />
       )}
       {shouldDisplayToolbox && (

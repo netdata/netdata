@@ -13,7 +13,7 @@ interface Props {
   colors: {
     [key: string]: string
   }
-  units: string
+  unitsCurrent: string
 }
 
 export const legendPluginModuleString = (withContext: boolean, chartDetails: ChartDetails) => {
@@ -62,7 +62,7 @@ export const ChartLegend = ({
   chartDetails,
   chartLibrary,
   colors,
-  units,
+  unitsCurrent,
 }: Props) => {
   const netdataLast = chartData.last_entry * 1000
   // todo lift before/after to the state (when doing highlighting/pan/zoom)
@@ -103,7 +103,7 @@ export const ChartLegend = ({
         {window.NETDATA.dateTime.localeTimeString(legendDate)}
       </span>
       <br />
-      <span className="netdata-legend-title-units">{units}</span>
+      <span className="netdata-legend-title-units">{unitsCurrent}</span>
       <br />
       {/* perfect_scroller */}
       <div className="netdata-legend-series-content">
