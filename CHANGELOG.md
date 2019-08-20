@@ -28,6 +28,7 @@
 -  Change "netdata" to "Netdata" in all docs [\#6621](https://github.com/netdata/netdata/pull/6621) ([joelhans](https://github.com/joelhans))
 - netdata: Add cosmix as codeowner, wherever cakrit is [\#6618](https://github.com/netdata/netdata/pull/6618) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mysql: do not remove `slave\_status` from queries in module [\#6617](https://github.com/netdata/netdata/pull/6617) ([ilyam8](https://github.com/ilyam8))
+- Add alarm variables to the response of chart and data \(\#6054\) [\#6615](https://github.com/netdata/netdata/pull/6615) ([alpes214](https://github.com/alpes214))
 - Better system OS detection for RHEL6 and Mac OS X [\#6612](https://github.com/netdata/netdata/pull/6612) ([dex4er](https://github.com/dex4er))
 - update package version requirements for LZ4 and libuv [\#6607](https://github.com/netdata/netdata/pull/6607) ([mfundul](https://github.com/mfundul))
 - netdata/installer: do not enable netdata, if it was previously disabled [\#6606](https://github.com/netdata/netdata/pull/6606) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
