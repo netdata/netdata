@@ -15,7 +15,7 @@
 Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling Netdata easy.
 
 For monitoring the whole host, running Netdata in a container can limit its capabilities. 
-Some data like the host OS performance or status is not accessible or not as detailed as when running Netdata on the host.
+Some data, like the host OS performance or status, is not accessible or not as detailed in a container as when running Netdata directly on the host.
 A way around this is to provide special mounts to the Docker container so that Netdata can get visibility on host OS information like `/sys` and `/proc` folders or even `/etc/group` and shadow files.
 
 ## Package scrambling in runtime (x86_64 only)
