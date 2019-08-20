@@ -137,7 +137,7 @@ Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#e
 
 ## Install Netdata using Docker Compose with SSL/TLS enabled HTTP Proxy
 
-For a permanent installation on a public server, you should [secure the Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
+For a permanent installation on a public server, you should [secure the Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
 
