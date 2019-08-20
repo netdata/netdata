@@ -170,8 +170,6 @@ services:
 
 You can restrict access by following [official caddy guide](https://caddyserver.com/docs/basicauth) and adding lines to Caddyfile.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
-
 ## Publish a test image to your own repository
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
@@ -181,7 +179,7 @@ You may either use the command line tools available or take advantage of our Tra
 
 The script `packaging/docker/build-test.sh` can be used to create an image and upload it to a repository of your choosing. 
 
-```
+```bash
 Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PWD> [-s]
 	-s skip build, just push the image
 Builds an amd64 image and pushes it to the docker hub repository REPOSITORY
@@ -193,7 +191,7 @@ Example:
 
 We get a local copy of the Helm chart at <https://github.com/netdata/helmchart>. We modify `values.yaml` to have the following:
 
-```
+```yaml
 image:
   repository: cakrit/netdata-prs
   tag: PR5576
@@ -202,7 +200,7 @@ image:
 
 We check out PR5576 and run the following:
 
-```
+```bash
 ./packaging/docker/build-test.sh -r cakrit/netdata-prs -v PR5576 -u cakrit -p 'XXX'
 ```
 
@@ -234,3 +232,5 @@ Once you have contacted the Netdata owners to setup you up on Github and Travis,
     -   COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN variables to enable Travis to submit your code for analysis to Coverity.
 
 Having followed these instructions, your forked repository should be all set up for Travis Integration, happy testing!
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
