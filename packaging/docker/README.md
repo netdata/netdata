@@ -4,12 +4,19 @@
 >
 > Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with <https://github.com/multiarch> naming), so **`armv7hf` is not updated** either.
 
+## Prerequisites
+
+-   [Docker](https://docs.docker.com/install/#server)
+-   [Docker Compose](https://docs.docker.com/compose/install/)
+-   Domain configured in DNS pointing to host.
+
 ## Limitations
 
 Running Netdata in a container is good for an internal network or to quickly analyze a host. 
 
 For monitoring the whole host, this can limit its capabilities. 
 Some data like the host OS performance or status is not accessible or not as detailed as when running Netdata on the host.
+A way around this is to provide special mounts to the Docker container so that Netdata can get visibility on host OS information like `/sys` and `/proc` folders or even `/etc/group` and shadow files.
 
 ## Package scrambling in runtime (x86_64 only)
 
@@ -66,6 +73,30 @@ Deploy a Docker socket proxy that accepts and filters out requests using somethi
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
 
+Below is [an example repository (and image)](https://github.com/Tecnativa/docker-socket-proxy) that provides a proxy to the socket.
+
+You run the Docker Socket Proxy in its own Docker Compose file and leave it on a private network that you can add to other services that require access.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    ports:
+      - 19999:19999
+    environment:
+      - DOCKER_HOST=proxy:2375
+  proxy:
+    image: tecnativa/docker-socket-proxy
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+
+```
+**Note:** Replace `2375` with the port of your proxy.
+
 #### Giving group access to the Docker socket (less safe)
 
 **Important Note**: You should seriously consider the necessity of activating this option,
@@ -88,10 +119,7 @@ grep docker /etc/group | cut -d ':' -f 3
 as it grants to the `netdata` user access to the privileged socket connection of docker service and therefore your whole machine.
 
 ```yaml
-
-
-
-: '3'
+version: '3'
 services:
   netdata:
     image: netdata/netdata
@@ -107,21 +135,15 @@ services:
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide [Netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address Netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
-## Install Netdata using Docker Compose with SSL/TLS enabled http proxy
+## Install Netdata using Docker Compose with SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you should [secure the Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install netdata with an SSL reverse proxy and basic authentication.
 
 You can use the following docker-compose.yml and Caddyfile files to run Netdata with Docker. Replace the Domains and email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
 
-### Prerequisites
-
--   [Docker](https://docs.docker.com/install/#server)
--   [Docker Compose](https://docs.docker.com/compose/install/)
--   Domain configured in DNS pointing to host.
-
 ### Caddyfile
 
-This file needs to be placed in /opt with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
+This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
 
 ```caddyfile
 netdata.example.org {
