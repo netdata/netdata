@@ -32,6 +32,7 @@ static struct {
         , {"match-ids"       , 0    , RRDR_OPTION_MATCH_IDS}
         , {"match_names"     , 0    , RRDR_OPTION_MATCH_NAMES}
         , {"match-names"     , 0    , RRDR_OPTION_MATCH_NAMES}
+        , {"showcustomvars"  , 0    , RRDR_OPTION_CUSTOM_VARS}
         , {                  NULL, 0, 0}
 };
 
