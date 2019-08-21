@@ -8,6 +8,15 @@
 
 **Merged pull requests:**
 
+- netdata/packaging: Align libdir in all configure commands [\#6682](https://github.com/netdata/netdata/pull/6682) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- spigotmc module: :pencil2: fix typos. [\#6680](https://github.com/netdata/netdata/pull/6680) ([Cat7373](https://github.com/Cat7373))
+- netdata/packaging: \[ci skip\] Correlate configure command [\#6678](https://github.com/netdata/netdata/pull/6678) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging: Add auto-generation of packages for nightly [\#6675](https://github.com/netdata/netdata/pull/6675) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- add CHANGELOG.md to .remarkignore [\#6671](https://github.com/netdata/netdata/pull/6671) ([prhomhyse](https://github.com/prhomhyse))
+- netdata/packaging: separately identify dependency resolution for HTTPS and DB engine [\#6670](https://github.com/netdata/netdata/pull/6670) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Bugfix 931843 1 [\#6667](https://github.com/netdata/netdata/pull/6667) ([sunflowerbofh](https://github.com/sunflowerbofh))
+- Fix Markdown Lint warnings [\#6664](https://github.com/netdata/netdata/pull/6664) ([prhomhyse](https://github.com/prhomhyse))
+- Remove texts inside tests/Makefile [\#6660](https://github.com/netdata/netdata/pull/6660) ([thiagoftsm](https://github.com/thiagoftsm))
 - Prometheus version update [\#6652](https://github.com/netdata/netdata/pull/6652) ([prhomhyse](https://github.com/prhomhyse))
 - Accept \<\> around links in markdown [\#6646](https://github.com/netdata/netdata/pull/6646) ([cakrit](https://github.com/cakrit))
 - netdata/installer: Fix error running kickstart as a non-privileged user [\#6642](https://github.com/netdata/netdata/pull/6642) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -19,6 +28,7 @@
 -  Change "netdata" to "Netdata" in all docs [\#6621](https://github.com/netdata/netdata/pull/6621) ([joelhans](https://github.com/joelhans))
 - netdata: Add cosmix as codeowner, wherever cakrit is [\#6618](https://github.com/netdata/netdata/pull/6618) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mysql: do not remove `slave\_status` from queries in module [\#6617](https://github.com/netdata/netdata/pull/6617) ([ilyam8](https://github.com/ilyam8))
+- Add alarm variables to the response of chart and data \(\#6054\) [\#6615](https://github.com/netdata/netdata/pull/6615) ([alpes214](https://github.com/alpes214))
 - Better system OS detection for RHEL6 and Mac OS X [\#6612](https://github.com/netdata/netdata/pull/6612) ([dex4er](https://github.com/dex4er))
 - update package version requirements for LZ4 and libuv [\#6607](https://github.com/netdata/netdata/pull/6607) ([mfundul](https://github.com/mfundul))
 - netdata/installer: do not enable netdata, if it was previously disabled [\#6606](https://github.com/netdata/netdata/pull/6606) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
