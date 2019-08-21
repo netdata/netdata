@@ -73,7 +73,7 @@ stages:
 
     # Build RPM packages under special conditions
   - name: Package centos, fedora and opensuse
-    if: type != cron AND type != pull_request AND branch = split-cups
+    if: type != cron AND type != pull_request AND branch = master
 
 
 
