@@ -507,6 +507,68 @@ The Netdata team maintains two releases of the Netdata agent: **nightly** and **
 -   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata installation
 -   Retain more control over the Netdata version you use
 
+## Offline installations
+
+You can install Netdata on systems without internet access, but you need to take
+a few extra steps to make it work.
+
+By default, the `kickstart.sh` and `kickstart-static64.sh` download Netdata
+assets, like the precompiled binary and a few dependencies, using the system's
+internet connect, but you can also supply these files from the local filesystem.
+
+First, download the required files. If you're using `kickstart.sh`, you need the
+Netdata tarball, the checksums, the go.d plugin binary, and the go.d plugin
+configuration. If you're using `kickstart-static64.sh`, you need only the
+Netdata tarball and checksums.
+
+Download the files you need to a system of yours that's connected to the
+internet. You can use the commands below, or visit the [latest Netdata release
+page](https://github.com/netdata/netdata/releases/latest) and [latest go.d
+plugin release page](https://github.com/netdata/go.d.plugin/releases) to
+download the required files manually.
+
+```bash
+cd /tmp
+
+# Netdata tarball
+curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
+
+# Netdata checksums
+curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
+
+# go.d plugin (for linux-amd64 systems)
+# For binaries for other OS types and architectures, visit the go.d releases 
+# page: https://github.com/netdata/go.d.plugin/releases/latest
+curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*linux-amd64.tar.gz" | cut -d '"' -f 4 | wget -qi -
+
+# go.d configuration 
+curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
+```
+
+Move these files to the `/tmp` directory on the offline system in whichever way
+your organization allows.
+
+Now you can run either the `kickstart.sh` or `kickstart-static64.sh` scripts
+using the `--local-tarball-override` option. This option requires you to specify
+the location and names of the files you just downloaded. 
+
+!!! note When using `--local-tarball-override`, the `kickstart.sh` or
+    `kickstart-64.sh` scripts won't download any Netdata assets from the
+    internet. But, you may still need a connection to install dependencies using
+    your system's package manager. The scripts will warn you if your system
+    doesn't have all the dependencies.
+
+```bash
+# kickstart.sh
+bash &lt;(curl -Ss https://my-netdata.io/kickstart.sh) --local-tarball-override /tmp/netdata.tar.gz /tmp/checksums.txt /tmp/go.d.binary.tar.gz /tmp/go.d.config.tar.gz
+
+# kickstart-static64.sh
+bash &lt;(curl -Ss https://my-netdata.io/kickstart-static64.sh) --local-tarball-override /tmp/netdata.tar.gz /tmp/checksums.txt
+```
+
+Now that you're finished with your offline installation, you can move on to our
+[getting started guide](../../docs/GettingStarted.md)!
+
 ## Automatic updates
 
 By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
