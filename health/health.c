@@ -155,6 +155,7 @@ void health_reload_host(RRDHOST *host) {
  * Reload the host configuration for all hosts.
  */
 void health_reload(void) {
+
     rrd_rdlock();
 
     RRDHOST *host;
