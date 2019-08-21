@@ -538,7 +538,10 @@ int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         );
     }
 
-    return (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)?1:0;
+    if(rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)
+        return 1;
+    else
+        return 0;
 }
 
 /**
