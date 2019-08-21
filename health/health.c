@@ -531,7 +531,6 @@ int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
              (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
         );
     }
-
     if(rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)
         return 1;
     else
