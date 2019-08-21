@@ -67,14 +67,6 @@ inline void health_log_rotate(RRDHOST *host) {
     }
 }
 
-/**
- * Alarm Log Save
- *
- * Save the alarm entry inside the file pointer of the host
- *
- * @param host the structure with pointer to the file
- * @param ae the alarm entry that will be stored.
- */
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
 
@@ -131,17 +123,6 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     }
 }
 
-/**
- * Alarm log read
- *
- * Read the alarms from the file pointer and create alarm entries.
- *
- * @param host the structure where we will be stored the alarms
- * @param fp the file pointer where the data is stored
- * @param filename the filename used to open fp.
- *
- * @return It returns the number of alarms loaded
- */
 inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename) {
     errno = 0;
 
@@ -363,13 +344,6 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
     return loaded;
 }
 
-/**
- * Alarm Log Load
- *
- * Load the alarm entries present inside a file.
- *
- * @param host  the structure with file the file name where the alarm entries are stored.
- */
 inline void health_alarm_log_load(RRDHOST *host) {
     health_alarm_log_close(host);
 
@@ -399,33 +373,6 @@ inline void health_alarm_log_load(RRDHOST *host) {
 // ----------------------------------------------------------------------------
 // health alarm log management
 
-/**
- * Create alarm entry
- *
- * Allocate the alarm entry setting variable values.
- *
- * @param host the main structure where the alarm entries are linked.
- * @param alarm_id the ID of the alarm that raised the event
- * @param alarm_event_id the unique ID of this event
- * @param when the time of the alarm
- * @param name the alarm name
- * @param chart the chart where the alarm is associated
- * @param family the family that the chart is associated
- * @param exec the command to execute for this entry.
- * @param recipient the recipient that receives the information
- * @param duration
- * @param old_value the previous value
- * @param new_value the current value
- * @param old_status the previous status
- * @param new_status the current status
- * @param source the file that generated this alarm
- * @param units the units of an alarm
- * @param info
- * @param delay
- * @param flags the alarm flags
- *
- * @return It returns a new alarm entry on success and NULL otherwise
- */
 inline ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
@@ -536,13 +483,6 @@ inline void health_alarm_log(
     health_alarm_log_save(host, ae);
 }
 
-/**
- * Alarm Log Free One No checks no unlink
- *
- * Simple clean of the alarm entry structures.
- *
- * @param ae the alarm entry that will be cleaned.
- */
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->name);
     freez(ae->chart);
@@ -557,14 +497,6 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae);
 }
 
-/**
- * Alarm log free
- *
- * Loop trough all alarms in the health log and clean them and
- * take care of the link.
- *
- * @param host the host structure with the alarms to clean
- */
 inline void health_alarm_log_free(RRDHOST *host) {
     rrdhost_check_wrlock(host);
 
