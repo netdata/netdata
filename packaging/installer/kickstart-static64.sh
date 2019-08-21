@@ -210,7 +210,6 @@ while [ -n "${1}" ]; do
 		echo >&2 "Unknown option '${1}'"
 		exit 1
 	fi
-	shift
 done
 [ -n "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
 
