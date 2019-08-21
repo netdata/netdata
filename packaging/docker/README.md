@@ -1,22 +1,21 @@
 # Install Netdata with Docker
 
-> :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running Netdata in Docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
->
-> Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with <https://github.com/multiarch> naming), so **`armv7hf` is not updated** either.
-
-## Limitations
-
 Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling Netdata easy.
+
+See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
+
+## Limitations running Netdata in Docker
 
 For monitoring the whole host, running Netdata in a container can limit its capabilities. 
 Some data, like the host OS performance or status, is not accessible or not as detailed in a container as when running Netdata directly on the host.
+
 A way around this is to provide special mounts to the Docker container so that Netdata can get visibility on host OS information like `/sys` and `/proc` folders or even `/etc/group` and shadow files.
 
-## Package scrambling in runtime (x86_64 only)
+Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND in the [Docker documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
 
-By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata docker container.
+### Package scrambling in runtime (x86_64 only)
 
-For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
+By default on x86_64 architecture our docker images use [Polymorphic Polyverse Linux package scrambling](https://polyverse.io/how-it-works/). For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata docker container.
 
 ## Run Netdata with the docker command
 
