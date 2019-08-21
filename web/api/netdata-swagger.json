@@ -243,7 +243,8 @@
                 "percentage",
                 "unaligned",
                 "match-ids",
-                "match-names"
+                "match-names",
+                "showcustomvars"
               ],
               "collectionFormat": "pipes"
             },
@@ -975,6 +976,14 @@
             }
           }
         },
+        "chart_variables": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/chart_variables"
+            }
+          }
+        },
         "green": {
           "type": "number",
           "description": "Chart health green threshold"
@@ -1011,13 +1020,8 @@
         "chart_variables": {
           "type": "object",
           "properties": {
-            "varname1": {
-              "type": "number",
-              "format": "float"
-            },
-            "varname2": {
-              "type": "number",
-              "format": "float"
+            "key": {
+              "$ref": "#/definitions/chart_variables"
             }
           }
         },
@@ -1046,6 +1050,19 @@
               "format": "float"
             }
           }
+        }
+      }
+    },
+    "chart_variables": {
+      "type": "object",
+      "properties": {
+        "varname1": {
+          "type": "number",
+          "format": "float"
+        },
+        "varname2": {
+          "type": "number",
+          "format": "float"
         }
       }
     },
@@ -1144,6 +1161,14 @@
         "format": {
           "type": "string",
           "description": "The format of the result returned."
+        },
+        "chart_variables": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/chart_variables"
+            }
+          }
         },
         "result": {
           "description": "The result requested, in the format requested."
