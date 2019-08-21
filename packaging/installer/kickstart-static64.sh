@@ -189,7 +189,7 @@ done
 
 # ---------------------------------------------------------------------------------------------------------------------
 TMPDIR=$(create_tmp_directory)
-cd "${TMPDIR}" || :
+cd "${TMPDIR}"
 
 set_tarball_urls "${RELEASE_CHANNEL}"
 progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
@@ -202,12 +202,14 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 progress "Installing netdata"
-
 run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} ${inner_opts}
 
 #shellcheck disable=SC2181
 if [ $? -eq 0 ]; then
-	rm "${TMPDIR}/netdata-latest.gz.run"
+	run ${sudo} rm "${TMPDIR}/netdata-latest.gz.run"
+	if [ ! "${TMPDIR}" = "/" ] && [ -d "${TMPDIR}" ]; then
+		run ${sudo} rm -rf "${TMPDIR}"
+	fi
 else
 	echo >&2 "NOTE: did not remove: ${TMPDIR}/netdata-latest.gz.run"
 fi

@@ -2,13 +2,13 @@
 
 [PagerDuty](https://www.pagerduty.com/company/) is the enterprise incident resolution service that integrates with ITOps and DevOps monitoring stacks to improve operational reliability and agility. From enriching and aggregating events to correlating them into incidents, PagerDuty streamlines the incident management process by reducing alert noise and resolution times.
 
-Here is an example of a PagerDuty dashboard with netdata notifications:
+Here is an example of a PagerDuty dashboard with Netdata notifications:
 
-![PagerDuty dashboard with netdata notifications](https://cloud.githubusercontent.com/assets/19278582/21233877/b466a08a-c2a5-11e6-8d66-ee6eed43818f.png)
+![PagerDuty dashboard with Netdata notifications](https://cloud.githubusercontent.com/assets/19278582/21233877/b466a08a-c2a5-11e6-8d66-ee6eed43818f.png)
 
-To have netdata send notifications to PagerDuty, you'll first need to set up a PagerDuty `Generic API` service and install the PagerDuty agent on the host running netdata.  See the following guide for details:
+To have Netdata send notifications to PagerDuty, you'll first need to set up a PagerDuty `Generic API` service and install the PagerDuty agent on the host running Netdata.  See the following guide for details:
 
-https://www.pagerduty.com/docs/guides/agent-install-guide/
+<https://www.pagerduty.com/docs/guides/agent-install-guide/>
 
 During the setup of the `Generic API` PagerDuty service, you'll obtain a `pagerduty service key`.  Keep this **service key** handy.
 
@@ -34,4 +34,4 @@ SEND_PD="YES"
 DEFAULT_RECIPIENT_PD="<service key>"
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fpagerduty%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Fnotifications%2Fpagerduty%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

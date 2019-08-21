@@ -62,6 +62,7 @@ extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
+void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
 extern int health_alarm_log_open(RRDHOST *host);
 extern void health_alarm_log_close(RRDHOST *host);

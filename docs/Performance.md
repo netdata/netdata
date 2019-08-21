@@ -3,19 +3,21 @@
 Netdata performance is affected by:
 
 **Data collection**
-- the number of charts for which data are collected
-- the number of plugins running
-- the technology of the plugins (i.e. BASH plugins are slower than binary plugins)
-- the frequency of data collection
+
+-   the number of charts for which data are collected
+-   the number of plugins running
+-   the technology of the plugins (i.e. BASH plugins are slower than binary plugins)
+-   the frequency of data collection
 
 You can control all the above.
 
 **Web clients accessing the data**
-- the duration of the charts in the dashboard
-- the number of charts refreshes requested
-- the compression level of the web responses
 
----
+-   the duration of the charts in the dashboard
+-   the number of charts refreshes requested
+-   the compression level of the web responses
+
+- - -
 
 ## Netdata Daemon
 
@@ -24,9 +26,10 @@ For most server systems, with a few hundred charts and a few thousand dimensions
 To prove Netdata scalability, check issue [#1323](https://github.com/netdata/netdata/issues/1323#issuecomment-265501668) where Netdata collects 95.000 metrics per second, with 12% CPU utilization of a single core!
 
 In embedded systems, if the Netdata daemon is using a lot of CPU without any web clients accessing it, you should lower the data collection frequency. To set the data collection frequency, edit `/etc/netdata/netdata.conf` and set `update_every` to a higher number (this is the frequency in seconds data are collected for all charts: higher number of seconds = lower frequency, the default is 1 for per second data collection). You can also set this frequency per module or chart. Check the [daemon configuration](../daemon/config) for plugins and charts. For specific modules, the configuration needs to be changed in:
-- `python.d.conf` for [python](../collectors/python.d.plugin/#pythondplugin)
-- `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin)
-- `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
+
+-   `python.d.conf` for [python](../collectors/python.d.plugin/#pythondplugin)
+-   `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin)
+-   `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
 
 ## Plugins
 
@@ -41,7 +44,6 @@ Normally, each user connected will request less than 10 chart refreshes per seco
 Netdata runs with the lowest possible process priority, so even if 1000 users are accessing dashboards, it should not influence your applications. CPU utilization will reach 100%, but your applications should get all the CPU they need.
 
 To lower the CPU utilization of Netdata when clients are accessing the dashboard, set `web compression level = 1`, or disable web compression completely by setting `enable web responses gzip compression = no`. Both settings are in the `[web]` section.
-
 
 ## Monitoring a heavy loaded system
 
@@ -119,17 +121,17 @@ Edit `/etc/netdata/netdata.conf`, find the `[plugins]` section:
 
 In detail:
 
-plugin|description
-:---:|:---------
-`proc`|the internal plugin used to monitor the system. Normally, you don't want to disable this. You can disable individual functions of it at the next section.
-`tc`|monitoring network interfaces QoS (tc classes)
-`idlejitter`|internal plugin (written in C) that attempts show if the systems starved for CPU. Disabling it will eliminate a thread.
-`cgroups`|monitoring linux containers. Most probably you are not going to need it. This will also eliminate another thread.
-`checks`|a debugging plugin, which is disabled by default.
-`apps`|a plugin that monitors system processes. It is very complex and heavy (consumes twice the CPU resources of the Netdata daemon), so if you don't need to monitor the process tree, you can disable it.
-`charts.d`|BASH plugins (squid, nginx, mysql, etc). This is a heavy plugin, that consumes twice the CPU resources of the Netdata daemon.
-`node.d`|node.js plugin, currently used for SNMP data collection and monitoring named (the name server).
-`python.d`|has many modules and can use over 20MB of memory.  
+| plugin|description|
+|:----:|:----------|
+| `proc`|the internal plugin used to monitor the system. Normally, you don't want to disable this. You can disable individual functions of it at the next section.|
+| `tc`|monitoring network interfaces QoS (tc classes)|
+| `idlejitter`|internal plugin (written in C) that attempts show if the systems starved for CPU. Disabling it will eliminate a thread.|
+| `cgroups`|monitoring linux containers. Most probably you are not going to need it. This will also eliminate another thread.|
+| `checks`|a debugging plugin, which is disabled by default.|
+| `apps`|a plugin that monitors system processes. It is very complex and heavy (consumes twice the CPU resources of the Netdata daemon), so if you don't need to monitor the process tree, you can disable it.|
+| `charts.d`|BASH plugins (squid, nginx, mysql, etc). This is a heavy plugin, that consumes twice the CPU resources of the Netdata daemon.|
+| `node.d`|node.js plugin, currently used for SNMP data collection and monitoring named (the name server).|
+| `python.d`|has many modules and can use over 20MB of memory.|
 
 For most IoT devices, you can disable all plugins except `proc`. For `proc` there is another section that controls which functions of it you need. Check the next section.
 
@@ -170,6 +172,7 @@ Normally, you will not need them. To disable them, set:
 	error log = none
 	access log = none
 ```
+
 ### 5. Set memory mode to RAM
 
 Setting the memory mode to `ram` will disable loading and saving the round robin database. This will not affect anything while running Netdata, but it might be required if you have very limited storage available.
@@ -191,7 +194,6 @@ You can set the default size of the round robin database for all charts, using:
 The units for history is `[global].update every` seconds. So if `[global].update every = 6` and `[global].history = 600`, you will have an hour of data ( 6 x 600 = 3.600 ), which will store 600 points per dimension, one every 6 seconds.
 
 Check also [Database](../database) for directions on calculating the size of the round robin database.
-
 
 ### 7. Disable gzip compression of responses
 
@@ -217,4 +219,4 @@ Finally, if no web server is installed on your device, you can use port tcp/80 f
 	port = 80
 ```
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FPerformance&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FPerformance&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

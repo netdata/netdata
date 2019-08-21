@@ -163,7 +163,7 @@ paths:
           type: array
           items:
             type: string
-            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage', 'unaligned', 'match-ids', 'match-names' ]
+            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage', 'unaligned', 'match-ids', 'match-names', 'showcustomvars' ]
             collectionFormat: pipes
           default: [seconds, jsonwrap]
           allowEmptyValue: false
@@ -654,6 +654,11 @@ definitions:
         properties:
           key:
             $ref: '#/definitions/dimension'
+      chart_variables:
+        type: object
+        properties:
+          key:
+            $ref: '#/definitions/chart_variables'
       green:
         type: number
         description: 'Chart health green threshold'
@@ -681,12 +686,8 @@ definitions:
       chart_variables:
         type: object
         properties:
-          varname1:
-            type: number
-            format: float
-          varname2:
-            type: number
-            format: float
+          key:
+            $ref: '#/definitions/chart_variables'
       family_variables:
         type: object
         properties:
@@ -705,6 +706,15 @@ definitions:
           varname2:
             type: number
             format: float
+  chart_variables:
+    type: object
+    properties:
+      varname1:
+        type: number
+        format: float
+      varname2:
+        type: number
+        format: float
   dimension:
     type: object
     properties:
@@ -776,6 +786,11 @@ definitions:
       format:
         type: string
         description: 'The format of the result returned.'
+      chart_variables:
+        type: object
+        properties:
+          key:
+            $ref: '#/definitions/chart_variables'
       result:
         description: 'The result requested, in the format requested.'
   alarms:

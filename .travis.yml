@@ -1,5 +1,4 @@
 dist: xenial
-sudo: true
 language: c
 services:
   - docker
@@ -170,19 +169,31 @@ jobs:
       script: sudo -E tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 16.04"
 
+      # Ubuntu runs
+    - name: Run netdata lifecycle, on Ubuntu 18.04 (Containerized)
+      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:18.04" tests/updater_checks.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 18.04"
+
     - name: Run netdata lifecycle, on Ubuntu 19.04 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.04" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.04"
 
       # Centos runs
+    - name: Run netdata lifecycle on CentOS 6 (Containerized)
+      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:6" tests/updater_checks.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 6"
+
     - name: Run netdata lifecycle on CentOS 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
 
-      # Debian runs
     - name: Run netdata lifecycle, on Debian 9 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:stretch" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 9 (stretch)"
+
+    - name: Run netdata lifecycle, on Debian 10 (Containerized)
+      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "debian:buster" tests/updater_checks.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Debian 10 (buster)"
 
       # openSuSE runs
     - name: Run netdata lifecycle, on openSuSE 15.0
@@ -219,6 +230,10 @@ jobs:
     - name: Run netdata lifecycle, on Fedora 30 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
+
+#    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
+#      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
+#      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
 
 
@@ -270,7 +285,7 @@ jobs:
         depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "Failed to build DEB for ${BUILD_STRING}.${BUILD_ARCH}"
       before_deploy:
-        - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
+        - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale DEB found"
       deploy:
         - provider: packagecloud
           repository: "${DEPLOY_REPO}"
@@ -374,7 +389,7 @@ jobs:
         depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "Failed to build RPM for ${BUILD_STRING}.${BUILD_ARCH}"
       before_deploy:
-        - .travis/package_management/yank_stale_rpm.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
+        - .travis/package_management/yank_stale_pkg.sh "${PACKAGES_DIRECTORY}" "${BUILD_STRING}" || echo "No stale RPM found"
       deploy:
         - provider: packagecloud
           repository: "${DEPLOY_REPO}"
@@ -402,8 +417,6 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-
-
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for Enterprise Linux 6"
       if: commit_message =~ /(\[Package i386 RPM Enterprise Linux\]|\[Package i386 RPM\]|\[Package amd64 RPM Enterprise Linux\]|\[Package amd64 RPM\])/
@@ -411,8 +424,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-
 
     # Fedora distros build
     #
@@ -424,8 +435,6 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-
-
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for Fedora 29"
       if: commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
@@ -434,8 +443,6 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-
-
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for Fedora 28"
       if: commit_message =~ /(\[Package arm64 RPM Fedora\]|\[Package arm64 RPM\]|\[Package amd64 RPM Fedora\]|\[Package amd64 RPM\])/
@@ -443,8 +450,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="28" BUILD_STRING="fedora/28"
         - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-
 
     # Opensuse distros build
     #
@@ -455,8 +460,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="opensuse" BUILD_RELEASE="15.0" BUILD_STRING="opensuse/15.1"
         - PACKAGE_TYPE="rpm" REPO_TOOL="zypper"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-
 
     - <<: *_RPM_TEMPLATE
       name: "Build & Publish RPM package for OpenSuSE 15.0"
@@ -538,7 +541,15 @@ jobs:
     #
     - stage: Nightly release
 
-      name: Build & Publish docker images
+      name: Trigger .RPM and .DEB package generation
+      before_script: post_message "TRAVIS_MESSAGE" "Starting RPM and DEB package generation for nightlies" "${NOTIF_CHANNEL}"
+      script:
+        - .travis/trigger_package_generation.sh "[Build latest]"
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly package generation produced errors" "${NOTIF_CHANNEL}"
+      git:
+        depth: false
+
+    - name: Build & Publish docker images
       before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch

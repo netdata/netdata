@@ -3,6 +3,8 @@
 # Author: ilyam8
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import ssl
+
 from copy import deepcopy
 from datetime import datetime
 from sys import exc_info
@@ -418,18 +420,31 @@ CHARTS = {
     }
 }
 
+DEFAULT_HOST = '127.0.0.1'
+DEFAULT_PORT = 27017
+DEFAULT_TIMEOUT = 100
+DEFAULT_AUTHDB = 'admin'
+
+CONN_PARAM_HOST = 'host'
+CONN_PARAM_PORT = 'port'
+CONN_PARAM_SERVER_SELECTION_TIMEOUT_MS = 'serverselectiontimeoutms'
+CONN_PARAM_SSL_SSL = 'ssl'
+CONN_PARAM_SSL_CERT_REQS = 'ssl_cert_reqs'
+CONN_PARAM_SSL_CA_CERTS = 'ssl_ca_certs'
+CONN_PARAM_SSL_CRL_FILE = 'ssl_crlfile'
+CONN_PARAM_SSL_CERT_FILE = 'ssl_certfile'
+CONN_PARAM_SSL_KEY_FILE = 'ssl_keyfile'
+CONN_PARAM_SSL_PEM_PASSPHRASE = 'ssl_pem_passphrase'
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER[:]
         self.definitions = deepcopy(CHARTS)
-        self.authdb = self.configuration.get('authdb', 'admin')
+        self.authdb = self.configuration.get('authdb', DEFAULT_AUTHDB)
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
-        self.host = self.configuration.get('host', '127.0.0.1')
-        self.port = self.configuration.get('port', 27017)
-        self.timeout = self.configuration.get('timeout', 100)
         self.metrics_to_collect = deepcopy(DEFAULT_METRICS)
         self.connection = None
         self.do_replica = None
@@ -705,14 +720,53 @@ class Service(SimpleService):
 
         return data
 
-    def _create_connection(self):
-        conn_vars = {'host': self.host, 'port': self.port}
+    def build_ssl_connection_params(self):
+        conf = self.configuration
+
+        def cert_req(v):
+            if v is None:
+                return None
+            if not v:
+                return ssl.CERT_NONE
+            return ssl.CERT_REQUIRED
+
+        ssl_params = {
+            CONN_PARAM_SSL_SSL: conf.get(CONN_PARAM_SSL_SSL),
+            CONN_PARAM_SSL_CERT_REQS: cert_req(conf.get(CONN_PARAM_SSL_CERT_REQS)),
+            CONN_PARAM_SSL_CA_CERTS: conf.get(CONN_PARAM_SSL_CA_CERTS),
+            CONN_PARAM_SSL_CRL_FILE: conf.get(CONN_PARAM_SSL_CRL_FILE),
+            CONN_PARAM_SSL_CERT_FILE: conf.get(CONN_PARAM_SSL_CERT_FILE),
+            CONN_PARAM_SSL_KEY_FILE: conf.get(CONN_PARAM_SSL_KEY_FILE),
+            CONN_PARAM_SSL_PEM_PASSPHRASE: conf.get(CONN_PARAM_SSL_PEM_PASSPHRASE),
+        }
+
+        ssl_params = dict((k, v) for k, v in ssl_params.items() if v is not None)
+
+        return ssl_params
+
+    def build_connection_params(self):
+        conf = self.configuration
+        params = {
+            CONN_PARAM_HOST: conf.get(CONN_PARAM_HOST, DEFAULT_HOST),
+            CONN_PARAM_PORT: conf.get(CONN_PARAM_PORT, DEFAULT_PORT),
+        }
         if hasattr(MongoClient, 'server_selection_timeout'):
-            conn_vars.update({'serverselectiontimeoutms': self.timeout})
+            params[CONN_PARAM_SERVER_SELECTION_TIMEOUT_MS] = conf.get('timeout', DEFAULT_TIMEOUT)
+
+        params.update(self.build_ssl_connection_params())
+        return params
+
+    def _create_connection(self):
+        params = self.build_connection_params()
+        self.debug('creating connection, connection params: {0}'.format(sorted(params)))
+
         try:
-            connection = MongoClient(**conn_vars)
+            connection = MongoClient(**params)
             if self.user and self.password:
+                self.debug('authenticating, user: {0}, password: {1}'.format(self.user, self.password))
                 getattr(connection, self.authdb).authenticate(name=self.user, password=self.password)
+            else:
+                self.debug('skip authenticating, user and password are not set')
             # elif self.user:
             #     connection.admin.authenticate(name=self.user, mechanism='MONGODB-X509')
             server_status = connection.admin.command('serverStatus')
