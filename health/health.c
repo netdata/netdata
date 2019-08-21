@@ -317,13 +317,6 @@ static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) 
     health_alarm_execute(host, ae);
 }
 
-/**
- * Alarm Log Process
- *
- * Process the alarm entries allocated in the RRDHOST.
- *
- * @param host is the structure with the alarm entries
- */
 static inline void health_alarm_log_process(RRDHOST *host) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
