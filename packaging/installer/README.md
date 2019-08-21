@@ -536,10 +536,9 @@ curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "bro
 # Netdata checksums
 curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
 
-# go.d plugin (for linux-amd64 systems)
-# For binaries for other OS types and architectures, visit the go.d releases 
-# page: https://github.com/netdata/go.d.plugin/releases/latest
-curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*linux-amd64.tar.gz" | cut -d '"' -f 4 | wget -qi -
+# go.d plugin 
+# For binaries for OS types and architectures not listed on [go.d releases](https://github.com/netdata/go.d.plugin/releases/latest), kindly open a github issue and we will do our best to serve your request
+export OS=$(uname -s | tr '[:upper:]' '[:lower:]') ARCH=$(uname -m | sed -e 's/i386/386/g' -e 's/i686/386/g' -e 's/x86_64/amd64/g' -e 's/aarch64/arm64/g' -e 's/armv64/arm64/g' -e 's/armv6l/arm/g' -e 's/armv7l/arm/g' -e 's/armv5tel/arm/g') && curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*${OS}-${ARCH}.tar.gz" | cut -d '"' -f 4 | wget -qi -
 
 # go.d configuration 
 curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
