@@ -109,6 +109,27 @@ A new file is introduced: [stream.conf](stream.conf) (to edit it on your system 
 `/etc/netdata/edit-config stream.conf`). This file holds streaming configuration for both the
 sending and the receiving netdata.
 
+You can add a [global] section on the master server's [stream.conf](stream.conf) and activate
+additional slave statistics as follows.
+
+```
+[global]
+				activate stream statistics = yes
+```
+
+This will add a new streams section under netdata monitoring and provide five new charts with slave
+statistics
+
+A "memory" chart that attempts to measure the amount of RAM allocated for the slaves in the master server (charts and dimensions)
+
+A "streams" chart that reports the number currently incoming streams (slaves)
+
+A "processors" chart that reports the number of active processors of all slaves by incercepting the active processors HOST variable
+
+A "metrics" chart to count all the dimensions provided by the slaves
+
+A "processes" chart for active processes reported by the slaves by intercepting the "system.active_processes" dimension
+
 API keys are used to authorize the communication of a pair of sending-receiving netdata.
 Once the communication is authorized, the sending netdata can push metrics for any number of hosts.
 
