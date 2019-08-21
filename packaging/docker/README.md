@@ -15,7 +15,7 @@ Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/en
 
 ### Package scrambling in runtime (x86_64 only)
 
-By default on x86_64 architecture our docker images use [Polymorphic Polyverse Linux package scrambling](https://polyverse.io/how-it-works/). For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata docker container.
+Our x86_64 Docker images use [Polymorphic Polyverse Linux package scrambling](https://polyverse.io/how-it-works/). For increased security, you can enable rescrambling of Netdata packages during runtime by setting the environment variable `RESCRAMBLE=true` while starting Netdata with a Docker container.
 
 ## Run Netdata with the docker command
 
