@@ -589,7 +589,9 @@ void *health_main(void *ptr) {
                 continue;
 
             if (unlikely(apply_hibernation_delay)) {
-                info("Postponing health checks for %ld seconds, on host '%s'.", hibernation_delay, host->hostname);
+
+                info("Postponing health checks for %ld seconds, on host '%s'.", hibernation_delay, host->hostname
+                );
 
                 host->health_delay_up_to = now + hibernation_delay;
             }
@@ -606,6 +608,7 @@ void *health_main(void *ptr) {
 
             // the first loop is to lookup values from the db
             for (rc = host->alarms; rc; rc = rc->next) {
+
                 if (update_disabled_silenced(host, rc))
                     continue;
 
