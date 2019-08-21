@@ -4,12 +4,6 @@
 >
 > Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with <https://github.com/multiarch> naming), so **`armv7hf` is not updated** either.
 
-## Prerequisites
-
--   [Docker](https://docs.docker.com/install/#server)
--   [Docker Compose](https://docs.docker.com/compose/install/)
--   Domain configured in DNS pointing to host.
-
 ## Limitations
 
 Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling Netdata easy.
