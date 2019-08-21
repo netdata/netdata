@@ -215,7 +215,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         else {
             // we have not executed this alarm notification in the past
             // so, don't send CLEAR notifications
-            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR) && (ae->old_status < RRDCALC_STATUS_RAISED)) {
+            if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR) && (ae->old_status < RRDCALC_STATUS_RAISED) && ae->last_repeat) {
                 debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
                       , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
                 goto done;
