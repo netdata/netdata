@@ -102,6 +102,9 @@ this.options = {
 };
 ```
 
+To change the display order of your hosts, which is saved in localStorage, click the settings gear in the lower right corner
+
+
 ## dashboard.js
 
 To add Netdata charts to any web page (dedicated to Netdata or not), you need to include the `/dashboard.js` file of a Netdata server.

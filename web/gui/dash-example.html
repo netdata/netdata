@@ -9,10 +9,8 @@
 	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
-	<div id="test"></div>
-
 	<div id="alarms" class="collapsed">
-		<div class="alarm-collapse-button" onclick="dash.toggle_alarm_collapse()"></div>
+		<div class="alarm-collapse-button" onclick="dash.toggle_alarm_collapse()">&rsaquo;</div>
 		<span class="alarm-count"></span>
 		<h1>Alarms</h1>
 		<div class="alarm-host-list"></div>
@@ -64,7 +62,8 @@
 						data-title="CPU"
 						data-units="%"
 						data-gauge-max-value="100"
-						data-colors="#22AA99">
+						data-colors="#22AA99"
+						data-gauge-stroke-color="#373B40">
 					</div>
 					<div class="dash-chart"
 						data-dash-netdata="system.net"
@@ -98,21 +97,305 @@
 	crossorigin="anonymous">
 </script>
 <script type="text/javascript">
-var $jscomp={scope:{},findInternal:function(a,c,b){a instanceof String&&(a=String(a));for(var d=a.length,e=0;e<d;e++){var f=a[e];if(c.call(b,f,e,a))return{i:e,v:f}}return{i:-1,v:void 0}}};$jscomp.defineProperty="function"==typeof Object.defineProperties?Object.defineProperty:function(a,c,b){if(b.get||b.set)throw new TypeError("ES3 does not support getters and setters.");a!=Array.prototype&&a!=Object.prototype&&(a[c]=b.value)};
-$jscomp.getGlobal=function(a){return"undefined"!=typeof window&&window===a?a:"undefined"!=typeof global&&null!=global?global:a};$jscomp.global=$jscomp.getGlobal(this);$jscomp.polyfill=function(a,c,b,d){if(c){b=$jscomp.global;a=a.split(".");for(d=0;d<a.length-1;d++){var e=a[d];e in b||(b[e]={});b=b[e]}a=a[a.length-1];d=b[a];c=c(d);c!=d&&null!=c&&$jscomp.defineProperty(b,a,{configurable:!0,writable:!0,value:c})}};
-$jscomp.polyfill("Array.prototype.find",function(a){return a?a:function(a,b){return $jscomp.findInternal(this,a,b).v}},"es6-impl","es3");var PickNSort=function(a){this.items=[];this.callback=function(a,b){console.log(a,b)};this.reset=function(){this.items=[]};this.last_output={enabled:[],disabled:[]};this.add_css_to_page(a)};
-PickNSort.prototype.create_modal=function(){$("<div></div>",{id:"picknsort-container"}).appendTo("body");$("<div></div>",{id:"picknsort-window"}).appendTo("#picknsort-container");$("<div></div>",{id:"picknsort-close-button",text:"\u2573"}).appendTo("#picknsort-window");$("<div></div>",{id:"picknsort-item-list"}).appendTo("#picknsort-window");$("<div></div>",{text:"Apply",id:"picknsort-apply-button"}).appendTo("#picknsort-window");$("<div></div>",{text:"Reset",id:"picknsort-reset-button"}).appendTo("#picknsort-window");
-$("#picknsort-close-button").click(function(){picknsort.destroy_modal();picknsort.callback(null,null)});$("#picknsort-apply-button").click(function(){picknsort.apply()});$("#picknsort-reset-button").click(function(){picknsort.reset()})};PickNSort.prototype.destroy_modal=function(){$("#picknsort-container").remove()};PickNSort.prototype.populate_list=function(){this.clear_list();for(var a=0,c=this.items.length;a<c;a++)this.draw_item(a)};
-PickNSort.prototype.draw_item=function(a){var c=this.items[a],b=$("<div></div>").addClass("picknsort-item"),d=$("<div></div>").addClass("picknsort-item-checkbox-wrapper");$("<input>",{type:"checkbox",checked:c.enabled}).addClass("picknsort-item-checkbox").appendTo(d);c=$("<div></div>",{text:c.value}).addClass("picknsort-item-value");a=$("<div></div>").addClass("picknsort-item-nav").append("<div class='picknsort-item-down' data-index='"+a+"' onclick='picknsort.shift_down(this)'>&#8595;</div>").append("<div class='picknsort-item-up' data-index='"+
-a+"' onclick='picknsort.shift_up(this)'>&#8593;</div>");b.append(d).append(c).append(a).appendTo("#picknsort-item-list")};PickNSort.prototype.clear_list=function(){$("#picknsort-item-list").html("")};PickNSort.prototype.popup=function(a,c,b){b=void 0===b?{}:b;this.callback=a||this.callback;this.reset=c||this.reset;b.enabled||(b.enabled=this.last_output.enabled);b.disabled||(b.disabled=this.last_output.disabled);this.parse_items(b.enabled,b.disabled);this.items.length&&(this.create_modal(),this.populate_list())};
-PickNSort.prototype.parse_items=function(a,c){this.items=[];for(var b=0,d=a.length;b<d;b++)this.items.push({value:a[b],enabled:!0});b=0;for(d=c.length;b<d;b++)this.items.push({value:c[b],enabled:!1})};PickNSort.prototype.shift_down=function(a){a=$(a).data("index");if(a!==this.items.length-1){var c=this.items[a];this.items[a]=this.items[a+1];this.items[a+1]=c;this.move_element_down(a)}};
-PickNSort.prototype.shift_up=function(a){a=$(a).data("index");if(0!==a){var c=this.items[a];this.items[a]=this.items[a-1];this.items[a-1]=c;this.move_element_up(a)}};PickNSort.prototype.move_element_up=function(a){var c=$(".picknsort-item:eq("+a+")"),b=$(".picknsort-item:eq("+(a-1)+")");c.insertBefore(b);c.find(".picknsort-item-down, .picknsort-item-up").data("index",a-1);b.find(".picknsort-item-down, .picknsort-item-up").data("index",a)};
-PickNSort.prototype.move_element_down=function(a){var c=$(".picknsort-item:eq("+a+")"),b=$(".picknsort-item:eq("+(a+1)+")");c.insertAfter(b);c.find(".picknsort-item-down, .picknsort-item-up").data("index",a+1);b.find(".picknsort-item-down, .picknsort-item-up").data("index",a)};
-PickNSort.prototype.apply=function(){for(var a=[],c=0,b=this.items.length;c<b;c++)a.push(this.items[c].value);var d=[];$("input.picknsort-item-checkbox:not(:checked)").each(function(b){var c=$("input.picknsort-item-checkbox").index($(this));b=a.splice(c-1*b,1);d.push(b[0])});this.callback(a,d);this.last_output={enabled:a,disabled:d};this.destroy_modal()};
-PickNSort.prototype.add_css_to_page=function(a){var c={windowbg:"#FFF",itembg:"#F4F4F4",itemcolor:"#535353"},b={windowbg:"#444",itembg:"#333",itemcolor:"#DBDBDB"};a=a?b:c;$("<style>").prop("type","text/css").html("\n#picknsort-container {\n    position: fixed;\n    z-index: 9999 !important;\n    top: 0;\n    bottom: 0;\n    left: 0;\n    right: 0;\n    background: rgba(0,0,0,0.5);\n}\n#picknsort-window {\n    max-height: 90vh;\n    width: 40em;\n    background: "+a.windowbg+";\n    position: absolute;\n    top: 5em;\n    left: calc(50% - 20em);\n    padding: 2em;\n    padding-top: 4em;\n}\n#picknsort-close-button {\n    position: absolute;\n    top: 1em;\n    font-size: 1.5em;\n    color: #666;\n    right: 1em;\n    cursor: pointer;\n}\n#picknsort-item-list {\n    max-height: 60vh;\n    overflow-y: scroll;\n    margin-bottom: 1em;\n}\n#picknsort-apply-button, #picknsort-reset-button {\n    text-align: center;\n    font-size: 1.5em;\n    padding: 1em;\n    background: rgb(106, 232, 165);\n    font-weight: bold;\n    color: #FFF;\n    cursor: pointer;\n    margin-top: 1em;\n}\n#picknsort-reset-button {\n    background: #CCC;\n}\n.picknsort-item {\n    padding: 1em;\n    border-top: solid 1px #CCC;\n    margin-bottom: 1em;\n    position: relative;\n    background: "+
-a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n    position: absolute;\n    top: 0;\n    left: 0;\n    bottom: 0;\n    width: 3em;\n    text-align: center;\n}\n.picknsort-item-checkbox {\n    transform: scale(1.5);\n    margin-top: 1.3em !important;\n}\n.picknsort-item-value {\n    margin-left: 3em;\n}\n.picknsort-item-nav {\n    font-size: 2em;\n    position: absolute;\n    right: 0;\n    top: 0;\n    bottom: 0;\n    color: #CCC;\n    cursor: pointer;\n}\n.picknsort-item-down, .picknsort-item-up {\n    display: inline-block;\n    padding: 0em 0.5em;\n    height: calc(100% - 0.2em);\n}\n        ").appendTo("head")};
+class PickNSort {
+	// PickNSort.js
+
+    constructor (dark) {
+        this.items = [];
+        this.callback = function (output, disabled) { console.log(output, disabled) };
+        this.reset = function () { this.items = [] };
+        this.last_output = {
+            enabled: [],
+            disabled: []
+        }
+
+        this.add_css_to_page(dark);
+    }
+
+    create_modal () {
+        $("<div></div>", {
+            id: "picknsort-container"
+        }).appendTo('body');
+
+        $("<div></div>", {
+            id: 'picknsort-window'
+        }).appendTo('#picknsort-container');
+
+        $("<div></div>", {
+            id: "picknsort-close-button",
+            text: '\u2573'
+        }).appendTo('#picknsort-window');
+
+        $("<div></div>", {
+            id: "picknsort-item-list"
+        }).appendTo('#picknsort-window')
+
+        $("<div></div>", {
+            text: "Apply",
+            id: "picknsort-apply-button"
+        }).appendTo('#picknsort-window');
+
+        $("<div></div>", {
+            text: "Reset",
+            id: "picknsort-reset-button"
+        }).appendTo('#picknsort-window');
+
+        $('#picknsort-close-button').click(function () {
+            picknsort.destroy_modal();
+            picknsort.callback(null, null);
+        });
+
+        $('#picknsort-apply-button').click(function () {
+            picknsort.apply();
+        });
+
+        $('#picknsort-reset-button').click(function () {
+            picknsort.reset();
+        });
+    }
+
+    destroy_modal () {
+        $('#picknsort-container').remove();
+    }
+
+    populate_list () {
+        this.clear_list();
+
+        for (var i=0, len=this.items.length; i<len; i++) {
+            this.draw_item(i);
+        }
+    }
+
+    draw_item (index) {
+        var item = this.items[index];
+
+        var $item = $("<div></div>").addClass("picknsort-item");
+
+        var $checkbox= $("<div></div>").addClass('picknsort-item-checkbox-wrapper');
+
+        $("<input>", {
+            type: "checkbox",
+            checked: item.enabled
+        }).addClass('picknsort-item-checkbox')
+        .appendTo($checkbox);
+
+        var $value = $("<div></div>", {
+            text: item.value
+        }).addClass("picknsort-item-value");
+
+        var $nav = $("<div></div>").addClass("picknsort-item-nav")
+        .append("<div class='picknsort-item-down' data-index='" + index + "' onclick='picknsort.shift_down(this)'>&#8595;</div>")
+        .append("<div class='picknsort-item-up' data-index='" + index + "' onclick='picknsort.shift_up(this)'>&#8593;</div>");
+
+        $item.append($checkbox).append($value).append($nav).appendTo('#picknsort-item-list');
+    }
+
+    clear_list () {
+        $('#picknsort-item-list').html('');
+    }
+
+    popup (callback, reset, options={}) {
+        this.callback = callback || this.callback;
+        this.reset = reset || this.reset;
+        if (!options.enabled) {
+            options.enabled = this.last_output.enabled;
+        }
+        if (!options.disabled) {
+            options.disabled = this.last_output.disabled;
+        }
+
+        this.parse_items(options.enabled, options.disabled);
+        if (this.items.length) {
+            this.create_modal();
+            this.populate_list();
+        }
+
+    }
+
+    parse_items (enabled, disabled) {
+        this.items = [];
+
+        for (var i=0, len=enabled.length; i<len; i++) {
+            this.items.push({
+                value: enabled[i],
+                enabled: true
+            });
+        }
+
+        for (var i=0, len=disabled.length; i<len; i++) {
+            this.items.push({
+                value: disabled[i],
+                enabled: false
+            });
+        }
+    }
+
+    shift_down (el) {
+        var index = $(el).data('index');
+        if (index === this.items.length - 1) {
+            return;
+        }
+        var temp = this.items[index];
+        this.items[index] = this.items[index + 1];
+        this.items[index + 1] = temp;
+        this.move_element_down(index);
+    }
+
+    shift_up (el) {
+        var index = $(el).data('index');
+        if (index === 0) {
+            return;
+        }
+        var temp = this.items[index];
+        this.items[index] = this.items[index - 1];
+        this.items[index - 1] = temp;
+        this.move_element_up(index);
+    }
+
+    move_element_up (index) {
+        var $src = $('.picknsort-item:eq(' + index + ')');
+        var $dest = $('.picknsort-item:eq(' + (index-1) + ')');
+        $src.insertBefore($dest);
+
+        // Update data-index
+        $src.find('.picknsort-item-down, .picknsort-item-up').data("index", index-1);
+        $dest.find('.picknsort-item-down, .picknsort-item-up').data("index", index);
+    }
+
+    move_element_down (index) {
+        var $src = $('.picknsort-item:eq(' + index + ')');
+        var $dest = $('.picknsort-item:eq(' + (index+1) + ')');
+        $src.insertAfter($dest);
+
+        // Update data-index
+        $src.find('.picknsort-item-down, .picknsort-item-up').data("index", index+1);
+        $dest.find('.picknsort-item-down, .picknsort-item-up').data("index", index);
+    }
+
+    apply () {
+        var out = [];
+        for (var i=0, len=this.items.length; i<len; i++) {
+            out.push(this.items[i].value);
+        }
+        var disabled = [];
+        $('input.picknsort-item-checkbox:not(:checked)').each(function (elindex) {
+            var itemindex = $('input.picknsort-item-checkbox').index($(this));
+            // Adjust for deleted elements
+            var spliceindex = itemindex - (1 * elindex);
+            var del = out.splice(spliceindex, 1);
+            disabled.push(del[0]);
+        });
+        this.callback(out, disabled);
+        this.last_output = {
+            enabled: out,
+            disabled: disabled
+        }
+        this.destroy_modal();
+    }
+
+    add_css_to_page (dark) {
+        var light_theme = {
+            windowbg: "#FFF",
+            itembg: "#F4F4F4",
+            itemcolor: "#535353"
+        }
+        var dark_theme = {
+            windowbg: "#444",
+            itembg: "#333",
+            itemcolor: "#DBDBDB"
+        }
+        var current_theme = (dark) ? dark_theme : light_theme;
+        $("<style>")
+            .prop("type", "text/css")
+            .html(`
+#picknsort-container {
+    position: fixed;
+    z-index: 9999 !important;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.5);
+}
+#picknsort-window {
+    max-height: 90vh;
+    width: 40em;
+    background: ${current_theme.windowbg};
+    position: absolute;
+    top: 5em;
+    left: calc(50% - 20em);
+    padding: 2em;
+    padding-top: 4em;
+}
+#picknsort-close-button {
+    position: absolute;
+    top: 1em;
+    font-size: 1.5em;
+    color: #666;
+    right: 1em;
+    cursor: pointer;
+}
+#picknsort-item-list {
+    max-height: 60vh;
+    overflow-y: scroll;
+    margin-bottom: 1em;
+}
+#picknsort-apply-button, #picknsort-reset-button {
+    text-align: center;
+    font-size: 1.5em;
+    padding: 1em;
+    background: rgb(106, 232, 165);
+    font-weight: bold;
+    color: #FFF;
+    cursor: pointer;
+    margin-top: 1em;
+}
+#picknsort-reset-button {
+    background: #CCC;
+}
+.picknsort-item {
+    padding: 1em;
+    border-top: solid 1px #CCC;
+    margin-bottom: 1em;
+    position: relative;
+    background: ${current_theme.itembg};
+    color: ${current_theme.itemcolor}
+}
+.picknsort-item-checkbox-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3em;
+    text-align: center;
+}
+.picknsort-item-checkbox {
+    transform: scale(1.5);
+    margin-top: 1.3em !important;
+}
+.picknsort-item-value {
+    margin-left: 3em;
+}
+.picknsort-item-nav {
+    font-size: 2em;
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    color: #CCC;
+    cursor: pointer;
+}
+.picknsort-item-down, .picknsort-item-up {
+    display: inline-block;
+    padding: 0em 0.5em;
+    height: calc(100% - 0.2em);
+}
+        `).appendTo("head");
+    }
+}
 </script>
 <script type="text/javascript">
+	// Dash JS
 
 	function picknsort_setup () {
 		if (localStorage.getItem('netdata_ordered_hosts')) {
@@ -321,6 +604,7 @@ a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n
 				'role': 'application',
 				'data-width': that.options.chart_width,
 				'data-title': ' ',
+				'data-easypiechart-trackcolor': "#373B40",
 				'data-chart-library': 'easypiechart'
 
 			})
@@ -515,7 +799,7 @@ a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n
 		top: 0;
 		bottom: 0;
 		background-color: #111;
-		width: 24em;
+		width: 23em;
 		padding: 1em;
 		color: #AAA;
 		box-shadow: 0 0 3em #060606;
@@ -541,13 +825,17 @@ a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n
 		position: absolute;
 		top: 0;
 		left: 0;
-		width: 1em;
-		height: 100vh;
-		background: #4a4a4a;
+		width: 0.9em;
+		height: 0.9em;
+		font-size: 4em;
+		line-height: 0.8;
+		background: #111;
+		text-align: center;
+		cursor: default;
 	}
 
 	#alarms .alarm-collapse-button:hover {
-		background: #393939;
+		background: #000;
 	}
 
 	#alarms.collapsed {
@@ -561,6 +849,7 @@ a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n
 		top: 0;
 		bottom: 0;
 		width: 4em;
+		height: 100vh;
 		opacity: 0;
 		z-index: 9999;
 	}
@@ -575,7 +864,6 @@ a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n
 
 	#alarms .alarm-host-list {
 		margin-top: 1em;
-		margin-left: 1em;
 		height: 100%;
 		overflow-y: scroll;
 		scrollbar-width: thin;
@@ -697,6 +985,10 @@ a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n
 		margin-bottom: 1em;
 	}
 
+	.netdata-legend-resize-handler {
+		display: none
+	}
+
 	.dash-charts {
 		white-space: normal;
 		margin: 2em 0;
@@ -705,6 +997,10 @@ a.itembg+";\n    color: "+a.itemcolor+"\n}\n.picknsort-item-checkbox-wrapper {\n
 	.dash-chart {
 		display: inline-block;
 		vertical-align: top;
+	}
+
+	.easyPieChartLabel {
+		color: #FFF;
 	}
 
 	.loading-error {
