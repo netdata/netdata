@@ -501,7 +501,7 @@ Requires: netdata = %{version}
 Use this plugin to enable metrics collection from cupsd, the daemon running when CUPS is enabled on the system
 
 %files plugin-cups
-%attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
+%attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 
 %changelog
 * Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdat.acloud> - 0.0.0-8
