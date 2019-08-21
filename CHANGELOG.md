@@ -8,6 +8,7 @@
 
 **Merged pull requests:**
 
+- Tabulatin on health/health.c [\#6691](https://github.com/netdata/netdata/pull/6691) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/packaging: Align libdir in all configure commands [\#6682](https://github.com/netdata/netdata/pull/6682) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - spigotmc module: :pencil2: fix typos. [\#6680](https://github.com/netdata/netdata/pull/6680) ([Cat7373](https://github.com/Cat7373))
 - netdata/packaging: \[ci skip\] Correlate configure command [\#6678](https://github.com/netdata/netdata/pull/6678) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -34,6 +35,7 @@
 - netdata/installer: do not enable netdata, if it was previously disabled [\#6606](https://github.com/netdata/netdata/pull/6606) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix typos in: 'README.md' file. [\#6604](https://github.com/netdata/netdata/pull/6604) ([coffeina](https://github.com/coffeina))
 - mysql collector: slave\_status charts per replication channel [\#6597](https://github.com/netdata/netdata/pull/6597) ([ilyam8](https://github.com/ilyam8))
+- Install Netdata with Docker  [\#6596](https://github.com/netdata/netdata/pull/6596) ([prhomhyse](https://github.com/prhomhyse))
 - netdata/packaging: Expect .tar.gz version of go.d plugin [\#6590](https://github.com/netdata/netdata/pull/6590) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix configure.ac allowing deprecated LZ4 library call [\#6589](https://github.com/netdata/netdata/pull/6589) ([mfundul](https://github.com/mfundul))
 - Fix crash in malloc [\#6583](https://github.com/netdata/netdata/pull/6583) ([thiagoftsm](https://github.com/thiagoftsm))
