@@ -531,7 +531,7 @@ int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
              (rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
         );
     }
-    if(rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)
+    if (rc->rrdcalc_flags & RRDCALC_FLAG_DISABLED)
         return 1;
     else
         return 0;
@@ -690,7 +690,7 @@ void *health_main(void *ptr) {
                         debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': expression '%s' failed: %s",
                               host->hostname, rc->chart ? rc->chart : "NOCHART", rc->name,
                               rc->calculation->parsed_as, buffer_tostring(rc->calculation->error_msg)
-                         );
+                        );
                     } else {
                         rc->rrdcalc_flags &= ~RRDCALC_FLAG_CALC_ERROR;
 
@@ -796,7 +796,7 @@ void *health_main(void *ptr) {
                     switch (critical_status) {
                         case RRDCALC_STATUS_CLEAR:
                             if (status == RRDCALC_STATUS_UNDEFINED)
-                            status = RRDCALC_STATUS_CLEAR;
+                               status = RRDCALC_STATUS_CLEAR;
                             break;
 
                         case RRDCALC_STATUS_RAISED:
@@ -837,7 +837,7 @@ void *health_main(void *ptr) {
 
                         // COMMENTED: because we do need to send raising alarms
                         // if(now + delay < rc->delay_up_to_timestamp)
-                        // delay = (int)(rc->delay_up_to_timestamp - now);
+                        //      delay = (int)(rc->delay_up_to_timestamp - now);
 
                         rc->delay_last = delay;
                         rc->delay_up_to_timestamp = now + delay;
@@ -877,7 +877,6 @@ void *health_main(void *ptr) {
                         else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL))
                             repeat_every = rc->crit_repeat_every;
                     }
-
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
@@ -890,7 +889,6 @@ void *health_main(void *ptr) {
                                         ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
                                 )
                         );
-
                         ae->last_repeat = rc->last_repeat;
                         health_process_notifications(host, ae);
                         debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
@@ -914,6 +912,7 @@ void *health_main(void *ptr) {
         } /* rrdhost_foreach */
 
         rrd_unlock();
+
 
         if(unlikely(netdata_exit))
             break;
