@@ -87,7 +87,7 @@ netdata-coverity-analysis.tgz
 .settings/
 README
 TODO.md
-netdata.conf
+system/netdata.conf
 TODO.txt
 
 web/gui/chart-info/
