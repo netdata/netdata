@@ -60,7 +60,8 @@ stages:
     if: branch = master AND type != pull_request AND type != cron
 
   - name: Publish for release
-    if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/
+    # We don't run on release candidates
+    if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /(\[netdata release candidate\]|\[netdata major release\]|\[netdata minor release\]|\[netdata patch release\])/ AND tag !~ /(-rc)/
 
     # Build DEB packages under special conditions
   - name: Package ubuntu/* and debian/*
@@ -475,26 +476,48 @@ jobs:
 
     # We only publish if a TAG has been set during packaging
     - stage: Publish for release
+      _template: &RELEASE_TEMPLATE
+        git:
+          depth: false
+        before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images" "${NOTIF_CHANNEL}"
+        script:
+          - echo "GIT Branch:" && git branch
+          - echo "Last commit:" && git log -1
+          - echo "GIT Describe:" && git describe
+          - echo "packaging/version:" && cat packaging/version
+          - packaging/docker/check_login.sh
+          - echo "Switching to latest master branch, to pick up tagging if any" && git checkout master && git pull
+          - packaging/docker/build.sh
+          - packaging/docker/publish.sh
+        after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"
 
-      name: Build & Publish docker images
-      before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images" "${NOTIF_CHANNEL}"
-      script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - packaging/docker/check_login.sh
-        - echo "Switching to latest master branch, to pick up tagging if any" && git checkout master && git pull
-        - packaging/docker/build.sh
-        - packaging/docker/publish.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"
-      git:
-        depth: false
-      env: ALLOW_SOFT_FAILURE_HERE=true
-      # We don't run on release candidates
-      if: tag !~ /(-rc)/
+      name: Build & Publish docker image for i386
+      <<: *RELEASE_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=i386
+
+    - name: Build & Publish docker image for amd64
+      <<: *RELEASE_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=amd64
+
+    - name: Build & Publish docker image for armhf
+      <<: *RELEASE_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=armhf
+
+    - name: Build & Publish docker image for aarch64
+      <<: *RELEASE_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=aarch64
 
     - name: Create release draft
+      git:
+        depth: false
       before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
@@ -503,11 +526,7 @@ jobs:
         - echo "packaging/version:" && cat packaging/version
         - echo "Generating release artifacts" && .travis/create_artifacts.sh  # Could/should be a common storage to put this and share between jobs
         - .travis/draft_release.sh
-      git:
-        depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Draft release submission failed"
-      # We don't run on release candidates
-      if: tag !~ /(-rc)/
 
 
 
@@ -540,30 +559,52 @@ jobs:
     # This is the nightly execution step
     #
     - stage: Nightly release
+      _template: &NIGHTLY_TEMPLATE
+        git:
+          depth: false
+        before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "${NOTIF_CHANNEL}"
+        script:
+          - echo "GIT Branch:" && git branch
+          - echo "Last commit:" && git log -1
+          - echo "GIT Describe:" && git describe
+          - echo "packaging/version:" && cat packaging/version
+          - docker info
+          - packaging/docker/check_login.sh
+          - packaging/docker/build.sh
+          - packaging/docker/publish.sh
+        after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
 
-      name: Trigger .RPM and .DEB package generation
+      name: Build & Publish docker image for i386
+      <<: *NIGHTLY_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=i386
+
+    - name: Build & Publish docker image for amd64
+      <<: *NIGHTLY_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=amd64
+
+    - name: Build & Publish docker image for armhf
+      <<: *NIGHTLY_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=armhf
+
+    - name: Build & Publish docker image for aarch64
+      <<: *NIGHTLY_TEMPLATE
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
+        - ARCHS=aarch64
+
+    - name: Trigger .RPM and .DEB package generation
       before_script: post_message "TRAVIS_MESSAGE" "Starting RPM and DEB package generation for nightlies" "${NOTIF_CHANNEL}"
       script:
         - .travis/trigger_package_generation.sh "[Build latest]"
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly package generation produced errors" "${NOTIF_CHANNEL}"
       git:
         depth: false
-
-    - name: Build & Publish docker images
-      before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "${NOTIF_CHANNEL}"
-      script:
-        - echo "GIT Branch:" && git branch
-        - echo "Last commit:" && git log -1
-        - echo "GIT Describe:" && git describe
-        - echo "packaging/version:" && cat packaging/version
-        - docker info
-        - packaging/docker/check_login.sh
-        - packaging/docker/build.sh
-        - packaging/docker/publish.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
-      git:
-        depth: false
-      env: ALLOW_SOFT_FAILURE_HERE=true
 
     - name: Create nightly release artifacts, publish to GCS
       before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies" "${NOTIF_CHANNEL}"
