@@ -737,3 +737,19 @@ body {
 .ps-container:hover > .ps-scrollbar-y-rail:hover > .ps-scrollbar-y {
     background-color: #999; /* scrollbar color on hover */
 }
+
+.dygraph__history-tip {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: none; /* overriden in js */
+    margin-right: 25px;
+    direction: rtl;
+    overflow: hidden;
+}
+
+.dygraph__history-tip-content {
+    display: inline-block;
+    white-space: nowrap;
+    direction: ltr;
+}
