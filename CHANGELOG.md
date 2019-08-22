@@ -13,6 +13,7 @@
 - spigotmc module: :pencil2: fix typos. [\#6680](https://github.com/netdata/netdata/pull/6680) ([Cat7373](https://github.com/Cat7373))
 - netdata/packaging: \[ci skip\] Correlate configure command [\#6678](https://github.com/netdata/netdata/pull/6678) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Add auto-generation of packages for nightly [\#6675](https://github.com/netdata/netdata/pull/6675) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- .travis.yml: Build docker images in parallel [\#6672](https://github.com/netdata/netdata/pull/6672) ([knatsakis](https://github.com/knatsakis))
 - add CHANGELOG.md to .remarkignore [\#6671](https://github.com/netdata/netdata/pull/6671) ([prhomhyse](https://github.com/prhomhyse))
 - netdata/packaging: separately identify dependency resolution for HTTPS and DB engine [\#6670](https://github.com/netdata/netdata/pull/6670) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Bugfix 931843 1 [\#6667](https://github.com/netdata/netdata/pull/6667) ([sunflowerbofh](https://github.com/sunflowerbofh))
