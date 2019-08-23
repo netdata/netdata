@@ -213,6 +213,50 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     return 200;
 }
 
+inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
+    RRDCALC_STATUS status = RRDCALC_STATUS_RAISED;
+    BUFFER *contexts = NULL;
+
+    buffer_flush(w->response.data);
+    buffer_sprintf(w->response.data, "[");
+
+    while(url) {
+        char *value = mystrsep(&url, "&");
+        if(!value || !*value) continue;
+
+        char *name = mystrsep(&value, "=");
+        if(!name || !*name) continue;
+        if(!value || !*value) continue;
+
+        debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
+
+        char* p = value;
+        if(!strcmp(name, "status")) {
+            while ((*p = toupper(*p))) p++;
+            if (!strcmp("CRITICAL", value)) status = RRDCALC_STATUS_CRITICAL;
+            else if (!strcmp("WARNING", value)) status = RRDCALC_STATUS_WARNING;
+            else if (!strcmp("UNINITIALIZED", value)) status = RRDCALC_STATUS_UNINITIALIZED;
+            else if (!strcmp("UNDEFINED", value)) status = RRDCALC_STATUS_UNDEFINED;
+            else if (!strcmp("REMOVED", value)) status = RRDCALC_STATUS_REMOVED;
+            else if (!strcmp("CLEAR", value)) status = RRDCALC_STATUS_CLEAR;
+        }
+        else if(!strcmp(name, "context") || !strcmp(name, "ctx")) {
+            if(!contexts) contexts = buffer_create(255);
+            buffer_strcat(contexts, "|");
+            buffer_strcat(contexts, value);
+        }
+    }
+
+    health_aggregate_alarms(host, w->response.data, contexts, status);
+
+    buffer_sprintf(w->response.data, "]\n");
+    w->response.data->contenttype = CT_APPLICATION_JSON;
+    buffer_no_cacheable(w->response.data);
+
+    buffer_free(contexts);
+    return 200;
+}
+
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     uint32_t after = 0;
 
@@ -780,6 +824,7 @@ static struct api_command {
         { "alarms",          0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarms          },
         { "alarm_log",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_log       },
         { "alarm_variables", 0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_variables },
+        { "alarm_count",     0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_alarm_count     },
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_allmetrics      },
         { "manage/health",   0, WEB_CLIENT_ACL_MGMT,      web_client_api_request_v1_mgmt_health     },
         // terminator
