@@ -53,6 +53,12 @@ override_dh_install: debian/netdata.postinst
 	done
 	sed -i "/^#PERMS#/d" $(CURDIR)/debian/netdata.postinst
 
+	# Set the CUPS plugin install rule
+	#
+	mkdir -p $(TOP)-plugin-cups/usr/lib/netdata/plugins.d
+	mv -f debian/tmp/usr/lib/netdata/plugins.d/cups.plugin \
+	$(TOP)-plugin-cups/usr/lib/netdata/plugins.d/cups.plugin
+
 	# Install go
 	#
 	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/netdata/ $(TOP)/usr/libexec/netdata
@@ -80,6 +86,9 @@ override_dh_fixperms:
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
 	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
+
+	# CUPS plugin package
+	chmod 0750 $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
 
 override_dh_installlogrotate:
 	cp system/netdata.logrotate debian/netdata.logrotate
