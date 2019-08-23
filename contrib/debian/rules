@@ -55,9 +55,9 @@ override_dh_install: debian/netdata.postinst
 
 	# Set the CUPS plugin install rule
 	#
-	mkdir -p $(TOP)-plugin-cups/usr/lib/netdata/plugins.d
-	mv -f debian/tmp/usr/lib/netdata/plugins.d/cups.plugin \
-	$(TOP)-plugin-cups/usr/lib/netdata/plugins.d/cups.plugin
+	mkdir -p $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d
+	mv -f $(CURDIR)/debian/tmp/usr/libexec/netdata/plugins.d/cups.plugin \
+	$(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
 
 	# Install go
 	#
