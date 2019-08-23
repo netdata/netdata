@@ -746,10 +746,12 @@ body {
     margin-right: 25px;
     direction: rtl;
     overflow: hidden;
+    pointer-events: none;
 }
 
 .dygraph__history-tip-content {
     display: inline-block;
     white-space: nowrap;
     direction: ltr;
+    pointer-events: auto;
 }
