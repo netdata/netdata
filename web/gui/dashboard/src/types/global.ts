@@ -103,6 +103,9 @@ interface NETDATA {
   serverDefault: string
   start: () => void
   themes: { [key: string]: Theme }
+  fastNumberFormat: {
+    get: (min: number, max: number) => Intl.NumberFormat,
+  }
 }
 
 type jQuery = any

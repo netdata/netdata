@@ -62,8 +62,9 @@ export const Chart = ({
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
   const {
-    // todo take into account units_current from unitsConversionSetup()
     units = chartDetails.units,
+    unitsCommon,
+    unitsDesired = window.NETDATA.options.current.units,
   } = attributes
 
   const shouldDisplayToolbox = hasLegend(attributes)
@@ -97,13 +98,15 @@ export const Chart = ({
   }, [attributes, chartSettings, hasLegend, portalNode])
 
   const {
+    legendFormatValue,
     legendFormatValueDecimalsFromMinMax,
-    convertUnits,
     unitsCurrent,
   } = useFormatters({
+    attributes,
+    data: chartData,
     units,
-    unitsCommon: "todo",
-    unitsDesired: "todo",
+    unitsCommon,
+    unitsDesired,
     uuid: chartUuid,
   })
 
@@ -128,9 +131,10 @@ export const Chart = ({
         chartLibrary={chartLibrary}
         colors={colors}
         chartUuid={chartUuid}
-        legendFormatValue={convertUnits}
+        legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
         setMinMax={([min, max]) => { legendFormatValueDecimalsFromMinMax(min, max) }}
+        unitsCurrent={unitsCurrent}
       />
       {hasLegend && (
         <ChartLegend
@@ -139,6 +143,7 @@ export const Chart = ({
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}
           colors={colors}
+          legendFormatValue={legendFormatValue}
           unitsCurrent={unitsCurrent}
         />
       )}

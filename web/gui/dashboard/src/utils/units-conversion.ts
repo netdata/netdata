@@ -269,7 +269,7 @@ export const unitsConversionCreator = {
   // + every time units are switched call the callback
   get(
     uuid: string, min: number, max: number, units: string | undefined,
-    desiredUnits: undefined | null | string, commonUnitsName: string | undefined,
+    desiredUnits: undefined | null | string, commonUnitsName: string | null | undefined,
     switchUnitsCallback: (units: string) => void,
   ) {
     // validate the parameters
@@ -286,7 +286,7 @@ export const unitsConversionCreator = {
     }
 
     // check if the caller wants the original units
-    if (typeof desiredUnits === "undefined" || desiredUnits === null || desiredUnits === "original" || desiredUnits === units) {
+    if (desiredUnits === undefined || desiredUnits === null || desiredUnits === "original" || desiredUnits === units) {
       // console.log('DEBUG: ' + uuid.toString() + ' original units wanted');
       switchUnitsCallback(units)
       return identity

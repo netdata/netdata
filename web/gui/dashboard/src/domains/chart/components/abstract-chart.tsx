@@ -17,6 +17,7 @@ interface Props {
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
   setMinMax: (minMax: [number, number]) => void
+  unitsCurrent: string
 }
 
 export const AbstractChart = ({
@@ -29,6 +30,7 @@ export const AbstractChart = ({
   legendFormatValue,
   orderedColors,
   setMinMax,
+  unitsCurrent,
 }: Props) => (
   <DygraphChart
     attributes={attributes}
@@ -40,5 +42,6 @@ export const AbstractChart = ({
     legendFormatValue={legendFormatValue}
     orderedColors={orderedColors}
     setMinMax={setMinMax}
+    unitsCurrent={unitsCurrent}
   />
 )

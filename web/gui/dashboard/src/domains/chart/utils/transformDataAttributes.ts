@@ -84,8 +84,11 @@ export interface Attributes {
   before: number
   legend: boolean
   units: string
+  unitsCommon: string | undefined
+  unitsDesired: string | undefined
   colors: string | undefined
   commonColors: string | undefined
+  decimalDigits: number | undefined
 
   dygraphType: string | undefined
   dygraphValueRange: any[] | undefined
@@ -162,8 +165,11 @@ const getAttributesMap = (): AttributesMap => ({
   before: { key: "after", defaultValue: window.NETDATA.chartDefaults.before },
   legend: { key: "legend", type: "boolean", defaultValue: true },
   units: { key: "units" },
+  unitsCommon: { key: "common-units" },
+  unitsDesired: { key: "desired-units" },
   colors: { key: "colors" },
   commonColors: { key: "common-colors" },
+  decimalDigits: { key: "decimal-digits" },
 
   // let's not put the default values here, because they will also be needed by the main Agent page
   // and the Cloud App

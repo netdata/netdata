@@ -25,6 +25,7 @@ interface GetDygraphOptions {
   chartSettings: ChartLibraryConfig,
   hiddenLabelsElementId: string,
   orderedColors: string[],
+  unitsCurrent: string,
   xAxisTimeString: (d: Date) => string,
 }
 const getDygraphOptions = ({
@@ -34,6 +35,7 @@ const getDygraphOptions = ({
   chartSettings,
   hiddenLabelsElementId,
   orderedColors,
+  unitsCurrent,
   xAxisTimeString,
 }: GetDygraphOptions) => {
   const isSparkline = attributes.dygraphTheme === "sparkline"
@@ -117,7 +119,6 @@ const getDygraphOptions = ({
     dygraphYAxisLabelWidth = 50,
     dygraphDrawYAxis = dygraphDrawAxis,
   } = attributes
-  const yLabel = "percentage" // todo (state.unts_current)
   // todo lift the state
   const visibility = chartData.dimension_names.map(() => true)
   return {
@@ -143,7 +144,7 @@ const getDygraphOptions = ({
     xRangePad: dygraphXRangePad,
     yRangePad: dygraphYRangePad,
     valueRange: dygraphValueRange,
-    ylabel: yLabel,
+    ylabel: unitsCurrent,
     yLabelWidth: dygraphYLabelWidth,
 
     // the function to plot the chart
@@ -229,6 +230,7 @@ interface Props {
   orderedColors: string[]
 
   setMinMax: (minMax: [number, number]) => void
+  unitsCurrent: string
 }
 export const DygraphChart = ({
   attributes,
@@ -241,6 +243,7 @@ export const DygraphChart = ({
   orderedColors,
 
   setMinMax,
+  unitsCurrent,
 }: Props) => {
   const { xAxisTimeString } = useDateTime()
   const chartSettings = chartLibrariesSettings[chartLibrary]
@@ -253,6 +256,7 @@ export const DygraphChart = ({
     chartSettings,
     hiddenLabelsElementId,
     orderedColors,
+    unitsCurrent,
     xAxisTimeString,
   })
 
@@ -273,12 +277,15 @@ export const DygraphChart = ({
 
   useLayoutEffect(() => {
     if (dygraphInstance && legendFormatValue) {
+      const isSparkline = attributes.dygraphTheme === "sparkline"
+      // corresponds to NETDATA.dygraphChartUpdate in old dashboard
       dygraphInstance.updateOptions({
         axes: {
           y: {
             axisLabelFormatter: (y: Date | number) => legendFormatValue(y as number),
           },
         },
+        ylabel: isSparkline ? unitsCurrent : undefined,
       })
     }
   })
