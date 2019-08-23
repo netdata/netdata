@@ -430,6 +430,38 @@ paths:
             type: array
             items:
               $ref: '#/definitions/alarm_log_entry'
+  /alarm_count:
+    get:
+      summary: 'Get an overall status of the chart'
+      description: "Checks multiple charts with the same context and counts number of alarms with given status."
+      parameters:
+        - in: query
+          name: context
+          description: "Specify context which should be checked"
+          required: false
+          allowEmptyValue: true
+          type: array
+          items:
+            type: string
+            collectionFormat: pipes
+          default: ['system.cpu']
+        - in: query
+          name: status
+          description: "Specify alarm status to count"
+          required: false
+          allowEmptyValue: true
+          type: string
+          enum: ['REMOVED', 'UNDEFINED', 'UNINITIALIZED', 'CLEAR', 'RAISED', 'WARNING', 'CRITICAL']
+          default: 'RAISED'
+      responses:
+        '200':
+          description: 'An object containing a count of alarms with given status for given contexts'
+          schema:
+            type: array
+            items: 
+              type: number
+        '500':
+          description: 'Internal server error. This usually means the server is out of memory.'
   /manage/health:
     get:
       summary: 'Accesses the health management API to control health checks and notifications at runtime.'
