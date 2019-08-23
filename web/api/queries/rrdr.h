@@ -22,6 +22,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_DISPLAY_ABS  = 0x00002000, // for badges, display the absolute value, but calculate colors with sign
     RRDR_OPTION_MATCH_IDS    = 0x00004000, // when filtering dimensions, match only IDs
     RRDR_OPTION_MATCH_NAMES  = 0x00008000, // when filtering dimensions, match only names
+    RRDR_OPTION_CUSTOM_VARS  = 0x00010000, // when wraping response in a JSON, return custom variables in response
 } RRDR_OPTIONS;
 
 typedef enum rrdr_value_flag {

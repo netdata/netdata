@@ -1,24 +1,25 @@
 # Install Netdata with Docker
 
-> :warning: As of Sep 9th, 2018 we ship [new docker builds](https://github.com/netdata/netdata/pull/3995), running Netdata in Docker with an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND is presented by goinbigdata [here](http://goinbigdata.com/docker-run-vs-cmd-vs-entrypoint/) and by docker docs [here](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
->
-> Also, the `latest` is now based on alpine, so **`alpine` is not updated any more** and `armv7hf` is now replaced with `armhf` (to comply with <https://github.com/multiarch> naming), so **`armv7hf` is not updated** either.
+Running Netdata in a container works best for an internal network or to quickly analyze a host. Docker helps you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling Netdata easy.
 
-## Limitations
+See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-Running Netdata in a container for monitoring the whole host, can limit its capabilities. Some data is not accessible or not as detailed as when running Netdata on the host.
+## Limitations running Netdata in Docker
 
-## Package scrambling in runtime (x86_64 only)
+For monitoring the whole host, running Netdata in a container can limit its capabilities. 
+Some data, like the host OS performance or status, is not accessible or not as detailed in a container as when running Netdata directly on the host.
 
-By default on x86_64 architecture our docker images use Polymorphic Polyverse Linux package scrambling. For increased security you can enable rescrambling of packages during runtime. To do this set environment variable `RESCRAMBLE=true` while starting Netdata docker container.
+A way around this is to provide special mounts to the Docker container so that Netdata can get visibility on host OS information like `/sys` and `/proc` folders or even `/etc/group` and shadow files.
 
-For more information go to [Polyverse site](https://polyverse.io/how-it-works/)
+Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about ENTRYPOINT vs COMMAND in the [Docker documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
+
+### Package scrambling in runtime (x86_64 only)
+
+Our x86_64 Docker images use [Polymorphic Polyverse Linux package scrambling](https://polyverse.io/how-it-works/). For increased security, you can enable rescrambling of Netdata packages during runtime by setting the environment variable `RESCRAMBLE=true` while starting Netdata with a Docker container.
 
 ## Run Netdata with the docker command
 
 Quickly start Netdata with the `docker` command. Netdata is then available at <http://host:19999>
-
-This is good for an internal network or to quickly analyse a host.
 
 ```bash
 docker run -d --name=netdata \
@@ -32,7 +33,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-The above can be converted to docker-compose file for ease of management:
+The above can be converted to `docker-compose` file for ease of management:
 
 ```yaml
 version: '3'
@@ -61,9 +62,33 @@ There are a few options for resolving container names within Netdata. Some metho
 
 #### Docker socket proxy (safest option)
 
-Deploy a Docker socket proxy that accepts and filter out requests using something like [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access to the CONTAINERS endpoint.
+Deploy a Docker socket proxy that accepts and filters out requests using something like [HAProxy](https://docs.netdata.cloud/docs/running-behind-haproxy/) so that it restricts connections to read-only access to the CONTAINERS endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker network. Access to the proxy container is limited to only within the network.
+
+Below is [an example repository (and image)](https://github.com/Tecnativa/docker-socket-proxy) that provides a proxy to the socket.
+
+You run the Docker Socket Proxy in its own Docker Compose file and leave it on a private network that you can add to other services that require access.
+
+```yaml
+version: '3'
+services:
+  netdata:
+    image: netdata/netdata
+    # ... rest of your config ...
+    ports:
+      - 19999:19999
+    environment:
+      - DOCKER_HOST=proxy:2375
+  proxy:
+    image: tecnativa/docker-socket-proxy
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+
+```
+**Note:** Replace `2375` with the port of your proxy.
 
 #### Giving group access to the Docker socket (less safe)
 
@@ -103,21 +128,15 @@ services:
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide [Netdata daemon command line options](https://docs.netdata.cloud/daemon/#command-line-options) such as the IP address Netdata will be running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
-## Install Netdata using Docker Compose with SSL/TLS enabled http proxy
+## Install Netdata using Docker Compose with SSL/TLS enabled HTTP Proxy
 
-For a permanent installation on a public server, you should [secure your Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL reverse proxy and basic authentication.
+For a permanent installation on a public server, you should [secure the Netdata instance](../../docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL reverse proxy and basic authentication.
 
-You can use use the following docker-compose.yml and Caddyfile files to run Netdata with docker. Replace the Domains and email address for [Letsencrypt](https://letsencrypt.org/) before starting.
-
-### Prerequisites
-
--   [Docker](https://docs.docker.com/install/#server)
--   [Docker Compose](https://docs.docker.com/compose/install/)
--   Domain configured in DNS pointing to host.
+You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
 
 ### Caddyfile
 
-This file needs to be placed in /opt with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Letsencrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
+This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain and you need to provide your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be executed internally by the caddy server.
 
 ```caddyfile
 netdata.example.org {
@@ -166,8 +185,6 @@ services:
 
 You can restrict access by following [official caddy guide](https://caddyserver.com/docs/basicauth) and adding lines to Caddyfile.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
-
 ## Publish a test image to your own repository
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
@@ -177,7 +194,7 @@ You may either use the command line tools available or take advantage of our Tra
 
 The script `packaging/docker/build-test.sh` can be used to create an image and upload it to a repository of your choosing. 
 
-```
+```bash
 Usage: packaging/docker/build-test.sh -r <REPOSITORY> -v <VERSION> -u <DOCKER_USERNAME> -p <DOCKER_PWD> [-s]
 	-s skip build, just push the image
 Builds an amd64 image and pushes it to the docker hub repository REPOSITORY
@@ -189,7 +206,7 @@ Example:
 
 We get a local copy of the Helm chart at <https://github.com/netdata/helmchart>. We modify `values.yaml` to have the following:
 
-```
+```yaml
 image:
   repository: cakrit/netdata-prs
   tag: PR5576
@@ -198,7 +215,7 @@ image:
 
 We check out PR5576 and run the following:
 
-```
+```bash
 ./packaging/docker/build-test.sh -r cakrit/netdata-prs -v PR5576 -u cakrit -p 'XXX'
 ```
 
@@ -209,6 +226,7 @@ If we make changes to the code, we execute the same `build-test.sh` command, fol
 ### Inside Netdata organization, using Travis CI
 
 To enable Travis CI integration on your own repositories (Docker and Github), you need to be part of the Netdata organization.
+
 Once you have contacted the Netdata owners to setup you up on Github and Travis, execute the following steps
 
 -   Preparation
@@ -229,3 +247,5 @@ Once you have contacted the Netdata owners to setup you up on Github and Travis,
     -   COVERITY_SCAN_SUBMIT_EMAIL and COVERITY_SCAN_TOKEN variables to enable Travis to submit your code for analysis to Coverity.
 
 Having followed these instructions, your forked repository should be all set up for Travis Integration, happy testing!
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fpackaging%2Fdocker%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
