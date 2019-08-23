@@ -63,14 +63,12 @@ override_dh_install: debian/netdata.postinst
 	# Set the rest of the plugin install rules
 	#
 	mkdir -p $(TOP)/usr/libexec/netdata/plugins.d
-	for plugin in cgroup-network freeipmi.plugin nfacct.plugin perf.plugin; do \
-		cp $(CURDIR)/debian/tmp/usr/libexec/netdata/plugins.d/$${plugin} \
-		$(TOP)/usr/libexec/netdata/plugins.d; \
-	done
+	mv -f $(CURDIR)/debian/tmp/usr/libexec/netdata/plugins.d/*.plugin \
+	$(TOP)/usr/libexec/netdata/plugins.d; \
 
 	# Install go
 	#
-	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/netdata/ $(TOP)/usr/libexec/netdata
+	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/netdata $(TOP)/usr/libexec/netdata
 
 override_dh_installdocs:
 	dh_installdocs
