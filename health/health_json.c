@@ -240,7 +240,7 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     rrdhost_rdlock(host);
 
     if (contexts) {
-        p = buffer_tostring(contexts);
+        p = (char*)buffer_tostring(contexts);
         while(p && *p && (tok = mystrsep(&p, ", |"))) {
             if(!*tok) continue;
 
@@ -248,7 +248,8 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
                 if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                     continue;
                 if(unlikely(rc->rrdset && rc->rrdset->hash_context == simple_hash(tok)
-                            && !strcmp(rc->rrdset->context, tok) && rc->status == status))
+                            && !strcmp(rc->rrdset->context, tok)
+                            && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
                     numberOfAlarms++;
             }
         }
@@ -258,7 +259,7 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
             if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
                 continue;
 
-            if(unlikely(rc->status == status))
+            if(unlikely((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status))
                 numberOfAlarms++;
         }
     }
