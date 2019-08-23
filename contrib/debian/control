@@ -58,5 +58,6 @@ Description: real-time charts for system monitoring
 
 Package: netdata-plugin-cups
 Architecture: any
-Depends: cups
+Depends: cups,
+         netdata (>= ${source:Version})
 Description: The Common Unix Printing System plugin for metrics collection from cupds
