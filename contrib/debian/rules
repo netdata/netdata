@@ -33,9 +33,9 @@ override_dh_install: debian/netdata.postinst
 
 	# Copy over required files
 	#
-	[ ! -f $(TOP)/var/lib/netdata ] && mv -f $(CURDIR)/debian/tmp/var/lib/netdata \
+	[ ! -d $(TOP)/var/lib/netdata ] && mv -f $(CURDIR)/debian/tmp/var/lib/netdata \
 						 $(TOP)/var/lib/netdata
-	[ ! -f $(TOP)/var/cache/netdata ] && mv -f $(CURDIR)/debian/tmp/var/cache/netdata \
+	[ ! -d $(TOP)/var/cache/netdata ] && mv -f $(CURDIR)/debian/tmp/var/cache/netdata \
 						 $(TOP)/var/cache/netdata
 
 
