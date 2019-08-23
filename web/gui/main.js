@@ -1799,7 +1799,7 @@ function renderPage(menus, data) {
         minute: 'minute', minutes: 'minutes', second: 'second', seconds: 'seconds', space: '&nbsp;',
       }) +
       ' of real-time history.<br />&nbsp;<br />' + 'Get more history by ' +
-      '<a href="https://docs.netdata.cloud/daemon/config/#global-section-options" target=_blank>configuring Netdata\'s <b>history</b></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>' +
+      '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <b>history</b></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>' +
       '<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
     div.innerHTML = html;

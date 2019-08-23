@@ -979,7 +979,7 @@ NETDATA.dygraphChartCreate = function (state, data) {
         <span class="dygraph__history-tip-content">
           Want to extend your history of real-time metrics?
           <br />
-           <a href="https://docs.netdata.cloud/daemon/config/#global-section-options" target=_blank>
+           <a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>
              Configure Netdata's <b>history</b></a>
            or use the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine</a>.
         </span>
