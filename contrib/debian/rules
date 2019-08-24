@@ -40,12 +40,12 @@ override_dh_install: debian/netdata.postinst
 
 	# Set the rest of the software in the main package
 	#
-	cp -r $(TEMPTOP)/usr $(TOP)/usr
-	cp -r $(TEMPTOP)/var $(TOP)/var
-	#cp -r $(TEMPTOP)/etc $(TOP)/etc
+	cp -rp $(TEMPTOP)/usr $(TOP)/usr
+	cp -rp $(TEMPTOP)/var $(TOP)/var
+	#cp -rp $(TEMPTOP)/etc $(TOP)/etc
 
 	# Copy sample netdata.conf
-	cp $(CURDIR)/system/edit-config $(TOP)/etc/netdata/
+	cp -p $(CURDIR)/system/edit-config $(TOP)/etc/netdata/
 
 	# Create placeholder dirs in netdata configuration directory
 	#
