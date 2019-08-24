@@ -31,16 +31,6 @@ override_dh_install: debian/netdata.postinst
 	#
 	find "$(TOP)" -name .keep -exec rm '{}' ';'
 
-	# Copy over required files
-	#
-	mkdir -p $(TOP)/var/lib
-	[ ! -d $(TOP)/var/lib/netdata ] && mv -f $(CURDIR)/debian/tmp/var/lib/netdata \
-						 $(TOP)/var/lib/netdata
-	mkdir -p $(TOP)/var/cache
-	[ ! -d $(TOP)/var/cache/netdata ] && mv -f $(CURDIR)/debian/tmp/var/cache/netdata \
-						 $(TOP)/var/cache/netdata
-
-
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
 	mkdir -p "$(TOP)/usr/share/netdata"
