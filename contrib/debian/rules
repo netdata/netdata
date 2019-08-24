@@ -46,11 +46,11 @@ override_dh_install: debian/netdata.postinst
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
-	mkdir -p "$(TEMPTOP)/usr/share/netdata/www"
-	for D in $$(find "$(TEMPTOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
+	mkdir -p "$(TOP)/usr/share/netdata/www"
+	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
 		echo Relocating $$D; \
-		mv "$(TEMPTOP)/var/lib/netdata/www/$$D" "$(TEMPTOP)/usr/share/netdata/www/$$D"; \
-		ln -s "$(TEMPTOP)/usr/share/netdata/$$D" "$(TEMPTOP)/var/lib/netdata/www/$$D"; \
+		mv "$(TOP)/var/lib/netdata/www/$$D" "$(TOP)/usr/share/netdata/www/$$D"; \
+		ln -s "/usr/share/netdata/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
 	done
 
 	# Update postinst to set correct group for www files on installation.
@@ -58,7 +58,7 @@ override_dh_install: debian/netdata.postinst
 	# messy. We also set all web files in /var as conffiles so an upgrade
 	# doesn't splat them.
 	#
-	for D in $$(find "$(TEMPTOP)/var/lib/netdata/www/" -maxdepth 1 -type f -printf '%f '); do \
+	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type f -printf '%f '); do \
 		echo Updating postinst for $$D; \
 		sed -i "s/^#PERMS#/chgrp netdata \/var\/lib\/netdata\/www\/$$D\n#PERMS#/g" \
 			$(CURDIR)/debian/netdata.postinst; \
@@ -68,7 +68,7 @@ override_dh_install: debian/netdata.postinst
 
 	# Install go
 	#
-	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TEMPTOP)/usr/lib/netdata $(TEMPTOP)/usr/libexec/netdata
+	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/netdata $(TOP)/usr/libexec/netdata
 
 override_dh_installdocs:
 	dh_installdocs
