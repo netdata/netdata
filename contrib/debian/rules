@@ -46,7 +46,7 @@ override_dh_install: debian/netdata.postinst
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
-	mkdir -p "$(TEMPTOP)/usr/share/netdata"
+	mkdir -p "$(TEMPTOP)/usr/share/netdata/www"
 	for D in $$(find "$(TEMPTOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
 		echo Relocating $$D; \
 		mv "$(TEMPTOP)/var/lib/netdata/www/$$D" "$(TEMPTOP)/usr/share/netdata/www/$$D"; \
