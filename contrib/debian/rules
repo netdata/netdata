@@ -41,12 +41,7 @@ override_dh_install: debian/netdata.postinst
 	#
 	mkdir -p $(TOP)/usr/libexec/netdata/plugins.d
 	mv -f $(CURDIR)/debian/tmp/usr/libexec/netdata/plugins.d/*.plugin \
-	$(TOP)/usr/libexec/netdata/plugins.d; \
-
-	# Move the rest of the stuff back on the main package
-	#
-	cp -r $(CURDIR)/debian/tmp/* $(CURDIR)/debian/netdata/
-	rm -rf $(CURDIR)/debian/tmp/*
+	$(TOP)/usr/libexec/netdata/plugins.d;
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
