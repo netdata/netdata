@@ -43,7 +43,21 @@ override_dh_install: debian/netdata.postinst
 	cp -r $(TEMPTOP)/usr $(TOP)/usr
 	cp -r $(TEMPTOP)/var $(TOP)/var
 	#cp -r $(TEMPTOP)/etc $(TOP)/etc
+
+	# Copy sample netdata.conf
 	cp $(CURDIR)/system/edit-config $(TOP)/etc/netdata/
+
+	# Create placeholder dirs in netdata configuration directory
+	#
+	mkdir -p $(TOP)/etc/netdata/health.d
+	mkdir -p $(TOP)/etc/netdata/python.d
+	mkdir -p $(TOP)/etc/netdata/charts.d
+	mkdir -p $(TOP)/etc/netdata/cystonm-plugins.d
+	mkdir -p $(TOP)/etc/netdata/go.d
+	mkdir -p $(TOP)/etc/netdata/ssl
+	mkdir -p $(TOP)/etc/netdata/node.d
+	mkdir -p $(TOP)/etc/netdata/statsd.d
+
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
@@ -94,6 +108,10 @@ override_dh_fixperms:
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
 	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
+
+	# Support script for configuration file management
+	#
+	chmod 0750 $(TOP)/etc/netdata/edit-config
 
 	# CUPS plugin package
 	chmod 0750 $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
