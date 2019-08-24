@@ -38,11 +38,11 @@ override_dh_install: debian/netdata.postinst
 	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/cups.plugin \
 	$(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
 
-	# Set the rest of the plugin install rules
+	# Set the rest of the software in the main package
 	#
-	mkdir -p $(TOP)/usr/libexec/netdata/plugins.d
-	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/*.plugin \
-	$(TOP)/usr/libexec/netdata/plugins.d;
+	cp -r $(TEMPTOP)/usr $(TOP)/usr
+	cp -r $(TEMPTOP)/var $(TOP)/var
+	cp -r $(TEMPTOP)/etc $(TOP)/etc
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
