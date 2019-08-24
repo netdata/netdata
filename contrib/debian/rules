@@ -42,7 +42,8 @@ override_dh_install: debian/netdata.postinst
 	#
 	cp -r $(TEMPTOP)/usr $(TOP)/usr
 	cp -r $(TEMPTOP)/var $(TOP)/var
-	cp -r $(TEMPTOP)/etc $(TOP)/etc
+	#cp -r $(TEMPTOP)/etc $(TOP)/etc
+	cp $(CURDIR)/system/edit-config $(TOP)/etc/netdata/
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
