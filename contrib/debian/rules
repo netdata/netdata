@@ -45,7 +45,8 @@ override_dh_install: debian/netdata.postinst
 
 	# Move the rest of the stuff back on the main package
 	#
-	mv -f $(CURDIR)/debian/tmp/* $(CURDIR)/debian/netdata/
+	cp -r $(CURDIR)/debian/tmp/* $(CURDIR)/debian/netdata/
+	rm -rf $(CURDIR)/debian/tmp/*
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
