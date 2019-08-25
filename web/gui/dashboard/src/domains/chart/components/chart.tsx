@@ -1,5 +1,5 @@
 import { __, forEachObjIndexed, prop } from "ramda"
-import React, { useEffect, useLayoutEffect } from "react"
+import React, { useEffect, useLayoutEffect, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
 import { requestCommonColorsAction } from "domains/global/actions"
@@ -110,6 +110,9 @@ export const Chart = ({
     uuid: chartUuid,
   })
 
+  const [legendLabelValues, setLegendLabelValues] = useState<(number | null)[]>(
+    chartData.dimension_names.map(() => null))
+
   const selectAssignedColors = createSelectAssignedColors({
     chartContext: chartDetails.context,
     chartUuid,
@@ -133,6 +136,7 @@ export const Chart = ({
         chartUuid={chartUuid}
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
+        setLegendLabelValues={setLegendLabelValues}
         setMinMax={([min, max]) => { legendFormatValueDecimalsFromMinMax(min, max) }}
         unitsCurrent={unitsCurrent}
       />
@@ -145,6 +149,7 @@ export const Chart = ({
           colors={colors}
           legendFormatValue={legendFormatValue}
           unitsCurrent={unitsCurrent}
+          legendLabelValues={legendLabelValues}
         />
       )}
       {shouldDisplayToolbox && (

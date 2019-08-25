@@ -14,6 +14,7 @@ interface Props {
     [key: string]: string
   }
   legendFormatValue: (value: number | string) => (number | string)
+  legendLabelValues: (number | null)[]
   unitsCurrent: string
 }
 
@@ -64,6 +65,7 @@ export const ChartLegend = ({
   chartLibrary,
   colors,
   legendFormatValue,
+  legendLabelValues,
   unitsCurrent,
 }: Props) => {
   const netdataLast = chartData.last_entry * 1000
@@ -152,7 +154,9 @@ export const ChartLegend = ({
                 // todo this needs to be further formatted using this.legendFormatValue()
                 // (but first, charts needs to be configured)
               >
-                {legendFormatValue(chartData.view_latest_values[i])}
+                {legendFormatValue(
+                  legendLabelValues[i] || chartData.view_latest_values[i],
+                )}
               </span>
             </Fragment>
           )

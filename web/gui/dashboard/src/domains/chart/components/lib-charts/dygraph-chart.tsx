@@ -18,6 +18,16 @@ import { ChartData, ChartDetails } from "../../chart-types"
 
 import "./dygraph-chart.css"
 
+interface Serie {
+  color: string
+  dashHTML: string
+  isVisible: boolean
+  label: string
+  labelHTML: string
+  y: number
+  yHTML: string
+}
+
 interface GetDygraphOptions {
   attributes: Attributes,
   chartData: ChartData,
@@ -25,6 +35,7 @@ interface GetDygraphOptions {
   chartSettings: ChartLibraryConfig,
   hiddenLabelsElementId: string,
   orderedColors: string[],
+  setLegendLabelValues: (labelValues: number[]) => void
   unitsCurrent: string,
   xAxisTimeString: (d: Date) => string,
 }
@@ -35,6 +46,7 @@ const getDygraphOptions = ({
   chartSettings,
   hiddenLabelsElementId,
   orderedColors,
+  setLegendLabelValues,
   unitsCurrent,
   xAxisTimeString,
 }: GetDygraphOptions) => {
@@ -214,6 +226,15 @@ const getDygraphOptions = ({
         // axisLabelFormatter is added on the updates
       },
     },
+    legendFormatter: (data: { x: number | undefined, series: Serie[] }) => {
+      // todo this dygraph callback should not be used to send side effects
+      // investigate if setting label value can be moved to different callback
+
+      if (data.x !== undefined) {
+        setLegendLabelValues(data.series.map(serie => serie.y))
+      }
+      return ""
+    },
   }
 }
 
@@ -229,6 +250,7 @@ interface Props {
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
 
+  setLegendLabelValues: (labelValues: number[]) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
 }
@@ -242,6 +264,7 @@ export const DygraphChart = ({
   legendFormatValue,
   orderedColors,
 
+  setLegendLabelValues,
   setMinMax,
   unitsCurrent,
 }: Props) => {
@@ -249,22 +272,23 @@ export const DygraphChart = ({
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const hiddenLabelsElementId = `${chartUuid}-hidden-labels-id`
 
-  const dygraphOptions = getDygraphOptions({
-    attributes,
-    chartData,
-    chartDetails,
-    chartSettings,
-    hiddenLabelsElementId,
-    orderedColors,
-    unitsCurrent,
-    xAxisTimeString,
-  })
-
   const chartElement = useRef<HTMLDivElement>(null)
   const [dygraphInstance, setDygraphInstance] = useState<Dygraph | null>(null)
 
   useLayoutEffect(() => {
     if (chartElement && chartElement.current && !dygraphInstance) {
+      const dygraphOptions = getDygraphOptions({
+        attributes,
+        chartData,
+        chartDetails,
+        chartSettings,
+        hiddenLabelsElementId,
+        orderedColors,
+        setLegendLabelValues,
+        unitsCurrent,
+        xAxisTimeString,
+      })
+
       // todo if any flickering will happen, show the dygraph chart only when it's
       // updated with proper formatting (toggle visibility with css)
       const instance = new Dygraph((chartElement.current), chartData.result.data, dygraphOptions)
@@ -273,7 +297,9 @@ export const DygraphChart = ({
       const extremes = (instance as NetdataDygraph).yAxisExtremes()[0]
       setMinMax(extremes)
     }
-  }, [chartData.result.data, dygraphInstance, dygraphOptions, setMinMax])
+  }, [attributes, chartData, chartDetails, chartSettings, dygraphInstance, hiddenLabelsElementId,
+    orderedColors, setLegendLabelValues, setMinMax, unitsCurrent, xAxisTimeString,
+  ])
 
   useLayoutEffect(() => {
     if (dygraphInstance && legendFormatValue) {
