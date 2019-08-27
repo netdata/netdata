@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 %global contentdir %{_datadir}/netdata
 
+
+#TODO: Temporary fix for the build-id error during go.d plugin set up
+%global _missing_build_ids_terminate_build 0
+
 # This is temporary and should eventually be resolved. This bypasses
 # the default rhel __os_install_post which throws a python compile
 # error.

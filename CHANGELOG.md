@@ -45,6 +45,7 @@
 - netdata/packaging: Bare OS validations [\#6574](https://github.com/netdata/netdata/pull/6574) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - vsphere collector: charts descritpion and alarms [\#6572](https://github.com/netdata/netdata/pull/6572) ([ilyam8](https://github.com/ilyam8))
 -  Documentation style guide & build instructions [\#6563](https://github.com/netdata/netdata/pull/6563) ([joelhans](https://github.com/joelhans))
+- Add alarm status counter api call [\#6554](https://github.com/netdata/netdata/pull/6554) ([alpes214](https://github.com/alpes214))
 - netdata/packaging: Documentation on distribution support matrix and functionality availability [\#6552](https://github.com/netdata/netdata/pull/6552) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
 - Add MongoDB backend [\#6524](https://github.com/netdata/netdata/pull/6524) ([vlvkobal](https://github.com/vlvkobal))
@@ -459,7 +460,7 @@
 - Prevent data corruption upon GUID duplication between master and slave netdata instances [\#5511](https://github.com/netdata/netdata/pull/5511) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Convert SpigotMC module to use regexes for parsing. [\#5507](https://github.com/netdata/netdata/pull/5507) ([Ferroin](https://github.com/Ferroin))
 - Add zero minimum in linux power supply module [\#5395](https://github.com/netdata/netdata/pull/5395) ([vlvkobal](https://github.com/vlvkobal))
-- sslcheck module: \(remote\) SSL certificate expiry time check [\#5365](https://github.com/netdata/netdata/pull/5365) ([p-thurner](https://github.com/p-thurner))
+- sslcheck module: \(remote\) SSL certificate expiry time check [\#5365](https://github.com/netdata/netdata/pull/5365) ([ghost](https://github.com/ghost))
 
 ## [v1.12.2](https://github.com/netdata/netdata/tree/v1.12.2) (2019-02-28)
 
