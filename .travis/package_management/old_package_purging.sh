@@ -90,4 +90,4 @@ for v in ${VERSIONS_TO_PURGE/\n//}; do
 done
 
 # Done, clean up
-# [ -d "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
+[ -d "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
