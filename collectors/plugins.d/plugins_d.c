@@ -249,7 +249,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 #ifdef ENABLE_HTTPS
     int bytesleft = 0;
     char tmpbuffer[PLUGINSD_LINE_MAX];
-    char *readfrom;
+    char *readfrom = NULL;
 #endif
     char *r = NULL;
     while(!ferror(fp)) {
