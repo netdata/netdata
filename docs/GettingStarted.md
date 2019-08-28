@@ -1,83 +1,57 @@
 # Getting started guide
 
-Thanks for installing Netdata! In this guide, we'll walk you through the first steps you should take after getting Netdata installed.
+Thanks for installing Netdata! In this guide, we'll walk you through the first
+steps you should take after getting Netdata installed.
 
-Netdata can collect thousands of metrics in real-time without any configuration, but there are a few things you can do, like extending the history, to make Netdata work best for your particular needs.
+Netdata can collect thousands of metrics in real-time without any configuration,
+but there are a few things you can do, like extending the history, to make
+Netdata work best for your particular needs.
 
-!!! note
-    If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details, including our one-liner script that works on almost all Linux distributions.
-
+!!! note If you haven't installed Netdata yet, visit the [installation
+    instructions](../packaging/installer) for details, including our one-liner
+    script that works on almost all Linux distributions.
 
 ## Access the dashboard
 
-Open up your browser of choice and navigate to `http://SERVER-IP:19999/`. Replace `SERVER-IP` with the IP address of the system you have Netdata installed on. You'll then be able to see Netdata's dashboard directly in your browser window.
+Open up your browser of choice. If you installed Netdata on the same system
+you're using to open your browser, navigate to `http://localhost:19999/`. If you
+installed Netdata on a remote system, navigate to `http://SYSTEM-IP:19999/`
+after replacing `SYSTEM-IP` with the IP address of that system.
 
-<details markdown="1"><summary>I don't know my system's IP address!</summary>
+Hit `Enter`. Welcome to Netdata!
 
-If you installed Netdata on your **local system** (as in the same system you're using to browse this very guide), replace `SERVER-IP` with `localhost`: `http://localhost:19999`.
+![Animated GIF of navigating to the
+dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)
 
-If you installed Netdata on **another system in your network**, you need to know its *internal IP address*. Run `ip route get 8.8.8.8 | grep -oP " src [0-9\.]+ "` and try to navigate to the IP address(es) that the command returns.
+**Next**: 
 
-If you installed Netdata on a **remote system**, such as VPS or other cloud hosting environment, you need to know its *external IP address*. Check out your provider's dashboard for that information. If you happen to be connected to the remote system with SSH, run either `dig +short myip.opendns.com @resolver1.opendns.com` or `curl ifconfig.me` to find the external IP address, and use that to visit the Netdata dashboard.
-
-</details>
-
-<details markdown="1"><summary>Can't see the Netdata dashboard? Try to verify that Netdata is installed, running, and operational:</summary>
-
-**Verify Netdata is running**
-
-If the system you're trying to monitor is a remote server, open an SSH session to the server and execute `sudo ps -e | grep netdata`. You should see a response with the PID of the Netdata daemon.
-
-If it prints nothing, Netdata is not running. Check out the [installation page](../packaging/installer) to reinstall Netdata or fix your installation.
-
-When you install multiple Netdata servers, all your servers will appear at the node menu at the top left of the dashboard. For this to work, you have to manually access just once, the dashboard of each of your Netdata servers.
-
-The node menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the current view are propagated to the other Netdata server:
-
--   the current charts panning (drag the charts left or right),
--   the current charts zooming (`SHIFT` + mouse wheel over a chart),
--   the highlighted time-frame (`ALT` + select an area on a chart),
--   the scrolling position of the dashboard,
--   the theme you use,
--   etc.
-
-On the same SSH session, execute `tail -f /var/log/netdata/access.log`. Or, if you used the static 64-bit package, try `tail -f /opt/netdata/var/log/netdata/access.log`. This command will print all the HTTP requests Netdata receives.
-
-With this command still running, try accessing your dashboard using your browser. If nothing new is printed into your terminal, it means Netdata isn't receiving your HTTP request. That probably means something, like a firewall, is blocking the requests from reaching Netdata.
-
-</details>
-
-To start/stop Netdata, depending on your environment, you should use:
-
--   `systemctl start netdata` and `systemctl stop netdata`
--   `service netdata start` and `service netdata stop`
--   `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
+-   Read more about the [standard Netdata dashboard](../web/gui/).
+-   Learn all the specifics of [using charts](../web/README.md#using-charts) or the
+differences between [charts, context, and
+families](../web/README.md#charts-contexts-families).
 
 ## Change how long Netdata stores metrics
 
+By default, Netdata stores 1 hour of historical metrics and uses about
+25MB of RAM.
 
+If that's not enough for you, you're in luck—Netdata is quite flexible when it
+comes to long-term storage based on your system and your needs.
 
-The default installation of Netdata is configured for a small round-robin database: just 1 hour of data. Depending on the memory your system has and the amount you can dedicate to Netdata, you should adapt this. On production systems with limited RAM, we suggest to set this to 3-4 hours. For best results you should set this to 24 or 48 hours.
+There's two ways to quickly increase the depth of historical metrics: by
+increasing the `history` value for the default database or switching to the DB
+engine.
 
-For every hour of data, Netdata needs about 25MB of RAM. If you can dedicate about 100MB of RAM to Netdata, you should set its database size to 4 hours.
+We have a tutorial for just that: [Changing how long Netdata stores metrics](tutorial/longer-metrics-storage.md).
 
-To do this, edit `/etc/netdata/netdata.conf` (or `/opt/netdata/etc/netdata/netdata.conf`) and set:
+**Next**:
 
-```
-[global]
-    history = SECONDS
-```
-
-Make sure the `history` line is not commented (comment lines start with `#`).
-
-1 hour is 3600 seconds, so the number you need to set is the result of `HOURS * 3600`.
-
-!!! danger
-    Be careful when you set this on production systems. If you set it too high, your system may run out of memory. By default, Netdata is configured to be killed first when the system starves for memory, but better be careful to avoid issues.
-
-For more information about Netdata memory requirements, [check this page](../database).
-
-If your kernel supports KSM (most do), you can [enable KSM to half Netdata memory requirement](../database#ksm).
+-   Learn how to [configure Netdata's daemon](../daemon/config/) via the
+    `netdata.conf` file.
+-   Read up on the memory requirements of the [default database](../database/),
+    or figure out whether your system has KSM enabled, which can [reduce the
+    default database's memory usage](../database/README.md#ksm) by about 60%.
+-   
 
 ## Service discovery and auto-detection
 
