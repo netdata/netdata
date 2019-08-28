@@ -131,7 +131,8 @@ calculated_number backend_calculate_value_from_stored_data(
     }
 */
     for(rd->state->query_ops.init(rd, &handle, after, before) ; !rd->state->query_ops.is_finished(&handle) ; ) {
-        n = rd->state->query_ops.next_metric(&handle);
+        time_t curr_t;
+        n = rd->state->query_ops.next_metric(&handle, &curr_t);
 
         if(unlikely(!does_storage_number_exist(n))) {
             // not collected

@@ -24,6 +24,9 @@ void sanity_check(void)
 
     /* page count must fit in 8 bits */
     BUILD_BUG_ON(MAX_PAGES_PER_EXTENT > 255);
+
+    /* page info scratch space must be able to hold 2 32-bit integers */
+    BUILD_BUG_ON(sizeof(((struct rrdeng_page_info *)0)->scratch) < 2 * sizeof(uint32_t));
 }
 
 void read_extent_cb(uv_fs_t* req)

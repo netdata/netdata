@@ -4,6 +4,8 @@ The Database Engine works like a traditional
 database. There is some amount of RAM dedicated to data caching and indexing and the rest of
 the data reside compressed on disk. The number of history entries is not fixed in this case,
 but depends on the configured disk space and the effective compression ratio of the data stored.
+This is the **only mode** that supports changing the data collection update frequency
+(`update_every`) **without losing** the previously stored metrics.
 
 ## Files
 
