@@ -3,6 +3,9 @@ stages:
 
 job 1:
   stage: "Code quality, linting, syntax, code style"
+  before_script:
+    - sudo apt-get clean all && sudo apt-get update
+    - sudo apt-get install -y shellcheck
   script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
 
 job 2:
