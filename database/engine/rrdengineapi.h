@@ -15,6 +15,12 @@
 extern int default_rrdeng_page_cache_mb;
 extern int default_rrdeng_disk_quota_mb;
 
+struct rrdeng_region_info {
+    time_t start_time;
+    int update_every;
+    unsigned points;
+};
+
 extern void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrdeng_page_descr **ret_descr);
 extern void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
                                Word_t page_correlation_id);
@@ -25,9 +31,12 @@ extern void rrdeng_store_metric_init(RRDDIM *rd);
 extern void rrdeng_store_metric_flush_current_page(RRDDIM *rd);
 extern void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number number);
 extern void rrdeng_store_metric_finalize(RRDDIM *rd);
+extern unsigned
+    rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t end_time,
+                                    struct rrdeng_region_info **region_info_arrayp, unsigned *max_intervalp);
 extern void rrdeng_load_metric_init(RRDDIM *rd, struct rrddim_query_handle *rrdimm_handle,
                                     time_t start_time, time_t end_time);
-extern storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle);
+extern storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle, time_t *current_time);
 extern int rrdeng_load_metric_is_finished(struct rrddim_query_handle *rrdimm_handle);
 extern void rrdeng_load_metric_finalize(struct rrddim_query_handle *rrdimm_handle);
 extern time_t rrdeng_metric_latest_time(RRDDIM *rd);

@@ -1788,7 +1788,19 @@ function renderPage(menus, data) {
 
     sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/blob/master/docs/Add-more-charts-to-netdata.md#add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
-    sidebar += '<li class="" style="margin:20px;color:#666;"><small>netdata on <b>' + data.hostname.toString() + '</b>, collects every ' + ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ' <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presented as <b>' + data.charts_count.toLocaleString() + '</b> charts and monitored by <b>' + data.alarms_count.toLocaleString() + '</b> alarms, using ' + Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory for ' + NETDATA.seconds4human(data.update_every * data.history, { space: '&nbsp;' }) + ' of real-time history.<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
+    sidebar += '<li class="" style="margin:20px;color:#666;"><small>Every ' +
+      ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
+      'Netdata collects <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presents them in <b>' +
+      data.charts_count.toLocaleString() + '</b> charts and monitors them with <b>' +
+      data.alarms_count.toLocaleString() + '</b> alarms. Netdata is using ' +
+      Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory on <b>' +
+      data.hostname.toString() + '</b> for ' +
+      NETDATA.seconds4human(data.update_every * data.history, {
+        minute: 'minute', minutes: 'minutes', second: 'second', seconds: 'seconds', space: '&nbsp;',
+      }) +
+      ' of real-time history.<br />&nbsp;<br />' + 'Get more history by ' +
+      '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <b>history</b></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>' +
+      '<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
     div.innerHTML = html;
     document.getElementById('sidebar').innerHTML = sidebar;
