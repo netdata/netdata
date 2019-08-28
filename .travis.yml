@@ -336,6 +336,16 @@ jobs:
 
 
 
+    - <<: *_DEB_TEMPLATE
+      name: "Build & Publish DEB package for ubuntu/trusty"
+      if: commit_message =~ /(\[Package arm64 DEB Ubuntu\]|\[Package arm64 DEB\]|\[Package i386 DEB Ubuntu\]|\[Package i386 DEB\]|\[Package amd64 DEB Ubuntu\]|\[Package amd64 DEB\])/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="trusty" BUILD_STRING="ubuntu/trusty"
+        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+
+
     # Debian distros build
     #
     - <<: *_DEB_TEMPLATE
