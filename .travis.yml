@@ -29,6 +29,7 @@ install:
   - export DEPLOY_REPO="netdata"  # Default production packaging repository
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
   - export PACKAGING_USER="$(echo ${TRAVIS_REPO_SLUG} | cut -d'/' -f1)"
+  - export PACKAGE_CLOUD_RETENTION_DAYS=30
 
 
 
@@ -574,7 +575,11 @@ jobs:
       git:
         depth: false
 
-
+    - name: Clean up package cloud nightly repository from old versions
+      before_script: post_message "TRAVIS_MESSAGE" "Starting package cloud repository clean up" "${NOTIF_CHANNEL}"
+      script:
+        - DEPLOY_REPO="netdata-edge" .travis/package_management/old_package_purging.sh
+        - DEPLOY_REPO="netdata-devel" .travis/package_management/old_package_purging.sh
 
     # This is the nightly execution step
     #
