@@ -12,7 +12,7 @@ renice 19 $$ >/dev/null 2>/dev/null
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
 	progress "Found old etc/netdata directory, reinstating this"
-	[ -f /opt/netdata/etc/netdata.new ] && rm -rf /opt/netdata/etc/netdata.new
+	[ -d /opt/netdata/etc/netdata.new ] && rm -rf /opt/netdata/etc/netdata.new
 	mv -f /opt/netdata/etc/netdata /opt/netdata/etc/netdata.new
 	mv -f /opt/netdata/etc/netdata.old /opt/netdata/etc/netdata
 
