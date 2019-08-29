@@ -12,9 +12,8 @@ have complete visibility over the range of support.
 
 -   **Version**: Operating system version supported
 -   **Family**: The family that the OS belongs to
--   **CI Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
--   **CI Testing**: Testing has been implemented to prevent broken or problematic code reaching our users
--   **CI Integration**: CI Integration has been fully implemented for the particular operating system version
+-   **CI: Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
+-   **CI: Testing**: Testing has been implemented to prevent broken or problematic code reaching our users
 -   **CD**: Continious deployment support has been fully enabled for this operating system
 -   **.DEB**: We provide a `.DEB` package for that particular operating system
 -   **.RPM**: We provide a `.RPM` package for that particular operating system
@@ -25,7 +24,7 @@ have complete visibility over the range of support.
 
 ## AMD64 Architecture
 
-| Version | Family | CI Smoke testing | CI Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
+| Version | Family | CI: Smoke testing | CI: Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
 :------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
 | 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
@@ -57,7 +56,7 @@ have complete visibility over the range of support.
 
 ## x86 Architecture
 
-| Version | Family | CI Smoke testing | CI Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
+| Version | Family | CI: Smoke testing | CI: Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
 :------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
 | 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#10004; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#10004; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
