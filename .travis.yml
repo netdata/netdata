@@ -506,10 +506,11 @@ jobs:
           - echo "Last commit:" && git log -1
           - echo "GIT Describe:" && git describe
           - echo "packaging/version:" && cat packaging/version
-          - packaging/docker/check_login.sh
-          - echo "Switching to latest master branch, to pick up tagging if any" && git checkout master && git pull
-          - packaging/docker/build.sh
-          - packaging/docker/publish.sh
+          - >-
+            packaging/docker/check_login.sh
+            && echo "Switching to latest master branch, to pick up tagging if any" && git checkout master && git pull
+            && packaging/docker/build.sh
+            && packaging/docker/publish.sh
         after_failure: post_message "TRAVIS_MESSAGE" "<!here> Docker image publishing failed"
 
       name: Build & Publish docker image for i386
@@ -594,9 +595,10 @@ jobs:
           - echo "GIT Describe:" && git describe
           - echo "packaging/version:" && cat packaging/version
           - docker info
-          - packaging/docker/check_login.sh
-          - packaging/docker/build.sh
-          - packaging/docker/publish.sh
+          - >-
+            packaging/docker/check_login.sh
+            && packaging/docker/build.sh
+            && packaging/docker/publish.sh
         after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly docker image publish failed"
 
       name: Build & Publish docker image for i386
