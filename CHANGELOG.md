@@ -8,6 +8,11 @@
 
 **Merged pull requests:**
 
+- Fix corrupted transaction payload handling [\#6731](https://github.com/netdata/netdata/pull/6731) ([mfundul](https://github.com/mfundul))
+- Netdata-installer warning removed [\#6715](https://github.com/netdata/netdata/pull/6715) ([thiagoftsm](https://github.com/thiagoftsm))
+- Remove of unecessary NULL web server [\#6714](https://github.com/netdata/netdata/pull/6714) ([thiagoftsm](https://github.com/thiagoftsm))
+- History tips [\#6711](https://github.com/netdata/netdata/pull/6711) ([jacekkolasa](https://github.com/jacekkolasa))
+- exact path to netdata.conf in .gitignore [\#6709](https://github.com/netdata/netdata/pull/6709) ([sunflowerbofh](https://github.com/sunflowerbofh))
 - Tabulatin on health/health.c [\#6691](https://github.com/netdata/netdata/pull/6691) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/packaging: Align libdir in all configure commands [\#6682](https://github.com/netdata/netdata/pull/6682) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - spigotmc module: :pencil2: fix typos. [\#6680](https://github.com/netdata/netdata/pull/6680) ([Cat7373](https://github.com/Cat7373))
@@ -50,6 +55,7 @@
 - mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
 - Add MongoDB backend [\#6524](https://github.com/netdata/netdata/pull/6524) ([vlvkobal](https://github.com/vlvkobal))
 - Netdata Cloud documentation [\#6476](https://github.com/netdata/netdata/pull/6476) ([joelhans](https://github.com/joelhans))
+- Variable Granularity support for data collection [\#6430](https://github.com/netdata/netdata/pull/6430) ([mfundul](https://github.com/mfundul))
 - \(re-open\) ZRAM info collector module \(proc.plugin\) [\#6424](https://github.com/netdata/netdata/pull/6424) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
 - Update plugin\_nfacct.c [\#6098](https://github.com/netdata/netdata/pull/6098) ([fun04wr0ng](https://github.com/fun04wr0ng))
 
@@ -173,7 +179,7 @@
 - Add note regarding libexecdir [\#6301](https://github.com/netdata/netdata/pull/6301) ([cakrit](https://github.com/cakrit))
 - stale bot limits update [\#6297](https://github.com/netdata/netdata/pull/6297) ([ilyam8](https://github.com/ilyam8))
 - \[freeipmi\] Remove id in sensor name when already unique [\#6296](https://github.com/netdata/netdata/pull/6296) ([Saruspete](https://github.com/Saruspete))
-- Web [\#6294](https://github.com/netdata/netdata/pull/6294) ([thiagoftsm](https://github.com/thiagoftsm))
+- Agent Frontend footer hidden [\#6294](https://github.com/netdata/netdata/pull/6294) ([thiagoftsm](https://github.com/thiagoftsm))
 - doc: remove single/multi-threaded web server configuration [\#6291](https://github.com/netdata/netdata/pull/6291) ([nodiscc](https://github.com/nodiscc))
 - Add a riak plugin [\#6286](https://github.com/netdata/netdata/pull/6286) ([jchristgit](https://github.com/jchristgit))
 - netdata/packaging: Separate beta messages from production messages [\#6282](https://github.com/netdata/netdata/pull/6282) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
