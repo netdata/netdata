@@ -514,7 +514,7 @@ a few extra steps to make it work.
 
 By default, the `kickstart.sh` and `kickstart-static64.sh` download Netdata
 assets, like the precompiled binary and a few dependencies, using the system's
-internet connect, but you can also supply these files from the local filesystem.
+internet connection, but you can also supply these files from the local filesystem.
 
 First, download the required files. If you're using `kickstart.sh`, you need the
 Netdata tarball, the checksums, the go.d plugin binary, and the go.d plugin
@@ -545,14 +545,14 @@ curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep 
 ```
 
 Move these files to the `/tmp` directory on the offline system in whichever way
-your organization allows.
+your defined policy allows (if any).
 
 Now you can run either the `kickstart.sh` or `kickstart-static64.sh` scripts
 using the `--local-tarball-override` option. This option requires you to specify
 the location and names of the files you just downloaded. 
 
 !!! note When using `--local-tarball-override`, the `kickstart.sh` or
-    `kickstart-64.sh` scripts won't download any Netdata assets from the
+    `kickstart-static64.sh` scripts won't download any Netdata assets from the
     internet. But, you may still need a connection to install dependencies using
     your system's package manager. The scripts will warn you if your system
     doesn't have all the dependencies.
