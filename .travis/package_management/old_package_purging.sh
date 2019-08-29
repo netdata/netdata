@@ -18,7 +18,7 @@ delete_files_for_version() {
 	local v="$1"
 
 	# Delete the selected filenames in version
-	FILES_IN_VERSION=$(cat ${PKG_LIST_FILE} | jq --sort-keys --arg v "${v}" '.[] | select ( .version | contains($v))' | grep filename | cut -d':' -f 2)
+	FILES_IN_VERSION=$(jq --sort-keys --arg v "${v}" '.[] | select ( .version | contains($v))' "${PKG_LIST_FILE}" | grep filename | cut -d':' -f 2)
 
 	# Iterate through the files and delete them
 	for pkg in ${FILES_IN_VERSION/\\n/}; do
@@ -73,12 +73,12 @@ curl -sS "https://${PKG_CLOUD_TOKEN}:@packagecloud.io/api/v1/repos/${PACKAGING_U
 
 # Get versions within the desired duration
 #
-VERSIONS_TO_PURGE=$(cat "${PKG_LIST_FILE}" | jq --arg s "${DATE_EPOCH}" --arg e "${DATE_UNTIL_TO_DELETE}" '
+VERSIONS_TO_PURGE=$(jq --arg s "${DATE_EPOCH}" --arg e "${DATE_UNTIL_TO_DELETE}" '
 [($s, $e) | strptime("%Y-%m-%d")[0:3]] as $r
   | map(select(
         (.created_at[:19] | strptime("%Y-%m-%dT%H:%M:%S")[0:3]) as $d
           | $d >= $r[0] and $d <= $r[1]
-))' | grep '"version":' | sort -u | sed -e 's/ //g' | cut -d':' -f2)
+))' "${PKG_LIST_FILE}" | grep '"version":' | sort -u | sed -e 's/ //g' | cut -d':' -f2)
 
 echo "We will be deleting the following versions: ${VERSIONS_TO_PURGE}"
 for v in ${VERSIONS_TO_PURGE/\n//}; do
