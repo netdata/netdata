@@ -579,7 +579,7 @@ jobs:
       before_script: post_message "TRAVIS_MESSAGE" "Starting package cloud repository clean up" "${NOTIF_CHANNEL}"
       script:
         - DEPLOY_REPO="netdata-edge" .travis/package_management/old_package_purging.sh
-        - DEPLOY_REPO="netdata" .travis/package_management/old_package_purging.sh
+        - DEPLOY_REPO="netdata-devel" .travis/package_management/old_package_purging.sh
 
     # This is the nightly execution step
     #
