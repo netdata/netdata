@@ -47,6 +47,11 @@ Each of these sections provides the same number of charts:
     -   Threads Running
     -   Processes Running
     -   Pipes Open
+    -   Carried Over Uptime (since the Netdata restart)
+    -   Minimum Uptime
+    -   Average Uptime
+    -   Maximum Uptime
+
 -   Swap Memory
     -   Swap Memory Used
     -   Major Page Faults (i.e. swap activity)

@@ -985,6 +985,10 @@ netdataDashboard.context = {
         height: 2.0
     },
 
+    'apps.uptime': {
+        info: 'Carried over process group uptime since the Netdata restart. The period of time within which at least one process in the group was running.'
+    },
+
     // ------------------------------------------------------------------------
     // USERS
 
@@ -1008,6 +1012,10 @@ netdataDashboard.context = {
         height: 2.0
     },
 
+    'users.uptime': {
+        info: 'Carried over process group uptime since the Netdata restart. The period of time within which at least one process in the group was running.'
+    },
+
     // ------------------------------------------------------------------------
     // GROUPS
 
@@ -1020,7 +1028,7 @@ netdataDashboard.context = {
     },
 
     'groups.vmem': {
-        info: 'Virtual memory allocated per user group. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
+        info: 'Virtual memory allocated per user group since the Netdata restart. Please check <a href="https://github.com/netdata/netdata/tree/master/daemon#virtual-memory" target="_blank">this article</a> for more information.'
     },
 
     'groups.preads': {
@@ -1029,6 +1037,10 @@ netdataDashboard.context = {
 
     'groups.pwrites': {
         height: 2.0
+    },
+
+    'groups.uptime': {
+        info: 'Carried over process group uptime. The period of time within which at least one process in the group was running.'
     },
 
     // ------------------------------------------------------------------------
