@@ -8,7 +8,7 @@
 #  --non-interactive        do not wait for input
 #  --dont-start-it          do not start netdata after install
 #  --stable-channel         Use the stable release channel, rather than the nightly to fetch sources
-#  --local-tarball-override Use a manually provided tarball for the installation
+#  --local-files Use a manually provided tarball for the installation
 #
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -192,16 +192,16 @@ while [ -n "${1}" ]; do
 		inner_opts="${inner_opts} ${1}"
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
-	elif [ "${1}" = "--local-tarball-override" ]; then
+	elif [ "${1}" = "--local-files" ]; then
 		shift 1
 		if [ -z "${1}" ]; then
-			fatal "Option --local-tarball-override requires extra information. The desired tarball full filename is needed"
+			fatal "Option --local-files requires extra information. The desired tarball full filename is needed"
 		fi
 
 		NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
 		shift 1
 		if [ -z "${1}" ]; then
-			fatal "Option --local-tarball-override requires a pair of the tarball source and the checksum file"
+			fatal "Option --local-files requires a pair of the tarball source and the checksum file"
 		fi
 
 		NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"

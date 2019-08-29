@@ -48,7 +48,7 @@ To learn more about the pros and cons of using *nightly* vs. *stable* releases, 
 Verify the integrity of the script with this:
 
 ```bash
-[ "574456abacd54a625b44275fda43c507" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "dc439c58bfc41de23b14b86d71c79a31" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 _It should print `OK, VALID` if the script is the one we ship._
@@ -67,14 +67,14 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--local-tarball-override`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
+-   `--local-files`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
 
 Example using all the above parameters:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-tarball-override /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt /tmp/manually.downloaded.go.d.binary.tar.gz /tmp/manually.downloaded.go.d.config.tar.gz
+$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt /tmp/manually.downloaded.go.d.binary.tar.gz /tmp/manually.downloaded.go.d.config.tar.gz
 ```
-Note: `--stable-channel` and `--local-tarball-override` overlap, if you use the tarball override the stable channel option is not effective
+Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
 
 Once Netdata is installed, see [Getting Started](../../docs/GettingStarted.md).
@@ -109,7 +109,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "8a9f864ddcb70b7dc01d4e5bf4550a81" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "722e0164ccdf98316b3ce5f563ffc2bf" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -120,14 +120,14 @@ The `kickstart-static64.sh` script passes all its parameters to `netdata-install
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--local-tarball-override`: Used for offline installations. Pass two file paths, one for the tarball and one fir the checksum file, to force kickstart run the process using those files.
+-   `--local-files`: Used for offline installations. Pass two file paths, one for the tarball and one fir the checksum file, to force kickstart run the process using those files.
 
 Example using all the above parameters:
 
 ```sh
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-tarball-override /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
+$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
 ```
-Note: `--stable-channel` and `--local-tarball-override` overlap, if you use the tarball override the stable channel option is not effective
+Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 
 If your shell fails to handle the above one liner, do this:
 
@@ -548,10 +548,10 @@ Move these files to the `/tmp` directory on the offline system in whichever way
 your defined policy allows (if any).
 
 Now you can run either the `kickstart.sh` or `kickstart-static64.sh` scripts
-using the `--local-tarball-override` option. This option requires you to specify
+using the `--local-files` option. This option requires you to specify
 the location and names of the files you just downloaded. 
 
-!!! note When using `--local-tarball-override`, the `kickstart.sh` or
+!!! note When using `--local-files`, the `kickstart.sh` or
     `kickstart-static64.sh` scripts won't download any Netdata assets from the
     internet. But, you may still need a connection to install dependencies using
     your system's package manager. The scripts will warn you if your system
@@ -559,10 +559,10 @@ the location and names of the files you just downloaded.
 
 ```bash
 # kickstart.sh
-bash &lt;(curl -Ss https://my-netdata.io/kickstart.sh) --local-tarball-override /tmp/netdata.tar.gz /tmp/checksums.txt /tmp/go.d.binary.tar.gz /tmp/go.d.config.tar.gz
+bash &lt;(curl -Ss https://my-netdata.io/kickstart.sh) --local-files /tmp/netdata.tar.gz /tmp/checksums.txt /tmp/go.d.binary.tar.gz /tmp/go.d.config.tar.gz
 
 # kickstart-static64.sh
-bash &lt;(curl -Ss https://my-netdata.io/kickstart-static64.sh) --local-tarball-override /tmp/netdata.tar.gz /tmp/checksums.txt
+bash &lt;(curl -Ss https://my-netdata.io/kickstart-static64.sh) --local-files /tmp/netdata.tar.gz /tmp/checksums.txt
 ```
 
 Now that you're finished with your offline installation, you can move on to our

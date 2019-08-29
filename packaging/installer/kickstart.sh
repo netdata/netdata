@@ -13,7 +13,7 @@
 #  --dont-wait                do not prompt for user input
 #  --non-interactive          do not prompt for user input
 #  --no-updates               do not install script for daily updates
-#  --local-tarball-override   set the full path of the desired tarball to run install with
+#  --local-files   set the full path of the desired tarball to run install with
 #
 # This script will:
 #
@@ -299,31 +299,31 @@ while [ -n "${1}" ]; do
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
 		shift 1
-	elif [ "${1}" == "--local-tarball-override" ]; then
+	elif [ "${1}" == "--local-files" ]; then
 		shift 1
 		if [ -z "${1}" ]; then
-			fatal "Missing netdata: Option --local-tarball-override requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing netdata: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
 		shift 1
 
 		if [ -z "${1}" ]; then
-			fatal "Missing checksum file: Option --local-tarball-override requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing checksum file: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
 		shift 1
 
 		if [ -z "${1}" ]; then
-			fatal "Missing go.d tarball: Option --local-tarball-override requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing go.d tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN="${1}"
 		shift 1
 
 		if [ -z "${1}" ]; then
-			fatal "Missing go.d config tarball: Option --local-tarball-override requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing go.d config tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG="${1}"
