@@ -8,18 +8,22 @@ This collector supports:
 -   each SNMP device can be used to collect data for any number of charts
 -   each chart may have any number of dimensions
 -   each SNMP device may have a different update frequency
--   each SNMP device will accept one or more batches to report values (you can set `max_request_size` per SNMP server, to control the size of batches).
+-   each SNMP device will accept one or more batches to report values (you can
+    set `max_request_size` per SNMP server, to control the size of batches).
 
 ## Configuration
 
-You will need to create the file `/etc/netdata/node.d/snmp.conf` with data like the following.
+You will need to create the file `/etc/netdata/node.d/snmp.conf` with data like
+the following.
 
 In this example:
 
 -   the SNMP device is `10.11.12.8`.
 -   the SNMP community is `public`.
--   we will update the values every 10 seconds (`update_every: 10` under the server `10.11.12.8`).
--   we define 2 charts `snmp_switch.bandwidth_port1` and `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`.
+-   we will update the values every 10 seconds (`update_every: 10` under the
+    server `10.11.12.8`).
+-   we define 2 charts `snmp_switch.bandwidth_port1` and
+    `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`.
 
 ```json
 {
@@ -88,21 +92,30 @@ In this example:
 
 `update_every` is the update frequency for each server, in seconds.
 
-`max_request_size` limits the maximum number of OIDs that will be requested in a single call. The default is 50. Lower this number of you get `TooBig` errors in Netdata's `error.log`.
+`max_request_size` limits the maximum number of OIDs that will be requested in a
+single call. The default is 50. Lower this number of you get `TooBig` errors in
+Netdata's `error.log`.
 
-`family` sets the name of the submenu of the dashboard each chart will appear under.
+`family` sets the name of the submenu of the dashboard each chart will appear
+under.
 
-`multiplier` and `divisor` are passed by the plugin to the Netdata daemon and are applied to the metric to convert it properly to `units`. For incremental counters with the exception of Counter64 type metrics, `offset` is added to the metric from within the SNMP plugin. This means that the value you will see in debug mode in the `DEBUG: setting current chart to... SET` line for a metric will not have been multiplied or divided, but it will have had the offset added to it. 
+`multiplier` and `divisor` are passed by the plugin to the Netdata daemon and
+are applied to the metric to convert it properly to `units`. For incremental
+counters with the exception of Counter64 type metrics, `offset` is added to the
+metric from within the SNMP plugin. This means that the value you will see in
+debug mode in the `DEBUG: setting current chart to... SET` line for a metric
+will not have been multiplied or divided, but it will have had the offset added
+to it. 
 
-<details markdown="1">
+<details markdown="1"><summary><b>Caution: Counter64 metrics do not support `offset` (issue #5028).</b></summary>
 
-<summary><b>Caution: Counter64 metrics do not support `offset` (issue #5028).</b></summary>
-
-The SNMP plugin supports Counter64 metrics with the only limitation that the `offset` parameter should not be defined. Due to the way Javascript handles large numbers and the fact that the offset is applied to metrics inside the plugin, the offset will be ignored silently.
+The SNMP plugin supports Counter64 metrics with the only limitation that the
+`offset` parameter should not be defined. Due to the way Javascript handles
+large numbers and the fact that the offset is applied to metrics inside the
+plugin, the offset will be ignored silently.
 
 </details> 
 
-<br>
 If you need to define many charts using incremental OIDs, you can use something like this:
 
 ```json
@@ -146,28 +159,39 @@ If you need to define many charts using incremental OIDs, you can use something 
 }
 ```
 
-This is like the previous, but the option `multiply_range` given, will multiply the current chart from `1` to `24` inclusive, producing 24 charts in total for the 24 ports of the switch `10.11.12.8`.
+This is like the previous, but the option `multiply_range` given, will multiply
+the current chart from `1` to `24` inclusive, producing 24 charts in total for
+the 24 ports of the switch `10.11.12.8`.
 
 Each of the 24 new charts will have its id (1-24) appended at:
 
-1.  its chart unique id, i.e. `snmp_switch.bandwidth_port1` to `snmp_switch.bandwidth_port24`
-2.  its `title`, i.e. `Switch Bandwidth for port 1` to `Switch Bandwidth for port 24`
-3.  its `oid` (for all dimensions), i.e. dimension `in` will be `1.3.6.1.2.1.2.2.1.10.1` to `1.3.6.1.2.1.2.2.1.10.24`
-4.  its priority (which will be incremented for each chart so that the charts will appear on the dashboard in this order)
+1.  its chart unique id, i.e. `snmp_switch.bandwidth_port1` to
+    `snmp_switch.bandwidth_port24`
+2.  its `title`, i.e. `Switch Bandwidth for port 1` to `Switch Bandwidth for
+    port 24`
+3.  its `oid` (for all dimensions), i.e. dimension `in` will be
+    `1.3.6.1.2.1.2.2.1.10.1` to `1.3.6.1.2.1.2.2.1.10.24`
+4.  its priority (which will be incremented for each chart so that the charts
+    will appear on the dashboard in this order)
 
 The `options` given for each server, are:
 
--   `timeout`, the time to wait for the SNMP device to respond. The default is 5000 ms.
--   `version`, the SNMP version to use. `0` is Version 1, `1` is Version 2c. The default is Version 1 (`0`).
+-   `timeout`, the time to wait for the SNMP device to respond. The default is
+    5000 ms.
+-   `version`, the SNMP version to use. `0` is Version 1, `1` is Version 2c. The
+    default is Version 1 (`0`).
 -   `transport`, the default is `udp4`.
 -   `port`, the port of the SNMP device to connect to. The default is `161`.
--   `retries`, the number of attempts to make to fetch the data. The default is `1`.
+-   `retries`, the number of attempts to make to fetch the data. The default is
+    `1`.
 
 ## Retrieving names from snmp
 
-You can append a value retrieved from SNMP to the title, by adding `titleoid` to the chart.
+You can append a value retrieved from SNMP to the title, by adding `titleoid` to
+the chart.
 
-You can set a dimension name to a value retrieved from SNMP, by adding `oidname` to the dimension.
+You can set a dimension name to a value retrieved from SNMP, by adding `oidname`
+to the dimension.
 
 Both of the above will participate in `multiply_range`.
 
@@ -179,15 +203,24 @@ To test it, you can run:
 /usr/libexec/netdata/plugins.d/node.d.plugin 1 snmp
 ```
 
-The above will run it on your console and you will be able to see what Netdata sees, but also errors. You can get a very detailed output by appending `debug` to the command line.
+The above will run it on your console and you will be able to see what Netdata
+sees, but also errors. You can get a very detailed output by appending `debug`
+to the command line.
 
-If it works, restart Netdata to activate the snmp collector and refresh the dashboard (if your SNMP device responds with a delay, you may need to refresh the dashboard in a few seconds).
+If it works, restart Netdata to activate the snmp collector and refresh the
+dashboard (if your SNMP device responds with a delay, you may need to refresh
+the dashboard in a few seconds).
 
 ## Data collection speed
 
-Keep in mind that many SNMP switches and routers are very slow. They may not be able to report values per second. If you run `node.d.plugin` in `debug` mode, it will report the time it took for the SNMP device to respond. My switch, for example, needs 7-8 seconds to respond for the traffic on 24 ports (48 OIDs, in/out).
+Keep in mind that many SNMP switches and routers are very slow. They may not be
+able to report values per second. If you run `node.d.plugin` in `debug` mode, it
+will report the time it took for the SNMP device to respond. My switch, for
+example, needs 7-8 seconds to respond for the traffic on 24 ports (48 OIDs,
+in/out).
 
-Also, if you use many SNMP clients on the same SNMP device at the same time, values may be skipped. This is a problem of the SNMP device, not this collector.
+Also, if you use many SNMP clients on the same SNMP device at the same time,
+values may be skipped. This is a problem of the SNMP device, not this collector.
 
 ## Finding OIDs
 
@@ -203,20 +236,26 @@ snmpwalk -t 20 -v 1 -O fn -c public 10.11.12.8
 -   `-c public` is the SNMP community
 -   `10.11.12.8` is the SNMP device
 
-Keep in mind that `snmpwalk` outputs the OIDs with a dot in front them. You should remove this dot when adding OIDs to the configuration file of this collector.
+Keep in mind that `snmpwalk` outputs the OIDs with a dot in front them. You
+should remove this dot when adding OIDs to the configuration file of this
+collector.
 
 ## Example: Linksys SRW2024P
 
 This is what I use for my Linksys SRW2024P. It creates:
 
 1.  A chart for power consumption (it is a PoE switch)
-2.  Two charts for packets received (total packets received and packets received with errors)
+2.  Two charts for packets received (total packets received and packets received
+    with errors)
 3.  One chart for packets output
-4.  24 charts, one for each port of the switch. It also appends the port names, as defined at the switch, to the chart titles.
+4.  24 charts, one for each port of the switch. It also appends the port names,
+    as defined at the switch, to the chart titles.
 
-This switch also reports various other metrics, like snmp, packets per port, etc. Unfortunately it does not report CPU utilization or backplane utilization.
+This switch also reports various other metrics, like snmp, packets per port,
+etc. Unfortunately it does not report CPU utilization or backplane utilization.
 
-This switch has a very slow SNMP processors. To respond, it needs about 8 seconds, so I have set the refresh frequency (`update_every`) to 15 seconds.
+This switch has a very slow SNMP processors. To respond, it needs about 8
+seconds, so I have set the refresh frequency (`update_every`) to 15 seconds.
 
 ```json
 {
@@ -361,8 +400,7 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                 }
             }
         }
-    }
-    ]
+    }],
 }
 ```
 
