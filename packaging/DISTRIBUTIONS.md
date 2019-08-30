@@ -158,7 +158,7 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 -   **Flags to disable from source**: --disable-lto
 -   **What packages required for auto-detect?**: No package dependency, depends on GCC version
 
-### Collectors
+### External plugins, built with netdata build tools
 
 #### FREEIPMI
 
