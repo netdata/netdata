@@ -40,19 +40,19 @@ To persist your configurations, don't edit the files under the `stock config dir
 
 ### Change what I see
 
-##### Increase the metrics retention period
+#### Increase the metrics retention period
 
 Increase `history` in [netdata.conf \[global\]](../daemon/config/#global-section-options). Just ensure you understand [how much memory will be required](../database/)
 
-##### Reduce the data collection frequency
+#### Reduce the data collection frequency
 
 Increase `update every` in [netdata.conf \[global\]](../daemon/config/#global-section-options). This is another way to increase your metrics retention period, but at a lower resolution than the default 1s.
 
-##### Modify how a chart is displayed
+#### Modify how a chart is displayed
 
 In `netdata.conf` under `# Per chart configuration` you will find several [\[CHART_NAME\] sections](../daemon/config/#per-chart-configuration), where you can control all aspects of a specific chart. 
 
-##### Disable a collector
+#### Disable a collector
 
 Entire plugins can be turned off from the [netdata.conf \[plugins\]](../daemon/config/#plugins-section-options) section. To disable specific modules of a plugin orchestrator, you need to edit one of the following:
 
@@ -60,21 +60,21 @@ Entire plugins can be turned off from the [netdata.conf \[plugins\]](../daemon/c
 -   `node.d.conf` for [nodejs](../collectors/node.d.plugin/#nodedplugin)
 -   `charts.d.conf` for [bash](../collectors/charts.d.plugin/#chartsdplugin)
 
-##### Show charts with zero metrics
+#### Show charts with zero metrics
 
 By default, Netdata will enable monitoring metrics for disks, memory, and network only when they are not zero. If they are constantly zero they are ignored. Metrics that will start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though). Use `yes` instead of `auto` in plugin configuration sections to enable these charts permanently. You can also set the `enable zero metrics` option to `yes` in the `[global]` section which enables charts with zero metrics for all internal Netdata plugins.
 
 ### Modify alarms and notifications
 
-##### Add a new alarm
+#### Add a new alarm
 
 You can add a new alarm definition either by editing an existing stock alarm config file under `health.d` (e.g. `/etc/netdata/edit-config health.d/load.conf`), or by adding a new `.conf` file under `/etc/netdata/health.d`. The documentation on how to define an alarm is in [health monitoring](../health/#health-monitoring). It is suggested to look at some of the stock alarm definitions, so you can ensure you understand how the various options work.  
 
-##### Turn off all alarms and notifications
+#### Turn off all alarms and notifications
 
 Just set `enabled = no` in the [netdata.conf \[health\]](../daemon/config/#health-section-options) section
 
-##### Modify or disable a specific alarm
+#### Modify or disable a specific alarm
 
 The `health.d` directory that contains the alarm triggers for [health monitoring](../health/#health-monitoring). It has one .conf file per collector. You can easily find the .conf file you will need to modify, by looking for the "source" line on the table that appears on the right side of an alarm on the Netdata gui. 
 
@@ -83,17 +83,17 @@ For example, if you click on Alarms and go to the tab 'All', the default Netdata
 As stated at the top of the .conf file, **you can disable an alarm notification by setting the 'to' line to: silent**.
 To modify how the alarm gets triggered, we suggest that you go through the guide on [health monitoring](../health/#health-monitoring).
 
-##### Receive notifications using my preferred method
+#### Receive notifications using my preferred method
 
 You only need to configure `health_alarm_notify.conf`. To learn how to do it, read first [alarm notifications](../health/notifications/#netdata-alarm-notifications) and then open the submenu `Supported Notifications` under `Alarm notifications` in the documentation to find the specific page on your prefered notification method. 
 
 ### Make security-related customizations
 
-##### Change the Netdata web server access lists
+#### Change the Netdata web server access lists
 
 You have several options under the [netdata.conf \[web\]](../web/server/#access-lists) section. 
 
-##### Stop sending info to registry.my-netdata.io
+#### Stop sending info to registry.my-netdata.io
 
 You will need to configure the [registry] section in `netdata.conf`. First read the [registry documentation](../registry/). In it, are instructions on how to [run your own registry](../registry/#run-your-own-registry).
 
@@ -103,23 +103,21 @@ The settings are under `netdata.conf` [web]. Look at the [web server documentati
 
 ### System resource usage
 
-##### Reduce the resources Netdata uses
+#### Reduce the resources Netdata uses
 
 The page on [Netdata performance](Performance.md) has an excellent guide on how to reduce the Netdata cpu/disk/RAM utilization to levels suitable even for the weakest [IoT devices](netdata-for-IoT.md).
 
-##### Change when Netdata saves metrics to disk
+#### Change when Netdata saves metrics to disk
 
 [netdata.conf \[global\]](../daemon/config/#global-section-options) : `memory mode`
 
-</details>
-
-##### Prevent Netdata from getting immediately killed when my server runs out of memory
+#### Prevent Netdata from getting immediately killed when my server runs out of memory
 
 You can change the Netdata [OOM score](../daemon/#oom-score) in `netdata.conf` [global]. 
 
 ### Other
 
-##### Move Netdata directories
+#### Move Netdata directories
 
 The various directory paths are in [netdata.conf \[global\]](../daemon/config/#global-section-options).
 
