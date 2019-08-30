@@ -142,6 +142,13 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
         error("failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
 
     else {
+#if defined(__gnu_linux__)
+        if (tag)
+            pthread_setname_np(*thread, tag);
+#elif defined(__FreeBSD__) || defined(__OpenBSD__)
+        if (tag)
+            pthread_set_name_np(*thread, tag);
+#endif
         if (!(options & NETDATA_THREAD_OPTION_JOINABLE)) {
             int ret2 = pthread_detach(*thread);
             if (ret2 != 0)
