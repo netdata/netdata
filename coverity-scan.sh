@@ -9,11 +9,21 @@
 
 # To run manually, save configuration to .coverity-scan.conf like this:
 #
+# the repository to report to coverity - devs can set here their own fork
 # REPOSITORY="netdata/netdata"
+#
+# the email of the developer, as given to coverity
 # COVERITY_SCAN_SUBMIT_MAIL="you@example.com"
+#
+# the token given by coverity to the developer
 # COVERITY_SCAN_TOKEN="TOKEN taken from Coverity site"
+#
+# the absolute path of the cov-build - optional
 # COVERITY_BUILD_PATH="/opt/cov-analysis-linux64-2019.03/bin/cov-build"
-# DEBUG=1
+#
+# when set, the script will print on screen the curl command that submits the build to coverity
+# this includes the token, so the default is not to print it.
+# COVERITY_SUBMIT_DEBUG=1
 #
 # All these variables can also be exported before running this script.
 
@@ -90,7 +100,7 @@ run tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
 debugrun() {
 	# hide the token when DEBUG is not 1
 
-	if [ "${DEBUG}" = "1" ]
+	if [ "${COVERITY_SUBMIT_DEBUG}" = "1" ]
 	then
 		run "${@}"
 		return $?
