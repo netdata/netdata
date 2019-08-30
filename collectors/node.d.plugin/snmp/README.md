@@ -94,9 +94,14 @@ In this example:
 
 `multiplier` and `divisor` are passed by the plugin to the Netdata daemon and are applied to the metric to convert it properly to `units`. For incremental counters with the exception of Counter64 type metrics, `offset` is added to the metric from within the SNMP plugin. This means that the value you will see in debug mode in the `DEBUG: setting current chart to... SET` line for a metric will not have been multiplied or divided, but it will have had the offset added to it. 
 
-<details markdown="1"><summary><b>Caution: Counter64 metrics do not support `offset` (issue #5028).</b></summary>
+<details markdown="1">
+
+<summary><b>Caution: Counter64 metrics do not support `offset` (issue #5028).</b></summary>
+
 The SNMP plugin supports Counter64 metrics with the only limitation that the `offset` parameter should not be defined. Due to the way Javascript handles large numbers and the fact that the offset is applied to metrics inside the plugin, the offset will be ignored silently.
+
 </details> 
+
 <br>
 If you need to define many charts using incremental OIDs, you can use something like this:
 
