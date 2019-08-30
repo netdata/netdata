@@ -26,7 +26,7 @@ mkdir -p "${WORKDIR}"
 curl -SL --data "token=${token}&project=${REPOSITORY}" https://scan.coverity.com/download/linux64 > "${WORKDIR}/coverity_tool.tar.gz"
 if [ -f "${WORKDIR}/coverity_tool.tar.gz" ]; then
 	tar -x -C "${WORKDIR}" -f "${WORKDIR}/coverity_tool.tar.gz"
-	sudo mv "${WORKDIR}/cov-analysis-linux64-2017.07" /opt/coverity
+	sudo mv "${WORKDIR}/cov-analysis-linux64-2019.03" /opt/coverity
 	export PATH=${PATH}:/opt/coverity/bin/
 else
 	echo "Failed to download coverity tool tarball!"
