@@ -1792,13 +1792,7 @@ function renderPage(menus, data) {
       ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
       'Netdata collects <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presents them in <b>' +
       data.charts_count.toLocaleString() + '</b> charts and monitors them with <b>' +
-      data.alarms_count.toLocaleString() + '</b> alarms. Netdata is using ' +
-      Math.round(data.rrd_memory_bytes / 1024 / 1024).toLocaleString() + ' MB of memory on <b>' +
-      data.hostname.toString() + '</b> for ' +
-      NETDATA.seconds4human(data.update_every * data.history, {
-        minute: 'minute', minutes: 'minutes', second: 'second', seconds: 'seconds', space: '&nbsp;',
-      }) +
-      ' of real-time history.<br />&nbsp;<br />' + 'Get more history by ' +
+      data.alarms_count.toLocaleString() + '</b> alarms. <br />&nbsp;<br />' + 'Get more history by ' +
       '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <b>history</b></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>' +
       '<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
     sidebar += '</ul>';
