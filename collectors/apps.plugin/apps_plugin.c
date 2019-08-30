@@ -260,6 +260,12 @@ struct target {
     kernel_uint_t openeventpolls;
     kernel_uint_t openother;
 
+    kernel_uint_t starttime;
+    kernel_uint_t collected_starttime;
+    kernel_uint_t uptime_min;
+    kernel_uint_t uptime_sum;
+    kernel_uint_t uptime_max;
+
     unsigned int processes; // how many processes have been merged to this
     int exposed;            // if set, we have sent this to netdata
     int hidden;             // if set, we set the hidden flag on the dimension
@@ -345,7 +351,7 @@ struct pid_stat {
     // int64_t nice;
     int32_t num_threads;
     // int64_t itrealvalue;
-    // kernel_uint_t starttime;
+    kernel_uint_t collected_starttime;
     // kernel_uint_t vsize;
     // kernel_uint_t rss;
     // kernel_uint_t rsslim;
@@ -419,6 +425,8 @@ struct pid_stat {
     usec_t io_collected_usec;
     usec_t last_io_collected_usec;
 
+    kernel_uint_t uptime;
+
     char *fds_dirname;              // the full directory name in /proc/PID/fd
 
     char *stat_filename;
@@ -432,6 +440,8 @@ struct pid_stat {
 };
 
 size_t pagesize;
+
+kernel_uint_t global_uptime;
 
 // log each problem once per process
 // log flood protection flags (log_thrown)
@@ -1421,7 +1431,8 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
     p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
-    // p->starttime     = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
+    p->collected_starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
+    p->uptime           = (global_uptime > p->collected_starttime)?(global_uptime - p->collected_starttime):0;
     // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
     // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
     // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
@@ -1489,6 +1500,8 @@ cleanup:
     // p->rss              = 0;
     return 0;
 }
+
+// ----------------------------------------------------------------------------
 
 static inline int read_proc_pid_io(struct pid_stat *p, void *ptr) {
     (void)ptr;
@@ -2634,6 +2647,12 @@ static int collect_data_for_all_processes(void) {
         collect_data_for_pid(pid, &procbase[i]);
     }
 #else
+    static char uptime_filename[FILENAME_MAX + 1] = "";
+    if(*uptime_filename == '\0')
+        snprintfz(uptime_filename, FILENAME_MAX, "%s/proc/uptime", netdata_configured_host_prefix);
+
+    global_uptime = (kernel_uint_t)(uptime_msec(uptime_filename) / MSEC_PER_SEC);
+
     char dirname[FILENAME_MAX + 1];
 
     snprintfz(dirname, FILENAME_MAX, "%s/proc", netdata_configured_host_prefix);
@@ -2879,6 +2898,11 @@ static size_t zero_all_targets(struct target *root) {
             w->openother = 0;
         }
 
+        w->collected_starttime = 0;
+        w->uptime_min = 0;
+        w->uptime_sum = 0;
+        w->uptime_max = 0;
+
         if(unlikely(w->root_pid)) {
             struct pid_on_target *pid_on_target_to_free, *pid_on_target = w->root_pid;
 
@@ -3032,6 +3056,11 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
     w->processes++;
     w->num_threads += p->num_threads;
 
+    if(!w->collected_starttime || p->collected_starttime < w->collected_starttime) w->collected_starttime = p->collected_starttime;
+    if(!w->uptime_min || p->uptime < w->uptime_min) w->uptime_min = p->uptime;
+    w->uptime_sum += p->uptime;
+    if(!w->uptime_max || w->uptime_max < p->uptime) w->uptime_max = p->uptime;
+
     if(unlikely(debug_enabled || w->debug_enabled)) {
         debug_log_int("aggregating '%s' pid %d on target '%s' utime=" KERNEL_UINT_FORMAT ", stime=" KERNEL_UINT_FORMAT ", gtime=" KERNEL_UINT_FORMAT ", cutime=" KERNEL_UINT_FORMAT ", cstime=" KERNEL_UINT_FORMAT ", cgtime=" KERNEL_UINT_FORMAT ", minflt=" KERNEL_UINT_FORMAT ", majflt=" KERNEL_UINT_FORMAT ", cminflt=" KERNEL_UINT_FORMAT ", cmajflt=" KERNEL_UINT_FORMAT "", p->comm, p->pid, w->name, p->utime, p->stime, p->gtime, p->cutime, p->cstime, p->cgtime, p->minflt, p->majflt, p->cminflt, p->cmajflt);
 
@@ -3039,6 +3068,19 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
         pid_on_target->pid = p->pid;
         pid_on_target->next = w->root_pid;
         w->root_pid = pid_on_target;
+    }
+}
+
+static inline void post_aggregate_targets(struct target *root) {
+    struct target *w;
+    for (w = root; w ; w = w->next) {
+        if(w->collected_starttime) {
+            if (!w->starttime || w->collected_starttime < w->starttime) {
+                w->starttime = w->collected_starttime;
+            }
+        } else {
+            w->starttime = 0;
+        }
     }
 }
 
@@ -3101,6 +3143,10 @@ static void calculate_netdata_statistics(void) {
         if(enable_file_charts)
             aggregate_pid_fds_on_targets(p);
     }
+
+    post_aggregate_targets(apps_groups_root_target);
+    post_aggregate_targets(users_root_target);
+    post_aggregate_targets(groups_root_target);
 
     cleanup_exited_pids();
 }
@@ -3457,6 +3503,36 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
+#ifndef __FreeBSD__
+    send_BEGIN(type, "uptime", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, (global_uptime > w->starttime)?(global_uptime - w->starttime):0);
+    }
+    send_END();
+
+    send_BEGIN(type, "uptime_min", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->uptime_min);
+    }
+    send_END();
+
+    send_BEGIN(type, "uptime_avg", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->processes?(w->uptime_sum / w->processes):0);
+    }
+    send_END();
+
+    send_BEGIN(type, "uptime_max", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->uptime_max);
+    }
+    send_END();
+#endif
+
     send_BEGIN(type, "mem", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
@@ -3614,6 +3690,32 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
         if(unlikely(w->exposed))
             fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
     }
+
+#ifndef __FreeBSD__
+    fprintf(stdout, "CHART %s.uptime '' '%s Carried Over Uptime' 'seconds' processes %s.uptime line 20008 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+
+    fprintf(stdout, "CHART %s.uptime_min '' '%s Minimum Uptime' 'seconds' processes %s.uptime_min line 20009 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+
+    fprintf(stdout, "CHART %s.uptime_avg '' '%s Average Uptime' 'seconds' processes %s.uptime_avg line 20010 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+
+    fprintf(stdout, "CHART %s.uptime_max '' '%s Maximum Uptime' 'seconds' processes %s.uptime_max line 20011 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", w->name);
+    }
+#endif
 
     fprintf(stdout, "CHART %s.cpu_user '' '%s CPU User Time (%d%% = %d core%s)' 'percentage' cpu %s.cpu_user stacked 20020 %d\n", type, title, (processors * 100), processors, (processors>1)?"s":"", type, update_every);
     for (w = root; w ; w = w->next) {

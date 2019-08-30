@@ -438,6 +438,9 @@ if test x"\$nox11" = xn; then
     fi
 fi
 
+[ -d "\$targetdir/etc/netdata.old" ] && echo "Moving existing old directory" && mv "\$targetdir/etc/netdata.old" "\$targetdir/etc/netdata.old.$$"
+[ -d \$targetdir/etc/netdata ] && echo "Backing up existing directory" && cp -r \$targetdir/etc/netdata "\$targetdir/etc/netdata.old"
+
 if test x"\$targetdir" = x.; then
     tmpdir="."
 else
