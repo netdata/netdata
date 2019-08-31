@@ -77,8 +77,7 @@ packaging/makeself/tmp/
 # coverity
 cov-int/
 netdata-coverity-analysis.tgz
-.coverity-token
-.coverity-build
+.coverity-scan.conf
 
 .cproject/
 .idea/
