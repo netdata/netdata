@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#
 # Coverity scan script
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
@@ -29,18 +30,22 @@
 #
 # If the first parameter of this script is "install",
 # coverity build tools will be downloaded and installed in /opt/coverity
+set -e
+
+TMP_DIR="$(mktemp -d /tmp/netdata-coverity-scan-XXXXX)"
+INSTALL_DIR="/opt"
 
 # the version of coverity to use
 COVERITY_BUILD_VERSION="cov-analysis-linux64-2019.03"
 
-source packaging/installer/functions.sh || exit 1
+source packaging/installer/functions.sh
 
 cpus=$(find_processors)
 [ -z "${cpus}" ] && cpus=1
 
 if [ -f ".coverity-scan.conf" ]
 then
-	source ".coverity-scan.conf" || exit 1
+	source ".coverity-scan.conf"
 fi
 
 repo="${REPOSITORY}"
@@ -74,9 +79,12 @@ debugrun() {
 }
 
 scanit() {
-  export PATH="${PATH}:/opt/${COVERITY_BUILD_VERSION}/bin/"
+  progress "Scanning using coverity"
+
+  export PATH="${PATH}:${INSTALL_DIR}/${COVERITY_BUILD_VERSION}/bin/"
   covbuild="${COVERITY_BUILD_PATH}"
   [ -z "${covbuild}" ] && covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
+
   if [ -z "${covbuild}" ]; then
     fatal "Cannot find 'cov-build' binary in \$PATH. Export variable COVERITY_BUILD_PATH or set it in .coverity-scan.conf"
   elif [ ! -x "${covbuild}" ]; then
@@ -110,10 +118,10 @@ scanit() {
   #	--enable-backend-mongodb \
 
   progress "Analyzing netdata..."
-  run "${covbuild}" --dir cov-int make -j${cpus} || exit 1
+  run "${covbuild}" --dir cov-int make -j${cpus}
 
   echo >&2 "Compressing analysis..."
-  run tar czvf netdata-coverity-analysis.tgz cov-int || exit 1
+  run tar czvf netdata-coverity-analysis.tgz cov-int
 
   echo >&2 "Sending analysis to coverity for netdata version ${version} ..."
   COVERITY_SUBMIT_RESULT=$(debugrun curl --progress-bar \
@@ -130,18 +138,18 @@ scanit() {
 }
 
 installit() {
-  progress "Downloading coverity..."
-  cd /tmp || exit 1
+  progress "Downloading coverity in ${TMP_DIR}..."
+  cd "${TMP_DIR}"
 
-  [ -f "${COVERITY_BUILD_VERSION}.tar.gz" ] && run rm -f "${COVERITY_BUILD_VERSION}.tar.gz"
   debugrun curl --remote-name --remote-header-name --show-error --location --data "token=${token}&project=${repo}" https://scan.coverity.com/download/linux64
 
   if [ -f "${COVERITY_BUILD_VERSION}.tar.gz" ]; then
     progress "Installing coverity..."
-    cd /opt || exit 1
-    run sudo tar -z -x -f  "/tmp/${COVERITY_BUILD_VERSION}.tar.gz" || exit 1
-    rm "/tmp/${COVERITY_BUILD_VERSION}.tar.gz"
-    export PATH=${PATH}:/opt/${COVERITY_BUILD_VERSION}/bin/
+    cd "${INSTALL_DIR}"
+
+    run sudo tar -z -x -f  "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz" || exit 1
+    rm "${TMP_DIR}/${COVERITY_BUILD_VERSION}.tar.gz"
+    export PATH=${PATH}:${INSTALL_DIR}/${COVERITY_BUILD_VERSION}/bin/
   else
     fatal "Failed to download coverity tool tarball!"
   fi
@@ -152,16 +160,17 @@ installit() {
     fatal "Failed to install coverity."
   fi
 
+  # Clean temp directory
+  [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
+
   progress "Coverity scan tools are installed."
   return 0
 }
 
-if [ "${1}" = "install" ]
+if [ "${1}" = "--with-install" ]
 then
   shift 1
-  installit "${@}"
-  exit $?
-else
-  scanit "${@}"
-  exit $?
+  installit
 fi
+
+scanit "${@}"
