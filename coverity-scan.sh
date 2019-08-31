@@ -37,7 +37,8 @@ INSTALL_DIR="/opt"
 # the version of coverity to use
 COVERITY_BUILD_VERSION="cov-analysis-linux64-2019.03"
 
-source packaging/installer/functions.sh
+# TODO: For some reasons this does not fully load on Debian 10 (Haven't checked if it happens on other distros yet), it breaks
+source packaging/installer/functions.sh || echo "Failed to fully load the functions library"
 
 cpus=$(find_processors)
 [ -z "${cpus}" ] && cpus=1
