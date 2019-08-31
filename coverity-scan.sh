@@ -63,6 +63,10 @@ if [ -z "${token}" ]; then
 	fatal "export variable COVERITY_SCAN_TOKEN or set it in .coverity-scan.conf"
 fi
 
+if ! command -v curl >/dev/null 2>&1; then
+	fatal "CURL is required for coverity scan to work"
+fi
+
 # only print the output of a command
 # when debugging is enabled
 # used to hide the token when debugging is not enabled
