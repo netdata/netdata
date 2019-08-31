@@ -32,7 +32,6 @@
 # coverity build tools will be downloaded and installed in /opt/coverity
 set -e
 
-TMP_DIR="$(mktemp -d /tmp/netdata-coverity-scan-XXXXX)"
 INSTALL_DIR="/opt"
 
 # the version of coverity to use
@@ -138,6 +137,7 @@ scanit() {
 }
 
 installit() {
+  TMP_DIR="$(mktemp -d /tmp/netdata-coverity-scan-XXXXX)"
   progress "Downloading coverity in ${TMP_DIR}..."
   cd "${TMP_DIR}"
 
