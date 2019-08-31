@@ -222,8 +222,17 @@ dependencies() {
 		if ! detect_bash4 "${bash}"; then
 			warning "Cannot detect packages to be installed in this system, without BASH v4+."
 		else
-			progress "Downloading script to detect required packages..."
-			download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+			progress "Fetching script to detect required packages..."
+			if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+				if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+					run mv "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+				else
+					fatal "Invalid given dependency file, please check your --local-files parameter options and try again"
+				fi
+			else
+				download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+			fi
+
 			if [ ! -s "${TMPDIR}/install-required-packages.sh" ]; then
 				warning "Downloaded dependency installation script is empty."
 			else
@@ -299,34 +308,41 @@ while [ -n "${1}" ]; do
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
 		shift 1
-	elif [ "${1}" == "--local-files" ]; then
+	elif [ "${1}" = "--local-files" ]; then
 		shift 1
 		if [ -z "${1}" ]; then
-			fatal "Missing netdata: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing netdata: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
 		shift 1
 
 		if [ -z "${1}" ]; then
-			fatal "Missing checksum file: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing checksum file: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
 		shift 1
 
 		if [ -z "${1}" ]; then
-			fatal "Missing go.d tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing go.d tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN="${1}"
 		shift 1
 
 		if [ -z "${1}" ]; then
-			fatal "Missing go.d config tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksumi, the go.d plugin tarball and the go.d plugin config tarball, in this particular order"
+			fatal "Missing go.d config tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
 		fi
 
 		export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG="${1}"
+		shift 1
+
+		if [ -z "${1}" ]; then
+			fatal "Missing dependencies management scriptlet: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+		fi
+
+		export NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT="${1}"
 		shift 1
 	else
 		break
