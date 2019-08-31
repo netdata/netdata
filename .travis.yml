@@ -533,7 +533,10 @@ jobs:
       name: Run coverity scan
       # Just notify people that Nightly ops triggered, use the first step as a hook to do that
       before_script: post_message "TRAVIS_MESSAGE" "Starting nightly operations" "${NOTIF_CHANNEL}"
-      script: ./coverity-install.sh && ./coverity-scan.sh || echo "Coverity failed :("
+      script: ./coverity-install.sh && ./coverity-scan.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Coverity nightly run has failed" "${NOTIF_CHANNEL}"
+      env:
+        - ALLOW_SOFT_FAILURE_HERE=true
 
     - name: Kickstart files integrity testing (extended)
       script: ./tests/installer/checksums.sh

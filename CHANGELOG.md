@@ -4,10 +4,12 @@
 
 **Fixed bugs:**
 
+- netdata/installer: fix static64 installer always overwriting configuration [\#6710](https://github.com/netdata/netdata/pull/6710) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: put go.d version in one place [\#6557](https://github.com/netdata/netdata/pull/6557) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 **Merged pull requests:**
 
+- netdata/packaging: fix coverity problem in travis \(2 issues\) [\#6743](https://github.com/netdata/netdata/pull/6743) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Add purging logic for package cloud repositories [\#6732](https://github.com/netdata/netdata/pull/6732) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix corrupted transaction payload handling [\#6731](https://github.com/netdata/netdata/pull/6731) ([mfundul](https://github.com/mfundul))
 - Netdata-installer warning removed [\#6715](https://github.com/netdata/netdata/pull/6715) ([thiagoftsm](https://github.com/thiagoftsm))
