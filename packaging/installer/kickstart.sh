@@ -225,7 +225,7 @@ dependencies() {
 			progress "Fetching script to detect required packages..."
 			if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
 				if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
-					run mv "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+					run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
 				else
 					fatal "Invalid given dependency file, please check your --local-files parameter options and try again"
 				fi
