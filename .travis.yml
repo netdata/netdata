@@ -534,7 +534,7 @@ jobs:
       before_script:
         - post_message "TRAVIS_MESSAGE" "Starting nightly operations" "${NOTIF_CHANNEL}"
         - bash <(curl -sS https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh) --dont-wait --non-interactive netdata
-        - sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev libprotobuf-dev libprotoc-dev libssl-dev
+        - sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
       script: ./coverity-install.sh && ./coverity-scan.sh
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Coverity nightly run has failed" "${NOTIF_CHANNEL}"
       env:
