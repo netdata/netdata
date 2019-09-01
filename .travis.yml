@@ -269,7 +269,7 @@ jobs:
         git:
           depth: false
         before_install:
-          - sudo apt-get install -y wget lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
+          - sudo apt-get install -y wget lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
           - source tests/installer/slack.sh
         before_script:
           - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
