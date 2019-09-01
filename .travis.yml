@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 language: c
 services:
   - docker
