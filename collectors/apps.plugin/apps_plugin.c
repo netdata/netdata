@@ -3957,6 +3957,10 @@ static void parse_args(int argc, char **argv)
                     " without-files     enable / disable reporting files, sockets, pipes\n"
                     "                   (default is enabled)\n"
                     "\n"
+                    " without-users     disable reporting per user charts\n"
+                    "\n"
+                    " without-groups    disable reporting per user group charts\n"
+                    "\n"
 #ifndef __FreeBSD__
                     " fds-cache-secs N  cache the files of processed for N seconds\n"
                     "                   caching is adaptive per file (when a file\n"
