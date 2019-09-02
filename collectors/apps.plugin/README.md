@@ -142,6 +142,13 @@ ones at the top. Processes not matched by any row, will inherit it from their pa
 The order also controls the order of the dimensions on the generated charts (although applications started
 after apps.plugin is started, will be appended to the existing list of dimensions the `netdata` daemon maintains).
 
+There are a few command line options you can pass to `apps.plugin`. The list of available options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` file. For example, to disable user and user group charts you should set
+
+```
+[plugin:apps]
+  command options = without-users without-groups
+```
+
 ## Permissions
 
 `apps.plugin` requires additional privileges to collect all the information it needs.
