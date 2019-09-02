@@ -6,7 +6,7 @@
 #include "libnetdata/libnetdata.h"
 
 typedef enum rrdr_options {
-    RRDR_OPTION_NONZERO      = 0x00000001, // don't output dimensions will just zero values
+    RRDR_OPTION_NONZERO      = 0x00000001, // don't output dimensions with just zero values
     RRDR_OPTION_REVERSED     = 0x00000002, // output the rows in reverse order (oldest to newest)
     RRDR_OPTION_ABSOLUTE     = 0x00000004, // values positive, for DATASOURCE_SSV before summing
     RRDR_OPTION_MIN2MAX      = 0x00000008, // when adding dimensions, use max - min, instead of sum
@@ -18,7 +18,7 @@ typedef enum rrdr_options {
     RRDR_OPTION_JSON_WRAP    = 0x00000200, // wrap the response in a JSON header with info about the result
     RRDR_OPTION_LABEL_QUOTES = 0x00000400, // in CSV output, wrap header labels in double quotes
     RRDR_OPTION_PERCENTAGE   = 0x00000800, // give values as percentage of total
-    RRDR_OPTION_NOT_ALIGNED  = 0x00001000, // do not align charts for persistant timeframes
+    RRDR_OPTION_NOT_ALIGNED  = 0x00001000, // do not align charts for persistent timeframes
     RRDR_OPTION_DISPLAY_ABS  = 0x00002000, // for badges, display the absolute value, but calculate colors with sign
     RRDR_OPTION_MATCH_IDS    = 0x00004000, // when filtering dimensions, match only IDs
     RRDR_OPTION_MATCH_NAMES  = 0x00008000, // when filtering dimensions, match only names
@@ -40,8 +40,11 @@ typedef enum rrdr_dimension_flag {
 
 // RRDR result options
 typedef enum rrdr_result_flags {
-    RRDR_RESULT_OPTION_ABSOLUTE = 0x00000001, // the query uses absolute time-frames (can be cached by browsers and proxies)
-    RRDR_RESULT_OPTION_RELATIVE = 0x00000002, // the query uses relative time-frames (should not to be cached by browsers and proxies)
+    RRDR_RESULT_OPTION_ABSOLUTE      = 0x00000001, // the query uses absolute time-frames
+                                                   // (can be cached by browsers and proxies)
+    RRDR_RESULT_OPTION_RELATIVE      = 0x00000002, // the query uses relative time-frames
+                                                   // (should not to be cached by browsers and proxies)
+    RRDR_RESULT_OPTION_VARIABLE_STEP = 0x00000004, // the query uses variable-step time-frames
 } RRDR_RESULT_FLAGS;
 
 typedef struct rrdresult {
