@@ -109,7 +109,7 @@ static void thread_cleanup(void *ptr) {
     netdata_thread = NULL;
 }
 
-static void *thread_set_name(NETDATA_THREAD *nt) {
+static void thread_set_name(NETDATA_THREAD *nt) {
 
     if (nt->tag) {
         char *threadname = strdupz(nt->tag);
