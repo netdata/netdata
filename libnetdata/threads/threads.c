@@ -121,6 +121,26 @@ static void *thread_start(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("cannot set pthread cancel state to ENABLE.");
 
+    if (netdata_thread->tag) {
+        char *threadname = strdupz(netdata_thread->tag);
+        if (threadname) {
+            // Name if limited to 16 chars
+            threadname[15] = 0;
+#if defined(__FreeBSD__)
+            if (pthread_set_name_np(pthread_self(), threadname) != 0)
+                error("cannot set pthread name of %d to %s", gettid(), threadname);
+#elif defined(__APPLE__)
+            if (pthread_setname_np(threadname) != 0)
+                error("cannot set pthread name of %d to %s", gettid(), threadname);
+#else
+            if (pthread_setname_np(pthread_self(), threadname) != 0)
+                error("cannot set pthread name of %d to %s", gettid(), threadname);
+#endif
+            info("set name of thread %d to %s", gettid(), threadname);
+            free(threadname);
+        }
+    }
+
     void *ret = NULL;
     pthread_cleanup_push(thread_cleanup, ptr);
             ret = netdata_thread->start_routine(netdata_thread->arg);
@@ -142,13 +162,6 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
         error("failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
 
     else {
-#if defined(__gnu_linux__)
-        if (tag)
-            pthread_setname_np(*thread, tag);
-#elif defined(__FreeBSD__) || defined(__OpenBSD__)
-        if (tag)
-            pthread_set_name_np(*thread, tag);
-#endif
         if (!(options & NETDATA_THREAD_OPTION_JOINABLE)) {
             int ret2 = pthread_detach(*thread);
             if (ret2 != 0)
