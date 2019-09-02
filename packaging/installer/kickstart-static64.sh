@@ -207,7 +207,7 @@ while [ -n "${1}" ]; do
 		NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
 		shift 1
 	else
-		echo >&2 "Unknown option '${1}'"
+		echo >&2 "Unknown option '${1}' or invalid number of arguments. Please check the README for the available arguments of ${0} and try again"
 		exit 1
 	fi
 done
