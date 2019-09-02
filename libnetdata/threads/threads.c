@@ -109,6 +109,33 @@ static void thread_cleanup(void *ptr) {
     netdata_thread = NULL;
 }
 
+static void *thread_set_name(NETDATA_THREAD *nt) {
+
+    if (nt->tag) {
+        char *threadname = strdupz(nt->tag);
+        int ret = 0;
+
+        if (threadname) {
+            // Name is limited to 16 chars
+            threadname[15] = 0;
+#if defined(__FreeBSD__)
+            ret = pthread_set_name_np(pthread_self(), threadname);
+#elif defined(__APPLE__)
+            ret = pthread_setname_np(threadname);
+#else
+            ret = pthread_setname_np(pthread_self(), threadname);
+#endif
+
+            if (ret != 0)
+                error("cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
+            else
+                info("set name of thread %d to %s", gettid(), threadname);
+
+            free(threadname);
+        }
+    }
+}
+
 static void *thread_start(void *ptr) {
     netdata_thread = (NETDATA_THREAD *)ptr;
 
@@ -121,25 +148,7 @@ static void *thread_start(void *ptr) {
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("cannot set pthread cancel state to ENABLE.");
 
-    if (netdata_thread->tag) {
-        char *threadname = strdupz(netdata_thread->tag);
-        if (threadname) {
-            // Name if limited to 16 chars
-            threadname[15] = 0;
-#if defined(__FreeBSD__)
-            if (pthread_set_name_np(pthread_self(), threadname) != 0)
-                error("cannot set pthread name of %d to %s", gettid(), threadname);
-#elif defined(__APPLE__)
-            if (pthread_setname_np(threadname) != 0)
-                error("cannot set pthread name of %d to %s", gettid(), threadname);
-#else
-            if (pthread_setname_np(pthread_self(), threadname) != 0)
-                error("cannot set pthread name of %d to %s", gettid(), threadname);
-#endif
-            info("set name of thread %d to %s", gettid(), threadname);
-            free(threadname);
-        }
-    }
+    thread_set_name(ptr);
 
     void *ret = NULL;
     pthread_cleanup_push(thread_cleanup, ptr);
