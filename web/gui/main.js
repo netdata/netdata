@@ -1786,15 +1786,23 @@ function renderPage(menus, data) {
         html += mhead + shtml + '</div></div><hr role="separator"/>';
     }
 
+    const isMemoryModeDbEngine = data.memory_mode === "dbengine";
+
     sidebar += '<li class="" style="padding-top:15px;"><a href="https://github.com/netdata/netdata/blob/master/docs/Add-more-charts-to-netdata.md#add-more-charts-to-netdata" target="_blank"><i class="fas fa-plus"></i> add more charts</a></li>';
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
     sidebar += '<li class="" style="margin:20px;color:#666;"><small>Every ' +
       ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
       'Netdata collects <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presents them in <b>' +
       data.charts_count.toLocaleString() + '</b> charts and monitors them with <b>' +
-      data.alarms_count.toLocaleString() + '</b> alarms. <br />&nbsp;<br />' + 'Get more history by ' +
-      '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <b>history</b></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>' +
-      '<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
+      data.alarms_count.toLocaleString() + '</b> alarms.';
+
+    if (!isMemoryModeDbEngine) {
+        sidebar += '<br />&nbsp;<br />Get more history by ' +
+          '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <b>history</b></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>'
+    }
+
+    sidebar += '<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
+
     sidebar += '</ul>';
     div.innerHTML = html;
     document.getElementById('sidebar').innerHTML = sidebar;
