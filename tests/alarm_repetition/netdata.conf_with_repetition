@@ -1,0 +1,57 @@
+# netdata configuration
+#
+# You can download the latest version of this file, using:
+#
+#  wget -O /etc/netdata/netdata.conf http://localhost:19999/netdata.conf
+# or
+#  curl -o /etc/netdata/netdata.conf http://localhost:19999/netdata.conf
+#
+# You can uncomment and change any of the options below.
+# The value shown in the commented settings, is the default value.
+#
+
+# global netdata configuration
+
+[global]
+    #run as user = netdata
+
+[web]
+    #ssl key = /etc/netdata/ssl/key2048.pem
+    #ssl certificate = /etc/netdata/ssl/cert2048.pem
+    mode = static-threaded
+    # listen backlog = 4096
+    default port = 19999
+    #bind to = *=dashboard|registry|streaming|netdata.conf|badges|management *:20000=dashboard|registry|streaming|netdata.conf|badges|management^SSL=optional *:20001=dashboard|registry|streaming|netdata.conf|badges|management^SSL=force unix:/tmp/netdata/netdata.sock
+    # web files owner = netdata
+    # web files group = netdata
+    #accept a streaming request every seconds = 2
+
+[plugins]
+    proc = yes
+    diskspace = no
+    cgroups = no
+    tc = no
+    idlejitter = no
+    enable running new plugins = no
+    check for new plugins every = 60
+    go.d = no
+    node.d = no
+    charts.d = no
+    nfacct = no
+    python.d = no
+    apps = no
+    fping = no
+    cups = no
+
+[health]
+    enabled = yes
+    in memory max health log entries = 1000
+    default repeat warning = 4s
+    default repeat critical = 2s
+
+[registry]
+    enabled = yes
+    allow from = *
+
+[cloud]
+    cloud base url = https://netdata.cloud

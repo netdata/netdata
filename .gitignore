@@ -166,6 +166,7 @@ gmon.txt
 sitespeed-result/
 tests/acls/acl.sh
 tests/urls/request.sh
+tests/alarm_repetition/alarm.sh
 
 # tests and temp files
 python.d/python-modules-installer.sh
