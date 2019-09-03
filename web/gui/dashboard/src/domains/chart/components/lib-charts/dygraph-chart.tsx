@@ -1,13 +1,16 @@
-/* eslint-disable max-len */
+import { findIndex } from "ramda"
 import React, {
   useLayoutEffect, useRef, useState,
 } from "react"
+import { useSelector } from "react-redux"
 import classNames from "classnames"
 import Dygraph from "dygraphs"
 import "dygraphs/src/extras/smooth-plotter"
 
 import { NetdataDygraph } from "types/vendor-overrides"
 import { useDateTime } from "utils/date-time"
+import { selectGlobalSelectionMaster } from "domains/global/selectors"
+
 import { Attributes } from "../../utils/transformDataAttributes"
 import {
   chartLibrariesSettings,
@@ -18,16 +21,6 @@ import { ChartData, ChartDetails } from "../../chart-types"
 
 import "./dygraph-chart.css"
 
-interface Serie {
-  color: string
-  dashHTML: string
-  isVisible: boolean
-  label: string
-  labelHTML: string
-  y: number
-  yHTML: string
-}
-
 interface GetDygraphOptions {
   attributes: Attributes,
   chartData: ChartData,
@@ -35,7 +28,7 @@ interface GetDygraphOptions {
   chartSettings: ChartLibraryConfig,
   hiddenLabelsElementId: string,
   orderedColors: string[],
-  setLegendLabelValues: (labelValues: number[]) => void
+  setHoveredX: (hoveredX: number | null) => void
   unitsCurrent: string,
   xAxisTimeString: (d: Date) => string,
 }
@@ -46,7 +39,7 @@ const getDygraphOptions = ({
   chartSettings,
   hiddenLabelsElementId,
   orderedColors,
-  setLegendLabelValues,
+  setHoveredX,
   unitsCurrent,
   xAxisTimeString,
 }: GetDygraphOptions) => {
@@ -226,14 +219,42 @@ const getDygraphOptions = ({
         // axisLabelFormatter is added on the updates
       },
     },
-    legendFormatter: (data: { x: number | undefined, series: Serie[] }) => {
-      // todo this dygraph callback should not be used to send side effects
-      // investigate if setting label value can be moved to different callback
 
-      if (data.x !== undefined) {
-        setLegendLabelValues(data.series.map(serie => serie.y))
-      }
-      return ""
+    highlightCallback(
+      event: MouseEvent, xval: number,
+    ) {
+      // todo
+      // state.pauseChart()
+
+      // todo dont know if that's still valid (following comment is from old code)
+      // there is a bug in dygraph when the chart is zoomed enough
+      // the time it thinks is selected is wrong
+      // here we calculate the time t based on the row number selected
+      // which is ok
+      // let t = state.data_after + row * state.data_update_every;
+      // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(
+      // Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' +
+      // state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' +
+      // state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' +
+      // state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before +
+      // ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' +
+      // state.data_update_every);
+
+      // todo
+      // if (state.tmp.dygraph_mouse_down !== true) {
+      setHoveredX(xval)
+      // }
+    },
+
+    unhighlightCallback() {
+      // todo
+      // if (state.tmp.dygraph_mouse_down) {
+      //   return;
+      // }
+
+      // todo
+      // state.unpauseChart();
+      setHoveredX(null)
     },
   }
 }
@@ -250,7 +271,8 @@ interface Props {
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
 
-  setLegendLabelValues: (labelValues: number[]) => void
+  hoveredX: number | null
+  setHoveredX: (hoveredX: number | null) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
 }
@@ -264,7 +286,8 @@ export const DygraphChart = ({
   legendFormatValue,
   orderedColors,
 
-  setLegendLabelValues,
+  hoveredX,
+  setHoveredX,
   setMinMax,
   unitsCurrent,
 }: Props) => {
@@ -284,7 +307,7 @@ export const DygraphChart = ({
         chartSettings,
         hiddenLabelsElementId,
         orderedColors,
-        setLegendLabelValues,
+        setHoveredX,
         unitsCurrent,
         xAxisTimeString,
       })
@@ -298,7 +321,7 @@ export const DygraphChart = ({
       setMinMax(extremes)
     }
   }, [attributes, chartData, chartDetails, chartSettings, dygraphInstance, hiddenLabelsElementId,
-    orderedColors, setLegendLabelValues, setMinMax, unitsCurrent, xAxisTimeString,
+    orderedColors, setHoveredX, setMinMax, unitsCurrent, xAxisTimeString,
   ])
 
   useLayoutEffect(() => {
@@ -314,7 +337,33 @@ export const DygraphChart = ({
         ylabel: isSparkline ? unitsCurrent : undefined,
       })
     }
-  })
+  }, [attributes.dygraphTheme, dygraphInstance, legendFormatValue, unitsCurrent])
+
+
+  // update data of the chart
+  useLayoutEffect(() => {
+    if (dygraphInstance) {
+      dygraphInstance.updateOptions({
+        file: chartData.result.data,
+      })
+    }
+  }, [chartData.result.data, dygraphInstance])
+
+
+  // set selection
+  const currentSelectionMasterId = useSelector(selectGlobalSelectionMaster)
+  useLayoutEffect(() => {
+    if (dygraphInstance && currentSelectionMasterId && currentSelectionMasterId !== chartUuid) {
+      const hoveredRow = findIndex((x: any) => x[0] === hoveredX, chartData.result.data)
+
+      if (hoveredX === null) {
+        dygraphInstance.clearSelection()
+        return
+      }
+      dygraphInstance.setSelection(hoveredRow)
+    }
+  }, [chartData.result.data, chartUuid, currentSelectionMasterId, dygraphInstance, hoveredX])
+
 
   const chartElemId = `${chartLibrary}-${chartUuid}-chart`
   const { hasLegend } = chartSettings
@@ -331,8 +380,7 @@ export const DygraphChart = ({
           : classNames(
             "netdata-chart",
             `netdata-${chartLibrary}-chart`,
-          )
-        }
+          )}
       />
       <div className="dygraph-chart__labels-hidden" id={hiddenLabelsElementId} />
     </>

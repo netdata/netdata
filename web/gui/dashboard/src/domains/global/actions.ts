@@ -11,3 +11,6 @@ export const requestCommonColorsAction = createAction<RequestCommonColors>("glob
 
 export const setTimezoneAction = createAction<{timezone: string}>("globalSetTmezone")
 window.TEMPORARY_setTimezoneAction = setTimezoneAction
+
+interface SetGlobalSelectionAction { chartUuid: string; hoveredX: number }
+export const setGlobalSelectionAction = createAction<SetGlobalSelectionAction>("setGlobalSelection")

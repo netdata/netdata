@@ -1,6 +1,6 @@
 import { init, last, mergeAll } from "ramda"
 import { createReducer } from "redux-act"
-import { requestCommonColorsAction, setTimezoneAction } from "./actions"
+import { requestCommonColorsAction, setGlobalSelectionAction, setTimezoneAction } from "./actions"
 
 export type StateT = {
   commonColorsKeys: {
@@ -14,12 +14,16 @@ export type StateT = {
       copyTheme: boolean
     }
   }
+  currentSelectionMasterId: string | null
   timezone: string | undefined
+  hoveredX: number | null
 }
 
 const initialState = {
   commonColorsKeys: {},
+  currentSelectionMasterId: null,
   timezone: window.NETDATA.options.current.timezone,
+  hoveredX: null,
 }
 
 export const globalReducer = createReducer<StateT>(
@@ -119,6 +123,12 @@ globalReducer.on(requestCommonColorsAction, (state, {
 globalReducer.on(setTimezoneAction, (state, { timezone = "default" }) => ({
   ...state,
   timezone,
+}))
+
+globalReducer.on(setGlobalSelectionAction, (state, { chartUuid, hoveredX }) => ({
+  ...state,
+  hoveredX,
+  currentSelectionMasterId: chartUuid,
 }))
 
 export const globalKey = "global"

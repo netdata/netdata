@@ -1,9 +1,11 @@
 import { __, forEachObjIndexed, prop } from "ramda"
-import React, { useEffect, useLayoutEffect, useState } from "react"
+import React, {
+  useEffect, useLayoutEffect, useState, useCallback,
+} from "react"
 import { useDispatch, useSelector } from "react-redux"
 
-import { requestCommonColorsAction } from "domains/global/actions"
-import { createSelectAssignedColors } from "domains/global/selectors"
+import { requestCommonColorsAction, setGlobalSelectionAction } from "domains/global/actions"
+import { createSelectAssignedColors, selectGlobalSelection } from "domains/global/selectors"
 
 import { ChartLegend } from "./chart-legend"
 import { Attributes } from "../utils/transformDataAttributes"
@@ -110,8 +112,20 @@ export const Chart = ({
     uuid: chartUuid,
   })
 
-  const [legendLabelValues, setLegendLabelValues] = useState<(number | null)[]>(
-    chartData.dimension_names.map(() => null))
+  const [localHoveredX, setLocalHoveredX] = useState<number | null>(null)
+
+  const isGlobalSelectionSyncFlagTrue = true // todo
+  const handleSetHoveredX = useCallback((newHoveredX) => {
+    if (isGlobalSelectionSyncFlagTrue) {
+      dispatch(setGlobalSelectionAction({ chartUuid, hoveredX: newHoveredX }))
+    } else {
+      setLocalHoveredX(newHoveredX)
+    }
+  }, [chartUuid, dispatch, isGlobalSelectionSyncFlagTrue])
+  const globalHoveredX = useSelector(selectGlobalSelection)
+  const hoveredX = isGlobalSelectionSyncFlagTrue
+    ? globalHoveredX
+    : localHoveredX
 
   const selectAssignedColors = createSelectAssignedColors({
     chartContext: chartDetails.context,
@@ -136,7 +150,8 @@ export const Chart = ({
         chartUuid={chartUuid}
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
-        setLegendLabelValues={setLegendLabelValues}
+        hoveredX={hoveredX}
+        setHoveredX={handleSetHoveredX}
         setMinMax={([min, max]) => { legendFormatValueDecimalsFromMinMax(min, max) }}
         unitsCurrent={unitsCurrent}
       />
@@ -147,9 +162,9 @@ export const Chart = ({
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}
           colors={colors}
+          hoveredX={hoveredX}
           legendFormatValue={legendFormatValue}
           unitsCurrent={unitsCurrent}
-          legendLabelValues={legendLabelValues}
         />
       )}
       {shouldDisplayToolbox && (

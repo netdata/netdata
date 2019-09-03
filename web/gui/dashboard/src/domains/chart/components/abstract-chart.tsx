@@ -16,7 +16,8 @@ interface Props {
   chartUuid: string
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
-  setLegendLabelValues: (labelValues: number[]) => void
+  hoveredX: number | null
+  setHoveredX: (hoveredX: number | null) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
 }
@@ -30,7 +31,8 @@ export const AbstractChart = ({
   chartUuid,
   legendFormatValue,
   orderedColors,
-  setLegendLabelValues,
+  hoveredX,
+  setHoveredX,
   setMinMax,
   unitsCurrent,
 }: Props) => (
@@ -43,7 +45,8 @@ export const AbstractChart = ({
     chartUuid={chartUuid}
     legendFormatValue={legendFormatValue}
     orderedColors={orderedColors}
-    setLegendLabelValues={setLegendLabelValues}
+    hoveredX={hoveredX}
+    setHoveredX={setHoveredX}
     setMinMax={setMinMax}
     unitsCurrent={unitsCurrent}
   />

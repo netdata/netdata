@@ -1,6 +1,7 @@
 import React, { Fragment } from "react"
 import classNames from "classnames"
 
+import { find } from "ramda"
 import { seconds4human } from "../utils/seconds4human"
 import { Attributes } from "../utils/transformDataAttributes"
 import { ChartData, ChartDetails } from "../chart-types"
@@ -13,8 +14,8 @@ interface Props {
   colors: {
     [key: string]: string
   }
+  hoveredX: number | null
   legendFormatValue: (value: number | string) => (number | string)
-  legendLabelValues: (number | null)[]
   unitsCurrent: string
 }
 
@@ -64,8 +65,8 @@ export const ChartLegend = ({
   chartDetails,
   chartLibrary,
   colors,
+  hoveredX,
   legendFormatValue,
-  legendLabelValues,
   unitsCurrent,
 }: Props) => {
   const netdataLast = chartData.last_entry * 1000
@@ -115,6 +116,22 @@ export const ChartLegend = ({
           const color = colors[dimensionName]
           const rgb = window.NETDATA.colorHex2Rgb(color)
           const isSelected = true // todo lift to state
+
+          let value
+          if (hoveredX) {
+            const hoveredValueArray = find(
+              (x: any) => x[0] === hoveredX,
+              chartData.result.data,
+            ) as number[]
+            if (!hoveredValueArray) {
+              value = ""
+            } else {
+              value = hoveredValueArray[i + 1]
+            }
+          } else {
+            value = chartData.view_latest_values[i]
+          }
+
           return (
             <Fragment key={dimensionName}>
               {i !== 0 && <br />}
@@ -124,7 +141,7 @@ export const ChartLegend = ({
                   "netdata-legend-name",
                   { "netdata-legend-name": isSelected },
                 )}
-                style={{ color }} // omitted !important during refractor (react doesn't support it)
+                style={{ color }}
               >
                 <table
                   className={`netdata-legend-name-table-${chartDetails.chart_type}`}
@@ -148,14 +165,9 @@ export const ChartLegend = ({
                   { selected: isSelected },
                 )}
                 style={{ color }} // omitted !important during refractor (react doesn't support it)
-                // value was set in dashboard.js by this.legendSetLabelValue
-                // this.legendSetLabelValue could be called by: legendFormatter (dygraph internal
-                // function), legendShowUndefined (clearing), or this.legendShowLatestValues
-                // todo this needs to be further formatted using this.legendFormatValue()
-                // (but first, charts needs to be configured)
               >
                 {legendFormatValue(
-                  legendLabelValues[i] || chartData.view_latest_values[i],
+                  value,
                 )}
               </span>
             </Fragment>

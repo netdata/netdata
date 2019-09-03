@@ -1,3 +1,4 @@
+import { prop } from "ramda"
 import { createSelector } from "reselect"
 
 import { AppStateT } from "store/app-state"
@@ -14,5 +15,15 @@ export const selectGlobal = (state: AppStateT) => state.global
 
 export const selectTimezone = createSelector(
   selectGlobal,
-  subState => subState.timezone,
+  (subState) => subState.timezone,
+)
+
+export const selectGlobalSelection = createSelector(
+  selectGlobal,
+  prop("hoveredX"),
+)
+
+export const selectGlobalSelectionMaster = createSelector(
+  selectGlobal,
+  prop("currentSelectionMasterId"),
 )
