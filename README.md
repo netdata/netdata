@@ -170,6 +170,8 @@ This release includes several fixes and improvements to the TLS encryption featu
 
 Finally, we improved the way Netdata displays charts with no metrics. By default, Netdata displays charts for disks, memory, and networks only when the associated metrics are not zero. Users could enable these charts permanently using the corresponding configuration options, but they would need to change more than 200 options. With this new improvement, users can enable all charts with zero values using a single, global configuration parameter.
 
+---
+
 `Jul 9th, 2019` - **[Netdata v1.16.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release v1.16.0 contains 40 bug fixes, 31 improvements and 20 documentation updates
