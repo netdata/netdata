@@ -210,7 +210,7 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     w->response.data->contenttype = CT_APPLICATION_JSON;
     health_alarms2json(host, w->response.data, all);
     buffer_no_cacheable(w->response.data);
-    return 200;
+    return HTTP_RESP_OK;
 }
 
 inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
@@ -274,11 +274,11 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     health_alarm_log2json(host, w->response.data, after);
-    return 200;
+    return HTTP_RESP_OK;
 }
 
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
-    int ret = 400;
+    int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
 
     buffer_flush(w->response.data);
@@ -311,14 +311,14 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
-        ret = 404;
+        ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
     st->last_accessed_time = now_realtime_sec();
     callback(st, w->response.data);
-    return 200;
+    return HTTP_RESP_OK;
 
     cleanup:
     return ret;
@@ -334,7 +334,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
     charts2json(host, w->response.data);
-    return 200;
+    return HTTP_RESP_OK;
 }
 
 inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url) {
@@ -354,7 +354,7 @@ void fix_google_param(char *s) {
 inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
-    int ret = 400;
+    int ret = HTTP_RESP_BAD_REQUEST;
     BUFFER *dimensions = NULL;
 
     buffer_flush(w->response.data);
@@ -467,7 +467,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     if(!st) {
         buffer_strcat(w->response.data, "Chart is not found: ");
         buffer_strcat_htmlescape(w->response.data, chart);
-        ret = 404;
+        ret = HTTP_RESP_NOT_FOUND;
         goto cleanup;
     }
     st->last_accessed_time = now_realtime_sec();
@@ -654,7 +654,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
     if(unlikely(respect_web_browser_do_not_track_policy && web_client_has_donottrack(w))) {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Your web browser is sending 'DNT: 1' (Do Not Track). The registry requires persistent cookies on your browser to work.");
-        return 400;
+        return HTTP_RESP_BAD_REQUEST;
     }
 
     if(unlikely(action == 'H')) {
@@ -674,7 +674,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
                 error("Invalid registry request - access requires these parameters: machine ('%s'), url ('%s'), name ('%s')", machine_guid ? machine_guid : "UNSET", machine_url ? machine_url : "UNSET", url_name ? url_name : "UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Access request.");
-                return 400;
+                return HTTP_RESP_BAD_REQUEST;
             }
 
             web_client_enable_tracking_required(w);
@@ -685,7 +685,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
                 error("Invalid registry request - delete requires these parameters: machine ('%s'), url ('%s'), delete_url ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", delete_url?delete_url:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Delete request.");
-                return 400;
+                return HTTP_RESP_BAD_REQUEST;
             }
 
             web_client_enable_tracking_required(w);
@@ -696,7 +696,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
                 error("Invalid registry request - search requires these parameters: machine ('%s'), url ('%s'), for ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", search_machine_guid?search_machine_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Search request.");
-                return 400;
+                return HTTP_RESP_BAD_REQUEST;
             }
 
             web_client_enable_tracking_required(w);
@@ -707,7 +707,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
                 error("Invalid registry request - switching identity requires these parameters: machine ('%s'), url ('%s'), to ('%s')", machine_guid?machine_guid:"UNSET", machine_url?machine_url:"UNSET", to_person_guid?to_person_guid:"UNSET");
                 buffer_flush(w->response.data);
                 buffer_strcat(w->response.data, "Invalid registry Switch request.");
-                return 400;
+                return HTTP_RESP_BAD_REQUEST;
             }
 
             web_client_enable_tracking_required(w);
@@ -719,7 +719,7 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
         default:
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Invalid registry request - you need to set an action: hello, access, delete, search");
-            return 400;
+            return HTTP_RESP_BAD_REQUEST;
     }
 }
 
@@ -763,7 +763,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
 
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
-    if (!netdata_ready) return 503;
+    if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
@@ -801,7 +801,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 
     buffer_strcat(wb, "}");
     buffer_no_cacheable(wb);
-    return 200;
+    return HTTP_RESP_OK;
 }
 
 static struct api_command {
@@ -860,11 +860,11 @@ inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Unsupported v1 API command: ");
         buffer_strcat_htmlescape(w->response.data, url);
-        return 404;
+        return HTTP_RESP_NOT_FOUND;
     }
     else {
         buffer_flush(w->response.data);
         buffer_sprintf(w->response.data, "Which API v1 command?");
-        return 400;
+        return HTTP_RESP_BAD_REQUEST;
     }
 }

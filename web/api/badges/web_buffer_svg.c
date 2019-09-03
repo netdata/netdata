@@ -789,7 +789,7 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 }
 
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
-    int ret = 400;
+    int ret = HTTP_RESP_BAD_REQUEST;
     buffer_flush(w->response.data);
 
     BUFFER *dimensions = NULL;
@@ -867,7 +867,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     if(!st) {
         buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0);
-        ret = 200;
+        ret = HTTP_RESP_OK;
         goto cleanup;
     }
     st->last_accessed_time = now_realtime_sec();
@@ -878,7 +878,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         if (!rc) {
             buffer_no_cacheable(w->response.data);
             buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0);
-            ret = 200;
+            ret = HTTP_RESP_OK;
             goto cleanup;
         }
     }
@@ -997,13 +997,13 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 scale,
                 options
         );
-        ret = 200;
+        ret = HTTP_RESP_OK;
     }
     else {
         time_t latest_timestamp = 0;
         int value_is_null = 1;
         calculated_number n = NAN;
-        ret = 500;
+        ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
         // if the collected value is too old, don't calculate its value
         if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
@@ -1011,11 +1011,11 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                                       , points, after, before, group, 0, options, NULL, &latest_timestamp, &value_is_null);
 
         // if the value cannot be calculated, show empty badge
-        if (ret != 200) {
+        if (ret != HTTP_RESP_OK) {
             buffer_no_cacheable(w->response.data);
             value_is_null = 1;
             n = 0;
-            ret = 200;
+            ret = HTTP_RESP_OK;
         }
         else if (refresh > 0) {
             buffer_sprintf(w->response.header, "Refresh: %d\r\n", refresh);

@@ -1,6 +1,6 @@
 # Changelog
 
-## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-02)
+## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
 **Fixed bugs:**
 
@@ -9,6 +9,7 @@
 
 **Merged pull requests:**
 
+- Remove changelog generation from release, as it keeps breaking [\#6761](https://github.com/netdata/netdata/pull/6761) ([cakrit](https://github.com/cakrit))
 - Skip issues from release changelog [\#6759](https://github.com/netdata/netdata/pull/6759) ([cakrit](https://github.com/cakrit))
 - Increase minimum release for changelog [\#6758](https://github.com/netdata/netdata/pull/6758) ([cakrit](https://github.com/cakrit))
 - netdata/packaging: Add python3-lxc dependency [\#6753](https://github.com/netdata/netdata/pull/6753) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
