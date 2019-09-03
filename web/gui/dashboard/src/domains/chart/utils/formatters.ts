@@ -118,7 +118,7 @@ export const useFormatters = ({
       return
     }
 
-    let newDecimals = decimals
+    let newDecimals
 
     if (data.min === data.max) {
       // it is a fixed number, let the visualizer decide based on the value

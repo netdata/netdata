@@ -136,7 +136,7 @@ const convertibleUnits: ConvertibleUnits = {
         return window.NETDATA.options.current.temperature === "fahrenheit"
       },
       convert(value: number) {
-        return value * 9 / 5 + 32
+        return (value * 9) / 5 + 32
       },
     },
   },
@@ -147,7 +147,7 @@ const convertibleUnits: ConvertibleUnits = {
         return window.NETDATA.options.current.temperature === "fahrenheit"
       },
       convert(value: number) {
-        return value * 9 / 5 + 32
+        return (value * 9) / 5 + 32
       },
     },
   },

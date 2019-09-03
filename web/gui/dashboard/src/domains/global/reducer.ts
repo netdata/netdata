@@ -98,7 +98,7 @@ globalReducer.on(requestCommonColorsAction, (state, {
   const requestedDimensionsAssigned = mergeAll(
     dimensionNames
       // dont assign already assigned dimensions
-      .filter(dimensionName => !subState.assigned[dimensionName])
+      .filter((dimensionName) => !subState.assigned[dimensionName])
       .map((dimensionName, i) => ({
         [dimensionName]: subState.available[(i + currentlyAssignedNr) % subState.available.length],
       })),
