@@ -72,7 +72,7 @@ int rrdset2value_api_v1(
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions);
     if(!r) {
         if(value_is_null) *value_is_null = 1;
-        return 500;
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     if(rrdr_rows(r) == 0) {
@@ -82,7 +82,7 @@ int rrdset2value_api_v1(
         if(db_before) *db_before = 0;
         if(value_is_null) *value_is_null = 1;
 
-        return 400;
+        return HTTP_RESP_BAD_REQUEST;
     }
 
     if(wb) {
@@ -99,7 +99,7 @@ int rrdset2value_api_v1(
     *n = rrdr2value(r, i, options, value_is_null);
 
     rrdr_free(r);
-    return 200;
+    return HTTP_RESP_OK;
 }
 
 int rrdset2anything_api_v1(
@@ -120,7 +120,7 @@ int rrdset2anything_api_v1(
     RRDR *r = rrd2rrdr(st, points, after, before, group_method, group_time, options, dimensions?buffer_tostring(dimensions):NULL);
     if(!r) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
-        return 500;
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
     if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
@@ -294,5 +294,5 @@ int rrdset2anything_api_v1(
     }
 
     rrdr_free(r);
-    return 200;
+    return HTTP_RESP_OK;
 }

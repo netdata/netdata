@@ -16,6 +16,8 @@
 #include "web/api/formatters/charts2json.h"
 #include "web/api/formatters/json_wrapper.h"
 
+#include "web/server/web_client.h"
+
 #define HOSTNAME_MAX 1024
 
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
