@@ -119,7 +119,7 @@ static void thread_set_name(NETDATA_THREAD *nt) {
             // Name is limited to 16 chars
             threadname[15] = 0;
 #if defined(__FreeBSD__)
-            ret = pthread_set_name_np(pthread_self(), threadname);
+            pthread_set_name_np(pthread_self(), threadname);
 #elif defined(__APPLE__)
             ret = pthread_setname_np(threadname);
 #else
