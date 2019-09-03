@@ -28,11 +28,11 @@ No matter where you use Netdata's charts, you'll want to know how to
 
 ## Using charts
 
-Netdata's chart's are far from static. They're interactive, real-time, and work
+Netdata's charts are far from static. They are interactive, real-time, and work
 with your mouse, touchpad, or touchscreen!
 
 Hover over any chart to temporarily pause it and see the exact values presented
-as different [dimensions](#dimensions). Click or tap to lock the chart.
+as different [dimensions](#dimensions). Click or tap stop the chart from automatically updating with new metrics, thereby locking it to a single timeframe.
 
 ![Animated GIF of hovering over a chart to see
 values](https://user-images.githubusercontent.com/1153921/62968279-9227dd00-bdbf-11e9-9112-1d21444d0f31.gif)
@@ -42,7 +42,7 @@ forward or backward in time, or selecting a specific timeframe for more in-depth
 analysis.
 
 Whenever you use a chart in this way, Netdata synchronizes all the other charts
-to match it. This even applies across different Netdata agents if you connect
+to match it. Chart synchronization even works between separate Netdata agents if you connect
 them using the [node menu](../registry)!
 
 You can change how charts show their metrics in a few different ways, each of

@@ -137,7 +137,7 @@ customDashboard.menu = {
 };
 ```
 
-Finally, tell Netdata where you've put your customization file by replacing
+Finally, tell Netdata where you placed your customization file by replacing
 `your_dashboard_info_file.js` below.
 
 ```conf

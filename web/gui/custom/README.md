@@ -269,15 +269,14 @@ You can set the size of the chart using this:
 percentages, pixels, etc). Keep in mind that for certain chart libraries,
 `dashboard.js` may apply an aspect ratio to these.
 
-If you want `dashboard.js` to remember permanently (browser local storage) the
+If you want `dashboard.js` to permanently remember (browser local storage) the
 dimensions of the chart (the user may resize it), you can add: `data-id="
 SETTINGS_ID"`, where `SETTINGS_ID` is anything that will be common for this
 chart across user sessions.
 
 ### Netdata server
 
-Each chart can get data from a different Netdata server. You can give per chart
-the Netdata server using:
+Each chart can get data from a different Netdata server. You can specify the Netdata server to use for each chart using:
 
 ```html
 <div data-netdata="unique.id"
@@ -297,12 +296,9 @@ to the nodes dashboards, you can use the following:
 
 ### Chart library
 
-Netdata supports a number of chart libraries. The default is Dygraph, but the
-standard dashboard also uses Gauge.js and EasyPieChart frequently to create
-overviews of essential metrics.
-
-The default chart library is `dygraph`, but you can set a different chart
-library per chart using `data-chart-library`:
+Netdata supports a number of chart libraries. The default chart library is
+`dygraph`, but you can set a different chart library per chart using
+`data-chart-library`:
 
 ```html
 <div data-netdata="unique.id"
@@ -339,16 +335,13 @@ becomes 600 pixels wide, then `dashboard.js` will request the same 10 minutes of
 data, represented in 200 points and the chart will be refreshed once every 3
 seconds.
 
-If you need to have a fixed number of points in the data source retrieved from
-the Netdata server, you can set:
+If you need the chart to show a fixed number of points, you can set the `data-points` option. Replace `DATA_POINTS` with the number of points you need:
 
 ```html
 <div data-netdata="unique.id"
  data-points="DATA_POINTS"
  ></div>
 ```
-
-Where `DATA_POINTS` is the number of points you need.
 
 You can also overwrite the pixels-per-point per chart using this:
 

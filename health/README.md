@@ -451,7 +451,8 @@ _Hint: If you don't know how to find the CHART_NAME, you can read about it [here
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
 <details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
-Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in templates for charts belonging to the same [context](../web/README.md#contexts). The reason is that all charts of a given contexts are essentially identical, with the only difference being the [family](../web/README.md#families) that identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway, unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
+
+Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in templates for charts belonging to a given [context](../web/README.md#contexts). The reason is that all charts of a given contexts are essentially identical, with the only difference being the [family](../web/README.md#families) that identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway, unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
 </details>
 
 -   **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of $this for the other configured alarms of the chart also appears, under the name of each configured alarm.
