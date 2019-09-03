@@ -2613,7 +2613,7 @@ netdataDashboard.context = {
 
     'vcsa.software_updates_health': {
         info:
-            '<code>softwarepackages</code> represents information on available software updates available in the remote vSphere Update Manager repository:<br>' +
+            '<code>softwarepackages</code> represents information on available software updates available in the remote vSphere Update Manager repository.<br>' +
             '<code>-1</code>: unknown; ' +
             '<code>0</code>: no updates available; ' +
             '<code>2</code>: non-security updates are available; ' +
