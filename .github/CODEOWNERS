@@ -5,16 +5,16 @@
 * @ktsaou @cakrit @cosmix
 
 # Ownership by directory structure
-.travis/ @paulkatsoulakis @cakrit @cosmix
-.github/ @paulkatsoulakis @cakrit @cosmix
+.travis/ @cakrit @cosmix
+.github/ @cakrit @cosmix
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
-backends/prometheus/ @vlvkobal @paulkatsoulakis @thiagoftsm
-build/ @paulkatsoulakis @cakrit @cosmix
+backends/prometheus/ @vlvkobal @thiagoftsm
+build/ @cakrit @cosmix
 collectors/ @vlvkobal @mfundul @cakrit @cosmix
-collectors/charts.d.plugin/ @paulkatsoulakis @cakrit @cosmix
+collectors/charts.d.plugin/ @cakrit @cosmix
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cakrit @cosmix
 collectors/macos.plugin/ @vlvkobal @thiagoftsm @cakrit @cosmix
 collectors/node.d.plugin/ @VLegakis @cakrit @cosmix
@@ -30,9 +30,9 @@ health/ @thiagoftsm @vlvkobal @cakrit @cosmix
 health/health.d/ @thiagoftsm @vlvkobal @cakrit @cosmix
 health/notifications/ @Ferroin @thiagoftsm @cakrit @cosmix
 libnetdata/ @thiagofsm @mfundul @cakrit @cosmix
-packaging/ @paulkatsoulakis @cakrit @cosmix
-packaging/installer/ @paulkatsoulakis @cakrit @cosmix
-packaging/makeself/ @paulkatsoulakis @cakrit @cosmix
+packaging/ @cakrit @cosmix
+packaging/installer/ @cakrit @cosmix
+packaging/makeself/ @cakrit @cosmix
 registry/ @VLegakis @cakrit @cosmix
 streaming/ @thiagoftsm @vlvkobal @cakrit @cosmix
 web/ @thiagoftsm @mfundul @vlvkobal @cakrit @cosmix
@@ -40,19 +40,19 @@ web/gui/ @VLegakis @cakrit @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @cakrit @cosmix @joelhans
-*.am @paulkatsoulakis
+*.am @cakrit @cosmix
 
 # Ownership of specific files
-.gitignore @paulkatsoulakis @cakrit @cosmix
-.travis.yml @paulkatsoulakis
-.lgtm.yml @paulkatsoulakis
-.eslintrc @paulkatsoulakis
-.eslintignore @paulkatsoulakis
-.csslintrc @paulkatsoulakis
-.codeclimate.yml @paulkatsoulakis
-.codacy.yml @paulkatsoulakis
-netdata.spec.in @paulkatsoulakis
-netdata-installer.sh @paulkatsoulakis @cakrit @cosmix
+.gitignore @cakrit @cosmix
+.travis.yml @cakrit @cosmix
+.lgtm.yml @cakrit @cosmix
+.eslintrc @cakrit @cosmix
+.eslintignore @cakrit @cosmix
+.csslintrc @cakrit @cosmix
+.codeclimate.yml @cakrit @cosmix
+.codacy.yml @cakrit @cosmix
+netdata.spec.in @cakrit @cosmix
+netdata-installer.sh @cakrit @cosmix
 netlify.toml @cakrit @cosmix
 package.json @VLegakis
 packaging/version @netdatabot

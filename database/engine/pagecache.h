@@ -48,9 +48,6 @@ struct page_cache_descr {
  * number of descriptor users   |    DESTROY |     LOCKED | ALLOCATED |
  */
 struct rrdeng_page_descr {
-    uint32_t page_length;
-    usec_t start_time;
-    usec_t end_time;
     uuid_t *id; /* never changes */
     struct extent_info *extent;
 
@@ -59,7 +56,24 @@ struct rrdeng_page_descr {
 
     /* Compare-And-Swap target for page cache descriptor allocation algorithm */
     volatile unsigned long pg_cache_descr_state;
+
+    /* page information */
+    usec_t start_time;
+    usec_t end_time;
+    uint32_t page_length;
 };
+
+#define PAGE_INFO_SCRATCH_SZ (8)
+struct rrdeng_page_info {
+    uint8_t scratch[PAGE_INFO_SCRATCH_SZ]; /* scratch area to be used by page-cache users */
+
+    usec_t start_time;
+    usec_t end_time;
+    uint32_t page_length;
+};
+
+/* returns 1 for success, 0 for failure */
+typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
 
 #define PAGE_CACHE_MAX_PRELOAD_PAGES    (256)
 
@@ -149,11 +163,20 @@ extern void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_desc
 extern void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
                             struct rrdeng_page_descr *descr);
 extern void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr, uint8_t remove_dirty);
-extern struct pg_cache_page_index *
-        pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time);
+extern usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
+                                            usec_t start_time, usec_t end_time);
+extern void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
+                                            usec_t point_in_time, pg_cache_page_info_filter_t *filter,
+                                            struct rrdeng_page_info *page_info);
+extern unsigned
+        pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time, usec_t end_time,
+                         struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp);
 extern struct rrdeng_page_descr *
         pg_cache_lookup(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
                         usec_t point_in_time);
+extern struct rrdeng_page_descr *
+        pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
+                     usec_t start_time, usec_t end_time);
 extern struct pg_cache_page_index *create_page_index(uuid_t *id);
 extern void init_page_cache(struct rrdengine_instance *ctx);
 extern void free_page_cache(struct rrdengine_instance *ctx);

@@ -10,6 +10,15 @@ umask 002
 renice 19 $$ >/dev/null 2>/dev/null
 
 # -----------------------------------------------------------------------------
+if [ -d /opt/netdata/etc/netdata.old ]; then
+	progress "Found old etc/netdata directory, reinstating this"
+	[ -d /opt/netdata/etc/netdata.new ] && rm -rf /opt/netdata/etc/netdata.new
+	mv -f /opt/netdata/etc/netdata /opt/netdata/etc/netdata.new
+	mv -f /opt/netdata/etc/netdata.old /opt/netdata/etc/netdata
+
+	progress "Trigger stock config clean up"
+	rm -f /opt/netdata/etc/netdata/.installer-cleanup-of-stock-configs-done
+fi
 
 STARTIT=1
 

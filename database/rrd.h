@@ -273,8 +273,9 @@ struct rrddim_query_handle {
             struct rrdeng_page_descr *descr;
             struct rrdengine_instance *ctx;
             struct pg_cache_page_index *page_index;
-            time_t now; //TODO: remove now to implement next point iteration
-            time_t dt; //TODO: remove dt to implement next point iteration
+            time_t next_page_time;
+            time_t now;
+            unsigned position;
         } rrdeng; // state the database engine uses
 #endif
     };
@@ -307,7 +308,7 @@ struct rrddim_volatile {
         void (*init)(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 
         // run this to load each metric number from the database
-        storage_number (*next_metric)(struct rrddim_query_handle *handle);
+        storage_number (*next_metric)(struct rrddim_query_handle *handle, time_t *current_time);
 
         // run this to test if the series of next_metric() database queries is finished
         int (*is_finished)(struct rrddim_query_handle *handle);

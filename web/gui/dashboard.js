@@ -2281,8 +2281,28 @@ NETDATA.dygraphChartCreate = function (state, data) {
             NETDATA.globalSelectionSync.stop();
         },
         underlayCallback: function (canvas, area, g) {
-
             // the chart is about to be drawn
+
+            // update history_tip_element
+            if (state.tmp.dygraph_history_tip_element) {
+                const xHookRightSide = g.toDomXCoord(state.netdata_first);
+                if (xHookRightSide > area.x) {
+                    state.tmp.dygraph_history_tip_element_displayed = true;
+                    // group the styles for possible better performance
+                    state.tmp.dygraph_history_tip_element.setAttribute(
+                      'style',
+                      `display: block; left: ${area.x}px; right: calc(100% - ${xHookRightSide}px);`
+                    )
+                } else {
+                    if (state.tmp.dygraph_history_tip_element_displayed) {
+                        // additional check just for performance
+                        // don't update the DOM when it's not needed
+                        state.tmp.dygraph_history_tip_element.style.display = 'none';
+                        state.tmp.dygraph_history_tip_element_displayed = false;
+                    }
+                }
+            }
+
             // this function renders global highlighted time-frame
 
             if (NETDATA.globalChartUnderlay.isActive()) {
@@ -2750,6 +2770,21 @@ NETDATA.dygraphChartCreate = function (state, data) {
 
     state.tmp.dygraph_instance = new Dygraph(state.element_chart,
         data.result.data, state.tmp.dygraph_options);
+
+
+    state.tmp.dygraph_history_tip_element = document.createElement('div');
+    state.tmp.dygraph_history_tip_element.innerHTML = `
+        <span class="dygraph__history-tip-content">
+          Want to extend your history of real-time metrics?
+          <br />
+           <a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>
+             Configure Netdata's <b>history</b></a>
+           or use the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine</a>.
+        </span>
+    `;
+    state.tmp.dygraph_history_tip_element.className = 'dygraph__history-tip';
+    state.element_chart.appendChild(state.tmp.dygraph_history_tip_element);
+
 
     state.tmp.dygraph_force_zoom = false;
     state.tmp.dygraph_user_action = false;

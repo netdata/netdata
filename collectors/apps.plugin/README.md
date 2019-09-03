@@ -47,6 +47,11 @@ Each of these sections provides the same number of charts:
     -   Threads Running
     -   Processes Running
     -   Pipes Open
+    -   Carried Over Uptime (since the Netdata restart)
+    -   Minimum Uptime
+    -   Average Uptime
+    -   Maximum Uptime
+
 -   Swap Memory
     -   Swap Memory Used
     -   Major Page Faults (i.e. swap activity)
@@ -136,6 +141,13 @@ ones at the top. Processes not matched by any row, will inherit it from their pa
 
 The order also controls the order of the dimensions on the generated charts (although applications started
 after apps.plugin is started, will be appended to the existing list of dimensions the `netdata` daemon maintains).
+
+There are a few command line options you can pass to `apps.plugin`. The list of available options can be acquired with the `--help` flag. The options can be set in the `netdata.conf` file. For example, to disable user and user group charts you should set
+
+```
+[plugin:apps]
+  command options = without-users without-groups
+```
 
 ## Permissions
 

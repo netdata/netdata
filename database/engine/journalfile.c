@@ -269,7 +269,6 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     extent = mallocz(sizeof(*extent) + count * sizeof(extent->pages[0]));
     extent->offset = jf_metric_data->extent_offset;
     extent->size = jf_metric_data->extent_size;
-    extent->number_of_pages = count;
     extent->datafile = journalfile->datafile;
     extent->next = NULL;
 
@@ -282,7 +281,6 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             error("Unknown page type encountered.");
             continue;
         }
-        ++valid_pages;
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
 
         uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
@@ -308,11 +306,16 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->end_time = jf_metric_data->descr[i].end_time;
         descr->id = &page_index->id;
         descr->extent = extent;
-        extent->pages[i] = descr;
+        extent->pages[valid_pages++] = descr;
         pg_cache_insert(ctx, page_index, descr);
     }
+
+    extent->number_of_pages = valid_pages;
+
     if (likely(valid_pages))
         df_extent_insert(extent);
+    else
+        freez(extent);
 }
 
 /*

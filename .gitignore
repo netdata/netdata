@@ -77,8 +77,7 @@ packaging/makeself/tmp/
 # coverity
 cov-int/
 netdata-coverity-analysis.tgz
-.coverity-token
-.coverity-build
+.coverity-scan.conf
 
 .cproject/
 .idea/
@@ -87,7 +86,6 @@ netdata-coverity-analysis.tgz
 .settings/
 README
 TODO.md
-netdata.conf
 TODO.txt
 
 web/gui/chart-info/

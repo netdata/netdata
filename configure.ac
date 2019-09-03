@@ -280,9 +280,6 @@ AC_CHECK_LIB(
     [UV_LIBS="-luv"]
 )
 
-OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
-OPTIONAL_UV_LIBS="${UV_LIBS}"
-
 
 # -----------------------------------------------------------------------------
 # lz4 Extremely Fast Compression algorithm
@@ -293,9 +290,6 @@ AC_CHECK_LIB(
     [LZ4_LIBS="-llz4"]
 )
 
-OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
-OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
-
 
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
@@ -305,9 +299,6 @@ AC_CHECK_LIB(
     [JudyLIns],
     [JUDY_LIBS="-lJudy"]
 )
-
-OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
-OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
 
 
 # -----------------------------------------------------------------------------
@@ -356,9 +347,6 @@ AC_CHECK_LIB(
     [SSL_LIBS="-lcrypto -lssl"]
 )
 
-OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-OPTIONAL_SSL_LIBS="${SSL_LIBS}"
-
 # -----------------------------------------------------------------------------
 # JSON-C library
 
@@ -394,6 +382,14 @@ AC_MSG_CHECKING([if netdata dbengine should be used])
 if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
     enable_dbengine="yes"
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
+    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+    OPTIONAL_UV_LIBS="${UV_LIBS}"
+    OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
+    OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+    OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
+    OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
+    OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+    OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
     enable_dbengine="no"
 fi
@@ -402,10 +398,12 @@ AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 AC_MSG_CHECKING([if netdata https should be used])
 if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
-	enable_https="yes"
-	AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+    enable_https="yes"
+    AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+    OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+    OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
-	enable_https="no"
+    enable_https="no"
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
