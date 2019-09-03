@@ -845,7 +845,6 @@ void *health_main(void *ptr) {
                         rc->delay_up_to_timestamp = now + delay;
 
                         if(likely(!rrdcalc_isrepeating(rc))) {
-                            fprintf(stderr,"KILLME CREATE ENTRY 1 %s\n",rc->name);
                             ALARM_ENTRY *ae = health_create_alarm_entry(
                                     host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,
                                     rc->rrdset->family, rc->exec, rc->recipient, now - rc->last_status_change,
@@ -892,9 +891,7 @@ void *health_main(void *ptr) {
                         }
                     }
 
-                    fprintf(stderr,"KILLME LOOPING ENTRY 2 %s %d\n",rc->name, repeat_every);
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
-                        fprintf(stderr,"KILLME CREATE ENTRY 2 %s\n",rc->name);
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(
                                 host, rc->id, rc->next_event_id++, now, rc->name, rc->rrdset->id,

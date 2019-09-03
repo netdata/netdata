@@ -80,7 +80,10 @@ process_data "double_with_template"
 change_alarm_file "$HEALTHDIR/dim_double_with_template.conf" "system_cpu.conf.template_foreach" "$HEALTHDIR/dim_foreach_with_template.conf"
 process_data "foreach_with_template"
 
-rm "$HEALTHDIR/dim_foreach_with_template.conf"
+change_alarm_file "$HEALTHDIR/dim_foreach_with_template.conf" "system_cpu.conf.template_foreach_sp" "$HEALTHDIR/dim_foreach_with_template_sp.conf"
+process_data "foreach_with_template"
+
+rm "$HEALTHDIR/dim_foreach_with_template_sp.conf"
 rm -rf "$OUTDIR"
 
 echo  -e "${GREEN} all the tests were sucessful"

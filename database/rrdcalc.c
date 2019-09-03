@@ -333,7 +333,6 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
 
     if(!rc->foreachdim) {
         // link it to the host alarms list
-        fprintf(stderr,"KILLME NORMAL LIST %s: %s\n",rc->chart, rc->name);
         if(likely(host->alarms)) {
             // append it
             RRDCALC *t;
@@ -354,7 +353,6 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
         }
     } else {
         //link it case there is a foreach
-        fprintf(stderr,"KILLME LIST FOREACHDIM %s: %s\n",rc->chart, rc->name);
         if(likely(host->alarms_with_foreach)) {
             // append it
             RRDCALC *t;

@@ -450,7 +450,6 @@ inline void health_alarm_log(
         error("Repeating alarms cannot be added to host's alarm log entries. It seems somewhere in the logic, API is being misused. Alarm id: %u", ae->alarm_id);
         return;
     }
-    fprintf(stderr,"KILLME ALARM LOG %s\n",ae->name);
     // link it
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
     ae->next = host->health_log.alarms;

@@ -375,19 +375,18 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         RRDCALC *rrdc;
         rrdhost_wrlock(host);
         for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
-            if(simple_pattern_matches(rrdc->spdim, rd->id) || simple_pattern_matches(rrdc->spdim, rd->name)) {
-                if(!strcmp(rrdc->chart, st->name)) {
+            if (simple_pattern_matches(rrdc->spdim, rd->id) || simple_pattern_matches(rrdc->spdim, rd->name)) {
+                if (!strcmp(rrdc->chart, st->name)) {
                     char *usename = alarm_name_with_dim(rrdc->name, rd->name);
-                    if(usename) {
+                    if (usename) {
                         if(rrdcalc_exists(host, st->name, usename, 0, 0)){
                             freez(usename);
                             continue;
                         }
 
                         RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, usename, rd->name);
-                        if(child) {
+                        if (child) {
                             rrdcalc_add_to_host(host, child);
-                            fprintf(stderr,"KILLME DIM ALARM %s,%s: %s %s %s %d\n",st->name, rd->name, rrdc->chart, rrdc->name, rrdc->foreachdim,rrdc->foreachcounter );
                             RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)child);
                             if (rdcmp != child) {
                                 error("Cannot insert the alarm index ID %s",child->name);
