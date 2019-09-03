@@ -85,11 +85,12 @@ class Service(SocketService):
 
         try:
             active_jobs = self.get_active_jobs()
-            found_jobs, job_data = self.process_jobs(active_jobs)
-            self.remove_stale_jobs(found_jobs)
-            return job_data
         except GearmanReadException:
             return None
+
+        found_jobs, job_data = self.process_jobs(active_jobs)
+        self.remove_stale_jobs(found_jobs)
+        return job_data
 
     def get_active_jobs(self):
         active_jobs = []
