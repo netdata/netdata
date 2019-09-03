@@ -152,6 +152,24 @@ not just visualize metrics.
 
 ## News
 
+`Sep 3rd, 2019` - **[Netdata v1.17.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.17.0 contains 38 bug fixes, 33 improvements, and 20 documentation updates.
+
+You can now change the data collection frequency at will, without losing previously collected values. A major improvement to the new database engine allows you not only to store metrics at variable granularity, but also to autoscale the time axis of the charts, depending on the data collection frequencies used during the presented time.
+
+You can also now monitor VM performance from one or more vCenter servers with a new [VSphere collector](https://docs.netdata.cloud/collectors/go.d.plugin/modules/vsphere/). In addition, the `proc` plugin now also collects ZRAM device performance metrics and the `apps` plugin monitors process uptime for the defined process groups.
+
+Continuing our efforts to integrate with as many existing solutions as possible, you can now directly archive metrics from Netdata to MongoDB via a new backend.
+
+Netdata badges now support international (UTF8) characters! We also made our URL parser smarter, not only for international character support, but also for other strange API queries.
+
+We also added `.DEB` packages to our binary distribution repositories at [Packagecloud](https://packagecloud.io/netdata), a new collector for Linux zram device metrics, and support for plain text email notifications.
+
+This release includes several fixes and improvements to the TLS encryption feature we introduced in v1.16.0. First, encryption slave-to-master streaming connections wasn't working as intended. And second, our community helped us discover cases where HTTP requests were not correctly redirected to HTTPS with TLS enabled. This release mitigates those issues and improves TLS support overall.
+
+Finally, we improved the way Netdata displays charts with no metrics. By default, Netdata displays charts for disks, memory, and networks only when the associated metrics are not zero. Users could enable these charts permanently using the corresponding configuration options, but they would need to change more than 200 options. With this new improvement, users can enable all charts with zero values using a single, global configuration parameter.
+
 `Jul 9th, 2019` - **[Netdata v1.16.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release v1.16.0 contains 40 bug fixes, 31 improvements and 20 documentation updates
