@@ -194,6 +194,7 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
     return DATASOURCE_JSON;
 }
 
+
 inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
     int all = 0;
 

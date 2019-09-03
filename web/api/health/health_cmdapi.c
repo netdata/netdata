@@ -87,7 +87,6 @@ void health_silencers2json(BUFFER *wb) {
  * Silencer to FILE
  *
  * Write the sliencer buffer to a file.
- *
  * @param wb
  */
 void health_silencers2file(BUFFER *wb) {
