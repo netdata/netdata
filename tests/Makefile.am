@@ -7,6 +7,7 @@ CLEANFILES = \
 	health_mgmtapi/health-cmdapi-test.sh \
 	acls/acl.sh \
 	urls/request.sh \
+	alarm_repetition/alarm.sh \
 	template_dimension/template_dim.sh \
 	$(NULL)
 
@@ -27,14 +28,22 @@ dist_noinst_DATA = \
     health_mgmtapi/health-cmdapi-test.sh.in \
     acls/acl.sh.in \
     urls/request.sh.in \
+<<<<<<< HEAD
     template_dimension/template_dim.sh.in \
+=======
+    alarm_repetition/alarm.sh.in \
+>>>>>>> 0798426c7dbfc290b1f6f6e397063a09ee8a3447
 	$(NULL)
 
 dist_plugins_SCRIPTS = \
 	health_mgmtapi/health-cmdapi-test.sh \
 	acls/acl.sh \
 	urls/request.sh \
+<<<<<<< HEAD
 	template_dimension/template_dim.sh \
+=======
+	alarm_repetition/alarm.sh \
+>>>>>>> 0798426c7dbfc290b1f6f6e397063a09ee8a3447
 	$(NULL)
 
 dist_noinst_SCRIPTS = \

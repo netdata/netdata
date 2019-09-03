@@ -43,6 +43,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                     "\t\t\"updates_id\": %u,\n"
                     "\t\t\"value_string\": \"%s\",\n"
                     "\t\t\"old_value_string\": \"%s\",\n"
+                    "\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\"silenced\": \"%s\",\n"
                    , host->hostname
                    , ae->unique_id
@@ -71,6 +72,7 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    , ae->updates_id
                    , ae->new_value_string
                    , ae->old_value_string
+                   , (unsigned long)ae->last_repeat
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
     );
 
@@ -143,6 +145,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                     "\t\t\t\"warn_repeat_every\": \"%u\",\n"
                     "\t\t\t\"crit_repeat_every\": \"%u\",\n"
                     "\t\t\t\"value_string\": \"%s\",\n"
+                    "\t\t\t\"last_repeat\": \"%lu\",\n"
                    , rc->chart, rc->name
                    , (unsigned long)rc->id
                    , rc->name
@@ -170,6 +173,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->warn_repeat_every
                    , rc->crit_repeat_every
                    , value_string
+                   , (unsigned long)rc->last_repeat
     );
 
     if(unlikely(rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)) {
