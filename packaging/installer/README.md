@@ -354,11 +354,15 @@ pkg install libuv
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.9.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.15.0.txz
 ```
-**Note:** If you receive a ` Not Found` error during the last two commands above, you will either need to manually look in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its URL instead, or you can try manually changing the netdata version in the URL to the latest version.
+**Note:** If you receive a ` Not Found` error during the last two commands above, you will either need to manually look in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its URL instead, or you can try manually changing the netdata version in the URL to the latest version.  
 
-Now to start Netdata manually, run `service netdata onestart`
+You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
-To start Netdata automatically every boot, add `service netdata onestart` as a Shellcmd entry within the pfSense web interface under **Services/Shellcmd**. You'll need to install the Shellcmd package beforehand under **System/Package Manager/Available Packages**. The Shellcmd Type should be set to `Shellcmd`.
+Now to start Netdata manually, run `service netdata onestart`  
+
+Visit the Netdata dashboard to confirm it's working: `http://<pfsenseIP>:19999`
+
+To start Netdata automatically every boot, add `service netdata onestart` as a Shellcmd entry within the pfSense web interface under **Services/Shellcmd**. You'll need to install the Shellcmd package beforehand under **System/Package Manager/Available Packages**. The Shellcmd Type should be set to `Shellcmd`.  
 ![](https://i.imgur.com/wcKiPe1.png)
 Alternatively more information can be found in <https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages>, for achieving the same via the command line and scripts.
 
