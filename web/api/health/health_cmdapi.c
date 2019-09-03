@@ -40,7 +40,7 @@ void free_silencers(SILENCER *t) {
  * @param val the json value
  * @param hasprev has it a previous value?
  *
- * @return It returns 1 case there is a new value and hasprev otherwise
+ * @return
  */
 int health_silencers2json_entry(BUFFER *wb, char* var, char* val, int hasprev) {
     if (val) {
@@ -88,7 +88,7 @@ void health_silencers2json(BUFFER *wb) {
  *
  * Write the sliencer buffer to a file.
  *
- * @param wb is the buffer structure with the information to be stored in the file.
+ * @param wb
  */
 void health_silencers2file(BUFFER *wb) {
     if (wb->len == 0) return;

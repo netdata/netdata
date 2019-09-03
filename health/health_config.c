@@ -25,16 +25,6 @@
 #define HEALTH_OPTIONS_KEY "options"
 #define HEALTH_REPEAT_KEY "repeat"
 
-/**
- * Add alarm from config
- *
- * Add a new RRDCALC to the host
- *
- * @param host the output structure
- * @param rc the input structure
- *
- * @return It returns 1 on success and 0 otherwise
- */
 static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
         error("Health configuration for alarm '%s' does not have a chart", rc->name);
@@ -88,16 +78,6 @@ static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     return 1;
 }
 
-/**
- * Add template from config
- *
- * Add a new RRDCALCTEMPLATE to the host
- *
- * @param host the output structure
- * @param rc the input structure
- *
- * @return It returns 1 on success and 0 otherwise
- */
 static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt->context)) {
         error("Health configuration for template '%s' does not have a context", rt->name);
@@ -183,19 +163,6 @@ static inline int rrdcalctemplate_add_template_from_config(RRDHOST *host, RRDCAL
     return 1;
 }
 
-/**
- * Parse delay
- *
- * @param line the line number of the filename
- * @param filename the name of the file with the alarm/template configuration
- * @param string the value of a specific key inside the file
- * @param delay_up_duration the output variable
- * @param delay_down_duration the output variable
- * @param delay_max_duration the output variable
- * @param delay_multiplier the output variable
- *
- * @return It always return 1
- */
 static inline int health_parse_delay(
         size_t line, const char *filename, char *string,
         int *delay_up_duration,
@@ -276,15 +243,6 @@ static inline int health_parse_delay(
     return 1;
 }
 
-/**
- * Parse Options
- *
- * Parse the options for the alarm and set the initial flags
- *
- * @param s the options are the options given by the user
- *
- * @return it returns the option variable initialized.
- */
 static inline uint32_t health_parse_options(const char *s) {
     uint32_t options = 0;
     char buf[100+1] = "";
@@ -314,19 +272,6 @@ static inline uint32_t health_parse_options(const char *s) {
     return options;
 }
 
-/**
- * Parse Repeat
- *
- * Parse the repeat interval of a specific alarm
- *
- * @param line the line number
- * @param file the file name
- * @param string the value of a specific key
- * @param warn_repeat_every the output variable to store the warning time
- * @param crit_repeat_every the output variable to store the critical time
- *
- * @return It always return 1
- */
 static inline int health_parse_repeat(
         size_t line,
         const char *file,
@@ -390,23 +335,6 @@ SIMPLE_PATTERN *health_pattern_from_foreach(char *s) {
     return val;
 }
 
-/**
- * Parse DB lookup
- *
- *
- * @param line the line number of the filename
- * @param filename the name of the file with the alarm/template configuration
- * @param string the value of a specific key inside the file
- * @param group_method is an output variable to store the group method.
- * @param after output variable to store the first timestamp
- * @param before output variable to store the last timestamp
- * @param every output variable to store the time length
- * @param options output variable to store the flags based in the user input.
- * @param dimensions output vector to store the dimensions
- * @param foreachdim output vector for dimensions
- *
- * @return It returns 1 on success and 0 otherwise
- */
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
         RRDR_GROUPING *group_method, int *after, int *before, int *every,
@@ -531,29 +459,12 @@ static inline int health_parse_db_lookup(
     return 1;
 }
 
-/**
- * Source File
- *
- * Make a buffer with the file name and return to store inside a RRDCALCTEMPLATE or RRDCALC
- *
- * @param line the line number
- * @param file the filename
- *
- * @return It returns the buffer with the source file
- */
 static inline char *health_source_file(size_t line, const char *file) {
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "%zu@%s", line, file);
     return strdupz(buffer);
 }
 
-/**
- * Strip Quotes
- *
- * Replace either the single quote or double quote with spaces
- *
- * @param s the string with quotes to work.
- */
 static inline void strip_quotes(char *s) {
     while(*s) {
         if(*s == '\'' || *s == '"') *s = ' ';
@@ -561,17 +472,6 @@ static inline void strip_quotes(char *s) {
     }
 }
 
-/**
- * Health Read File
- *
- * Function responsible to parse the conf files.
- * This function is also given as argument for the function 'recursive_config_double_dir_load'.
- *
- * @param filename the name of the file to be parsed.
- * @param data the output RRDHOST structure.
- *
- * @return It returns 1 on success and 0 otherwise
- */
 static int health_readfile(const char *filename, void *data) {
     RRDHOST *host = (RRDHOST *)data;
 
@@ -1054,16 +954,6 @@ static int health_readfile(const char *filename, void *data) {
     return 1;
 }
 
-/**
- * Health Read Directory
- *
- * Read information from the user and stock directory and store in the structure host.
- *
- * @param host the output structure
- * @param user_path the health user config directory
- * @param stock_path the health stock config directory
- * @param subpath a common subdirectory for the previous two parameters.
- */
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
     if(unlikely(!host->health_enabled)) {
         debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", host->hostname);

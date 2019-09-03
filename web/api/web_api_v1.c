@@ -194,17 +194,6 @@ inline uint32_t web_client_api_request_v1_data_google_format(char *name) {
     return DATASOURCE_JSON;
 }
 
-/**
- * API Request V1 alarms
- *
- * Function called to write the alarms in json format
- *
- * @param host is the structure of a specific host
- * @param w is the web_client structure for a specific connection
- * @param url the request done by the users
- *
- * @return it always returns 200.
- */
 inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w, char *url) {
     int all = 0;
 
@@ -267,17 +256,6 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     return 200;
 }
 
-/**
- * Request V1 alarm log
- *
- * Make the messages with the Alarm entries to give as response for the client.
- *
- * @param host is the structure of a specific host
- * @param w is the web_client structure for a specific connection
- * @param url the request done by the users
- *
- * @return It always returns 200
- */
 inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client *w, char *url) {
     uint32_t after = 0;
 
@@ -298,18 +276,6 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     return HTTP_RESP_OK;
 }
 
-/**
- * API Request single chart
- *
- * Request data for a specific chart in the database
- *
- * @param host is the structure of a specific host
- * @param w is the web_client structure for a specific connection
- * @param url the request done by the users
- * @param callback the function used to fill the buffer
- *
- * @return It returns 200 on success and 400 otherwise
- */
 inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client *w, char *url, void callback(RRDSET *st, BUFFER *buf)) {
     int ret = HTTP_RESP_BAD_REQUEST;
     char *chart = NULL;
@@ -357,17 +323,6 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     return ret;
 }
 
-/**
- * API Request V1 alarm variable
- *
- * Write all the alarm variables into a buffer in the format json.
- *
- * @param host is the structure of a specific host
- * @param w is the web_client structure for a specific connection
- * @param url the request done by the users
- *
- * @return It returns 200 on success and 400 otherwise
- */
 inline int web_client_api_request_v1_alarm_variables(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, health_api_v1_chart_variables2json);
 }

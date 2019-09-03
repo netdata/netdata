@@ -24,13 +24,6 @@ void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST
     }
 }
 
-/**
- * RRDCALC TEMPLATE LINK MATCHING
- *
- * Link a template for a specific chart.
- *
- * @param st is the chart where the alarm will be attached.
- */
 void rrdcalctemplate_link_matching(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     RRDCALCTEMPLATE *rt;
@@ -44,14 +37,6 @@ void rrdcalctemplate_link_matching(RRDSET *st) {
     }
 }
 
-/**
- * Template free
- *
- * After the template to be unlinked from the caller, this function
- * cleans the heap.
- *
- * @param rt the template to be cleaned.
- */
 inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt)) return;
 
@@ -75,14 +60,6 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt);
 }
 
-/**
- * RRDCALC Templace Unlink and Free
- *
- * Unlink the template from Host and call rrdcalctemplate_free
- *
- * @param host the structure with the template links
- * @param rt the template that will be unlink and cleaned.
- */
 inline void rrdcalctemplate_unlink_and_free(RRDHOST *host, RRDCALCTEMPLATE *rt) {
     if(unlikely(!rt)) return;
 

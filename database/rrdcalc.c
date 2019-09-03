@@ -304,14 +304,6 @@ void dimension_remove_pipe_comma(char *str) {
     }
 }
 
-/**
- * Add to host
- *
- * Add an alarm for a specific host.
- *
- * @param host the output structure
- * @param rc the alarm that will be added
- */
 inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
@@ -377,17 +369,6 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     }
 }
 
-/**
- * RRDCALC Create From Template
- *
- * Create a new alarm from the template.
- *
- * @param host the host structure with the alarms united.
- * @param rt the template for the alarm.
- * @param chart the chart name
- *
- * @return it returns the alarm on success and NULL otherwise.
- */
 inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart) {
     debug(D_HEALTH, "Health creating dynamic alarm (from template) '%s.%s'", chart, rt->name);
 
@@ -441,13 +422,11 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
         if(!rc->calculation)
             error("Health alarm '%s.%s': failed to parse calculation expression '%s'", chart, rt->name, rt->calculation->source);
     }
-
     if(rt->warning) {
         rc->warning = expression_parse(rt->warning->source, NULL, NULL);
         if(!rc->warning)
             error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", chart, rt->name, rt->warning->source);
     }
-
     if(rt->critical) {
         rc->critical = expression_parse(rt->critical->source, NULL, NULL);
         if(!rc->critical)
@@ -566,13 +545,6 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     return newrc;
 }
 
-/**
- * RRDCALC Free
- *
- * Clean the alarm structure.
- *
- * @param rc the structure with the addresses to release.
- */
 void rrdcalc_free(RRDCALC *rc) {
     if(unlikely(!rc)) return;
 

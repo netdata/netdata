@@ -13,15 +13,6 @@ static inline void health_string2json(BUFFER *wb, const char *prefix, const char
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-/**
- * Alarmm entry 2 json with nolock
- *
- * Convert the alarm entry to a json buffer.
- *
- * @param wb the output buffer
- * @param ae the alarm entry input
- * @param host is the web structure that stores the host information,
- */
 static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) {
     buffer_sprintf(wb,
             "\n\t{\n"
@@ -100,15 +91,6 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
     buffer_strcat(wb, "\t}");
 }
 
-/**
- * Alarm log to JSON
- *
- * Loop trough all the alarm entries written them inside a json buffer to deliver for the client.
- *
- * @param host is the web structure that stores the host information,
- * @param wb the output buffer to write the json response
- * @param after the smallest ID value to compare.
- */
 void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
