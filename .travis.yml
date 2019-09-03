@@ -62,7 +62,8 @@ stages:
 
   - name: Publish for release
     # We don't run on release candidates
-    if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/
+    #if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/
+    if: branch = auto-trigger-stable-builds
 
     # Build DEB packages under special conditions
   - name: Package ubuntu/* and debian/*
