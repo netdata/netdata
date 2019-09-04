@@ -7,9 +7,7 @@ Netdata can collect thousands of metrics in real-time without any configuration,
 but there are a few things you can do, like extending the history, to make
 Netdata work best for your particular needs.
 
-!!! note If you haven't installed Netdata yet, visit the [installation
-    instructions](../packaging/installer) for details, including our one-liner
-    script that works on almost all Linux distributions.
+> If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details, including our one-liner script that works on almost all Linux distributions.
 
 ## Access the dashboard
 
@@ -26,23 +24,20 @@ dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c
 **Next**: 
 
 -   Read more about the [standard Netdata dashboard](../web/gui/).
--   Learn all the specifics of [using charts](../web/README.md#using-charts) or the
-differences between [charts, context, and
-families](../web/README.md#charts-contexts-families).
+-   Learn all the specifics of [using charts](../web/README.md#using-charts) or the differences between [charts, context, and families](../web/README.md#charts-contexts-families).
 
 ## Change how long Netdata stores metrics
 
 By default, Netdata stores 1 hour of historical metrics and uses about
 25MB of RAM.
 
-If that's not enough for you, you're in luck—Netdata is quite flexible when it
+If that's not enough for you, Netdata is quite adaptible when it
 comes to long-term storage based on your system and your needs.
 
 There's two ways to quickly increase the depth of historical metrics: by
-increasing the `history` value for the default database or switching to the DB
-engine.
+increasing the `history` value for the default database, or switching to the database engine.
 
-We have a tutorial for just that: [Changing how long Netdata stores metrics](tutorial/longer-metrics-storage.md).
+We have a tutorial that walks you through both options: [Changing how long Netdata stores metrics](tutorial/longer-metrics-storage.md).
 
 **Next**:
 
@@ -51,7 +46,6 @@ We have a tutorial for just that: [Changing how long Netdata stores metrics](tut
 -   Read up on the memory requirements of the [default database](../database/),
     or figure out whether your system has KSM enabled, which can [reduce the
     default database's memory usage](../database/README.md#ksm) by about 60%.
--   
 
 ## Service discovery and auto-detection
 
