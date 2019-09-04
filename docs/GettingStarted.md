@@ -1,25 +1,18 @@
 # Getting started guide
 
-Thanks for installing Netdata! In this guide, we'll walk you through the first
-steps you should take after getting Netdata installed.
+Thanks for installing Netdata! In this guide, we'll walk you through the first steps you should take after getting Netdata installed.
 
-Netdata can collect thousands of metrics in real-time without any configuration,
-but there are a few things you can do, like extending the history, to make
-Netdata work best for your particular needs.
+Netdata can collect thousands of metrics in real-time without any configuration but there are a few things you can do, like extending the history, to make Netdata work best for your particular needs.
 
 > If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details, including our one-liner script that works on almost all Linux distributions.
 
 ## Access the dashboard
 
-Open up your browser of choice. If you installed Netdata on the same system
-you're using to open your browser, navigate to `http://localhost:19999/`. If you
-installed Netdata on a remote system, navigate to `http://SYSTEM-IP:19999/`
-after replacing `SYSTEM-IP` with the IP address of that system.
+Open up your browser of choice. If you installed Netdata on the same system you're using to open your browser, navigate to `http://localhost:19999/`. If you installed Netdata on a remote system, navigate to `http://SYSTEM-IP:19999/` after replacing `SYSTEM-IP` with the IP address of that system.
 
 Hit `Enter`. Welcome to Netdata!
 
-![Animated GIF of navigating to the
-dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)
+![Animated GIF of navigating to the dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)
 
 **Next**: 
 
