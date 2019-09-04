@@ -347,7 +347,8 @@ delay: [[[up U] [down D] multiplier M] max X]
 
 #### Alarm line `repeat`
 
-Defines the interval between repeating notifications for the alarms in CRITICAL or WARNING mode. This will override the default interval settings inherited from health settings in `netdata.conf`. The default settings for repeating notifications are `default repeat warning = DURATION` and `default repeat critical = DURATION` which can be found in health stock configuration.
+Defines the interval between repeating notifications for the alarms in CRITICAL or WARNING mode. This will override the default interval settings inherited from health settings in `netdata.conf`. The default settings for repeating notifications are `default repeat warning = DURATION` and `default repeat critical = DURATION` which can be found in health stock configuration, when one of these interval is bigger than 0, Netdata will activate the repeat notification for `CRITICAL`, `CLEAR` and `WARNING` messages.
+`
 
 Format:
 

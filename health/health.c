@@ -216,9 +216,11 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             // we have not executed this alarm notification in the past
             // so, don't send CLEAR notifications
             if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
-                debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
-                      , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
-                goto done;
+                if((!(ae->flags & HEALTH_ENTRY_RUN_ONCE)) || (ae->flags & HEALTH_ENTRY_RUN_ONCE && ae->old_status < RRDCALC_STATUS_RAISED) ) {
+                    debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
+                    , ae->chart, ae->name, rrdcalc_status2string(ae->new_status));
+                    goto done;
+                }
             }
         }
     }
@@ -872,10 +874,21 @@ void *health_main(void *ptr) {
                 for(rc = host->alarms; rc ; rc = rc->next) {
                     int repeat_every = 0;
                     if(unlikely(rrdcalc_isrepeating(rc))) {
-                        if(unlikely(rc->status == RRDCALC_STATUS_WARNING))
+                        if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUN_ONCE;
                             repeat_every = rc->warn_repeat_every;
-                        else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL))
+                        } else if(unlikely(rc->status == RRDCALC_STATUS_CRITICAL)) {
+                            rc->rrdcalc_flags &= ~RRDCALC_FLAG_RUN_ONCE;
                             repeat_every = rc->crit_repeat_every;
+                        } else if(unlikely(rc->status == RRDCALC_STATUS_CLEAR)) {
+                            if(!(rc->rrdcalc_flags & RRDCALC_FLAG_RUN_ONCE)) {
+                                if(rc->old_status == RRDCALC_STATUS_CRITICAL) {
+                                    repeat_every = rc->crit_repeat_every;
+                                } else if (rc->old_status == RRDCALC_STATUS_WARNING) {
+                                    repeat_every = rc->warn_repeat_every;
+                                }
+                            }
+                        }
                     }
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
                         rc->last_repeat = now;
@@ -890,6 +903,10 @@ void *health_main(void *ptr) {
                                 )
                         );
                         ae->last_repeat = rc->last_repeat;
+                        if (!(rc->rrdcalc_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {
+                            ae->flags |= HEALTH_ENTRY_RUN_ONCE;
+                        }
+                        rc->rrdcalc_flags |= RRDCALC_FLAG_RUN_ONCE;
                         health_process_notifications(host, ae);
                         debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                         health_alarm_log_free_one_nochecks_nounlink(ae);
