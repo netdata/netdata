@@ -7,7 +7,8 @@ HEALTHDIR="@configdir_POST@/health.d/"
 OUTDIR="workdir/"
 
 #url to do download
-MURL="http://localhost:19999/api/v1/alarms?active"
+QUERY="/api/v1/alarms?active"
+MURL="http://localhost:19999$QUERY"
 
 #error messages
 RED='\033[0;31m'
@@ -36,14 +37,16 @@ netdata_test_download() {
   TEST="$?"
   if [ "$TEST" -ne "0" ]; then
     echo -e "${RED} Error to get the alarms"
-    killall netdata
+    kill "$5"
+    rm "$HEALTHDIR/ram.conf"
     exit 1
   fi
 
   COUNT=$(grep -w "\"last_repeat\":" "$2" | grep -c "$OPT" "\"0\"")
   if [ "$COUNT" -eq "0" ]; then
     echo -e "${RED} Netdata gave an unexpected result when alarm repetition is $4"
-    killall netdata
+    killall "$5"
+    rm "$HEALTHDIR/ram.conf"
     exit 1
   fi
 
@@ -52,7 +55,7 @@ netdata_test_download() {
 
 get_the_logs() {
   curl -v -k --create-dirs -o "$OUTDIR/$1.out" "$MURL" 2> "$OUTDIR/$1.err"
-  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2" "$3"
+  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2" "$3" "$4"
 }
 
 process_data() {
@@ -61,7 +64,7 @@ process_data() {
   NETDATAPID=$!
   echo -e "${NOCOLOR}Sleeping during $SEC seconds to create alarm entries"
   sleep $SEC
-  get_the_logs "$1" "$2" "$3"
+  get_the_logs "$1" "$2" "$3" "$NETDATAPID"
   kill $NETDATAPID
 }
 
