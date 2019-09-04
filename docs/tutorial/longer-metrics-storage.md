@@ -9,17 +9,7 @@ By configuring Netdata properly, you can store days, months, or even _years_ of 
 
 This tutorial gives two options for configuring Netdata to store metrics longer. First, you can configure the round-robin database. And second, you can switch to the _extremely efficient_ database engine.
 
-We recommend the [database engine](#using-the-database-engine) 
-
-The truth is that the only thing holding you back from storing days, months, or even _years_ of per-second metrics is the amount of system resources you'll let Netdata use.
-
-
-
-
-This tutorial will give you a few options for deeper storage: first, the default
-database, followed by the _new, extremely efficient_ DB engine. 
-
-We recommend the [database engine](), since it will soon be the default option for storing metrics, but offer both options, as many users are still 
+We recommend the [database engine](#using-the-database-engine), as it will soon be the default database, but the choice is yours.
 
 Let's get started.
 
@@ -128,14 +118,14 @@ Now, given that the database engine uses _both_ RAM and disk, there are two othe
 
 `page cache size` sets the maximum amount of RAM (in MiB) the database engine will use for caching and indexing. `dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed metrics.
 
-If you'd like to change these options from their default, read more about the [database engine's memory footprint](https://docs.netdata.cloud/database/engine/#memory-requirements).
+If you'd like to change these options from their default, read more about the [database engine's memory footprint](../../database/engine/README.md#memory-requirements).
 
 With the database engine active, you can even back up your `/var/cache/netdata/dbengine/` folder, where the database engine stores all the datafiles and their corresponding journalfiles, to another system for safekeeping.
 
+## What's next?
 
+Now that you have either configured the round-robin database or the database engine to store more metrics, you'll probably want to see it in action!
 
+For more information about how to pan charts to view historical metrics, see our documentation on [using charts](../../web/README.md#using-charts).
 
-In the future, it'll be the default method for storing long-term metrics, but we're still fleshing out more features, like 
-
-
-Or, dive straight into the [database engine documentation](https://docs.netdata.cloud/database/engine/).
+And if Netdata is now using more resources than you'd like, view our [performance guide](../Performance.md) for details on how to optimize your installation.
