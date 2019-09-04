@@ -89,21 +89,6 @@ debugrun() {
 
 scanit() {
   progress "Scanning using coverity"
-
-  if [ -z "${OTHER_OPTIONS}" ]; then
-    OTHER_OPTIONS="--disable-lto"
-    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-https"
-    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-jsonc"
-    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-nfacct"
-    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-freeipmi"
-    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-cups"
-    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-prometheus-remote-write"
-
-    # TODO: enable these plugins too
-    #	--enable-plugin-xenstat \
-    #	--enable-backend-kinesis \
-    #	--enable-backend-mongodb \
-  fi
   export PATH="${PATH}:${INSTALL_DIR}/${COVERITY_BUILD_VERSION}/bin/"
   covbuild="${COVERITY_BUILD_PATH}"
   [ -z "${covbuild}" ] && covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
@@ -180,14 +165,33 @@ installit() {
   return 0
 }
 
-OTHER_OPTIONS=""
+OTHER_OPTIONS="--disable-lto"
+OTHER_OPTIONS="${OTHER_OPTIONS} --enable-https"
+OTHER_OPTIONS="${OTHER_OPTIONS} --enable-jsonc"
+OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-nfacct"
+OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-freeipmi"
+OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-cups"
+OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-prometheus-remote-write"
+
+# TODO: enable these plugins too
+#	--enable-plugin-xenstat \
+#	--enable-backend-kinesis \
+#	--enable-backend-mongodb \
+FOUND_OPTS="NO"
 while [ -n "${1}" ]; do
 	if [ "${1}" = "--with-install" ]; then
 		progress "Running coverity install"
 		installit
 		shift 1
 	elif [ -n "${1}" ]; then
-		OTHER_OPTIONS="${OTHER_OPTIONS} ${1}"
+		# Clear the default arguments, once you bump into the first argument
+		if [ "${FOUND_OPTS}" = "NO" ]; then
+			OTHER_OPTIONS="${1}"
+			FOUND_OPTS="YES"
+		else
+			OTHER_OPTIONS="${OTHER_OPTIONS} ${1}"
+		fi
+
 		shift 1
 	else
 		break
