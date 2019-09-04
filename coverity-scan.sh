@@ -7,6 +7,7 @@
 # Author  : Costa Tsaousis (costa@netdata.cloud)
 # Author  : Pawel Krupa (paulfantom)
 # Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
+# shellcheck disable=SC1091,SC2230
 
 # To run manually, save configuration to .coverity-scan.conf like this:
 #
@@ -33,6 +34,7 @@
 #
 # If the first parameter of this script is "install",
 # coverity build tools will be downloaded and installed in /opt/coverity
+
 set -e
 
 INSTALL_DIR="/opt"
@@ -117,7 +119,7 @@ scanit() {
     --enable-plugin-freeipmi \
     --enable-plugin-cups \
     --enable-backend-prometheus-remote-write \
-    ${NULL}
+    "${NULL}"
 
   # TODO: enable these plugins too
   #	--enable-plugin-xenstat \
@@ -133,13 +135,13 @@ scanit() {
   echo >&2 "Sending analysis to coverity for netdata version ${version} ..."
   COVERITY_SUBMIT_RESULT=$(debugrun curl --progress-bar \
     --form token="${token}" \
-    --form email=${email} \
+    --form email="${email}" \
     --form file=@netdata-coverity-analysis.tgz \
     --form version="${version}" \
     --form description="netdata, monitor everything, in real-time." \
-    https://scan.coverity.com/builds?project=${repo})
+    https://scan.coverity.com/builds?project="${repo}")
 
-  echo ${COVERITY_SUBMIT_RESULT} | grep -q -e 'Build successfully submitted' || echo >&2 "scan results were not pushed to coverity. Message was: ${COVERITY_SUBMIT_RESULT}"
+  echo "${COVERITY_SUBMIT_RESULT}" | grep -q -e 'Build successfully submitted' || echo >&2 "scan results were not pushed to coverity. Message was: ${COVERITY_SUBMIT_RESULT}"
 
   progress "Coverity scan completed"
 }
