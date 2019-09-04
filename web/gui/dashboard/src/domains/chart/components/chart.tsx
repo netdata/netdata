@@ -1,6 +1,6 @@
 import { __, forEachObjIndexed, prop } from "ramda"
 import React, {
-  useEffect, useLayoutEffect, useState, useCallback,
+  useEffect, useLayoutEffect, useState, useCallback, useMemo,
 } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
@@ -69,6 +69,16 @@ export const Chart = ({
     unitsDesired = window.NETDATA.options.current.units,
   } = attributes
 
+  // selecting dimensions
+  const dimensionNamesFlatString = chartData.dimension_names.join("")
+  const [selectedDimensions, setSelectedDimensions] = useState<string[]>([])
+  const dimensionsVisibility = useMemo(() => chartData.dimension_names.map(
+    (dimensionName) => (selectedDimensions.length === 0
+      ? true
+      : selectedDimensions.includes(dimensionName)),
+  ),
+  [chartData.dimension_names, selectedDimensions])
+
   const shouldDisplayToolbox = hasLegend(attributes)
     && window.NETDATA.options.current.legend_toolbox
 
@@ -83,8 +93,7 @@ export const Chart = ({
     }))
   }, [ // eslint-disable-line react-hooks/exhaustive-deps
     dispatch, attributes.commonColors, chartDetails.context, chartUuid, attributes.colors,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    chartData.dimension_names.join(("")),
+    dimensionNamesFlatString,
   ])
 
   // todo omit this for Cloud/Main Agent app
@@ -148,6 +157,7 @@ export const Chart = ({
         chartLibrary={chartLibrary}
         colors={colors}
         chartUuid={chartUuid}
+        dimensionsVisibility={dimensionsVisibility}
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
         hoveredX={hoveredX}
@@ -164,6 +174,8 @@ export const Chart = ({
           colors={colors}
           hoveredX={hoveredX}
           legendFormatValue={legendFormatValue}
+          selectedDimensions={selectedDimensions}
+          setSelectedDimensions={setSelectedDimensions}
           unitsCurrent={unitsCurrent}
         />
       )}

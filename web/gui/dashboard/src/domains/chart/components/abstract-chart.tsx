@@ -14,6 +14,7 @@ interface Props {
     [key: string]: string
   }
   chartUuid: string
+  dimensionsVisibility: boolean[]
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
   hoveredX: number | null
@@ -29,6 +30,7 @@ export const AbstractChart = ({
   chartLibrary,
   colors,
   chartUuid,
+  dimensionsVisibility,
   legendFormatValue,
   orderedColors,
   hoveredX,
@@ -43,6 +45,7 @@ export const AbstractChart = ({
     chartLibrary={chartLibrary}
     colors={colors}
     chartUuid={chartUuid}
+    dimensionsVisibility={dimensionsVisibility}
     legendFormatValue={legendFormatValue}
     orderedColors={orderedColors}
     hoveredX={hoveredX}

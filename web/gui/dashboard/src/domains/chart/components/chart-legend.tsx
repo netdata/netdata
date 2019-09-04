@@ -16,6 +16,8 @@ interface Props {
   }
   hoveredX: number | null
   legendFormatValue: (value: number | string) => (number | string)
+  selectedDimensions: string[]
+  setSelectedDimensions: (selectedDimensions: string[]) => void
   unitsCurrent: string
 }
 
@@ -67,6 +69,8 @@ export const ChartLegend = ({
   colors,
   hoveredX,
   legendFormatValue,
+  selectedDimensions,
+  setSelectedDimensions,
   unitsCurrent,
 }: Props) => {
   const netdataLast = chartData.last_entry * 1000
@@ -88,6 +92,16 @@ export const ChartLegend = ({
   const colorFillOpacity = window.NETDATA.options.current[
     `color_fill_opacity_${chartDetails.chart_type}`
   ]
+
+  const handleDimensionClick = (dimensionName: string) => (event: React.MouseEvent) => {
+    event.preventDefault()
+    const isCurrentlySelected = selectedDimensions.includes(dimensionName)
+    const newSelectedDimensions = isCurrentlySelected
+      ? selectedDimensions.filter((dimension) => dimension !== dimensionName)
+      : selectedDimensions.concat(dimensionName)
+    setSelectedDimensions(newSelectedDimensions)
+  }
+
   return (
     <div className={classNames(
       "netdata-chart-legend",
@@ -113,9 +127,12 @@ export const ChartLegend = ({
       {/* perfect_scroller */}
       <div className="netdata-legend-series-content">
         {chartData.dimension_names.map((dimensionName, i) => {
+          // todo dimension could be a separate component
           const color = colors[dimensionName]
           const rgb = window.NETDATA.colorHex2Rgb(color)
-          const isSelected = true // todo lift to state
+
+          const isSelected = selectedDimensions.length === 0
+            || selectedDimensions.includes(dimensionName)
 
           let value
           if (hoveredX) {
@@ -135,13 +152,17 @@ export const ChartLegend = ({
           return (
             <Fragment key={dimensionName}>
               {i !== 0 && <br />}
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events */}
               <span
                 title={dimensionName}
                 className={classNames(
                   "netdata-legend-name",
-                  { "netdata-legend-name": isSelected },
+                  isSelected ? "selected" : "not-selected",
                 )}
+                onClick={handleDimensionClick(dimensionName)}
+                role="button"
                 style={{ color }}
+                tabIndex={0}
               >
                 <table
                   className={`netdata-legend-name-table-${chartDetails.chart_type}`}
@@ -158,13 +179,17 @@ export const ChartLegend = ({
                 {" "}
                 {dimensionName}
               </span>
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events */}
               <span
                 title={dimensionName}
                 className={classNames(
                   "netdata-legend-value",
-                  { selected: isSelected },
+                  isSelected ? "selected" : "not-selected",
                 )}
+                onClick={handleDimensionClick(dimensionName)}
+                role="button"
                 style={{ color }} // omitted !important during refractor (react doesn't support it)
+                tabIndex={0}
               >
                 {legendFormatValue(
                   value,

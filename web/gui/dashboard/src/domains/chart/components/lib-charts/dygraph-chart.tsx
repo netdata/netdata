@@ -21,28 +21,30 @@ import { ChartData, ChartDetails } from "../../chart-types"
 
 import "./dygraph-chart.css"
 
-interface GetDygraphOptions {
+interface GetInitialDygraphOptions {
   attributes: Attributes,
   chartData: ChartData,
   chartDetails: ChartDetails,
   chartSettings: ChartLibraryConfig,
+  dimensionsVisibility: boolean[]
   hiddenLabelsElementId: string,
   orderedColors: string[],
   setHoveredX: (hoveredX: number | null) => void
   unitsCurrent: string,
   xAxisTimeString: (d: Date) => string,
 }
-const getDygraphOptions = ({
+const getInitialDygraphOptions = ({
   attributes,
   chartData,
   chartDetails,
   chartSettings,
+  dimensionsVisibility,
   hiddenLabelsElementId,
   orderedColors,
   setHoveredX,
   unitsCurrent,
   xAxisTimeString,
-}: GetDygraphOptions) => {
+}: GetInitialDygraphOptions) => {
   const isSparkline = attributes.dygraphTheme === "sparkline"
   const highlightCircleSize = isSparkline ? 3 : 4
 
@@ -124,8 +126,6 @@ const getDygraphOptions = ({
     dygraphYAxisLabelWidth = 50,
     dygraphDrawYAxis = dygraphDrawAxis,
   } = attributes
-  // todo lift the state
-  const visibility = chartData.dimension_names.map(() => true)
   return {
     colors: dygraphColors,
 
@@ -198,7 +198,7 @@ const getDygraphOptions = ({
     highlightSeriesOpts: dygraphHighlightSeriesOpts, // TOO SLOW: { strokeWidth: 1.5 },
     // TOO SLOW: (state.tmp.dygraph_chart_type === 'stacked')?0.7:0.5,
     highlightSeriesBackgroundAlpha: dygraphHighlightSeriesBackgroundAlpha,
-    visibility,
+    visibility: dimensionsVisibility,
     logscale: isLogScale,
 
     axes: {
@@ -268,6 +268,7 @@ interface Props {
   colors: {
     [key: string]: string
   }
+  dimensionsVisibility: boolean[]
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
 
@@ -283,6 +284,7 @@ export const DygraphChart = ({
   chartLibrary,
   // colors,
   chartUuid,
+  dimensionsVisibility,
   legendFormatValue,
   orderedColors,
 
@@ -300,11 +302,12 @@ export const DygraphChart = ({
 
   useLayoutEffect(() => {
     if (chartElement && chartElement.current && !dygraphInstance) {
-      const dygraphOptions = getDygraphOptions({
+      const dygraphOptions = getInitialDygraphOptions({
         attributes,
         chartData,
         chartDetails,
         chartSettings,
+        dimensionsVisibility,
         hiddenLabelsElementId,
         orderedColors,
         setHoveredX,
@@ -320,9 +323,8 @@ export const DygraphChart = ({
       const extremes = (instance as NetdataDygraph).yAxisExtremes()[0]
       setMinMax(extremes)
     }
-  }, [attributes, chartData, chartDetails, chartSettings, dygraphInstance, hiddenLabelsElementId,
-    orderedColors, setHoveredX, setMinMax, unitsCurrent, xAxisTimeString,
-  ])
+  }, [attributes, chartData, chartDetails, chartSettings, dimensionsVisibility, dygraphInstance,
+    hiddenLabelsElementId, orderedColors, setHoveredX, setMinMax, unitsCurrent, xAxisTimeString])
 
   useLayoutEffect(() => {
     if (dygraphInstance && legendFormatValue) {
@@ -334,10 +336,12 @@ export const DygraphChart = ({
             axisLabelFormatter: (y: Date | number) => legendFormatValue(y as number),
           },
         },
+        visibility: dimensionsVisibility,
         ylabel: isSparkline ? unitsCurrent : undefined,
       })
     }
-  }, [attributes.dygraphTheme, dygraphInstance, legendFormatValue, unitsCurrent])
+  }, [attributes.dygraphTheme, dimensionsVisibility, dygraphInstance, legendFormatValue,
+    unitsCurrent])
 
 
   // update data of the chart
