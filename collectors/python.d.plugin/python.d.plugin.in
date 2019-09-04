@@ -132,7 +132,7 @@ def available_modules():
 AVAILABLE_MODULES = available_modules()
 
 JOB_BASE_CONF = {
-    'update_every': os.getenv(ENV_NETDATA_UPDATE_EVERY, 1),
+    'update_every': int(os.getenv(ENV_NETDATA_UPDATE_EVERY, 1)),
     'priority': 60000,
     'autodetection_retry': 0,
     'chart_cleanup': 10,
