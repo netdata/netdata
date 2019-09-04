@@ -112,27 +112,25 @@ static void thread_cleanup(void *ptr) {
 static void thread_set_name(NETDATA_THREAD *nt) {
 
     if (nt->tag) {
-        char *threadname = strdupz(nt->tag);
         int ret = 0;
 
-        if (threadname) {
-            // Name is limited to 16 chars
-            threadname[15] = 0;
+        // Name is limited to 16 chars
+        char threadname[16];
+        strncpyz(threadname, nt->tag, 15);
+
 #if defined(__FreeBSD__)
-            pthread_set_name_np(pthread_self(), threadname);
+        pthread_set_name_np(pthread_self(), threadname);
 #elif defined(__APPLE__)
-            ret = pthread_setname_np(threadname);
+        ret = pthread_setname_np(threadname);
 #else
-            ret = pthread_setname_np(pthread_self(), threadname);
+        ret = pthread_setname_np(pthread_self(), threadname);
 #endif
 
-            if (ret != 0)
-                error("cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
-            else
-                info("set name of thread %d to %s", gettid(), threadname);
+        if (ret != 0)
+            error("cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
+        else
+            info("set name of thread %d to %s", gettid(), threadname);
 
-            free(threadname);
-        }
     }
 }
 
