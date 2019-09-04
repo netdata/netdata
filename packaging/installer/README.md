@@ -344,7 +344,7 @@ cd netdata
 
 To install Netdata on pfSense, run the following commands (within a shell or under the **Diagnostics/Command** prompt within the pfSense web interface).
 
-Note the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata and Python are downloaded from the FreeBSD repository.
+Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata and Python are downloaded from the FreeBSD repository.
 
 ```sh
 pkg install pkgconf
@@ -358,7 +358,7 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.15.0.txz
 
 You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
-Now to start Netdata manually, run `service netdata onestart`  
+To start Netdata manually, run `service netdata onestart`  
 
 Visit the Netdata dashboard to confirm it's working: `http://<pfsenseIP>:19999`
 
