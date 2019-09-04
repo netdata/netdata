@@ -342,28 +342,31 @@ cd netdata
 
 ##### pfSense
 
-To install Netdata on pfSense run the following commands (within a shell or under Diagnostics/Command Prompt within the pfSense web interface).
+To install Netdata on pfSense, run the following commands (within a shell or under the **Diagnostics/Command** prompt within the pfSense web interface).
 
-Change platform (i386/amd64, etc) and FreeBSD versions (10/11, etc) according to your environment and change Netdata version (1.10.0 in example) according to latest version present within the FreeSBD repository:-
-
-Note first three packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata is downloaded from the FreeBSD repository.
+Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata and Python are downloaded from the FreeBSD repository.
 
 ```sh
 pkg install pkgconf
 pkg install bash
 pkg install e2fsprogs-libuuid
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.8_2.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.13.0.txz
+pkg install libuv
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.9.txz
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.15.0.txz
 ```
+**Note:** If you receive a ` Not Found` error during the last two commands above, you will either need to manually look in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its URL instead, or you can try manually changing the netdata version in the URL to the latest version.  
 
-To start Netdata manually run `service netdata onestart`
+You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
-To start Netdata automatically at each boot add `service netdata onestart` as a Shellcmd within the pfSense web interface (under **Services/Shellcmd**, which you need to install beforehand under **System/Package Manager/Available Packages**).
-Shellcmd Type should be set to `Shellcmd`.
+To start Netdata manually, run `service netdata onestart`  
+
+Visit the Netdata dashboard to confirm it's working: `http://<pfsenseIP>:19999`
+
+To start Netdata automatically every boot, add `service netdata onestart` as a Shellcmd entry within the pfSense web interface under **Services/Shellcmd**. You'll need to install the Shellcmd package beforehand under **System/Package Manager/Available Packages**. The Shellcmd Type should be set to `Shellcmd`.  
 ![](https://i.imgur.com/wcKiPe1.png)
 Alternatively more information can be found in <https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages>, for achieving the same via the command line and scripts.
 
-If you experience an issue with `/usr/bin/install` absense on pfSense 2.3 or earlier, update pfSense or use workaround from <https://redmine.pfsense.org/issues/6643>  
+If you experience an issue with `/usr/bin/install` being absent in pfSense 2.3 or earlier, update pfSense or use a workaround from <https://redmine.pfsense.org/issues/6643>  
 
 **Note:** In pfSense, the Netdata configuration files are located under `/usr/local/etc/netdata`
 
