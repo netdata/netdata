@@ -698,7 +698,6 @@ struct rrdhost {
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
     RRDCALC *alarms_with_foreach;
-    RRDCALCTEMPLATE *alarms_template_with_foreach;
     avl_tree_lock alarms_idx_health_log;
     avl_tree_lock alarms_idx_name;
 
@@ -711,6 +710,7 @@ struct rrdhost {
     // these are used to create alarms when charts
     // are created or renamed, that match them
     RRDCALCTEMPLATE *templates;
+    RRDCALCTEMPLATE *alarms_template_with_foreach;
 
 
     // ------------------------------------------------------------------------

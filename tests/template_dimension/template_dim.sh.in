@@ -46,10 +46,11 @@ get_the_logs() {
 }
 
 process_data() {
-  netdata
+  netdata -D &
+  NETDATAPID=$!
   echo -e "${NOCOLOR}Sleeping during 15 seconds to create alarms"
   sleep 15
-  killall netdata
+  kill $NETDATAPID
   get_the_logs "$1" $2
 }
 

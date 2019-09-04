@@ -586,36 +586,6 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
     }
 
-    fprintf(stderr,"KILLME REMOVE ME %s %d %s\n",rc->chart, rc->foreachcounter, rc->foreachdim);
-    if(rc->foreachcounter) {
-        RRDCALC *t;
-        for(t = host->alarms_with_foreach; t ; t = t->next) {
-            if (!strcmp(t->chart,rc->chart)) {
-                fprintf(stderr,"KILLME REMOVE ME UNIQUE %s %d\n",rc->name, rc->foreachcounter );
-            }
-        }
-        /*
-        if(unlikely(rc == host->alarms_with_foreach)) {
-            fprintf(stderr,"KILLME REMOVE ME UNIQUE %s %d\n",rc->name, rc->foreachcounter );
-            rc->foreachcounter--;
-            if(!rc->foreachcounter) {
-                host->alarms_with_foreach = rc->next;
-            }
-        } else {
-            RRDCALC *t;
-            for(t = host->alarms_with_foreach; t && t->next != rc; t = t->next) ;
-            if(t) {
-                t->foreachcounter--;
-                fprintf(stderr,"KILLME REMOVE ME GROUP %s %d\n",t->name, t->foreachcounter );
-                if(!t->foreachcounter) {
-                    t->next = rc->next;
-                    rc->next = NULL;
-                }
-            }
-        }
-         */
-    }
-
     if (rc) {
         RRDCALC *rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_health_log, (avl *)rc);
         if (rdcmp) {
