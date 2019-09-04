@@ -26,6 +26,9 @@
 # this includes the token, so the default is not to print it.
 # COVERITY_SUBMIT_DEBUG=1
 #
+# Override the standard coverity build version we know is supported
+# COVERITY_BUILD_VERSION="cov-analysis-linux64-2019.03"
+#
 # All these variables can also be exported before running this script.
 #
 # If the first parameter of this script is "install",
@@ -35,7 +38,7 @@ set -e
 INSTALL_DIR="/opt"
 
 # the version of coverity to use
-COVERITY_BUILD_VERSION="cov-analysis-linux64-2019.03"
+COVERITY_BUILD_VERSION="${COVERITY_BUILD_VERSION:-cov-analysis-linux64-2019.03}"
 
 # TODO: For some reasons this does not fully load on Debian 10 (Haven't checked if it happens on other distros yet), it breaks
 source packaging/installer/functions.sh || echo "Failed to fully load the functions library"
