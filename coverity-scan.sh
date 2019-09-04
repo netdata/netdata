@@ -90,6 +90,20 @@ debugrun() {
 scanit() {
   progress "Scanning using coverity"
 
+  if [ -z "${OTHER_OPTIONS}" ]; then
+    OTHER_OPTIONS="--disable-lto"
+    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-https"
+    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-jsonc"
+    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-nfacct"
+    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-freeipmi"
+    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-cups"
+    OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-prometheus-remote-write"
+
+    # TODO: enable these plugins too
+    #	--enable-plugin-xenstat \
+    #	--enable-backend-kinesis \
+    #	--enable-backend-mongodb \
+  fi
   export PATH="${PATH}:${INSTALL_DIR}/${COVERITY_BUILD_VERSION}/bin/"
   covbuild="${COVERITY_BUILD_PATH}"
   [ -z "${covbuild}" ] && covbuild="$(which cov-build 2>/dev/null || command -v cov-build 2>/dev/null)"
@@ -111,20 +125,9 @@ scanit() {
   [ -f netdata-coverity-analysis.tgz ] && run rm netdata-coverity-analysis.tgz
 
   progress "Configuring netdata source..."
-  run autoreconf -ivf
-  run ./configure --disable-lto \
-    --enable-https \
-    --enable-jsonc \
-    --enable-plugin-nfacct \
-    --enable-plugin-freeipmi \
-    --enable-plugin-cups \
-    --enable-backend-prometheus-remote-write \
-    "${NULL}"
 
-  # TODO: enable these plugins too
-  #	--enable-plugin-xenstat \
-  #	--enable-backend-kinesis \
-  #	--enable-backend-mongodb \
+  run autoreconf -ivf
+  run ./configure "${OTHER_OPTIONS}"
 
   progress "Analyzing netdata..."
   run "${covbuild}" --dir cov-int make -j${cpus}
@@ -177,10 +180,19 @@ installit() {
   return 0
 }
 
-if [ "${1}" = "--with-install" ]
-then
-  shift 1
-  installit
-fi
+OTHER_OPTIONS=""
+while [ -n "${1}" ]; do
+	if [ "${1}" = "--with-install" ]; then
+		progress "Running coverity install"
+		installit
+		shift 1
+	elif [ -n "${1}" ]; then
+		OTHER_OPTIONS="${OTHER_OPTIONS} ${1}"
+		shift 1
+	else
+		break
+	fi
+done
 
-scanit "${@}"
+echo "Running coverity scan with extra options ${OTHER_OPTIONS}"
+scanit "${OTHER_OPTIONS}"
