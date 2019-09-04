@@ -1,5 +1,16 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+**Merged pull requests:**
+
+- \(Documentation\) fix pfsense instructions and links [\#6768](https://github.com/netdata/netdata/pull/6768) ([Fohdeesha](https://github.com/Fohdeesha))
+- netdata/packaging: Trigger stable package generation upon release process [\#6766](https://github.com/netdata/netdata/pull/6766) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- update cache hashes for js and css [\#6756](https://github.com/netdata/netdata/pull/6756) ([jacekkolasa](https://github.com/jacekkolasa))
+- Stop configure.ac from linking against dbengine and https libraries w… [\#6658](https://github.com/netdata/netdata/pull/6658) ([mfundul](https://github.com/mfundul))
+- Fix clear notification missing [\#6638](https://github.com/netdata/netdata/pull/6638) ([thiagoftsm](https://github.com/thiagoftsm))
+- HTTP response message [\#6595](https://github.com/netdata/netdata/pull/6595) ([thiagoftsm](https://github.com/thiagoftsm))
+
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
 **Fixed bugs:**
@@ -60,7 +71,7 @@
 - Build DEB and RPM packages in parallel [\#6579](https://github.com/netdata/netdata/pull/6579) ([knatsakis](https://github.com/knatsakis))
 - Fixed typo 'follwing' -\> 'following' [\#6575](https://github.com/netdata/netdata/pull/6575) ([vvanouytsel](https://github.com/vvanouytsel))
 - netdata/packaging: Bare OS validations [\#6574](https://github.com/netdata/netdata/pull/6574) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- vsphere collector: charts descritpion and alarms [\#6572](https://github.com/netdata/netdata/pull/6572) ([ilyam8](https://github.com/ilyam8))
+- vsphere collector: charts description and alarms [\#6572](https://github.com/netdata/netdata/pull/6572) ([ilyam8](https://github.com/ilyam8))
 -  Documentation style guide & build instructions [\#6563](https://github.com/netdata/netdata/pull/6563) ([joelhans](https://github.com/joelhans))
 - Add alarm status counter api call [\#6554](https://github.com/netdata/netdata/pull/6554) ([alpes214](https://github.com/alpes214))
 - netdata/packaging: Documentation on distribution support matrix and functionality availability [\#6552](https://github.com/netdata/netdata/pull/6552) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
