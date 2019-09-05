@@ -48,15 +48,22 @@ configuration.
 -   Move Netdata's dashboard to a [different port](https://docs.netdata.cloud/web/server/) or enable TLS/HTTPS
     encryption.
 -   See all the `netdata.conf` options in our [daemon configuration documentation](../daemon/config/).
--   Learn how to configure `systemd` to expose [systemd services
-    utilization](../collectors/cgroups.plugin/README.md#monitoring-systemd-services) metrics automatically.
 
 ## Collect data from more sources
 
+Netdata auto-detects sources for collecting data, such as database servers, web servers, and more, **when it starts**.
 
+If you want to collect metrics from a new service or application, you need to [restart
+Netdata](#start-and-stop-netdata). If that doesn't work, make sure that the plugin/module is enabled. Some modules, like
+`chrony`, are disabled by default. Containers and VMs are auto-detected forever when Netdata is running on the host
+level (as in not in a container itself).
 
-Netdata uses both **internal** and **external** plugins for collecting data. Internal plugins run inside of Netdata
-itself, while external plugins are independent processes that send metrics to Netdata over pipes.
+Once Netdata detects a data source, it will keep trying to collect data from that source until you restart Netdata
+again. If you stop a web server and keep Netdata running, Netdata will begin collecting data again as soon as you start
+the web server back up.
+
+To collect data from all these sources, Netdata uses both **internal** and **external** plugins. Internal plugins run
+inside of Netdata itself, while external plugins are independent processes that send metrics to Netdata over pipes.
 
 There are also plugin **orchestrators**, which are external plugins with one or more data collection **modules**.
 
@@ -68,7 +75,8 @@ And there are many ways to configure plugins.
 -   In `.conf` files for each external plugin: For example, at `/etc/netdata/python.d.conf`.
 -   In `.conf` files for each module : For example, at `/etc/netdata/python.d/nginx.conf`.
 
-It's complex, so let's walk through how you would enable and configure collecting data from an Nginx web server using the `nginx` module and the `python.d` plugin orchestrator.
+It's complex, so let's walk through how you would enable and configure collecting data from an Nginx web server using
+the `nginx` module and the `python.d` plugin orchestrator.
 
 First, you can enable or disable the `python.d` plugin entirely.
 
@@ -113,28 +121,18 @@ In the `nginx.conf` file, you'll find dozens of additional options for
 
 To enable/disable other plugins and their respective modules, follow the same steps.
 
-### How and when Netdata automatically detects services/applications
-
-Netdata auto-detects sources for collecting data, such as database servers, web servers, and more, **when it starts**.
-
-If you want to collect metrics from a new service or application, you need to [restart
-Netdata](#start-and-stop-netdata). If that doesn't work, make sure that the plugin/module is enabled. Some
-modules, like `chrony`, are disabled by default due to issues our users were having.
-
-Once Netdata detects a data source, it will keep trying to collect data from that source until you restart Netdata
-again. If you stop a web server and keep Netdata running, Netdata will begin collecting data again as soon as you start
-the web server back up.
-
-Containers and VMs are auto-detected forever when Netdata is running on the host level (as in not in a container
-itself).
-
 **Next**:
 
-
+-   Improve the [performance](Performance.md) of Netdata on low-memory systems.
+-   Configure `systemd` to expose [systemd services
+    utilization](../collectors/cgroups.plugin/README.md#monitoring-systemd-services) metrics automatically.
+-   [Reconfigure individual charts](../daemon/config/README.md#per-chart-configuration) in `netdata.conf`.
+-   Run your own [registry](../registry/README.md#run-your-own-registry).
 
 ## Health monitoring and alarms
 
-Netdata comes with hundreds of health monitoring alarms for detecting anomalies on production servers. If you're running Netdata on a workstation, you might want to disable Netdata's alarms.
+Netdata comes with hundreds of health monitoring alarms for detecting anomalies on production servers. If you're running
+Netdata on a workstation, you might want to disable Netdata's alarms.
 
 Edit your `/etc/netdata/netdata.conf` file and set the following:
 
@@ -143,13 +141,19 @@ Edit your `/etc/netdata/netdata.conf` file and set the following:
     enabled = no
 ```
 
-If you want to keep health monitoring enabled for the dashboard, but turn email notifications off, edit your `health_alarm_notify.conf` file with `edit-config`, or with your the text editor of your choice:
+If you want to keep health monitoring enabled for the dashboard, but turn email notifications off, edit your
+`health_alarm_notify.conf` file with `edit-config`, or with your the text editor of your choice:
 
 ```bash
 sudo /etc/netdata/edit-config health_alarm_notify.conf
 ```
 
 Find the `SEND_EMAIL="YES"` and change it to `SEND_EMAIL="NO"`.
+
+**Next**:
+
+-   Write your own health alarm using the [examples](../health/README.md#examples).
+-   Add a new notification method, like [Slack](../health/notifications/slack/).
 
 ## Change how long Netdata stores metrics
 
@@ -158,45 +162,57 @@ By default, Netdata stores 1 hour of historical metrics and uses about 25MB of R
 If that's not enough for you, Netdata is quite adaptible when it comes to long-term storage based on your system and
 your needs.
 
-There's two ways to quickly increase the depth of historical metrics: by increasing the `history` value for the default
-database, or switching to the database engine.
+There's two ways to quickly increase the depth of historical metrics: increase the `history` value for the round-robin
+that's enabled by default with every new Netdata installation, or switch to the database engine.
 
 We have a tutorial that walks you through both options: [Changing how long Netdata stores
 metrics](tutorial/longer-metrics-storage.md).
 
 **Next**:
 
--   Learn how to [configure Netdata's daemon](../daemon/config/) via the `netdata.conf` file.
--   Read up on the memory requirements of the [default database](../database/), or figure out whether your system has
-    KSM enabled, which can [reduce the default database's memory usage](../database/README.md#ksm) by about 60%.
+-   Learn more about the [memory requirements for the database engine](../database/engine/README.md#memory-requirements)
+    to understand how much RAM/disk space you should commit to storing historical metrics.
+-   Read up on the memory requirements of the [round-robin database](../database/), or figure out whether your system
+    has KSM enabled, which can [reduce the default database's memory usage](../database/README.md#ksm) by about 60%.
 
 ## Performance troubleshooting
 
 Because Netdata auto-detects and collects system information from so many source, it effectively replaces your need to
-use other command line tools to track down performance anomalies. Netdata not only shows the same information as tools like `free`, `df`, `vmstat`, and `top`, but it also shows what happened in the past.
-
-
+use other command line tools to track down performance anomalies. Netdata not only shows the same information as tools
+like `free`, `df`, `vmstat`, and `top`, but it also shows what happened in the past.
 
 You can also use the descriptions that come with most Netdata charts to figure out where to look next for the anomaly's
 root cause.
 
+> **NEED MORE INFORMATION HERE**
 
-## Add more Netdata agents to the My nodes menu
+**Next**:
 
-<!-- When you install multiple Netdata servers, all your servers will appear at the node menu at the top left of the
-dashboard. For this to work, you have to manually access just once, the dashboard of each of your netdata servers.
+-   Read up on how Netdata uses [meaningful presentation](/why-netdata/meaningful-presentation.md) to reduce your
+    reliance on console tools.
 
-The node menu is more than just browser bookmarks. When switching Netdata servers from that menu, any settings of the
-current view are propagated to the other netdata server:
+## Monitoring multiple systems with Netdata
 
-- the current charts panning (drag the charts left or right),
-- the current charts zooming (`SHIFT` + mouse wheel over a chart),
-- the highlighted time-frame (`ALT` + select an area on a chart),
-- the scrolling position of the dashboard,
-- the theme you use,
-- etc.
+If you have Netdata installed on multiple systems, you can have them all appear in the **My nodes** menu at the top-left
+corner of the dashboard.
 
-are all sent over to other Netdata server, to allow you troubleshoot cross-server performance issues easily. -->
+To show all your servers in that menu, you need to [register for or sign in](netdata-cloud/signing-in.md) to [Netdata
+Cloud](netdata-cloud/) from each system. They will then all appear in the My nodes menu.
+
+![Animated GIF of the My Nodes menu in
+action](https://user-images.githubusercontent.com/1153921/64389938-9aa7b800-cff9-11e9-9653-a77e791811ad.gif)
+
+Whenever you pan, zoom, highlihgt, or pause a chart, Netdata will synchronize those settings with any other agent you
+visit via the My nodes menu. Even your scroll position is synchronized, so you'll see exactly the same charts and
+respective data on another system.
+
+You can now track performance anomalies across your entire infrastructure without ever leaving Netdata!
+
+**Next**:
+
+-   Read up on how the [Netdata Cloud registry works](../registry/) and what kind of data it stores and sends to your
+    web browser.
+-   Familiarize yourself with the [Nodes View](netdata-cloud/nodes-view.md)
 
 ## Start and stop Netdata
 
@@ -208,16 +224,23 @@ stop Netdata manually, but it's still useful to know how to do.
 -   To **restart** Netdata, run `service netdata restart`.
 
 The `service` command is a wrapper script that uses the best method of starting or stopping Netdata based on your
-system. But, if either of those commands fail, try using the equivalents for `systemd` and `init.d` 
+system. But, if either of those commands fail, try using the equivalent commands for `systemd` and `init.d` 
 
 -   **systemd**: `systemctl start netdata`, `systemctl stop netdata`, `systemctl restart netdata`
 -   **init.d**: `/etc/init.d/netdata start`, `/etc/init.d/netdata stop`, `/etc/init.d/netdata restart`
 
 ## What's next?
 
--   Check [Data Collection](../collectors) for configuring data collection plugins.
--   Check [Health Monitoring](../health) for configuring your own alarms, or setting up alarm notifications.
--   Check [Streaming](../streaming) for centralizing Netdata metrics.
--   Check [Backends](../backends) for long term archiving of Netdata metrics to time-series databases.
+Even after you've configured `netdata.conf`, tweaked alarms, learned the basics of performance troubleshooting, and
+added all your systems to the **My nodes** menu, you've just gotten started with Netdata.
+
+Take a look at some more advanced features and configurations:
+
+-   Centralize Netdata metrics from many systems with [streaming](../streaming)
+-   Enable long-term archiving of Netdata metrics via [backends](../backends) to time-series databases.
+-   Improve security by putting Netdata behind an [Nginx proxy with SSL](Running-behind-nginx.md).
+
+Or, learn more about how you can contribute to [Netdata core](../CONTRIBUTING.md) or our
+[documentation](contributing/contributing-documentation.md)!
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2FGettingStarted&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
