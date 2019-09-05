@@ -252,8 +252,11 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 ssize_t r = read(ps->capacity->fd, buffer, 30);
                 if(unlikely(r < 1)) {
                     error("Cannot read file '%s'", ps->capacity->filename);
-                    power_supply_free(ps);
-                    ps = NULL;
+                    if (ps)
+                    {
+                        power_supply_free(ps);
+                        ps = NULL;
+                    }
                 }
                 else {
                     buffer[r] = '\0';
