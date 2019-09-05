@@ -7,7 +7,7 @@
 # Author  : Costa Tsaousis (costa@netdata.cloud)
 # Author  : Pawel Krupa (paulfantom)
 # Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
-# shellcheck disable=SC1091,SC2230
+# shellcheck disable=SC1091,SC2230,SC2086
 
 # To run manually, save configuration to .coverity-scan.conf like this:
 #
