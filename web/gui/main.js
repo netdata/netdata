@@ -1794,7 +1794,9 @@ function renderPage(menus, data) {
       ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
       'Netdata collects <b>' + data.dimensions_count.toLocaleString() + '</b> metrics on ' +
       data.hostname.toString() + ', presents them in <b>' +
-      data.charts_count.toLocaleString() + '</b> charts and monitors them with <b>' +
+      data.charts_count.toLocaleString() + '</b> charts' +
+      (isMemoryModeDbEngine ? '' : ',') + // oxford comma
+      ' and monitors them with <b>' +
       data.alarms_count.toLocaleString() + '</b> alarms.';
 
     if (!isMemoryModeDbEngine) {
