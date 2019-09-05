@@ -135,6 +135,7 @@ scanit() {
 }
 
 installit() {
+  ORIGINAL_DIR="${PWD}"
   TMP_DIR="$(mktemp -d /tmp/netdata-coverity-scan-XXXXX)"
   progress "Downloading coverity in ${TMP_DIR}..."
   cd "${TMP_DIR}"
@@ -162,6 +163,7 @@ installit() {
   [ -n "${TMP_DIR}" ] && rm -rf "${TMP_DIR}"
 
   progress "Coverity scan tools are installed."
+  cd "$ORIGINAL_DIR"
   return 0
 }
 
