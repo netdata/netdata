@@ -71,6 +71,8 @@ export const Chart = ({
 
   // selecting dimensions
   const dimensionNamesFlatString = chartData.dimension_names.join("")
+  // we need to have empty selectedDimensions work as {all enabled}, in case
+  // new dimensions show up (when all are enabled, the new dimensions should also auto-enable)
   const [selectedDimensions, setSelectedDimensions] = useState<string[]>([])
   const dimensionsVisibility = useMemo(() => chartData.dimension_names.map(
     (dimensionName) => (selectedDimensions.length === 0

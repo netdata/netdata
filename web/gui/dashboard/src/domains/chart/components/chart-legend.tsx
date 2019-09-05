@@ -61,6 +61,43 @@ const legendResolutionTooltip = (chartData: ChartData, chartDetails: ChartDetail
   return `resolution ${seconds4human(viewed)}, collected every ${seconds4human(collected)}`
 }
 
+type GetNewSelectedDimensions = (arg: {
+  allDimensions: string[],
+  selectedDimensions: string[],
+  clickedDimensionName: string,
+  isModifierKeyPressed: boolean,
+}) => string[]
+
+export const getNewSelectedDimensions: GetNewSelectedDimensions = ({
+  allDimensions,
+  selectedDimensions,
+  clickedDimensionName,
+  isModifierKeyPressed,
+}) => {
+  // when selectedDimensions is empty, then all dimensions should be enabled
+  // let's narrow this case now
+  const enabledDimensions = selectedDimensions.length === 0 ? allDimensions : selectedDimensions
+  const isCurrentlySelected = enabledDimensions.includes(clickedDimensionName)
+
+  let newSelectedDimensions: string[]
+  if (!isModifierKeyPressed
+    && ((isCurrentlySelected && enabledDimensions.length > 1) || !isCurrentlySelected)
+  ) {
+    newSelectedDimensions = [clickedDimensionName]
+  } else if (isCurrentlySelected) { // modifier key pressed
+    newSelectedDimensions = enabledDimensions.filter(
+      (dimension) => dimension !== clickedDimensionName,
+    )
+  } else { // modifier key pressed
+    newSelectedDimensions = enabledDimensions.concat(clickedDimensionName)
+  }
+
+  if (newSelectedDimensions.length === allDimensions.length) {
+    return []
+  }
+  return newSelectedDimensions
+}
+
 export const ChartLegend = ({
   // attributes,
   chartData,
@@ -80,7 +117,8 @@ export const ChartLegend = ({
   const dataUpdateEvery = chartData.view_update_every * 1000
 
   const showUndefined = Math.abs(netdataLast - viewBefore) > dataUpdateEvery
-  console.log("showUndefined", showUndefined) // eslint-disable-line no-console
+  // eslint-disable-next-line no-void
+  void (showUndefined)
   // todo make separate case for showUndefined
 
   const legendDate = new Date(viewBefore)
@@ -93,12 +131,15 @@ export const ChartLegend = ({
     `color_fill_opacity_${chartDetails.chart_type}`
   ]
 
-  const handleDimensionClick = (dimensionName: string) => (event: React.MouseEvent) => {
+  const handleDimensionClick = (clickedDimensionName: string) => (event: React.MouseEvent) => {
     event.preventDefault()
-    const isCurrentlySelected = selectedDimensions.includes(dimensionName)
-    const newSelectedDimensions = isCurrentlySelected
-      ? selectedDimensions.filter((dimension) => dimension !== dimensionName)
-      : selectedDimensions.concat(dimensionName)
+    const isModifierKeyPressed = event.shiftKey || event.ctrlKey
+    const newSelectedDimensions = getNewSelectedDimensions({
+      allDimensions: chartData.dimension_names,
+      selectedDimensions,
+      clickedDimensionName,
+      isModifierKeyPressed,
+    })
     setSelectedDimensions(newSelectedDimensions)
   }
 
