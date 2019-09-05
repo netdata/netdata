@@ -68,7 +68,8 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     int i;
     for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
         if(i != STDIN_FILENO && i != STDERR_FILENO)
-            fcntl(i, F_SETFD, FD_CLOEXEC);
+            if (fcntl(i, F_SETFD, FD_CLOEXEC) == -1)
+                perror("custom peopen");
 
     if (!posix_spawn_file_actions_init(&fa)) {
         // move the pipe to stdout in the child
@@ -97,7 +98,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
         debug(D_CHILDS, "Spawned command: '%s' on pid %d from parent pid %d.", command, pid, getpid());
     } else {
         error("Failed to spawn command: '%s' from parent pid %d.", command, getpid());
-        close(pipefd[PIPE_READ]);
+        fclose(fp);
         fp = NULL;
     }
     close(pipefd[PIPE_WRITE]);
@@ -116,7 +117,7 @@ error_after_posix_spawn_file_actions_init:
     if (posix_spawn_file_actions_destroy(&fa))
         error("posix_spawn_file_actions_destroy");
 error_after_pipe:
-    close(pipefd[PIPE_READ]);
+    fclose(fp);
     close(pipefd[PIPE_WRITE]);
     return NULL;
 }

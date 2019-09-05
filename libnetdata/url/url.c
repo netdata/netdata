@@ -44,23 +44,6 @@ char *url_encode(char *str) {
 }
 
 /**
- * URL Decode
- *
- * Returns a url-decoded version of str
- * IMPORTANT: be sure to free() the returned string after use
- *
- * @param str the string that will be decode
- *
- * @return a pointer for the url decoded.
- */
-char *url_decode(char *str) {
-    size_t size = strlen(str) + 1;
-
-    char *buf = mallocz(size);
-    return url_decode_r(buf, str, size);
-}
-
-/**
  *  Percentage escape decode
  *
  *  Decode %XX character or return 0 if cannot
