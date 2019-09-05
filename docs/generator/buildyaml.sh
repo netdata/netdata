@@ -149,7 +149,7 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'packaging/installer/UPDATE.md'
     - 'packaging/DISTRIBUTIONS.md'
     - 'packaging/installer/UNINSTALL.md'
-- 'docs/GettingStarted.md'
+- 'docs/getting-started.md'
 - Running Netdata:
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'

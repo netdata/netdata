@@ -73,7 +73,7 @@ If the documentation you're working on has a direct correlation to some componen
 
 #### The `docs` folder
 
-At the root of the Netdata repository is a `docs/` folder. Inside this folder we place documentation that does not have a direct relationship to a specific component of Netdata. It's where we house our [getting started guide](../GettingStarted.md), guides on [running Netdata behind Nginx](../Running-behind-nginx.md), and more.
+At the root of the Netdata repository is a `docs/` folder. Inside this folder we place documentation that does not have a direct relationship to a specific component of Netdata. It's where we house our [getting started guide](../getting-started.md), guides on [running Netdata behind Nginx](../Running-behind-nginx.md), and more.
 
 If the documentation you're working on doesn't have a direct relaionship to a component of Netdata, it can be placed in this `docs/` folder.
 
