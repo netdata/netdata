@@ -1792,19 +1792,19 @@ function renderPage(menus, data) {
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
     sidebar += '<li class="" style="margin:20px;color:#666;"><small>Every ' +
       ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
-      'Netdata collects <b>' + data.dimensions_count.toLocaleString() + '</b> metrics on ' +
-      data.hostname.toString() + ', presents them in <b>' +
-      data.charts_count.toLocaleString() + '</b> charts' +
+      'Netdata collects <strong>' + data.dimensions_count.toLocaleString() + '</strong> metrics on ' +
+      data.hostname.toString() + ', presents them in <strong>' +
+      data.charts_count.toLocaleString() + '</strong> charts' +
       (isMemoryModeDbEngine ? '' : ',') + // oxford comma
-      ' and monitors them with <b>' +
-      data.alarms_count.toLocaleString() + '</b> alarms.';
+      ' and monitors them with <strong>' +
+      data.alarms_count.toLocaleString() + '</strong> alarms.';
 
     if (!isMemoryModeDbEngine) {
         sidebar += '<br />&nbsp;<br />Get more history by ' +
-          '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <b>history</b></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>'
+          '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <strong>history</strong></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>'
     }
 
-    sidebar += '<br/>&nbsp;<br/><b>netdata</b><br/>' + data.version.toString() + '</small></li>';
+    sidebar += '<br/>&nbsp;<br/><strong>netdata</strong><br/>' + data.version.toString() + '</small></li>';
 
     sidebar += '</ul>';
     div.innerHTML = html;
