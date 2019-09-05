@@ -77,7 +77,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it 
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/GettingStarted.md).
+Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
 
 ---
 
@@ -149,7 +149,7 @@ sh /tmp/kickstart-static64.sh
 
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/GettingStarted.md).
+Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
 
 ---
 
