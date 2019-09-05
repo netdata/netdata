@@ -154,7 +154,6 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'
     - 'daemon/config/README.md'
-    - 'docs/Charts.md'
 "
 navpart 2 web/server "" "Web server"
 navpart 3 web/server "" "" 2 excludefirstlevel
@@ -181,6 +180,9 @@ echo -ne "
     - 'docs/netdata-cloud/signing-in.md'
     - 'docs/netdata-cloud/nodes-view.md'
 "
+
+navpart 1 web "README" "Dashboards"
+navpart 2 web/gui "" "" 3
 
 navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
@@ -260,9 +262,6 @@ navpart 2 health/notifications "" "Supported notifications" 2 excludefirstlevel
 navpart 1 streaming "" "" 4
 
 navpart 1 backends "" "Archiving to backends" 3
-
-navpart 1 web "README" "Dashboards"
-navpart 2 web/gui "" "" 3
 
 navpart 1 web/api "" "HTTP API"
 navpart 2 web/api/exporters "" "Exporters" 2
