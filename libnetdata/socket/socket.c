@@ -1005,13 +1005,48 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags);
     if (likely(nfd >= 0)) {
-        char client_host[NI_MAXHOST+1];
-        if(getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)ipsize, NULL, 0, NI_NAMEREQD|NI_NUMERICSERV) != 0)
-            client_host[0] = 0;
-        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize, client_port, (socklen_t)portsize, NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
+        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize, client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
             error("LISTENER: cannot getnameinfo() on received client connection.");
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
+        }
+        char client_host[NI_MAXHOST+1];
+        if(getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)ipsize, NULL, 0, NI_NAMEREQD | NI_NUMERICSERV) != 0)
+            client_host[0] = 0;
+        else {
+            struct addrinfo *addr_infos = NULL;
+            if(getaddrinfo(client_host, NULL, NULL, &addr_infos)!=0) {
+                error("LISTENER: cannot validate hostname '%s' by resolving it",client_host);
+                client_host[0] = 0;
+            }
+            else {
+                struct addrinfo *scan = addr_infos;
+                int   validated = 0;
+                while(scan) {
+                    char address[INET6_ADDRSTRLEN+1];
+                    address[0] = 0;
+                    switch(scan->ai_addr->sa_family) {
+                        case AF_INET:
+                            inet_ntop(AF_INET, &((struct sockaddr_in*)(scan->ai_addr))->sin_addr, address, INET6_ADDRSTRLEN+1);
+                            break;
+                        case AF_INET6:
+                            inet_ntop(AF_INET6, &((struct sockaddr_in6*)(scan->ai_addr))->sin6_addr, address, INET6_ADDRSTRLEN+1);
+                            break;
+                    }
+                    debug(D_LISTENER, "Incoming ip %s reverse-resolved onto %s, validating against forward-resolution %s", client_ip, client_host, address);
+                    if(!strcmp(client_ip, address)) {
+                        validated = 1;
+                        break;
+                    }
+                    scan = scan->ai_next;
+                }
+                if(!validated) {
+                    error("LISTENER: Cannot validate '%s' as address of '%s', not listed in DNS", client_ip, client_host);
+                    client_host[0] = 0;
+                }
+            }
+            if(addr_infos!=NULL)
+                freeaddrinfo(addr_infos);
         }
 
 #ifdef __FreeBSD__
@@ -1057,7 +1092,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             // Allow patterns to match against either the resolved hostname or the numeric ip address.
             if(unlikely(!simple_pattern_matches(access_list, client_ip) && (client_host[0]==0 || !simple_pattern_matches(access_list, client_host)))) {
                 errno = 0;
-                debug(D_LISTENER, "Permission denied for client '%s', port '%s'", client_ip, client_port);
+                debug(D_LISTENER, "Permission denied for client '%s' (%s), port '%s'", client_ip, client_host, client_port);
                 error("DENIED ACCESS to client '%s'", client_ip);
                 close(nfd);
                 nfd = -1;
