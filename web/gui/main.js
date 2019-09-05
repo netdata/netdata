@@ -1792,7 +1792,8 @@ function renderPage(menus, data) {
     sidebar += '<li class=""><a href="https://github.com/netdata/netdata/tree/master/health#Health-monitoring" target="_blank"><i class="fas fa-plus"></i> add more alarms</a></li>';
     sidebar += '<li class="" style="margin:20px;color:#666;"><small>Every ' +
       ((data.update_every === 1) ? 'second' : data.update_every.toString() + ' seconds') + ', ' +
-      'Netdata collects <b>' + data.dimensions_count.toLocaleString() + '</b> metrics, presents them in <b>' +
+      'Netdata collects <b>' + data.dimensions_count.toLocaleString() + '</b> metrics on ' +
+      data.hostname.toString() + ', presents them in <b>' +
       data.charts_count.toLocaleString() + '</b> charts and monitors them with <b>' +
       data.alarms_count.toLocaleString() + '</b> alarms.';
 
