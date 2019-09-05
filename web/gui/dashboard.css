@@ -337,6 +337,11 @@ body {
     /* -webkit-font-smoothing: none; */
 }
 
+/* eslint recommends adding tabIndex for a11y, but the outline is showing on click */
+.netdata-legend-name:focus, .netdata-legend-value:focus {
+  outline: none;
+}
+
 .netdata-legend-name.not-selected {
     font-weight: normal;
     opacity: 0.3;
