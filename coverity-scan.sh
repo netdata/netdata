@@ -172,11 +172,11 @@ OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-nfacct"
 OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-freeipmi"
 OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-cups"
 OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-prometheus-remote-write"
-
 # TODO: enable these plugins too
-#	--enable-plugin-xenstat \
-#	--enable-backend-kinesis \
-#	--enable-backend-mongodb \
+#OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-xenstat"
+#OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-kinesis"
+#OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-mongodb"
+
 FOUND_OPTS="NO"
 while [ -n "${1}" ]; do
 	if [ "${1}" = "--with-install" ]; then
