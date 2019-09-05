@@ -351,6 +351,14 @@ code {
     /* -webkit-font-smoothing: none; */
 }
 
+.netdata-legend-value, .netdata-legend-name {
+    /* prevent highlight when shift-clicking */
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+}
+
 /* eslint recommends adding tabIndex for a11y, but the outline is showing on click */
 .netdata-legend-name:focus, .netdata-legend-value:focus {
     outline: none;
