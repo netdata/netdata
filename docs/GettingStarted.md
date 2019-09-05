@@ -1,6 +1,6 @@
 # Getting started guide
 
-Thanks for installing Netdata! In this guide, we'll walk you through the first steps you should take after getting Netdata installed.
+Thanks for installing Netdata! In this guide, we'll quickly walk you through the first steps you should take after getting Netdata installed.
 
 Netdata can collect thousands of metrics in real-time without any configuration but there are a few things you can do, like extending the history, to make Netdata work best for your particular needs.
 
@@ -8,7 +8,7 @@ Netdata can collect thousands of metrics in real-time without any configuration 
 
 ## Access the dashboard
 
-Open up your browser of choice. If you installed Netdata on the same system you're using to open your browser, navigate to `http://localhost:19999/`. If you installed Netdata on a remote system, navigate to `http://SYSTEM-IP:19999/` after replacing `SYSTEM-IP` with the IP address of that system.
+Open up your web browser of choice. If you installed Netdata on the same system you're using to open your browser, navigate to `http://localhost:19999/`. If you installed Netdata on a remote system, navigate to `http://SYSTEM-IP:19999/` after replacing `SYSTEM-IP` with the IP address of that system.
 
 Hit `Enter`. Welcome to Netdata!
 
@@ -19,47 +19,28 @@ Hit `Enter`. Welcome to Netdata!
 -   Read more about the [standard Netdata dashboard](../web/gui/).
 -   Learn all the specifics of [using charts](../web/README.md#using-charts) or the differences between [charts, context, and families](../web/README.md#charts-contexts-families).
 
-## Change how long Netdata stores metrics
+## Configuration basics
 
-By default, Netdata stores 1 hour of historical metrics and uses about
-25MB of RAM.
+Most of Netdata's configuration options are kept in the `netdata.conf` file.
 
-If that's not enough for you, Netdata is quite adaptible when it
-comes to long-term storage based on your system and your needs.
+On most systems, you can find that file at `/etc/netdata/netdata.conf`.
 
-There's two ways to quickly increase the depth of historical metrics: by
-increasing the `history` value for the default database, or switching to the database engine.
+> A few operating systems will place it at `/opt/netdata/etc/netdata/netdata.conf`, so check there if you find nothing at `/etc/netdata/netdata.conf`.
 
-We have a tutorial that walks you through both options: [Changing how long Netdata stores metrics](tutorial/longer-metrics-storage.md).
+For now, look at the `[global]` section in `netdata.conf`. Here's what it looks like in a default installation:
 
-**Next**:
+```conf
 
--   Learn how to [configure Netdata's daemon](../daemon/config/) via the
-    `netdata.conf` file.
--   Read up on the memory requirements of the [default database](../database/),
-    or figure out whether your system has KSM enabled, which can [reduce the
-    default database's memory usage](../database/README.md#ksm) by about 60%.
+```
 
-## Service discovery and auto-detection
 
-Netdata supports auto-detection of data collection sources. It auto-detects almost everything: database servers, web servers, dns server, etc.
 
-This auto-detection process happens **only once**, when Netdata starts. To have Netdata re-discover data sources, you need to restart it. There are a few exceptions to this:
+Change heading from Configuration quick start. Add information about the most important items in netdata.conf, such as history, memory mode, etc. (I could use some thoughts on which configurations are most useful and most commonly changed.)
 
--   containers and VMs are auto-detected forever (when Netdata is running at the host).
--   many data sources are collected but are silenced by default, until there is useful information to collect (for example network interface dropped packet, will appear after a packet has been dropped).
--   services that are not optimal to collect on all systems, are disabled by default.
--   services we received feedback from users that caused issues when monitored, are also disabled by default (for example, `chrony` is disabled by default, because CentOS ships a version of it that uses 100% CPU when queried for statistics).
+Retain information about configuring plugins using python.d and nginx as an example, but simplify and clarify as needed.
 
-Once a data collection source is detected, Netdata will never quit trying to collect data from it, until Netdata is restarted. So, if you stop your web server, Netdata will pick it up automatically when it is started again.
+I also believe the content under the Service discovery and auto-detection heading could be condensed and added to this section. Basically, clarify that a ton of stuff is auto-detected, so they don't have to configure/enable every plugin.
 
-Since Netdata is installed on all your systems (even inside containers), auto-detection is limited to `localhost`. This simplifies significantly the security model of a Netdata monitored infrastructure, since most applications allow `localhost` access  by default.
-
-A few well known data collection sources that commonly need to be configured are:
-
--   [systemd services utilization](../collectors/cgroups.plugin/#monitoring-systemd-services) are not exposed by default on most systems, so `systemd` has to be configured to expose those metrics.
-
-## Configuration quick start
 
 In Netdata we have:
 
@@ -104,6 +85,59 @@ Then, `nginx` has its own configuration file for configuring its data collection
 sudo /etc/netdata/edit-config python.d/nginx.conf
 ```
 
+
+
+## Change how long Netdata stores metrics
+
+By default, Netdata stores 1 hour of historical metrics and uses about
+25MB of RAM.
+
+If that's not enough for you, Netdata is quite adaptible when it
+comes to long-term storage based on your system and your needs.
+
+There's two ways to quickly increase the depth of historical metrics: by
+increasing the `history` value for the default database, or switching to the database engine.
+
+We have a tutorial that walks you through both options: [Changing how long Netdata stores metrics](tutorial/longer-metrics-storage.md).
+
+**Next**:
+
+-   Learn how to [configure Netdata's daemon](../daemon/config/) via the
+    `netdata.conf` file.
+-   Read up on the memory requirements of the [default database](../database/),
+    or figure out whether your system has KSM enabled, which can [reduce the
+    default database's memory usage](../database/README.md#ksm) by about 60%.
+
+
+
+
+
+## Service discovery and auto-detection
+
+
+
+
+Netdata supports auto-detection of data collection sources. It auto-detects almost everything: database servers, web servers, dns server, etc.
+
+This auto-detection process happens **only once**, when Netdata starts. To have Netdata re-discover data sources, you need to restart it. There are a few exceptions to this:
+
+-   containers and VMs are auto-detected forever (when Netdata is running at the host).
+-   many data sources are collected but are silenced by default, until there is useful information to collect (for example network interface dropped packet, will appear after a packet has been dropped).
+-   services that are not optimal to collect on all systems, are disabled by default.
+-   services we received feedback from users that caused issues when monitored, are also disabled by default (for example, `chrony` is disabled by default, because CentOS ships a version of it that uses 100% CPU when queried for statistics).
+
+Once a data collection source is detected, Netdata will never quit trying to collect data from it, until Netdata is restarted. So, if you stop your web server, Netdata will pick it up automatically when it is started again.
+
+Since Netdata is installed on all your systems (even inside containers), auto-detection is limited to `localhost`. This simplifies significantly the security model of a Netdata monitored infrastructure, since most applications allow `localhost` access  by default.
+
+A few well known data collection sources that commonly need to be configured are:
+
+-   [systemd services utilization](../collectors/cgroups.plugin/#monitoring-systemd-services) are not exposed by default on most systems, so `systemd` has to be configured to expose those metrics.
+
+## Configuration quick start
+
+
+
 ## Health monitoring and alarms
 
 Netdata ships hundreds of health monitoring alarms for detecting anomalies. These are optimized for production servers.
@@ -129,20 +163,6 @@ and set `SEND_EMAIL="NO"`.
 
 (For static 64bit installations use `sudo /opt/netdata/etc/netdata/edit-config health_alarm_notify.conf`).
 
-## Starting and stopping Netdata
-
-Netdata installer integrates Netdata to your init / systemd environment.
-
-To start/stop Netdata, depending on your environment, you should use:
-
-- `systemctl start netdata` and `systemctl stop netdata`
-- `service netdata start` and `service netdata stop`
-- `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
-
-Once Netdata is installed, the installer configures it to start at boot and stop at shutdown.
-
-For more information about using these commands, consult your system documentation.
-
 
 ## Add more Netdata agents to the My nodes menu
 
@@ -159,6 +179,18 @@ The node menu is more than just browser bookmarks. When switching Netdata server
 
 are all sent over to other Netdata server, to allow you troubleshoot cross-server performance issues easily.
 
+## Starting and stopping Netdata
+
+When you install Netdata, it's configured to start at boot and stop and restart/shutdown. You shouldn't need to start or stop Netdata manually, but it's still useful to know how to do.
+
+To **start** Netdata, open a terminal and run `service netdata start`.
+
+To **stop** Netdata, run `service netdata stop`.
+
+The `service` command is a wrapper script that uses the best method of starting or stopping Netdata based on your system. But, if either of those commands fail, try using the equivalents for `systemd` and `init.d` 
+
+-   **systemd**: `systemctl start netdata` and `systemctl stop netdata`
+-   **init.d**: `/etc/init.d/netdata start` and `/etc/init.d/netdata stop`
 
 ## What's next?
 

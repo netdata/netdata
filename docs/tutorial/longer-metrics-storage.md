@@ -47,8 +47,7 @@ metrics is how much RAM you're willing to dedicate to Netdata.
 > careful. Out of memory situations are very bad.
 
 To actually increase the `history` option, you need to edit your `netdata.conf`
-file. In most installations, you'll find it at `/etc/netdata/netdata.conf`, but some operating systems place it at `/opt/netdata/etc/netdata`. Use the text
-editor of your choosing and replace the `history` setting with the number of seconds you'd like to store.
+file. In most installations, you'll find it at `/etc/netdata/netdata.conf`, but some operating systems place it at `/opt/netdata/etc/netdata/netdata.conf`. Use the text editor of your choosing and replace the `history` setting with the number of seconds you'd like to store.
 
 How much RAM will a longer history use? Well, let's use a little math.
 
