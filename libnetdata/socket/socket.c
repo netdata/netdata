@@ -1005,7 +1005,10 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags);
     if (likely(nfd >= 0)) {
-        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize, client_port, (socklen_t)portsize, NI_NUMERICSERV) != 0) {
+        char client_host[NI_MAXHOST+1];
+        if(getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)ipsize, NULL, 0, NI_NAMEREQD|NI_NUMERICSERV) != 0)
+            client_host[0] = 0;
+        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize, client_port, (socklen_t)portsize, NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
             error("LISTENER: cannot getnameinfo() on received client connection.");
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
@@ -1051,7 +1054,8 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 client_ip[ipsize - 1] = '\0';
             }
 
-            if(unlikely(!simple_pattern_matches(access_list, client_ip))) {
+            // Allow patterns to match against either the resolved hostname or the numeric ip address.
+            if(unlikely(!simple_pattern_matches(access_list, client_ip) && (client_host[0]==0 || !simple_pattern_matches(access_list, client_host)))) {
                 errno = 0;
                 debug(D_LISTENER, "Permission denied for client '%s', port '%s'", client_ip, client_port);
                 error("DENIED ACCESS to client '%s'", client_ip);
