@@ -112,7 +112,7 @@ scanit() {
   progress "Configuring netdata source..."
 
   run autoreconf -ivf
-  run ./configure "${OTHER_OPTIONS}"
+  run ./configure ${OTHER_OPTIONS}
 
   progress "Analyzing netdata..."
   run "${covbuild}" --dir cov-int make -j${cpus}
