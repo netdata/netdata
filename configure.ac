@@ -1160,6 +1160,7 @@ AC_CONFIG_FILES([
     collectors/plugins.d/Makefile
     collectors/proc.plugin/Makefile
     collectors/python.d.plugin/Makefile
+    collectors/slabinfo.plugin/Makefile
     collectors/statsd.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
