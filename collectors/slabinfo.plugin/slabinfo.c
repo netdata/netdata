@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// For CentOS 6 support
-#include <stdint.h>
-// For PAGE_SIZE
-#include <sys/user.h>
-
 #include "libnetdata/libnetdata.h"
 #include "daemon/common.h"
+
+// For PAGE_SIZE
+#include <sys/user.h>
 
 #define PLUGIN_SLABINFO_NAME "slabinfo.plugin"
 #define PLUGIN_SLABINFO_PROCFILE "/proc/slabinfo"
