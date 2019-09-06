@@ -320,13 +320,6 @@ static inline void health_process_notifications(RRDHOST *host, ALARM_ENTRY *ae) 
     health_alarm_execute(host, ae);
 }
 
-/**
- * Log and Process
- *
- * Execute the scripts to notify about an alarm, after this remove it from the queue.
- *
- * @param host the structure with information about a host and its charts.
- */
 static inline void health_alarm_log_process(RRDHOST *host) {
     uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
     time_t now = now_realtime_sec();
