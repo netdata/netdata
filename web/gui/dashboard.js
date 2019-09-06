@@ -868,6 +868,13 @@ NETDATA.unitsConversion = {
             'TiB': 1024,
             'PiB': 1024 * 1024,
             'EiB': 1024 * 1024 * 1024
+        },
+        'num': {
+            'num': 1,
+            'num (K)': 1000,
+            'num (M)': 1000000,
+            'num (G)': 1000000000,
+            'num (T)': 1000000000000
         }
         /*
         'milliseconds': {
@@ -967,6 +974,72 @@ NETDATA.unitsConversion = {
                         + NETDATA.zeropad(milliseconds);
                 }
             }
+        },
+        'nanoseconds': {
+            'nanoseconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time && max < 1000;
+                },
+                convert: function (nanoseconds) {
+                    let tms = Math.round(nanoseconds * 10);
+                    nanoseconds = Math.floor(tms / 10);
+
+                    tms -= nanoseconds * 10;
+
+                    return (nanoseconds).toString() + '.' + tms.toString();
+                }
+            },
+            'microseconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time
+                           && max >= 1000 && max < 1000 * 1000;
+                },
+                convert: function (nanoseconds) {
+                    nanoseconds = Math.round(nanoseconds);
+
+                    let microseconds = Math.floor(nanoseconds / 1000);
+                    nanoseconds -= microseconds * 1000;
+
+                    nanoseconds = Math.round(nanoseconds / 10 );
+
+                    return microseconds.toString() + '.'
+                        + NETDATA.zeropad(nanoseconds);
+                }
+            },
+            'milliseconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time
+                           && max >= 1000 * 1000 && max < 1000 * 1000 * 1000;
+                },
+                convert: function (nanoseconds) {
+                    nanoseconds = Math.round(nanoseconds);
+
+                    let milliseconds = Math.floor(nanoseconds / 1000 / 1000);
+                    nanoseconds -= milliseconds * 1000 * 1000;
+
+                    nanoseconds = Math.round(nanoseconds / 1000 / 10);
+
+                    return milliseconds.toString() + '.'
+                        + NETDATA.zeropad(nanoseconds);
+                }
+            },
+            'seconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time
+                           && max >= 1000 * 1000 * 1000;
+                },
+                convert: function (nanoseconds) {
+                    nanoseconds = Math.round(nanoseconds);
+
+                    let seconds = Math.floor(nanoseconds / 1000 / 1000 / 1000);
+                    nanoseconds -= seconds * 1000 * 1000 * 1000;
+
+                    nanoseconds = Math.round(nanoseconds / 1000 / 1000 / 10);
+
+                    return seconds.toString() + '.'
+                        + NETDATA.zeropad(nanoseconds);
+                }
+            },
         }
     },
 
