@@ -774,6 +774,19 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 
 # -----------------------------------------------------------------------------
+# slabinfo.plugin
+
+AC_MSG_CHECKING([if slabinfo.plugin should be enabled])
+if test "${build_target}" == "linux"; then
+    enable_plugin_slabinfo="yes"
+else
+    enable_plugin_slabinfo="no"
+fi
+AC_MSG_RESULT([${enable_plugin_slabinfo}])
+AM_CONDITIONAL([ENABLE_PLUGIN_SLABINFO], [test "${enable_plugin_slabinfo}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # AWS Kinesis backend - libaws-cpp-sdk-kinesis, libaws-cpp-sdk-core, libssl, libcrypto, libcurl
 
 PKG_CHECK_MODULES(

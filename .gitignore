@@ -59,6 +59,9 @@ xenstat.plugin
 perf.plugin
 !perf.plugin/
 
+slabinfo.plugin
+!slabinfo.plugin/
+
 cgroup-network
 !cgroup-network/
 

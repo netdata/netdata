@@ -728,6 +728,7 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_CGROUP_NETWORK True)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
+    SET(ENABLE_PLUGIN_SLABINFO True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -737,6 +738,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
+    SET(ENABLE_PLUGIN_SLABINFO False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -746,6 +748,7 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_CGROUP_NETWORK False)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
+    SET(ENABLE_PLUGIN_SLABINFO False)
 
 ENDIF()
 
@@ -840,6 +843,20 @@ IF(ENABLE_PLUGIN_PERF)
     target_compile_options(perf.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "perf.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# slabinfo.plugin
+
+IF(ENABLE_PLUGIN_SLABINFO)
+    message(STATUS "slabinfo.plugin: enabled")
+    add_executable(slabinfo.plugin config.h ${SLABINFO_PLUGIN_FILES})
+    target_link_libraries (slabinfo.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(slabinfo.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(slabinfo.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "slabinfo.plugin: disabled")
 ENDIF()
 
 
