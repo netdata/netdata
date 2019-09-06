@@ -995,63 +995,88 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 }
 #endif
 
+/*
+ * ---------------------------------------------------------------------------------------------------------------------
+ * connection_allowed() - if there is an access list then check the connection matches a pattern.
+ *                        Numeric patterns are checked against the IP address first, only if they
+ *                        do not match is the hostname resolved (reverse-DNS) and checked. If the
+ *                        hostname matches then we perform forward DNS resolution to check the IP
+ *                        is really associated with the DNS record.
+ */
+int connection_allowed(struct sockaddr_storage *sadr, socklen_t addrlen, char *client_ip, size_t ipsize, 
+                       SIMPLE_PATTERN *access_list) {
+    char client_host[NI_MAXHOST];
+    client_host[NI_MAXHOST-1] = 0;
+    if(!access_list)
+        return 1;
+    if(simple_pattern_matches(access_list, client_ip))
+        return 1;
+    if(getnameinfo((struct sockaddr *)sadr, addrlen, client_host, (socklen_t)ipsize, 
+                   NULL, 0, NI_NAMEREQD) != 0) {
+        error("Incoming connection on '%s' does not match a numeric pattern, "
+              "and host could not be resolved", client_ip);
+        return 0;
+    }
+    if( !simple_pattern_matches(access_list, client_host)) {
+        error("Incoming connection on '%s' (%s) does not match allowed pattern",
+              client_ip, client_host);
+        return 0;
+    }
+    struct addrinfo *addr_infos = NULL;
+    if(getaddrinfo(client_host, NULL, NULL, &addr_infos)!=0) {
+        error("LISTENER: cannot validate hostname '%s' from '%s' by resolving it",
+              client_host, client_ip);
+        return 0;
+    }
+    struct addrinfo *scan = addr_infos;
+    int    validated = 0;
+    while(scan) {
+        char address[INET6_ADDRSTRLEN];
+        address[0] = 0;
+        switch(scan->ai_addr->sa_family) {
+            case AF_INET:
+                inet_ntop(AF_INET, &((struct sockaddr_in*)(scan->ai_addr))->sin_addr,
+                          address, INET6_ADDRSTRLEN);
+                break;
+            case AF_INET6:
+                inet_ntop(AF_INET6, &((struct sockaddr_in6*)(scan->ai_addr))->sin6_addr,
+                          address, INET6_ADDRSTRLEN);
+                break;
+        }
+        debug(D_LISTENER, "Incoming ip %s rev-resolved onto %s, validating against forward-resolution %s",
+              client_ip, client_host, address);
+        if(!strcmp(client_ip, address)) {
+            validated = 1;
+            break;
+        }
+        scan = scan->ai_next;
+    }
+    if(!validated)
+        error("LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS", client_ip, client_host);
+    if(addr_infos!=NULL)
+        freeaddrinfo(addr_infos);
+    return validated;
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // accept_socket() - accept a socket and store client IP and port
 
-int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, SIMPLE_PATTERN *access_list) {
+int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, 
+                  SIMPLE_PATTERN *access_list) {
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
 
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags);
     if (likely(nfd >= 0)) {
-        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize, 
+        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
             error("LISTENER: cannot getnameinfo() on received client connection.");
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
-        char client_host[NI_MAXHOST];
-        if(getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)ipsize, 
-                       NULL, 0, NI_NAMEREQD | NI_NUMERICSERV) != 0)
-            client_host[0] = 0;
-        else {
-            struct addrinfo *addr_infos = NULL;
-            if(getaddrinfo(client_host, NULL, NULL, &addr_infos)!=0) {
-                error("LISTENER: cannot validate hostname '%s' by resolving it",client_host);
-                client_host[0] = 0;
-            }
-            else {
-                struct addrinfo *scan = addr_infos;
-                int   validated = 0;
-                while(scan) {
-                    char address[INET6_ADDRSTRLEN];
-                    address[0] = 0;
-                    switch(scan->ai_addr->sa_family) {
-                        case AF_INET:
-                            inet_ntop(AF_INET, &((struct sockaddr_in*)(scan->ai_addr))->sin_addr, 
-                                      address, INET6_ADDRSTRLEN);
-                            break;
-                        case AF_INET6:
-                            inet_ntop(AF_INET6, &((struct sockaddr_in6*)(scan->ai_addr))->sin6_addr, 
-                                      address, INET6_ADDRSTRLEN);
-                            break;
-                    }
-                    debug(D_LISTENER, "Incoming ip %s rev-resolved onto %s, validating against forward-resolution %s",
-                          client_ip, client_host, address);
-                    if(!strcmp(client_ip, address)) {
-                        validated = 1;
-                        break;
-                    }
-                    scan = scan->ai_next;
-                }
-                if(!validated) {
-                    error("LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS", client_ip, client_host);
-                    client_host[0] = 0;
-                }
-            }
-            if(addr_infos!=NULL)
-                freeaddrinfo(addr_infos);
+        if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+            strncpy(client_ip, "localhost", ipsize);
+            client_ip[ipsize - 1] = '\0';
         }
 
 #ifdef __FreeBSD__
@@ -1087,24 +1112,13 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
-
-        if(access_list) {
-            if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
-                strncpy(client_ip, "localhost", ipsize);
-                client_ip[ipsize - 1] = '\0';
-            }
-
-            // Allow patterns to match against either the resolved hostname or the numeric ip address.
-            if(!simple_pattern_matches(access_list, client_ip) &&
-               (client_host[0]==0 || !simple_pattern_matches(access_list, client_host))) {
-                errno = 0;
-                debug(D_LISTENER, "Permission denied for client '%s' (%s), port '%s'", 
-                      client_ip, client_host, client_port);
-                error("DENIED ACCESS to client '%s'", client_ip);
-                close(nfd);
-                nfd = -1;
-                errno = EPERM;
-            }
+        if(!connection_allowed(&sadr, addrlen, client_ip, ipsize, access_list)) {
+            errno = 0;
+            debug(D_LISTENER, "Permission denied for client '%s', port '%s'", client_ip, client_port);
+            error("DENIED ACCESS to client '%s'", client_ip);
+            close(nfd);
+            nfd = -1;
+            errno = EPERM;
         }
     }
 #ifdef HAVE_ACCEPT4
