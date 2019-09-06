@@ -366,11 +366,10 @@ int main(int argc, char **argv) {
 	error_log_syslog = 0;
 
 	int update_every = 1;
-	int n = 0;
 
 	// Very simple options: only 1 for the time being
 	if (argc == 2) {
-		n = (int) str2l(argv[1]);
+		int n = (int) str2l(argv[1]);
 		if (n > 0) {
 			if (n >= UPDATE_EVERY_MAX) {
 				error("Invalid interval value: %s", argv[1]);
