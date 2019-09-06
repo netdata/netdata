@@ -252,7 +252,7 @@ unsigned int do_stats(int update_every, usec_t dt) {
 			// Memory Usage
 			printf("CHART %s.%s '' 'Memory Usage' 'B' '%s' '' line %d %d %s\n"
 				, CHART_TYPE
-				, "memory"
+				, "slabmemory"
 				, CHART_FAMILY
 				, CHART_PRIO
 				, update_every
@@ -265,7 +265,7 @@ unsigned int do_stats(int update_every, usec_t dt) {
 			// Slab active usage (filling)
 			printf("CHART %s.%s '' 'Object Filling' '%%' '%s' '' line %d %d %s\n"
 				, CHART_TYPE
-				, "filling"
+				, "slabfilling"
 				, CHART_FAMILY
 				, CHART_PRIO + 1
 				, update_every
@@ -279,7 +279,7 @@ unsigned int do_stats(int update_every, usec_t dt) {
 			// Memory waste
 			printf("CHART %s.%s '' 'Memory waste' 'B' '%s' '' line %d %d %s\n"
 				, CHART_TYPE
-				, "waste"
+				, "slabwaste"
 				, CHART_FAMILY
 				, CHART_PRIO + 2
 				, update_every
@@ -296,7 +296,7 @@ unsigned int do_stats(int update_every, usec_t dt) {
 		//
 		printf("BEGIN %s.%s\n"
 			, CHART_TYPE
-			, "memory"
+			, "slabmemory"
 		);
 		for (s = sactive; s; s = s->next) {
 			printf("SET %s = %lu\n"
@@ -311,7 +311,7 @@ unsigned int do_stats(int update_every, usec_t dt) {
 		//
 		printf("BEGIN %s.%s\n"
 			, CHART_TYPE
-			, "filling"
+			, "slabfilling"
 		);
 		for (s = sactive; s; s = s->next) {
 			printf("SET %s = %lu\n"
@@ -326,7 +326,7 @@ unsigned int do_stats(int update_every, usec_t dt) {
 		//
 		printf("BEGIN %s.%s\n"
 			, CHART_TYPE
-			, "waste"
+			, "slabwaste"
 		);
 		for (s = sactive; s; s = s->next) {
 			printf("SET %s = %lu\n"
