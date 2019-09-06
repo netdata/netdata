@@ -107,6 +107,7 @@ override_dh_fixperms:
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/apps.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
+	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/slabinfo.plugin
 	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
 
 	# Support script for configuration file management
