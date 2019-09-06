@@ -1,19 +1,19 @@
 # Getting started guide
 
-Thanks for installing Netdata! In this guide, we'll quickly walk you through the first steps you should take after
-getting Netdata installed.
+Thanks for trying Netdata! In this guide, we'll quickly walk you through the first steps you should take after getting
+Netdata installed.
 
-Netdata can collect thousands of metrics in real-time without any configuration, but there are a few things you can do,
-like extending the history, to make Netdata work best for your particular needs.
+Netdata can collect thousands of metrics in real-time without any configuration, but there are some valuable things to
+know to get the most of out Netdata based on your needs.
 
 > If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details,
-> including our one-liner script that works on almost all Linux distributions.
+> including our one-liner script, which automatically installs Netdata on almost all Linux distributions.
 
 ## Access the dashboard
 
 Open up your web browser of choice. If you installed Netdata on the same system you're using to open your browser,
 navigate to `http://localhost:19999/`. If you installed Netdata on a remote system, navigate to
-`http://SYSTEM-IP:19999/` after replacing `SYSTEM-IP` with the IP address of that system.
+`http://SYSTEM-IP:19999/`, replacing `SYSTEM-IP` with the IP address of that system.
 
 Hit `Enter`. Welcome to Netdata!
 
@@ -28,23 +28,24 @@ dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c
 
 ## Configuration basics
 
-Netdata primarily uses the `netdata.conf` for any custom configurations.
+Netdata primarily uses the `netdata.conf` for custom configurations.
 
 On most systems, you can find that file at `/etc/netdata/netdata.conf`.
 
 > Some operating systems will place your `netdata.conf` at `/opt/netdata/etc/netdata/netdata.conf`, so check there if
 > you find nothing at `/etc/netdata/netdata.conf`.
 
-To change an option in `netdata.conf`, change the number or text that after the equals sign. Remove the hash symbol
-(`#`) at the beginning of the line if there is one. If you leave the hash, Netdata will ignore your changes.
+The `netdata.conf` file is broken up into various sections, such as `[global]`, `[web]`, `[registry]`, and more.
 
-Once you save your changes, restart Netdata ([see here for details](#start-and-stop-netdata)) to load your new
-configuration.
+To change any option in `netdata.conf`, change the number or text after the equals sign. If there is a hash symbol (`#`)
+at the beginning of the line, remove it. Netdata ignores any lines with the hash, because they are **commented**.
+
+Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata)) to load your new configuration.
 
 **Next**:
 
 -   [Change how long Netdata stores metrics](#change-how-long-netdata-stores-metrics) by either increasing the `history`
-    or switching to the database engine.
+    option or switching to the database engine.
 -   Move Netdata's dashboard to a [different port](https://docs.netdata.cloud/web/server/) or enable TLS/HTTPS
     encryption.
 -   See all the `netdata.conf` options in our [daemon configuration documentation](../daemon/config/).
@@ -52,28 +53,28 @@ configuration.
 
 ## Collect data from more sources
 
-Netdata auto-detects sources for collecting data, such as database servers, web servers, and more, **when it starts**.
-To auto-detect and collect metrics from a service or application you just installed, you need to [restart
-Netdata](#start-and-stop-netdata).
+When Netdata **starts**, it auto-detects data sources, such as database servers, web servers, and more. To auto-detect
+and collect metrics from a service or application you just installed, you need to [restart
+Netdata](#start-stop-and-restart-netdata).
 
-> There is one exception: Containers and VMs are auto-detected forever when Netdata is running on the host level (as in
-> not in a container itself).
+> There is one exception: When Netdata is running on the host (as in not in a container itself), it will always
+> auto-detect containers and VMs.
 
-However, auto-detection only works if you configured the source correctly. If Netdata isn't collecting metrics from your
-service/application even after a restart, it's probably not configured correctly. Look at the [external plugin
+However, auto-detection only works if you configured the source correctly. If Netdata isn't collecting metrics after a
+restart, your service/application probably isn't configured correctly. Look at the [external plugin
 documentation](../collectors/plugins.d/) and find the appropriate module for your service/application. Those pages will
 contain more information about how to configure your service/application for auto-detection.
 
-Also, some modules, like `chrony`, are disabled by default and must be enabled manually for auto-detection to work.
+Some modules, like `chrony`, are disabled by default and must be enabled manually for auto-detection to work.
 
 Once Netdata detects a data valid source of data, it will continue trying to collect data from it. For example, if
-Netdata is collecting data from an Nginx web server, and you shut that server down, Netdata will keep looking for data
-and will collect new data as soon as you start the web server back up.
+Netdata is collecting data from an Nginx web server, and you shut Nginx down, Netdata will collect new data as soon as
+you start the web server back up—no restart necessary.
 
 ### Configuring plugins
 
-Even if Netdata auto-detects your service/application, you might want to configure how the plugin works, what data it's
-collecting, or how often it's collecting data.
+Even if Netdata auto-detects your service/application, you might want to configure what, or how often, Netdata is
+collecting data.
 
 Netdata uses **internal** and **external** plugins to collect data. Internal plugins run inside of Netdata itself, while
 external plugins are independent processes that send metrics to Netdata over pipes. There are also plugin
@@ -82,13 +83,13 @@ external plugins are independent processes that send metrics to Netdata over pip
 You can configure both internal and external plugins, along with the individual modules. There are many ways to do so:
 
 -   In `netdata.conf`, `[plugins]` section: Enable or disable internal or external plugins with `yes` or `no`.
--   In `netdata.conf`, `[plugin:XXX]` sections: Each plugin has a section for changing collection frequency or
-    passing options to the plugin.
+-   In `netdata.conf`, `[plugin:XXX]` sections: Each plugin has a section for changing collection frequency or passing
+    options to the plugin.
 -   In `.conf` files for each external plugin: For example, at `/etc/netdata/python.d.conf`.
 -   In `.conf` files for each module : For example, at `/etc/netdata/python.d/nginx.conf`.
 
-It's complex, so let's walk through an example of collecting data from an Nginx web server using the `nginx` module and
-the `python.d` plugin orchestrator.
+It's complex, so let's walk through an example of the various `.conf` files responsible for collecting data from an
+Nginx web server using the `nginx` module and the `python.d` plugin orchestrator.
 
 First, you can enable or disable the `python.d` plugin entirely in `netdata.conf`.
 
@@ -100,8 +101,8 @@ First, you can enable or disable the `python.d` plugin entirely in `netdata.conf
     python.d = no
 ```
 
-You can also configure the entire `python.d` external plugin via the `[plugin:python.d]` section in `netdata.conf` to
-change how often Netdata uses `python.d` to collect metrics:
+You can also configure the entire `python.d` external plugin via the `[plugin:python.d]` section in `netdata.conf`.
+Here, you can change how often Netdata uses `python.d` to collect metrics or pass other command options:
 
 ```conf
 [plugin:python.d]
@@ -109,15 +110,15 @@ change how often Netdata uses `python.d` to collect metrics:
     command options = 
 ```
 
-The `python.d` plugin has a separate configuration file for enabling and disabling modules. You can use the
-`edit-config` script to edit the file, or open it with your text editor of choice:
+The `python.d` plugin has a separate configuration file at `/etc/netdata/python.d.conf` for enabling and disabling
+modules. You can use the `edit-config` script to edit the file, or open it with your text editor of choice:
 
 ```bash
 sudo /etc/netdata/edit-config python.d.conf
 ```
 
-Finally, the `nginx` module has a configuration file in the `python.d` folder. Again, use `edit-config` or your
-editor of choice:
+Finally, the `nginx` module has a configuration file called `nginx.conf` in the `python.d` folder. Again, use
+`edit-config` or your editor of choice:
 
 ```bash
 sudo /etc/netdata/edit-config python.d/nginx.conf
@@ -125,8 +126,6 @@ sudo /etc/netdata/edit-config python.d/nginx.conf
 
 In the `nginx.conf` file, you'll find additional options. The default works in most situations, but you may need to make
 changes based on your particular Nginx setup.
-
-To configure other plugins and their respective modules, follow the same steps.
 
 **Next**:
 
@@ -147,14 +146,14 @@ Edit your `/etc/netdata/netdata.conf` file and set the following:
     enabled = no
 ```
 
-If you want to keep health monitoring enabled for the dashboard, but turn email notifications off, edit your
-`health_alarm_notify.conf` file with `edit-config`, or with your the text editor of your choice:
+If you want to keep health monitoring enabled, but turn email notifications off, edit your `health_alarm_notify.conf`
+file with `edit-config`, or with your the text editor of your choice:
 
 ```bash
 sudo /etc/netdata/edit-config health_alarm_notify.conf
 ```
 
-Find the `SEND_EMAIL="YES"` and change it to `SEND_EMAIL="NO"`.
+Find the `SEND_EMAIL="YES"` line and change it to `SEND_EMAIL="NO"`.
 
 **Next**:
 
@@ -165,11 +164,10 @@ Find the `SEND_EMAIL="YES"` and change it to `SEND_EMAIL="NO"`.
 
 By default, Netdata stores 1 hour of historical metrics and uses about 25MB of RAM.
 
-If that's not enough for you, Netdata is quite adaptable when it comes to long-term storage based on your system and
-your needs.
+If that's not enough for you, Netdata is quite adaptable to long-term storage of your system's metrics.
 
-There are two ways to increase the depth of historical metrics quickly: increase the `history` value for the round-robin
-that's enabled by default with every new Netdata installation, or switch to the database engine.
+There are two quick ways to increase the depth of historical metrics: increase the `history` value for the round-robin
+that's enabled by default, or switch to the database engine.
 
 We have a tutorial that walks you through both options: [**Changing how long Netdata stores
 metrics**](tutorial/longer-metrics-storage.md).
@@ -187,34 +185,36 @@ If you have Netdata installed on multiple systems, you can have them all appear 
 corner of the dashboard.
 
 To show all your servers in that menu, you need to [register for or sign in](netdata-cloud/signing-in.md) to [Netdata
-Cloud](netdata-cloud/) from each system. They will then all appear in the My nodes menu.
+Cloud](netdata-cloud/) from each system. Each system will then appear in the My nodes menu, quick you can use to quickly
+navigate between various systems.
 
 ![Animated GIF of the My Nodes menu in
 action](https://user-images.githubusercontent.com/1153921/64389938-9aa7b800-cff9-11e9-9653-a77e791811ad.gif)
 
 Whenever you pan, zoom, highlight, select, or pause a chart, Netdata will synchronize those settings with any other
-agent you visit via the My nodes menu. Even your scroll position is synchronized, so you'll see the same charts
-and respective data on another system.
+agent you visit via the My nodes menu. Even your scroll position is synchronized, so you'll see the same charts and
+respective data for easy comparisons or root cause analysis.
 
-You can now track performance anomalies across your entire infrastructure without ever leaving Netdata!
+You can now seamlessly track performance anomalies across your entire infrastructure!
 
 **Next**:
 
--   Read up on how the [Netdata Cloud registry works](../registry/) and what kind of data it stores and sends to your
+-   Read up on how the [Netdata Cloud registry works](../registry/), and what kind of data it stores and sends to your
     web browser.
 -   Familiarize yourself with the [Nodes View](netdata-cloud/nodes-view.md)
 
-## Start and stop Netdata
+## Start, stop, and restart Netdata
 
-When you install Netdata, it's configured to start at boot and stop and restart/shutdown. You shouldn't need to start or
-stop Netdata manually, but it's still useful to know how to do.
+When you install Netdata, it's configured to start at boot, and stop and restart/shutdown. You shouldn't need to start
+or stop Netdata manually, but you will probably need to restart Netdata at some point.
 
 -   To **start** Netdata, open a terminal and run `service netdata start`.
 -   To **stop** Netdata, run `service netdata stop`.
 -   To **restart** Netdata, run `service netdata restart`.
 
-The `service` command is a wrapper script that uses the best method of starting or stopping Netdata based on your
-system. But, if either of those commands fail, try using the equivalent commands for `systemd` and `init.d` 
+The `service` command is a wrapper script that tries to use your system's preferred method of starting or stopping
+Netdata based on your system. But, if either of those commands fail, try using the equivalent commands for `systemd` and
+`init.d` 
 
 -   **systemd**: `systemctl start netdata`, `systemctl stop netdata`, `systemctl restart netdata`
 -   **init.d**: `/etc/init.d/netdata start`, `/etc/init.d/netdata stop`, `/etc/init.d/netdata restart`
