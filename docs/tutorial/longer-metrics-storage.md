@@ -52,9 +52,8 @@ you'd like to store.
 You should base this number on two things: How much history you need for your use case, and how much RAM you're willing
 to dedicate to Netdata.
 
-> Take care when you change the `history` option on production systems. Netdata is configured to stop
-> its process if your system starts running out of RAM, but you can never be too careful. Out of memory situations are
-> very bad.
+> Take care when you change the `history` option on production systems. Netdata is configured to stop its process if
+> your system starts running out of RAM, but you can never be too careful. Out of memory situations are very bad.
 
 How much RAM will a longer history use? Let's use a little math.
 
@@ -84,7 +83,8 @@ With that formula, you can calculate the RAM usage for much larger history setti
 4 bytes * 86400 seconds * 1,000 metrics = 345600000 bytes = 345.6MB RAM
 ```
 
-To see how many metrics your system collects, and how much RAM Netdata is currently using, visit the dashboard and look at the bottom-right corner of the interface:
+To see how many metrics your system collects, and how much RAM Netdata is currently using, visit the dashboard and look
+at the bottom-right corner of the interface:
 
 >>>>>> SCREENSHOT GOES HERE
 
@@ -93,7 +93,9 @@ engine**, which uses both RAM and your system's disk to store more historical me
 
 ## Using the database engine
 
-The new database engine, released in v1.15 and undergoing constant improvement, uses both RAM and disk space for long-term metrics storage. Unlike the round-robin database, the database engine allows you to store a much larger dataset than your system's available RAM.
+The new database engine, released in v1.15 and undergoing constant improvement, uses both RAM and disk space for
+long-term metrics storage. Unlike the round-robin database, the database engine allows you to store a much larger
+dataset than your system's available RAM.
 
 The database engine will eventually become the default method of retaining metrics, but until then, you can switch to
 the database engine by changing a single option.
@@ -105,14 +107,15 @@ To switch to the database engine, edit your `netdata.conf` file, and change the 
     memory mode = dbengine
 ```
 
-Next, restart Netdata. On Linux systems, we recommend running `sudo service netdata restart`. You're now using the database engine!
+Next, restart Netdata. On Linux systems, we recommend running `sudo service netdata restart`. You're now using the
+database engine!
 
 > Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
 > we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
 
-What makes the database engine efficient? It's a traditional database, but data is split between RAM and disk. The
-database engine caches and indexes data on RAM to keep memory usage low, and then compresses older metrics onto disk for
-long-term storage.
+What makes the database engine efficient? While it's structured like a traditional database, the database engine splits
+data between RAM and disk. The database engine caches and indexes data on RAM to keep memory usage low, and then
+compresses older metrics onto disk for long-term storage.
 
 When the Netdata dashboard queries for historical metrics, the database engine will use its cache, stored in RAM, to
 return relevant metrics for visualization in charts.
@@ -130,7 +133,8 @@ size` and `dbengine disk space`.
 `dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
 metrics.
 
-Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000 metrics every second.
+Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000
+metrics every second.
 
 If you'd like to change these options, read more about the [database engine's memory
 footprint](../../database/engine/README.md#memory-requirements).
@@ -146,4 +150,5 @@ probably want to see it in action!
 For more information about how to pan charts to view historical metrics, see our documentation on [using
 charts](../../web/README.md#using-charts).
 
-And if you'd now like to reduce Netdata's resource usage, view our [performance guide](../Performance.md) for our best practices on optimization.
+And if you'd now like to reduce Netdata's resource usage, view our [performance guide](../Performance.md) for our best
+practices on optimization.
