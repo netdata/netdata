@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <fcntl.h>
+// For PAGE_SIZE
 #include <sys/user.h>
+
 #include "libnetdata/libnetdata.h"
 #include "daemon/common.h"
 
@@ -208,7 +209,7 @@ struct slabinfo *read_file_slabinfo() {
 
 		uint32_t memperslab = s->pages_per_slab * SLAB_PAGE_SIZE;
 		// Internal fragmentation: loss per slab, due to objects not being a multiple of pagesize
-		uint32_t lossperslab = memperslab - s->obj_per_slab * s->obj_size;
+		//uint32_t lossperslab = memperslab - s->obj_per_slab * s->obj_size;
 
 		// Total usage = slabs * pages per slab * page size
 		s->mem_usage = s->data_num_slabs * memperslab;
@@ -237,7 +238,7 @@ struct slabinfo *read_file_slabinfo() {
 
 
 
-unsigned int do_stats(int update_every, usec_t dt) {
+unsigned int do_slab_stats(int update_every, usec_t dt) {
 
 	static unsigned int loops = 0;
 	struct slabinfo *sactive = NULL, *s = NULL;
@@ -314,7 +315,7 @@ unsigned int do_stats(int update_every, usec_t dt) {
 			, "slabfilling"
 		);
 		for (s = sactive; s; s = s->next) {
-			printf("SET %s = %lu\n"
+			printf("SET %s = %u\n"
 				, s->name
 				, s->obj_filling
 			);
@@ -357,7 +358,6 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
-	pid_t pid = 0;
 
 	program_name = argv[0];
 	program_version = "0.1";
