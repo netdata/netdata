@@ -1114,8 +1114,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         }
         if(!connection_allowed(&sadr, addrlen, client_ip, ipsize, access_list)) {
             errno = 0;
-            debug(D_LISTENER, "Permission denied for client '%s', port '%s'", client_ip, client_port);
-            error("DENIED ACCESS to client '%s'", client_ip);
+            error("Permission denied for client '%s', port '%s'", client_ip, client_port);
             close(nfd);
             nfd = -1;
             errno = EPERM;
