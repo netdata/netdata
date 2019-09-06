@@ -5,6 +5,7 @@
 ## Prerequisites
 
 1.  install `xen-dom0-libs-devel` and `yajl-devel` using the package manager of your system.
+    Note: On Cent-OS systems you will need `centos-release-xen` repository and the required package for xen is `xen-devel`
 
 2.  re-install Netdata from source. The installer will detect that the required libraries are now available and will also build xenstat.plugin.
 
