@@ -1095,8 +1095,8 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             }
 
             // Allow patterns to match against either the resolved hostname or the numeric ip address.
-            if(unlikely(!simple_pattern_matches(access_list, client_ip) && 
-                        (client_host[0]==0 || !simple_pattern_matches(access_list, client_host)))) {
+            if(!simple_pattern_matches(access_list, client_ip) &&
+               (client_host[0]==0 || !simple_pattern_matches(access_list, client_host))) {
                 errno = 0;
                 debug(D_LISTENER, "Permission denied for client '%s' (%s), port '%s'", 
                       client_ip, client_host, client_port);
