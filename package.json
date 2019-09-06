@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "coffee-script": "^1.12.7",
+    "coffeescript": "^2.4.1",
     "dictionary-en-us": "^2.0.0",
     "gaze": "^1.1.2",
     "grunt": "^1.0.1",
