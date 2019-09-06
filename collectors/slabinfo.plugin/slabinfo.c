@@ -78,29 +78,29 @@ int running = 1;
 // Implementation choices:
 // - Iterates through a linked list of kmem_cache.
 // - Name is a char* from struct kmem_cache (mm/slab.h).
-// - Using 32chars for max name (max found is 24, with following cmd)
+// - max name size found is 24:
 //     grep -roP 'kmem_cache_create\(".+"'| awk '{split($0,a,"\""); print a[2],length(a[2]); }' | sort -k2 -n
-// - Using uint32 everywhere, as types fits and allows to use standard helpers
+// - Using uint64 everywhere, as types fits and allows to use standard helpers
 
 struct slabinfo {
 	// procfile fields
 	const char *name;
-	uint32_t active_objs;
-	uint32_t num_objs;
-	uint32_t obj_size;
-	uint32_t obj_per_slab;
-	uint32_t pages_per_slab;
-	uint32_t tune_limit;
-	uint32_t tune_batchcnt;
-	uint32_t tune_shared_factor;
-	uint32_t data_active_slabs;
-	uint32_t data_num_slabs;
-	uint32_t data_shared_avail;
+	uint64_t active_objs;
+	uint64_t num_objs;
+	uint64_t obj_size;
+	uint64_t obj_per_slab;
+	uint64_t pages_per_slab;
+	uint64_t tune_limit;
+	uint64_t tune_batchcnt;
+	uint64_t tune_shared_factor;
+	uint64_t data_active_slabs;
+	uint64_t data_num_slabs;
+	uint64_t data_shared_avail;
 
 	// Calculated fields
 	uint64_t mem_usage;
 	uint64_t mem_waste;
-	uint32_t obj_filling;
+	uint8_t  obj_filling;
 
 	uint32_t hash;
 	struct slabinfo *next;
@@ -118,7 +118,7 @@ static struct slabinfo *get_slabstruct(const char *name) {
 
 	// Search it, from the next to the end
 	for (s = slabinfo_next; s; s = s->next) {
-		if (hash = s->hash && !strcmp(name, s->name)) {
+		if ((hash = s->hash) && !strcmp(name, s->name)) {
 			debug(D_PLUGIN_SLABINFO, "<-- Found existing slabstruct after %s", slabinfo_last_used->name);
 			// Prepare the next run
 			slabinfo_next = s->next;
@@ -183,36 +183,36 @@ struct slabinfo *read_file_slabinfo() {
 	// Iterate on all lines to populate / update the slabinfo struct
 	size_t lines = procfile_lines(ff), l;
 
-	debug(D_PLUGIN_SLABINFO, "   Read %d lines from procfile", lines);
+	debug(D_PLUGIN_SLABINFO, "   Read %lu lines from procfile", lines);
 	for(l = 2; l < lines; l++) {
 		if (unlikely(procfile_linewords(ff, l) < 14)) {
-			debug(D_PLUGIN_SLABINFO, "    Line %d has only %d words, skipping", l, procfile_linewords(ff,l));
+			debug(D_PLUGIN_SLABINFO, "    Line %lu has only %lu words, skipping", l, procfile_linewords(ff,l));
 			continue;
 		}
 
 		char *name = procfile_lineword(ff, l, 0);
 		struct slabinfo *s = get_slabstruct(name);
 
-		s->active_objs    = str2uint32_t(procfile_lineword(ff, l, 1));
-		s->num_objs       = str2uint32_t(procfile_lineword(ff, l, 2));
-		s->obj_size       = str2uint32_t(procfile_lineword(ff, l, 3));
-		s->obj_per_slab   = str2uint32_t(procfile_lineword(ff, l, 4));
-		s->pages_per_slab = str2uint32_t(procfile_lineword(ff, l, 5));
+		s->active_objs    = str2uint64_t(procfile_lineword(ff, l, 1));
+		s->num_objs       = str2uint64_t(procfile_lineword(ff, l, 2));
+		s->obj_size       = str2uint64_t(procfile_lineword(ff, l, 3));
+		s->obj_per_slab   = str2uint64_t(procfile_lineword(ff, l, 4));
+		s->pages_per_slab = str2uint64_t(procfile_lineword(ff, l, 5));
 
-		s->tune_limit     = str2uint32_t(procfile_lineword(ff, l, 7));
-		s->tune_batchcnt  = str2uint32_t(procfile_lineword(ff, l, 8));
-		s->tune_shared_factor = str2uint32_t(procfile_lineword(ff, l, 9));
+		s->tune_limit     = str2uint64_t(procfile_lineword(ff, l, 7));
+		s->tune_batchcnt  = str2uint64_t(procfile_lineword(ff, l, 8));
+		s->tune_shared_factor = str2uint64_t(procfile_lineword(ff, l, 9));
 
-		s->data_active_slabs = str2uint32_t(procfile_lineword(ff, l, 11));
-		s->data_num_slabs    = str2uint32_t(procfile_lineword(ff, l, 12));
-		s->data_shared_avail = str2uint32_t(procfile_lineword(ff, l, 13));
+		s->data_active_slabs = str2uint64_t(procfile_lineword(ff, l, 11));
+		s->data_num_slabs    = str2uint64_t(procfile_lineword(ff, l, 12));
+		s->data_shared_avail = str2uint64_t(procfile_lineword(ff, l, 13));
 
 		uint32_t memperslab = s->pages_per_slab * SLAB_PAGE_SIZE;
 		// Internal fragmentation: loss per slab, due to objects not being a multiple of pagesize
 		//uint32_t lossperslab = memperslab - s->obj_per_slab * s->obj_size;
 
 		// Total usage = slabs * pages per slab * page size
-		s->mem_usage = (uint64_t)s->data_num_slabs * (uint64_t)memperslab;
+		s->mem_usage = (uint64_t)(s->data_num_slabs * memperslab);
 
 		// Wasted memory (filling): slabs allocated but not filled: sum total slab - sum total objects
 		s->mem_waste = s->mem_usage - (uint64_t)(s->active_objs * s->obj_size);
@@ -226,7 +226,7 @@ struct slabinfo *read_file_slabinfo() {
 		else
 			s->obj_filling = 0;
 
-		debug(D_PLUGIN_SLABINFO, "    Updated slab %s: %lu %lu %lu %lu %lu / %lu %lu %lu / %lu %lu %lu / %lu %lu %lu",
+		debug(D_PLUGIN_SLABINFO, "    Updated slab %s: %lu %lu %lu %lu %lu / %lu %lu %lu / %lu %lu %lu / %lu %lu %hhu",
 			name, s->active_objs, s->num_objs, s->obj_size, s->obj_per_slab, s->pages_per_slab,
 			s->tune_limit, s->tune_batchcnt, s->tune_shared_factor,
 			s->data_active_slabs, s->data_num_slabs, s->data_shared_avail,
@@ -238,7 +238,7 @@ struct slabinfo *read_file_slabinfo() {
 
 
 
-unsigned int do_slab_stats(int update_every, usec_t dt) {
+unsigned int do_slab_stats(int update_every) {
 
 	static unsigned int loops = 0;
 	struct slabinfo *sactive = NULL, *s = NULL;
@@ -383,7 +383,7 @@ int main(int argc, char **argv) {
 	}
 
 	// Call the main function. Time drift to be added
-	do_slab_stats(update_every, 0);
+	do_slab_stats(update_every);
 
 	return 0;
 }
