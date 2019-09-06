@@ -1042,9 +1042,8 @@ void free_page_cache(struct rrdengine_instance *ctx)
         /* Find first page in range */
         Index = (Word_t) 0;
         PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
-        if (likely(NULL != PValue)) {
-            descr = *PValue;
-        }
+        descr = unlikely(NULL == PValue) ? NULL : *PValue;
+
         while (descr != NULL) {
             /* Iterate all page descriptors of this metric */
 
