@@ -4,12 +4,19 @@
 
 **Merged pull requests:**
 
+- netdata/packaging: work around redhat complaining on build-id binary [\#6792](https://github.com/netdata/netdata/pull/6792) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging: fix changelog generation failing the build [\#6778](https://github.com/netdata/netdata/pull/6778) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/packaging: override control file for debian/buster [\#6777](https://github.com/netdata/netdata/pull/6777) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - \(Documentation\) fix pfsense instructions and links [\#6768](https://github.com/netdata/netdata/pull/6768) ([Fohdeesha](https://github.com/Fohdeesha))
 - netdata/packaging: Trigger stable package generation upon release process [\#6766](https://github.com/netdata/netdata/pull/6766) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - update cache hashes for js and css [\#6756](https://github.com/netdata/netdata/pull/6756) ([jacekkolasa](https://github.com/jacekkolasa))
+- \[libnetdata/thread\] Set thread name from tag [\#6745](https://github.com/netdata/netdata/pull/6745) ([Saruspete](https://github.com/Saruspete))
 - Stop configure.ac from linking against dbengine and https libraries w… [\#6658](https://github.com/netdata/netdata/pull/6658) ([mfundul](https://github.com/mfundul))
+- Add high level explanation of dashboard contents [\#6648](https://github.com/netdata/netdata/pull/6648) ([joelhans](https://github.com/joelhans))
 - Fix clear notification missing [\#6638](https://github.com/netdata/netdata/pull/6638) ([thiagoftsm](https://github.com/thiagoftsm))
+- dash.html [\#6603](https://github.com/netdata/netdata/pull/6603) ([tnyeanderson](https://github.com/tnyeanderson))
 - HTTP response message [\#6595](https://github.com/netdata/netdata/pull/6595) ([thiagoftsm](https://github.com/thiagoftsm))
+- Expand dashboard auto-scaling and convertible units [\#5920](https://github.com/netdata/netdata/pull/5920) ([qingkunl](https://github.com/qingkunl))
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
