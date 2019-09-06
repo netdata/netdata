@@ -38,7 +38,7 @@ On most systems, you can find that file at `/etc/netdata/netdata.conf`.
 The `netdata.conf` file is broken up into various sections, such as `[global]`, `[web]`, `[registry]`, and more.
 
 To change any option in `netdata.conf`, change the number or text after the equals sign. If there is a hash symbol (`#`)
-at the beginning of the line, remove it. Netdata ignores any lines with the hash, because they are **commented**.
+at the beginning of the line, remove it to **uncomment** it. Netdata ignores any lines with the hash because they are **commented**.
 
 Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata)) to load your new configuration.
 
@@ -62,12 +62,12 @@ Netdata](#start-stop-and-restart-netdata).
 
 However, auto-detection only works if you configured the source correctly. If Netdata isn't collecting metrics after a
 restart, your service/application probably isn't configured correctly. Look at the [external plugin
-documentation](../collectors/plugins.d/) and find the appropriate module for your service/application. Those pages will
+documentation](../collectors/plugins.d/) to find the appropriate module for your service/application. Those pages will
 contain more information about how to configure your service/application for auto-detection.
 
 Some modules, like `chrony`, are disabled by default and must be enabled manually for auto-detection to work.
 
-Once Netdata detects a data valid source of data, it will continue trying to collect data from it. For example, if
+Once Netdata detects a valid source of data, it will continue trying to collect data from it. For example, if
 Netdata is collecting data from an Nginx web server, and you shut Nginx down, Netdata will collect new data as soon as
 you start the web server back up—no restart necessary.
 
@@ -185,8 +185,7 @@ If you have Netdata installed on multiple systems, you can have them all appear 
 corner of the dashboard.
 
 To show all your servers in that menu, you need to [register for or sign in](netdata-cloud/signing-in.md) to [Netdata
-Cloud](netdata-cloud/) from each system. Each system will then appear in the My nodes menu, quick you can use to quickly
-navigate between various systems.
+Cloud](netdata-cloud/) from each system. Each system will then appear in the **My nodes** menu, which you can use to navigate between your systems quickly.
 
 ![Animated GIF of the My Nodes menu in
 action](https://user-images.githubusercontent.com/1153921/64389938-9aa7b800-cff9-11e9-9653-a77e791811ad.gif)
@@ -213,8 +212,8 @@ or stop Netdata manually, but you will probably need to restart Netdata at some 
 -   To **restart** Netdata, run `service netdata restart`.
 
 The `service` command is a wrapper script that tries to use your system's preferred method of starting or stopping
-Netdata based on your system. But, if either of those commands fail, try using the equivalent commands for `systemd` and
-`init.d` 
+Netdata based on your system. But, if either of those commands fails, try using the equivalent commands for `systemd`
+and `init.d`:
 
 -   **systemd**: `systemctl start netdata`, `systemctl stop netdata`, `systemctl restart netdata`
 -   **init.d**: `/etc/init.d/netdata start`, `/etc/init.d/netdata stop`, `/etc/init.d/netdata restart`
