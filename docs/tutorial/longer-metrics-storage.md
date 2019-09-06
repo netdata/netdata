@@ -1,19 +1,19 @@
-# Changing how long Netdata stores metrics
+# Change how long Netdata stores metrics
 
 Netdata helps you collect thousands of system and application metrics every second, but what about storing them for the
 long term?
 
-A lot of people think Netdata can only store about an hour's worth of real-time metrics, but that's just the default
-configuration. When it comes to long-term metrics storage, Netdata is quite capable.
+Many people think Netdata can only store about an hour's worth of real-time metrics, but that's just the default
+configuration. 
 
-By configuring Netdata properly, you can store days, months, or even _years_ of per-second metrics without having to
-rely on a [backend](../../backends/).
+With the right settings, Netdata is quite capable of efficiently storing hours or days worth of historical, per-second
+metrics without having to rely on a [backend](../../backends/), although that's also an option for more advanced users.
 
-This tutorial gives two options for configuring Netdata to store metrics longer. First, you can configure the
-round-robin database. And second, you can switch to the _extremely efficient_ database engine.
+This tutorial gives two options for configuring Netdata to store more metrics. First, you can configure the round-robin
+database. And second, you can switch to the _extremely efficient_ database engine.
 
-We recommend the [database engine](#using-the-database-engine), as it will soon be the default database, but the choice
-is yours.
+We recommend the [database engine](#using-the-database-engine), as it will soon be the default configuration, but the
+choice is yours.
 
 Let's get started.
 
@@ -29,7 +29,7 @@ By default, Netdata uses a round-robin database to store 1 hour of per-second me
 
 One hour has 3,600 seconds, hence the `3600` value!
 
-To make Netdata store more metrics, you can increase `history` to the number of seconds you'd like to store:
+To increase your historical metrics, you can increase `history` to the number of seconds you'd like to store:
 
 ```conf
 [global]
@@ -41,34 +41,37 @@ To make Netdata store more metrics, you can increase `history` to the number of 
     history = 86400
 ```
 
-And so on. When using the default database, the only restriction on historical metrics is how much RAM you're willing to
-dedicate to Netdata.
-
-> A word of warning: Take care when you change these the `history` value, especially on production systems. Netdata is
-> configured to stop its process if your system starts running out of RAM, but you can never be too careful. Out of
-> memory situations are very bad.
+And so on. 
 
 To increase the `history` option, you need to edit your `netdata.conf` file. In most installations, you'll find it at
-`/etc/netdata/netdata.conf`, but some operating systems place it at `/opt/netdata/etc/netdata/netdata.conf`. Use
-`/etc/netdata/edit-config netdata.conf` or your favorite text editor to and replace the `history` setting with the
-number of seconds you'd like to store.
+`/etc/netdata/netdata.conf`, but some operating systems place it at `/opt/netdata/etc/netdata/netdata.conf`. 
 
-How much RAM will a longer history use? Well, let's use a little math.
+Use `/etc/netdata/edit-config netdata.conf`, or your favorite text editor, to replace `3600` with the number of seconds
+you'd like to store.
 
-The default database needs 4 bytes for every value. If Netdata collects metrics every second, that's 4 bytes, per
-second, per metric.
+You should base this number on two things: How much history you need for your use case, and how much RAM you're willing
+to dedicate to Netdata.
+
+> Take care when you change the `history` option on production systems. Netdata is configured to stop
+> its process if your system starts running out of RAM, but you can never be too careful. Out of memory situations are
+> very bad.
+
+How much RAM will a longer history use? Let's use a little math.
+
+The round-robin database needs 4 bytes for every value Netdata collects. If Netdata collects metrics every second,
+that's 4 bytes, per second, per metric.
 
 ```text
 4 bytes * X seconds * Y metrics = RAM usage in bytes
 ```
 
-Here's how that works with the default configuration, assuming Netdata is collecting 1,000 metrics per second:
+Let's assume your system collects 1,000 metrics per second.
 
 ```text
 4 bytes * 3600 seconds * 1,000 metrics = 14400000 bytes = 14.4MB RAM
 ```
 
-With that formula, you can calculate the RAM usage for any system and configuration.
+With that formula, you can calculate the RAM usage for much larger history settings.
 
 ```conf
 # 2 hours at 1,000 metrics per second
@@ -81,17 +84,16 @@ With that formula, you can calculate the RAM usage for any system and configurat
 4 bytes * 86400 seconds * 1,000 metrics = 345600000 bytes = 345.6MB RAM
 ```
 
-Plug in the number of metrics from your system, and the history you'd like to store, to see the exact RAM usage for any
-duration of stored metrics.
+To see how many metrics your system collects, and how much RAM Netdata is currently using, visit the dashboard and look at the bottom-right corner of the interface:
 
-That's Now that you understand how to reconfigure and extend your `history` value, let's talk about the new **database
-engine**, which uses both RAM and your system's disk to store a ton of historical metrics with a minimal footprint.
+>>>>>> SCREENSHOT GOES HERE
+
+Now that you understand how to reconfigure and extend your `history` value, let's move on to the new **database
+engine**, which uses both RAM and your system's disk to store more historical metrics with a minimal footprint.
 
 ## Using the database engine
 
-The new database engine, released in v1.15 and undergoing constant improvement, uses both RAM and disk space to compress
-metrics efficiently. It allows you to store a much larger dataset than your system's available RAM, which means it
-solves the primary limitation of the default database.
+The new database engine, released in v1.15 and undergoing constant improvement, uses both RAM and disk space for long-term metrics storage. Unlike the round-robin database, the database engine allows you to store a much larger dataset than your system's available RAM.
 
 The database engine will eventually become the default method of retaining metrics, but until then, you can switch to
 the database engine by changing a single option.
@@ -103,13 +105,13 @@ To switch to the database engine, edit your `netdata.conf` file, and change the 
     memory mode = dbengine
 ```
 
-Restart Netdata, and you'll be using the database engine!
+Next, restart Netdata. On Linux systems, we recommend running `sudo service netdata restart`. You're now using the database engine!
 
-> Learn more about how we implemented the database engine and our vision for its future on our blog: [_How and why we're
-> bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
+> Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
+> we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
 
-What makes the database engine efficient? It's a traditional database split between RAM and disk. The database engine
-caches and indexes data on RAM to keep memory usage low, and then compresses older metrics and saves them to disk for
+What makes the database engine efficient? It's a traditional database, but data is split between RAM and disk. The
+database engine caches and indexes data on RAM to keep memory usage low, and then compresses older metrics onto disk for
 long-term storage.
 
 When the Netdata dashboard queries for historical metrics, the database engine will use its cache, stored in RAM, to
@@ -128,7 +130,9 @@ size` and `dbengine disk space`.
 `dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
 metrics.
 
-If you'd like to change these options from their default, read more about the [database engine's memory
+Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000 metrics every second.
+
+If you'd like to change these options, read more about the [database engine's memory
 footprint](../../database/engine/README.md#memory-requirements).
 
 With the database engine active, you can even back up your `/var/cache/netdata/dbengine/` to another location for
@@ -142,5 +146,4 @@ probably want to see it in action!
 For more information about how to pan charts to view historical metrics, see our documentation on [using
 charts](../../web/README.md#using-charts).
 
-And if Netdata is now using more resources than you'd like, view our [performance guide](../Performance.md) for details
-on how to optimize your installation.
+And if you'd now like to reduce Netdata's resource usage, view our [performance guide](../Performance.md) for our best practices on optimization.
