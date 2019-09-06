@@ -117,7 +117,11 @@ error_after_posix_spawn_file_actions_init:
     if (posix_spawn_file_actions_destroy(&fa))
         error("posix_spawn_file_actions_destroy");
 error_after_pipe:
-    fclose(fp);
+    if (fp)
+        fclose(fp);
+    else
+        close(pipefd[PIPE_READ]);
+
     close(pipefd[PIPE_WRITE]);
     return NULL;
 }
