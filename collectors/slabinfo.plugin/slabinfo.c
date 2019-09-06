@@ -212,10 +212,10 @@ struct slabinfo *read_file_slabinfo() {
 		//uint32_t lossperslab = memperslab - s->obj_per_slab * s->obj_size;
 
 		// Total usage = slabs * pages per slab * page size
-		s->mem_usage = s->data_num_slabs * memperslab;
+		s->mem_usage = (uint64_t)s->data_num_slabs * (uint64_t)memperslab;
 
 		// Wasted memory (filling): slabs allocated but not filled: sum total slab - sum total objects
-		s->mem_waste = s->mem_usage - s->active_objs * s->obj_size;
+		s->mem_waste = s->mem_usage - (uint64_t)(s->active_objs * s->obj_size);
 		//if (s->data_num_slabs > 1)
 		//	s->mem_waste += s->data_num_slabs * lossperslab;
 
