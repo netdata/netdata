@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// For CentOS 6 support
+#include <stdint.h>
 // For PAGE_SIZE
 #include <sys/user.h>
 
