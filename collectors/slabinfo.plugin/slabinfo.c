@@ -26,7 +26,7 @@ void netdata_cleanup_and_exit(int ret) {
 	exit(ret);
 }
 
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
+void send_statistics(const char *action, const char *action_result, const char *action_data) {
 	(void) action;
 	(void) action_result;
 	(void) action_data;
@@ -57,23 +57,23 @@ int running = 1;
 
 // Slabinfo format :
 // format 2.1 Was provided by 57ed3eda977a215f054102b460ab0eb5d8d112e6 (2.6.24-rc6) as:
-// seq_puts(m, "# name			<active_objs> <num_objs> <objsize> <objperslab> <pagesperslab>");
+// seq_puts(m, "# name  <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab>");
 // seq_puts(m, " : tunables <limit> <batchcount> <sharedfactor>");
 // seq_puts(m, " : slabdata <active_slabs> <num_slabs> <sharedavail>");
 //
 // With max values:
 // seq_printf(m, "%-17s %6lu %6lu %6u %4u %4d",
-//	cache_name(s), sinfo.active_objs, sinfo.num_objs, s->size, sinfo.objects_per_slab, (1 << sinfo.cache_order));
+//   cache_name(s), sinfo.active_objs, sinfo.num_objs, s->size, sinfo.objects_per_slab, (1 << sinfo.cache_order));
 // seq_printf(m, " : tunables %4u %4u %4u",
-//	sinfo.limit, sinfo.batchcount, sinfo.shared);
+//   sinfo.limit, sinfo.batchcount, sinfo.shared);
 // seq_printf(m, " : slabdata %6lu %6lu %6lu",
-//	sinfo.active_slabs, sinfo.num_slabs, sinfo.shared_avail);
+//   sinfo.active_slabs, sinfo.num_slabs, sinfo.shared_avail);
 //
 // If CONFIG_DEBUG_SLAB is set, it will also add columns from slabinfo_show_stats (for SLAB only):
 // seq_printf(m, " : globalstat %7lu %6lu %5lu %4lu %4lu %4lu %4lu %4lu %4lu",
-//	  allocs, high, grown, reaped, errors, max_freeable, node_allocs, node_frees, overflows);
+//   allocs, high, grown, reaped, errors, max_freeable, node_allocs, node_frees, overflows);
 // seq_printf(m, " : cpustat %6lu %6lu %6lu %6lu",
-//	   allochit, allocmiss, freehit, freemiss);
+//   allochit, allocmiss, freehit, freemiss);
 //
 // Implementation choices:
 // - Iterates through a linked list of kmem_cache.
@@ -244,7 +244,7 @@ unsigned int do_slab_stats(int update_every) {
 	struct slabinfo *sactive = NULL, *s = NULL;
 
 	// Main processing loop
-	while ( running ) {
+	while (running) {
 
 		sactive = read_file_slabinfo();
 
