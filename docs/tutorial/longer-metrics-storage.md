@@ -41,10 +41,20 @@ To increase your historical metrics, you can increase `history` to the number of
     history = 86400
 ```
 
-And so on. 
+And so on.
 
-To increase the `history` option, you need to edit your `netdata.conf` file. In most installations, you'll find it at
-`/etc/netdata/netdata.conf`, but some operating systems place it at `/opt/netdata/etc/netdata/netdata.conf`. 
+Next, check to see how many metrics Netdata collects on your system, and how much RAM that uses. Visit the Netdata
+dashboard and look at the bottom-right corner of the interface. You'll find a sentence similar to the following:
+
+> Every second, Netdata collects 1,938 metrics, presents them in 299 charts and monitors them with 81 alarms. Netdata is
+> using 25 MB of memory on **saguaro** for 1 hour, 6 minutes and 36 seconds of real-time history.
+
+On my system, the round-robin database is using 25 MB of RAM to store just over an hour's worth of data (3996 seconds,
+to be exact) for nearly 2,000 metrics.
+
+To increase the `history` option, you need to edit your `netdata.conf` file and increase the `history` setting. In most
+installations, you'll find it at `/etc/netdata/netdata.conf`, but some operating systems place it at
+`/opt/netdata/etc/netdata/netdata.conf`. 
 
 Use `/etc/netdata/edit-config netdata.conf`, or your favorite text editor, to replace `3600` with the number of seconds
 you'd like to store.
@@ -67,26 +77,21 @@ that's 4 bytes, per second, per metric.
 Let's assume your system collects 1,000 metrics per second.
 
 ```text
-4 bytes * 3600 seconds * 1,000 metrics = 14400000 bytes = 14.4MB RAM
+4 bytes * 3600 seconds * 1,000 metrics = 14400000 bytes = 14.4 MB RAM
 ```
 
 With that formula, you can calculate the RAM usage for much larger history settings.
 
 ```conf
 # 2 hours at 1,000 metrics per second
-4 bytes * 7200 seconds * 1,000 metrics = 28800000 bytes = 28.8MB RAM
+4 bytes * 7200 seconds * 1,000 metrics = 28800000 bytes = 28.8 MB RAM
 # 2 hours at 2,000 metrics per second
-4 bytes * 7200 seconds * 2,000 metrics = 57600000 bytes = 57.6MB RAM
+4 bytes * 7200 seconds * 2,000 metrics = 57600000 bytes = 57.6 MB RAM
 # 4 hours at 2,000 metrics per second
-4 bytes * 14440 seconds * 2,000 metrics = 115520000 bytes = 115.52MB RAM
+4 bytes * 14440 seconds * 2,000 metrics = 115520000 bytes = 115.52 MB RAM
 # 24 hours at 1,000 metrics per second
-4 bytes * 86400 seconds * 1,000 metrics = 345600000 bytes = 345.6MB RAM
+4 bytes * 86400 seconds * 1,000 metrics = 345600000 bytes = 345.6 MB RAM
 ```
-
-To see how many metrics your system collects, and how much RAM Netdata is currently using, visit the dashboard and look
-at the bottom-right corner of the interface:
-
->>>>>> SCREENSHOT GOES HERE
 
 Now that you understand how to reconfigure and extend your `history` value, let's move on to the new **database
 engine**, which uses both RAM and your system's disk to store more historical metrics with a minimal footprint.
