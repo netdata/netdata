@@ -35,7 +35,9 @@ struct pageline {
 	int node;
 	char *zone;
 	char *type;
+	int line;
 	uint64_t free_pages[MAX_PAGETYPE_ORDER];
+	RRDDIM  *rd[MAX_PAGETYPE_ORDER];
 };
 
 struct nodezone {
@@ -61,13 +63,15 @@ static inline uint64_t pageline_total_size(struct pageline *p) {
 static inline uint64_t pageline_total_count(struct pageline *p) {
 	uint64_t sum = 0, o;
 	for (o=0; o<MAX_PAGETYPE_ORDER; o++)
-		sum += p->free_pages[0];
+		sum += p->free_pages[o];
 	return sum;
 }
 
 // Check if a line of /proc/pagetypeinfo is valid to use
+// Free block lines starts by "Node" && 4th col is "type"
 #define pagetypeinfo_line_valid(ff, l) (strncmp(procfile_lineword(ff, l, 0), "Node", 4) == 0 && strncmp(procfile_lineword(ff, l, 4), "type", 4) == 0)
 
+// Dimension name from the order
 #define dim_name(s, o) (snprintfz(s, 16,"%luKB (%lu)", (1 << o) * PAGE_SIZE / 1024, o))
 
 int do_proc_pagetypeinfo(int update_every, usec_t dt) {
@@ -119,12 +123,29 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 		cnt_zones = 0;
 		pagelines_cnt = 0;
 
+		// Pass 1: how many lines would be valid
+		for (l = 4; l < lines; l++) {
+			if (!pagetypeinfo_line_valid(ff, l))
+				continue;
+
+			pagelines_cnt++;
+		}
+
+		// Init pagelines from scanned lines
+		if (!pagelines) {
+			pagelines = callocz(pagelines_cnt, sizeof(struct pageline));
+			if (!pagelines) {
+				error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu pagelines of %lu B", pagelines_cnt, sizeof(struct pageline));
+				return 1;
+			}
+		}
+
+		// Pass 2: Scan the file again, with details
+		p = 0;
 		for (l=4; l < lines; l++) {
 
-			// Free block lines starts by "Node" && 4th col is "type"
-			if (!pagetypeinfo_line_valid(ff, l)) {
+			if (!pagetypeinfo_line_valid(ff, l))
 				continue;
-			}
 
 			size_t nodenum = strtoul(procfile_lineword(ff, l, 1), NULL, 10);
 			char *zonename = procfile_lineword(ff, l, 3);
@@ -148,18 +169,17 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 					cnt_pagetypes = l - 4;
 			}
 
-			pagelines_cnt++;
+			// Populate the line
+			pgl = &pagelines[p];
 
-		}
+			pgl->line = l;
+			pgl->node = nodenum;
+			pgl->type = typename;
+			pgl->zone = zonename;
+			for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
+				pgl->free_pages[o] = str2uint64_t(procfile_lineword(ff, l, o+6));
 
-		// Init pagelines
-		if (!pagelines) {
-			pagelines = callocz(pagelines_cnt, sizeof(struct pageline));
-			if (!pagelines) {
-				error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu B for pageline", pagelines_cnt * sizeof(struct pageline));
-				return 1;
-			}
-
+			p++;
 		}
 
 		// Init the RRD graphs
@@ -172,7 +192,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 			, "pagetype"
 			, NULL
 			, "System orders available"
-			, "KB"
+			, "B"
 			, PLUGIN_PROC_NAME
 			, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
 			, NETDATA_CHART_PRIO_SYSTEM_MEMFRAG
@@ -194,17 +214,23 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 		// TODO
 
 		// Per-Numa Node & Zone & Type (full detail). Only if sum(line) > 0
-		st_nodezonetype = callocz(cnt_zones, sizeof(RRDSET*));
+		st_nodezonetype = callocz(cnt_zones, sizeof(RRDSET));
 		for (p = 0; p < pagelines_cnt; p++) {
 			pgl = &pagelines[p];
 
 			// Skip empty pagelines
-			if (!pgl || pageline_total_count(pgl) == 0)
+			// TODO: add configuration for override
+			if (!pgl || pageline_total_count(pgl) == 0) {
+				error("Skipping zero total for page %lu", p);
 				continue;
+			}
 
+			char id[4+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME+1];
+			snprintfz(id, 4+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME, "node%d_%s_%s", pgl->node, pgl->zone, pgl->type);
 
-			char id[MAX_ZONETYPE_NAME+1];
-			snprintfz(id, MAX_ZONETYPE_NAME, "node%d_%s_%s", pgl->node, pgl->zone, pgl->type);
+			char name[MAX_ZONETYPE_NAME + MAX_PAGETYPE_NAME +1];
+			snprintfz(name, MAX_ZONETYPE_NAME + MAX_PAGETYPE_NAME, "Node %d %s %s",
+				pgl->node, pgl->zone, pgl->type);
 
 			st_nodezonetype[p] = rrdset_create_localhost(
 					"mem"
@@ -212,23 +238,22 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 					, NULL
 					, "pagetype"
 					, NULL
-					, "Page Size Distribution"
-					, "pages size"
+					, name
+					, "B"
 					, PLUGIN_PROC_NAME
 					, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
-					, NETDATA_CHART_PRIO_MEM_PAGEFRAG
+					, NETDATA_CHART_PRIO_MEM_PAGEFRAG + p
 					, update_every
 					, RRDSET_TYPE_STACKED
 			);
-
 			for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
 				char id[3+1];
 				snprintfz(id, 3, "%lu", o);
 				char name[20+1];
 				dim_name(name, o);
 
-				RRDDIM *rd = rrddim_add(st_nodezonetype[p], id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
-				rrddim_set_by_pointer(st_order, rd, pgl->free_pages[o]);
+				pgl->rd[o] = rrddim_add(st_nodezonetype[p], id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
+				rrddim_set_by_pointer(st_order, pgl->rd[o], pgl->free_pages[o]);
 			}
 		}
 	}
@@ -249,7 +274,6 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 			continue;
 
 		int words = procfile_linewords(ff, l);
-//error("Line has %d words", words);
 
 		if (words < 6+cnt_pageorders) {
 			error("Unable to read line %lu, only %d words found instead of %d", l, words, 6 + cnt_pageorders);
@@ -257,12 +281,10 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 		}
 
 		for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
-//error("Updating order %lu", o);
 			// Reset counter
 			if (p == 0)
 				systemorders[o].count = 0;
 
-//error("data update for pageline=%lu order=%lu, value=%lu", p, o, pagelines[p].free_pages[o]);
 			// Update orders of the current line
 			pagelines[p].free_pages[o] = str2uint64_t(procfile_lineword(ff, l, o+6));
 
@@ -286,6 +308,19 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
 
 	// Per Node-Zone-Type
+	for (p = 0; p < pagelines_cnt; p++) {
+		// Skip empty graphs
+		if (!st_nodezonetype[p]) {
+			error("Skipping line %lu", p);
+			continue;
+		}
+
+		rrdset_next(st_nodezonetype[p]);
+		for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
+			rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages[o]);
+
+		rrdset_done(st_nodezonetype[p]);
+	}
 
 	return 0;
 }
