@@ -7,12 +7,9 @@ Each internal structure (process, file descriptor, inode...) is stored within a 
 
 ## configuring Netdata for slabinfo
 
-There is currently no configuration needed, aside to have the `slabinfo.plugin` plugin being able to read 
-`/proc/slabinfo`. As this procfile is only readable by root, (mode `0400` in the kernel source), we need to grant the 
-slabinfo.plugin this access, either by:
--  with Setuid root: `chown root: slabinfo.plugin && chmod u+s slabinfo.plugin`
--  with capability dac_override: `setcap cap_dac_override+ep slabinfo.plugin`
+There is currently no configuration needed.
 
+As `/proc/slabinfo` is only readable by root, this plugin needs to be setuid root.
 
 ## For what use
 
