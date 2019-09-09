@@ -9,6 +9,7 @@ export interface ChartLibraryConfig {
   hasLegend: (attributes: Attributes) => boolean
   hasToolboxPanAndZoom: boolean
   isLogScale?: (attributes: Attributes) => boolean
+  options: (attributes: Attributes) => string
   trackColors: boolean
   xssRegexIgnore: RegExp
 }
@@ -36,9 +37,12 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //   void (state)
     //   return "json"
     // },
-    // options(state) {
-    //   return `${"ms" + "%7C" + "flip"}${(this.isLogScale(state) ? ("%7Cabs") : "").toString()}`
-    // },
+    options(attributes: Attributes) {
+      if (this.isLogScale) {
+        return `ms|flip${this.isLogScale(attributes) ? "|abs" : ""}`
+      }
+      return ""
+    },
     hasLegend(attributes: Attributes) {
       // not using __hasLegendCache__ as in old-dashboard, because performance tweaks like this
       // probably won't be needed in react app
@@ -302,10 +306,9 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //     void (state)
     //     return "array"
     //   },
-    //   options(state) {
-    //     void (state)
-    //     return "absolute"
-    //   },
+    options() {
+      return "absolute"
+    },
     hasLegend() {
       return false
     },
