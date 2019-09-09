@@ -1,6 +1,6 @@
 import { createReducer } from "redux-act"
 
-import { updateChartDataAction, updateChartDetailsAction } from "./actions"
+import { fetchDataAction, updateChartDetailsAction } from "./actions"
 import { ChartState } from "./chart-types"
 
 export type StateT = {
@@ -21,7 +21,7 @@ export const chartReducer = createReducer<StateT>(
 
 const getSubstate = (state: StateT, id: string) => state[id] || initialSingleState
 
-chartReducer.on(updateChartDataAction, (state, { id, chartData }) => ({
+chartReducer.on(fetchDataAction.success, (state, { id, chartData }) => ({
   ...state,
   [id]: {
     ...getSubstate(state, id),

@@ -1,5 +1,7 @@
-import { delay } from "redux-saga/effects"
+import { spawn } from "redux-saga/effects"
+
+import { chartSagas } from "domains/chart/sagas"
 
 export function* rootSaga() {
-  yield delay(500)
+  yield spawn(chartSagas)
 }

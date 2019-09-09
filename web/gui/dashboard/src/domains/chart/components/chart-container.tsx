@@ -1,11 +1,14 @@
-import React from "react"
-import { useSelector } from "react-redux"
+import React, { useEffect, useState } from "react"
+import { useSelector, useDispatch } from "react-redux"
+import { useInterval } from "react-use"
 
 import { AppStateT } from "store/app-state"
-import { Chart } from "./chart"
-import { Attributes } from "../utils/transformDataAttributes"
 
+import { fetchDataAction } from "../actions"
+import { Attributes } from "../utils/transformDataAttributes"
 import { selectChartData, selectChartDetails } from "../selectors"
+
+import { Chart } from "./chart"
 
 export type Props = {
   attributes: Attributes
@@ -18,10 +21,30 @@ export const ChartContainer = ({
   chartUuid,
   portalNode,
 }: Props) => {
-  const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
   const chartDetails = useSelector((state: AppStateT) => selectChartDetails(
     state, { id: chartUuid },
   ))
+
+  const [shouldFetch, setShouldFetch] = useState<boolean>(true)
+  useInterval(() => {
+    setShouldFetch(true)
+  }, 2000)
+
+
+  const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
+  const dispatch = useDispatch()
+  useEffect(() => {
+    if (shouldFetch && chartDetails) {
+      setShouldFetch(false)
+      dispatch(fetchDataAction.request({
+        attributes,
+        id: chartDetails.id,
+        uuid: chartUuid,
+      }))
+    }
+  }, [attributes, chartDetails, chartUuid, dispatch, shouldFetch])
+
+
   if (!chartData || !chartDetails) {
     return <span>loading...</span>
   }
