@@ -9,7 +9,7 @@ Each internal structure (process, file descriptor, inode...) is stored within a 
 
 There is currently no configuration needed.
 
-As `/proc/slabinfo` is only readable by root, this plugin needs to be setuid root.
+As `/proc/slabinfo` is only readable by root, this plugin is setuid root.
 
 ## For what use
 
