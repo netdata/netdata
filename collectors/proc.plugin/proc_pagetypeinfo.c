@@ -52,15 +52,15 @@ struct systemorder {
 
 
 static inline uint64_t pageline_total_size(struct pageline *p) {
-	uint64_t sum = 0;
-	for (int o=0; o<MAX_PAGETYPE_ORDER; o++)
+	uint64_t sum = 0, o;
+	for (o=0; o<MAX_PAGETYPE_ORDER; o++)
 		sum += p->free_pages[o] * (o+1) * PAGE_SIZE;
 	return sum;
 }
 
 static inline uint64_t pageline_total_count(struct pageline *p) {
-	uint64_t sum = 0;
-	for (int o=0; o<MAX_PAGETYPE_ORDER; o++)
+	uint64_t sum = 0, o;
+	for (o=0; o<MAX_PAGETYPE_ORDER; o++)
 		sum += p->free_pages[0];
 	return sum;
 }
