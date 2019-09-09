@@ -400,6 +400,10 @@ set(PERF_PLUGIN_FILES
         collectors/perf.plugin/perf_plugin.c
         )
 
+set(SLABINFO_PLUGIN_FILES
+        collectors/slabinfo.plugin/slabinfo.c
+        )
+
 set(PROC_PLUGIN_FILES
         collectors/proc.plugin/ipc.c
         collectors/proc.plugin/plugin_proc.c
