@@ -4,7 +4,8 @@
 
 // For PAGE_SIZE
 #include <sys/user.h>
-
+// For ULONG_MAX
+#include <limits.h>
 
 #define PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME "/proc/pagetypeinfo"
 #define CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO "plugin:" PLUGIN_PROC_CONFIG_NAME ":" PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
@@ -64,16 +65,19 @@ static inline uint64_t pageline_total_count(struct pageline *p) {
 	return sum;
 }
 
+// Check if a line of /proc/pagetypeinfo is valid to use
+#define pagetypeinfo_line_valid(ff, l) (strncmp(procfile_lineword(ff, l, 0), "Node", 4) == 0 && strncmp(procfile_lineword(ff, l, 4), "type", 4) == 0)
 
+#define dim_name(s, o) (snprintfz(s, 16,"%luKB (%lu)", (1 << o) * PAGE_SIZE / 1024, o))
 
 int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 	(void)dt;
 
-	static int cnt_nodes = -1, cnt_zones = -1, cnt_pagetypes = -1, cnt_pageorders = -1, linemax = -1;
-
+	// Counters from parsing the file, that doesn't change after boot
+	static int cnt_nodes = -1, cnt_zones = -1, cnt_pagetypes = -1, cnt_pageorders = -1;
 	static struct systemorder systemorders[MAX_PAGETYPE_ORDER] = {};
-	static struct pageline** pagelines = NULL;
-	static size_t pagelines_cnt = -1;
+	static struct pageline* pagelines = NULL;
+	static size_t pagelines_cnt = -1, lines = -1;
 
 	static procfile *ff = NULL;
 
@@ -81,9 +85,12 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 	//static RRDSET **st_nodezone = NULL;
 	static RRDSET **st_nodezonetype = NULL;
 
+	// Local temp variables
 	size_t l, o, p;
-	struct pageline *pgl;
+	struct pageline *pgl = NULL;
 
+	// --------------------------------------------------------------------
+	// Startup: Open /proc/pagetypeinfo
 	if(unlikely(!ff)) {
 		ff = procfile_open(PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, " \t,", PROCFILE_FLAG_DEFAULT);
 	}
@@ -97,51 +104,62 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 	// --------------------------------------------------------------------
 	// Init: find how many cnt_nodes, Zones and Types
 	if(unlikely(cnt_nodes == -1)) {
-		size_t nodelast = -1, tmpint = -1;
+		size_t nodenumlast = -1;
+		char *zonenamelast;
 
-		size_t lines = procfile_lines(ff);
+		lines = procfile_lines(ff);
 		if(unlikely(!lines)) {
 			error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
 			return 1;
 		}
 
 		// 4th line is the "Free pages count...". Just substract the 8 words.
-		cnt_pageorders = procfile_linewords(ff, 3) - 8;
+		cnt_pageorders = procfile_linewords(ff, 3) - 9;
 		cnt_nodes = 0;
+		cnt_zones = 0;
 		pagelines_cnt = 0;
 
 		for (l=4; l < lines; l++) {
-			// first empty line is the end of the "Free pages" block
-			if (strncmp(procfile_lineword(ff, l, 0), "Node", 4) != 0) {
-				linemax = l;
-				break;
+
+			// Free block lines starts by "Node" && 4th col is "type"
+			if (!pagetypeinfo_line_valid(ff, l)) {
+				continue;
+			}
+
+			size_t nodenum = strtoul(procfile_lineword(ff, l, 1), NULL, 10);
+			char *zonename = procfile_lineword(ff, l, 3);
+			char *typename = procfile_lineword(ff, l, 5);
+
+			// We changed node or zone
+			if (nodenum != nodenumlast || !zonenamelast ||  strncmp(zonename, zonenamelast, 6) != 0) {
+				cnt_zones++;
+				zonenamelast = zonename;
 			}
 
 			// Count the number of numa cnt_nodes
-			if( (tmpint = strtoul(procfile_lineword(ff, l, 0), NULL, 16) ) && tmpint != nodelast ) {
+			if( nodenum != nodenumlast ) {
 				cnt_nodes++;
-				nodelast = tmpint;
+				nodenumlast = nodenum;
 			}
 
 			// Unmovable is always the first in the enum. The first line higher than 4
-			if (strncmp(procfile_lineword(ff, l, 6), "Unmovable", 10) == 0 && l >4) {
+			if (strncmp(typename, "Unmovable", 10) == 0 && l >4) {
 				if (cnt_pagetypes == -1)
 					cnt_pagetypes = l - 4;
 			}
 
 			pagelines_cnt++;
-		}
 
-		debug(0x1, "Init: cnt_nodes=%d types=%d orders=%d linemax=%d",
-			cnt_nodes, cnt_pagetypes, cnt_pageorders, linemax );
+		}
 
 		// Init pagelines
 		if (!pagelines) {
 			pagelines = callocz(pagelines_cnt, sizeof(struct pageline));
 			if (!pagelines) {
-				error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu B for pageline", linemax * sizeof(struct pageline));
+				error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu B for pageline", pagelines_cnt * sizeof(struct pageline));
 				return 1;
 			}
+
 		}
 
 		// Init the RRD graphs
@@ -154,7 +172,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 			, "pagetype"
 			, NULL
 			, "System orders available"
-			, "MB"
+			, "KB"
 			, PLUGIN_PROC_NAME
 			, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
 			, NETDATA_CHART_PRIO_SYSTEM_MEMFRAG
@@ -164,9 +182,11 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 		for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
 			char id[3+1];
 			snprintfz(id, 3, "%lu", o);
+
 			char name[20+1];
-			snprintfz(name, 16,"Order %lu (%luMB)", o, (1 << o) * PAGE_SIZE);
-			systemorders[o].rd = rrddim_add(st_order, id, name, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+			dim_name(name, o);
+
+			systemorders[o].rd = rrddim_add(st_order, id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
 			rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].count);
 		}
 
@@ -176,10 +196,10 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 		// Per-Numa Node & Zone & Type (full detail). Only if sum(line) > 0
 		st_nodezonetype = callocz(cnt_zones, sizeof(RRDSET*));
 		for (p = 0; p < pagelines_cnt; p++) {
-			pgl = pagelines[p];
+			pgl = &pagelines[p];
 
 			// Skip empty pagelines
-			if (pageline_total_count(pgl) == 0)
+			if (!pgl || pageline_total_count(pgl) == 0)
 				continue;
 
 
@@ -205,8 +225,9 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 				char id[3+1];
 				snprintfz(id, 3, "%lu", o);
 				char name[20+1];
-				snprintfz(name, 20,"Order %lu (%luMB)", o, (1 << o) * PAGE_SIZE);
-				RRDDIM *rd = rrddim_add(st_nodezonetype[p], id, name, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+				dim_name(name, o);
+
+				RRDDIM *rd = rrddim_add(st_nodezonetype[p], id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
 				rrddim_set_by_pointer(st_order, rd, pgl->free_pages[o]);
 			}
 		}
@@ -221,26 +242,36 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 	// Update pagelines
 
 	// Process each line
-	for (p = 0; p < pagelines_cnt; p++) {
-		l = p+4;
+	p = 0;
+	for (l=4; l<lines; l++) {
+
+		if (!pagetypeinfo_line_valid(ff, l))
+			continue;
 
 		int words = procfile_linewords(ff, l);
+//error("Line has %d words", words);
+
 		if (words < 6+cnt_pageorders) {
 			error("Unable to read line %lu, only %d words found instead of %d", l, words, 6 + cnt_pageorders);
 			break;
 		}
 
 		for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
+//error("Updating order %lu", o);
 			// Reset counter
 			if (p == 0)
 				systemorders[o].count = 0;
 
+//error("data update for pageline=%lu order=%lu, value=%lu", p, o, pagelines[p].free_pages[o]);
 			// Update orders of the current line
-			pagelines[p]->free_pages[o] = str2uint64_t(procfile_lineword(ff, l, o+6));
+			pagelines[p].free_pages[o] = str2uint64_t(procfile_lineword(ff, l, o+6));
 
 			// Update sum by order
-			systemorders[o].count += pagelines[p]->free_pages[o];
+			systemorders[o].count += pagelines[p].free_pages[o];
 		}
+
+		assert(p < pagelines_cnt);
+		p++;
 	}
 
 	// --------------------------------------------------------------------
