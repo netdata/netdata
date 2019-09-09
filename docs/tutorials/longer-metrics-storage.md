@@ -4,18 +4,68 @@ Netdata helps you collect thousands of system and application metrics every seco
 long term?
 
 Many people think Netdata can only store about an hour's worth of real-time metrics, but that's just the default
-configuration. 
+configuration. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of
+historical, per-second metrics without having to rely on a [backend](../../backends/).
 
-With the right settings, Netdata is quite capable of efficiently storing hours or days worth of historical, per-second
-metrics without having to rely on a [backend](../../backends/), although that's also an option for more advanced users.
-
-This tutorial gives two options for configuring Netdata to store more metrics. First, you can configure the round-robin
-database. And second, you can switch to the _extremely efficient_ database engine.
-
-We recommend the [database engine](#using-the-database-engine), as it will soon be the default configuration, but the
-choice is yours.
+This tutorial gives two options for configuring Netdata to store more metrics. We recommend the [**database
+engine**](#using-the-database-engine), as it will soon be the default configuration. However, you can stick with the
+current default **round-robin database** if you prefer.
 
 Let's get started.
+
+## Using the database engine
+
+The new database engine, released in v1.15 and undergoing constant improvement, uses both RAM and disk space for
+long-term metrics storage. Unlike the round-robin database, the database engine allows you to store a much larger
+dataset than your system's available RAM.
+
+The database engine will eventually become the default method of retaining metrics, but until then, you can switch to
+the database engine by changing a single option.
+
+Edit your `netdata.conf` file and change the `memory mode` setting to `dbengine`:
+
+```conf
+[global]
+    memory mode = dbengine
+```
+
+Next, restart Netdata. On Linux systems, we recommend running `sudo service netdata restart`. You're now using the
+database engine!
+
+> Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
+> we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
+
+What makes the database engine efficient? While it's structured like a traditional database, the database engine splits
+data between RAM and disk. The database engine caches and indexes data on RAM to keep memory usage low, and then
+compresses older metrics onto disk for long-term storage.
+
+When the Netdata dashboard queries for historical metrics, the database engine will use its cache, stored in RAM, to
+return relevant metrics for visualization in charts.
+
+Now, given that the database engine uses _both_ RAM and disk, there are two other settings to consider: `page cache
+size` and `dbengine disk space`.
+
+```conf
+[global]
+    page cache size = 32
+    dbengine disk space = 256
+```
+
+`page cache size` sets the maximum amount of RAM (in MiB) the database engine will use for caching and indexing.
+`dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
+metrics.
+
+Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000
+metrics every second.
+
+If you'd like to change these options, read more about the [database engine's memory
+footprint](../../database/engine/README.md#memory-requirements).
+
+With the database engine active, you can even back up your `/var/cache/netdata/dbengine/` to another location for
+redundancy.
+
+Now that you know how to switch to the database engine, let's cover the default round-robin database for those who
+aren't ready to make the move.
 
 ## Using the round-robin database
 
@@ -93,63 +143,9 @@ With that formula, you can calculate the RAM usage for much larger history setti
 4 bytes * 86400 seconds * 1,000 metrics = 345600000 bytes = 345.6 MB RAM
 ```
 
-Now that you understand how to reconfigure and extend your `history` value, let's move on to the new **database
-engine**, which uses both RAM and your system's disk to store more historical metrics with a minimal footprint.
-
-## Using the database engine
-
-The new database engine, released in v1.15 and undergoing constant improvement, uses both RAM and disk space for
-long-term metrics storage. Unlike the round-robin database, the database engine allows you to store a much larger
-dataset than your system's available RAM.
-
-The database engine will eventually become the default method of retaining metrics, but until then, you can switch to
-the database engine by changing a single option.
-
-To switch to the database engine, edit your `netdata.conf` file, and change the `memory mode` setting to `dbengine`:
-
-```conf
-[global]
-    memory mode = dbengine
-```
-
-Next, restart Netdata. On Linux systems, we recommend running `sudo service netdata restart`. You're now using the
-database engine!
-
-> Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
-> we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
-
-What makes the database engine efficient? While it's structured like a traditional database, the database engine splits
-data between RAM and disk. The database engine caches and indexes data on RAM to keep memory usage low, and then
-compresses older metrics onto disk for long-term storage.
-
-When the Netdata dashboard queries for historical metrics, the database engine will use its cache, stored in RAM, to
-return relevant metrics for visualization in charts.
-
-Now, given that the database engine uses _both_ RAM and disk, there are two other settings to consider: `page cache
-size` and `dbengine disk space`.
-
-```conf
-[global]
-    page cache size = 32
-    dbengine disk space = 256
-```
-
-`page cache size` sets the maximum amount of RAM (in MiB) the database engine will use for caching and indexing.
-`dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
-metrics.
-
-Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000
-metrics every second.
-
-If you'd like to change these options, read more about the [database engine's memory
-footprint](../../database/engine/README.md#memory-requirements).
-
-With the database engine active, you can even back up your `/var/cache/netdata/dbengine/` to another location for
-redundancy.
-
 ## What's next?
 
-Now that you have either configured the round-robin database or the database engine to store more metrics, you'll
+Now that you have either configured database engine or round-robin database engine to store more metrics, you'll
 probably want to see it in action!
 
 For more information about how to pan charts to view historical metrics, see our documentation on [using

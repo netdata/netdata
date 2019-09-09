@@ -38,7 +38,8 @@ On most systems, you can find that file at `/etc/netdata/netdata.conf`.
 The `netdata.conf` file is broken up into various sections, such as `[global]`, `[web]`, `[registry]`, and more.
 
 To change any option in `netdata.conf`, change the number or text after the equals sign. If there is a hash symbol (`#`)
-at the beginning of the line, remove it to **uncomment** it. Netdata ignores any lines with the hash because they are **commented**.
+at the beginning of the line, remove it to **uncomment** it. Netdata ignores any lines with the hash because they are
+**commented**.
 
 Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata)) to load your new configuration.
 
@@ -170,7 +171,7 @@ There are two quick ways to increase the depth of historical metrics: increase t
 that's enabled by default, or switch to the database engine.
 
 We have a tutorial that walks you through both options: [**Changing how long Netdata stores
-metrics**](tutorial/longer-metrics-storage.md).
+metrics**](tutorials/longer-metrics-storage.md).
 
 **Next**:
 
@@ -185,7 +186,8 @@ If you have Netdata installed on multiple systems, you can have them all appear 
 corner of the dashboard.
 
 To show all your servers in that menu, you need to [register for or sign in](netdata-cloud/signing-in.md) to [Netdata
-Cloud](netdata-cloud/) from each system. Each system will then appear in the **My nodes** menu, which you can use to navigate between your systems quickly.
+Cloud](netdata-cloud/) from each system. Each system will then appear in the **My nodes** menu, which you can use to
+navigate between your systems quickly.
 
 ![Animated GIF of the My Nodes menu in
 action](https://user-images.githubusercontent.com/1153921/64389938-9aa7b800-cff9-11e9-9653-a77e791811ad.gif)
