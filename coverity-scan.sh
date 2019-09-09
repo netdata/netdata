@@ -168,18 +168,18 @@ installit() {
 }
 
 OTHER_OPTIONS="--disable-lto"
-OTHER_OPTIONS="${OTHER_OPTIONS} --with-zlib"
-OTHER_OPTIONS="${OTHER_OPTIONS} --with-math"
-OTHER_OPTIONS="${OTHER_OPTIONS} --enable-https"
-OTHER_OPTIONS="${OTHER_OPTIONS} --enable-jsonc"
-OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-nfacct"
-OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-freeipmi"
-OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-cups"
-OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-prometheus-remote-write"
+OTHER_OPTIONS+=" --with-zlib"
+OTHER_OPTIONS+=" --with-math"
+OTHER_OPTIONS+=" --enable-https"
+OTHER_OPTIONS+=" --enable-jsonc"
+OTHER_OPTIONS+=" --enable-plugin-nfacct"
+OTHER_OPTIONS+=" --enable-plugin-freeipmi"
+OTHER_OPTIONS+=" --enable-plugin-cups"
+OTHER_OPTIONS+=" --enable-backend-prometheus-remote-write"
 # TODO: enable these plugins too
-#OTHER_OPTIONS="${OTHER_OPTIONS} --enable-plugin-xenstat"
-#OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-kinesis"
-#OTHER_OPTIONS="${OTHER_OPTIONS} --enable-backend-mongodb"
+#OTHER_OPTIONS+=" --enable-plugin-xenstat"
+#OTHER_OPTIONS+=" --enable-backend-kinesis"
+#OTHER_OPTIONS+=" --enable-backend-mongodb"
 
 FOUND_OPTS="NO"
 while [ -n "${1}" ]; do
@@ -193,7 +193,7 @@ while [ -n "${1}" ]; do
 			OTHER_OPTIONS="${1}"
 			FOUND_OPTS="YES"
 		else
-			OTHER_OPTIONS="${OTHER_OPTIONS} ${1}"
+			OTHER_OPTIONS+=" ${1}"
 		fi
 
 		shift 1
