@@ -272,7 +272,6 @@ unsigned int do_slab_stats(int update_every) {
 				, update_every
 				, PLUGIN_SLABINFO_NAME
 			);
-			debug(D_PLUGIN_SLABINFO, " ok 2");
 			for (s = sactive; s; s = s->next) {
 				printf("DIMENSION %s '' absolute 1 1\n", s->name);
 			}
