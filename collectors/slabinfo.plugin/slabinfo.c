@@ -189,10 +189,10 @@ struct slabinfo *read_file_slabinfo() {
     // Iterate on all lines to populate / update the slabinfo struct
     size_t lines = procfile_lines(ff), l;
 
-    slabdebug("   Read %lu lines from procfile", lines);
+    slabdebug("   Read %lu lines from procfile", (unsigned long)lines);
     for(l = 2; l < lines; l++) {
         if (unlikely(procfile_linewords(ff, l) < 14)) {
-            slabdebug("    Line %lu has only %lu words, skipping", l, procfile_linewords(ff,l));
+            slabdebug("    Line %lu has only %lu words, skipping", (unsigned long)l, procfile_linewords(ff,l));
             continue;
         }
 
