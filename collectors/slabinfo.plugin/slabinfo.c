@@ -19,7 +19,7 @@
 
 // #define slabdebug(...) if (debug) { fprintf(stderr, __VA_ARGS__); }
 #define slabdebug(args...) if (debug) { \
-    fprintf(stderr, "slabinfo.plugin DEBUG (%04lu@%-10.10s:%-15.15s)::", __LINE__, __FILE__, __FUNCTION__); \
+    fprintf(stderr, "slabinfo.plugin DEBUG (%04d@%-10.10s:%-15.15s)::", __LINE__, __FILE__, __FUNCTION__); \
     fprintf(stderr, ##args); \
     fprintf(stderr, "\n"); }
 
