@@ -9,8 +9,6 @@
 #define PLUGIN_SLABINFO_NAME "slabinfo.plugin"
 #define PLUGIN_SLABINFO_PROCFILE "/proc/slabinfo"
 
-#define D_PLUGIN_SLABINFO 0x0000000200000000
-
 #define CHART_TYPE "mem"
 #define CHART_FAMILY "slab"
 #define CHART_PRIO 3000
@@ -18,6 +16,13 @@
 // As we're talking about kernel-pagesize, there's no hugepage.
 // So it's reliable to use it as an arch constant
 #define SLAB_PAGE_SIZE PAGE_SIZE
+
+// #define slabdebug(...) if (debug) { fprintf(stderr, __VA_ARGS__); }
+#define slabdebug(args...) if (debug) { \
+	fprintf(stderr, "slabinfo.plugin DEBUG (%04lu@%-10.10s:%-15.15s)::", __LINE__, __FILE__, __FUNCTION__); \
+	fprintf(stderr, ##args); \
+	fprintf(stderr, "\n"); }
+
 
 // ----------------------------------------------------------------------------
 
@@ -52,6 +57,7 @@ char *netdata_configured_host_prefix = "";
 
 
 int running = 1;
+int debug = 0;
 
 // ----------------------------------------------------------------------------
 
@@ -112,14 +118,14 @@ struct slabinfo {
 static struct slabinfo *get_slabstruct(const char *name) {
 	struct slabinfo *s;
 
-	debug(D_PLUGIN_SLABINFO, "--> Requested slabstruct %s", name);
+	slabdebug("--> Requested slabstruct %s", name);
 
 	uint32_t hash = simple_hash(name);
 
 	// Search it, from the next to the end
 	for (s = slabinfo_next; s; s = s->next) {
 		if ((hash = s->hash) && !strcmp(name, s->name)) {
-			debug(D_PLUGIN_SLABINFO, "<-- Found existing slabstruct after %s", slabinfo_last_used->name);
+			slabdebug("<-- Found existing slabstruct after %s", slabinfo_last_used->name);
 			// Prepare the next run
 			slabinfo_next = s->next;
 			slabinfo_last_used = s;
@@ -130,7 +136,7 @@ static struct slabinfo *get_slabstruct(const char *name) {
 	// Search it from the begining to the last position we used
 	for (s = slabinfo_root; s != slabinfo_last_used; s = s->next) {
 		if (hash == s->hash && !strcmp(name, s->name)) {
-			debug(D_PLUGIN_SLABINFO, "<-- Found existing slabstruct after root %s", slabinfo_root->name);
+			slabdebug("<-- Found existing slabstruct after root %s", slabinfo_root->name);
 			slabinfo_next = s->next;
 			slabinfo_last_used = s;
 			return s;
@@ -144,13 +150,13 @@ static struct slabinfo *get_slabstruct(const char *name) {
 
 	// Add it to the current postion
 	if (slabinfo_root) {
-		debug(D_PLUGIN_SLABINFO, "<-- Creating new slabstruct after %s", slabinfo_last_used->name);
+		slabdebug("<-- Creating new slabstruct after %s", slabinfo_last_used->name);
 		s->next = slabinfo_last_used->next;
 		slabinfo_last_used->next = s;
 		slabinfo_last_used = s;
 	}
 	else {
-		debug(D_PLUGIN_SLABINFO, "<-- Creating new slabstruct as root");
+		slabdebug("<-- Creating new slabstruct as root");
 		slabinfo_root = slabinfo_last_used = s;
 	}
 
@@ -161,7 +167,7 @@ static struct slabinfo *get_slabstruct(const char *name) {
 // Read a full pass of slabinfo to update the structs
 struct slabinfo *read_file_slabinfo() {
 
-	debug(D_PLUGIN_SLABINFO, "-> Reading procfile %s", PLUGIN_SLABINFO_PROCFILE);
+	slabdebug("-> Reading procfile %s", PLUGIN_SLABINFO_PROCFILE);
 
 	static procfile *ff = NULL;
 
@@ -183,10 +189,10 @@ struct slabinfo *read_file_slabinfo() {
 	// Iterate on all lines to populate / update the slabinfo struct
 	size_t lines = procfile_lines(ff), l;
 
-	debug(D_PLUGIN_SLABINFO, "   Read %lu lines from procfile", lines);
+	slabdebug("   Read %lu lines from procfile", lines);
 	for(l = 2; l < lines; l++) {
 		if (unlikely(procfile_linewords(ff, l) < 14)) {
-			debug(D_PLUGIN_SLABINFO, "    Line %lu has only %lu words, skipping", l, procfile_linewords(ff,l));
+			slabdebug("    Line %lu has only %lu words, skipping", l, procfile_linewords(ff,l));
 			continue;
 		}
 
@@ -226,7 +232,7 @@ struct slabinfo *read_file_slabinfo() {
 		else
 			s->obj_filling = 0;
 
-		debug(D_PLUGIN_SLABINFO, "    Updated slab %s: %lu %lu %lu %lu %lu / %lu %lu %lu / %lu %lu %lu / %lu %lu %hhu",
+		slabdebug("    Updated slab %s: %lu %lu %lu %lu %lu / %lu %lu %lu / %lu %lu %lu / %lu %lu %hhu",
 			name, s->active_objs, s->num_objs, s->obj_size, s->obj_per_slab, s->pages_per_slab,
 			s->tune_limit, s->tune_batchcnt, s->tune_shared_factor,
 			s->data_active_slabs, s->data_num_slabs, s->data_shared_avail,
@@ -362,24 +368,49 @@ int main(int argc, char **argv) {
 	program_version = "0.1";
 	error_log_syslog = 0;
 
-	int update_every = 1;
+	int update_every = 1, i, n, freq = 0;
 
-	// Very simple options: only 1 for the time being
-	if (argc == 2) {
-		int n = (int) str2l(argv[1]);
-		if (n > 0) {
-			if (n >= UPDATE_EVERY_MAX) {
-				error("Invalid interval value: %s", argv[1]);
-				exit(1);
+	for (i = 1; i < argc; i++) {
+		// Frequency parsing
+		if(isdigit(*argv[i]) && !freq) {
+			n = (int) str2l(argv[i]);
+			if (n > 0) {
+				if (n >= UPDATE_EVERY_MAX) {
+					error("Invalid interval value: %s", argv[i]);
+					exit(1);
+				}
+				freq = n;
 			}
-
-			update_every = n;
+		}
+		else if (strcmp("debug", argv[i]) == 0) {
+			debug = 1;
+			continue;
 		}
 		else {
-			error("Invalid interval value: %s", argv[1]);
+			fprintf(stderr,
+				"\n"
+				" netdata slabinfo.plugin %s\n"
+				" This program is a data collector plugin for netdata.\n"
+				"\n"
+				" Available command line options:\n"
+				"\n"
+				"  COLLECTION_FREQUENCY    data collection frequency in seconds\n"
+				"                          minimum: %d\n"
+				"\n"
+				"  debug                   enable verbose output\n"
+				"                          default: disabled\n"
+				"\n",
+				update_every
+			);
 			exit(1);
 		}
 	}
+
+	if(freq >= update_every)
+		update_every = freq;
+	else if(freq)
+		error("update frequency %d seconds is too small for slabinfo. Using %d.", freq, update_every);
+
 
 	// Call the main function. Time drift to be added
 	do_slab_stats(update_every);
