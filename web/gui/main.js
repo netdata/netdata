@@ -71,6 +71,7 @@ var urlOptions = {
     alarm_unique_id: 0,
     alarm_id: 0,
     alarm_event_id: 0,
+    alarm_when: 0,
     alarm_freeze: false,
 
     hasProperty: function (property) {
@@ -128,6 +129,10 @@ var urlOptions = {
                     urlOptions.hash = variables[len];
                 }
             }
+        }
+
+        if ((urlOptions.alarm_when > 0) && (urlOptions.after == 0)) {
+            urlOptions.after = urlOptions.alarm_when;
         }
 
         var booleans = ['nowelcome', 'show_alarms', 'update_always'];

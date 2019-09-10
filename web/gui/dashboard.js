@@ -8322,10 +8322,19 @@ let chartState = function (element) {
         this.data_url += "&options=" + this.chartURLOptions();
 
         if(NETDATA.options.redirect_freeze) {
-            after = NETDATA.options.redirect_after;
+            let current_interval = Math.floor(Date.now() / 1000) - NETDATA.options.redirect_after;
+            if( (current_interval) > 120 ) {
+                after = NETDATA.options.redirect_after - 60;
+            } else {
+                current_interval /= 2;
+                after = NETDATA.options.redirect_after - current_interval;
+            }
             if(!NETDATA.options.redirect_before) {
-                before = after + 60;
-                after -= 60;
+                if( (current_interval) > 120 ) {
+                    before = NETDATA.options.redirect_after  + 60;
+                } else {
+                    before = NETDATA.options.redirect_after  + current_interval;
+                }
                 NETDATA.options.redirect_before  = before;
             }else {
                 before = NETDATA.options.redirect_before;
