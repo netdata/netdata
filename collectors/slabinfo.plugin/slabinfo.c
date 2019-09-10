@@ -388,11 +388,10 @@ int main(int argc, char **argv) {
 		}
 		else {
 			fprintf(stderr,
+				"netdata slabinfo.plugin %s\n"
+				"This program is a data collector plugin for netdata.\n"
 				"\n"
-				" netdata slabinfo.plugin %s\n"
-				" This program is a data collector plugin for netdata.\n"
-				"\n"
-				" Available command line options:\n"
+				"Available command line options:\n"
 				"\n"
 				"  COLLECTION_FREQUENCY    data collection frequency in seconds\n"
 				"                          minimum: %d\n"
@@ -400,6 +399,7 @@ int main(int argc, char **argv) {
 				"  debug                   enable verbose output\n"
 				"                          default: disabled\n"
 				"\n",
+				program_version,
 				update_every
 			);
 			exit(1);
