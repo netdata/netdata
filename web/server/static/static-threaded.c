@@ -76,7 +76,7 @@ static void *web_server_file_add_callback(POLLINFO *pi, short int *events, void 
     return w;
 }
 
-static void web_werver_file_del_callback(POLLINFO *pi) {
+static void web_server_file_del_callback(POLLINFO *pi) {
     struct web_client *w = (struct web_client *)pi->data;
     debug(D_WEB_CLIENT, "%llu: RELEASE FILE READ ON FD %d", w->id, pi->fd);
 
@@ -271,7 +271,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                         , "FILENAME"
                         , ""
                         , web_server_file_add_callback
-                        , web_werver_file_del_callback
+                        , web_server_file_del_callback
                         , web_server_file_read_callback
                         , web_server_file_write_callback
                         , (void *) w
