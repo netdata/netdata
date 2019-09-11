@@ -1,0 +1,58 @@
+Source: netdata
+Build-Depends: debhelper (>= 9),
+               dh-autoreconf,
+               dh-systemd (>= 1.5),
+               dpkg-dev (>= 1.13.19),
+               zlib1g-dev,
+               uuid-dev,
+               libuv1-dev,
+               liblz4-dev,
+               libjudy-dev,
+               libssl-dev,
+               libmnl-dev,
+               libjson-c-dev,
+               libcups2-dev,
+               libipmimonitoring-dev,
+               libnetfilter-acct-dev,
+               libsnappy-dev,
+               libprotobuf-dev,
+               libprotoc-dev,
+               autogen,
+               autoconf,
+               automake,
+               pkg-config,
+               curl,
+               gcc,
+               g++
+Section: net
+Priority: optional
+Maintainer: Netdata Builder <bot@netdata.cloud>
+Standards-Version: 3.9.6
+Homepage: https://netdata.cloud
+
+Package: netdata
+Architecture: any
+Depends: adduser,
+         libcap2-bin (>= 1:2.0),
+         lsb-base (>= 3.1-23.2),
+         zlib1g,
+         libuuid1,
+         libuv1,
+         liblz4-1,
+         libjudydebian1,
+         openssl,
+         libmnl0,
+         libjson-c2,
+         cups,
+         freeipmi,
+         libnetfilter-acct1,
+         libprotobuf-c1,
+         libsnappy1v5,
+         libprotoc9v5,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Description: real-time charts for system monitoring
+ Netdata is a daemon that collects data in realtime (per second)
+ and presents a web site to view and analyze them. The presentation
+ is also real-time and full of interactive charts that precisely
+ render all collected values.
