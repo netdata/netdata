@@ -160,7 +160,8 @@ struct web_client {
     char decoded_url[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the URL in this buffer
     char decoded_query_string[NETDATA_WEB_REQUEST_URL_SIZE + 1];  // we decode the Query String in this buffer
     char last_url[NETDATA_WEB_REQUEST_URL_SIZE+1];       // we keep a copy of the decoded URL here
-    char host[256];
+    char server_host[NI_MAXHOST];
+    char client_host[NI_MAXHOST];
     size_t url_path_length;
     char separator; // This value can be either '?' or 'f'
     char *url_search_path; //A pointer to the search path sent by the client

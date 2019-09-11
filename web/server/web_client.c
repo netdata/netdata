@@ -1147,8 +1147,8 @@ static inline void web_client_send_http_header(struct web_client *w) {
     char headerbegin[8328];
     if (w->response.code == HTTP_RESP_MOVED_PERM) {
         memcpy(headerbegin,"\r\nLocation: https://",20);
-        size_t headerlength = strlen(w->host);
-        memcpy(&headerbegin[20],w->host,headerlength);
+        size_t headerlength = strlen(w->server_host);
+        memcpy(&headerbegin[20],w->server_host,headerlength);
         headerlength += 20;
         size_t tmp = strlen(w->last_url);
         memcpy(&headerbegin[headerlength],w->last_url,tmp);
