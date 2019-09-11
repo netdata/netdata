@@ -106,6 +106,7 @@ typedef struct pollinfo {
     WEB_CLIENT_ACL port_acl; // the access lists permitted on this web server port (it's -1 for client sockets)
     char *client_ip;        // the connected client IP
     char *client_port;      // the connected client port
+    char client_host[NI_MAXHOST];
 
     time_t connected_t;     // the time the socket connected
     time_t last_received_t; // the time the socket last received data
