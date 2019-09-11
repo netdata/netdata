@@ -2001,7 +2001,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
 {
     const int DSET_CHARTS = 16;
     const int DSET_DIMS = 128;
-    const uint64_t EXPECTED_COMPRESSION_RATIO = 94;
+    const uint64_t EXPECTED_COMPRESSION_RATIO = 20;
     RRDHOST *host = NULL;
     struct dbengine_chart_thread thread_info[DSET_CHARTS];
     int i;
@@ -2010,7 +2010,8 @@ void generate_dbengine_dataset(unsigned history_seconds)
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
     default_rrdeng_page_cache_mb = 128;
     // Worst case for uncompressible data
-    default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS) * sizeof(storage_number) * history_seconds) / (1024 * 1024);
+    default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * history_seconds) /
+                                   (1024 * 1024);
     default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
     error_log_limit_unlimited();
