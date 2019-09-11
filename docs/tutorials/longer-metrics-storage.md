@@ -4,7 +4,7 @@ Netdata helps you collect thousands of system and application metrics every seco
 long term?
 
 Many people think Netdata can only store about an hour's worth of real-time metrics, but that's just the default
-configuration. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of
+configuration today. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of
 historical, per-second metrics without having to rely on a [backend](../../backends/).
 
 This tutorial gives two options for configuring Netdata to store more metrics. We recommend the [**database
@@ -15,8 +15,8 @@ Let's get started.
 
 ## Using the database engine
 
-The new database engine, released in v1.15 and undergoing constant improvement, uses both RAM and disk space for
-long-term metrics storage. Unlike the round-robin database, the database engine allows you to store a much larger
+The database engine uses RAM to store recent metrics while also using a "spill to disk" feature that takes advantage of
+available disk space for long-term metrics storage.This feature of the database engine allows you to store a much larger
 dataset than your system's available RAM.
 
 The database engine will eventually become the default method of retaining metrics, but until then, you can switch to
@@ -61,7 +61,7 @@ metrics every second.
 If you'd like to change these options, read more about the [database engine's memory
 footprint](../../database/engine/README.md#memory-requirements).
 
-With the database engine active, you can even back up your `/var/cache/netdata/dbengine/` to another location for
+With the database engine active, you can back up your `/var/cache/netdata/dbengine/` folder to another location for
 redundancy.
 
 Now that you know how to switch to the database engine, let's cover the default round-robin database for those who
@@ -97,10 +97,10 @@ Next, check to see how many metrics Netdata collects on your system, and how muc
 dashboard and look at the bottom-right corner of the interface. You'll find a sentence similar to the following:
 
 > Every second, Netdata collects 1,938 metrics, presents them in 299 charts and monitors them with 81 alarms. Netdata is
-> using 25 MB of memory on **saguaro** for 1 hour, 6 minutes and 36 seconds of real-time history.
+> using 25 MB of memory on **netdata-linux** for 1 hour, 6 minutes and 36 seconds of real-time history.
 
-On my system, the round-robin database is using 25 MB of RAM to store just over an hour's worth of data (3996 seconds,
-to be exact) for nearly 2,000 metrics.
+On this desktop system, using a Ryzen 5 1600 and 16GB of RAM, the round-robin databases uses 25 MB of RAM to store just
+over an hour's worth of data for nearly 2,000 metrics.
 
 To increase the `history` option, you need to edit your `netdata.conf` file and increase the `history` setting. In most
 installations, you'll find it at `/etc/netdata/netdata.conf`, but some operating systems place it at
