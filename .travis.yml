@@ -67,7 +67,7 @@ stages:
 
     # Build DEB packages under special conditions
   - name: Package ubuntu/* and debian/*
-    if: type != cron AND type != pull_request AND branch = fix-workflow-for-changelog
+    if: type != cron AND type != pull_request AND branch = master
 
     # Build RPM packages under special conditions
   - name: Package centos, fedora and opensuse
