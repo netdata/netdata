@@ -7,6 +7,7 @@
 import lxc
 import subprocess
 import os
+import sys
 
 def fetch_version(orig_build_version):
     tag = None
@@ -157,15 +158,17 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     run_command_in_host(['make', 'dist'], tmp_src)
 
     print(".6 Copy generated tarbal to desired path")
+    generated_tarball = '%snetdata-%s.tar.gz' % (tmp_src, pkg_friendly_version)
+
     if os.path.exists('netdata-%s.tar.gz' % pkg_friendly_version):
-        run_command_in_host(['sudo', 'cp', '%snetdata-%s.tar.gz' % (tmp_src, pkg_friendly_version), tar_file], tmp_src)
+        run_command_in_host(['sudo', 'cp', generated_tarball, tar_file])
 
         print(".7 Fixing permissions on tarball")
-        run_command_in_host(['sudo', 'chmod', '777', tar_file], tmp_src)
+        run_command_in_host(['sudo', 'chmod', '777', tar_file])
 
         print(".8 Returning to original directory, removing temp");
-        run_command_in_host(['rm', '-r', '/tmp/netdata-source'])
+        run_command_in_host(['rm', '-r', tmp_src])
 
     else:
-        print("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % 'netdata-%s.tar.gz' % pkg_friendly_version)
+        print("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % generated_tarball)
         sys.exit(1)
