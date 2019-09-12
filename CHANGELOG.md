@@ -4,7 +4,11 @@
 
 **Merged pull requests:**
 
+- netdata/packaging: fix ubuntu/xenial runtime dependencies [\#6825](https://github.com/netdata/netdata/pull/6825) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/ci: Force last good version of git-semver, they broke it [\#6820](https://github.com/netdata/netdata/pull/6820) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/ci: Fix author on triggering commits for packaging [\#6813](https://github.com/netdata/netdata/pull/6813) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: remove fedora/28, is no longer available [\#6808](https://github.com/netdata/netdata/pull/6808) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- netdata/ci: second batch of fixes for coverity scan script and others [\#6804](https://github.com/netdata/netdata/pull/6804) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: work around redhat complaining on build-id binary [\#6792](https://github.com/netdata/netdata/pull/6792) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: fix changelog generation failing the build [\#6778](https://github.com/netdata/netdata/pull/6778) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: override control file for debian/buster [\#6777](https://github.com/netdata/netdata/pull/6777) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -12,6 +16,7 @@
 - netdata/packaging: Trigger stable package generation upon release process [\#6766](https://github.com/netdata/netdata/pull/6766) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - update cache hashes for js and css [\#6756](https://github.com/netdata/netdata/pull/6756) ([jacekkolasa](https://github.com/jacekkolasa))
 - \[libnetdata/thread\] Set thread name from tag [\#6745](https://github.com/netdata/netdata/pull/6745) ([Saruspete](https://github.com/Saruspete))
+- pythond respect prev running jobs and refactor [\#6661](https://github.com/netdata/netdata/pull/6661) ([ilyam8](https://github.com/ilyam8))
 - Stop configure.ac from linking against dbengine and https libraries w… [\#6658](https://github.com/netdata/netdata/pull/6658) ([mfundul](https://github.com/mfundul))
 - Add high level explanation of dashboard contents [\#6648](https://github.com/netdata/netdata/pull/6648) ([joelhans](https://github.com/joelhans))
 - Fix clear notification missing [\#6638](https://github.com/netdata/netdata/pull/6638) ([thiagoftsm](https://github.com/thiagoftsm))
