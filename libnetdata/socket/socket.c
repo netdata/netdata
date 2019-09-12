@@ -1006,7 +1006,8 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
  *                        update the client_host if uninitialized - ensure the hostsize is the number
  *                        of *writable* bytes (i.e. be aware of the strdup used to compact the pollinfo).
  */
-extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list) {
+extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
+                              const char *patname) {
     if (!access_list)
         return 1;
     if (simple_pattern_matches(access_list, client_ip))
@@ -1016,11 +1017,12 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
     {
         struct sockaddr_storage sadr;
         socklen_t addrlen = sizeof(sadr);
-        if (getsockname(fd, (struct sockaddr*)&sadr, &addrlen)!=0 ||
-            getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
-                        NULL, 0, NI_NAMEREQD) != 0) {
+        int err = getpeername(fd, (struct sockaddr*)&sadr, &addrlen);
+        if (err!=0 ||
+            (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
+                              NULL, 0, NI_NAMEREQD)) != 0) {
             error("Incoming connection on '%s' does not match a numeric pattern, "
-                  "and host could not be resolved", client_ip);
+                  "and host could not be resolved (err=%s)", client_ip, gai_strerror(err));
             if (hostsize>=8)
                 strcpy(client_host,"UNKNOWN");
             return 0;
@@ -1063,8 +1065,8 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
             freeaddrinfo(addr_infos);
     }
     if (!simple_pattern_matches(access_list, client_host)) {
-        error("Incoming connection on '%s' (%s) does not match allowed pattern",
-              client_ip, client_host);
+        info("Incoming connection on '%s' (%s) does not match allowed pattern for %s",
+              client_ip, client_host, patname);
         return 0;
     }
     return 1;
@@ -1124,7 +1126,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
-        if(!connection_allowed(fd, client_ip, client_host, hostsize, access_list)) {
+        if(!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection")) {
             errno = 0;
             error("Permission denied for client '%s', port '%s'", client_ip, client_port);
             close(nfd);
