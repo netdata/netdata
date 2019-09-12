@@ -521,8 +521,7 @@ jobs:
     - name: Trigger .RPM and .DEB package generation
       before_script: post_message "TRAVIS_MESSAGE" "Starting RPM and DEB package generation for release" "${NOTIF_CHANNEL}"
       script:
-        - if [[ -z "${GIT_TAG}" ]] || [[ ! "${GIT_TAG}" = "$(git tag --points-at)" ]]; then post_message "TRAVIS_MESSAGE" "<!here> I Did not find a valid GIT_TAG to proceed with stable packaging" "${NOTIF_CHANNEL}" && exit 1; fi;
-        - if [[ -n "${GIT_TAG}" ]] && [[ "${GIT_TAG}" = "$(git tag --points-at)" ]]; then .travis/trigger_package_generation.sh; fi;
+        - .travis/trigger_package_generation.sh
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Stable release package generation produced errors" "${NOTIF_CHANNEL}"
       git:
         depth: false
