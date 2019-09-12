@@ -1012,7 +1012,7 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
         return 1;
     if (simple_pattern_matches(access_list, client_ip))
         return 1;
-    // If the host is uninitialized then 
+    // If the hostname is unresolved (and needed) then attempt the DNS lookups.
     if (client_host[0]==0)
     {
         struct sockaddr_storage sadr;
@@ -1075,7 +1075,7 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
 // --------------------------------------------------------------------------------------------------------------------
 // accept_socket() - accept a socket and store client IP and port
 
-int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, 
+int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
                   char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list) {
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
@@ -1440,7 +1440,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                         client_port[0] = 0;
 
                         debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
-                        nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, INET6_ADDRSTRLEN, client_port, NI_MAXSERV, 
+                        nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, INET6_ADDRSTRLEN, client_port, NI_MAXSERV,
                                             client_host, NI_MAXHOST, p->access_list);
                         if (unlikely(nfd < 0)) {
                             // accept failed
