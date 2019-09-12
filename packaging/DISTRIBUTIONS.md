@@ -188,7 +188,8 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 
 -   **Flags/instructions to enable**: None
 -   **Flags to disable from source**: --disable-plugin-xenstat
--   **What packages required for auto-detect?**: `xen-dom0-libs-devel`, `yajl-dev`
+-   **What packages required for auto-detect?**: `xen-dom0-libs-devel or xen-devel`, `yajl-dev or yajl-devel`
+    Note: for cent-OS based systems you will need `centos-release-xen` repository to get xen-devel
 
 #### CUPS
 
