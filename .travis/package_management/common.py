@@ -158,7 +158,7 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
 
     print(".6 Copy generated tarbal to desired path")
     if os.path.exists('netdata-%s.tar.gz' % pkg_friendly_version):
-        run_command_in_host(['sudo', 'cp', 'netdata-%s.tar.gz' % pkg_friendly_version, tar_file], tmp_src)
+        run_command_in_host(['sudo', 'cp', '%snetdata-%s.tar.gz' % (tmp_src, pkg_friendly_version), tar_file], tmp_src)
 
         print(".7 Fixing permissions on tarball")
         run_command_in_host(['sudo', 'chmod', '777', tar_file], tmp_src)
