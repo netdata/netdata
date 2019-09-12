@@ -19,7 +19,7 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
 
     strncpyz(w->client_ip,   pi->client_ip,   sizeof(w->client_ip) - 1);
     strncpyz(w->client_port, pi->client_port, sizeof(w->client_port) - 1);
-    strncpyz(w->client_host, pi->host,        sizeof(w->client_host) - 1);
+    strncpyz(w->client_host, pi->client_host, sizeof(w->client_host) - 1);
 
     if(unlikely(!*w->client_ip))   strcpy(w->client_ip,   "-");
     if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
@@ -271,6 +271,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
                         , 0
                         , POLLINFO_FLAG_CLIENT_SOCKET
                         , "FILENAME"
+                        , ""
                         , ""
                         , web_server_file_add_callback
                         , web_server_file_del_callback
