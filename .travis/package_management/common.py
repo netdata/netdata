@@ -8,6 +8,8 @@ import lxc
 import subprocess
 import os
 import sys
+import tempfile
+import shutil
 
 def fetch_version(orig_build_version):
     tag = None
@@ -135,7 +137,7 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
 
     print(".0 Copy repo to prepare it for tarball generation")
-    tmp_src = '/tmp/netdata-source/'
+    tmp_src = tempfile.mkdtemp(prefix='netdata-source-')
     run_command_in_host(['cp', '-r', '.', tmp_src])
 
     if tag is not None:
@@ -167,8 +169,7 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
         run_command_in_host(['sudo', 'chmod', '777', tar_file])
 
         print(".8 Returning to original directory, removing temp");
-        run_command_in_host(['rm', '-r', tmp_src])
-
+        shutil.rmtree(tmp_src)
     else:
         print("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % generated_tarball)
         sys.exit(1)
