@@ -236,9 +236,9 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 || (do_detail == CONFIG_BOOLEAN_AUTO && pageline_total_count(pgl) == 0))
                 continue;
 
-            // "pagetype" + NUMA-NodeId + ZoneName + TypeName
-            char setid[8+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME+1];
-            snprintfz(setid, 4+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME, "pagetype_%d_%s_%s", pgl->node, pgl->zone, pgl->type);
+            // "pagetype Node" + NUMA-NodeId + ZoneName + TypeName
+            char setid[13+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME+1];
+            snprintfz(setid, 13+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME, "pagetype_Node%d_%s_%s", pgl->node, pgl->zone, pgl->type);
 
             // Skip explicitely refused charts
             if (simple_pattern_matches(filter_types, setid))
