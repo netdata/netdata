@@ -292,7 +292,6 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             systemorders[o].size += pagelines[p].free_pages_size[o];
         }
 
-        assert(p < pagelines_cnt);
         p++;
     }
 
