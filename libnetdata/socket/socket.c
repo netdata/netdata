@@ -1018,20 +1018,20 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
         struct sockaddr_storage sadr;
         socklen_t addrlen = sizeof(sadr);
         int err = getpeername(fd, (struct sockaddr*)&sadr, &addrlen);
-        if (err!=0 ||
+        if (err != 0 ||
             (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
                               NULL, 0, NI_NAMEREQD)) != 0) {
             error("Incoming connection on '%s' does not match a numeric pattern, "
                   "and host could not be resolved (err=%s)", client_ip, gai_strerror(err));
-            if (hostsize>=8)
+            if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
             return 0;
         }
         struct addrinfo *addr_infos = NULL;
-        if (getaddrinfo(client_host, NULL, NULL, &addr_infos)!=0) {
+        if (getaddrinfo(client_host, NULL, NULL, &addr_infos) !=0 ) {
             error("LISTENER: cannot validate hostname '%s' from '%s' by resolving it",
                   client_host, client_ip);
-            if (hostsize>=8)
+            if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
             return 0;
         }
@@ -1058,7 +1058,7 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
         }
         if (!validated) {
             error("LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS", client_ip, client_host);
-            if (hostsize>=8)
+            if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
         }
         if (addr_infos!=NULL)
