@@ -168,7 +168,8 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
         print(".7 Fixing permissions on tarball")
         run_command_in_host(['sudo', 'chmod', '777', tar_file])
 
-        print(".8 Returning to original directory, removing temp");
+        print(".8 Bring over netdata.spec, Remove temp directory");
+        run_command_in_host(['cp', '%s/netdata.spec' % tmp_src, 'netdata.spec'])
         shutil.rmtree(tmp_src)
     else:
         print("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % generated_tarball)
