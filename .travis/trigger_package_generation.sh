@@ -45,7 +45,19 @@ push_change
 echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
 sleep "${WAIT_TIME}"
 
+commit_change "i386" "DEB"
+push_change
+
+echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
+sleep "${WAIT_TIME}"
+
 commit_change "amd64" "RPM"
+push_change
+
+echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
+sleep "${WAIT_TIME}"
+
+commit_change "i386" "RPM"
 push_change
 
 echo "---- Done! ----"
