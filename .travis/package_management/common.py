@@ -7,6 +7,9 @@
 import lxc
 import subprocess
 import os
+import sys
+import tempfile
+import shutil
 
 def fetch_version(orig_build_version):
     tag = None
@@ -53,10 +56,10 @@ def run_command(container, command):
     if command_result != 0:
         raise Exception("Command failed with exit code %d" % command_result)
 
-def run_command_in_host(cmd):
-    print("Issue command in host: %s" % str(cmd))
+def run_command_in_host(cmd, cwd=None):
+    print("Issue command in host: %s, cwd:%s" % (str(cmd), str(cwd)))
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
     o, e = proc.communicate()
     print('Output: ' + o.decode('ascii'))
     print('Error: '  + e.decode('ascii'))
@@ -133,31 +136,40 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     print(".0 Preparing local implementation tarball for version %s" % pkg_friendly_version)
     tar_file = os.environ['LXC_CONTAINER_ROOT'] + dest_archive
 
+    print(".0 Copy repo to prepare it for tarball generation")
+    tmp_src = tempfile.mkdtemp(prefix='netdata-source-')
+    run_command_in_host(['cp', '-r', '.', tmp_src])
+
     if tag is not None:
         print(".1 Checking out tag %s" % tag)
-        run_command_in_host(['git', 'fetch', '--all'])
+        run_command_in_host(['git', 'fetch', '--all'], tmp_src)
 
         # TODO: Keep in mind that tricky 'v' there, needs to be removed once we clear our versioning scheme
-        run_command_in_host(['git', 'checkout', 'v%s' % pkg_friendly_version])
+        run_command_in_host(['git', 'checkout', 'v%s' % pkg_friendly_version], tmp_src)
 
     print(".2 Tagging the code with version: %s" % pkg_friendly_version)
-    run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]])
+    run_command_in_host(['git', 'tag', '-a', pkg_friendly_version, '-m', 'Tagging while packaging on %s' % os.environ["CONTAINER_NAME"]], tmp_src)
 
     print(".3 Run autoreconf -ivf")
-    run_command_in_host(['autoreconf', '-ivf'])
+    run_command_in_host(['autoreconf', '-ivf'], tmp_src)
 
     print(".4 Run configure")
-    run_command_in_host(['./configure', '--prefix=/usr', '--sysconfdir=/etc', '--localstatedir=/var', '--libdir=/usr/lib', '--libexecdir=/usr/libexec', '--with-math', '--with-zlib', '--with-user=netdata'])
+    run_command_in_host(['./configure', '--prefix=/usr', '--sysconfdir=/etc', '--localstatedir=/var', '--libdir=/usr/lib', '--libexecdir=/usr/libexec', '--with-math', '--with-zlib', '--with-user=netdata'], tmp_src)
 
     print(".5 Run make dist")
-    run_command_in_host(['make', 'dist'])
+    run_command_in_host(['make', 'dist'], tmp_src)
 
     print(".6 Copy generated tarbal to desired path")
-    if os.path.exists('netdata-%s.tar.gz' % pkg_friendly_version):
-        run_command_in_host(['sudo', 'cp', 'netdata-%s.tar.gz' % pkg_friendly_version, tar_file])
+    generated_tarball = '%snetdata-%s.tar.gz' % (tmp_src, pkg_friendly_version)
+
+    if os.path.exists(generated_tarball):
+        run_command_in_host(['sudo', 'cp', generated_tarball, tar_file])
 
         print(".7 Fixing permissions on tarball")
         run_command_in_host(['sudo', 'chmod', '777', tar_file])
+
+        print(".8 Returning to original directory, removing temp");
+        shutil.rmtree(tmp_src)
     else:
-        print("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % 'netdata-%s.tar.gz' % pkg_friendly_version)
+        print("I could not find (%s) on the disk, stopping the build. Kindly check the logs and try again" % generated_tarball)
         sys.exit(1)
