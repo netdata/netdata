@@ -57,8 +57,13 @@ print("Checking version consistency")
 since_version = os.environ["LATEST_RELEASE_VERSION"]
 if str(since_version).replace('v', '') == str(new_version) and str(new_version).count('.') == 2:
     s = since_version.split('.')
-    prev = str(int(s[1]) - 1)
-    since_version = s[0] + '.' + prev + s[2]
+    if int(s[2]) > 0:
+        patch_prev = str(int(s[2]) - 1)
+        since_version = s[0] + '.' + s[1] + '.'  + patch_prev
+    else:
+        prev = str(int(s[1]) - 1)
+        since_version = s[0] + '.' + prev + '.' + s[2]
+
     print("We seem to be building a new stable release, reduce by one since_version option. New since_version:%s" % since_version)
 
 print("Fixing changelog tags")

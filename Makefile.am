@@ -72,7 +72,6 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
-	coverity-install.sh \
 	packaging/installer/netdata-updater.sh \
 	packaging/installer/netdata-uninstaller.sh \
 	packaging/installer/kickstart.sh \
