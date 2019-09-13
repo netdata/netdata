@@ -3162,26 +3162,6 @@ let chartState = function (element) {
         this.data_url += "&gtime=" + this.gtime;
         this.data_url += "&options=" + this.chartURLOptions();
 
-        if(NETDATA.options.redirect_freeze) {
-            let current_interval = Math.floor(Date.now() / 1000) - NETDATA.options.redirect_after;
-            if( (current_interval) > 120 ) {
-                after = NETDATA.options.redirect_after - 60;
-            } else {
-                current_interval /= 2;
-                after = NETDATA.options.redirect_after - current_interval;
-            }
-            if(!NETDATA.options.redirect_before) {
-                if( (current_interval) > 120 ) {
-                    before = NETDATA.options.redirect_after  + 60;
-                } else {
-                    before = NETDATA.options.redirect_after  + current_interval;
-                }
-                NETDATA.options.redirect_before  = before;
-            }else {
-                before = NETDATA.options.redirect_before;
-            }
-        }
-
         if (after) {
             this.data_url += "&after=" + after.toString();
         }

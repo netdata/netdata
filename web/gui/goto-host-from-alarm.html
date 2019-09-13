@@ -70,7 +70,6 @@ var urlOptions = {
     alarm_id: 0,
     alarm_event_id: 0,
     alarm_when: 0,
-    alarm_freeze: false,
     hasProperty: function(property) {
         return typeof this[property] !== 'undefined';
     }
@@ -94,8 +93,6 @@ function netdataQueryParse() {
 }
 
 function netdataURL(url) {
-    var alarm_time = urlOptions.alarm_when;
-
     return url + '#top'
         + ';nowelcome=1'
         // + ';show_alarms=1'
@@ -105,8 +102,7 @@ function netdataURL(url) {
         + ';alarm_unique_id=' + urlOptions.alarm_unique_id.toString()
         + ';alarm_id=' + urlOptions.alarm_id.toString()
         + ';alarm_event_id=' + urlOptions.alarm_event_id.toString()
-        + ';after=' + alarm_time.toString()
-        + ';alarm_freeze=' + urlOptions.alarm_freeze.toString()
+        + ';alarm_when=' + urlOptions.alarm_when.toString()
         ;
 }
 

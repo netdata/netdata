@@ -72,7 +72,6 @@ var urlOptions = {
     alarm_id: 0,
     alarm_event_id: 0,
     alarm_when: 0,
-    alarm_freeze: false,
 
     hasProperty: function (property) {
         // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
@@ -145,7 +144,7 @@ var urlOptions = {
             }
         }
 
-        var numeric = ['after', 'before', 'highlight_after', 'highlight_before'];
+        var numeric = ['after', 'before', 'highlight_after', 'highlight_before', 'alarm_when'];
         len = numeric.length;
         while (len--) {
             if (typeof urlOptions[numeric[len]] === 'string') {
@@ -157,6 +156,22 @@ var urlOptions = {
                     urlOptions[numeric[len]] = 0;
                 }
             }
+        }
+
+        if (urlOptions.alarm_when) {
+            // if alarm_when exists, create after/before params
+            // -/+ 2 minutes from the alarm, and reload the page
+            const alarmTime = new Date(urlOptions.alarm_when * 1000).valueOf();
+            const timeMarginMs = 120000; // 2 mins
+
+            const after = alarmTime - timeMarginMs;
+            const before = alarmTime + timeMarginMs;
+            const newHash = document.location.hash.replace(
+                /;alarm_when=[0-9]*/i,
+                ";after=" + after + ";before=" + before,
+            );
+            history.replaceState(null, '', newHash);
+            location.reload();
         }
 
         if (urlOptions.server !== null && urlOptions.server !== '') {
@@ -2345,7 +2360,7 @@ function alarmsUpdateModal() {
                     void (field);
                     void ($element);
                     let main_url;
-                    let common_url = "&host=" + encodeURIComponent(row['hostname']) + "&chart=" + encodeURIComponent(row['chart']) + "&family=" + encodeURIComponent(row['family']) + "&alarm=" + encodeURIComponent(row['name']) + "&alarm_unique_id=" + row['unique_id'] + "&alarm_id=" + row['alarm_id'] + "&alarm_event_id=" +  row['alarm_event_id'] + "&alarm_when=" + row['when'] + "&alarm_freeze=true";
+                    let common_url = "&host=" + encodeURIComponent(row['hostname']) + "&chart=" + encodeURIComponent(row['chart']) + "&family=" + encodeURIComponent(row['family']) + "&alarm=" + encodeURIComponent(row['name']) + "&alarm_unique_id=" + row['unique_id'] + "&alarm_id=" + row['alarm_id'] + "&alarm_event_id=" +  row['alarm_event_id'] + "&alarm_when=" + row['when'];
                     if (NETDATA.registry.isUsingGlobalRegistry() && NETDATA.registry.machine_guid != null) {
                         main_url = "https://netdata.cloud/alarms/redirect?agentID=" + NETDATA.registry.machine_guid + common_url;
                     } else {
@@ -3093,11 +3108,6 @@ function printPage() {
         }
 
         NETDATA.parseDom();
-        if(urlOptions.alarm_freeze && urlOptions.after > 0) {
-            NETDATA.options.redirect_before = urlOptions.before;
-            NETDATA.options.redirect_after = urlOptions.after;
-            NETDATA.options.redirect_freeze = urlOptions.alarm_freeze;
-        }
         showPageFooter();
 
         NETDATA.globalSelectionSync.stop();
@@ -4406,11 +4416,6 @@ function finalizePage() {
     // if we ommit this, the affix menu will be wrong, since all
     // the Dom elements are initially zero-sized
     NETDATA.parseDom();
-    if(urlOptions.alarm_freeze && urlOptions.after > 0) {
-        NETDATA.options.redirect_after = urlOptions.after;
-        NETDATA.options.redirect_before = urlOptions.before;
-        NETDATA.options.redirect_freeze = urlOptions.alarm_freeze;
-    }
 
     // ------------------------------------------------------------------------
 
