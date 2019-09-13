@@ -248,8 +248,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         ps = NULL;
                     }
                 }
-
-                if (ps)
+                else
                 {
                     ssize_t r = read(ps->capacity->fd, buffer, 30);
                     if(unlikely(r < 1)) {
@@ -257,7 +256,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         power_supply_free(ps);
                         ps = NULL;
                     }
-                    else {
+                    else
+                    {
                         buffer[r] = '\0';
                         ps->capacity->value = str2ull(buffer);
 
