@@ -1,6 +1,6 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [ω1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
 **Merged pull requests:**
 
