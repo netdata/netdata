@@ -160,7 +160,7 @@ def prepare_version_source(dest_archive, pkg_friendly_version, tag=None):
     run_command_in_host(['make', 'dist'], tmp_src)
 
     print(".6 Copy generated tarbal to desired path")
-    generated_tarball = '%snetdata-%s.tar.gz' % (tmp_src, pkg_friendly_version)
+    generated_tarball = '%s/netdata-%s.tar.gz' % (tmp_src, pkg_friendly_version)
 
     if os.path.exists(generated_tarball):
         run_command_in_host(['sudo', 'cp', generated_tarball, tar_file])
