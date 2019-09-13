@@ -130,10 +130,6 @@ var urlOptions = {
             }
         }
 
-        if ((urlOptions.alarm_when > 0) && (urlOptions.after == 0)) {
-            urlOptions.after = urlOptions.alarm_when;
-        }
-
         var booleans = ['nowelcome', 'show_alarms', 'update_always'];
         len = booleans.length;
         while (len--) {
