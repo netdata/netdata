@@ -31,6 +31,8 @@
 //
 // /proc/pagetypeinfo is declared in mm/vmstat.c :: init_mm_internals
 //
+
+// One line of /proc/pagetypeinfo
 struct pageline {
     int node;
     char *zone;
@@ -40,12 +42,7 @@ struct pageline {
     RRDDIM  *rd[MAX_PAGETYPE_ORDER];
 };
 
-struct nodezone {
-    int node;
-    char *zone;
-    struct pageline* lines[MAX_PAGETYPE];
-};
-
+// Sum of all orders
 struct systemorder {
     uint64_t size;
     RRDDIM *rd;
@@ -77,16 +74,20 @@ static inline uint64_t pageline_total_count(struct pageline *p) {
 int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     (void)dt;
 
+    // Config
+    static int do_global, do_detail;
+    static SIMPLE_PATTERN *filter_types = NULL;
+
     // Counters from parsing the file, that doesn't change after boot
     static int cnt_nodes = -1, cnt_zones = -1, cnt_pagetypes = -1, cnt_pageorders = -1;
     static struct systemorder systemorders[MAX_PAGETYPE_ORDER] = {};
     static struct pageline* pagelines = NULL;
     static size_t pagelines_cnt = -1, lines = -1;
 
-	// Handle
+    // Handle
     static procfile *ff = NULL;
 
-	// RRD Sets
+    // RRD Sets
     static RRDSET *st_order = NULL;
     static RRDSET **st_nodezonetype = NULL;
 
@@ -117,6 +118,16 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
             return 1;
         }
+
+        // Configuration
+        do_global = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable system summary", CONFIG_BOOLEAN_YES);
+        do_detail = config_get_boolean_ondemand(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "enable detail per-type", CONFIG_BOOLEAN_AUTO);
+        filter_types = simple_pattern_create(
+                config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "hide charts id matching", "")
+                , NULL
+                , SIMPLE_PATTERN_SUFFIX
+        );
+
 
         // 4th line is the "Free pages count...". Just substract the 8 words.
         cnt_pageorders = procfile_linewords(ff, 3) - 9;
@@ -186,60 +197,65 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         // Init the RRD graphs
 
         // Per-Order: sum of all node, zone, type Grouped by order
-        st_order = rrdset_create_localhost(
-            "mem"
-            , "pagetype_orders"
-            , NULL
-            , "pagetype"
-            , NULL
-            , "System orders available"
-            , "B"
-            , PLUGIN_PROC_NAME
-            , PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
-            , NETDATA_CHART_PRIO_SYSTEM_MEMFRAG
-            , update_every
-            , RRDSET_TYPE_STACKED
-        );
-        for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
-            char id[3+1];
-            snprintfz(id, 3, "%lu", o);
+        if (do_global == CONFIG_BOOLEAN_YES) {
+            st_order = rrdset_create_localhost(
+                "mem"
+                , "pagetype_global"
+                , NULL
+                , "pagetype"
+                , NULL
+                , "System orders available"
+                , "B"
+                , PLUGIN_PROC_NAME
+                , PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
+                , NETDATA_CHART_PRIO_SYSTEM_MEMFRAG
+                , update_every
+                , RRDSET_TYPE_STACKED
+            );
+            for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
+                char id[3+1];
+                snprintfz(id, 3, "%lu", o);
 
-            char name[20+1];
-            dim_name(name, o);
+                char name[20+1];
+                dim_name(name, o);
 
-            systemorders[o].rd = rrddim_add(st_order, id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
-            rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
+                systemorders[o].rd = rrddim_add(st_order, id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
+            }
         }
 
-        // Per Numa-Node & Zone
-        // TODO
 
         // Per-Numa Node & Zone & Type (full detail). Only if sum(line) > 0
         st_nodezonetype = callocz(cnt_zones, sizeof(RRDSET));
         for (p = 0; p < pagelines_cnt; p++) {
             pgl = &pagelines[p];
 
-            // Skip empty pagelines
-            // TODO: add configuration for override
-            if (!pgl || pageline_total_count(pgl) == 0) {
-                error("Skipping zero total for page %lu", p);
+            // Skip invalid, refused or empty pagelines if not explicitely requested
+            if (!pgl
+                || do_detail == CONFIG_BOOLEAN_NO
+                || (do_detail == CONFIG_BOOLEAN_AUTO && pageline_total_count(pgl) == 0))
                 continue;
-            }
 
-            char id[4+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME+1];
-            snprintfz(id, 4+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME, "node%d_%s_%s", pgl->node, pgl->zone, pgl->type);
+            // "pagetype" + NUMA-NodeId + ZoneName + TypeName
+            char setid[8+1+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME+1];
+            snprintfz(setid, 4+2+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME, "pagetype_%d_%s_%s", pgl->node, pgl->zone, pgl->type);
 
-            char name[MAX_ZONETYPE_NAME + MAX_PAGETYPE_NAME +1];
-            snprintfz(name, MAX_ZONETYPE_NAME + MAX_PAGETYPE_NAME, "Node %d %s %s",
+            // Skip explicitely refused charts
+            if (simple_pattern_matches(filter_types, setid))
+                continue;
+
+            // "Node" + NUMA-NodeID + ZoneName + TypeName
+            char setname[4+1+MAX_ZONETYPE_NAME+1+MAX_PAGETYPE_NAME +1];
+            snprintfz(setname, MAX_ZONETYPE_NAME + MAX_PAGETYPE_NAME, "Node %d %s %s",
                 pgl->node, pgl->zone, pgl->type);
 
             st_nodezonetype[p] = rrdset_create_localhost(
                     "mem"
-                    , id
+                    , setid
                     , NULL
                     , "pagetype"
                     , NULL
-                    , name
+                    , setname
                     , "B"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
@@ -248,12 +264,12 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
             for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
-                char id[3+1];
-                snprintfz(id, 3, "%lu", o);
-                char name[20+1];
-                dim_name(name, o);
+                char dimid[3+1];
+                snprintfz(dimid, 3, "%lu", o);
+                char dimname[20+1];
+                dim_name(dimname, o);
 
-                pgl->rd[o] = rrddim_add(st_nodezonetype[p], id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
+                pgl->rd[o] = rrddim_add(st_nodezonetype[p], dimid, dimname, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
             }
         }
     }
@@ -299,26 +315,29 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     // update RRD values
 
     // Global system per order
-    rrdset_next(st_order);
-    for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
-        rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
+    if (do_global) {
+        rrdset_next(st_order);
+        for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
+            rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
+        }
+        rrdset_done(st_order);
     }
-    rrdset_done(st_order);
-
 
     // Per Node-Zone-Type
-    for (p = 0; p < pagelines_cnt; p++) {
-        // Skip empty graphs
-        if (!st_nodezonetype[p]) {
-            error("Skipping line %lu", p);
-            continue;
+    if (do_detail) {
+        for (p = 0; p < pagelines_cnt; p++) {
+            // Skip empty graphs
+            if (!st_nodezonetype[p]) {
+                error("Skipping line %lu", p);
+                continue;
+            }
+
+            rrdset_next(st_nodezonetype[p]);
+            for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
+                rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages_size[o]);
+
+            rrdset_done(st_nodezonetype[p]);
         }
-
-        rrdset_next(st_nodezonetype[p]);
-        for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
-            rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages_size[o]);
-
-        rrdset_done(st_nodezonetype[p]);
     }
 
     return 0;
