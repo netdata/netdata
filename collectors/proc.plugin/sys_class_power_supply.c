@@ -249,28 +249,28 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     }
                 }
 
-                ssize_t r = read(ps->capacity->fd, buffer, 30);
-                if(unlikely(r < 1)) {
-                    error("Cannot read file '%s'", ps->capacity->filename);
-                    if (ps)
-                    {
+                if (ps)
+                {
+                    ssize_t r = read(ps->capacity->fd, buffer, 30);
+                    if(unlikely(r < 1)) {
+                        error("Cannot read file '%s'", ps->capacity->filename);
                         power_supply_free(ps);
                         ps = NULL;
                     }
-                }
-                else {
-                    buffer[r] = '\0';
-                    ps->capacity->value = str2ull(buffer);
-                }
+                    else {
+                        buffer[r] = '\0';
+                        ps->capacity->value = str2ull(buffer);
 
-                if(unlikely(!keep_fds_open)) {
-                    close(ps->capacity->fd);
-                    ps->capacity->fd = -1;
-                }
-                else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
-                    error("Cannot seek in file '%s'", ps->capacity->filename);
-                    close(ps->capacity->fd);
-                    ps->capacity->fd = -1;
+                        if(unlikely(!keep_fds_open)) {
+                            close(ps->capacity->fd);
+                            ps->capacity->fd = -1;
+                        }
+                        else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
+                            error("Cannot seek in file '%s'", ps->capacity->filename);
+                            close(ps->capacity->fd);
+                            ps->capacity->fd = -1;
+                        }
+                    }
                 }
             }
 
