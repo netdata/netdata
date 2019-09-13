@@ -36,7 +36,7 @@ struct pageline {
 	char *zone;
 	char *type;
 	int line;
-	uint64_t free_pages[MAX_PAGETYPE_ORDER];
+	uint64_t free_pages_size[MAX_PAGETYPE_ORDER];
 	RRDDIM  *rd[MAX_PAGETYPE_ORDER];
 };
 
@@ -47,7 +47,7 @@ struct nodezone {
 };
 
 struct systemorder {
-	uint64_t count;
+	uint64_t size;
 	RRDDIM *rd;
 };
 
@@ -56,14 +56,14 @@ struct systemorder {
 static inline uint64_t pageline_total_size(struct pageline *p) {
 	uint64_t sum = 0, o;
 	for (o=0; o<MAX_PAGETYPE_ORDER; o++)
-		sum += p->free_pages[o] * (o+1) * PAGE_SIZE;
+		sum += p->free_pages_size[o] * (o+1) * PAGE_SIZE;
 	return sum;
 }
 
 static inline uint64_t pageline_total_count(struct pageline *p) {
 	uint64_t sum = 0, o;
 	for (o=0; o<MAX_PAGETYPE_ORDER; o++)
-		sum += p->free_pages[o];
+		sum += p->free_pages_size[o];
 	return sum;
 }
 
@@ -177,7 +177,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 			pgl->type = typename;
 			pgl->zone = zonename;
 			for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
-				pgl->free_pages[o] = str2uint64_t(procfile_lineword(ff, l, o+6));
+				pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
 
 			p++;
 		}
@@ -207,7 +207,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 			dim_name(name, o);
 
 			systemorders[o].rd = rrddim_add(st_order, id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
-			rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].count);
+			rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
 		}
 
 		// Per Numa-Node & Zone
@@ -253,7 +253,6 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 				dim_name(name, o);
 
 				pgl->rd[o] = rrddim_add(st_nodezonetype[p], id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
-				rrddim_set_by_pointer(st_order, pgl->rd[o], pgl->free_pages[o]);
 			}
 		}
 	}
@@ -283,13 +282,13 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 		for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
 			// Reset counter
 			if (p == 0)
-				systemorders[o].count = 0;
+				systemorders[o].size = 0;
 
 			// Update orders of the current line
-			pagelines[p].free_pages[o] = str2uint64_t(procfile_lineword(ff, l, o+6));
+			pagelines[p].free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
 
 			// Update sum by order
-			systemorders[o].count += pagelines[p].free_pages[o];
+			systemorders[o].size += pagelines[p].free_pages_size[o];
 		}
 
 		assert(p < pagelines_cnt);
@@ -302,7 +301,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 	// Global system per order
 	rrdset_next(st_order);
 	for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
-		rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].count);
+		rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
 	}
 	rrdset_done(st_order);
 
@@ -317,7 +316,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
 		rrdset_next(st_nodezonetype[p]);
 		for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
-			rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages[o]);
+			rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages_size[o]);
 
 		rrdset_done(st_nodezonetype[p]);
 	}
