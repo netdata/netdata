@@ -1,8 +1,6 @@
 import { combineReducers } from "redux"
-import {
-  globalReducer,
-  globalKey,
-} from "../domains/global/reducer"
+import { globalReducer } from "domains/global/reducer"
+import { storeKey as globalKey } from "domains/global/constants"
 
 import {
   chartReducer,

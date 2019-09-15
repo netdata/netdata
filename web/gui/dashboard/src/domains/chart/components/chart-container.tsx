@@ -4,6 +4,7 @@ import { useInterval } from "react-use"
 
 import { AppStateT } from "store/app-state"
 
+import { selectGlobalPanAndZoom } from "domains/global/selectors"
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { Attributes } from "../utils/transformDataAttributes"
 import { getChartPixelsPerPoint } from "../utils/get-chart-pixels-per-point"
@@ -63,9 +64,17 @@ export const ChartContainer = ({
   }, 2000)
 
 
+  // todo local state option
+  const globalPanAndZoom = useSelector(selectGlobalPanAndZoom)
+  const isGlobalPanAndZoomMaster = !!globalPanAndZoom && globalPanAndZoom.masterID === chartUuid
+
+  useEffect(() => {
+    setShouldFetch(true)
+  }, [globalPanAndZoom])
+
   const {
-    after = window.NETDATA.chartDefaults.after,
-    before = window.NETDATA.chartDefaults.before,
+    after: initialAfter = window.NETDATA.chartDefaults.after,
+    before: initialBefore = window.NETDATA.chartDefaults.before,
   } = attributes
 
   const chartSettings = chartLibrariesSettings[attributes.chartLibrary]
@@ -83,7 +92,36 @@ export const ChartContainer = ({
     if (shouldFetch && chartDetails) {
       // todo can be overriden by main.js
       const forceDataPoints = window.NETDATA.options.force_data_points
-      const pointsMultiplier = 1
+
+      let after
+      let before
+      let pointsMultiplier = 1
+
+      let requestedPadding = 0
+      if (globalPanAndZoom) {
+        // if (globalPanAndZoom.before !== null && globalPanAndZoom.after !== null) {
+        if (isGlobalPanAndZoomMaster) {
+          before = Math.round(globalPanAndZoom.before / 1000)
+          after = Math.round(globalPanAndZoom.after / 1000)
+
+          if (window.NETDATA.options.current.pan_and_zoom_data_padding) {
+            requestedPadding = Math.round((before - after) / 2)
+            after -= requestedPadding
+            before += requestedPadding
+            requestedPadding *= 1000
+            pointsMultiplier = 2
+          }
+        } else {
+          after = Math.round(globalPanAndZoom.after / 1000)
+          before = Math.round(globalPanAndZoom.before / 1000)
+          pointsMultiplier = 1
+        }
+      } else {
+        // no globalPanAndZoom
+        before = initialBefore
+        after = initialAfter
+        pointsMultiplier = 1
+      }
 
       const dataPoints = attributes.points
         || (Math.round(chartWidth / getChartPixelsPerPoint({ attributes, chartSettings })))
@@ -107,8 +145,8 @@ export const ChartContainer = ({
         id: chartUuid,
       }))
     }
-  }, [after, attributes, before, chartDetails, chartSettings, chartUuid, chartWidth, dispatch,
-    hasLegend, portalNode, shouldFetch])
+  }, [attributes, chartDetails, chartSettings, chartUuid, chartWidth, dispatch, globalPanAndZoom,
+    hasLegend, initialAfter, initialBefore, isGlobalPanAndZoomMaster, portalNode, shouldFetch])
 
 
   if (!chartData || !chartDetails) {

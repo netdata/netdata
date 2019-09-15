@@ -3,11 +3,12 @@ import { createSelector } from "reselect"
 
 import { AppStateT } from "store/app-state"
 
-import { GetKeyArguments, getKeyForCommonColorsState, globalKey } from "./reducer"
+import { GetKeyArguments, getKeyForCommonColorsState } from "./reducer"
+import { storeKey } from "./constants"
 
 export const createSelectAssignedColors = (args: GetKeyArguments) => (state: AppStateT) => {
   const keyName = getKeyForCommonColorsState(args)
-  const substate = state[globalKey].commonColorsKeys[keyName]
+  const substate = state[storeKey].commonColorsKeys[keyName]
   return substate && substate.assigned
 }
 
@@ -26,4 +27,9 @@ export const selectGlobalSelection = createSelector(
 export const selectGlobalSelectionMaster = createSelector(
   selectGlobal,
   prop("currentSelectionMasterId"),
+)
+
+export const selectGlobalPanAndZoom = createSelector(
+  selectGlobal,
+  prop("globalPanAndZoom"),
 )
