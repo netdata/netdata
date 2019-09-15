@@ -30,7 +30,7 @@ install:
   - export PACKAGING_USER="netdata" # Standard package cloud account
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
   - export PACKAGE_CLOUD_RETENTION_DAYS=30
-  - if [ "${TRAVIS_REPO_SLUG}" = "paulkatsoulakis/netdata" ]; then export DEPLOY_REPO="netdata-devel";  fi;
+  - if [ ! "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export DEPLOY_REPO="netdata-devel";  fi;
 
 
 
