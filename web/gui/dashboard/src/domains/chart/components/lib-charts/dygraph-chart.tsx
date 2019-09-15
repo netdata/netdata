@@ -1,6 +1,6 @@
 import { findIndex } from "ramda"
 import React, {
-  useLayoutEffect, useRef, useState,
+  useLayoutEffect, useRef, useState, useCallback,
 } from "react"
 import { useSelector } from "react-redux"
 import classNames from "classnames"
@@ -20,6 +20,9 @@ import {
 import { ChartData, ChartDetails } from "../../chart-types"
 
 import "./dygraph-chart.css"
+
+// all noops are just todos, places to not break linter
+const noop: any = () => {}
 
 interface GetInitialDygraphOptions {
   attributes: Attributes,
@@ -276,6 +279,7 @@ interface Props {
   setHoveredX: (hoveredX: number | null) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
+  updateChartPanAndZoom: (arg: { after: number, before: number, masterID: string }) => void
 }
 export const DygraphChart = ({
   attributes,
@@ -292,6 +296,7 @@ export const DygraphChart = ({
   setHoveredX,
   setMinMax,
   unitsCurrent,
+  updateChartPanAndZoom,
 }: Props) => {
   const { xAxisTimeString } = useDateTime()
   const chartSettings = chartLibrariesSettings[chartLibrary]
@@ -300,9 +305,19 @@ export const DygraphChart = ({
   const chartElement = useRef<HTMLDivElement>(null)
   const [dygraphInstance, setDygraphInstance] = useState<Dygraph | null>(null)
 
+  const updateChartPanOrZoom = useCallback(({ after, before }) => {
+    updateChartPanAndZoom({
+      after,
+      before,
+      masterID: chartUuid,
+    })
+  }, [chartUuid, updateChartPanAndZoom])
+
+  const latestIsUserAction = useRef(false)
+
   useLayoutEffect(() => {
     if (chartElement && chartElement.current && !dygraphInstance) {
-      const dygraphOptions = getInitialDygraphOptions({
+      const dygraphOptionsStatic = getInitialDygraphOptions({
         attributes,
         chartData,
         chartDetails,
@@ -315,6 +330,83 @@ export const DygraphChart = ({
         xAxisTimeString,
       })
 
+      latestIsUserAction.current = true
+
+      const dygraphOptions = {
+        ...dygraphOptionsStatic,
+        drawCallback(dygraph: Dygraph) {
+          // the user has panned the chart and this is called to re-draw the chart
+          // 1. refresh this chart by adding data to it
+          // 2. notify all the other charts about the update they need
+
+          // to prevent an infinite loop (feedback), we use
+          //     state.tmp.dygraph_user_action
+          // - when true, this is initiated by a user
+          // - when false, this is feedback
+
+          if (latestIsUserAction.current) {
+            latestIsUserAction.current = false
+            const xRange = dygraph.xAxisRange()
+            const after = Math.round(xRange[0])
+            const before = Math.round(xRange[1])
+
+            // if (before <= netdataLast && after >= netdataFirst) {
+            // todo update only when we are within the data limits
+            updateChartPanOrZoom({ after, before })
+            // }
+          }
+        },
+        interactionModel: {
+          mousedown(event: MouseEvent, dygraph: Dygraph, context: any) {
+            context.initializeMouseDown(event, dygraph, context)
+
+            if (event.button && event.button === 1) {
+              if (event.shiftKey) {
+                noop()
+              } else if (event.altKey || event.ctrlKey || event.metaKey) {
+                noop()
+              } else {
+                noop()
+              }
+            } else if (event.shiftKey) {
+              noop()
+            } else if (event.altKey || event.ctrlKey || event.metaKey) {
+              noop()
+            } else {
+              latestIsUserAction.current = true
+
+              // @ts-ignore
+              Dygraph.startPan(event, dygraph, context)
+            }
+          },
+          mousemove(event: MouseEvent, dygraph: Dygraph, context: any) {
+            // if (state.tmp.dygraph_highlight_after !== null) {
+            // else if (
+            if (context.isPanning) {
+              latestIsUserAction.current = true
+              // eslint-disable-next-line no-param-reassign
+              context.is2DPan = false
+              // @ts-ignore
+              Dygraph.movePan(event, dygraph, context)
+            }
+          },
+          mouseup(event: MouseEvent, dygraph: Dygraph, context: any) {
+            if (context.isPanning) {
+              latestIsUserAction.current = true
+              // @ts-ignore
+              Dygraph.endPan(event, dygraph, context)
+            }
+          },
+          click(event: MouseEvent, dygraph: Dygraph, context: any) {
+            event.preventDefault()
+            noop(dygraph, context)
+          },
+          touchend(event: MouseEvent, dygraph: Dygraph, context: any) {
+            noop(event, dygraph, context)
+          },
+        },
+      }
+
       // todo if any flickering will happen, show the dygraph chart only when it's
       // updated with proper formatting (toggle visibility with css)
       const instance = new Dygraph((chartElement.current), chartData.result.data, dygraphOptions)
@@ -323,8 +415,9 @@ export const DygraphChart = ({
       const extremes = (instance as NetdataDygraph).yAxisExtremes()[0]
       setMinMax(extremes)
     }
-  }, [attributes, chartData, chartDetails, chartSettings, dimensionsVisibility, dygraphInstance,
-    hiddenLabelsElementId, orderedColors, setHoveredX, setMinMax, unitsCurrent, xAxisTimeString])
+  }, [attributes, chartData, chartDetails, chartSettings, chartUuid, dimensionsVisibility,
+    dygraphInstance, hiddenLabelsElementId, orderedColors, setHoveredX, setMinMax,
+    unitsCurrent, updateChartPanOrZoom, xAxisTimeString])
 
   useLayoutEffect(() => {
     if (dygraphInstance && legendFormatValue) {

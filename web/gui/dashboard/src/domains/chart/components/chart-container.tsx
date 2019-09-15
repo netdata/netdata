@@ -158,6 +158,7 @@ export const ChartContainer = ({
       chartData={chartData}
       chartDetails={chartDetails}
       chartUuid={chartUuid}
+      chartWidth={chartWidth}
       portalNode={portalNode}
     />
   )

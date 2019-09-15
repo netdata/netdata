@@ -20,6 +20,7 @@ interface Props {
   chartData: ChartData
   chartDetails: ChartDetails
   chartUuid: string
+  chartWidth: number
   attributes: Attributes
   portalNode: HTMLElement
 }
@@ -55,6 +56,7 @@ export const Chart = ({
   chartData,
   chartDetails,
   chartUuid,
+  chartWidth,
   attributes: {
     chartLibrary,
   },
@@ -159,6 +161,7 @@ export const Chart = ({
         chartLibrary={chartLibrary}
         colors={colors}
         chartUuid={chartUuid}
+        chartWidth={chartWidth}
         dimensionsVisibility={dimensionsVisibility}
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
