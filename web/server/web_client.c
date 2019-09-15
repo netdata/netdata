@@ -791,7 +791,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         w->auth_bearer_token = strdupz(v);
     }
     else if(hash == hash_host && !strcasecmp(s, "Host")){
-        strncpyz(w->host, v, ((size_t)(ve - v) < sizeof(w->host)-1 ? (size_t)(ve - v) : sizeof(w->host)-1));
+        strncpyz(w->server_host, v, ((size_t)(ve - v) < sizeof(w->server_host)-1 ? (size_t)(ve - v) : sizeof(w->server_host)-1));
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
