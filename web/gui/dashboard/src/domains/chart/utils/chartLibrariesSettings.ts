@@ -6,16 +6,24 @@ export type ChartLibraryName = "dygraph"
 // | "gauge" | "textonly"
 export interface ChartLibraryConfig {
   aspectRatio?: number
+  format: string
   hasLegend: (attributes: Attributes) => boolean
   hasToolboxPanAndZoom: boolean
   isLogScale?: (attributes: Attributes) => boolean
   options: (attributes: Attributes) => string
   trackColors: boolean
+  pixelsPerPoint: (attributes: Attributes) => number
   xssRegexIgnore: RegExp
 }
 export type ChartLibrariesSettings = {
   [key in ChartLibraryName]: ChartLibraryConfig
 }
+
+type IsDygraphSparkline = (attributes: Attributes) => boolean
+const isDygraphSparkline: IsDygraphSparkline = (attributes) => (
+  attributes.dygraphTheme === "sparkline"
+)
+
 export const chartLibrariesSettings: ChartLibrariesSettings = {
   dygraph: {
     // initialize: window.NETDATA.dygraphInitialize,
@@ -33,10 +41,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     // initialized: false,
     // enabled: true,
     xssRegexIgnore: new RegExp("^/api/v1/data.result.data$"),
-    // format(state) {
-    //   void (state)
-    //   return "json"
-    // },
+    format: "json",
     options(attributes: Attributes) {
       if (this.isLogScale) {
         return `ms|flip${this.isLogScale(attributes) ? "|abs" : ""}`
@@ -46,8 +51,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     hasLegend(attributes: Attributes) {
       // not using __hasLegendCache__ as in old-dashboard, because performance tweaks like this
       // probably won't be needed in react app
-      const isSparkline = attributes.dygraphTheme === "sparkline"
-      return !isSparkline && attributes.legend
+      return !isDygraphSparkline(attributes) && attributes.legend
     },
     // autoresize(state) {
     //   void (state)
@@ -58,6 +62,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //   return 5000
     // },
     trackColors: true,
+    pixelsPerPoint: ((attributes: Attributes) => (isDygraphSparkline(attributes) ? 2 : 3)),
     // pixels_per_point(state) {
     //   return (this.isSparkline(state) === false) ? 3 : 2
     // },
@@ -302,10 +307,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //   initialized: false,
     //   enabled: true,
     xssRegexIgnore: new RegExp("^/api/v1/data.result$"),
-    //   format(state) {
-    //     void (state)
-    //     return "array"
-    //   },
+    format: "array",
     options() {
       return "absolute"
     },
@@ -321,10 +323,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //     return 5000
     //   },
     trackColors: true,
-    //   pixels_per_point(state) {
-    //     void (state)
-    //     return 3
-    //   },
+    pixelsPerPoint: () => 3,
     aspectRatio: 100,
   //   container_class(state) {
   //     void (state)

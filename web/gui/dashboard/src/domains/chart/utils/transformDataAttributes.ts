@@ -182,7 +182,7 @@ const getAttributesMap = (): AttributesMap => ({
   gtime: { key: "gtime" },
   method: { key: "method" },
   overrideOptions: { key: "override-options" },
-  pixelsPerPoint: { key: "pixels-per-point"},
+  pixelsPerPoint: { key: "pixels-per-point" },
   points: { key: "points" },
 
   // let's not put the default values here, because they will also be needed by the main Agent page

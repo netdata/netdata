@@ -70,11 +70,11 @@ export const AbstractChart = ({
     beforeForced += chartData.view_update_every - (beforeForced % chartData.view_update_every)
 
     // the final wanted duration
-    let wantedDuration = beforeForced - afterForced;
+    let wantedDuration = beforeForced - afterForced
 
     // to allow panning, accept just a point below our minimum
     if ((currentDuraton - chartData.view_update_every) < minDuration) {
-      minDuration = currentDuraton - chartData.view_update_every;
+      minDuration = currentDuraton - chartData.view_update_every
     }
 
     // we do it, but we adjust to minimum size and return false
