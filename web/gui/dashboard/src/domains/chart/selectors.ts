@@ -1,9 +1,10 @@
 import { createSelector } from "reselect"
 
 import { AppStateT } from "store/app-state"
-import { chartKey, initialSingleState } from "./reducer"
+import { initialSingleState } from "./reducer"
+import { storeKey } from "./constants"
 
-export const selectChartsState = (state: AppStateT) => state[chartKey]
+export const selectChartsState = (state: AppStateT) => state[storeKey]
 export const selectSingleChartState = createSelector(
   selectChartsState,
   (_: any, { id }: { id: string }) => id,

@@ -15,7 +15,9 @@ export interface UpdateChartDetailsAction {
   chartDetails: ChartDetails
   id: string
 }
-export const updateChartDetailsAction = createAction<UpdateChartDetailsAction>(`${storeKey}/updateChartDetails`)
+export const updateChartDetailsAction = createAction<UpdateChartDetailsAction>(
+  `${storeKey}/updateChartDetails`,
+)
 
 export interface FetchDataPayload {
   chart: string,

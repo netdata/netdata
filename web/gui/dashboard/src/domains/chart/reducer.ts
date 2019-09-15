@@ -36,5 +36,3 @@ chartReducer.on(updateChartDetailsAction, (state, { id, chartDetails }) => ({
     chartDetails,
   },
 }))
-
-export const chartKey = "chart"
