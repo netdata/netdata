@@ -1,7 +1,6 @@
 import { createAction } from "redux-act"
 
 import { createRequestAction } from "utils/createRequestAction"
-import { Attributes } from "domains/chart/utils/transformDataAttributes"
 
 import { storeKey } from "./constants"
 import { ChartData, ChartDetails } from "./chart-types"
@@ -19,9 +18,17 @@ export interface UpdateChartDetailsAction {
 export const updateChartDetailsAction = createAction<UpdateChartDetailsAction>(`${storeKey}/updateChartDetails`)
 
 export interface FetchDataPayload {
-  attributes: Attributes,
+  chart: string,
+  format: string,
+  points: number,
+  group: string,
+  gtime: number,
+  options: string,
+  after: number | null,
+  before?: number | null,
+  dimensions?: string,
+
   id: string,
-  uuid: string,
 }
 export const fetchDataAction = createRequestAction<
   FetchDataPayload,
