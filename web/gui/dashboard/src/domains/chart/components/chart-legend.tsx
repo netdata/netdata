@@ -225,7 +225,7 @@ export const ChartLegend = ({
                 title={dimensionName}
                 className={classNames(
                   "netdata-legend-value",
-                  isSelected ? "selected" : "not-selected",
+                  !isSelected && "hidden",
                 )}
                 onClick={handleDimensionClick(dimensionName)}
                 role="button"
