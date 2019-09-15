@@ -90,6 +90,13 @@ export interface Attributes {
   commonColors: string | undefined
   decimalDigits: number | undefined
 
+  appendOptions: string | undefined
+  gtime: number | undefined
+  method: string | undefined
+  overrideOptions: string | undefined
+  pixelsPerPoint: number | undefined
+  points: number | undefined
+
   dygraphType: string | undefined
   dygraphValueRange: any[] | undefined
   dygraphTheme: string | undefined
@@ -162,7 +169,7 @@ const getAttributesMap = (): AttributesMap => ({
   width: { key: "width", defaultValue: window.NETDATA.chartDefaults.width },
   height: { key: "height", defaultValue: window.NETDATA.chartDefaults.height },
   after: { key: "after", defaultValue: window.NETDATA.chartDefaults.after },
-  before: { key: "after", defaultValue: window.NETDATA.chartDefaults.before },
+  before: { key: "before", defaultValue: window.NETDATA.chartDefaults.before },
   legend: { key: "legend", type: "boolean", defaultValue: true },
   units: { key: "units" },
   unitsCommon: { key: "common-units" },
@@ -170,6 +177,13 @@ const getAttributesMap = (): AttributesMap => ({
   colors: { key: "colors" },
   commonColors: { key: "common-colors" },
   decimalDigits: { key: "decimal-digits" },
+
+  appendOptions: { key: "append-options" },
+  gtime: { key: "gtime" },
+  method: { key: "method" },
+  overrideOptions: { key: "override-options" },
+  pixelsPerPoint: { key: "pixels-per-point"},
+  points: { key: "points" },
 
   // let's not put the default values here, because they will also be needed by the main Agent page
   // and the Cloud App
