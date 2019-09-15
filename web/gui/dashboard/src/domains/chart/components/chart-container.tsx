@@ -6,6 +6,7 @@ import { AppStateT } from "store/app-state"
 
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { Attributes } from "../utils/transformDataAttributes"
+import { getChartPixelsPerPoint } from "../utils/get-chart-pixels-per-point"
 
 import { fetchDataAction } from "../actions"
 import { selectChartData, selectChartDetails } from "../selectors"
@@ -80,6 +81,14 @@ export const ChartContainer = ({
   const dispatch = useDispatch()
   useEffect(() => {
     if (shouldFetch && chartDetails) {
+      // todo can be overriden by main.js
+      const forceDataPoints = window.NETDATA.options.force_data_points
+      const pointsMultiplier = 1
+
+      const dataPoints = attributes.points
+        || (Math.round(chartWidth / getChartPixelsPerPoint({ attributes, chartSettings })))
+      const points = forceDataPoints || (dataPoints * pointsMultiplier)
+
       const group = attributes.method || window.NETDATA.chartDefaults.method
 
       setShouldFetch(false)
@@ -87,7 +96,7 @@ export const ChartContainer = ({
         // properties to be passed to API
         chart: chartDetails.id,
         format: chartSettings.format,
-        points: 63,
+        points,
         group,
         gtime: attributes.gtime || 0,
         options: getChartURLOptions(attributes),
