@@ -4,6 +4,7 @@
 # the location of plugins in /usr/lib
 DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 TOP = $(CURDIR)/debian/netdata
+TEMPTOP = $(CURDIR)/debian/tmp
 
 %:
 	# For jessie and beyond
@@ -31,9 +32,36 @@ override_dh_install: debian/netdata.postinst
 	#
 	find "$(TOP)" -name .keep -exec rm '{}' ';'
 
+	# Set the CUPS plugin install rule
+	#
+	mkdir -p $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/cups.plugin \
+	$(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
+
+	# Set the rest of the software in the main package
+	#
+	cp -rp $(TEMPTOP)/usr $(TOP)/usr
+	cp -rp $(TEMPTOP)/var $(TOP)/var
+	#cp -rp $(TEMPTOP)/etc $(TOP)/etc
+
+	# Copy sample netdata.conf
+	cp -p $(CURDIR)/system/edit-config $(TOP)/etc/netdata/
+
+	# Create placeholder dirs in netdata configuration directory
+	#
+	mkdir -p $(TOP)/etc/netdata/health.d
+	mkdir -p $(TOP)/etc/netdata/python.d
+	mkdir -p $(TOP)/etc/netdata/charts.d
+	mkdir -p $(TOP)/etc/netdata/cystonm-plugins.d
+	mkdir -p $(TOP)/etc/netdata/go.d
+	mkdir -p $(TOP)/etc/netdata/ssl
+	mkdir -p $(TOP)/etc/netdata/node.d
+	mkdir -p $(TOP)/etc/netdata/statsd.d
+
+
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
-	mkdir -p "$(TOP)/usr/share/netdata"
+	mkdir -p "$(TOP)/usr/share/netdata/www"
 	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
 		echo Relocating $$D; \
 		mv "$(TOP)/var/lib/netdata/www/$$D" "$(TOP)/usr/share/netdata/www/$$D"; \
@@ -55,7 +83,7 @@ override_dh_install: debian/netdata.postinst
 
 	# Install go
 	#
-	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/$(DEB_HOST_MULTIARCH)/netdata/ $(TOP)/usr/libexec/netdata
+	debian/install_go.sh $$(cat ${CURDIR}/packaging/go.d.version) $(TOP)/usr/lib/netdata $(TOP)/usr/libexec/netdata
 
 override_dh_installdocs:
 	dh_installdocs
@@ -80,6 +108,13 @@ override_dh_fixperms:
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
 	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
+
+	# Support script for configuration file management
+	#
+	chmod 0750 $(TOP)/etc/netdata/edit-config
+
+	# CUPS plugin package
+	chmod 0750 $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
 
 override_dh_installlogrotate:
 	cp system/netdata.logrotate debian/netdata.logrotate

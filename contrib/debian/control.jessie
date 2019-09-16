@@ -41,7 +41,6 @@ Depends: adduser,
          openssl,
          libmnl0,
          libjson-c3,
-         cups,
          freeipmi,
          libnetfilter-acct1,
          libprotobuf-c1,
@@ -54,3 +53,9 @@ Description: real-time charts for system monitoring
  and presents a web site to view and analyze them. The presentation
  is also real-time and full of interactive charts that precisely
  render all collected values.
+
+Package: netdata-plugin-cups
+Architecture: any
+Depends: cups,
+         netdata (>= ${source:Version})
+Description: The Common Unix Printing System plugin for metrics collection from cupds
