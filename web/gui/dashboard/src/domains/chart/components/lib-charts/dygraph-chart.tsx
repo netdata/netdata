@@ -330,7 +330,7 @@ export const DygraphChart = ({
         xAxisTimeString,
       })
 
-      latestIsUserAction.current = true
+      latestIsUserAction.current = false
 
       const dygraphOptions = {
         ...dygraphOptionsStatic,
