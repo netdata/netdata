@@ -2111,7 +2111,7 @@ function alarmsUpdateModal() {
             var badge_url = NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto';
 
             var action_buttons = '<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/>'
-                + '<div class="action-button ripple" title="click to scroll the dashboard to the chart of this alarm" data-toggle="tooltip" data-placement="bottom" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;"><i class="fab fa-periscope"></i></div>'
+                + '<div class="action-button ripple" title="click to scroll the dashboard to the chart of this alarm" data-toggle="tooltip" data-placement="bottom" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\', ' + alarm.last_status_change * 1000 + ', \'' + alarm.status + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;"><i class="fab fa-periscope"></i></div>'
                 + '<div class="action-button ripple" title="click to copy to the clipboard the URL of this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopy(\'' + badge_url + '\'); return false;"><i class="far fa-copy"></i></div>'
                 + '<div class="action-button ripple" title="click to copy to the clipboard an auto-refreshing <code>embed</code> html element for this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopyBadgeEmbed(\'' + badge_url + '\'); return false;"><i class="fas fa-copy"></i></div>';
 
@@ -3994,9 +3994,21 @@ function scrollDashboardTo() {
 
 var modalHiddenCallback = null;
 
-function scrollToChartAfterHidingModal(chart) {
+function scrollToChartAfterHidingModal(chart, alarmDate, alarmStatus) {
     modalHiddenCallback = function () {
-        NETDATA.alarms.scrollToChart(chart);
+        NETDATA.alarms.scrollToChart(chart, alarmDate);
+
+        if (['WARNING', 'CRITICAL'].includes(alarmStatus)) {
+            const currentChartState = NETDATA.options.targets.find(
+              (chartState) => chartState.id === chart,
+            )
+            const twoMinutes = 2 * 60 * 1000
+            NETDATA.globalPanAndZoom.setMaster(
+              currentChartState,
+              alarmDate - twoMinutes,
+              alarmDate + twoMinutes,
+            )
+        }
     };
 }
 
