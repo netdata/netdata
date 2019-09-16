@@ -313,7 +313,10 @@ export const DygraphChart = ({
     })
   }, [chartUuid, updateChartPanAndZoom])
 
+  // state.tmp.dygraph_user_action in old dashboard
   const latestIsUserAction = useRef(false)
+  // state.tmp.dygraph_mouse_down in old dashboard
+  const isMouseDown = useRef(false)
 
   useLayoutEffect(() => {
     if (chartElement && chartElement.current && !dygraphInstance) {
@@ -357,25 +360,43 @@ export const DygraphChart = ({
             }
           }
         },
+        zoomCallback: (minDate: number, maxDate: number) => {
+          latestIsUserAction.current = true
+          updateChartPanOrZoom({ after: minDate, before: maxDate })
+        },
         interactionModel: {
           mousedown(event: MouseEvent, dygraph: Dygraph, context: any) {
+            // Right-click should not initiate anything.
+            if (event.button && event.button === 2) {
+              return
+            }
+
+            latestIsUserAction.current = true
+            isMouseDown.current = true
             context.initializeMouseDown(event, dygraph, context)
 
             if (event.button && event.button === 1) {
+              // middle mouse button
               if (event.shiftKey) {
-                noop()
+                // panning
+                // @ts-ignore
+                Dygraph.startPan(event, dygraph, context)
               } else if (event.altKey || event.ctrlKey || event.metaKey) {
+                // middle mouse button highlight
                 noop()
               } else {
+                // middle mouse button selection for zoom
                 noop()
               }
             } else if (event.shiftKey) {
-              noop()
+              // left mouse button selection for zoom (ZOOM)
+              // @ts-ignore
+              Dygraph.startZoom(event, dygraph, context)
             } else if (event.altKey || event.ctrlKey || event.metaKey) {
+              // left mouse button highlight
               noop()
             } else {
-              latestIsUserAction.current = true
-
+              // left mouse button dragging (PAN)
               // @ts-ignore
               Dygraph.startPan(event, dygraph, context)
             }
@@ -389,13 +410,21 @@ export const DygraphChart = ({
               context.is2DPan = false
               // @ts-ignore
               Dygraph.movePan(event, dygraph, context)
+            } else if (context.isZooming) {
+              // @ts-ignore
+              Dygraph.moveZoom(event, dygraph, context)
             }
           },
           mouseup(event: MouseEvent, dygraph: Dygraph, context: any) {
+            isMouseDown.current = false
             if (context.isPanning) {
               latestIsUserAction.current = true
               // @ts-ignore
               Dygraph.endPan(event, dygraph, context)
+            } else if (context.isZooming) {
+              latestIsUserAction.current = true
+              // @ts-ignore
+              Dygraph.endZoom(event, dygraph, context)
             }
           },
           click(event: MouseEvent, dygraph: Dygraph, context: any) {
