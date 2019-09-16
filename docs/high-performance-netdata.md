@@ -126,7 +126,7 @@ You can check limits with following commands:
 
 ```sh
 cat /proc/$(ps aux | grep "nginx: master process" | grep -v grep | awk '{print $2}')/limits | grep "Max open files"
-cat /proc/$(ps aux | grep "netdata" | head -n1 | grep -v grep | awk '{print $2}')/limits | grep "Max open files"
+cat /proc/$(ps aux | grep "\/[n]etdata " | head -n1 | grep -v grep | awk '{print $2}')/limits | grep "Max open files"
 ```
 
 View of the files:
