@@ -8,6 +8,7 @@ exclude_paths:
   - contrib/**
   - packaging/makeself/**
   - web/gui/css/**
+  - web/gui/dashboard/**
   - web/gui/lib/**
   - web/gui/old/**
   - web/gui/src/**
