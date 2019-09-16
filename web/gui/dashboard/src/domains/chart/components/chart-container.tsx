@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useLayoutEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { useInterval, useThrottle } from "react-use"
 
 import { AppStateT } from "store/app-state"
 
 import { selectGlobalPanAndZoom } from "domains/global/selectors"
+import { forEachObjIndexed } from "ramda"
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { Attributes } from "../utils/transformDataAttributes"
 import { getChartPixelsPerPoint } from "../utils/get-chart-pixels-per-point"
+import { getPortalNodeStyles } from "../utils/get-portal-node-styles"
 
 import { fetchDataAction } from "../actions"
 import { selectChartData, selectChartDetails } from "../selectors"
@@ -84,6 +86,8 @@ export const ChartContainer = ({
 
   const chartSettings = chartLibrariesSettings[attributes.chartLibrary]
   const { hasLegend } = chartSettings
+
+  const [hasPortalNodeBeenStyled, setHasPortalNodeBeenStyled] = useState<boolean>(false)
   // todo take width via hook/HOC and put this into useMemo
   const chartWidth = portalNode.getBoundingClientRect().width
     - (hasLegend ? 140 : 0)
@@ -94,7 +98,7 @@ export const ChartContainer = ({
   const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
   const dispatch = useDispatch()
   useEffect(() => {
-    if (shouldFetch && chartDetails) {
+    if (shouldFetch && chartDetails && hasPortalNodeBeenStyled) {
       // todo can be overriden by main.js
       const forceDataPoints = window.NETDATA.options.force_data_points
 
@@ -151,7 +155,21 @@ export const ChartContainer = ({
       }))
     }
   }, [attributes, chartDetails, chartSettings, chartUuid, chartWidth, dispatch, globalPanAndZoom,
-    hasLegend, initialAfter, initialBefore, isGlobalPanAndZoomMaster, portalNode, shouldFetch])
+    hasLegend, hasPortalNodeBeenStyled, initialAfter, initialBefore, isGlobalPanAndZoomMaster,
+    portalNode, shouldFetch])
+
+  // todo omit this for Cloud/Main Agent app
+  useLayoutEffect(() => {
+    const styles = getPortalNodeStyles(attributes, chartSettings)
+    forEachObjIndexed((value, styleName) => {
+      if (value) {
+        portalNode.style.setProperty(styleName, value)
+      }
+    }, styles)
+    // eslint-disable-next-line no-param-reassign
+    portalNode.className = hasLegend ? "netdata-container-with-legend" : "netdata-container"
+    setHasPortalNodeBeenStyled(true)
+  }, [attributes, chartSettings, hasLegend, portalNode, setHasPortalNodeBeenStyled])
 
 
   if (!chartData || !chartDetails) {
@@ -164,7 +182,6 @@ export const ChartContainer = ({
       chartDetails={chartDetails}
       chartUuid={chartUuid}
       chartWidth={chartWidth}
-      portalNode={portalNode}
     />
   )
 }

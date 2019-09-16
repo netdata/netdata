@@ -1,6 +1,6 @@
-import { __, forEachObjIndexed, prop } from "ramda"
+import { __, prop } from "ramda"
 import React, {
-  useEffect, useLayoutEffect, useState, useCallback, useMemo,
+  useEffect, useState, useCallback, useMemo,
 } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
@@ -9,7 +9,7 @@ import { createSelectAssignedColors, selectGlobalSelection } from "domains/globa
 
 import { ChartLegend } from "./chart-legend"
 import { Attributes } from "../utils/transformDataAttributes"
-import { chartLibrariesSettings, ChartLibraryConfig } from "../utils/chartLibrariesSettings"
+import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { ChartData, ChartDetails } from "../chart-types"
 import { LegendToolbox } from "./legend-toolbox"
 import { ResizeHandler } from "./resize-handler"
@@ -22,34 +22,6 @@ interface Props {
   chartUuid: string
   chartWidth: number
   attributes: Attributes
-  portalNode: HTMLElement
-}
-
-const getStyles = (attributes: Attributes, chartSettings: ChartLibraryConfig) => {
-  let width
-  if (typeof attributes.width === "string") {
-    // eslint-disable-next-line prefer-destructuring
-    width = attributes.width
-  } else if (typeof attributes.width === "number") {
-    width = `${attributes.width.toString()}px`
-  }
-  let height
-  if (chartSettings.aspectRatio === undefined) {
-    if (typeof attributes.height === "string") {
-      // eslint-disable-next-line prefer-destructuring
-      height = attributes.height
-    } else if (typeof attributes.height === "number") {
-      height = `${attributes.height.toString()}px`
-    }
-  }
-  const minWidth = window.NETDATA.chartDefaults.min_width !== null
-    ? window.NETDATA.chartDefaults.min_width
-    : undefined
-  return {
-    height,
-    width,
-    minWidth,
-  }
 }
 
 export const Chart = ({
@@ -61,7 +33,6 @@ export const Chart = ({
     chartLibrary,
   },
   attributes,
-  portalNode,
 }: Props) => {
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
@@ -100,18 +71,6 @@ export const Chart = ({
     dimensionNamesFlatString,
   ])
 
-  // todo omit this for Cloud/Main Agent app
-  useLayoutEffect(() => {
-    const styles = getStyles(attributes, chartSettings)
-    forEachObjIndexed((value, styleName) => {
-      if (value) {
-        portalNode.style.setProperty(styleName, value)
-      }
-    }, styles)
-    // eslint-disable-next-line no-param-reassign
-    portalNode.className = hasLegend ? "netdata-container-with-legend" : "netdata-container"
-  }, [attributes, chartSettings, hasLegend, portalNode])
-
   const {
     legendFormatValue,
     legendFormatValueDecimalsFromMinMax,
@@ -148,7 +107,7 @@ export const Chart = ({
   })
   const colors = useSelector(selectAssignedColors)
   if (!colors) {
-    return null
+    return null // wait for createSelectAssignedColors reducer result to come back
   }
   const orderedColors = chartData.dimension_names.map(prop(__, colors))
 
