@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { useInterval } from "react-use"
+import { useInterval, useThrottle } from "react-use"
 
 import { AppStateT } from "store/app-state"
 
@@ -68,9 +68,14 @@ export const ChartContainer = ({
   const globalPanAndZoom = useSelector(selectGlobalPanAndZoom)
   const isGlobalPanAndZoomMaster = !!globalPanAndZoom && globalPanAndZoom.masterID === chartUuid
 
+  // don't send new requests too often (throttle)
+  // corresponds to force_update_at in old dashboard
+  // + 50 is because normal loop only happened there once per 100ms anyway..
+  const globalPanAndZoomThrottled = useThrottle(globalPanAndZoom,
+    window.NETDATA.options.current.pan_and_zoom_delay + 50)
   useEffect(() => {
     setShouldFetch(true)
-  }, [globalPanAndZoom])
+  }, [globalPanAndZoomThrottled])
 
   const {
     after: initialAfter = window.NETDATA.chartDefaults.after,
