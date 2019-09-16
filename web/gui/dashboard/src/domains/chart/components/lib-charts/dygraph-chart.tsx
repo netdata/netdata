@@ -350,10 +350,11 @@ export const DygraphChart = ({
             const after = Math.round(xRange[0])
             const before = Math.round(xRange[1])
 
-            // if (before <= netdataLast && after >= netdataFirst) {
-            // todo update only when we are within the data limits
-            updateChartPanOrZoom({ after, before })
-            // }
+            if (before <= (chartData.last_entry * 1000)
+              && after >= (chartData.first_entry * 1000)
+            ) {
+              updateChartPanOrZoom({ after, before })
+            }
           }
         },
         interactionModel: {
