@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 %global contentdir %{_datadir}/netdata
-
+%global version @PACKAGE_VERSION@
 
 #TODO: Temporary fix for the build-id error during go.d plugin set up
 %global _missing_build_ids_terminate_build 0
@@ -83,7 +83,7 @@ fi \
 
 Summary:	Real-time performance monitoring, done right!
 Name:		netdata
-Version:	@PACKAGE_VERSION@
+Version:	%{version}
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
@@ -193,7 +193,6 @@ Requires: freeipmi
 
 # CUPS plugin dependencies
 BuildRequires: cups-devel
-Requires: cups
 # end - cups plugin dependencies
 
 # Prometheus remote write dependencies
@@ -275,6 +274,11 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 # ###########################################################
 # Install perf.plugin
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
+
+# ###########################################################
+# Install cups.plugin
+install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
+
 
 # ###########################################################
 # Install registry directory
@@ -483,8 +487,25 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
+# CUPS belongs to a different sub package
+%exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
+
+%package plugin-cups
+Summary: The Common Unix Printing System plugin for netdata
+Group: Applications/System
+Requires: cups
+Requires: netdata = %{version}
+
+%description plugin-cups
+ This is the Common Unix Printing System plugin for the netdata daemon.
+Use this plugin to enable metrics collection from cupsd, the daemon running when CUPS is enabled on the system
+
+%files plugin-cups
+%attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 
 %changelog
+* Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdat.acloud> - 0.0.0-8
+- Split CUPS functionality on separate package
 * Fri Jun 28 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-7
 - Raise the path overrides to the spec file level, not just the configure.
 - Adjust tighter permissions on some folders, based on what we did on our installer
