@@ -63,18 +63,19 @@ export const AbstractChart = ({
 
     let afterForced = Math.round(after)
     let beforeForced = Math.round(before)
+    const viewUpdateEvery = chartData.view_update_every * 1000
 
     // align them to update_every
     // stretching them further away
-    afterForced -= afterForced % (chartData.view_update_every * 1000)
-    beforeForced += chartData.view_update_every - (beforeForced % chartData.view_update_every)
+    afterForced -= afterForced % (viewUpdateEvery)
+    beforeForced += viewUpdateEvery - (beforeForced % viewUpdateEvery)
 
     // the final wanted duration
     let wantedDuration = beforeForced - afterForced
 
     // to allow panning, accept just a point below our minimum
-    if ((currentDuraton - chartData.view_update_every) < minDuration) {
-      minDuration = currentDuraton - chartData.view_update_every
+    if ((currentDuraton - viewUpdateEvery) < minDuration) {
+      minDuration = currentDuraton - viewUpdateEvery
     }
 
     // we do it, but we adjust to minimum size and return false
@@ -91,8 +92,8 @@ export const AbstractChart = ({
       doCallback = false
     }
 
-    const tolerance = chartData.view_update_every * 2
-    const movement = Math.abs(beforeForced - chartData.view_update_every)
+    const tolerance = viewUpdateEvery * 2
+    const movement = Math.abs(beforeForced - viewBefore)
 
     if (
       Math.abs(currentDuraton - wantedDuration) <= tolerance && movement <= tolerance && doCallback
