@@ -197,7 +197,7 @@ class ModuleConfig:
         return [v for v in self.config if isinstance(self.config.get(v), dict)]
 
     def single_job(self):
-        return [self.create_job(self.name)]
+        return [self.create_job(self.name, self.config)]
 
     def multi_job(self):
         return [self.create_job(n, self.config[n]) for n in self.job_names()]
