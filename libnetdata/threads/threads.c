@@ -109,6 +109,31 @@ static void thread_cleanup(void *ptr) {
     netdata_thread = NULL;
 }
 
+static void thread_set_name(NETDATA_THREAD *nt) {
+
+    if (nt->tag) {
+        int ret = 0;
+
+        // Name is limited to 16 chars
+        char threadname[16];
+        strncpyz(threadname, nt->tag, 15);
+
+#if defined(__FreeBSD__)
+        pthread_set_name_np(pthread_self(), threadname);
+#elif defined(__APPLE__)
+        ret = pthread_setname_np(threadname);
+#else
+        ret = pthread_setname_np(pthread_self(), threadname);
+#endif
+
+        if (ret != 0)
+            error("cannot set pthread name of %d to %s. ErrCode: %d", gettid(), threadname, ret);
+        else
+            info("set name of thread %d to %s", gettid(), threadname);
+
+    }
+}
+
 static void *thread_start(void *ptr) {
     netdata_thread = (NETDATA_THREAD *)ptr;
 
@@ -120,6 +145,8 @@ static void *thread_start(void *ptr) {
 
     if(pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
         error("cannot set pthread cancel state to ENABLE.");
+
+    thread_set_name(ptr);
 
     void *ret = NULL;
     pthread_cleanup_push(thread_cleanup, ptr);
