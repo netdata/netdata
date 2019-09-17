@@ -1,7 +1,15 @@
 #!/usr/bin/env sh
+#
 # SPDX-License-Identifier: GPL-3.0-or-later
 # shellcheck disable=SC1117,SC2039,SC2059,SC2086
-
+#
+#  Options to run
+#  --dont-wait              do not wait for input
+#  --non-interactive        do not wait for input
+#  --dont-start-it          do not start netdata after install
+#  --stable-channel         Use the stable release channel, rather than the nightly to fetch sources
+#  --local-files Use a manually provided tarball for the installation
+#
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
 
@@ -127,6 +135,11 @@ download() {
 }
 
 set_tarball_urls() {
+	if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then
+		progress "Not fetching remote tarballs, local override was given"
+		return
+	fi
+
 	if [ "$1" = "stable" ]; then
 		local latest
 		# Simple version
@@ -179,11 +192,24 @@ while [ -n "${1}" ]; do
 		inner_opts="${inner_opts} ${1}"
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
+	elif [ "${1}" = "--local-files" ]; then
+		shift 1
+		if [ -z "${1}" ]; then
+			fatal "Option --local-files requires extra information. The desired tarball full filename is needed"
+		fi
+
+		NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
+		shift 1
+		if [ -z "${1}" ]; then
+			fatal "Option --local-files requires a pair of the tarball source and the checksum file"
+		fi
+
+		NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
+		shift 1
 	else
-		echo >&2 "Unknown option '${1}'"
+		echo >&2 "Unknown option '${1}' or invalid number of arguments. Please check the README for the available arguments of ${0} and try again"
 		exit 1
 	fi
-	shift
 done
 [ -n "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
 
@@ -191,11 +217,18 @@ done
 TMPDIR=$(create_tmp_directory)
 cd "${TMPDIR}"
 
-set_tarball_urls "${RELEASE_CHANNEL}"
-progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
+if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then
+	set_tarball_urls "${RELEASE_CHANNEL}"
+	progress "Downloading static netdata binary: ${NETDATA_TARBALL_URL}"
 
-download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
-download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
+	download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
+	download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.gz.run"
+else
+	progress "Installation sources were given as input, running installation using \"${NETDATA_LOCAL_TARBALL_OVERRIDE}\""
+	run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE}" "${TMPDIR}/netdata-latest.gz.run"
+	run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM}" "${TMPDIR}/sha256sum.txt"
+fi
+
 if ! grep netdata-latest.gz.run "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
 	fatal "Static binary checksum validation failed. Stopping netdata installation and leaving binary in ${TMPDIR}"
 fi

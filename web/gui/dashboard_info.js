@@ -498,6 +498,12 @@ netdataDashboard.menu = {
         title: 'vSphere',
         icon: '<i class="fas fa-server"></i>',
         info: 'Performance statistics for ESXI hosts and virtual machines. Data collected from <a href="https://www.vmware.com/products/vcenter-server.html">VMware vCenter Server</a> using <code><a href="https://github.com/vmware/govmomi"> govmomi</a></code>  library.'
+    },
+
+    'vcsa': {
+        title: 'VCSA',
+        icon: '<i class="fas fa-server"></i>',
+        info: 'vCenter Server Appliance health statistics. Data collected from <a href="https://vmware.github.io/vsphere-automation-sdk-rest/vsphere/index.html#SVC_com.vmware.appliance.health">Health API</a>.'
     }
 };
 
@@ -2587,5 +2593,37 @@ netdataDashboard.context = {
 
     'vsphere.overall_status': {
         info: '<code>0</code> is unknown, <code>1</code> is OK, <code>2</code> is might have a problem, <code>3</code> is definitely has a problem.'
-    }
+    },
+
+    // ------------------------------------------------------------------------
+    // VCSA
+    'vcsa.system_health': {
+        info:
+            '<code>-1</code>: unknown; ' +
+            '<code>0</code>: all components are healthy; ' +
+            '<code>1</code>: one or more components might become overloaded soon; ' +
+            '<code>2</code>: one or more components in the appliance might be degraded; ' +
+            '<code>3</code>: one or more components might be in an unusable status and the appliance might become unresponsive soon; ' +
+            '<code>4</code>: no health data is available.'
+            },
+
+    'vcsa.components_health': {
+        info:
+            '<code>-1</code>: unknown; ' +
+            '<code>0</code>: healthy; ' +
+            '<code>1</code>: healthy, but may have some problems; ' +
+            '<code>2</code>: degraded, and may have serious problems; ' +
+            '<code>3</code>: unavailable, or will stop functioning soon; ' +
+            '<code>4</code>: no health data is available.'
+            },
+
+    'vcsa.software_updates_health': {
+        info:
+            '<code>softwarepackages</code> represents information on available software updates available in the remote vSphere Update Manager repository.<br>' +
+            '<code>-1</code>: unknown; ' +
+            '<code>0</code>: no updates available; ' +
+            '<code>2</code>: non-security updates are available; ' +
+            '<code>3</code>: security updates are available; ' +
+            '<code>4</code>: an error retrieving information on software updates.'
+            }
 };

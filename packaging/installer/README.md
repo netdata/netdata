@@ -48,7 +48,7 @@ To learn more about the pros and cons of using *nightly* vs. *stable* releases, 
 Verify the integrity of the script with this:
 
 ```bash
-[ "b6d16c171ccad073b86327246151d875" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "735e9966a4cf0187863e06a5282b34a7" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 _It should print `OK, VALID` if the script is the one we ship._
@@ -67,13 +67,14 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
+-   `--local-files`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
 
 Example using all the above parameters:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel
+$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt /tmp/manually.downloaded.go.d.binary.tar.gz /tmp/manually.downloaded.go.d.config.tar.gz
 ```
-
+Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
 
 Once Netdata is installed, see [Getting Started](../../docs/GettingStarted.md).
@@ -108,7 +109,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "4415e8c13e529a795abb953a9be14ad5" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "5c432e78d5f40403e8b7c00b1a19a7ca" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -119,12 +120,14 @@ The `kickstart-static64.sh` script passes all its parameters to `netdata-install
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
+-   `--local-files`: Used for offline installations. Pass two file paths, one for the tarball and one fir the checksum file, to force kickstart run the process using those files.
 
 Example using all the above parameters:
 
 ```sh
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel
+$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
 ```
+Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 
 If your shell fails to handle the above one liner, do this:
 
@@ -503,6 +506,76 @@ The Netdata team maintains two releases of the Netdata agent: **nightly** and **
 
 -   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata installation
 -   Retain more control over the Netdata version you use
+
+## Offline installations
+
+You can install Netdata on systems without internet access, but you need to take
+a few extra steps to make it work.
+
+By default, the `kickstart.sh` and `kickstart-static64.sh` download Netdata
+assets, like the precompiled binary and a few dependencies, using the system's
+internet connection, but you can also supply these files from the local filesystem.
+
+First, download the required files. If you're using `kickstart.sh`, you need the
+Netdata tarball, the checksums, the go.d plugin binary, and the go.d plugin
+configuration. If you're using `kickstart-static64.sh`, you need only the
+Netdata tarball and checksums.
+
+Download the files you need to a system of yours that's connected to the
+internet. You can use the commands below, or visit the [latest Netdata release
+page](https://github.com/netdata/netdata/releases/latest) and [latest go.d
+plugin release page](https://github.com/netdata/go.d.plugin/releases) to
+download the required files manually.
+
+```bash
+cd /tmp
+
+# Since you won't be having an active internet connection on the destination, you will need to manually get the kickstart script itself
+# Download kickstart.sh or kickstart-static64.sh, depending the installation you have chosen to run
+curl -s https://my-netdata.io/kickstart.sh > kickstart.sh
+or
+curl -s https://my-netdata.io/kickstart-static64.sh > kickstart-static64.sh
+
+# Netdata tarball
+curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
+
+# Netdata checksums
+curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
+
+# Netdata dependency handling script
+curl -s https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh | wget -qi -
+
+# go.d plugin 
+# For binaries for OS types and architectures not listed on [go.d releases](https://github.com/netdata/go.d.plugin/releases/latest), kindly open a github issue and we will do our best to serve your request
+export OS=$(uname -s | tr '[:upper:]' '[:lower:]') ARCH=$(uname -m | sed -e 's/i386/386/g' -e 's/i686/386/g' -e 's/x86_64/amd64/g' -e 's/aarch64/arm64/g' -e 's/armv64/arm64/g' -e 's/armv6l/arm/g' -e 's/armv7l/arm/g' -e 's/armv5tel/arm/g') && curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*${OS}-${ARCH}.tar.gz" | cut -d '"' -f 4 | wget -qi -
+
+# go.d configuration 
+curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
+```
+
+Move these files to the `/tmp` directory on the offline system in whichever way
+your defined policy allows (if any).
+
+Now you can run either the `kickstart.sh` or `kickstart-static64.sh` scripts
+using the `--local-files` option. This option requires you to specify
+the location and names of the files you just downloaded. 
+
+!!! note When using `--local-files`, the `kickstart.sh` or
+    `kickstart-static64.sh` scripts won't download any Netdata assets from the
+    internet. But, you may still need a connection to install dependencies using
+    your system's package manager. The scripts will warn you if your system
+    doesn't have all the dependencies.
+
+```bash
+# kickstart.sh
+bash kickstart.sh --local-files /tmp/netdata-version-number-here.tar.gz /tmp/sha256sums.txt /tmp/go.d-binary-filename.tar.gz /tmp/config.tar.gz /tmp/install-required-packages.sh
+
+# kickstart-static64.sh
+bash kickstart-static64.sh --local-files /tmp/netdata.tar.gz /tmp/checksums.txt
+```
+
+Now that you're finished with your offline installation, you can move on to our
+[getting started guide](../../docs/GettingStarted.md)!
 
 ## Automatic updates
 
