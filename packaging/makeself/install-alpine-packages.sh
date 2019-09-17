@@ -1,9 +1,16 @@
 #!/usr/bin/env sh
-# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Installation script for the alpine host
+# to prepare the static binary
+#
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
 
-# this script should be running in alpine linux
-# install the required packages
+# Packaging update
 apk update
+
+# Add required APK packages
 apk add --no-cache \
     bash \
     wget \
@@ -24,4 +31,18 @@ apk add --no-cache \
     zlib-dev \
     libmnl-dev \
     libnetfilter_acct-dev \
+    libuv-dev \
+    lz4-dev \
+    openssl-dev \
     || exit 1
+
+# Judy doesnt seem to be available on the repositories, download manually and install it
+export JUDY_VER="1.0.5"
+wget -O /judy.tar.gz http://downloads.sourceforge.net/project/judy/judy/Judy-${JUDY_VER}/Judy-${JUDY_VER}.tar.gz
+cd /
+tar -xf judy.tar.gz
+rm judy.tar.gz
+cd /judy-${JUDY_VER}
+CFLAGS="-O2 -s" CXXFLAGS="-O2 -s" ./configure
+make
+make install;

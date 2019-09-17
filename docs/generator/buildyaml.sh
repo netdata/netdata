@@ -48,11 +48,12 @@ navpart() {
 }
 
 echo -e 'site_name: Netdata Documentation
+site_url: https://docs.netdata.cloud
 repo_url: https://github.com/netdata/netdata
 repo_name: GitHub
 edit_uri: blob/master
 site_description: Netdata Documentation
-copyright: Netdata, 2018
+copyright: Netdata, 2019
 docs_dir: '${docs_dir}'
 site_dir: '${site_dir}'
 #use_directory_urls: false
@@ -67,6 +68,9 @@ extra:
       link: "https://www.facebook.com/linuxnetdata/"
 theme:
     name: "material"
+    palette:
+      primary: "blue grey"
+      accent: "light green"
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
     language: '${language}'
@@ -85,9 +89,7 @@ markdown_extensions:
  - footnotes
  - tables
  - admonition
- - codehilite
  - meta
- - nl2br
  - sane_lists
  - smarty
  - toc:
@@ -100,6 +102,10 @@ markdown_extensions:
  - pymdownx.caret
  - pymdownx.critic
  - pymdownx.details
+ - pymdownx.highlight:
+    pygments_style: manni
+    css_class: "highlight codehilite"
+    linenums_style: pymdownx-inline
  - pymdownx.inlinehilite
  - pymdownx.magiclink
  - pymdownx.mark
@@ -118,16 +124,19 @@ markdown_extensions:
  - pymdownx.extrarawhtml
 nav:'
 
-navpart 1 . README "About"
+navpart 1 . "README" ""
 
-echo -ne "    - 'docs/Demo-Sites.md'
+navpart 1 . . "About Netdata"
+
+echo -ne "    - 'docs/what-is-netdata.md'
+    - 'docs/Demo-Sites.md'
     - 'docs/netdata-security.md'
     - 'docs/anonymous-statistics.md'
     - 'docs/Donations-netdata-has-received.md'
     - 'docs/a-github-star-is-important.md'
     - REDISTRIBUTED.md
     - CHANGELOG.md
-    - CONTRIBUTING.md
+    - SECURITY.md
 - Why Netdata:
     - 'docs/why-netdata/README.md'
     - 'docs/why-netdata/1s-granularity.md'
@@ -138,13 +147,13 @@ echo -ne "    - 'docs/Demo-Sites.md'
     - 'packaging/installer/README.md'
     - 'packaging/docker/README.md'
     - 'packaging/installer/UPDATE.md'
+    - 'packaging/DISTRIBUTIONS.md'
     - 'packaging/installer/UNINSTALL.md'
 - 'docs/GettingStarted.md'
-- Running netdata:
+- Running Netdata:
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'
     - 'daemon/config/README.md'
-    - 'docs/Charts.md'
 "
 navpart 2 web/server "" "Web server"
 navpart 3 web/server "" "" 2 excludefirstlevel
@@ -153,15 +162,27 @@ echo -ne "        - Running behind another web server:
             - 'docs/Running-behind-apache.md'
             - 'docs/Running-behind-lighttpd.md'
             - 'docs/Running-behind-caddy.md'
+        - 'docs/Running-behind-haproxy.md'
 "
 #navpart 2 system
 navpart 2 database
+navpart 2 database/engine
 navpart 2 registry
 
 echo -ne "    - 'docs/Performance.md'
     - 'docs/netdata-for-IoT.md'
     - 'docs/high-performance-netdata.md'
 "
+
+navpart 1 . netdata-cloud "Netdata Cloud"
+echo -ne "
+    - 'docs/netdata-cloud/README.md'
+    - 'docs/netdata-cloud/signing-in.md'
+    - 'docs/netdata-cloud/nodes-view.md'
+"
+
+navpart 1 web "README" "Dashboards"
+navpart 2 web/gui "" "" 3
 
 navpart 1 collectors "" "Data collection" 1
 echo -ne "    - 'docs/Add-more-charts-to-netdata.md'
@@ -224,8 +245,11 @@ echo -ne "        - BASH:
 navpart 3 collectors/apps.plugin
 navpart 3 collectors/cups.plugin
 navpart 3 collectors/fping.plugin
+navpart 3 collectors/ioping.plugin
 navpart 3 collectors/freeipmi.plugin
 navpart 3 collectors/nfacct.plugin
+navpart 3 collectors/xenstat.plugin
+navpart 3 collectors/perf.plugin
 
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'
@@ -239,9 +263,6 @@ navpart 1 streaming "" "" 4
 
 navpart 1 backends "" "Archiving to backends" 3
 
-navpart 1 web "README" "Dashboards"
-navpart 2 web/gui "" "" 3
-
 navpart 1 web/api "" "HTTP API"
 navpart 2 web/api/exporters "" "Exporters" 2
 navpart 2 web/api/formatters "" "Formatters" 2
@@ -249,10 +270,16 @@ navpart 2 web/api/badges "" "" 2
 navpart 2 web/api/health "" "" 2
 navpart 2 web/api/queries "" "Queries" 2
 
-echo -ne "- Hacking netdata:
+echo -ne "- Contributing to Netdata:
+    - CONTRIBUTING.md
+    - 'docs/contributing/contributing-documentation.md'
+    - 'docs/contributing/style-guide.md'
     - CODE_OF_CONDUCT.md
-    - 'docs/Netdata-Security-and-Disclosure-Information.md'
     - CONTRIBUTORS.md
+    - packaging/maintainers/README.md
+"
+
+echo -ne "- Additional information:
 "
 navpart 2 packaging/makeself "" "" 4
 navpart 2 libnetdata "" "libnetdata" 4

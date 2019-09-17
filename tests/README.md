@@ -1,4 +1,5 @@
 # Testing
+
 This readme is a manual on how to get started with unit testing on javascript and nodejs
 
 Original author: BrainDoctor (github), July 2017
@@ -24,10 +25,10 @@ Other browsers work too (Chrome, Firefox). However, only the Chromium Browser 59
 
 The commands above leave me with the following versions (July 2017):
 
- - nodejs: v4.2.6
- - npm: 3.5.2
- - chromium-browser: 59.0.3071.109
- - WebStorm (optional): 2017.1.4
+-   nodejs: v4.2.6
+-   npm: 3.5.2
+-   chromium-browser: 59.0.3071.109
+-   WebStorm (optional): 2017.1.4
 
 ## Configuration
 
@@ -46,22 +47,24 @@ If you use the JetBrains WebStorm IDE, you can integrate the karma runtime.
 #### for Karma (Client side testing)
 
 Headless Chromium:
-1. Run > Edit Configurations
-2. "+" > Karma
-3. - Name: Karma Headless Chromium
-   - Configuration file: /path/to/your/netdata/tests/web/karma.conf.js
-   - Browsers to start: ChromiumHeadless
-   - Node interpreter: /usr/bin/nodejs (MUST be absolute, NVM works too)
-   - Karma package: /path/to/your/netdata/node_modules/karma
+
+1.  Run > Edit Configurations
+2.  "+" > Karma
+3.  -   Name: Karma Headless Chromium
+    -   Configuration file: /path/to/your/netdata/tests/web/karma.conf.js
+    -   Browsers to start: ChromiumHeadless
+    -   Node interpreter: /usr/bin/nodejs (MUST be absolute, NVM works too)
+    -   Karma package: /path/to/your/netdata/node_modules/karma
 
 GUI Chromium is similar:
-1. Run > Edit Configurations
-2. "+" > Karma
-3. - Name: Karma Chromium
-   - Configuration file: /path/to/your/netdata/tests/web/karma.conf.js
-   - Browsers to start: Chromium
-   - Node interpreter: /usr/bin/nodejs (MUST be absolute, NVM works too)
-   - Karma package: /path/to/your/netdata/node_modules/karma
+
+1.  Run > Edit Configurations
+2.  "+" > Karma
+3.  -   Name: Karma Chromium
+    -   Configuration file: /path/to/your/netdata/tests/web/karma.conf.js
+    -   Browsers to start: Chromium
+    -   Node interpreter: /usr/bin/nodejs (MUST be absolute, NVM works too)
+    -   Karma package: /path/to/your/netdata/node_modules/karma
 
 You may add other browsers too (comma separated). With the "Browsers to start" field you can override any settings in karma.conf.js.
 
@@ -69,18 +72,19 @@ Also it is recommended to install WebStorm IDE Extension/Addon to Chrome/Chromiu
 
 #### for node.d plugins (nodejs)
 
-1. Run > Edit Configurations
-2. "+" > Node.js
-3. - Name: Node.d plugins
-   - Node interpreter: /usr/bin/nodejs (MUST be absolute, NVM works too)
-   - JavaScript file: node_modules/jasmine-node/bin/jasmine-node
-   - Application parameters: --captureExceptions tests/node.d
+1.  Run > Edit Configurations
+2.  "+" > Node.js
+3.  -   Name: Node.d plugins
+    -   Node interpreter: /usr/bin/nodejs (MUST be absolute, NVM works too)
+    -   JavaScript file: node_modules/jasmine-node/bin/jasmine-node
+    -   Application parameters: --captureExceptions tests/node.d
 
 ## Running
 
 ### In WebStorm
 
 #### Karma
+
 Just run the configured run configurations and they produce nice test trees:
 
 ![karma_run_2](https://user-images.githubusercontent.com/12159026/28277789-559149f6-6b1b-11e7-9cc7-a81d81d12c35.png)
@@ -99,6 +103,7 @@ cd /path/to/your/netdata
 
 nodejs ./node_modules/karma/bin/karma start tests/web/karma.conf.js --single-run=true --browsers=ChromiumHeadless
 ```
+
 will start the karma server, start chromium in headless mode and exit.
 
 If a test fails, it produces even a stack trace:
@@ -135,5 +140,4 @@ The karma and node.d runners can be integrated in Travis (AFAIK), but that is ou
 
 Note: Karma is for browser-testing. On a build server, no GUI or browser might by available, unless browsers support headless mode.
 
-
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Ftests%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Ftests%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

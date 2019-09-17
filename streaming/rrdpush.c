@@ -48,6 +48,11 @@ unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
+#ifdef ENABLE_HTTPS
+int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
+char *netdata_ssl_ca_path = NULL;
+char *netdata_ssl_ca_file = NULL;
+#endif
 
 static void load_stream_conf() {
     errno = 0;
@@ -78,6 +83,29 @@ int rrdpush_init() {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
         default_rrdpush_enabled = 0;
     }
+
+#ifdef ENABLE_HTTPS
+    if (netdata_use_ssl_on_stream == NETDATA_SSL_OPTIONAL) {
+        if (default_rrdpush_destination){
+            char *test = strstr(default_rrdpush_destination,":SSL");
+            if(test){
+                *test = 0X00;
+                netdata_use_ssl_on_stream = NETDATA_SSL_FORCE;
+            }
+        }
+    }
+
+    char *invalid_certificate = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "ssl skip certificate verification", "no");
+    if ( !strcmp(invalid_certificate,"yes")){
+        if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE){
+            info("Netdata is configured to accept invalid SSL certificate.");
+            netdata_validate_server = NETDATA_SSL_INVALID_CERTIFICATE;
+        }
+    }
+
+    netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", "/etc/ssl/certs/");
+    netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/certs.pem");
+#endif
 
     return default_rrdpush_enabled;
 }
@@ -151,13 +179,15 @@ static inline void rrdpush_send_chart_definition_nolock(RRDSET *st) {
 
     // properly set the name for the remote end to parse it
     char *name = "";
-    if(unlikely(strcmp(st->id, st->name))) {
-        // they differ
-        name = strchr(st->name, '.');
-        if(name)
-            name++;
-        else
-            name = "";
+    if(likely(st->name)) {
+        if(unlikely(strcmp(st->id, st->name))) {
+            // they differ
+            name = strchr(st->name, '.');
+            if(name)
+                name++;
+            else
+                name = "";
+        }
     }
 
     // info("CHART '%s' '%s'", st->id, name);
@@ -412,6 +442,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     }
 }
 
+//called from client side
 static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     struct timeval tv = {
             .tv_sec = timeout,
@@ -440,10 +471,53 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: initializing communication...", host->hostname, connected_to);
 
+#ifdef ENABLE_HTTPS
+    if( netdata_client_ctx ){
+        host->ssl.flags = NETDATA_SSL_START;
+        if (!host->ssl.conn){
+            host->ssl.conn = SSL_new(netdata_client_ctx);
+            if(!host->ssl.conn){
+                error("Failed to allocate SSL structure.");
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            }
+        }
+        else{
+            SSL_clear(host->ssl.conn);
+        }
+
+        if (host->ssl.conn)
+        {
+            if (SSL_set_fd(host->ssl.conn, host->rrdpush_sender_socket) != 1) {
+                error("Failed to set the socket to the SSL on socket fd %d.", host->rrdpush_sender_socket);
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            } else{
+                host->ssl.flags = NETDATA_SSL_HANDSHAKE_COMPLETE;
+            }
+        }
+    }
+    else {
+        host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+    }
+#endif
+
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
-    snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s HTTP/1.1\r\n"
+    int eol = snprintfz(http, HTTP_HEADER_SIZE,
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
+                    "&NETDATA_SYSTEM_OS_NAME=%s"
+                    "&NETDATA_SYSTEM_OS_ID=%s"
+                    "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
+                    "&NETDATA_SYSTEM_OS_VERSION=%s"
+                    "&NETDATA_SYSTEM_OS_VERSION_ID=%s"
+                    "&NETDATA_SYSTEM_OS_DETECTION=%s"
+                    "&NETDATA_SYSTEM_KERNEL_NAME=%s"
+                    "&NETDATA_SYSTEM_KERNEL_VERSION=%s"
+                    "&NETDATA_SYSTEM_ARCHITECTURE=%s"
+                    "&NETDATA_SYSTEM_VIRTUALIZATION=%s"
+                    "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
+                    "&NETDATA_SYSTEM_CONTAINER=%s"
+                    "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
+                    " HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
               , host->rrdpush_send_api_key
@@ -453,12 +527,56 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , default_rrd_update_every
               , host->os
               , host->timezone
-              , (host->tags)?host->tags:""
+              , (host->tags) ? host->tags : ""
+              , (host->system_info->os_name) ? host->system_info->os_name : ""
+              , (host->system_info->os_id) ? host->system_info->os_id : ""
+              , (host->system_info->os_id_like) ? host->system_info->os_id_like : ""
+              , (host->system_info->os_version) ? host->system_info->os_version : ""
+              , (host->system_info->os_version_id) ? host->system_info->os_version_id : ""
+              , (host->system_info->os_detection) ? host->system_info->os_detection : ""
+              , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
+              , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
+              , (host->system_info->architecture) ? host->system_info->architecture : ""
+              , (host->system_info->virtualization) ? host->system_info->virtualization : ""
+              , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
+              , (host->system_info->container) ? host->system_info->container : ""
+              , (host->system_info->container_detection) ? host->system_info->container_detection : ""
               , host->program_name
               , host->program_version
     );
+    http[eol] = 0x00;
 
+#ifdef ENABLE_HTTPS
+    if (!host->ssl.flags) {
+        ERR_clear_error();
+        SSL_set_connect_state(host->ssl.conn);
+        int err = SSL_connect(host->ssl.conn);
+        if (err != 1){
+            err = SSL_get_error(host->ssl.conn, err);
+            error("SSL cannot connect with the server:  %s ",ERR_error_string((long)SSL_get_error(host->ssl.conn,err),NULL));
+            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+                rrdpush_sender_thread_close_socket(host);
+                return 0;
+            }else {
+                host->ssl.flags = NETDATA_SSL_NO_HANDSHAKE;
+            }
+        }
+        else {
+            if (netdata_use_ssl_on_stream == NETDATA_SSL_FORCE) {
+                if (netdata_validate_server == NETDATA_SSL_VALID_CERTIFICATE) {
+                    if ( security_test_certificate(host->ssl.conn)) {
+                        error("Closing the stream connection, because the server SSL certificate is not valid.");
+                        rrdpush_sender_thread_close_socket(host);
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+    if(send_timeout(&host->ssl,host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
+#else
     if(send_timeout(host->rrdpush_sender_socket, http, strlen(http), 0, timeout) == -1) {
+#endif
         error("STREAM %s [send to %s]: failed to send HTTP header to remote netdata.", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -466,7 +584,11 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
+#ifdef ENABLE_HTTPS
+    if(recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+#else
     if(recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+#endif
         error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -535,6 +657,13 @@ void *rrdpush_sender_thread(void *ptr) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.", host->hostname, gettid());
         return NULL;
     }
+
+#ifdef ENABLE_HTTPS
+    if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
+        security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
+        security_location_for_context(netdata_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+    }
+#endif
 
     info("STREAM %s [send]: thread created (task id %d)", host->hostname, gettid());
 
@@ -682,7 +811,17 @@ void *rrdpush_sender_thread(void *ptr) {
                         rrdpush_buffer_lock(host);
 
                         debug(D_STREAM, "STREAM: Sending data, starting from %zu, size %zu...", begin, buffer_strlen(host->rrdpush_sender_buffer));
-                        ssize_t ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+                        ssize_t ret;
+#ifdef ENABLE_HTTPS
+                        SSL *conn = host->ssl.conn ;
+                        if(conn && !host->ssl.flags) {
+                            ret = SSL_write(conn,&host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin);
+                        } else {
+                            ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+                        }
+#else
+                        ret = send(host->rrdpush_sender_socket, &host->rrdpush_sender_buffer->buffer[begin], buffer_strlen(host->rrdpush_sender_buffer) - begin, MSG_DONTWAIT);
+#endif
                         if (unlikely(ret == -1)) {
                             if (errno != EAGAIN && errno != EINTR && errno != EWOULDBLOCK) {
                                 debug(D_STREAM, "STREAM: Send failed - closing socket...");
@@ -819,9 +958,13 @@ static int rrdpush_receive(int fd
                            , const char *tags
                            , const char *program_name
                            , const char *program_version
+                           , struct rrdhost_system_info *system_info
                            , int update_every
                            , char *client_ip
                            , char *client_port
+#ifdef ENABLE_HTTPS
+                           , struct netdata_ssl *ssl
+#endif
 ) {
     RRDHOST *host;
     int history = default_rrd_history_entries;
@@ -868,8 +1011,12 @@ static int rrdpush_receive(int fd
     tags = appconfig_set_default(&stream_config, machine_guid, "host tags", (tags)?tags:"");
     if(tags && !*tags) tags = NULL;
 
-    if(!strcmp(machine_guid, "localhost"))
-        host = localhost;
+    if (strcmp(machine_guid, localhost->machine_guid) == 0) {
+        log_stream_connection(client_ip, client_port, key, machine_guid, hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO MASTER");
+        error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the master/proxy machine guid to a slave?", hostname, client_ip, client_port, machine_guid);
+        close(fd);
+        return 1;
+    }
     else
         host = rrdhost_find_or_create(
                 hostname
@@ -888,6 +1035,7 @@ static int rrdpush_receive(int fd
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , system_info
         );
 
     if(!host) {
@@ -930,7 +1078,13 @@ static int rrdpush_receive(int fd
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", client_ip, client_port);
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
+#ifdef ENABLE_HTTPS
+    host->ssl.conn = ssl->conn;
+    host->ssl.flags = ssl->flags;
+    if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+#else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+#endif
         log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "FAILED - CANNOT REPLY");
         error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", host->hostname, client_ip, client_port);
         close(fd);
@@ -1021,7 +1175,11 @@ struct rrdpush_thread {
     char *client_port;
     char *program_name;
     char *program_version;
+    struct rrdhost_system_info *system_info;
     int update_every;
+#ifdef ENABLE_HTTPS
+    struct netdata_ssl ssl;
+#endif
 };
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
@@ -1043,31 +1201,41 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         freez(rpt->client_port);
         freez(rpt->program_name);
         freez(rpt->program_version);
+#ifdef ENABLE_HTTPS
+        if(rpt->ssl.conn){
+            SSL_free(rpt->ssl.conn);
+        }
+#endif
         freez(rpt);
+
     }
 }
 
 static void *rrdpush_receiver_thread(void *ptr) {
     netdata_thread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
 
-        struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
-        info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+    struct rrdpush_thread *rpt = (struct rrdpush_thread *)ptr;
+    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
-        rrdpush_receive(
-                rpt->fd
-                , rpt->key
-                , rpt->hostname
-                , rpt->registry_hostname
-                , rpt->machine_guid
-                , rpt->os
-                , rpt->timezone
-                , rpt->tags
-                , rpt->program_name
-                , rpt->program_version
-                , rpt->update_every
-                , rpt->client_ip
-                , rpt->client_port
-        );
+    rrdpush_receive(
+	    rpt->fd
+	    , rpt->key
+	    , rpt->hostname
+	    , rpt->registry_hostname
+	    , rpt->machine_guid
+	    , rpt->os
+	    , rpt->timezone
+	    , rpt->tags
+	    , rpt->program_name
+	    , rpt->program_version
+        , rpt->system_info
+	    , rpt->update_every
+	    , rpt->client_ip
+	    , rpt->client_port
+#ifdef ENABLE_HTTPS
+	    , &rpt->ssl
+#endif
+    );
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1114,6 +1282,8 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     int update_every = default_rrd_update_every;
     char buf[GUID_LEN + 1];
 
+    struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+
     while(url) {
         char *value = mystrsep(&url, "&");
         if(!value || !*value) continue;
@@ -1139,40 +1309,48 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else if(!strcmp(name, "tags"))
             tags = value;
         else
-            info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
+            if(unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
+                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
+            }
     }
 
     if(!key || !*key) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO KEY");
         error("STREAM [receive from [%s]:%s]: request without an API key. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!hostname || !*hostname) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO HOSTNAME");
         error("STREAM [receive from [%s]:%s]: request without a hostname. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!machine_guid || !*machine_guid) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - NO MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: request without a machine GUID. Forbidding access.", w->client_ip, w->client_port);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(key, buf) == -1) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID KEY");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not valid GUID (use the command uuidgen to generate one). Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(machine_guid, buf) == -1) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!appconfig_get_boolean(&stream_config, key, "enabled", 0)) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - KEY NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
@@ -1183,6 +1361,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         if(key_allow_from) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
                 simple_pattern_free(key_allow_from);
+                rrdhost_system_info_free(system_info);
                 log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: API key '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, key);
                 return rrdpush_receiver_permission_denied(w);
@@ -1192,6 +1371,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     }
 
     if(!appconfig_get_boolean(&stream_config, machine_guid, "enabled", 1)) {
+        rrdhost_system_info_free(system_info);
         log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - MACHINE GUID NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         return rrdpush_receiver_permission_denied(w);
@@ -1202,6 +1382,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         if(machine_allow_from) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
                 simple_pattern_free(machine_allow_from);
+                rrdhost_system_info_free(system_info);
                 log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: Machine GUID '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, machine_guid);
                 return rrdpush_receiver_permission_denied(w);
@@ -1222,6 +1403,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
 
         if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
             netdata_mutex_unlock(&stream_rate_mutex);
+            rrdhost_system_info_free(system_info);
             error("STREAM [receive from [%s]:%s]: too busy to accept new streaming request. Will be allowed in %ld secs.", w->client_ip, w->client_port, (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
             return rrdpush_receiver_too_busy_now(w);
         }
@@ -1242,6 +1424,14 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
+    rpt->system_info       = system_info;
+#ifdef ENABLE_HTTPS
+    rpt->ssl.conn          = w->ssl.conn;
+    rpt->ssl.flags         = w->ssl.flags;
+
+    w->ssl.conn = NULL;
+    w->ssl.flags = NETDATA_SSL_START;
+#endif
 
     if(w->user_agent && w->user_agent[0]) {
         char *t = strchr(w->user_agent, '/');
@@ -1253,6 +1443,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         rpt->program_name = strdupz(w->user_agent);
         if(t && *t) rpt->program_version = strdupz(t);
     }
+
 
     netdata_thread_t thread;
 

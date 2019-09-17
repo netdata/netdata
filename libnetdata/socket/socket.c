@@ -301,14 +301,47 @@ void listen_sockets_close(LISTEN_SOCKETS *sockets) {
     sockets->failed = 0;
 }
 
-WEB_CLIENT_ACL read_acl(char *st) {
-    if (!strcmp(st,"dashboard")) return WEB_CLIENT_ACL_DASHBOARD;
-    if (!strcmp(st,"registry")) return WEB_CLIENT_ACL_REGISTRY;
-    if (!strcmp(st,"badges")) return WEB_CLIENT_ACL_BADGE;
-    if (!strcmp(st,"management")) return WEB_CLIENT_ACL_MGMT;
-    if (!strcmp(st,"streaming")) return WEB_CLIENT_ACL_STREAMING;
-    if (!strcmp(st,"netdata.conf")) return WEB_CLIENT_ACL_NETDATACONF;
+/*
+ *  SSL ACL
+ *
+ *  Search the SSL acl and apply it case it is set.
+ *
+ *  @param acl is the acl given by the user.
+ */
+WEB_CLIENT_ACL socket_ssl_acl(char *acl) {
+    char *ssl = strchr(acl,'^');
+    if(ssl) {
+        //Due the format of the SSL command it is always the last command,
+        //we finish it here to avoid problems with the ACLs
+        *ssl = '\0';
+#ifdef ENABLE_HTTPS
+        ssl++;
+        if (!strncmp("SSL=",ssl,4)) {
+            ssl += 4;
+            if (!strcmp(ssl,"optional")) {
+                return WEB_CLIENT_ACL_SSL_OPTIONAL;
+            }
+            else if (!strcmp(ssl,"force")) {
+                return WEB_CLIENT_ACL_SSL_FORCE;
+            }
+        }
+#endif
+    }
+
     return WEB_CLIENT_ACL_NONE;
+}
+
+WEB_CLIENT_ACL read_acl(char *st) {
+    WEB_CLIENT_ACL ret = socket_ssl_acl(st);
+
+    if (!strcmp(st,"dashboard")) ret |= WEB_CLIENT_ACL_DASHBOARD;
+    if (!strcmp(st,"registry")) ret |= WEB_CLIENT_ACL_REGISTRY;
+    if (!strcmp(st,"badges")) ret |= WEB_CLIENT_ACL_BADGE;
+    if (!strcmp(st,"management")) ret |= WEB_CLIENT_ACL_MGMT;
+    if (!strcmp(st,"streaming")) ret |= WEB_CLIENT_ACL_STREAMING;
+    if (!strcmp(st,"netdata.conf")) ret |= WEB_CLIENT_ACL_NETDATACONF;
+
+    return ret;
 }
 
 static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, uint16_t default_port, int listen_backlog) {
@@ -350,7 +383,7 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
             error("LISTENER: Cannot create unix socket '%s'", path);
             sockets->failed++;
         } else {
-            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+            acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
             listen_sockets_add(sockets, fd, AF_UNIX, socktype, protocol_str, path, 0, acl_flags);
             added++;
         }
@@ -400,7 +433,13 @@ static inline int bind_to_this(LISTEN_SOCKETS *sockets, const char *definition, 
         }
         acl_flags |= read_acl(portconfig);
     } else {
-        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING;
+        acl_flags = WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_REGISTRY | WEB_CLIENT_ACL_BADGE | WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_NETDATACONF | WEB_CLIENT_ACL_STREAMING | WEB_CLIENT_ACL_SSL_DEFAULT;
+    }
+
+    //Case the user does not set the option SSL in the "bind to", but he has
+    //the certificates, I must redirect, so I am assuming here the default option
+    if(!(acl_flags & WEB_CLIENT_ACL_SSL_OPTIONAL) && !(acl_flags & WEB_CLIENT_ACL_SSL_FORCE)) {
+        acl_flags |= WEB_CLIENT_ACL_SSL_DEFAULT;
     }
 
     uint32_t scope_id = 0;
@@ -794,11 +833,15 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
     while(*s) {
         const char *e = s;
 
+        // skip path, moving both s(tart) and e(nd)
+        if(*e == '/')
+            while(!isspace(*e) && *e != ',') s = ++e;
+
         // skip separators, moving both s(tart) and e(nd)
         while(isspace(*e) || *e == ',') s = ++e;
 
         // move e(nd) to the first separator
-        while(*e && !isspace(*e) && *e != ',') e++;
+        while(*e && !isspace(*e) && *e != ',' && *e != '/') e++;
 
         // is there anything?
         if(!*s || s == e) break;
@@ -824,7 +867,12 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
 // --------------------------------------------------------------------------------------------------------------------
 // helpers to send/receive data in one call, in blocking mode, with a timeout
 
+#ifdef ENABLE_HTTPS
+ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+#else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+#endif
+
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -852,10 +900,22 @@ ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         if(fd.events & POLLIN) break;
     }
 
+#ifdef ENABLE_HTTPS
+    if (ssl->conn) {
+        if (!ssl->flags) {
+            return SSL_read(ssl->conn,buf,len);
+        }
+    }
+#endif
     return recv(sockfd, buf, len, flags);
 }
 
+#ifdef ENABLE_HTTPS
+ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout) {
+#else
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) {
+#endif
+
     for(;;) {
         struct pollfd fd = {
                 .fd = sockfd,
@@ -883,6 +943,13 @@ ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout) 
         if(fd.events & POLLOUT) break;
     }
 
+#ifdef ENABLE_HTTPS
+    if(ssl->conn) {
+        if (!ssl->flags) {
+            return SSL_write(ssl->conn, buf, len);
+        }
+    }
+#endif
     return send(sockfd, buf, len, flags);
 }
 
@@ -943,6 +1010,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
+
+#ifdef __FreeBSD__
+        if(((struct sockaddr *)&sadr)->sa_family == AF_LOCAL)
+            strncpyz(client_ip, "localhost", ipsize);
+#endif
 
         client_ip[ipsize - 1] = '\0';
         client_port[portsize - 1] = '\0';
@@ -1286,6 +1358,8 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                     do {
                         char client_ip[NI_MAXHOST + 1];
                         char client_port[NI_MAXSERV + 1];
+                        client_ip[0] = 0x00;
+                        client_port[0] = 0x00;
 
                         debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
                         nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, NI_MAXHOST + 1, client_port, NI_MAXSERV + 1, p->access_list);

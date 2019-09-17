@@ -27,8 +27,6 @@
 
 # External files
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"
-NIGHTLY_PACKAGE_TARBALL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
-NIGHTLY_PACKAGE_CHECKSUM="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -60,13 +58,27 @@ setup_terminal() {
 
 	return 0
 }
+setup_terminal || echo >/dev/null
 
-progress() {
-	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+# -----------------------------------------------------------------------------
+fatal() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+	exit 1
 }
 
+run_ok() {
+	printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+}
+
+run_failed() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+}
+
+ESCAPED_PRINT_METHOD=
+printf "%q " test >/dev/null 2>&1
+[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
-	if printf "%q " test >/dev/null 2>&1; then
+	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
 		printf "%q " "${@}"
 	else
 		printf "%s" "${*}"
@@ -74,27 +86,47 @@ escaped_print() {
 	return 0
 }
 
+progress() {
+	echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
+}
+
+run_logfile="/dev/null"
 run() {
-	local dir="${PWD}" info_console
+	local user="${USER--}" dir="${PWD}" info info_console
 
 	if [ "${UID}" = "0" ]; then
+		info="[root ${dir}]# "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
 	else
+		info="[${user} ${dir}]$ "
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	escaped_print "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" "${@}" "${TPUT_RESET}\n" >&2
+	printf >>"${run_logfile}" "${info}"
+	escaped_print >>"${run_logfile}" "${@}"
+	printf >>"${run_logfile}" " ... "
+
+	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+	escaped_print >&2 "${@}"
+	printf >&2 "${TPUT_RESET}\n"
 
 	"${@}"
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+		run_failed
+		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
 	else
-		printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+		run_ok
+		printf >>"${run_logfile}" "OK\n"
 	fi
 
 	return ${ret}
+}
+
+fatal() {
+	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+	exit 1
 }
 
 warning() {
@@ -107,9 +139,15 @@ warning() {
 	fi
 }
 
-fatal() {
-	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
-	exit 1
+create_tmp_directory() {
+	# Check if tmp is mounted as noexec
+	if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts > /dev/null 2>&1; then
+		pattern="$(pwd)/netdata-kickstart-XXXXXX"
+	else
+		pattern="/tmp/netdata-kickstart-XXXXXX"
+	fi
+
+	mktemp -d $pattern
 }
 
 download() {
@@ -121,6 +159,20 @@ download() {
 		run wget -T 15 -O - "${url}" >"${dest}" || fatal "Cannot download ${url}"
 	else
 		fatal "I need curl or wget to proceed, but neither is available on this system."
+	fi
+}
+
+set_tarball_urls() {
+	if [ "$1" = "stable" ]; then
+		local latest
+		# Simple version
+		# latest="$(curl -sSL https://api.github.com/repos/netdata/netdata/releases/latest | grep tag_name | cut -d'"' -f4)"
+		latest="$(download "https://api.github.com/repos/netdata/netdata/releases/latest" /dev/stdout | grep tag_name | cut -d'"' -f4)"
+		export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/netdata-$latest.tar.gz"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
+	else
+		export NETDATA_TARBALL_URL="https://storage.googleapis.com/netdata-nightlies/netdata-latest.tar.gz"
+		export NETDATA_TARBALL_CHECKSUM_URL="https://storage.googleapis.com/netdata-nightlies/sha256sums.txt"
 	fi
 }
 
@@ -147,14 +199,59 @@ detect_bash4() {
 	return 0
 }
 
+dependencies() {
+	SYSTEM="$(uname -s 2> /dev/null || uname -v)"
+	OS="$(uname -o 2> /dev/null || uname -rs)"
+	MACHINE="$(uname -m 2> /dev/null)"
+
+	echo "System            : ${SYSTEM}"
+	echo "Operating System  : ${OS}"
+	echo "Machine           : ${MACHINE}"
+	echo "BASH major version: ${BASH_MAJOR_VERSION}"
+
+	if [ "${OS}" != "GNU/Linux" ] && [ "${SYSTEM}" != "Linux" ]; then
+		warning "Cannot detect the packages to be installed on a ${SYSTEM} - ${OS} system."
+	else
+		bash="$(command -v bash 2>/dev/null)"
+		if ! detect_bash4 "${bash}"; then
+			warning "Cannot detect packages to be installed in this system, without BASH v4+."
+		else
+			progress "Downloading script to detect required packages..."
+			download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+			if [ ! -s "${TMPDIR}/install-required-packages.sh" ]; then
+				warning "Downloaded dependency installation script is empty."
+			else
+				progress "Running downloaded script to detect required packages..."
+				run ${sudo} "${bash}" "${TMPDIR}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
+				# shellcheck disable=SC2181
+				if [ $? -ne 0 ] ; then
+					warning "It failed to install all the required packages, but installation might still be possible."
+				fi
+			fi
+
+		fi
+	fi
+}
+
+safe_sha256sum() {
+	# Within the contexct of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start non-common options
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256sum $@
+	elif command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 $@
+	else
+		fatal "I could not find a suitable checksum binary to use"
+	fi
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
 umask 022
 
 sudo=""
 [ -z "${UID}" ] && UID="$(id -u)"
 [ "${UID}" -ne "0" ] && sudo="sudo"
 export PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-
-setup_terminal || echo >/dev/null
 
 # ---------------------------------------------------------------------------------------------------------------------
 # try to update using autoupdater in the first place
@@ -181,6 +278,7 @@ INTERACTIVE=1
 PACKAGES_INSTALLER_OPTIONS="netdata"
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="--auto-update"
+RELEASE_CHANNEL="nightly"
 while [ -n "${1}" ]; do
 	if [ "${1}" = "all" ]; then
 		PACKAGES_INSTALLER_OPTIONS="netdata-all"
@@ -192,6 +290,9 @@ while [ -n "${1}" ]; do
 		# echo >&2 "netdata will not auto-update"
 		NETDATA_UPDATES=
 		shift 1
+	elif [ "${1}" = "--stable-channel" ]; then
+		RELEASE_CHANNEL="stable"
+		shift 1
 	else
 		break
 	fi
@@ -202,59 +303,20 @@ if [ "${INTERACTIVE}" = "0" ]; then
 	NETDATA_INSTALLER_OPTIONS="--dont-wait"
 fi
 
-# ---------------------------------------------------------------------------------------------------------------------
-# detect system parameters and install dependencies
+TMPDIR=$(create_tmp_directory)
+cd "${TMPDIR}"
 
-SYSTEM="$(uname -s)"
-OS="$(uname -o)"
-MACHINE="$(uname -m)"
-
-cat <<EOF
-System            : ${SYSTEM}
-Operating System  : ${OS}
-Machine           : ${MACHINE}
-BASH major version: ${BASH_MAJOR_VERSION}
-EOF
-
-# Check if tmp is mounted as noexec
-if grep -Eq '^[^ ]+ /tmp [^ ]+ ([^ ]*,)?noexec[, ]' /proc/mounts; then
-	pattern="$(pwd)/netdata-kickstart-XXXXXX"
-else
-	pattern="/tmp/netdata-kickstart-XXXXXX"
-fi
-
-tmpdir="$(mktemp -d $pattern)"
-cd "${tmpdir}" || :
-
-if [ "${OS}" != "GNU/Linux" ] && [ "${SYSTEM}" != "Linux" ]; then
-	warning "Cannot detect the packages to be installed on a ${SYSTEM} - ${OS} system."
-else
-	bash="$(command -v bash 2>/dev/null)"
-	if ! detect_bash4 "${bash}"; then
-		warning "Cannot detect packages to be installed in this system, without BASH v4+."
-	else
-		progress "Downloading script to detect required packages..."
-		download "${PACKAGES_SCRIPT}" "${tmpdir}/install-required-packages.sh"
-		if [ ! -s "${tmpdir}/install-required-packages.sh" ]; then
-			warning "Downloaded dependency installation script is empty."
-		else
-			progress "Running downloaded script to detect required packages..."
-			run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${PACKAGES_INSTALLER_OPTIONS}
-			if [ $? -ne 0 ] ; then
-				warning "It failed to install all the required packages, but installation might still be possible."
-			fi
-		fi
-
-	fi
-fi
+dependencies
 
 # ---------------------------------------------------------------------------------------------------------------------
-# download netdata nightly package
+# download netdata package
 
-download "${NIGHTLY_PACKAGE_CHECKSUM}" "${tmpdir}/sha256sum.txt"
-download "${NIGHTLY_PACKAGE_TARBALL}" "${tmpdir}/netdata-latest.tar.gz"
-if ! grep netdata-latest.tar.gz sha256sum.txt | sha256sum --check - >/dev/null 2>&1; then
-	failed "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${tmpdir}"
+set_tarball_urls "${RELEASE_CHANNEL}"
+
+download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
+download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
+if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
+	fatal "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${TMPDIR}"
 fi
 run tar -xf netdata-latest.tar.gz
 rm -rf netdata-latest.tar.gz >/dev/null 2>&1
@@ -266,7 +328,9 @@ cd netdata-* || fatal "Cannot cd to netdata source tree"
 if [ -x netdata-installer.sh ]; then
 	progress "Installing netdata..."
 	run ${sudo} ./netdata-installer.sh ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS} "${@}" || fatal "netdata-installer.sh exited with error"
-	rm -rf "${tmpdir}" >/dev/null 2>&1
+	if [ -d "${TMPDIR}" ] && [ ! "${TMPDIR}" = "/" ]; then
+		run ${sudo} rm -rf "${TMPDIR}" >/dev/null 2>&1
+	fi
 else
-	fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${tmpdir}"
+	fatal "Cannot install netdata from source (the source directory does not include netdata-installer.sh). Leaving all files in ${TMPDIR}"
 fi

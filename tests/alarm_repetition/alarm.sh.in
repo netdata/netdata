@@ -1,0 +1,86 @@
+#!/bin/bash
+
+#The health directory to put the alarms
+HEALTHDIR="@configdir_POST@/health.d/"
+
+#output directory
+OUTDIR="workdir/"
+
+#url to do download
+MURL="http://localhost:19999/api/v1/alarms?active"
+
+#error messages
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NOCOLOR='\033[0m'
+
+MYCDIR="$(pwd)"
+CONFFILE="$MYCDIR/netdata.conf"
+
+change_alarm_file() {
+  if [ -f "$1" ]; then
+    rm "$1"
+  fi
+
+  #copy keeping the permissions
+  cp -a "$2" "$3"
+}
+
+netdata_test_download() {
+  OPT="-e"
+  if [ "$3" == "I" ]; then
+    OPT="-v"
+  fi
+
+  grep "HTTP/1.1 200 OK" "$1" 2>/dev/null 1>/dev/null
+  TEST="$?"
+  if [ "$TEST" -ne "0" ]; then
+    echo -e "${RED} Error to get the alarms"
+    killall netdata
+    exit 1
+  fi
+
+  COUNT=$(grep -w "\"last_repeat\":" "$2" | grep -c "$OPT" "\"0\"")
+  if [ "$COUNT" -eq "0" ]; then
+    echo -e "${RED} Netdata gave an unexpected result when alarm repetition is $4"
+    killall netdata
+    exit 1
+  fi
+
+  echo -e "${GREEN} I got the expected result"
+}
+
+get_the_logs() {
+  curl -v -k --create-dirs -o "$OUTDIR/$1.out" "$MURL" 2> "$OUTDIR/$1.err"
+  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2" "$3"
+}
+
+process_data() {
+  SEC=120
+  netdata -c "$CONFFILE" -D &
+  NETDATAPID=$!
+  echo -e "${NOCOLOR}Sleeping during $SEC seconds to create alarm entries"
+  sleep $SEC
+  get_the_logs "$1" "$2" "$3"
+  kill $NETDATAPID
+}
+
+mkdir "$OUTDIR"
+CREATEDIR="$?"
+if [ "$CREATEDIR" -ne "0" ]; then
+  echo  -e "${RED}Cannot create the output directory, it already exists. The test will overwrite previous results."
+fi
+
+change_alarm_file "./0" "ram_without_repetition.conf" "$HEALTHDIR/ram.conf"
+cp -a netdata.conf_without_repetition netdata.conf
+process_data "ram_without" "K" "not activated."
+rm netdata.conf
+
+change_alarm_file "$HEALTHDIR/ram.conf" "ram_with_repetition.conf" "$HEALTHDIR/ram.conf"
+cp -a netdata.conf_with_repetition netdata.conf
+process_data "ram_with" "I" "activated."
+rm netdata.conf
+
+echo  -e "${GREEN} all the tests were sucessful"
+rm "$HEALTHDIR/ram.conf"
+rm -rf $OUTDIR

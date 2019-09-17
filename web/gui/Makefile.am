@@ -4,7 +4,6 @@
 #
 MAINTAINERCLEANFILES= $(srcdir)/Makefile.in
 CLEANFILES = \
-	dashboard.js \
 	version.txt \
 	$(NULL)
 
@@ -30,6 +29,7 @@ DASHBOARD_JS_FILES = \
     src/dashboard.js/charting/d3pie.js \
     src/dashboard.js/charting/d3.js \
     src/dashboard.js/charting/peity.js \
+    src/dashboard.js/charting/textonly.js \
     src/dashboard.js/charting.js \
     src/dashboard.js/chart-registry.js \
     src/dashboard.js/common.js \
@@ -61,12 +61,19 @@ dist_web_DATA = \
 	index.html \
 	main.css \
 	main.js \
+	console.html \
 	infographic.html \
 	robots.txt \
 	refresh-badges.js \
 	sitemap.xml \
 	tv.html \
+	dash-example.html \
 	version.txt \
+	$(NULL)
+
+webstaticdir=$(webdir)/static/img
+dist_webstatic_DATA = \
+    static/img/netdata-logomark.svg \
 	$(NULL)
 
 weblibdir=$(webdir)/lib

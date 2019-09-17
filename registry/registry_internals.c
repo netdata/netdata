@@ -126,6 +126,11 @@ REGISTRY_PERSON_URL *registry_verify_request(char *person_guid, char *machine_gu
         info("Registry Request Verification: URL not found for person, person: '%s', machine '%s', url '%s'", person_guid, machine_guid, url);
         return NULL;
     }
+    //else if (pu->machine != m) {
+    //    info("Registry Request Verification: Machine mismatch: person: '%s', machine requested='%s' <> loaded='%s', url '%s'", person_guid, machine_guid, pu->machine->guid, url);
+    //    return NULL;
+    //}
+
     return pu;
 }
 
@@ -171,11 +176,13 @@ REGISTRY_PERSON *registry_request_delete(char *person_guid, char *machine_guid, 
     delete_url = registry_fix_url(delete_url, NULL);
 
     // make sure the user is not deleting the url it uses
+    /*
     if(!strcmp(delete_url, pu->url->url)) {
         info("Registry Delete Request: delete URL is the one currently accessed, person: '%s', machine '%s', url '%s', delete url '%s'"
              , p->guid, m->guid, pu->url->url, delete_url);
         return NULL;
     }
+    */
 
     REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, delete_url);
     if(!dpu) {

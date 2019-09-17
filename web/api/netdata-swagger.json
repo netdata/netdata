@@ -18,13 +18,16 @@
     "/info": {
       "get": {
         "summary": "Get netdata basic information",
-        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
+        "description": "The info endpoint returns basic information about netdata. It provides:\n* netdata version\n* netdata unique id\n* list of hosts mirrored (includes itself)\n* Operating System, Virtualization and Container technology information\n* List of active collector plugins and modules\n* number of alarms in the host\n  * number of alarms in normal state\n  * number of alarms in warning state\n  * number of alarms in critical state\n",
         "responses": {
           "200": {
             "description": "netdata basic information",
             "schema": {
               "$ref": "#/definitions/info"
             }
+          },
+          "503": {
+            "description": "netdata daemon not ready (used for health checks)"
           }
         }
       }
@@ -70,6 +73,39 @@
           },
           "404": {
             "description": "No chart with the given id is found."
+          }
+        }
+      }
+    },
+    "/alarm_variables": {
+      "get": {
+        "summary": "List variables available to configure alarms for a chart",
+        "description": "Returns the basic information of a chart and all the variables that can be used in alarm and template health configurations for the particular chart or family",
+        "parameters": [
+          {
+            "name": "chart",
+            "in": "query",
+            "description": "The id of the chart as returned by the /charts call.",
+            "required": true,
+            "type": "string",
+            "format": "as returned by /charts"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A javascript object with information about the chart and the available variables",
+            "schema": {
+              "$ref": "#/definitions/alarm_variables"
+            }
+          },
+          "400": {
+            "description": "Bad request - the body will include a message stating what is wrong."
+          },
+          "404": {
+            "description": "No chart with the given id is found."
+          },
+          "500": {
+            "description": "Internal server error. This usually means the server is out of memory."
           }
         }
       }
@@ -207,7 +243,8 @@
                 "percentage",
                 "unaligned",
                 "match-ids",
-                "match-names"
+                "match-names",
+                "showcustomvars"
               ],
               "collectionFormat": "pipes"
             },
@@ -507,6 +544,30 @@
             "default": "yes"
           },
           {
+            "name": "oldunits",
+            "in": "query",
+            "description": "When enabled, netdata will show metric names for the default source=average as they appeared before 1.12, by using the legacy unit naming conventions",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "default": "yes"
+          },
+          {
+            "name": "hideunits",
+            "in": "query",
+            "description": "When enabled, netdata will not include the units in the metric names, for the default source=average.",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "yes",
+              "no"
+            ],
+            "default": "yes"
+          },
+          {
             "name": "server",
             "in": "query",
             "description": "Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.",
@@ -596,6 +657,61 @@
         }
       }
     },
+    "/alarm_count": {
+      "get": {
+        "summary": "Get an overall status of the chart",
+        "description": "Checks multiple charts with the same context and counts number of alarms with given status.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "context",
+            "description": "Specify context which should be checked",
+            "required": false,
+            "allowEmptyValue": true,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "collectionFormat": "pipes"
+            },
+            "default": [
+              "system.cpu"
+            ]
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "description": "Specify alarm status to count",
+            "required": false,
+            "allowEmptyValue": true,
+            "type": "string",
+            "enum": [
+              "REMOVED",
+              "UNDEFINED",
+              "UNINITIALIZED",
+              "CLEAR",
+              "RAISED",
+              "WARNING",
+              "CRITICAL"
+            ],
+            "default": "RAISED"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An object containing a count of alarms with given status for given contexts",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. This usually means the server is out of memory."
+          }
+        }
+      }
+    },
     "/manage/health": {
       "get": {
         "summary": "Accesses the health management API to control health checks and notifications at runtime.",
@@ -604,7 +720,7 @@
           {
             "name": "cmd",
             "in": "query",
-            "description": "DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors.",
+            "description": "DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors. LIST: Show active configuration.",
             "required": false,
             "type": "string",
             "enum": [
@@ -612,7 +728,8 @@
               "SILENCE ALL",
               "DISABLE",
               "SILENCE",
-              "RESET"
+              "RESET",
+              "LIST"
             ]
           },
           {
@@ -681,6 +798,90 @@
             "host1.example.com",
             "host2.example.com"
           ]
+        },
+        "os_name": {
+          "type": "string",
+          "description": "Operating System Name",
+          "example": "Manjaro Linux"
+        },
+        "os_id": {
+          "type": "string",
+          "description": "Operating System ID",
+          "example": "manjaro"
+        },
+        "os_id_like": {
+          "type": "string",
+          "description": "Known OS similar to this OS",
+          "example": "arch"
+        },
+        "os_version": {
+          "type": "string",
+          "description": "Operating System Version",
+          "example": "18.0.4"
+        },
+        "os_version_id": {
+          "type": "string",
+          "description": "Operating System Version ID",
+          "example": "unknown"
+        },
+        "os_detection": {
+          "type": "string",
+          "description": "OS parameters detection method",
+          "example": "Mixed"
+        },
+        "kernel_name": {
+          "type": "string",
+          "description": "Kernel Name",
+          "example": "Linux"
+        },
+        "kernel_version": {
+          "type": "string",
+          "description": "Kernel Version",
+          "example": "4.19.32-1-MANJARO"
+        },
+        "architecture": {
+          "type": "string",
+          "description": "Kernel architecture",
+          "example": "x86_64"
+        },
+        "virtualization": {
+          "type": "string",
+          "description": "Virtualization Type",
+          "example": "kvm"
+        },
+        "virt_detection": {
+          "type": "string",
+          "description": "Virtualization detection method",
+          "example": "systemd-detect-virt"
+        },
+        "container": {
+          "type": "string",
+          "description": "Container technology",
+          "example": "docker"
+        },
+        "container_detection": {
+          "type": "string",
+          "description": "Container technology detection method",
+          "example": "dockerenv"
+        },
+        "collectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "Array of collector plugins and modules",
+            "properties": {
+              "plugin": {
+                "type": "string",
+                "description": "Collector plugin",
+                "example": "python.d.plugin"
+              },
+              "module": {
+                "type": "string",
+                "description": "Module of the collector plugin",
+                "example": "dockerd"
+              }
+            }
+          }
         },
         "alarms": {
           "type": "object",
@@ -830,6 +1031,14 @@
             }
           }
         },
+        "chart_variables": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/chart_variables"
+            }
+          }
+        },
         "green": {
           "type": "number",
           "description": "Chart health green threshold"
@@ -837,6 +1046,78 @@
         "red": {
           "type": "number",
           "description": "Chart health red trheshold"
+        }
+      }
+    },
+    "alarm_variables": {
+      "type": "object",
+      "properties": {
+        "chart": {
+          "type": "string",
+          "description": "The unique id of the chart"
+        },
+        "chart_name": {
+          "type": "string",
+          "description": "The name of the chart"
+        },
+        "cnart_context": {
+          "type": "string",
+          "description": "The context of the chart. It is shared across multiple monitored software or hardware instances and used in alarm templates"
+        },
+        "family": {
+          "type": "string",
+          "description": "The family of the chart."
+        },
+        "host": {
+          "type": "string",
+          "description": "The host containing the chart."
+        },
+        "chart_variables": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/chart_variables"
+            }
+          }
+        },
+        "family_variables": {
+          "type": "object",
+          "properties": {
+            "varname1": {
+              "type": "number",
+              "format": "float"
+            },
+            "varname2": {
+              "type": "number",
+              "format": "float"
+            }
+          }
+        },
+        "host_variables": {
+          "type": "object",
+          "properties": {
+            "varname1": {
+              "type": "number",
+              "format": "float"
+            },
+            "varname2": {
+              "type": "number",
+              "format": "float"
+            }
+          }
+        }
+      }
+    },
+    "chart_variables": {
+      "type": "object",
+      "properties": {
+        "varname1": {
+          "type": "number",
+          "format": "float"
+        },
+        "varname2": {
+          "type": "number",
+          "format": "float"
         }
       }
     },
@@ -935,6 +1216,14 @@
         "format": {
           "type": "string",
           "description": "The format of the result returned."
+        },
+        "chart_variables": {
+          "type": "object",
+          "properties": {
+            "key": {
+              "$ref": "#/definitions/chart_variables"
+            }
+          }
         },
         "result": {
           "description": "The result requested, in the format requested."
@@ -1096,6 +1385,14 @@
                 },
                 "crit_parsed": {
                   "type": "string"
+                },
+                "warn_repeat_every": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "crit_repeat_every": {
+                  "type": "integer",
+                  "format": "int32"
                 },
                 "green": {
                   "type": "string",

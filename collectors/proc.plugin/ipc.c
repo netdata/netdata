@@ -65,6 +65,11 @@ struct message_queue {
     struct message_queue * next;
 };
 
+struct shm_stats {
+    unsigned long long segments;
+    unsigned long long bytes;
+};
+
 static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
     static procfile *ff = NULL;
     static int error_shown = 0;
@@ -179,7 +184,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
     struct message_queue *msq;
 
     if(unlikely(!ff)) {
-        ff = procfile_open(config_get("plugin:proc:ipc", "msg filename to monitor", msg_filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        ff = procfile_open(msg_filename, " \t:", PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) return 1;
     }
 
@@ -230,10 +235,49 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
     return 0;
 }
 
+int ipc_shm_get_info(char *shm_filename, struct shm_stats *shm) {
+    static procfile *ff;
+
+    if(unlikely(!ff)) {
+        ff = procfile_open(shm_filename, " \t:", PROCFILE_FLAG_DEFAULT);
+        if(unlikely(!ff)) return 1;
+    }
+
+    ff = procfile_readall(ff);
+    if(unlikely(!ff)) return 1;
+
+    size_t lines = procfile_lines(ff);
+    size_t words = 0;
+
+    if(unlikely(lines < 2)) {
+        error("Cannot read %s. Expected 2 or more lines, read %zu.", ff->filename, lines);
+        return 1;
+    }
+
+    shm->segments = 0;
+    shm->bytes = 0;
+
+    // loop through all lines except the first and the last ones
+    size_t l;
+    for(l = 1; l < lines - 1; l++) {
+        words = procfile_linewords(ff, l);
+        if(unlikely(words < 2)) continue;
+        if(unlikely(words < 16)) {
+            error("Cannot read %s line. Expected 16 params, read %zu.", ff->filename, words);
+            continue;
+        }
+
+        shm->segments++;
+        shm->bytes += str2ull(procfile_lineword(ff, l, 3));
+    }
+
+    return 0;
+}
+
 int do_ipc(int update_every, usec_t dt) {
     (void)dt;
 
-    static int do_sem = -1, do_msg = -1;
+    static int do_sem = -1, do_msg = -1, do_shm = -1;
     static int read_limits_next = -1;
     static struct ipc_limits limits;
     static struct ipc_status status;
@@ -243,14 +287,20 @@ int do_ipc(int update_every, usec_t dt) {
     static char *msg_filename = NULL;
     static struct message_queue *message_queue_root = NULL;
     static long long dimensions_limit;
+    static char *shm_filename = NULL;
 
     if(unlikely(do_sem == -1)) {
-        do_sem = config_get_boolean("plugin:proc:ipc", "semaphore totals", CONFIG_BOOLEAN_YES);
         do_msg = config_get_boolean("plugin:proc:ipc", "message queues", CONFIG_BOOLEAN_YES);
+        do_sem = config_get_boolean("plugin:proc:ipc", "semaphore totals", CONFIG_BOOLEAN_YES);
+        do_shm = config_get_boolean("plugin:proc:ipc", "shared memory totals", CONFIG_BOOLEAN_YES);
 
         char filename[FILENAME_MAX + 1];
+
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sysvipc/msg");
         msg_filename = config_get("plugin:proc:ipc", "msg filename to monitor", filename);
+
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/sysvipc/shm");
+        shm_filename = config_get("plugin:proc:ipc", "shm filename to monitor", filename);
 
         dimensions_limit = config_get_number("plugin:proc:ipc", "max dimensions in memory allowed", 50);
 
@@ -457,6 +507,68 @@ int do_ipc(int update_every, usec_t dt) {
                 rrdset_is_obsolete(st_msq_bytes);
                 st_msq_bytes = NULL;
             }
+        }
+    }
+
+    // --------------------------------------------------------------------
+
+    if(likely(do_shm != CONFIG_BOOLEAN_NO)) {
+        static RRDSET *st_shm_segments = NULL, *st_shm_bytes = NULL;
+        static RRDDIM *rd_shm_segments = NULL, *rd_shm_bytes = NULL;
+        struct shm_stats shm;
+
+        if(!ipc_shm_get_info(shm_filename, &shm)) {
+            if(unlikely(!st_shm_segments)) {
+                st_shm_segments = rrdset_create_localhost(
+                        "system"
+                        , "shared_memory_segments"
+                        , NULL
+                        , "ipc shared memory"
+                        , NULL
+                        , "IPC Shared Memory Number of Segments"
+                        , "segments"
+                        , PLUGIN_PROC_NAME
+                        , "ipc"
+                        , NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SEGS
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
+
+                rd_shm_segments = rrddim_add(st_shm_segments, "segments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(st_shm_segments);
+
+            rrddim_set_by_pointer(st_shm_segments, rd_shm_segments, shm.segments);
+
+            rrdset_done(st_shm_segments);
+
+            // --------------------------------------------------------------------
+
+            if(unlikely(!st_shm_bytes)) {
+                st_shm_bytes = rrdset_create_localhost(
+                        "system"
+                        , "shared_memory_bytes"
+                        , NULL
+                        , "ipc shared memory"
+                        , NULL
+                        , "IPC Shared Memory Used Bytes"
+                        , "bytes"
+                        , PLUGIN_PROC_NAME
+                        , "ipc"
+                        , NETDATA_CHART_PRIO_SYSTEM_IPC_SHARED_MEM_SIZE
+                        , update_every
+                        , RRDSET_TYPE_STACKED
+                );
+
+                rd_shm_bytes = rrddim_add(st_shm_bytes, "bytes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(st_shm_bytes);
+
+            rrddim_set_by_pointer(st_shm_bytes, rd_shm_bytes, shm.bytes);
+
+            rrdset_done(st_shm_bytes);
         }
     }
 

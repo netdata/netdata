@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Description: mongodb netdata python.d module
-# Author: l2isbad
+# Author: ilyam8
 # SPDX-License-Identifier: GPL-3.0-or-later
+
+import ssl
 
 from copy import deepcopy
 from datetime import datetime
@@ -418,17 +420,31 @@ CHARTS = {
     }
 }
 
+DEFAULT_HOST = '127.0.0.1'
+DEFAULT_PORT = 27017
+DEFAULT_TIMEOUT = 100
+DEFAULT_AUTHDB = 'admin'
+
+CONN_PARAM_HOST = 'host'
+CONN_PARAM_PORT = 'port'
+CONN_PARAM_SERVER_SELECTION_TIMEOUT_MS = 'serverselectiontimeoutms'
+CONN_PARAM_SSL_SSL = 'ssl'
+CONN_PARAM_SSL_CERT_REQS = 'ssl_cert_reqs'
+CONN_PARAM_SSL_CA_CERTS = 'ssl_ca_certs'
+CONN_PARAM_SSL_CRL_FILE = 'ssl_crlfile'
+CONN_PARAM_SSL_CERT_FILE = 'ssl_certfile'
+CONN_PARAM_SSL_KEY_FILE = 'ssl_keyfile'
+CONN_PARAM_SSL_PEM_PASSPHRASE = 'ssl_pem_passphrase'
+
 
 class Service(SimpleService):
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER[:]
         self.definitions = deepcopy(CHARTS)
+        self.authdb = self.configuration.get('authdb', DEFAULT_AUTHDB)
         self.user = self.configuration.get('user')
         self.password = self.configuration.get('pass')
-        self.host = self.configuration.get('host', '127.0.0.1')
-        self.port = self.configuration.get('port', 27017)
-        self.timeout = self.configuration.get('timeout', 100)
         self.metrics_to_collect = deepcopy(DEFAULT_METRICS)
         self.connection = None
         self.do_replica = None
@@ -468,7 +484,8 @@ class Service(SimpleService):
             self.metrics_to_collect.extend(COMMANDS)
         if 'wiredTiger' in server_status:
             self.metrics_to_collect.extend(WIREDTIGER)
-        if 'Collection' in server_status['locks']:
+        has_locks = 'locks' in server_status
+        if has_locks and 'Collection' in server_status['locks']:
             self.metrics_to_collect.extend(LOCKS)
 
     def create_charts_(self, server_status):
@@ -495,13 +512,14 @@ class Service(SimpleService):
             self.order.remove('command_total_rate')
             self.order.remove('command_failed_rate')
 
-        if 'Collection' not in server_status['locks']:
+        has_no_locks = 'locks' not in server_status
+        if has_no_locks or 'Collection' not in server_status['locks']:
             self.order.remove('locks_collection')
             self.order.remove('locks_database')
             self.order.remove('locks_global')
             self.order.remove('locks_metadata')
 
-        if 'oplog' not in server_status['locks']:
+        if has_no_locks or 'oplog' not in server_status['locks']:
             self.order.remove('locks_oplog')
 
         for dbase in self.databases:
@@ -631,7 +649,7 @@ class Service(SimpleService):
         if not raw_data:
             return None
 
-        to_netdata = dict()
+        data = dict()
         serverStatus = raw_data['serverStatus']
         dbStats = raw_data.get('dbStats')
         replSetGetStatus = raw_data.get('replSetGetStatus')
@@ -648,23 +666,22 @@ class Service(SimpleService):
                     break
 
             if not isinstance(value, dict) and key:
-                to_netdata[new_name or key] = value if not func else func(value)
+                data[new_name or key] = value if not func else func(value)
 
-        to_netdata['nonmapped'] = to_netdata['virtual'] - serverStatus['mem'].get('mappedWithJournal',
-                                                                                  to_netdata['mapped'])
-        if to_netdata.get('maximum bytes configured'):
-            maximum = to_netdata['maximum bytes configured']
-            to_netdata['wiredTiger_percent_clean'] = int(to_netdata['bytes currently in the cache']
-                                                         * 100 / maximum * 1000)
-            to_netdata['wiredTiger_percent_dirty'] = int(to_netdata['tracked dirty bytes in the cache']
-                                                         * 100 / maximum * 1000)
+        if 'mapped' in serverStatus['mem']:
+            data['nonmapped'] = data['virtual'] - serverStatus['mem'].get('mappedWithJournal', data['mapped'])
+
+        if data.get('maximum bytes configured'):
+            maximum = data['maximum bytes configured']
+            data['wiredTiger_percent_clean'] = int(data['bytes currently in the cache'] * 100 / maximum * 1000)
+            data['wiredTiger_percent_dirty'] = int(data['tracked dirty bytes in the cache'] * 100 / maximum * 1000)
 
         # dbStats
         if dbStats:
             for dbase in dbStats:
                 for metric in DBSTATS:
                     key = '_'.join([dbase, metric])
-                    to_netdata[key] = dbStats[dbase][metric]
+                    data[key] = dbStats[dbase][metric]
 
         # replSetGetStatus
         if replSetGetStatus:
@@ -675,39 +692,81 @@ class Service(SimpleService):
             for member in members:
                 if not member.get('self'):
                     other_hosts.append(member)
+
                 # Replica set time diff between current time and time when last entry from the oplog was applied
                 if member.get('optimeDate', unix_epoch) != unix_epoch:
                     member_optimedate = member['name'] + '_optimedate'
-                    to_netdata.update({member_optimedate: int(delta_calculation(delta=utc_now - member['optimeDate'],
-                                                                                multiplier=1000))})
+                    delta = utc_now - member['optimeDate']
+                    data[member_optimedate] = int(delta_calculation(delta=delta, multiplier=1000))
+
                 # Replica set members state
                 member_state = member['name'] + '_state'
                 for elem in REPL_SET_STATES:
                     state = elem[0]
-                    to_netdata.update({'_'.join([member_state, state]): 0})
-                to_netdata.update({'_'.join([member_state, str(member['state'])]): member['state']})
+                    data.update({'_'.join([member_state, state]): 0})
+                data.update({'_'.join([member_state, str(member['state'])]): member['state']})
+
             # Heartbeat lag calculation
             for other in other_hosts:
                 if other['lastHeartbeatRecv'] != unix_epoch:
                     node = other['name'] + '_heartbeat_lag'
-                    to_netdata[node] = int(delta_calculation(delta=utc_now - other['lastHeartbeatRecv'],
-                                                             multiplier=1000))
+                    delta = utc_now - other['lastHeartbeatRecv']
+                    data[node] = int(delta_calculation(delta=delta, multiplier=1000))
 
         if getReplicationInfo:
             first_event = getReplicationInfo['ASCENDING']['ts'].as_datetime()
             last_event = getReplicationInfo['DESCENDING']['ts'].as_datetime()
-            to_netdata['timeDiff'] = int(delta_calculation(delta=last_event - first_event, multiplier=1000))
+            data['timeDiff'] = int(delta_calculation(delta=last_event - first_event, multiplier=1000))
 
-        return to_netdata
+        return data
+
+    def build_ssl_connection_params(self):
+        conf = self.configuration
+
+        def cert_req(v):
+            if v is None:
+                return None
+            if not v:
+                return ssl.CERT_NONE
+            return ssl.CERT_REQUIRED
+
+        ssl_params = {
+            CONN_PARAM_SSL_SSL: conf.get(CONN_PARAM_SSL_SSL),
+            CONN_PARAM_SSL_CERT_REQS: cert_req(conf.get(CONN_PARAM_SSL_CERT_REQS)),
+            CONN_PARAM_SSL_CA_CERTS: conf.get(CONN_PARAM_SSL_CA_CERTS),
+            CONN_PARAM_SSL_CRL_FILE: conf.get(CONN_PARAM_SSL_CRL_FILE),
+            CONN_PARAM_SSL_CERT_FILE: conf.get(CONN_PARAM_SSL_CERT_FILE),
+            CONN_PARAM_SSL_KEY_FILE: conf.get(CONN_PARAM_SSL_KEY_FILE),
+            CONN_PARAM_SSL_PEM_PASSPHRASE: conf.get(CONN_PARAM_SSL_PEM_PASSPHRASE),
+        }
+
+        ssl_params = dict((k, v) for k, v in ssl_params.items() if v is not None)
+
+        return ssl_params
+
+    def build_connection_params(self):
+        conf = self.configuration
+        params = {
+            CONN_PARAM_HOST: conf.get(CONN_PARAM_HOST, DEFAULT_HOST),
+            CONN_PARAM_PORT: conf.get(CONN_PARAM_PORT, DEFAULT_PORT),
+        }
+        if hasattr(MongoClient, 'server_selection_timeout'):
+            params[CONN_PARAM_SERVER_SELECTION_TIMEOUT_MS] = conf.get('timeout', DEFAULT_TIMEOUT)
+
+        params.update(self.build_ssl_connection_params())
+        return params
 
     def _create_connection(self):
-        conn_vars = {'host': self.host, 'port': self.port}
-        if hasattr(MongoClient, 'server_selection_timeout'):
-            conn_vars.update({'serverselectiontimeoutms': self.timeout})
+        params = self.build_connection_params()
+        self.debug('creating connection, connection params: {0}'.format(sorted(params)))
+
         try:
-            connection = MongoClient(**conn_vars)
+            connection = MongoClient(**params)
             if self.user and self.password:
-                connection.admin.authenticate(name=self.user, password=self.password)
+                self.debug('authenticating, user: {0}, password: {1}'.format(self.user, self.password))
+                getattr(connection, self.authdb).authenticate(name=self.user, password=self.password)
+            else:
+                self.debug('skip authenticating, user and password are not set')
             # elif self.user:
             #     connection.admin.authenticate(name=self.user, mechanism='MONGODB-X509')
             server_status = connection.admin.command('serverStatus')

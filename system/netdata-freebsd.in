@@ -7,7 +7,7 @@ name=netdata
 rcvar=netdata_enable
 
 piddir="@localstatedir_POST@/run/netdata"
-pidfile="${pidfile}/netdata.pid"
+pidfile="${piddir}/netdata.pid"
 
 command="@sbindir_POST@/netdata"
 command_args="-P ${pidfile}"

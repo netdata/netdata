@@ -71,7 +71,7 @@ void grouping_free_ses(RRDR *r) {
 void grouping_add_ses(RRDR *r, calculated_number value) {
     struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
 
-    if(isnormal(value)) {
+    if(calculated_number_isnumber(value)) {
         if(unlikely(!g->count))
             g->level = value;
 
@@ -83,7 +83,7 @@ void grouping_add_ses(RRDR *r, calculated_number value) {
 calculated_number grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
     struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
 
-    if(unlikely(!g->count || !isnormal(g->level))) {
+    if(unlikely(!g->count || !calculated_number_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
         return 0.0;
     }

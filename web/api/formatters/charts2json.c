@@ -54,6 +54,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                        ",\n\t\"timezone\": \"%s\""
                        ",\n\t\"update_every\": %d"
                        ",\n\t\"history\": %ld"
+                       ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
                    , host->hostname
@@ -63,6 +64,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                    , host->timezone
                    , host->rrd_update_every
                    , host->rrd_history_entries
+                   , rrd_memory_mode_name(host->rrd_memory_mode)
                    , custom_dashboard_info_js_filename
     );
 
@@ -134,4 +136,57 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     }
 
     buffer_sprintf(wb, "\n\t]\n}\n");
+}
+
+// generate collectors list for the api/v1/info call
+
+struct collector {
+    char *plugin;
+    char *module;
+};
+
+struct array_printer {
+    int c;
+    BUFFER *wb;
+};
+
+int print_collector(void *entry, void *data) {
+    struct array_printer *ap = (struct array_printer *)data;
+    BUFFER *wb = ap->wb;
+    struct collector *col=(struct collector *) entry;
+    if(ap->c) buffer_strcat(wb, ",");
+    buffer_strcat(wb, "\n\t\t{\n\t\t\t\"plugin\": \"");
+    buffer_strcat(wb, col->plugin);
+    buffer_strcat(wb, "\",\n\t\t\t\"module\": \"");
+    buffer_strcat(wb, col->module);
+    buffer_strcat(wb, "\"\n\t\t}");
+    (ap->c)++;
+    return 0;
+}
+
+void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
+    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    RRDSET *st;
+    char name[500];
+
+    time_t now = now_realtime_sec();
+    rrdhost_rdlock(host);
+    rrdset_foreach_read(st, host) {
+        if (rrdset_is_available_for_viewers(st)) {
+            struct collector col = {
+                    .plugin = st->plugin_name ? st->plugin_name : "",
+                    .module = st->module_name ? st->module_name : ""
+            };
+            sprintf(name, "%s:%s", col.plugin, col.module);
+            dictionary_set(dict, name, &col, sizeof(struct collector));
+            st->last_accessed_time = now;
+        }
+    }
+    rrdhost_unlock(host);
+    struct array_printer ap = {
+            .c = 0,
+            .wb = wb
+    };
+    dictionary_get_all(dict, print_collector, &ap);
+    dictionary_destroy(dict);
 }

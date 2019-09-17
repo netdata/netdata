@@ -43,7 +43,9 @@ int do_proc_vmstat(int update_every, usec_t dt) {
         arl_expect(arl_base, "pswpin", &pswpin);
         arl_expect(arl_base, "pswpout", &pswpout);
 
-        if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO && get_numa_node_count() >= 2)) {
+        if(do_numa == CONFIG_BOOLEAN_YES || (do_numa == CONFIG_BOOLEAN_AUTO &&
+                                             (get_numa_node_count() >= 2 ||
+                                              netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
             arl_expect(arl_base, "numa_foreign", &numa_foreign);
             arl_expect(arl_base, "numa_hint_faults_local", &numa_hint_faults_local);
             arl_expect(arl_base, "numa_hint_faults", &numa_hint_faults);
@@ -91,7 +93,9 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(pswpin || pswpout || do_swapio == CONFIG_BOOLEAN_YES) {
+    if(do_swapio == CONFIG_BOOLEAN_YES || (do_swapio == CONFIG_BOOLEAN_AUTO &&
+                                           (pswpin || pswpout ||
+                                            netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_swapio = CONFIG_BOOLEAN_YES;
 
         static RRDSET *st_swapio = NULL;

@@ -17,4 +17,5 @@ dist_noinst_DATA = \
 
 dist_plugins_SCRIPTS = \
 	anonymous-statistics.sh \
+	system-info.sh \
 	$(NULL)

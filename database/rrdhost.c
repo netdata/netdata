@@ -122,6 +122,7 @@ RRDHOST *rrdhost_create(const char *hostname,
                         char *rrdpush_destination,
                         char *rrdpush_api_key,
                         char *rrdpush_send_charts_matching,
+                        struct rrdhost_system_info *system_info,
                         int is_localhost
 ) {
     debug(D_RRDHOST, "Host '%s': adding with guid '%s'", hostname, guid);
@@ -133,6 +134,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrd_update_every    = (update_every > 0)?update_every:1;
     host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
     host->rrd_memory_mode     = memory_mode;
+#ifdef ENABLE_DBENGINE
+    host->page_cache_mb       = default_rrdeng_page_cache_mb;
+    host->disk_space_mb       = default_rrdeng_disk_quota_mb;
+#endif
     host->health_enabled      = (memory_mode == RRD_MEMORY_MODE_NONE)? 0 : health_enabled;
     host->rrdpush_send_enabled     = (rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) ? 1 : 0;
     host->rrdpush_send_destination = (host->rrdpush_send_enabled)?strdupz(rrdpush_destination):NULL;
@@ -142,6 +147,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->rrdpush_sender_pipe[0] = -1;
     host->rrdpush_sender_pipe[1] = -1;
     host->rrdpush_sender_socket  = -1;
+#ifdef ENABLE_HTTPS
+    host->ssl.conn = NULL;
+    host->ssl.flags = NETDATA_SSL_START;
+#endif
 
     netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);
@@ -157,6 +166,8 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->program_version = strdupz((program_version && *program_version)?program_version:"unknown");
     host->registry_hostname = strdupz((registry_hostname && *registry_hostname)?registry_hostname:hostname);
 
+    host->system_info = system_info;
+
     avl_init_lock(&(host->rrdset_root_index),      rrdset_compare);
     avl_init_lock(&(host->rrdset_root_index_name), rrdset_compare_name);
     avl_init_lock(&(host->rrdfamily_root_index),   rrdfamily_compare);
@@ -168,6 +179,10 @@ RRDHOST *rrdhost_create(const char *hostname,
     if(config_get_boolean(CONFIG_SECTION_GLOBAL, "delete orphan hosts files", 1) && !is_localhost)
         rrdhost_flag_set(host, RRDHOST_FLAG_DELETE_ORPHAN_HOST);
 
+    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
+    avl_init_lock(&(host->alarms_idx_health_log), alarm_compare_id);
+    avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -202,7 +217,8 @@ RRDHOST *rrdhost_create(const char *hostname,
         snprintfz(filename, FILENAME_MAX, "%s/%s", netdata_configured_cache_dir, host->machine_guid);
         host->cache_dir = strdupz(filename);
 
-        if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE) {
+        if(host->rrd_memory_mode == RRD_MEMORY_MODE_MAP || host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE ||
+           host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             int r = mkdir(host->cache_dir, 0775);
             if(r != 0 && errno != EEXIST)
                 error("Host '%s': cannot create directory '%s'", host->hostname, host->cache_dir);
@@ -218,6 +234,30 @@ RRDHOST *rrdhost_create(const char *hostname,
        }
 
     }
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+        char dbenginepath[FILENAME_MAX + 1];
+        int ret;
+
+        snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", host->cache_dir);
+        ret = mkdir(dbenginepath, 0775);
+        if(ret != 0 && errno != EEXIST)
+            error("Host '%s': cannot create directory '%s'", host->hostname, dbenginepath);
+        else
+            ret = rrdeng_init(&host->rrdeng_ctx, dbenginepath, host->page_cache_mb, host->disk_space_mb);
+        if(ret) {
+            error("Host '%s': cannot initialize host with machine guid '%s'. Failed to initialize DB engine at '%s'.",
+                  host->hostname, host->machine_guid, host->cache_dir);
+            rrdhost_free(host);
+            host = NULL;
+            //rrd_hosts_available++; //TODO: maybe we want this?
+
+            return host;
+        }
+#else
+        fatal("RRD_MEMORY_MODE_DBENGINE is not supported in this platform.");
+#endif
+    }
 
     if(host->health_enabled) {
         snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
@@ -229,7 +269,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
     host->health_log_filename = strdupz(filename);
 
-    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health_default_exec = strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health_default_recipient = strdupz("root");
 
@@ -238,12 +278,12 @@ RRDHOST *rrdhost_create(const char *hostname,
     // load health configuration
 
     if(host->health_enabled) {
-        health_alarm_log_load(host);
-        health_alarm_log_open(host);
-
         rrdhost_wrlock(host);
         health_readdir(host, health_user_config_dir(), health_stock_config_dir(), NULL);
         rrdhost_unlock(host);
+
+        health_alarm_log_load(host);
+        health_alarm_log_open(host);
     }
 
 
@@ -332,6 +372,7 @@ RRDHOST *rrdhost_find_or_create(
         , char *rrdpush_destination
         , char *rrdpush_api_key
         , char *rrdpush_send_charts_matching
+        , struct rrdhost_system_info *system_info
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
@@ -355,6 +396,7 @@ RRDHOST *rrdhost_find_or_create(
                 , rrdpush_destination
                 , rrdpush_api_key
                 , rrdpush_send_charts_matching
+                , system_info
                 , 0
         );
     }
@@ -439,7 +481,7 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-void rrd_init(char *hostname) {
+void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1)
@@ -468,6 +510,7 @@ void rrd_init(char *hostname) {
             , default_rrdpush_destination
             , default_rrdpush_api_key
             , default_rrdpush_send_charts_matching
+            , system_info
             , 1
     );
     rrd_unlock();
@@ -513,6 +556,27 @@ void __rrd_check_wrlock(const char *file, const char *function, const unsigned l
 // ----------------------------------------------------------------------------
 // RRDHOST - free
 
+void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
+    info("SYSTEM_INFO: free %p", system_info);
+
+    if(likely(system_info)) {
+        freez(system_info->os_name);
+        freez(system_info->os_id);
+        freez(system_info->os_id_like);
+        freez(system_info->os_version);
+        freez(system_info->os_version_id);
+        freez(system_info->os_detection);
+        freez(system_info->kernel_name);
+        freez(system_info->kernel_version);
+        freez(system_info->architecture);
+        freez(system_info->virtualization);
+        freez(system_info->virt_detection);
+        freez(system_info->container);
+        freez(system_info->container_detection);
+        freez(system_info);
+    }
+}
+
 void rrdhost_free(RRDHOST *host) {
     if(!host) return;
 
@@ -541,6 +605,12 @@ void rrdhost_free(RRDHOST *host) {
     rrdvar_free_remaining_variables(host, &host->rrdvar_root_index);
 
     health_alarm_log_free(host);
+
+    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+#ifdef ENABLE_DBENGINE
+        rrdeng_exit(host->rrdeng_ctx);
+#endif
+    }
 
     // ------------------------------------------------------------------------
     // remove it from the indexes
@@ -573,6 +643,7 @@ void rrdhost_free(RRDHOST *host) {
     freez((void *)host->timezone);
     freez(host->program_version);
     freez(host->program_name);
+    rrdhost_system_info_free(host->system_info);
     freez(host->cache_dir);
     freez(host->varlib_dir);
     freez(host->rrdpush_send_api_key);
@@ -743,4 +814,109 @@ restart_after_removal:
             goto restart_after_removal;
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// RRDHOST - set system info from environment variables
+
+int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
+    int res = 0;
+
+    if(!strcmp(name, "NETDATA_SYSTEM_OS_NAME")){
+        freez(system_info->os_name);
+        system_info->os_name = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID")){
+        freez(system_info->os_id);
+        system_info->os_id = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE")){
+        freez(system_info->os_id_like);
+        system_info->os_id_like = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION")){
+        freez(system_info->os_version);
+        system_info->os_version = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID")){
+        freez(system_info->os_version_id);
+        system_info->os_version_id = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION")){
+        freez(system_info->os_detection);
+        system_info->os_detection = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
+        freez(system_info->kernel_name);
+        system_info->kernel_name = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_VERSION")){
+        freez(system_info->kernel_version);
+        system_info->kernel_version = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_ARCHITECTURE")){
+        freez(system_info->architecture);
+        system_info->architecture = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_VIRTUALIZATION")){
+        freez(system_info->virtualization);
+        system_info->virtualization = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_VIRT_DETECTION")){
+        freez(system_info->virt_detection);
+        system_info->virt_detection = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER")){
+        freez(system_info->container);
+        system_info->container = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_SYSTEM_CONTAINER_DETECTION")){
+        freez(system_info->container_detection);
+        system_info->container_detection = strdupz(value);
+    }
+    else {
+        res = 1;
+    }
+
+    return res;
+}
+
+/**
+ * Alarm Compare ID
+ *
+ * Callback function used with the binary trees to compare the id of RRDCALC
+ *
+ * @param a a pointer to the RRDCAL item to insert,compare or update the binary tree
+ * @param b the pointer to the binary tree.
+ *
+ * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
+ */
+int alarm_compare_id(void *a, void *b) {
+    register uint32_t hash1 = ((RRDCALC *)a)->id;
+    register uint32_t hash2 = ((RRDCALC *)b)->id;
+
+    if(hash1 < hash2) return -1;
+    else if(hash1 > hash2) return 1;
+
+    return 0;
+}
+
+/**
+ * Alarm Compare NAME
+ *
+ * Callback function used with the binary trees to compare the name of RRDCALC
+ *
+ * @param a a pointer to the RRDCAL item to insert,compare or update the binary tree
+ * @param b the pointer to the binary tree.
+ *
+ * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
+ */
+int alarm_compare_name(void *a, void *b) {
+    RRDCALC *in1 = (RRDCALC *)a;
+    RRDCALC *in2 = (RRDCALC *)b;
+
+    if(in1->hash < in2->hash) return -1;
+    else if(in1->hash > in2->hash) return 1;
+
+    return strcmp(in1->name,in2->name);
 }

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Description: smart netdata python.d module
-# Author: l2isbad, vorph1
+# Author: ilyam8, vorph1
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import os
@@ -440,6 +440,20 @@ class AtaNormalized(BaseAtaSmartAttribute):
         return self.normalized_value
 
 
+class Ata3(BaseAtaSmartAttribute):
+    def value(self):
+        value = int(self.raw_value)
+        # https://github.com/netdata/netdata/issues/5919
+        #
+        # 3;151;38684000679;
+        # 423 (Average 447)
+        # 38684000679 & 0xFFF -> 423
+        # (38684000679 & 0xFFF0000) >> 16 -> 447
+        if value > 1e6:
+            return value & 0xFFF
+        return value
+
+
 class Ata9(BaseAtaSmartAttribute):
     def value(self):
         value = int(self.raw_value)
@@ -454,7 +468,14 @@ class Ata190(BaseAtaSmartAttribute):
 
 
 class Ata194(BaseAtaSmartAttribute):
+    # https://github.com/netdata/netdata/issues/3041
+    # https://github.com/netdata/netdata/issues/5919
+    #
+    # The low byte is the current temperature, the third lowest is the maximum, and the fifth lowest is the minimum
     def value(self):
+        value = int(self.raw_value)
+        if value > 1e6:
+            return value & 0xFF
         return min(int(self.normalized_value), int(self.raw_value))
 
 
@@ -475,7 +496,9 @@ class SCSIRaw(BaseSCSISmartAttribute):
 def ata_attribute_factory(value):
     name = value[0]
 
-    if name == ATTR9:
+    if name == ATTR3:
+        return Ata3(*value)
+    elif name == ATTR9:
         return Ata9(*value)
     elif name == ATTR190:
         return Ata190(*value)
@@ -535,6 +558,7 @@ class DiskLogFile:
 
 class BaseDisk:
     def __init__(self, name, log_file):
+        self.raw_name = name
         self.name = re.sub(r'_+', '_', name)
         self.log_file = log_file
         self.attrs = list()
@@ -543,8 +567,8 @@ class BaseDisk:
 
     def __eq__(self, other):
         if isinstance(other, BaseDisk):
-            return self.name == other.name
-        return self.name == other
+            return self.raw_name == other.raw_name
+        return self.raw_name == other
 
     def __ne__(self, other):
         return not self == other
@@ -634,7 +658,7 @@ class Service(SimpleService):
                     not disk.log_file.is_active(current_time, self.age),
                 ]
             ):
-                self.disks.remove(disk.name)
+                self.disks.remove(disk.raw_name)
                 self.remove_disk_from_charts(disk)
 
     def scan(self):
@@ -658,9 +682,11 @@ class Service(SimpleService):
         path = os.path.join(self.log_path, full_name)
 
         if name in self.disks:
+            self.debug('skipping {0}: already in disks'.format(full_name))
             return None
 
         if [p for p in self.exclude if p in name]:
+            self.debug('skipping {0}: filtered by `exclude` option'.format(full_name))
             return None
 
         if not os.access(path, os.R_OK):
@@ -724,5 +750,4 @@ class Service(SimpleService):
             if not chart_id or chart_id not in self.charts:
                 continue
 
-            # TODO: can't delete dimension
-            self.charts[chart_id].hide_dimension('{0}_{1}'.format(disk.name, attr.name))
+            self.charts[chart_id].del_dimension('{0}_{1}'.format(disk.name, attr.name))

@@ -55,6 +55,8 @@ typedef long double collected_number;
 
 #define calculated_number_equal(a, b) (calculated_number_fabs((a) - (b)) < calculated_number_epsilon)
 
+#define calculated_number_isnumber(a) (!(fpclassify(a) & (FP_NAN|FP_INFINITE)))
+
 typedef uint32_t storage_number;
 #define STORAGE_NUMBER_FORMAT "%u"
 

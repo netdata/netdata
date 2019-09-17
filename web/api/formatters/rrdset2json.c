@@ -7,6 +7,9 @@
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used) {
     rrdset_rdlock(st);
 
+    time_t first_entry_t = rrdset_first_entry_t(st);
+    time_t last_entry_t  = rrdset_last_entry_t(st);
+
     buffer_sprintf(wb,
             "\t\t{\n"
             "\t\t\t\"id\": \"%s\",\n"
@@ -40,9 +43,9 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
                    , st->units
                    , st->name
                    , rrdset_type_name(st->chart_type)
-                   , st->entries * st->update_every
-                   , rrdset_first_entry_t(st)
-                   , rrdset_last_entry_t(st)
+                   , last_entry_t - first_entry_t + st->update_every//st->entries * st->update_every
+                   , first_entry_t//rrdset_first_entry_t(st)
+                   , last_entry_t//rrdset_last_entry_t(st)
                    , st->update_every
     );
 
@@ -70,7 +73,10 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     if(dimensions_count) *dimensions_count += dimensions;
     if(memory_used) *memory_used += memory;
 
-    buffer_strcat(wb, "\n\t\t\t},\n\t\t\t\"green\": ");
+    buffer_sprintf(wb, "\n\t\t\t},\n\t\t\t\"chart_variables\": ");
+    health_api_v1_chart_custom_variables2json(st, wb);
+
+    buffer_strcat(wb, ",\n\t\t\t\"green\": ");
     buffer_rrd_value(wb, st->green);
     buffer_strcat(wb, ",\n\t\t\t\"red\": ");
     buffer_rrd_value(wb, st->red);

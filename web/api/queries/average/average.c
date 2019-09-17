@@ -46,9 +46,12 @@ calculated_number grouping_flush_average(RRDR *r,  RRDR_VALUE_FLAGS *rrdr_value_
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;
     }
     else {
-        if(unlikely(r->internal.resampling_group != 1))
-            value = g->sum / r->internal.resampling_divisor;
-        else
+        if(unlikely(r->internal.resampling_group != 1)) {
+            if (unlikely(r->result_options & RRDR_RESULT_OPTION_VARIABLE_STEP))
+                value = g->sum / g->count / r->internal.resampling_divisor;
+            else
+                value = g->sum / r->internal.resampling_divisor;
+        } else
             value = g->sum / g->count;
     }
 

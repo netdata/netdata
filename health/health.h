@@ -23,6 +23,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_ENTRY_FLAG_EXEC_RUN              0x00000004
 #define HEALTH_ENTRY_FLAG_EXEC_FAILED           0x00000008
 #define HEALTH_ENTRY_FLAG_SILENCED              0x00000010
+#define HEALTH_ENTRY_RUN_ONCE                   0x00000020
 
 #define HEALTH_ENTRY_FLAG_SAVED                 0x10000000
 #define HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION 0x80000000
@@ -35,16 +36,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_LISTEN_BACKLOG 4096
 #endif
 
-#define HEALTH_ALARM_KEY "alarm"
-#define HEALTH_TEMPLATE_KEY "template"
 #define HEALTH_ON_KEY "on"
-#define HEALTH_CONTEXT_KEY "context"
-#define HEALTH_CHART_KEY "chart"
-#define HEALTH_HOST_KEY "hosts"
-#define HEALTH_OS_KEY "os"
-#define HEALTH_FAMILIES_KEY "families"
-#define HEALTH_LOOKUP_KEY "lookup"
-#define HEALTH_CALC_KEY "calc"
 #define HEALTH_EVERY_KEY "every"
 #define HEALTH_GREEN_KEY "green"
 #define HEALTH_RED_KEY "red"
@@ -57,38 +49,9 @@ extern unsigned int default_health_enabled;
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
 
-typedef struct silencer {
-    char *alarms;
-    SIMPLE_PATTERN *alarms_pattern;
+#define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
-    char *hosts;
-    SIMPLE_PATTERN *hosts_pattern;
-
-    char *contexts;
-    SIMPLE_PATTERN *contexts_pattern;
-
-    char *charts;
-    SIMPLE_PATTERN *charts_pattern;
-
-    char *families;
-    SIMPLE_PATTERN *families_pattern;
-
-    struct silencer *next;
-} SILENCER;
-
-typedef enum silence_type {
-    STYPE_NONE,
-    STYPE_DISABLE_ALARMS,
-    STYPE_SILENCE_NOTIFICATIONS
-} SILENCE_TYPE;
-
-typedef struct silencers {
-    int all_alarms;
-    SILENCE_TYPE stype;
-    SILENCER *silencers;
-} SILENCERS;
-
-SILENCERS *silencers;
+char *silencers_filename;
 
 extern void health_init(void);
 extern void *health_main(void *ptr);
@@ -96,10 +59,12 @@ extern void *health_main(void *ptr);
 extern void health_reload(void);
 
 extern int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result);
+extern void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 extern void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 extern void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
+void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
 extern int health_alarm_log_open(RRDHOST *host);
 extern void health_alarm_log_close(RRDHOST *host);
@@ -108,7 +73,7 @@ extern void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 extern ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filename);
 extern void health_alarm_log_load(RRDHOST *host);
 
-extern void health_alarm_log(
+extern ALARM_ENTRY* health_create_alarm_entry(
         RRDHOST *host,
         uint32_t alarm_id,
         uint32_t alarm_event_id,
@@ -128,6 +93,8 @@ extern void health_alarm_log(
         const char *info,
         int delay,
         uint32_t flags);
+
+extern void health_alarm_log(RRDHOST *host, ALARM_ENTRY *ae);
 
 extern void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 extern char *health_user_config_dir(void);

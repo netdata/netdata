@@ -868,6 +868,13 @@ NETDATA.unitsConversion = {
             'TiB': 1024,
             'PiB': 1024 * 1024,
             'EiB': 1024 * 1024 * 1024
+        },
+        'num': {
+            'num': 1,
+            'num (K)': 1000,
+            'num (M)': 1000000,
+            'num (G)': 1000000000,
+            'num (T)': 1000000000000
         }
         /*
         'milliseconds': {
@@ -967,6 +974,72 @@ NETDATA.unitsConversion = {
                         + NETDATA.zeropad(milliseconds);
                 }
             }
+        },
+        'nanoseconds': {
+            'nanoseconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time && max < 1000;
+                },
+                convert: function (nanoseconds) {
+                    let tms = Math.round(nanoseconds * 10);
+                    nanoseconds = Math.floor(tms / 10);
+
+                    tms -= nanoseconds * 10;
+
+                    return (nanoseconds).toString() + '.' + tms.toString();
+                }
+            },
+            'microseconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time
+                           && max >= 1000 && max < 1000 * 1000;
+                },
+                convert: function (nanoseconds) {
+                    nanoseconds = Math.round(nanoseconds);
+
+                    let microseconds = Math.floor(nanoseconds / 1000);
+                    nanoseconds -= microseconds * 1000;
+
+                    nanoseconds = Math.round(nanoseconds / 10 );
+
+                    return microseconds.toString() + '.'
+                        + NETDATA.zeropad(nanoseconds);
+                }
+            },
+            'milliseconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time
+                           && max >= 1000 * 1000 && max < 1000 * 1000 * 1000;
+                },
+                convert: function (nanoseconds) {
+                    nanoseconds = Math.round(nanoseconds);
+
+                    let milliseconds = Math.floor(nanoseconds / 1000 / 1000);
+                    nanoseconds -= milliseconds * 1000 * 1000;
+
+                    nanoseconds = Math.round(nanoseconds / 1000 / 10);
+
+                    return milliseconds.toString() + '.'
+                        + NETDATA.zeropad(nanoseconds);
+                }
+            },
+            'seconds': {
+                check: function (max) {
+                    return NETDATA.options.current.seconds_as_time
+                           && max >= 1000 * 1000 * 1000;
+                },
+                convert: function (nanoseconds) {
+                    nanoseconds = Math.round(nanoseconds);
+
+                    let seconds = Math.floor(nanoseconds / 1000 / 1000 / 1000);
+                    nanoseconds -= seconds * 1000 * 1000 * 1000;
+
+                    nanoseconds = Math.round(nanoseconds / 1000 / 1000 / 10);
+
+                    return seconds.toString() + '.'
+                        + NETDATA.zeropad(nanoseconds);
+                }
+            },
         }
     },
 
@@ -1710,7 +1783,7 @@ NETDATA.timeout.init();
 NETDATA.themes = {
     white: {
         bootstrap_css: NETDATA.serverStatic + 'css/bootstrap-3.3.7.css',
-        dashboard_css: NETDATA.serverStatic + 'dashboard.css?v20180210-1',
+        dashboard_css: NETDATA.serverStatic + 'dashboard.css?v20190902-0',
         background: '#FFFFFF',
         foreground: '#000000',
         grid: '#F0F0F0',
@@ -1741,7 +1814,7 @@ NETDATA.themes = {
     },
     slate: {
         bootstrap_css: NETDATA.serverStatic + 'css/bootstrap-slate-flat-3.3.7.css?v20161229-1',
-        dashboard_css: NETDATA.serverStatic + 'dashboard.slate.css?v20180210-1',
+        dashboard_css: NETDATA.serverStatic + 'dashboard.slate.css?v20190902-0',
         background: '#272b30',
         foreground: '#C8C8C8',
         grid: '#283236',
@@ -2281,8 +2354,28 @@ NETDATA.dygraphChartCreate = function (state, data) {
             NETDATA.globalSelectionSync.stop();
         },
         underlayCallback: function (canvas, area, g) {
-
             // the chart is about to be drawn
+
+            // update history_tip_element
+            if (state.tmp.dygraph_history_tip_element) {
+                const xHookRightSide = g.toDomXCoord(state.netdata_first);
+                if (xHookRightSide > area.x) {
+                    state.tmp.dygraph_history_tip_element_displayed = true;
+                    // group the styles for possible better performance
+                    state.tmp.dygraph_history_tip_element.setAttribute(
+                      'style',
+                      `display: block; left: ${area.x}px; right: calc(100% - ${xHookRightSide}px);`
+                    )
+                } else {
+                    if (state.tmp.dygraph_history_tip_element_displayed) {
+                        // additional check just for performance
+                        // don't update the DOM when it's not needed
+                        state.tmp.dygraph_history_tip_element.style.display = 'none';
+                        state.tmp.dygraph_history_tip_element_displayed = false;
+                    }
+                }
+            }
+
             // this function renders global highlighted time-frame
 
             if (NETDATA.globalChartUnderlay.isActive()) {
@@ -2750,6 +2843,21 @@ NETDATA.dygraphChartCreate = function (state, data) {
 
     state.tmp.dygraph_instance = new Dygraph(state.element_chart,
         data.result.data, state.tmp.dygraph_options);
+
+
+    state.tmp.dygraph_history_tip_element = document.createElement('div');
+    state.tmp.dygraph_history_tip_element.innerHTML = `
+        <span class="dygraph__history-tip-content">
+          Want to extend your history of real-time metrics?
+          <br />
+           <a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>
+             Configure Netdata's <b>history</b></a>
+           or use the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine</a>.
+        </span>
+    `;
+    state.tmp.dygraph_history_tip_element.className = 'dygraph__history-tip';
+    state.element_chart.appendChild(state.tmp.dygraph_history_tip_element);
+
 
     state.tmp.dygraph_force_zoom = false;
     state.tmp.dygraph_user_action = false;
@@ -4194,6 +4302,23 @@ NETDATA.peityChartCreate = function (state, data) {
     return true;
 };
 
+// ----------------------------------------------------------------------------------------------------------------
+// "Text-only" chart - Just renders the raw value to the DOM
+
+NETDATA.textOnlyCreate = function(state, data) {
+    var decimalPlaces = NETDATA.dataAttribute(state.element, 'textonly-decimal-places', 1);
+    var prefix = NETDATA.dataAttribute(state.element, 'textonly-prefix', '');
+    var suffix = NETDATA.dataAttribute(state.element, 'textonly-suffix', '');
+
+    // Round based on number of decimal places to show
+    var precision = Math.pow(10, decimalPlaces);
+    var value = Math.round(data.result[0] * precision) / precision;
+
+    state.element.textContent = prefix + value + suffix;
+    return true;
+}
+
+NETDATA.textOnlyUpdate = NETDATA.textOnlyCreate;
 // Charts Libraries Registration
 
 NETDATA.chartLibraries = {
@@ -4631,6 +4756,48 @@ NETDATA.chartLibraries = {
             void(state);
             return 'netdata-container-gauge';
         }
+    },
+    "textonly": {
+        autoresize: function (state) {
+            void(state);
+            return false;
+        },
+        container_class: function (state) {
+            void(state);
+            return 'netdata-container';
+        },
+        create: NETDATA.textOnlyCreate,
+        enabled: true,
+        format: function (state) {
+            void(state);
+            return 'array';
+        },
+        initialized: true,
+        initialize: function (callback) {
+            callback();
+        },
+        legend: function (state) {
+            void(state);
+            return null;
+        },
+        max_updates_to_recreate: function (state) {
+            void(state);
+            return 5000;
+        },
+        options: function (state) {
+            void(state);
+            return 'absolute';
+        },
+        pixels_per_point: function (state) {
+            void(state);
+            return 3;
+        },
+        track_colors: function (state) {
+            void(state);
+            return false;
+        },
+        update: NETDATA.textOnlyUpdate,
+        xssRegexIgnore: new RegExp('^/api/v1/data\.result$'),
     }
 };
 
@@ -8059,10 +8226,10 @@ let chartState = function (element) {
     };
 
     this.chartDataUniqueID = function () {
-        return this.id + ',' + this.library_name + ',' + this.dimensions + ',' + this.chartURLOptions();
+        return this.id + ',' + this.library_name + ',' + this.dimensions + ',' + this.chartURLOptions(true);
     };
 
-    this.chartURLOptions = function () {
+    this.chartURLOptions = function (isForUniqueId) {
         let ret = '';
 
         if (this.override_options !== null) {
@@ -8077,7 +8244,9 @@ let chartState = function (element) {
 
         ret += '%7C' + 'jsonwrap';
 
-        if (NETDATA.options.current.eliminate_zero_dimensions) {
+        // always add `nonzero` when it's used to create a chartDataUniqueID
+        // we cannot just remove `nonzero` because of backwards compatibility with old snapshots
+        if (isForUniqueId || NETDATA.options.current.eliminate_zero_dimensions) {
             ret += '%7C' + 'nonzero';
         }
 
@@ -9698,7 +9867,7 @@ NETDATA.registry = {
     machines: null,       // the user's other URLs
     machines_array: null, // the user's other URLs in an array
     person_urls: null,
-
+    anonymous_statistics_checked: false,
     MASKED_DATA: "***",
 
     isUsingGlobalRegistry: function() {
@@ -9771,8 +9940,16 @@ NETDATA.registry = {
                 }
                 NETDATA.registry.machine_guid = data.machine_guid;
                 NETDATA.registry.hostname = data.hostname;
-                if (dataLayer) {
-                    if (data.anonymous_statistics) dataLayer.push({"anonymous_statistics" : "true", "machine_guid" : data.machine_guid});
+                if (!NETDATA.registry.anonymous_statistics_checked) {
+                    NETDATA.registry.anonymous_statistics_checked=true;
+                    if (data.anonymous_statistics) {
+                        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+                                new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+                            j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=false;j.src=
+                            'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+                        })(window,document,'script','dataLayer','GTM-N6CBMJD');
+                        dataLayer.push({"anonymous_statistics" : "true", "machine_guid" : data.machine_guid});
+                    }
                 }
                 NETDATA.registry.access(2, function (person_urls) {
                     NETDATA.registry.parsePersonUrls(person_urls);

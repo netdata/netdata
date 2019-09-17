@@ -12,4 +12,5 @@ extern void send_statistics(const char *action, const char *action_result, const
 
 extern char pidfile[];
 
+
 #endif /* NETDATA_DAEMON_H */

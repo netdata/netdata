@@ -5,10 +5,6 @@
 
 #include "../libnetdata.h"
 
-#ifndef isnormal
-#define isnormal(x) (fpclassify(x) == FP_NORMAL)
-#endif
-
 extern void log_series_to_stderr(LONG_DOUBLE *series, size_t entries, calculated_number result, const char *msg);
 
 extern LONG_DOUBLE average(const LONG_DOUBLE *series, size_t entries);

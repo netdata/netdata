@@ -20,6 +20,8 @@ paths:
         * netdata version
         * netdata unique id
         * list of hosts mirrored (includes itself)
+        * Operating System, Virtualization and Container technology information
+        * List of active collector plugins and modules
         * number of alarms in the host
           * number of alarms in normal state
           * number of alarms in warning state
@@ -29,6 +31,8 @@ paths:
           description: netdata basic information
           schema:
             $ref: '#/definitions/info'
+        '503':
+          description: netdata daemon not ready (used for health checks)
   /charts:
     get:
       summary: 'Get a list of all charts available at the server'
@@ -59,6 +63,28 @@ paths:
             $ref: '#/definitions/chart'
         '404':
           description: 'No chart with the given id is found.'
+  /alarm_variables:
+    get:
+      summary: 'List variables available to configure alarms for a chart'
+      description: 'Returns the basic information of a chart and all the variables that can be used in alarm and template health configurations for the particular chart or family'
+      parameters:
+        - name: chart
+          in: query
+          description: 'The id of the chart as returned by the /charts call.'
+          required: true
+          type: string
+          format: 'as returned by /charts'
+      responses:
+        '200':
+            description: 'A javascript object with information about the chart and the available variables'
+            schema:
+              $ref: '#/definitions/alarm_variables'
+        '400':
+          description: 'Bad request - the body will include a message stating what is wrong.'
+        '404':
+          description: 'No chart with the given id is found.'
+        '500':
+          description: 'Internal server error. This usually means the server is out of memory.'
   /data:
     get:
       summary: 'Get collected data for a specific chart'
@@ -137,7 +163,7 @@ paths:
           type: array
           items:
             type: string
-            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage', 'unaligned', 'match-ids', 'match-names' ]
+            enum: [ 'nonzero', 'flip', 'jsonwrap', 'min2max', 'seconds', 'milliseconds', 'abs', 'absolute', 'absolute-sum', 'null2zero', 'objectrows', 'google_json', 'percentage', 'unaligned', 'match-ids', 'match-names', 'showcustomvars' ]
             collectionFormat: pipes
           default: [seconds, jsonwrap]
           allowEmptyValue: false
@@ -333,6 +359,20 @@ paths:
           type: string
           enum: [ 'yes', 'no' ]
           default: 'yes'
+        - name: oldunits
+          in: query
+          description: 'When enabled, netdata will show metric names for the default source=average as they appeared before 1.12, by using the legacy unit naming conventions'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'yes'
+        - name: hideunits
+          in: query
+          description: 'When enabled, netdata will not include the units in the metric names, for the default source=average.'
+          required: false
+          type: string
+          enum: [ 'yes', 'no' ]
+          default: 'yes'
         - name: server
           in: query
           description: 'Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.'
@@ -390,6 +430,38 @@ paths:
             type: array
             items:
               $ref: '#/definitions/alarm_log_entry'
+  /alarm_count:
+    get:
+      summary: 'Get an overall status of the chart'
+      description: "Checks multiple charts with the same context and counts number of alarms with given status."
+      parameters:
+        - in: query
+          name: context
+          description: "Specify context which should be checked"
+          required: false
+          allowEmptyValue: true
+          type: array
+          items:
+            type: string
+            collectionFormat: pipes
+          default: ['system.cpu']
+        - in: query
+          name: status
+          description: "Specify alarm status to count"
+          required: false
+          allowEmptyValue: true
+          type: string
+          enum: ['REMOVED', 'UNDEFINED', 'UNINITIALIZED', 'CLEAR', 'RAISED', 'WARNING', 'CRITICAL']
+          default: 'RAISED'
+      responses:
+        '200':
+          description: 'An object containing a count of alarms with given status for given contexts'
+          schema:
+            type: array
+            items: 
+              type: number
+        '500':
+          description: 'Internal server error. This usually means the server is out of memory.'
   /manage/health:
     get:
       summary: 'Accesses the health management API to control health checks and notifications at runtime.'
@@ -397,10 +469,10 @@ paths:
       parameters:
         - name: cmd
           in: query
-          description: 'DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors.'
+          description: 'DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors. LIST: Show active configuration.'
           required: false
           type: string
-          enum: ['DISABLE ALL', 'SILENCE ALL', 'DISABLE', 'SILENCE', 'RESET']
+          enum: ['DISABLE ALL', 'SILENCE ALL', 'DISABLE', 'SILENCE', 'RESET', 'LIST']
         - name: alarm
           in: query
           description: 'The expression provided will match both `alarm` and `template` names.'
@@ -446,6 +518,72 @@ definitions:
         example:
           - host1.example.com
           - host2.example.com
+      os_name:
+        type: string
+        description: Operating System Name
+        example: Manjaro Linux      
+      os_id:
+        type: string
+        description: Operating System ID
+        example: manjaro
+      os_id_like:
+        type: string
+        description: Known OS similar to this OS
+        example: arch
+      os_version:
+        type: string
+        description: Operating System Version
+        example: 18.0.4
+      os_version_id:
+        type: string
+        description: Operating System Version ID
+        example: unknown
+      os_detection:
+        type: string
+        description: OS parameters detection method
+        example: Mixed
+      kernel_name:
+        type: string
+        description: Kernel Name
+        example: Linux
+      kernel_version:
+        type: string
+        description: Kernel Version
+        example: 4.19.32-1-MANJARO
+      architecture:
+        type: string
+        description: Kernel architecture
+        example: x86_64
+      virtualization:
+        type: string
+        description: Virtualization Type
+        example: kvm
+      virt_detection:
+        type: string
+        description: Virtualization detection method
+        example: systemd-detect-virt
+      container:
+        type: string
+        description: Container technology
+        example: docker
+      container_detection:
+        type: string
+        description: Container technology detection method
+        example: dockerenv
+      collectors:
+        type: array
+        items:
+          type: object
+          description: Array of collector plugins and modules
+          properties:
+            plugin:
+              type: string
+              description: Collector plugin
+              example: python.d.plugin
+            module:
+              type: string
+              description: Module of the collector plugin
+              example: dockerd
       alarms:
         type: object
         description: number of alarms in the server.
@@ -548,12 +686,67 @@ definitions:
         properties:
           key:
             $ref: '#/definitions/dimension'
+      chart_variables:
+        type: object
+        properties:
+          key:
+            $ref: '#/definitions/chart_variables'
       green:
         type: number
         description: 'Chart health green threshold'
       red:
         type: number
         description: 'Chart health red trheshold'
+  alarm_variables:
+    type: object
+    properties:
+      chart:
+        type: string
+        description: 'The unique id of the chart'
+      chart_name:
+        type: string
+        description: 'The name of the chart'
+      cnart_context:
+        type: string
+        description: 'The context of the chart. It is shared across multiple monitored software or hardware instances and used in alarm templates'
+      family:
+        type: string
+        description: 'The family of the chart.'
+      host:
+        type: string
+        description: 'The host containing the chart.'
+      chart_variables:
+        type: object
+        properties:
+          key:
+            $ref: '#/definitions/chart_variables'
+      family_variables:
+        type: object
+        properties:
+          varname1:
+            type: number
+            format: float
+          varname2:
+            type: number
+            format: float
+      host_variables:
+        type: object
+        properties:
+          varname1:
+            type: number
+            format: float
+          varname2:
+            type: number
+            format: float
+  chart_variables:
+    type: object
+    properties:
+      varname1:
+        type: number
+        format: float
+      varname2:
+        type: number
+        format: float
   dimension:
     type: object
     properties:
@@ -625,6 +818,11 @@ definitions:
       format:
         type: string
         description: 'The format of the result returned.'
+      chart_variables:
+        type: object
+        properties:
+          key:
+            $ref: '#/definitions/chart_variables'
       result:
         description: 'The result requested, in the format requested.'
   alarms:
@@ -741,6 +939,12 @@ definitions:
                 type: string
               crit_parsed: 
                 type: string
+              warn_repeat_every:
+                type: integer
+                format: int32
+              crit_repeat_every:
+                type: integer
+                format: int32
               green: 
                 type: string
                 format: nullable

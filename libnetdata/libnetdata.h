@@ -81,6 +81,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
+#include <spawn.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
@@ -202,6 +203,9 @@
 #endif
 #define abs(x) (((x) < 0)? (-(x)) : (x))
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 #define GUID_LEN 36
 
 extern void netdata_fix_chart_id(char *s);
@@ -295,6 +299,9 @@ extern char *netdata_configured_host_prefix;
 #include "clocks/clocks.h"
 #include "popen/popen.h"
 #include "simple_pattern/simple_pattern.h"
+#ifdef ENABLE_HTTPS
+# include "socket/security.h"
+#endif
 #include "socket/socket.h"
 #include "config/appconfig.h"
 #include "log/log.h"
@@ -304,5 +311,8 @@ extern char *netdata_configured_host_prefix;
 #include "statistical/statistical.h"
 #include "adaptive_resortable_list/adaptive_resortable_list.h"
 #include "url/url.h"
+#include "json/json.h"
+#include "health/health.h"
+#include "string/utf8.h"
 
 #endif // NETDATA_LIB_H

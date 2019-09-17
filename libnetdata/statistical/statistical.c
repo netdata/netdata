@@ -23,7 +23,7 @@ inline LONG_DOUBLE sum_and_count(const LONG_DOUBLE *series, size_t entries, size
     size_t c = 0;
 
     for(value = series; value < end ; value++) {
-        if(isnormal(*value)) {
+        if(calculated_number_isnumber(*value)) {
             sum += *value;
             c++;
         }
@@ -62,7 +62,7 @@ LONG_DOUBLE moving_average(const LONG_DOUBLE *series, size_t entries, size_t per
 
     for(i = 0, count = 0; i < entries; i++) {
         LONG_DOUBLE value = series[i];
-        if(unlikely(!isnormal(value))) continue;
+        if(unlikely(!calculated_number_isnumber(value))) continue;
 
         if(unlikely(count < period)) {
             sum += value;
@@ -173,7 +173,7 @@ LONG_DOUBLE running_median_estimate(const LONG_DOUBLE *series, size_t entries) {
 
     for(i = 0; i < entries ; i++) {
         LONG_DOUBLE value = series[i];
-        if(unlikely(!isnormal(value))) continue;
+        if(unlikely(!calculated_number_isnumber(value))) continue;
 
         average += ( value - average ) * 0.1f; // rough running average.
         median += copysignl( average * 0.01, value - median );
@@ -193,7 +193,7 @@ LONG_DOUBLE standard_deviation(const LONG_DOUBLE *series, size_t entries) {
     LONG_DOUBLE sum;
 
     for(count = 0, sum = 0, value = series ; value < end ;value++) {
-        if(likely(isnormal(*value))) {
+        if(likely(calculated_number_isnumber(*value))) {
             count++;
             sum += *value;
         }
@@ -205,7 +205,7 @@ LONG_DOUBLE standard_deviation(const LONG_DOUBLE *series, size_t entries) {
     LONG_DOUBLE average = sum / (LONG_DOUBLE)count;
 
     for(count = 0, sum = 0, value = series ; value < end ;value++) {
-        if(isnormal(*value)) {
+        if(calculated_number_isnumber(*value)) {
             count++;
             sum += powl(*value - average, 2);
         }
@@ -232,7 +232,7 @@ LONG_DOUBLE single_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
     LONG_DOUBLE level = (1.0 - alpha) * (*value);
 
     for(value++ ; value < end; value++) {
-        if(likely(isnormal(*value)))
+        if(likely(calculated_number_isnumber(*value)))
             level = alpha * (*value) + (1.0 - alpha) * level;
     }
 
@@ -250,7 +250,7 @@ LONG_DOUBLE single_exponential_smoothing_reverse(const LONG_DOUBLE *series, size
     LONG_DOUBLE level = (1.0 - alpha) * (*value);
 
     for(value++ ; value >= series; value--) {
-        if(likely(isnormal(*value)))
+        if(likely(calculated_number_isnumber(*value)))
             level = alpha * (*value) + (1.0 - alpha) * level;
     }
 
@@ -281,7 +281,7 @@ LONG_DOUBLE double_exponential_smoothing(const LONG_DOUBLE *series, size_t entri
 
     const LONG_DOUBLE *value = series;
     for(value++ ; value >= series; value--) {
-        if(likely(isnormal(*value))) {
+        if(likely(calculated_number_isnumber(*value))) {
 
             LONG_DOUBLE last_level = level;
             level = alpha * *value + (1.0 - alpha) * (level + trend);

@@ -53,15 +53,54 @@ function docker_get_name_classic() {
 }
 
 function docker_get_name_api() {
-	local id="${1}"
-	if [ ! -S "${DOCKER_HOST}" ]; then
-		warning "Can't find ${DOCKER_HOST}"
+	local path="/containers/${1}/json"
+	if [ -z "${DOCKER_HOST}" ]; then
+		warning "No DOCKER_HOST is set"
 		return 1
 	fi
-	info "Running API command: /containers/${id}/json"
-	JSON=$(echo -e "GET /containers/${id}/json HTTP/1.0\\r\\n" | nc -U "${DOCKER_HOST}" | grep '^{.*')
+	if ! command -v jq >/dev/null 2>&1; then
+		warning "Can't find jq command line tool. jq is required for netdata to retrieve docker container name using ${DOCKER_HOST} API, falling back to docker ps"
+		return 1
+	fi
+	if [ -S "${DOCKER_HOST}" ]; then
+		info "Running API command: curl --unix-socket ${DOCKER_HOST} http://localhost${path}"
+		JSON=$(curl -sS --unix-socket "${DOCKER_HOST}" "http://localhost${path}")
+	elif [ "${DOCKER_HOST}" == "/var/run/docker.sock" ]; then
+		warning "Docker socket was not found at ${DOCKER_HOST}"
+		return 1
+	else
+		info "Running API command: curl ${DOCKER_HOST}${path}"
+		JSON=$(curl -sS "${DOCKER_HOST}${path}")
+	fi
 	NAME=$(echo "$JSON" | jq -r .Name,.Config.Hostname | grep -v null | head -n1 | sed 's|^/||')
 	return 0
+}
+
+function k8s_get_name() {
+	# Take the last part of the delimited path identifier (expecting either _ or / as a delimiter).
+	local id="${1##*_}"
+	if [ "${id}" == "${1}" ]; then
+		id="${1##*/}"
+	fi
+	KUBE_TOKEN="$(</var/run/secrets/kubernetes.io/serviceaccount/token)"
+	if command -v jq >/dev/null 2>&1; then
+		NAME="$(
+		curl -sSk -H "Authorization: Bearer $KUBE_TOKEN"  "https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/pods" |
+		jq -r '.items[] | "k8s_\(.metadata.namespace)_\(.metadata.name)_\(.metadata.uid)_\(.status.containerStatuses[0].name) \(.status.containerStatuses[0].containerID)"' |
+		grep "$id" |
+		cut -d' ' -f1
+		)"
+	else
+		warning "jq command not available, k8s_get_name() cannot execute. Please install jq should you wish for k8s to be fully functional"
+	fi
+
+	if [ -z "${NAME}" ]; then
+		warning "cannot find the name of k8s pod with containerID '${id}'. Setting name to ${id} and disabling it"
+		NAME="${id}"
+		NAME_NOT_FOUND=3
+	else
+		info "k8s containerID '${id}' has chart name (namespace_podname_poduid_containername) '${NAME}'"
+	fi
 }
 
 function docker_get_name() {
@@ -73,6 +112,7 @@ function docker_get_name() {
 	fi
 	if [ -z "${NAME}" ]; then
 		warning "cannot find the name of docker container '${id}'"
+		NAME_NOT_FOUND=2
 		NAME="${id:0:12}"
 	else
 		info "docker container '${id}' is named '${NAME}'"
@@ -88,6 +128,7 @@ function docker_validate_id() {
 	fi
 }
 
+
 # -----------------------------------------------------------------------------
 
 [ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
@@ -95,6 +136,7 @@ function docker_validate_id() {
 
 DOCKER_HOST="${DOCKER_HOST:=/var/run/docker.sock}"
 CGROUP="${1}"
+NAME_NOT_FOUND=0
 NAME=
 
 # -----------------------------------------------------------------------------
@@ -116,23 +158,20 @@ for CONFIG in "${NETDATA_USER_CONFIG_DIR}/cgroups-names.conf" "${NETDATA_STOCK_C
 	fi
 done
 
+if [ -z "${NAME}" ] && [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}" ] && [[ ${CGROUP} =~ ^.*kubepods.* ]]; then
+	k8s_get_name "${CGROUP}"
+fi
+
 if [ -z "${NAME}" ]; then
 	if [[ ${CGROUP} =~ ^.*docker[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
 		# docker containers
 		#shellcheck disable=SC1117
 		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*docker[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
 		docker_validate_id "${DOCKERID}"
-
 	elif [[ ${CGROUP} =~ ^.*ecs[-_/\.][a-fA-F0-9]+[-_\.]?.*$ ]]; then
 		# ECS
 		#shellcheck disable=SC1117
 		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*ecs[-_/].*[-_/]\([a-fA-F0-9]\+\)[-_\.]\?.*$|\1|")"
-		docker_validate_id "${DOCKERID}"
-
-	elif [[ ${CGROUP} =~ ^.*kubepods[_/].*[_/]pod[a-fA-F0-9-]+[_/][a-fA-F0-9]+$ ]]; then
-		# kubernetes
-		#shellcheck disable=SC1117
-		DOCKERID="$(echo "${CGROUP}" | sed "s|^.*kubepods[_/].*[_/]pod[a-fA-F0-9-]\+[_/]\([a-fA-F0-9]\+\)$|\1|")"
 		docker_validate_id "${DOCKERID}"
 
 	elif [[ ${CGROUP} =~ machine.slice[_/].*\.service ]]; then
@@ -174,3 +213,6 @@ fi
 
 info "cgroup '${CGROUP}' is called '${NAME}'"
 echo "${NAME}"
+
+exit ${NAME_NOT_FOUND}
+

@@ -9,7 +9,7 @@ import sys
 from copy import deepcopy
 
 from bases.FrameworkServices.SocketService import SocketService
-from bases.loaders import YamlOrderedLoader
+from bases.loaders import load_config
 
 PRECISION = 1000
 
@@ -169,7 +169,7 @@ def _get_perthread_info(thread):
     for key, value in PER_THREAD_STAT_MAP.items():
         statmap[key.format(shortname=sname)] = (value[0].format(shortname=sname), value[1])
 
-    return (charts, order, statmap)
+    return charts, order, statmap
 
 
 class Service(SocketService):
@@ -205,7 +205,11 @@ class Service(SocketService):
     def _auto_config(self):
         if self.ubconf and os.access(self.ubconf, os.R_OK):
             self.debug('Unbound config: {0}'.format(self.ubconf))
-            conf = YamlOrderedLoader.load_config_from_file(self.ubconf)[0]
+            conf = dict()
+            try:
+                conf = load_config(self.ubconf)
+            except Exception as error:
+                self.error("error on loading '{0}' : {1}".format(self.ubconf, error))
             if self.ext is None:
                 if 'extended-statistics' in conf['server']:
                     self.ext = conf['server']['extended-statistics']
@@ -249,15 +253,19 @@ class Service(SocketService):
             else:
                 self.request = b'UBCT1 status\n'
             raw = self._get_raw_data()
-            for line in raw.splitlines():
-                if line.startswith('threads'):
-                    self.threads = int(line.split()[1])
-                    self._generate_perthread_charts()
-                    break
-            if self.threads is None:
-                self.info('Unable to auto-detect thread counts, disabling per-thread stats.')
-                self.perthread = False
-            self.request = tmp
+            if raw is None:
+                result = False
+                self.warning('Received no data from socket.')
+            else:
+                for line in raw.splitlines():
+                    if line.startswith('threads'):
+                        self.threads = int(line.split()[1])
+                        self._generate_perthread_charts()
+                        break
+                if self.threads is None:
+                    self.info('Unable to auto-detect thread counts, disabling per-thread stats.')
+                    self.perthread = False
+                self.request = tmp
         return result
 
     @staticmethod
@@ -270,10 +278,13 @@ class Service(SocketService):
         raw = self._get_raw_data()
         data = dict()
         tmp = dict()
-        for line in raw.splitlines():
-            stat = line.split('=')
-            tmp[stat[0]] = stat[1]
-        for item in self.statmap:
-            if item in tmp:
-                data[self.statmap[item][0]] = float(tmp[item]) * self.statmap[item][1]
+        if raw is not None:
+            for line in raw.splitlines():
+                stat = line.split('=')
+                tmp[stat[0]] = stat[1]
+            for item in self.statmap:
+                if item in tmp:
+                    data[self.statmap[item][0]] = float(tmp[item]) * self.statmap[item][1]
+        else:
+            self.warning('Received no data from socket.')
         return data

@@ -10,6 +10,15 @@ umask 002
 renice 19 $$ >/dev/null 2>/dev/null
 
 # -----------------------------------------------------------------------------
+if [ -d /opt/netdata/etc/netdata.old ]; then
+	progress "Found old etc/netdata directory, reinstating this"
+	[ -d /opt/netdata/etc/netdata.new ] && rm -rf /opt/netdata/etc/netdata.new
+	mv -f /opt/netdata/etc/netdata /opt/netdata/etc/netdata.new
+	mv -f /opt/netdata/etc/netdata.old /opt/netdata/etc/netdata
+
+	progress "Trigger stock config clean up"
+	rm -f /opt/netdata/etc/netdata/.installer-cleanup-of-stock-configs-done
+fi
 
 STARTIT=1
 
@@ -69,19 +78,29 @@ then
 fi
 
 # -----------------------------------------------------------------------------
-progress "Add user netdata to required user groups"
+progress "Attempt to create user/group netdata/netadata"
 
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
+NETDATA_ADDED_TO_GROUPS=""
+# Default user/group
 NETDATA_USER="root"
 NETDATA_GROUP="root"
-add_netdata_user_and_group "/opt/netdata"
-if [ $? -eq 0 ]
-    then
-    NETDATA_USER="netdata"
-    NETDATA_GROUP="netdata"
-else
-    run_failed "Failed to add netdata user and group"
-fi
 
+if portable_add_group netdata; then
+	if portable_add_user netdata "/opt/netdata"; then
+		progress "Add user netdata to required user groups"
+		for g in ${NETDATA_WANTED_GROUPS}; do
+			# shellcheck disable=SC2086
+			portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}" || run_failed "Failed to add netdata user to secondary groups"
+		done
+		NETDATA_USER="netdata"
+		NETDATA_GROUP="netdata"
+	else
+		run_failed "I could not add user netdata, will be using root"
+	fi
+else
+		run_failed "I could not add group netdata, so no user netdata will be created as well. Netdata run as root:root"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Check SSL certificates paths"
@@ -165,7 +184,7 @@ fi
 
 progress "create user config directories"
 
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d"
+for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "custom-plugins.d" "ssl"
 do
     if [ ! -d "etc/netdata/${x}" ]
         then
@@ -185,7 +204,7 @@ run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata
 
 progress "fix plugin permissions"
 
-for x in apps.plugin freeipmi.plugin cgroup-network
+for x in apps.plugin freeipmi.plugin ioping cgroup-network
 do
     f="usr/libexec/netdata/plugins.d/${x}"
 
@@ -206,20 +225,19 @@ fi
 
 # -----------------------------------------------------------------------------
 
-if [ ${STARTIT} -eq 1 ]
-then
+if [ ${STARTIT} -eq 0 ]; then
+    create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
+    netdata_banner "is installed now!"
+else
     progress "starting netdata"
 
-    restart_netdata "/opt/netdata/bin/netdata"
-    if [ $? -eq 0 ]
-        then
-        download_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+    if ! restart_netdata "/opt/netdata/bin/netdata"; then
+        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
         netdata_banner "is installed and running now!"
     else
-        generate_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
         netdata_banner "is installed now!"
     fi
-else
-    generate_netdata_conf "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
-    netdata_banner "is installed now!"
 fi
+run chown "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf"
+run chmod 0664 "/opt/netdata/etc/netdata/netdata.conf"

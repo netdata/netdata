@@ -1,3 +1,96 @@
 .md-nav__link {
     white-space: nowrap;
 }
+
+.md-typeset {
+    font-size: .75rem
+}
+
+/* Underline text */
+
+.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
+    border-bottom: 1px solid #272b30;
+}
+
+/*  Custom styling for the new documentation homepage.
+    In particular, the three buttons for install/getting started/configuration. */
+.homepage-nav {
+    display: flex;
+    margin-top: 1.4rem;
+}
+
+.homepage-nav div {
+    flex: 1;
+}
+
+.homepage-nav .nav-install {
+    margin-right: 1rem;
+}
+
+.homepage-nav .nav-configuration {
+    margin-left: 1rem;
+}
+
+.nav-button {
+    border: 2px solid black;
+    border-radius: 4px;
+    display: block;
+    font-weight: 700;
+    margin: 0 auto;
+    padding: 0.6rem 0;
+    text-align: center;
+}
+
+/* Hide the label at the top of the navigation menu. Does nothing. 
+   Well, it does do something on mobile, and this media query makes
+   sure it's hidden only on screens wide enough to not use the mobile sidebar. */
+@media only screen and (min-width:76.25em) {
+    .md-nav--primary .md-nav__title {
+        display: none;
+    }
+}
+
+/* Change the language selector dropdown to match new color. */
+.md-header-nav select#sel {
+    background-color: rgba(0,0,0,.26) !important;
+    padding: 3px;
+    margin-left: 5px;
+    margin-right: 20px;
+}
+
+/* Add some whitespace to the bottom of each doc. */
+.md-content {
+    margin-bottom: 6rem;
+}
+
+/* Make sure inline code in tables don't break. */
+.md-typeset__table code {
+    word-break: normal;
+}
+
+/* Give code blocks a little more line height */
+.md-typeset pre {
+    line-height: 1.6;
+}
+
+/* Show line numbers. */
+[data-linenos]:before {
+    border-right: .0625rem solid #ddd;
+    color: #999;
+    content: attr(data-linenos);
+    display: inline-block;
+    margin-left: -1.2rem;
+    margin-right: .7rem;
+    padding-left: 1.2rem;
+}
+
+.md-typeset .highlight .hll {
+    display: inline;
+    margin: 0;
+    padding: 0;
+}
+
+/* Bold the first item on the docs sidebar: Netdata Documentation */
+.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
+    font-weight: 700;
+}

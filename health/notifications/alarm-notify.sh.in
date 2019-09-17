@@ -165,6 +165,7 @@ kavenegar
 prowl
 awssns
 rocketchat
+sms
 "
 
 # -----------------------------------------------------------------------------
@@ -188,6 +189,7 @@ fi
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 [ -z "${NETDATA_CACHE_DIR}" ] && NETDATA_CACHE_DIR="@cachedir_POST@"
 [ -z "${NETDATA_REGISTRY_URL}" ] && NETDATA_REGISTRY_URL="https://registry.my-netdata.io"
+[ -z "${NETDATA_REGISTRY_CLOUD_BASE_URL}" ] && NETDATA_REGISTRY_CLOUD_BASE_URL="https://netdata.cloud"
 
 # -----------------------------------------------------------------------------
 # parse command line parameters
@@ -350,6 +352,7 @@ SYSLOG_FACILITY=
 EMAIL_SENDER=
 EMAIL_CHARSET=$(locale charmap 2>/dev/null)
 EMAIL_THREADING=
+EMAIL_PLAINTEXT_ONLY=
 
 # irc configs
 IRC_NICKNAME=
@@ -537,6 +540,14 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	fi
 fi
 
+if [ "${SEND_SMS}" = "YES" ]; then
+	if [ -z "${sendsms}" ]; then
+		sendsms="$(command -v sendsms 2>/dev/null)"
+	fi
+	if [ -z "${sendsms}" ]; then
+		SEND_SMS="NO"
+	fi
+fi
 # if we need sendmail, check for the sendmail command
 if [ "${SEND_EMAIL}" = "YES" ] && [ -z "${sendmail}" ]; then
 	sendmail="$(command -v sendmail 2>/dev/null)"
@@ -645,10 +656,12 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_KAFKA}" \
 	"${SEND_PD}" \
 	"${SEND_FLEEP}" \
+	"${SEND_PROWL}" \
 	"${SEND_CUSTOM}" \
 	"${SEND_IRC}" \
 	"${SEND_AWSSNS}" \
 	"${SEND_SYSLOG}" \
+	"${SEND_SMS}" \
 	"${SEND_MSTEAM}"; do
 	if [ "${method}" == "YES" ]; then
 		proceed=1
@@ -670,7 +683,7 @@ date=$(date --date=@${when} "${date_format}" 2>/dev/null)
 # ----------------------------------------------------------------------------
 # prepare some extra headers if we've been asked to thread e-mails
 if [ "${SEND_EMAIL}" == "YES" ] && [ "${EMAIL_THREADING}" != "NO" ]; then
-	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\nReferences: <${chart}-${name}@${host}>"
+	email_thread_headers="In-Reply-To: <${chart}-${name}@${host}>\\r\\nReferences: <${chart}-${name}@${host}>"
 else
 	email_thread_headers=
 fi
@@ -1242,7 +1255,7 @@ send_slack() {
                         }
                     ],
                     "thumb_url": "${image}",
-                    "footer": "by <${goto_url}|${host}>",
+                    "footer": "by ${host}",
                     "ts": ${when}
                 }
             ]
@@ -1727,6 +1740,37 @@ send_syslog() {
 }
 
 # -----------------------------------------------------------------------------
+# SMS sender
+
+send_sms() {
+	local recipients="${1}" errcode errmessage sent=0
+
+    # Human readable SMS
+    local msg="${host} ${status_message}: ${chart} (${family}), ${alarm}"
+
+    # limit it to 160 characters
+    msg="${msg:0:160}"
+
+	if [ "${SEND_SMS}" = "YES" ] && [ -n "${sendsms}" ] && [ -n "${recipients}" ] && [ -n "${msg}" ]; then
+		# http://api.kavenegar.com/v1/{API-KEY}/sms/send.json
+		for phone in ${recipients}; do
+			errmessage=$($sendsms $phone "$msg" 2>&1)
+			errcode=$?
+			if [ ${errcode} -eq 0 ]; then
+				info "sent smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send smstools3 SMS for: ${host} ${chart}.${name} is ${status} to '${user}' with error code ${errcode}: ${errmessage}."
+			fi
+		done
+
+		[ ${sent} -gt 0 ] && return 0
+	fi
+
+	return 1
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -1739,7 +1783,7 @@ url_family="${REPLY}"
 urlencode "${name}" >/dev/null
 url_name="${REPLY}"
 
-redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}"
+redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}"
 GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
@@ -1748,7 +1792,7 @@ if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then
 			NETDATA_REGISTRY_UNIQUE_ID="$(cat "@registrydir_POST@/netdata.public.unique.id")"
 		fi
 	fi
-	if [ ! -z "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
+	if [ -n "${NETDATA_REGISTRY_UNIQUE_ID}" ]; then
 		GOTOCLOUD=1
 	fi
 fi
@@ -1756,7 +1800,7 @@ fi
 if [ ${GOTOCLOUD} -eq 0 ]; then
 	goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?${redirect_params}"
 else
-	goto_url="https://netdata.cloud/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
+	goto_url="${NETDATA_REGISTRY_CLOUD_BASE_URL}/alarms/redirect?agentID=${NETDATA_REGISTRY_UNIQUE_ID}&${redirect_params}"
 fi
 
 # the severity of the alarm
@@ -1911,7 +1955,7 @@ send_pushbullet "${PUSHBULLET_ACCESS_TOKEN}" "${PUSHBULLET_SOURCE_DEVICE}" "${to
 Severity: ${severity}\\n
 Chart: ${chart}\\n
 Family: ${family}\\n
-$(date -d @${when})\\n
+${date}\\n
 The source of this alarm is line ${src}"
 
 SENT_PUSHBULLET=$?
@@ -1996,6 +2040,13 @@ ${info}"
 SENT_IRC=$?
 
 # -----------------------------------------------------------------------------
+# send the SMS message with smstools3
+
+send_sms "${to_sms}"
+
+SENT_SMS=$?
+
+# -----------------------------------------------------------------------------
 # send the custom message
 
 send_custom() {
@@ -2043,16 +2094,7 @@ SENT_SYSLOG=$?
 # -----------------------------------------------------------------------------
 # send the email
 
-send_email <<EOF
-To: ${to_email}
-Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
-MIME-Version: 1.0
-Content-Type: multipart/alternative; boundary="multipart-boundary"
-${email_thread_headers}
-
-This is a MIME-encoded multipart message
-
---multipart-boundary
+IFS='' read -r -d '' email_plaintext_part <<EOF
 Content-Type: text/plain; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
@@ -2074,8 +2116,27 @@ Evaluated Expression :  ${calc_expression}
 Expression Variables :  ${calc_param_values}
 
 The host has ${total_warnings} WARNING and ${total_critical} CRITICAL alarm(s) raised.
+EOF
+
+if [[ "${EMAIL_PLAINTEXT_ONLY}" == "YES" ]]; then
+
+send_email <<EOF
+To: ${to_email}
+Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="multipart-boundary"
+${email_thread_headers}
+
+This is a MIME-encoded multipart message
 
 --multipart-boundary
+${email_plaintext_part}
+--multipart-boundary--
+EOF
+
+else
+
+IFS='' read -r -d '' email_html_part <<EOF
 Content-Type: text/html; encoding=${EMAIL_CHARSET}
 Content-Disposition: inline
 Content-Transfer-Encoding: 8bit
@@ -2181,8 +2242,25 @@ Content-Transfer-Encoding: 8bit
 </table>
 </body>
 </html>
+EOF
+
+send_email <<EOF
+To: ${to_email}
+Subject: ${host} ${status_message} - ${name//_/ } - ${chart}
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="multipart-boundary"
+${email_thread_headers}
+
+This is a MIME-encoded multipart message
+
+--multipart-boundary
+${email_plaintext_part}
+--multipart-boundary
+${email_html_part}
 --multipart-boundary--
 EOF
+
+fi
 
 SENT_EMAIL=$?
 
@@ -2209,6 +2287,7 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_IRC}" \
 	"${SENT_AWSSNS}" \
 	"${SENT_SYSLOG}" \
+	"${SENT_SMS}" \
 	"${SENT_MSTEAM}"; do
 	if [ "${state}" -eq 0 ]; then
 		# we sent something

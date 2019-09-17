@@ -3,62 +3,305 @@
 Module monitors one or more mysql servers
 
 **Requirements:**
- * python library [MySQLdb](https://github.com/PyMySQL/mysqlclient-python) (faster) or [PyMySQL](https://github.com/PyMySQL/PyMySQL) (slower)
+
+-   python library [MySQLdb](https://github.com/PyMySQL/mysqlclient-python) (faster) or [PyMySQL](https://github.com/PyMySQL/PyMySQL) (slower)
 
 It will produce following charts (if data is available):
 
-1. **Bandwidth** in kbps
- * in
- * out
+1.  **Bandwidth** in kilobits/s
 
-2. **Queries** in queries/sec
- * queries
- * questions
- * slow queries
+    -   in
+    -   out
 
-3. **Operations** in operations/sec
- * opened tables
- * flush
- * commit
- * delete
- * prepare
- * read first
- * read key
- * read next
- * read prev
- * read random
- * read random next
- * rollback
- * save point
- * update
- * write
+2.  **Queries** in queries/sec
 
-4. **Table Locks** in locks/sec
- * immediate
- * waited
+    -   queries
+    -   questions
+    -   slow queries
 
-5. **Select Issues** in issues/sec
- * full join
- * full range join
- * range
- * range check
- * scan
+3.  **Queries By Type** in queries/s
 
-6. **Sort Issues** in issues/sec
- * merge passes
- * range
- * scan
+    -   select
+    -   delete
+    -   update
+    -   insert
+    -   cache hits
+    -   replace
 
-### configuration
+4.  **Handlerse** in handlers/s
+
+    -   commit
+    -   delete
+    -   prepare
+    -   read first
+    -   read key
+    -   read next
+    -   read prev
+    -   read rnd
+    -   read rnd next
+    -   rollback
+    -   savepoint
+    -   savepoint rollback
+    -   update
+    -   write
+
+5.  **Table Locks** in locks/s
+
+    -   immediate
+    -   waited
+
+6.  **Table Select Join Issuess** in joins/s
+
+    -   full join
+    -   full range join
+    -   range
+    -   range check
+    -   scan
+
+7.  **Table Sort Issuess** in joins/s
+
+    -   merge passes
+    -   range
+    -   scan
+
+8.  **Tmp Operations** in created/s
+
+    -   disk tables
+    -   files
+    -   tables
+
+9.  **Connections** in connections/s
+
+    -   all
+    -   aborted
+
+10. **Connections Active** in connections/s
+
+    -   active
+    -   limit
+    -   max active
+
+11. **Binlog Cache** in threads
+
+    -   disk
+    -   all
+
+12. **Threads** in transactions/s
+
+    -   connected
+    -   cached
+    -   running
+
+13. **Threads Creation Rate** in threads/s
+
+    -   created
+
+14. **Threads Cache Misses** in misses
+
+    -   misses
+
+15. **InnoDB I/O Bandwidth** in KiB/s
+
+    -   read
+    -   write
+
+16. **InnoDB I/O Operations** in operations/s
+
+    -   reads
+    -   writes
+    -   fsyncs
+
+17. **InnoDB Pending I/O Operations** in operations/s
+
+    -   reads
+    -   writes
+    -   fsyncs
+
+18. **InnoDB Log Operations** in operations/s
+
+    -   waits
+    -   write requests
+    -   writes
+
+19. **InnoDB OS Log Pending Operations** in operations
+
+    -   fsyncs
+    -   writes
+
+20. **InnoDB OS Log Operations** in operations/s
+
+    -   fsyncs
+
+21. **InnoDB OS Log Bandwidth** in KiB/s
+
+    -   write
+
+22. **InnoDB Current Row Locks** in operations
+
+    -   current waits
+
+23. **InnoDB Row Operations** in operations/s
+
+    -   inserted
+    -   read
+    -   updated
+    -   deleted
+
+24. **InnoDB Buffer Pool Pagess** in pages
+
+    -   data
+    -   dirty
+    -   free
+    -   misc
+    -   total
+
+25. **InnoDB Buffer Pool Flush Pages Requests** in requests/s
+
+    -   flush pages
+
+26. **InnoDB Buffer Pool Bytes** in MiB
+
+    -   data
+    -   dirty
+
+27. **InnoDB Buffer Pool Operations** in operations/s
+
+    -   disk reads
+    -   wait free
+
+28. **QCache Operations** in queries/s
+
+    -   hits
+    -   lowmem prunes
+    -   inserts
+    -   no caches
+
+29. **QCache Queries in Cache** in queries
+
+    -   queries
+
+30. **QCache Free Memory** in MiB
+
+    -   free
+
+31. **QCache Memory Blocks** in blocks
+
+    -   free
+    -   total
+
+32. **MyISAM Key Cache Blocks** in blocks
+
+    -   unused
+    -   used
+    -   not flushed
+
+33. **MyISAM Key Cache Requests** in requests/s
+
+    -   reads
+    -   writes
+
+34. **MyISAM Key Cache Requests** in requests/s
+
+    -   reads
+    -   writes
+
+35. **MyISAM Key Cache Disk Operations** in operations/s
+
+    -   reads
+    -   writes
+
+36. **Open Files** in files
+
+    -   files
+
+37. **Opened Files Rate** in files/s
+
+    -   files
+
+38. **Binlog Statement Cache** in statements/s
+
+    -   disk
+    -   all
+
+39. **Connection Errors** in errors/s
+
+    -   accept
+    -   internal
+    -   max
+    -   peer addr
+    -   select
+    -   tcpwrap
+
+40. **Slave Behind Seconds** in seconds
+
+    -   time
+
+41. **I/O / SQL Thread Running State** in bool
+
+    -   sql
+    -   io
+
+42. **Replicated Writesets** in writesets/s
+
+    -   rx
+    -   tx
+
+43. **Replicated Bytes** in KiB/s
+
+    -   rx
+    -   tx
+
+44. **Galera Queue** in writesets
+
+    -   rx
+    -   tx
+
+45. **Replication Conflicts** in transactions
+
+    -   bf aborts
+    -   cert fails
+
+46. **Flow Control** in ms
+
+    -   paused
+
+47. **Users CPU time** in percentage
+
+    -   users
+
+**Per user statistics:**
+
+1.  **Rows Operations** in operations/s
+
+    -   read
+    -   send
+    -   updated
+    -   inserted
+    -   deleted
+
+2.  **Commands** in commands/s
+
+    -   select
+    -   update
+    -   other
+
+## configuration
 
 You can provide, per server, the following:
 
-1. username which have access to database (defaults to 'root')
-2. password (defaults to none)
-3. mysql my.cnf configuration file
-4. mysql socket (optional)
-5. mysql host (ip or hostname)
-6. mysql port (defaults to 3306)
+1.  username which have access to database (defaults to 'root')
+2.  password (defaults to none)
+3.  mysql my.cnf configuration file
+4.  mysql socket (optional)
+5.  mysql host (ip or hostname)
+6.  mysql port (defaults to 3306)
+7.  ssl connection parameters
+
+    -   key: the path name of the client private key file.
+    -   cert: the path name of the client public key certificate file.
+    -   ca: the path name of the Certificate Authority (CA) certificate file. This option, if used, must specify the same certificate used by the server.
+    -   capath: the path name of the directory that contains trusted SSL CA certificate files.
+    -   cipher: the list of permitted ciphers for SSL encryption.
 
 Here is an example for 3 servers:
 
@@ -85,6 +328,8 @@ remote:
 
 If no configuration is given, module will attempt to connect to mysql server via unix socket at `/var/run/mysqld/mysqld.sock` without password and with username `root`
 
+`userstats` graph works only if you enable such plugin in MariaDB server and set proper mysql priviliges (SUPER or PROCESS). For more detail please check [MariaDB User Statistics page](https://mariadb.com/kb/en/library/user-statistics/)
+
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fmysql%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fmysql%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

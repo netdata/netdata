@@ -128,7 +128,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ce == CONFIG_BOOLEAN_YES || (do_ce == CONFIG_BOOLEAN_AUTO && ce_sum > 0)) {
+    if(do_ce == CONFIG_BOOLEAN_YES || (do_ce == CONFIG_BOOLEAN_AUTO &&
+                                       (ce_sum > 0 || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_ce = CONFIG_BOOLEAN_YES;
 
         static RRDSET *ce_st = NULL;
@@ -166,7 +167,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
 
-    if(do_ue == CONFIG_BOOLEAN_YES || (do_ue == CONFIG_BOOLEAN_AUTO && ue_sum > 0)) {
+    if(do_ue == CONFIG_BOOLEAN_YES || (do_ue == CONFIG_BOOLEAN_AUTO &&
+                                       (ue_sum > 0 || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
         do_ue = CONFIG_BOOLEAN_YES;
 
         static RRDSET *ue_st = NULL;
