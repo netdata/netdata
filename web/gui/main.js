@@ -725,7 +725,7 @@ function openAuthenticatedUrl(url) {
     if (isSignedIn()) {
         window.open(url);
     } else {
-        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}&redirectUrl=${encodeURIComponent(window.location.origin + "/" + url)}`);
+        window.open(`${NETDATA.registry.cloudBaseURL}/account/sign-in-agent?id=${NETDATA.registry.machine_guid}&name=${encodeURIComponent(NETDATA.registry.hostname)}&origin=${encodeURIComponent(window.location.origin + "/")}&redirect_uri=${encodeURIComponent(window.location.origin + "/" + url)}`);
     }
 }
 
@@ -4955,8 +4955,8 @@ function handleSignInMessage(e) {
     cloudToken = e.data.token;
 
     netdataRegistryCallback(registryAgents);
-    if (e.data.redirectUrl) {
-        window.location.replace(e.data.redirectUrl);
+    if (e.data.redirectURI) {
+        window.location.replace(e.data.redirectURI);
     }
 }
 
