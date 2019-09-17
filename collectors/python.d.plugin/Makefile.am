@@ -54,6 +54,7 @@ include example/Makefile.inc
 include exim/Makefile.inc
 include fail2ban/Makefile.inc
 include freeradius/Makefile.inc
+include gearman/Makefile.inc
 include go_expvar/Makefile.inc
 include haproxy/Makefile.inc
 include hddtemp/Makefile.inc

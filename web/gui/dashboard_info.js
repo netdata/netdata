@@ -213,6 +213,12 @@ netdataDashboard.menu = {
         info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
     },
 
+    'gearman': {
+        title: 'Gearman',
+        icon: '<i class="fas fa-tasks"></i>',
+        info: 'Gearman is a job server that allows you to do work in parallel, to load balance processing, and to call functions between languages.'
+    },
+
     'ioping': {
         title: 'ioping',
         icon: '<i class="fas fa-exchange-alt"></i>',
