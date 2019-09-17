@@ -530,6 +530,12 @@ download the required files manually.
 ```bash
 cd /tmp
 
+# Since you won't be having an active internet connection on the destination, you will need to manually get the kickstart script itself
+# Download kickstart.sh or kickstart-static64.sh, depending the installation you have chosen to run
+curl -s https://my-netdata.io/kickstart.sh > kickstart.sh
+or
+curl -s https://my-netdata.io/kickstart-static64.sh > kickstart-static64.sh
+
 # Netdata tarball
 curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
 
@@ -559,10 +565,10 @@ the location and names of the files you just downloaded.
 
 ```bash
 # kickstart.sh
-bash &lt;(curl -Ss https://my-netdata.io/kickstart.sh) --local-files /tmp/netdata.tar.gz /tmp/checksums.txt /tmp/go.d.binary.tar.gz /tmp/go.d.config.tar.gz
+bash kickstart.sh --local-files /tmp/netdata.tar.gz /tmp/checksums.txt /tmp/go.d.binary.tar.gz /tmp/go.d.config.tar.gz
 
 # kickstart-static64.sh
-bash &lt;(curl -Ss https://my-netdata.io/kickstart-static64.sh) --local-files /tmp/netdata.tar.gz /tmp/checksums.txt
+bash kickstart-static64.sh --local-files /tmp/netdata.tar.gz /tmp/checksums.txt
 ```
 
 Now that you're finished with your offline installation, you can move on to our
