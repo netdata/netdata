@@ -383,6 +383,10 @@ body.modal-open {
 
 /* -------------------------------------------------------------------------- */
 
+#alarms_log_table tbody tr {
+    cursor: pointer;
+}
+
 #my-netdata-dropdown-content {
     width: 500px;
 }

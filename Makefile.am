@@ -60,6 +60,7 @@ dist_noinst_DATA= \
 	package.json \
 	docs \
 	packaging/version \
+	packaging/go.d.version \
 	packaging/go.d.checksums \
 	packaging/installer/README.md \
 	packaging/installer/UNINSTALL.md \
@@ -71,7 +72,6 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
-	coverity-install.sh \
 	packaging/installer/netdata-updater.sh \
 	packaging/installer/netdata-uninstaller.sh \
 	packaging/installer/kickstart.sh \
@@ -279,6 +279,7 @@ PROC_PLUGIN_FILES = \
 	collectors/proc.plugin/proc_vmstat.c \
 	collectors/proc.plugin/proc_uptime.c \
 	collectors/proc.plugin/sys_kernel_mm_ksm.c \
+	collectors/proc.plugin/sys_block_zram.c \
 	collectors/proc.plugin/sys_devices_system_edac_mc.c \
 	collectors/proc.plugin/sys_devices_system_node.c \
 	collectors/proc.plugin/sys_fs_btrfs.c \
@@ -456,6 +457,11 @@ PROMETHEUS_REMOTE_WRITE_BACKEND_FILES = \
     backends/prometheus/remote_write/remote_write.proto \
     $(NULL)
 
+MONGODB_BACKEND_FILES = \
+    backends/mongodb/mongodb.c \
+    backends/mongodb/mongodb.h \
+    $(NULL)
+
 DAEMON_FILES = \
 	daemon/common.c \
 	daemon/common.h \
@@ -612,4 +618,9 @@ backends/prometheus/remote_write/remote_write.pb.cc \
 backends/prometheus/remote_write/remote_write.pb.h: backends/prometheus/remote_write/remote_write.proto
 	$(PROTOC) --proto_path=$(srcdir) --cpp_out=$(builddir) $^
 
+endif
+
+if ENABLE_BACKEND_MONGODB
+    netdata_SOURCES += $(MONGODB_BACKEND_FILES)
+    netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif

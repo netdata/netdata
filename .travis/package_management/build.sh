@@ -22,10 +22,11 @@ echo "Linking debian -> contrib/debian"
 ln -sf contrib/debian debian
 
 echo "Executing dpkg-buildpackage"
-if dpkg-buildpackage --version 2> /dev/null | grep -q "1.18"; then
-	dpkg-buildpackage --post-clean --pre-clean --build=binary
+# pre/post options are after 1.18.8, is simpler to just check help for their existence than parsing version
+if dpkg-buildpackage --help | grep "\-\-post\-clean" 2> /dev/null > /dev/null; then
+	dpkg-buildpackage --post-clean --pre-clean --build=binary -us -uc
 else
-	dpkg-buildpackage -b
+	dpkg-buildpackage -b -us -uc
 fi
 
 echo "DEB build script completed!"

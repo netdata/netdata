@@ -14,7 +14,6 @@
 
 /*  Custom styling for the new documentation homepage.
     In particular, the three buttons for install/getting started/configuration. */
-
 .homepage-nav {
     display: flex;
     margin-top: 1.4rem;
@@ -64,9 +63,31 @@
     margin-bottom: 6rem;
 }
 
-/* Make sure inline code in tables doesn't break. */
+/* Make sure inline code in tables don't break. */
 .md-typeset__table code {
     word-break: normal;
+}
+
+/* Give code blocks a little more line height */
+.md-typeset pre {
+    line-height: 1.6;
+}
+
+/* Show line numbers. */
+[data-linenos]:before {
+    border-right: .0625rem solid #ddd;
+    color: #999;
+    content: attr(data-linenos);
+    display: inline-block;
+    margin-left: -1.2rem;
+    margin-right: .7rem;
+    padding-left: 1.2rem;
+}
+
+.md-typeset .highlight .hll {
+    display: inline;
+    margin: 0;
+    padding: 0;
 }
 
 /* Bold the first item on the docs sidebar: Netdata Documentation */

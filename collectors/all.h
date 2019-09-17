@@ -93,6 +93,10 @@
 #define NETDATA_CHART_PRIO_MEM_HW                     1500
 #define NETDATA_CHART_PRIO_MEM_HW_ECC_CE              1550
 #define NETDATA_CHART_PRIO_MEM_HW_ECC_UE              1560
+#define NETDATA_CHART_PRIO_MEM_ZRAM                   1600
+#define NETDATA_CHART_PRIO_MEM_ZRAM_SAVINGS           1601
+#define NETDATA_CHART_PRIO_MEM_ZRAM_RATIO             1602
+#define NETDATA_CHART_PRIO_MEM_ZRAM_EFFICIENCY        1603
 
 // Disks
 

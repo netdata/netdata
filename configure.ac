@@ -83,6 +83,12 @@ AC_ARG_ENABLE(
     [enable_backend_prometheus_remote_write="detect"]
 )
 AC_ARG_ENABLE(
+    [backend-mongodb],
+    [AS_HELP_STRING([--enable-backend-mongodb], [enable mongodb backend @<:@default autodetect@:>@])],
+    ,
+    [enable_backend_mongodb="detect"]
+)
+AC_ARG_ENABLE(
     [pedantic],
     [AS_HELP_STRING([--enable-pedantic], [enable pedantic compiler warnings @<:@default disabled@:>@])],
     ,
@@ -274,21 +280,15 @@ AC_CHECK_LIB(
     [UV_LIBS="-luv"]
 )
 
-OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
-OPTIONAL_UV_LIBS="${UV_LIBS}"
-
 
 # -----------------------------------------------------------------------------
 # lz4 Extremely Fast Compression algorithm
 
 AC_CHECK_LIB(
     [lz4],
-    [LZ4_decompress_safe],
+    [LZ4_compress_default],
     [LZ4_LIBS="-llz4"]
 )
-
-OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
-OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
 
 
 # -----------------------------------------------------------------------------
@@ -299,9 +299,6 @@ AC_CHECK_LIB(
     [JudyLIns],
     [JUDY_LIBS="-lJudy"]
 )
-
-OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
-OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
 
 
 # -----------------------------------------------------------------------------
@@ -350,9 +347,6 @@ AC_CHECK_LIB(
     [SSL_LIBS="-lcrypto -lssl"]
 )
 
-OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
-OPTIONAL_SSL_LIBS="${SSL_LIBS}"
-
 # -----------------------------------------------------------------------------
 # JSON-C library
 
@@ -378,13 +372,24 @@ test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
 test "${enable_dbengine}" = "yes" -a -z "${JUDY_LIBS}" && \
     AC_MSG_ERROR([libJudy required but not found. Try installing 'libjudy-dev' or 'Judy-devel'.])
 
-test "${enable_dbengine}" = "yes" -o "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
-    AC_MSG_ERROR([OpenSSL required but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+test "${enable_https}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required for HTTPS but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
+
+test "${enable_dbengine}" = "yes" -a -z "${SSL_LIBS}" && \
+    AC_MSG_ERROR([OpenSSL required for DBENGINE but not found. Try installing 'libssl-dev' or 'openssl-devel'.])
 
 AC_MSG_CHECKING([if netdata dbengine should be used])
 if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
     enable_dbengine="yes"
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
+    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+    OPTIONAL_UV_LIBS="${UV_LIBS}"
+    OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
+    OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
+    OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
+    OPTIONAL_JUDY_LIBS="${JUDY_LIBS}"
+    OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+    OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
     enable_dbengine="no"
 fi
@@ -393,10 +398,12 @@ AM_CONDITIONAL([ENABLE_DBENGINE], [test "${enable_dbengine}" = "yes"])
 
 AC_MSG_CHECKING([if netdata https should be used])
 if test "${enable_https}" != "no" -a "${SSL_LIBS}"; then
-	enable_https="yes"
-	AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+    enable_https="yes"
+    AC_DEFINE([ENABLE_HTTPS], [1], [netdata HTTPS usability])
+    OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
+    OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
-	enable_https="no"
+    enable_https="no"
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
@@ -882,7 +889,7 @@ AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "ye
 
 PKG_CHECK_MODULES(
     [PROTOBUF],
-    [protobuf],
+    [protobuf >= 3],
     [have_libprotobuf=yes],
     [have_libprotobuf=no]
 )
@@ -965,6 +972,33 @@ AM_CONDITIONAL([ENABLE_BACKEND_PROMETHEUS_REMOTE_WRITE], [test "${enable_backend
 
 
 # -----------------------------------------------------------------------------
+# MongoDB backend - libmongoc
+
+PKG_CHECK_MODULES(
+    [LIBMONGOC],
+    [libmongoc-1.0 >= 1.7],
+    [have_libmongoc=yes],
+    [have_libmongoc=no]
+)
+
+test "${enable_backend_mongodb}" = "yes" -a "${have_libmongoc}" != "yes" && \
+    AC_MSG_ERROR([libmongoc required but not found. Try installing `mongoc`.])
+
+AC_MSG_CHECKING([if mongodb backend should be enabled])
+if test "${enable_backend_mongodb}" != "no" -a "${have_libmongoc}" = "yes"; then
+    enable_backend_mongodb="yes"
+    AC_DEFINE([HAVE_MONGOC], [1], [libmongoc usability])
+    OPTIONAL_MONGOC_CFLAGS="${LIBMONGOC_CFLAGS}"
+    OPTIONAL_MONGOC_LIBS="${LIBMONGOC_LIBS}"
+else
+    enable_backend_mongodb="no"
+fi
+
+AC_MSG_RESULT([${enable_backend_mongodb}])
+AM_CONDITIONAL([ENABLE_BACKEND_MONGODB], [test "${enable_backend_mongodb}" = "yes"])
+
+
+# -----------------------------------------------------------------------------
 # check for setns() - cgroup-network
 
 AC_CHECK_FUNC([setns])
@@ -988,7 +1022,7 @@ if test "${enable_lto}" != "no"; then
 fi
 if test "${have_lto}" = "yes"; then
     oCFLAGS="${CFLAGS}"
-    CFLAGS="${CFLAGS} -flto ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS}"
+    CFLAGS="${CFLAGS} -flto"
     ac_cv_c_lto_cross_compile="${enable_lto}"
     test "${ac_cv_c_lto_cross_compile}" != "yes" && ac_cv_c_lto_cross_compile="no"
     AC_C_LTO
@@ -1037,6 +1071,10 @@ AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
 
+CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
+    ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS}"
+
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
 CPPFLAGS="\
@@ -1076,6 +1114,8 @@ AC_SUBST([OPTIONAL_KINESIS_CFLAGS])
 AC_SUBST([OPTIONAL_KINESIS_LIBS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS])
 AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
+AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
+AC_SUBST([OPTIONAL_MONGOC_LIBS])
 
 
 AC_CONFIG_FILES([
@@ -1088,6 +1128,7 @@ AC_CONFIG_FILES([
     backends/prometheus/Makefile
     backends/prometheus/remote_write/Makefile
     backends/aws_kinesis/Makefile
+    backends/mongodb/Makefile
     collectors/Makefile
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile
