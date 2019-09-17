@@ -216,6 +216,9 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
 static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
+    unsigned failures = 0;
+    const unsigned FAILURES_CEILING = 10; /* truncates exponential backoff to (2^FAILURES_CEILING x slot) */
+    unsigned long exp_backoff_slot_usec = USEC_PER_MS * 10;
 
     assert(number < ctx->max_cache_pages);
 
@@ -224,11 +227,13 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
         debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
                 number);
     while (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1) {
+
         if (!pg_cache_try_evict_one_page_unsafe(ctx)) {
             /* failed to evict */
             struct completion compl;
             struct rrdeng_cmd cmd;
 
+            ++failures;
             uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
             init_completion(&compl);
@@ -240,6 +245,12 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
             wait_for_completion(&compl);
             destroy_completion(&compl);
 
+            if (unlikely(failures > 1)) {
+                unsigned long slots;
+                /* exponential backoff */
+                slots = random() % (2LU << MIN(failures, FAILURES_CEILING));
+                (void)sleep_usec(slots * exp_backoff_slot_usec);
+            }
             uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
         }
     }
@@ -1042,9 +1053,8 @@ void free_page_cache(struct rrdengine_instance *ctx)
         /* Find first page in range */
         Index = (Word_t) 0;
         PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
-        if (likely(NULL != PValue)) {
-            descr = *PValue;
-        }
+        descr = unlikely(NULL == PValue) ? NULL : *PValue;
+
         while (descr != NULL) {
             /* Iterate all page descriptors of this metric */
 

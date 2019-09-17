@@ -12,14 +12,14 @@ BUILD_NIGHTLY="$1"
 commit_change() {
 	local ARCH="$1"
 	local PKG="$2"
+	local GIT_MAIL="bot@netdata.cloud"
+	local GIT_USER="netdatabot"
 
 	echo "---- Committing ${ARCH} .${PKG} package generation ----"
-	git commit --allow-empty -m "[Package ${ARCH} ${PKG}]${BUILD_NIGHTLY} Package build process trigger"
+	git commit --allow-empty --author "${GIT_USER} <${GIT_MAIL}>" -m "[Package ${ARCH} ${PKG}]${BUILD_NIGHTLY} Package build process trigger"
 }
 
 push_change() {
-	local GIT_MAIL="bot@netdata.cloud"
-	local GIT_USER="netdatabot"
 
 	echo "---- Push changes to repository ----"
 	git push "https://${GITHUB_TOKEN}:@$(git config --get remote.origin.url | sed -e 's/^https:\/\///')"
@@ -45,7 +45,19 @@ push_change
 echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
 sleep "${WAIT_TIME}"
 
+commit_change "i386" "DEB"
+push_change
+
+echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
+sleep "${WAIT_TIME}"
+
 commit_change "amd64" "RPM"
+push_change
+
+echo "---- Waiting for ${WAIT_TIME} seconds before triggering next process ----"
+sleep "${WAIT_TIME}"
+
+commit_change "i386" "RPM"
 push_change
 
 echo "---- Done! ----"

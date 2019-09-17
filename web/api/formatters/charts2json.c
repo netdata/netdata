@@ -54,6 +54,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                        ",\n\t\"timezone\": \"%s\""
                        ",\n\t\"update_every\": %d"
                        ",\n\t\"history\": %ld"
+                       ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
                        ",\n\t\"charts\": {"
                    , host->hostname
@@ -63,6 +64,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                    , host->timezone
                    , host->rrd_update_every
                    , host->rrd_history_entries
+                   , rrd_memory_mode_name(host->rrd_memory_mode)
                    , custom_dashboard_info_js_filename
     );
 
