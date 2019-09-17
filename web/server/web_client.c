@@ -791,7 +791,7 @@ static inline char *http_header_parse(struct web_client *w, char *s, int parse_u
         w->auth_bearer_token = strdupz(v);
     }
     else if(hash == hash_host && !strcasecmp(s, "Host")){
-        strncpyz(w->host, v, (ve - v));
+        strncpyz(w->host, v, ((size_t)(ve - v) < sizeof(w->host)-1 ? (size_t)(ve - v) : sizeof(w->host)-1));
     }
 #ifdef NETDATA_WITH_ZLIB
     else if(hash == hash_accept_encoding && !strcasecmp(s, "Accept-Encoding")) {
@@ -1065,9 +1065,6 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
                 strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
-                if (w->url_search_path && w->separator) {
-                    *w->url_search_path = 0x00;
-                }
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {

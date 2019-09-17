@@ -248,6 +248,7 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
 struct variable2json_helper {
     BUFFER *buf;
     size_t counter;
+    RRDVAR_OPTIONS options;
 };
 
 static int single_variable2json(void *entry, void *data) {
@@ -255,14 +256,28 @@ static int single_variable2json(void *entry, void *data) {
     RRDVAR *rv = (RRDVAR *)entry;
     calculated_number value = rrdvar2number(rv);
 
-    if(unlikely(isnan(value) || isinf(value)))
-        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
-    else
-        buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" LONG_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (LONG_DOUBLE)value);
+    if (helper->options == RRDVAR_OPTION_DEFAULT || rv->options & helper->options) {
+        if(unlikely(isnan(value) || isinf(value)))
+            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": null", helper->counter?",":"", rv->name);
+        else
+            buffer_sprintf(helper->buf, "%s\n\t\t\"%s\": %0.5" LONG_DOUBLE_MODIFIER, helper->counter?",":"", rv->name, (LONG_DOUBLE)value);
 
-    helper->counter++;
+        helper->counter++;
+    }
 
     return 0;
+}
+
+void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf) {
+    struct variable2json_helper helper = {
+            .buf = buf,
+            .counter = 0,
+            .options = RRDVAR_OPTION_CUSTOM_CHART_VAR
+    };
+
+    buffer_sprintf(buf, "{");
+    avl_traverse_lock(&st->rrdvar_root_index, single_variable2json, (void *)&helper);
+    buffer_strcat(buf, "\n\t\t\t}");
 }
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
@@ -270,7 +285,8 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
 
     struct variable2json_helper helper = {
             .buf = buf,
-            .counter = 0
+            .counter = 0,
+            .options = RRDVAR_OPTION_DEFAULT
     };
 
     buffer_sprintf(buf, "{\n\t\"chart\": \"%s\",\n\t\"chart_name\": \"%s\",\n\t\"chart_context\": \"%s\",\n\t\"chart_variables\": {", st->id, st->name, st->context);

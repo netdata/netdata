@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
+#
+# This scriptplet validates nightlies age and notifies is if it gets too old
+#
+# Copyright: SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
 
 set -e
+
+# If we are not in netdata git repo, at the top level directory, fail
+TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
+CWD=$(git rev-parse --show-cdup || echo "")
+if [ -n "${CWD}" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
+    echo "Run as .travis/$(basename "$0") from top level directory of netdata git repository"
+    echo "Changelog age checker exited abnormally"
+    exit 1
+fi
+
+source tests/installer/slack.sh || echo "I could not load slack library"
 
 LAST_MODIFICATION="$(git log -1 --pretty="format:%at" CHANGELOG.md)"
 CURRENT_TIME="$(date +"%s")"

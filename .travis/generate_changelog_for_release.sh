@@ -31,6 +31,7 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 	--project "${PROJECT}" \
 	--token "${GITHUB_TOKEN}" \
 	--since-tag "v1.10.0" \
+	--no-issues \
 	--unreleased-label "**Next release**" \
 	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
 	--no-compare-link ${OPTS}

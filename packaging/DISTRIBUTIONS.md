@@ -12,9 +12,8 @@ have complete visibility over the range of support.
 
 -   **Version**: Operating system version supported
 -   **Family**: The family that the OS belongs to
--   **CI Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
--   **CI Testing**: Testing has been implemented to prevent broken or problematic code reaching our users
--   **CI Integration**: CI Integration has been fully implemented for the particular operating system version
+-   **CI: Smoke Testing**: Smoke testing has been implemented on our CI, to prevent broken code reaching our users
+-   **CI: Testing**: Testing has been implemented to prevent broken or problematic code reaching our users
 -   **CD**: Continious deployment support has been fully enabled for this operating system
 -   **.DEB**: We provide a `.DEB` package for that particular operating system
 -   **.RPM**: We provide a `.RPM` package for that particular operating system
@@ -25,42 +24,10 @@ have complete visibility over the range of support.
 
 ## AMD64 Architecture
 
-| Version | Family | CI Smoke testing | CI Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
+| Version | Family | CI: Smoke testing | CI: Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
 :------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
 | 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| 18.04.2 LTS (Bionic Beaver) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| 19.04 (Disco Dingo) Latest | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| Debian 7 (Wheezy) | Debian | &#10004; | &#63; | &#10004; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| Debian 8 (Jessie) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| Debian 9 (Stretch) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| Debian 10 (Buster) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| Versions 6.* | RHEL |  &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| Versions 7.* | RHEL | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| Versions 8.* | RHEL |  &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| Fedora 28 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| Fedora 29 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| Fedora 30 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| Fedora 31 | Fedora | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| CentOS 6.* | Cent OS | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| CentOS 7.* | Cent OS | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
-| CentOS 8.* | Cent OS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| OpenSuSE Leap 15.0 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| OpenSuSE Leap 15.1 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| OpenSuSE Tumbleweed | Open SuSE | &#10004; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10004; | &#63;
-| SLES 11 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| SLES 12 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
-| Alpine | Alpine | &#10004; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| Arch Linux (latest) | Arch | &#10004; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
-| All other linux | Other | &#63; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10004; | &#63;
-
-## x86 Architecture
-
-| Version | Family | CI Smoke testing | CI Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
-:------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
-| 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#10004; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
-| 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#10004; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 18.04.2 LTS (Bionic Beaver) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | 19.04 (Disco Dingo) Latest | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
 | Debian 7 (Wheezy) | Debian | &#10004; | &#63; | &#10004; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
@@ -79,6 +46,38 @@ have complete visibility over the range of support.
 | CentOS 8.* | Cent OS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | OpenSuSE Leap 15.0 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
 | OpenSuSE Leap 15.1 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
+| OpenSuSE Tumbleweed | Open SuSE | &#10004; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10004; | &#63;
+| SLES 11 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| SLES 12 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| SLES 15 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| Alpine | Alpine | &#10004; | &#63; | &#10007; | N/A | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| Arch Linux (latest) | Arch | &#10004; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| All other linux | Other | &#63; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10004; | &#63;
+
+## x86 Architecture
+
+| Version | Family | CI: Smoke testing | CI: Testing | CD | .DEB | .RPM | Installer | Kickstart | Kickstart64 | Community 
+:------------------: | :------------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------: | :----------------:
+| 14.04.6 LTS (Trusty Tahr) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| 16.04.6 LTS (Xenial Xerus) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| 18.04.2 LTS (Bionic Beaver) | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| 19.04 (Disco Dingo) Latest | Ubuntu | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| Debian 7 (Wheezy) | Debian | &#10004; | &#63; | &#10004; | &#10007; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| Debian 8 (Jessie) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| Debian 9 (Stretch) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| Debian 10 (Buster) | Debian | &#10004; | &#63; | &#10004; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#63;
+| Versions 6.* | RHEL |  &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
+| Versions 7.* | RHEL | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
+| Versions 8.* | RHEL |  &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| Fedora 28 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| Fedora 29 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| Fedora 30 | Fedora | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| Fedora 31 | Fedora | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| CentOS 6.* | Cent OS | &#10004; | &#63; | &#10004; | N/A | &#10004; | &#10004; | &#10004; | &#10004; | &#63;
+| CentOS 7.* | Cent OS | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| CentOS 8.* | Cent OS | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
+| OpenSuSE Leap 15.0 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
+| OpenSuSE Leap 15.1 | Open SuSE | &#10004; | &#63; | &#10004; | N/A | &#10007; | &#10004; | &#10004; | &#10004; | &#63;
 | OpenSuSE Tumbleweed | Open SuSE | &#10004; | &#63; | &#63; | N/A | &#10007; | &#10004; | &#63; | &#10004; | &#63;
 | SLES 11 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
 | SLES 12 | SLES | &#63; | &#63; | &#63; | N/A | &#10007; | &#63; | &#63; | &#10004; | &#63;
@@ -159,7 +158,7 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 -   **Flags to disable from source**: --disable-lto
 -   **What packages required for auto-detect?**: No package dependency, depends on GCC version
 
-### Collectors
+### External plugins, built with netdata build tools
 
 #### FREEIPMI
 
@@ -189,7 +188,8 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 
 -   **Flags/instructions to enable**: None
 -   **Flags to disable from source**: --disable-plugin-xenstat
--   **What packages required for auto-detect?**: `xen-dom0-libs-devel`, `yajl-dev`
+-   **What packages required for auto-detect?**: `xen-dom0-libs-devel or xen-devel`, `yajl-dev or yajl-devel`
+    Note: for cent-OS based systems you will need `centos-release-xen` repository to get xen-devel
 
 #### CUPS
 

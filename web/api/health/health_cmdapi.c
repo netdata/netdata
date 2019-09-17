@@ -116,7 +116,7 @@ void health_silencers2file(BUFFER *wb) {
  * @return It returns 200 on success and another code otherwise.
  */
 int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, char *url) {
-    int ret = 400;
+    int ret;
     (void) host;
 
     BUFFER *wb = w->response.data;
@@ -131,12 +131,12 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
 
     if (!w->auth_bearer_token) {
         buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
-        ret = 403;
+        ret = HTTP_RESP_FORBIDDEN;
     } else {
         debug(D_HEALTH, "HEALTH command API: Comparing secret '%s' to '%s'", w->auth_bearer_token, api_secret);
         if (strcmp(w->auth_bearer_token, api_secret)) {
             buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
-            ret = 403;
+            ret = HTTP_RESP_FORBIDDEN;
         } else {
             while (url) {
                 char *value = mystrsep(&url, "&");
@@ -190,12 +190,12 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             if (unlikely(silencers->stype != STYPE_NONE && !silencers->all_alarms && !silencers->silencers)) {
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_NOSELECTORWARNING);
             }
-            ret = 200;
+            ret = HTTP_RESP_OK;
         }
     }
     w->response.data = wb;
     buffer_no_cacheable(w->response.data);
-    if (ret == 200 && config_changed) {
+    if (ret == HTTP_RESP_OK && config_changed) {
         BUFFER *jsonb = buffer_create(200);
         health_silencers2json(jsonb);
         health_silencers2file(jsonb);
