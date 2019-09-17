@@ -33,7 +33,7 @@ This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS
 To install Netdata from source, and keep it up to date with our **nightly releases** automatically, run the following:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 !!! note
@@ -72,7 +72,7 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 Example using all the above parameters:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt /tmp/manually.downloaded.go.d.binary.tar.gz /tmp/manually.downloaded.go.d.config.tar.gz
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt /tmp/manually.downloaded.go.d.binary.tar.gz /tmp/manually.downloaded.go.d.config.tar.gz
 ```
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
@@ -90,7 +90,7 @@ You can install a pre-compiled static binary of Netdata on any Intel/AMD 64bit L
 To install Netdata from a binary package on any Linux distro and any kernel version on **Intel/AMD 64bit** systems, and keep it up to date with our **nightly releases** automatically, run the following:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
 !!! note

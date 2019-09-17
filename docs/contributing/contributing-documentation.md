@@ -56,7 +56,7 @@ Here is the workflow for editing documentation locally. First, create a fork of 
 GitHub will ask you where you want to clone the repository, and once finished you'll end up at the index of your forked Netdata repository. Clone your fork to your local machine:
 
 ```bash
-$ git clone https://github.com/YOUR-GITHUB-USERNAME/netdata.git
+git clone https://github.com/YOUR-GITHUB-USERNAME/netdata.git
 ```
 
 You can now jump into the directory and explore Netdata's structure for yourself.
@@ -99,7 +99,7 @@ Follow the [Python installation instructions](https://www.python.org/downloads/)
 Use `pip`, which was installed alongside Python, to install `mkdocs` and `mkdocs-material`. Your operating system might force you to use `pip2` or `pip3` instead, dependin on which version of Python you have installed.
 
 ```bash
-$ pip install mkdocs mkdocs-material
+pip install mkdocs mkdocs-material
 ```
 
 ??? note "Troubleshooting"
@@ -108,7 +108,7 @@ $ pip install mkdocs mkdocs-material
 When `pip` is finished installing, navigate to the root directory of the Netdata repository and run the documentation generator script.
 
 ```bash
-$ sh docs/generator/buildhtml.sh
+sh docs/generator/buildhtml.sh
 ```
 
 This process will take some time. Once finished, the built documentation site will be located at `docs/generator/build/`.
