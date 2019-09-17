@@ -69,6 +69,7 @@ var urlOptions = {
     alarm_unique_id: 0,
     alarm_id: 0,
     alarm_event_id: 0,
+    alarm_when: 0,
     hasProperty: function(property) {
         return typeof this[property] !== 'undefined';
     }
@@ -101,6 +102,7 @@ function netdataURL(url) {
         + ';alarm_unique_id=' + urlOptions.alarm_unique_id.toString()
         + ';alarm_id=' + urlOptions.alarm_id.toString()
         + ';alarm_event_id=' + urlOptions.alarm_event_id.toString()
+        + ';alarm_when=' + urlOptions.alarm_when.toString()
         ;
 }
 

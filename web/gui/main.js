@@ -71,6 +71,7 @@ var urlOptions = {
     alarm_unique_id: 0,
     alarm_id: 0,
     alarm_event_id: 0,
+    alarm_when: 0,
 
     hasProperty: function (property) {
         // console.log('checking property ' + property + ' of type ' + typeof(this[property]));
@@ -139,7 +140,7 @@ var urlOptions = {
             }
         }
 
-        var numeric = ['after', 'before', 'highlight_after', 'highlight_before'];
+        var numeric = ['after', 'before', 'highlight_after', 'highlight_before', 'alarm_when'];
         len = numeric.length;
         while (len--) {
             if (typeof urlOptions[numeric[len]] === 'string') {
@@ -151,6 +152,22 @@ var urlOptions = {
                     urlOptions[numeric[len]] = 0;
                 }
             }
+        }
+
+        if (urlOptions.alarm_when) {
+            // if alarm_when exists, create after/before params
+            // -/+ 2 minutes from the alarm, and reload the page
+            const alarmTime = new Date(urlOptions.alarm_when * 1000).valueOf();
+            const timeMarginMs = 120000; // 2 mins
+
+            const after = alarmTime - timeMarginMs;
+            const before = alarmTime + timeMarginMs;
+            const newHash = document.location.hash.replace(
+                /;alarm_when=[0-9]*/i,
+                ";after=" + after + ";before=" + before,
+            );
+            history.replaceState(null, '', newHash);
+            location.reload();
         }
 
         if (urlOptions.server !== null && urlOptions.server !== '') {
@@ -2094,7 +2111,7 @@ function alarmsUpdateModal() {
             var badge_url = NETDATA.alarms.server + '/api/v1/badge.svg?chart=' + alarm.chart + '&alarm=' + alarm.name + '&refresh=auto';
 
             var action_buttons = '<br/>&nbsp;<br/>role: <b>' + alarm.recipient + '</b><br/>&nbsp;<br/>'
-                + '<div class="action-button ripple" title="click to scroll the dashboard to the chart of this alarm" data-toggle="tooltip" data-placement="bottom" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;"><i class="fab fa-periscope"></i></div>'
+                + '<div class="action-button ripple" title="click to scroll the dashboard to the chart of this alarm" data-toggle="tooltip" data-placement="bottom" onClick="scrollToChartAfterHidingModal(\'' + alarm.chart + '\', ' + alarm.last_status_change * 1000 + ', \'' + alarm.status + '\'); $(\'#alarmsModal\').modal(\'hide\'); return false;"><i class="fab fa-periscope"></i></div>'
                 + '<div class="action-button ripple" title="click to copy to the clipboard the URL of this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopy(\'' + badge_url + '\'); return false;"><i class="far fa-copy"></i></div>'
                 + '<div class="action-button ripple" title="click to copy to the clipboard an auto-refreshing <code>embed</code> html element for this badge" data-toggle="tooltip" data-placement="bottom" onClick="clipboardCopyBadgeEmbed(\'' + badge_url + '\'); return false;"><i class="fas fa-copy"></i></div>';
 
@@ -2334,6 +2351,18 @@ function alarmsUpdateModal() {
                 exportDataType: 'basic',
                 exportOptions: {
                     fileName: 'netdata_alarm_log'
+                },
+                onClickRow: function (row, $element,field) {
+                    void (field);
+                    void ($element);
+                    let main_url;
+                    let common_url = "&host=" + encodeURIComponent(row['hostname']) + "&chart=" + encodeURIComponent(row['chart']) + "&family=" + encodeURIComponent(row['family']) + "&alarm=" + encodeURIComponent(row['name']) + "&alarm_unique_id=" + row['unique_id'] + "&alarm_id=" + row['alarm_id'] + "&alarm_event_id=" +  row['alarm_event_id'] + "&alarm_when=" + row['when'];
+                    if (NETDATA.registry.isUsingGlobalRegistry() && NETDATA.registry.machine_guid != null) {
+                        main_url = "https://netdata.cloud/alarms/redirect?agentID=" + NETDATA.registry.machine_guid + common_url;
+                    } else {
+                        main_url = NETDATA.registry.server + "/goto-host-from-alarm.html?" + common_url ;
+                    }
+                    window.open(main_url,"_blank");
                 },
                 rowStyle: function (row, index) {
                     void (index);
@@ -3965,9 +3994,21 @@ function scrollDashboardTo() {
 
 var modalHiddenCallback = null;
 
-function scrollToChartAfterHidingModal(chart) {
+function scrollToChartAfterHidingModal(chart, alarmDate, alarmStatus) {
     modalHiddenCallback = function () {
-        NETDATA.alarms.scrollToChart(chart);
+        NETDATA.alarms.scrollToChart(chart, alarmDate);
+
+        if (['WARNING', 'CRITICAL'].includes(alarmStatus)) {
+            const currentChartState = NETDATA.options.targets.find(
+              (chartState) => chartState.id === chart,
+            )
+            const twoMinutes = 2 * 60 * 1000
+            NETDATA.globalPanAndZoom.setMaster(
+              currentChartState,
+              alarmDate - twoMinutes,
+              alarmDate + twoMinutes,
+            )
+        }
     };
 }
 
