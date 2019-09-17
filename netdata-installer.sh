@@ -807,9 +807,19 @@ install_go() {
 		tmp=$(mktemp -d /tmp/netdata-go-XXXXXX)
 		GO_PACKAGE_BASENAME="go.d.plugin-${GO_PACKAGE_VERSION}.${OS}-${ARCH}.tar.gz"
 
-		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
+		if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" ]; then
+			download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/${GO_PACKAGE_BASENAME}" "${tmp}/${GO_PACKAGE_BASENAME}"
+		else
+			progress "Using provided go.d tarball ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}"
+			run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN}" "${tmp}/${GO_PACKAGE_BASENAME}"
+		fi
 
-		download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
+		if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" ]; then
+			download_go "https://github.com/netdata/go.d.plugin/releases/download/${GO_PACKAGE_VERSION}/config.tar.gz" "${tmp}/config.tar.gz"
+		else
+			progress "Using provided config file for go.d ${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}"
+			run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG}" "${tmp}/config.tar.gz"
+		fi
 
 		if [ ! -f "${tmp}/${GO_PACKAGE_BASENAME}" ] || [ ! -f "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/config.tar.gz" ] || [ ! -s "${tmp}/${GO_PACKAGE_BASENAME}" ]; then
 			run_failed "go.d plugin download failed, go.d plugin will not be available"

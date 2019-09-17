@@ -10,9 +10,10 @@
 # bash <(curl -Ss https://my-netdata.io/kickstart.sh) all
 #
 # Other options:
-#  --dont-wait       do not prompt for user input
-#  --non-interactive do not prompt for user input
-#  --no-updates      do not install script for daily updates
+#  --dont-wait                do not prompt for user input
+#  --non-interactive          do not prompt for user input
+#  --no-updates               do not install script for daily updates
+#  --local-files   set the full path of the desired tarball to run install with
 #
 # This script will:
 #
@@ -163,6 +164,11 @@ download() {
 }
 
 set_tarball_urls() {
+	if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then
+		progress "Not fetching remote tarballs, local override was given"
+		return
+	fi
+
 	if [ "$1" = "stable" ]; then
 		local latest
 		# Simple version
@@ -216,8 +222,17 @@ dependencies() {
 		if ! detect_bash4 "${bash}"; then
 			warning "Cannot detect packages to be installed in this system, without BASH v4+."
 		else
-			progress "Downloading script to detect required packages..."
-			download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+			progress "Fetching script to detect required packages..."
+			if [ -n "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+				if [ -f "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" ]; then
+					run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+				else
+					fatal "Invalid given dependency file, please check your --local-files parameter options and try again"
+				fi
+			else
+				download "${PACKAGES_SCRIPT}" "${TMPDIR}/install-required-packages.sh"
+			fi
+
 			if [ ! -s "${TMPDIR}/install-required-packages.sh" ]; then
 				warning "Downloaded dependency installation script is empty."
 			else
@@ -293,6 +308,42 @@ while [ -n "${1}" ]; do
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
 		shift 1
+	elif [ "${1}" = "--local-files" ]; then
+		shift 1
+		if [ -z "${1}" ]; then
+			fatal "Missing netdata: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+		fi
+
+		export NETDATA_LOCAL_TARBALL_OVERRIDE="${1}"
+		shift 1
+
+		if [ -z "${1}" ]; then
+			fatal "Missing checksum file: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+		fi
+
+		export NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM="${1}"
+		shift 1
+
+		if [ -z "${1}" ]; then
+			fatal "Missing go.d tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+		fi
+
+		export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN="${1}"
+		shift 1
+
+		if [ -z "${1}" ]; then
+			fatal "Missing go.d config tarball: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+		fi
+
+		export NETDATA_LOCAL_TARBALL_OVERRIDE_GO_PLUGIN_CONFIG="${1}"
+		shift 1
+
+		if [ -z "${1}" ]; then
+			fatal "Missing dependencies management scriptlet: Option --local-files requires extra information. The desired tarball for netdata, the checksum, the go.d plugin tarball , the go.d plugin config tarball and the dependency management script, in this particular order"
+		fi
+
+		export NETDATA_LOCAL_TARBALL_OVERRIDE_DEPS_SCRIPT="${1}"
+		shift 1
 	else
 		break
 	fi
@@ -311,10 +362,17 @@ dependencies
 # ---------------------------------------------------------------------------------------------------------------------
 # download netdata package
 
-set_tarball_urls "${RELEASE_CHANNEL}"
+if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then
+	set_tarball_urls "${RELEASE_CHANNEL}"
 
-download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
-download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
+	download "${NETDATA_TARBALL_CHECKSUM_URL}" "${TMPDIR}/sha256sum.txt"
+	download "${NETDATA_TARBALL_URL}" "${TMPDIR}/netdata-latest.tar.gz"
+else
+	progress "Installation sources were given as input, running installation using \"${NETDATA_LOCAL_TARBALL_OVERRIDE}\""
+	run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE_CHECKSUM}" "${TMPDIR}/sha256sum.txt"
+	run cp "${NETDATA_LOCAL_TARBALL_OVERRIDE}" "${TMPDIR}/netdata-latest.tar.gz"
+fi
+
 if ! grep netdata-latest.tar.gz "${TMPDIR}/sha256sum.txt" | safe_sha256sum -c - >/dev/null 2>&1; then
 	fatal "Tarball checksum validation failed. Stopping netdata installation and leaving tarball in ${TMPDIR}"
 fi
