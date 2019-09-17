@@ -15,7 +15,7 @@ change_file(){
     sed "s/$1/$2/g" netdata.cfg > "$4"
 }
 
-NETDATAPID=123456789
+NETDATAPID=""
 
 change_ssl_file(){
     KEYROW="ssl key = $3/key.pem"
