@@ -125,7 +125,7 @@ The `kickstart-static64.sh` script passes all its parameters to `netdata-install
 Example using all the above parameters:
 
 ```sh
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
 ```
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 
@@ -472,9 +472,9 @@ When Netdata is first installed, it will run as *root*. This may or may not be a
 3.  Change ownership of the following directories, as defined in [Netdata Security](../../docs/netdata-security.md#security-design):
 
 ```sh
-$ chown -R root:netdata /opt/netdata/usr/share/netdata
-$ chown -R netdata:netdata /opt/netdata/var/lib/netdata /opt/netdata/var/cache/netdata
-$ chown -R netdata:root /opt/netdata/var/log/netdata
+chown -R root:netdata /opt/netdata/usr/share/netdata
+chown -R netdata:netdata /opt/netdata/var/lib/netdata /opt/netdata/var/cache/netdata
+chown -R netdata:root /opt/netdata/var/log/netdata
 ```
 
 Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as an operating system, so no init script is installed. You'll have to do this manually:
