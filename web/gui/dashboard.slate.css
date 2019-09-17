@@ -351,6 +351,14 @@ code {
     /* -webkit-font-smoothing: none; */
 }
 
+.netdata-legend-value, .netdata-legend-name {
+    /* prevent highlight when shift-clicking */
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+}
+
 .netdata-legend-name.not-selected {
     font-weight: normal;
     opacity: 0.3;
