@@ -1783,7 +1783,7 @@ url_family="${REPLY}"
 urlencode "${name}" >/dev/null
 url_name="${REPLY}"
 
-redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}"
+redirect_params="host=${url_host}&chart=${url_chart}&family=${url_family}&alarm=${url_name}&alarm_unique_id=${unique_id}&alarm_id=${alarm_id}&alarm_event_id=${event_id}&alarm_when=${when}"
 GOTOCLOUD=0
 
 if [ "${NETDATA_REGISTRY_URL}" == "https://registry.my-netdata.io" ]; then

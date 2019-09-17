@@ -230,7 +230,6 @@ static struct ns {
 };
 
 int switch_namespace(const char *prefix, pid_t pid) {
-    if(!prefix) prefix = "";
 
 #ifdef HAVE_SETNS
 
