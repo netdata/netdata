@@ -161,7 +161,7 @@ portable_del_group() {
 		if grep -q "${groupname}" /etc/group; then
 		  run groupdel -f "${groupname}" && return 0
 		else
-		  echo >&2 "Group ${groupname} already remove in a previous step."
+		  echo >&2 "Group ${groupname} already removed in a previous step."
 		  run_ok
 		fi
 	fi
