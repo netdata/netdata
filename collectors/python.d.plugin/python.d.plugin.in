@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 '''':;
-
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
-fi
 pybinary=$(which python || which python3 || which python2)
 filtered=()
 for arg in "$@"
