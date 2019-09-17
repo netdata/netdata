@@ -236,6 +236,9 @@ Netdata can send metrics to prometheus from 3 data sources:
      The format of the metrics is: `CONTEXT_UNITS_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
      All the other operations are the same with `average`. 
 
+To change the data source to `sum` or `as-collected` you need to provide the `source` parameter in the request URL. 
+e.g.: `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`
+
 Keep in mind that early versions of Netdata were sending the metrics as: `CHART_DIMENSION{}`.
 
 ### Querying Metrics
