@@ -16,8 +16,10 @@ Netdata is not hosted by the CNCF but is the 3rd most starred open-source projec
 
 ---
 
+
 People get **addicted to Netdata**.<br/>
 Once you use it on your systems, **there is no going back**! *You have been warned...*
+
 
 ![image](https://user-images.githubusercontent.com/2662304/48305662-9de82980-e537-11e8-9f5b-aa1a60fbb82f.png)
 
