@@ -117,9 +117,9 @@ This process will take some time. Once finished, the built documentation site wi
 
 The best way to view the documentation site you just built is to run a simple web server from the `docs/generator/build/` directory. So, navigate there and run a Python-based web server:
 
-```
-$ cd docs/generator/build/
-$ python3 -m http.server 20000
+```sh
+cd docs/generator/build/
+python3 -m http.server 20000
 ```
 
 Feel free to replace the port number you want this web server to listen on (port `20000` in this case [only one higher than the agent!]).
