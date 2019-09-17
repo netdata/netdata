@@ -643,11 +643,6 @@ void main(void)
     total_active_file_hash = simple_hash("total_active_file");
     total_unevictable_hash = simple_hash("total_unevictable");
 
-    // cache functions
-    (void)simple_hash2("hello world");
-    (void)strcmp("1", "2");
-    (void)strtoull("123", NULL, 0);
-
   unsigned long i, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c5 = 0, c6 = 0, c7;
   unsigned long max = 1000000;
 
