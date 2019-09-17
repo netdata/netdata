@@ -356,8 +356,7 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                 }
             }
         }
-    }
-    ]
+    }],
 }
 ```
 
