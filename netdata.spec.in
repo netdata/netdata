@@ -279,6 +279,9 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 # Install cups.plugin
 install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
 
+# ###########################################################
+# Install slabinfo.plugin
+install -m 4750 -p slabinfo.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/slabinfo.plugin"
 
 # ###########################################################
 # Install registry directory
@@ -451,6 +454,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 # perf plugin
 %caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
+# perf plugin
+%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
 # freeipmi files
 %caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin

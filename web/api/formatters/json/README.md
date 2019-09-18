@@ -103,7 +103,7 @@ callback({
 > Using `format=datatable` and `options=`
 
 ```bash
-$ curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=nginx_local.connections&after=-3600&points=6&group=average&formdatatable&options='
+curl -Ss 'https://registry.my-netdata.io/api/v1/data?chart=nginx_local.connections&after=-3600&points=6&group=average&formdatatable&options='
 {
  "cols":
  [

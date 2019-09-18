@@ -26,7 +26,7 @@ It has been tested with apache 2.2 and apache 2.4. The latter also provides conn
 Apache 2.2 response:
 
 ```sh
-$ curl "http://127.0.0.1/server-status?auto"
+curl "http://127.0.0.1/server-status?auto"
 Total Accesses: 80057
 Total kBytes: 223017
 CPULoad: .018287
@@ -42,7 +42,7 @@ Scoreboard: _________________________......................................._W__
 Apache 2.4 response:
 
 ```sh
-$ curl "http://127.0.0.1/server-status?auto"
+curl "http://127.0.0.1/server-status?auto"
 127.0.0.1
 ServerVersion: Apache/2.4.18 (Unix)
 ServerMPM: event

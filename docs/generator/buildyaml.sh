@@ -250,6 +250,7 @@ navpart 3 collectors/freeipmi.plugin
 navpart 3 collectors/nfacct.plugin
 navpart 3 collectors/xenstat.plugin
 navpart 3 collectors/perf.plugin
+navpart 3 collectors/slabinfo.plugin
 
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'

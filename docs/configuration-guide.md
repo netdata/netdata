@@ -106,7 +106,7 @@ The page on [Netdata performance](Performance.md) has an excellent guide on how 
 
 ##### Change when Netdata saves metrics to disk
 
-[netdata.conf \[global\]](../daemon/config/#global-section-options) : `memory mode`</details>
+[netdata.conf \[global\]](../daemon/config/#global-section-options) : `memory mode`
 
 ##### Prevent Netdata from getting immediately killed when my server runs out of memory
 

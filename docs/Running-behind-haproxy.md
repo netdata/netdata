@@ -1,16 +1,21 @@
 # Netdata via HAProxy
 
-> HAProxy is a free, very fast and reliable solution offering high availability, load balancing, and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic web sites and powers quite a number of the world's most visited ones.
+> HAProxy is a free, very fast and reliable solution offering high availability, load balancing, 
+> and proxying for TCP and HTTP-based applications. It is particularly suited for very high traffic web sites 
+> and powers quite a number of the world's most visited ones.
 
-If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name can be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port. This can make it possible to connect to Netdata at <https://example.com> or <https://example.com/netdata/>, which is a much nicer experience then <http://example.com:19999>.
+If Netdata is running on a host running HAProxy, rather than connecting to Netdata from a port number, a domain name 
+can be pointed at HAProxy, and HAProxy can redirect connections to the Netdata port. This can make it possible to 
+connect to Netdata at <https://example.com> or <https://example.com/netdata/>, which is a much nicer experience then <http://example.com:19999>.
 
-To proxy requests from [HAProxy](https://github.com/haproxy/haproxy) to Netdata, the following configuration can be used:
+To proxy requests from [HAProxy](https://github.com/haproxy/haproxy) to Netdata, 
+the following configuration can be used:
 
 ## Default Configuration
 
 For all examples, set the mode to `http`
 
-```
+```conf
 defaults
     mode    http
 ```
@@ -23,7 +28,7 @@ A simple example where the base URL, say <http://example.com>, is used with no s
 
 Create a frontend to recieve the request.
 
-```
+```conf
 frontend http_frontend
     ## HTTP ipv4 and ipv6 on all ips ##
     bind :::80 v4v6
@@ -35,7 +40,7 @@ frontend http_frontend
 
 Create the Netdata backend which will send requests to port `19999`.
 
-```
+```conf
 backend netdata_backend
     option       forwardfor
     server       netdata_local     127.0.0.1:19999
@@ -54,7 +59,7 @@ A example where the base URL is used with a subpath `/netdata/`:
 
 To use a subpath, create an ACL, which will set a variable based on the subpath.
 
-```
+```conf
 frontend http_frontend
     ## HTTP ipv4 and ipv6 on all ips ##
     bind :::80 v4v6
@@ -77,7 +82,7 @@ frontend http_frontend
 
 Same as simple example, expept remove `/netdata/` with regex.
 
-```
+```conf
 backend netdata_backend
     option      forwardfor
     server      netdata_local     127.0.0.1:19999
@@ -92,13 +97,14 @@ backend netdata_backend
 
 ## Using TLS communication
 
-TLS can be used by adding port `443` and a cert to the frontend. This example will only use Netdata if host matches example.com (replace with your domain).
+TLS can be used by adding port `443` and a cert to the frontend. 
+This example will only use Netdata if host matches example.com (replace with your domain).
 
 ### Frontend
 
 This frontend uses a certificate list.
 
-```
+```conf
 frontend https_frontend
     ## HTTP ##
     bind :::80 v4v6
@@ -123,14 +129,15 @@ In the cert list file place a mapping from a certificate file to the domain used
 
 `/etc/letsencrypt/certslist.txt`:
 
-```
+```txt
 example.com /etc/letsencrypt/live/example.com/example.com.pem
 ```
 
-The file `/etc/letsencrypt/live/example.com/example.com.pem` should contain the key and certificate (in that order) concatenated into a `.pem` file.:
+The file `/etc/letsencrypt/live/example.com/example.com.pem` should contain the key and 
+certificate (in that order) concatenated into a `.pem` file.:
 
-```
-$ cat /etc/letsencrypt/live/example.com/fullchain.pem \
+```sh
+cat /etc/letsencrypt/live/example.com/fullchain.pem \
     /etc/letsencrypt/live/example.com/privkey.pem > \
     /etc/letsencrypt/live/example.com/example.com.pem
 ```
@@ -139,7 +146,7 @@ $ cat /etc/letsencrypt/live/example.com/fullchain.pem \
 
 Same as simple, except set protocol `https`.
 
-```
+```conf
 backend netdata_backend
     option forwardfor
     server      netdata_local     127.0.0.1:19999
@@ -155,7 +162,7 @@ backend netdata_backend
 
 To use basic HTTP Authentication, create a authentication list:
 
-```
+```conf
 # HTTP Auth
 userlist basic-auth-list
   group is-admin
@@ -165,20 +172,20 @@ userlist basic-auth-list
 
 You can create a hashed password using the `mkpassword` utility.
 
-```
-$ printf "passwordhere" | mkpasswd --stdin --method=sha-256
+```sh
+ printf "passwordhere" | mkpasswd --stdin --method=sha-256
 $5$l7Gk0VPIpKO$f5iEcxvjfdF11khw.utzSKqP7W.0oq8wX9nJwPLwzy1
 ```
 
 Replace `passwordhere` with hash:
 
-```
+```conf
 user admin password $5$l7Gk0VPIpKO$f5iEcxvjfdF11khw.utzSKqP7W.0oq8wX9nJwPLwzy1 groups is-admin
 ```
 
 Now add at the top of the backend:
 
-```
+```conf
 acl devops-auth http_auth_group(basic-auth-list) is-admin
 http-request auth realm netdata_local unless devops-auth
 ```
@@ -187,7 +194,7 @@ http-request auth realm netdata_local unless devops-auth
 
 Full example configuration with HTTP auth over TLS with subpath:
 
-```
+```conf
 global
     maxconn     20000
 

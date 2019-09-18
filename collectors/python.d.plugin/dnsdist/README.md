@@ -1,8 +1,8 @@
 # dnsdist
 
-Module monitor dnsdist performance and health metrics.
+This module monitors dnsdist performance and health metrics.
 
-Following charts are drawn:
+The module draws the following charts:
 
 1.  **Response latency**
 
@@ -45,7 +45,7 @@ Following charts are drawn:
     -   servfail-responses
     -   trunc-failures
 
-## configuration
+## Configuration
 
 ```yaml
 localhost:
@@ -56,7 +56,5 @@ localhost:
   header:
     X-API-Key: 'dnsdist-api-key'
 ```
-
----
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Fdnsdist%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
