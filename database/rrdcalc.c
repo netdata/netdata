@@ -487,7 +487,7 @@ inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
     newrc->next_event_id = 1;
     newrc->id = rrdcalc_get_unique_id(host, rc->chart, name, &rc->next_event_id);
     newrc->name = (char *)name;
-    newrc->hash = simple_hash(rc->name);
+    newrc->hash = simple_hash(newrc->name);
     newrc->chart = strdupz(rc->chart);
     newrc->hash_chart = simple_hash(rc->chart);
 
