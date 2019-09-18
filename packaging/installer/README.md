@@ -527,14 +527,11 @@ page](https://github.com/netdata/netdata/releases/latest) and [latest go.d
 plugin release page](https://github.com/netdata/go.d.plugin/releases) to
 download the required files manually.
 
+#### kickstart.sh
 ```bash
 cd /tmp
 
-# Since you won't be having an active internet connection on the destination, you will need to manually get the kickstart script itself
-# Download kickstart.sh or kickstart-static64.sh, depending the installation you have chosen to run
 curl -s https://my-netdata.io/kickstart.sh > kickstart.sh
-or
-curl -s https://my-netdata.io/kickstart-static64.sh > kickstart-static64.sh
 
 # Netdata tarball
 curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | wget -qi -
@@ -553,7 +550,20 @@ export OS=$(uname -s | tr '[:upper:]' '[:lower:]') ARCH=$(uname -m | sed -e 's/i
 curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
 ```
 
-Move these files to the `/tmp` directory on the offline system in whichever way
+#### kickstart-static64.sh
+```bash
+cd /tmp
+
+curl -s https://my-netdata.io/kickstart-static64.sh > kickstart-static64.sh
+
+# Netdata static64 tarball
+curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*gz.run" | cut -d '"' -f 4 | wget -qi -
+
+# Netdata checksums
+curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "browser_download_url.*txt" | cut -d '"' -f 4 | wget -qi -
+```
+
+Move downloaded files to the `/tmp` directory on the offline system in whichever way
 your defined policy allows (if any).
 
 Now you can run either the `kickstart.sh` or `kickstart-static64.sh` scripts
@@ -571,7 +581,7 @@ the location and names of the files you just downloaded.
 bash kickstart.sh --local-files /tmp/netdata-version-number-here.tar.gz /tmp/sha256sums.txt /tmp/go.d-binary-filename.tar.gz /tmp/config.tar.gz /tmp/install-required-packages.sh
 
 # kickstart-static64.sh
-bash kickstart-static64.sh --local-files /tmp/netdata.tar.gz /tmp/checksums.txt
+bash kickstart-static64.sh --local-files /tmp/netdata-version-number-here.gz.run /tmp/sha256sums.txt
 ```
 
 Now that you're finished with your offline installation, you can move on to our
