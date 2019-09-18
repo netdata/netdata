@@ -33,7 +33,7 @@ This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS
 To install Netdata from source, and keep it up to date with our **nightly releases** automatically, run the following:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 !!! note
@@ -72,7 +72,7 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 Example using all the above parameters:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt /tmp/manually.downloaded.go.d.binary.tar.gz /tmp/manually.downloaded.go.d.config.tar.gz
+bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt /tmp/manually.downloaded.go.d.binary.tar.gz /tmp/manually.downloaded.go.d.config.tar.gz
 ```
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
@@ -90,7 +90,7 @@ You can install a pre-compiled static binary of Netdata on any Intel/AMD 64bit L
 To install Netdata from a binary package on any Linux distro and any kernel version on **Intel/AMD 64bit** systems, and keep it up to date with our **nightly releases** automatically, run the following:
 
 ```bash
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 ```
 
 !!! note
@@ -125,7 +125,7 @@ The `kickstart-static64.sh` script passes all its parameters to `netdata-install
 Example using all the above parameters:
 
 ```sh
-$ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
 ```
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 
@@ -472,9 +472,9 @@ When Netdata is first installed, it will run as *root*. This may or may not be a
 3.  Change ownership of the following directories, as defined in [Netdata Security](../../docs/netdata-security.md#security-design):
 
 ```sh
-$ chown -R root:netdata /opt/netdata/usr/share/netdata
-$ chown -R netdata:netdata /opt/netdata/var/lib/netdata /opt/netdata/var/cache/netdata
-$ chown -R netdata:root /opt/netdata/var/log/netdata
+chown -R root:netdata /opt/netdata/usr/share/netdata
+chown -R netdata:netdata /opt/netdata/var/lib/netdata /opt/netdata/var/cache/netdata
+chown -R netdata:root /opt/netdata/var/log/netdata
 ```
 
 Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as an operating system, so no init script is installed. You'll have to do this manually:
