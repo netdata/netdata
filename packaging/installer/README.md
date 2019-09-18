@@ -527,7 +527,7 @@ page](https://github.com/netdata/netdata/releases/latest) and [latest go.d
 plugin release page](https://github.com/netdata/go.d.plugin/releases) to
 download the required files manually.
 
-kickstart.sh
+#### kickstart.sh
 ```bash
 cd /tmp
 
@@ -550,7 +550,7 @@ export OS=$(uname -s | tr '[:upper:]' '[:lower:]') ARCH=$(uname -m | sed -e 's/i
 curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
 ```
 
-kickstart-static64.sh
+#### kickstart-static64.sh
 ```bash
 cd /tmp
 
