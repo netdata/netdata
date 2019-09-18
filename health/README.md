@@ -680,7 +680,7 @@ lookup: average -3s percentage foreach system,user
   crit: $this > 80
 ```
 
-The lookup line will calculate the average CPU usage from system and user in the last 3 seconds, due to the fact we have
+The `lookup` line will calculate the average CPU usage from system and user in the last 3 seconds, due to the fact we have
 the foreach in the `lookup` line, Netdata will create two independent alarms called respectively `dim_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
