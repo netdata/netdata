@@ -150,7 +150,7 @@ int rrdset_set_name(RRDSET *st, const char *name) {
     rrdset_strncpyz_name(b, n, CONFIG_MAX_VALUE);
 
     if(rrdset_index_find_name(host, b, 0)) {
-        error("RRDSET: chart name '%s' on host '%s' already exists.", b, host->hostname);
+        info("RRDSET: chart name '%s' on host '%s' already exists.", b, host->hostname);
         return 0;
     }
 
