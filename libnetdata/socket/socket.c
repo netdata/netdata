@@ -1065,7 +1065,7 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
             freeaddrinfo(addr_infos);
     }
     if (!simple_pattern_matches(access_list, client_host)) {
-        info("Incoming connection on '%s' (%s) does not match allowed pattern for %s",
+        debug(D_LISTENER, "Incoming connection on '%s' (%s) does not match allowed pattern for %s",
               client_ip, client_host, patname);
         return 0;
     }
