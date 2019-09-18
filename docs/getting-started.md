@@ -51,18 +51,17 @@ Once you save your changes, [restart Netdata](#start-stop-and-restart-netdata) t
 
 ## Collect data from more sources
 
-When Netdata **starts**, it auto-detects data sources, such as database servers, web servers, and more. To auto-detect
-and collect metrics from a service or application you just installed, you need to [restart
+When Netdata _starts_, it auto-detects dozens of **data sources**, such as database servers, web servers, and more. To
+auto-detect and collect metrics from a service or application you just installed, you need to [restart
 Netdata](#start-stop-and-restart-netdata).
 
 > There is one exception: When Netdata is running on the host (as in not in a container itself), it will always
 > auto-detect containers and VMs.
 
-However, auto-detection only works if you installed source service/application using its standard installation
-procedure. If Netdata isn't collecting metrics after a restart, your service/application probably isn't configured
-correctly. Look at the [external plugin documentation](../collectors/plugins.d/) to find the appropriate module for your
-service/application. Those pages will contain more information about how to configure your service/application for
-auto-detection.
+However, auto-detection only works if you installed the source using its standard installation procedure. If Netdata
+isn't collecting metrics after a restart, your source probably isn't configured correctly. Look at the [external plugin
+documentation](../collectors/plugins.d/) to find the appropriate module for your source. Those pages will contain more
+information about how to configure your source for auto-detection.
 
 Some modules, like `chrony`, are disabled by default and must be enabled manually for auto-detection to work.
 
@@ -128,6 +127,8 @@ changes based on your particular Nginx setup.
 
 **What's next?**:
 
+-   Look at the [full list of data collection modules](Add-more-charts-to-netdata.md#available-data-collection-modules)
+    to configure your sources for auto-detection and monitoring.
 -   Improve the [performance](Performance.md) of Netdata on low-memory systems.
 -   Configure `systemd` to expose [systemd services
     utilization](../collectors/cgroups.plugin/README.md#monitoring-systemd-services) metrics automatically.
