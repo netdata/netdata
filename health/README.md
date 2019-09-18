@@ -675,12 +675,12 @@ Check if user or system dimension is using more than 50% of cpu:
     os: linux
 lookup: average -3s percentage foreach system,user
  units: %
- every: 1s
+ every: 10s
   warn: $this > 50
   crit: $this > 80
 ```
 
-The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds, due the fact we have
+The lookup line will calculate the average CPU usage from system and user in the last 3 seconds, due to the fact we have
 the foreach in the `lookup` line, Netdata will create two independent alarms called respectively `dim_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
@@ -694,7 +694,7 @@ Check if all dimensions is using more than 50% of cpu:
     os: linux
 lookup: average -3s percentage foreach *
  units: %
- every: 1s
+ every: 10s
   warn: $this > 50
   crit: $this > 80
 ```
