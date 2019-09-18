@@ -18,7 +18,7 @@ void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST
         if(unlikely(!rc))
             info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
 #ifdef NETDATA_INTERNAL_CHECKS
-        else if(rc->rrdset != st)
+        else if(rc->rrdset != st && !rc->foreachdim) //When we have a template with foreadhdim, the child will be added to the index late
             error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rc->chart?rc->chart:"NOCHART", rc->name, st->id);
 #endif
     }
