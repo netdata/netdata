@@ -22,6 +22,7 @@ SUBDIRS = \
     node.d.plugin \
     proc.plugin \
     python.d.plugin \
+    slabinfo.plugin \
     statsd.plugin \
     tc.plugin \
    	$(NULL)

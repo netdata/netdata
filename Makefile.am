@@ -236,6 +236,11 @@ NFACCT_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+SLABINFO_PLUGIN_FILES = \
+	collectors/slabinfo.plugin/slabinfo.c \
+	$(LIBNETDATA_FILES)
+	$(NULL)
+
 XENSTAT_PLUGIN_FILES = \
     collectors/xenstat.plugin/xenstat_plugin.c \
     $(LIBNETDATA_FILES) \
@@ -596,6 +601,14 @@ if ENABLE_PLUGIN_PERF
     plugins_PROGRAMS += perf.plugin
     perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
     perf_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_SLABINFO
+    plugins_PROGRAMS += slabinfo.plugin
+    slabinfo_plugin_SOURCES = $(SLABINFO_PLUGIN_FILES)
+    slabinfo_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
