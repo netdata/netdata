@@ -3,6 +3,7 @@ import { createReducer } from "redux-act"
 
 import {
   requestCommonColorsAction,
+  setGlobalChartUnderlayAction,
   setGlobalSelectionAction,
   setGlobalPanAndZoomAction,
   setTimezoneAction,
@@ -26,6 +27,11 @@ export type StateT = {
     before: number
     masterID: string
   }
+  globalChartUnderlay: null | {
+    after: number
+    before: number
+    masterID: string
+  }
   timezone: string | undefined
   hoveredX: number | null
 }
@@ -34,6 +40,7 @@ const initialState = {
   commonColorsKeys: {},
   currentSelectionMasterId: null,
   globalPanAndZoom: null,
+  globalChartUnderlay: null,
   timezone: window.NETDATA.options.current.timezone,
   hoveredX: null,
 }
@@ -146,6 +153,15 @@ globalReducer.on(setGlobalSelectionAction, (state, { chartUuid, hoveredX }) => (
 globalReducer.on(setGlobalPanAndZoomAction, (state, { after, before, masterID }) => ({
   ...state,
   globalPanAndZoom: {
+    after,
+    before,
+    masterID,
+  },
+}))
+
+globalReducer.on(setGlobalChartUnderlayAction, (state, { after, before, masterID }) => ({
+  ...state,
+  globalChartUnderlay: {
     after,
     before,
     masterID,

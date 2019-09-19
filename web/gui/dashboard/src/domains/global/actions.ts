@@ -29,3 +29,12 @@ interface SetGlobalPanAndZoomAction {
 export const setGlobalPanAndZoomAction = createAction<SetGlobalPanAndZoomAction>(
   `${storeKey}/setGlobalPanAndZoom`,
 )
+
+interface SetGlobalChartUnderlayAction {
+  after: number
+  before: number
+  masterID: string
+}
+export const setGlobalChartUnderlayAction = createAction<SetGlobalChartUnderlayAction>(
+  `${storeKey}/setGlobalChartUnderlay`,
+)

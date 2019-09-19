@@ -33,3 +33,8 @@ export const selectGlobalPanAndZoom = createSelector(
   selectGlobal,
   prop("globalPanAndZoom"),
 )
+
+export const selectGlobalChartUnderlay = createSelector(
+  selectGlobal,
+  prop("globalChartUnderlay"),
+)
