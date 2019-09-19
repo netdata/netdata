@@ -680,13 +680,13 @@ lookup: average -3s percentage foreach system,user
   crit: $this > 80
 ```
 
-The `lookup` line will calculate the average CPU usage from system and user in the last 3 seconds, due to the fact we have
-the foreach in the `lookup` line, Netdata will create two independent alarms called respectively `dim_template_system`
+The `lookup` line will calculate the average CPU usage from system and user in the last 3 seconds. Because we have
+the foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
 and `dim_template_user` that will have all the other parameters shared among them.
 
 ### Example 6
 
-Check if all dimensions is using more than 50% of cpu:
+Check if all dimensions are using more than 50% of cpu:
 
 ```
  alarm: dim_template
@@ -699,8 +699,8 @@ lookup: average -3s percentage foreach *
   crit: $this > 80
 ```
 
-The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds, here we will
-have the same behavior of the previous example, we will create alarms for all dimensions of the chart.
+The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds. In this case
+Netdata will create alarms for all dimensions of the chart.
 
 ## Troubleshooting
 
