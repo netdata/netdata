@@ -294,27 +294,27 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                     ps = NULL;
                                     break;
                                 }
-                            } else {
-                                ssize_t r = read(pd->fd, buffer, 30);
-                                if(unlikely(r < 1)) {
-                                    error("Cannot read file '%s'", pd->filename);
-                                    read_error = 1;
-                                    power_supply_free(ps);
-                                    ps = NULL;
-                                    break;
-                                }
-                                buffer[r] = '\0';
-                                pd->value = str2ull(buffer);
+                            }
 
-                                if(unlikely(!keep_fds_open)) {
-                                    close(pd->fd);
-                                    pd->fd = -1;
-                                }
-                                else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
-                                    error("Cannot seek in file '%s'", pd->filename);
-                                    close(pd->fd);
-                                    pd->fd = -1;
-                                }
+                            ssize_t r = read(pd->fd, buffer, 30);
+                            if(unlikely(r < 1)) {
+                                error("Cannot read file '%s'", pd->filename);
+                                read_error = 1;
+                                power_supply_free(ps);
+                                ps = NULL;
+                                break;
+                            }
+                            buffer[r] = '\0';
+                            pd->value = str2ull(buffer);
+
+                            if(unlikely(!keep_fds_open)) {
+                                close(pd->fd);
+                                pd->fd = -1;
+                            }
+                            else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
+                                error("Cannot seek in file '%s'", pd->filename);
+                                close(pd->fd);
+                                pd->fd = -1;
                             }
                         }
                     }
