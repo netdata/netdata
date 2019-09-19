@@ -300,6 +300,16 @@ export const DygraphChart = ({
   unitsCurrent,
   updateChartPanAndZoom,
 }: Props) => {
+  // setGlobalChartUnderlay is using state from closure (chartData.after), so we need to have always
+  // the newest callback. Unfortunately we cannot use Dygraph.updateOptions() (library restriction)
+  // for interactionModel callbacks so we need to keep the callback in mutable ref
+  const propsRef = useRef({
+    setGlobalChartUnderlay,
+  })
+  useLayoutEffect(() => {
+    propsRef.current.setGlobalChartUnderlay = setGlobalChartUnderlay
+  }, [setGlobalChartUnderlay])
+
   const { xAxisTimeString } = useDateTime()
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const hiddenLabelsElementId = `${chartUuid}-hidden-labels-id`
@@ -369,6 +379,9 @@ export const DygraphChart = ({
           latestIsUserAction.current = true
           updateChartPanOrZoom({ after: minDate, before: maxDate })
         },
+
+        // interactionModel cannot be replaced with updateOptions(). we need to keep all changing
+        // values and callbacks in mutable ref,
         interactionModel: {
           mousedown(event: MouseEvent, dygraph: Dygraph, context: any) {
             // Right-click should not initiate anything.
@@ -450,7 +463,7 @@ export const DygraphChart = ({
                 dygraph.toDataXCoord(event.offsetX),
               ])
 
-              setGlobalChartUnderlay({
+              propsRef.current.setGlobalChartUnderlay({
                 after: sortedRange[0],
                 before: sortedRange[1],
                 masterID: chartUuid,
