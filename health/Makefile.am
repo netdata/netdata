@@ -42,6 +42,7 @@ dist_healthconfig_DATA = \
     health.d/fping.conf \
     health.d/ioping.conf \
     health.d/fronius.conf \
+    health.d/gearman.conf \
     health.d/haproxy.conf \
     health.d/httpcheck.conf \
     health.d/ipc.conf \
@@ -84,6 +85,7 @@ dist_healthconfig_DATA = \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
     health.d/varnish.conf \
+    health.d/vcsa.conf \
     health.d/vsphere.conf \
     health.d/web_log.conf \
     health.d/wmi.conf \

@@ -158,7 +158,12 @@ portable_del_group() {
 
 	# Linux
 	if command -v groupdel 1>/dev/null 2>&1; then
-		run groupdel -f "${groupname}" && return 0
+		if grep -q "${groupname}" /etc/group; then
+		  run groupdel -f "${groupname}" && return 0
+		else
+		  echo >&2 "Group ${groupname} already removed in a previous step."
+		  run_ok
+		fi
 	fi
 
 	# mac OS
