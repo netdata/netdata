@@ -585,7 +585,7 @@ bash kickstart-static64.sh --local-files /tmp/netdata-version-number-here.gz.run
 ```
 
 Now that you're finished with your offline installation, you can move on to our
-[getting started guide](../../docs/GettingStarted.md)!
+[getting started guide](../../docs/getting-started.md)!
 
 ## Automatic updates
 
