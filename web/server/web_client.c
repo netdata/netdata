@@ -1212,7 +1212,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
     if(w->mode == WEB_CLIENT_MODE_OPTIONS) {
         buffer_strcat(w->response.header_output,
                 "Access-Control-Allow-Methods: GET, OPTIONS\r\n"
-                        "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control\r\n"
+                        "Access-Control-Allow-Headers: accept, x-requested-with, origin, content-type, cookie, pragma, cache-control, x-auth-token\r\n"
                         "Access-Control-Max-Age: 1209600\r\n" // 86400 * 14
         );
     }
