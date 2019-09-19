@@ -121,7 +121,7 @@ export const ChartLegend = ({
   void (showUndefined)
   // todo make separate case for showUndefined
 
-  const legendDate = new Date(viewBefore)
+  const legendDate = new Date(hoveredX || viewBefore)
 
   // todo make a possibility to add chartLegened when there's not chartData
   // (if this situation is possible)
