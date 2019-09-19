@@ -69,7 +69,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
         if(i != STDIN_FILENO && i != STDERR_FILENO)
             if (fcntl(i, F_SETFD, FD_CLOEXEC) == -1)
-                error("Error to call fcntl inside custom_peopen");
+                debug("Error to call fcntl inside custom_peopen");
 
     if (!posix_spawn_file_actions_init(&fa)) {
         // move the pipe to stdout in the child
