@@ -188,10 +188,13 @@ RELEASE_CHANNEL="nightly"
 while [ -n "${1}" ]; do
 	if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]; then
 		opts="${opts} --accept"
+		shift 1
 	elif [ "${1}" = "--dont-start-it" ]; then
 		inner_opts="${inner_opts} ${1}"
+		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
+		shift 1
 	elif [ "${1}" = "--local-files" ]; then
 		shift 1
 		if [ -z "${1}" ]; then
