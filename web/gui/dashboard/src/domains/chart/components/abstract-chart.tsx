@@ -24,6 +24,8 @@ interface Props {
   setHoveredX: (hoveredX: number | null) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
+  viewAfter: number,
+  viewBefore: number,
 }
 
 export const AbstractChart = ({
@@ -41,6 +43,8 @@ export const AbstractChart = ({
   setHoveredX,
   setMinMax,
   unitsCurrent,
+  viewAfter,
+  viewBefore,
 }: Props) => {
   const dispatch = useDispatch()
 
@@ -55,10 +59,7 @@ export const AbstractChart = ({
       return
     }
     let minDuration = fixedMinDuration
-    // similar naming to old dashboard, todo rethink
 
-    const viewAfter = chartData.after * 1000
-    const viewBefore = chartData.before * 1000
     const currentDuraton = Math.round(viewBefore - viewAfter)
 
     let afterForced = Math.round(after)
@@ -121,17 +122,15 @@ export const AbstractChart = ({
     if (doCallback && typeof callback === "function") {
       callback()
     }
-  }, [chartData, chartUuid, dispatch, fixedMinDuration])
+  }, [chartData.view_update_every, chartUuid, dispatch, fixedMinDuration, viewAfter, viewBefore])
 
 
   const setGlobalChartUnderlay = useCallback(({ after, before, masterID }) => {
     dispatch(setGlobalChartUnderlayAction({ after, before, masterID }))
 
     // freeze charts
-    const viewAfter = chartData.after * 1000
-    const viewBefore = chartData.before * 1000
     dispatch(setGlobalPanAndZoomAction({ after: viewAfter, before: viewBefore, masterID }))
-  }, [chartData, dispatch])
+  }, [dispatch, viewAfter, viewBefore])
 
 
   return (

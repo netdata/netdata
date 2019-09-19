@@ -19,6 +19,7 @@ interface Props {
   selectedDimensions: string[]
   setSelectedDimensions: (selectedDimensions: string[]) => void
   unitsCurrent: string
+  viewBefore: number
 }
 
 export const legendPluginModuleString = (withContext: boolean, chartDetails: ChartDetails) => {
@@ -109,11 +110,9 @@ export const ChartLegend = ({
   selectedDimensions,
   setSelectedDimensions,
   unitsCurrent,
+  viewBefore,
 }: Props) => {
   const netdataLast = chartData.last_entry * 1000
-  // todo lift before/after to the state (when doing highlighting/pan/zoom)
-  // when requested_padding, view_before is not always equal this.data_before
-  const viewBefore = chartData.before * 1000
   const dataUpdateEvery = chartData.view_update_every * 1000
 
   const showUndefined = Math.abs(netdataLast - viewBefore) > dataUpdateEvery

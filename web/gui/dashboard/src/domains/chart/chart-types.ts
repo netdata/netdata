@@ -56,4 +56,5 @@ export interface ChartDetails {
 export interface ChartState {
   chartData: ChartData | null
   chartDetails: ChartDetails | null
+  viewRange: [number, number]
 }

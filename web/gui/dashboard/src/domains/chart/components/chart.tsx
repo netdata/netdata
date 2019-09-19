@@ -6,11 +6,15 @@ import { useDispatch, useSelector } from "react-redux"
 
 import { requestCommonColorsAction, setGlobalSelectionAction } from "domains/global/actions"
 import { createSelectAssignedColors, selectGlobalSelection } from "domains/global/selectors"
+import { AppStateT } from "store/app-state"
 
-import { ChartLegend } from "./chart-legend"
 import { Attributes } from "../utils/transformDataAttributes"
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
+import { useFormatters } from "../utils/formatters"
 import { ChartData, ChartDetails } from "../chart-types"
+import { selectChartViewRange } from "../selectors"
+
+import { ChartLegend } from "./chart-legend"
 import { LegendToolbox } from "./legend-toolbox"
 import { ResizeHandler } from "./resize-handler"
 import { AbstractChart } from "./abstract-chart"
@@ -53,6 +57,7 @@ export const Chart = ({
       : selectedDimensions.includes(dimensionName)),
   ),
   [chartData.dimension_names, selectedDimensions])
+
 
   const shouldDisplayToolbox = hasLegend(attributes)
     && window.NETDATA.options.current.legend_toolbox
@@ -99,6 +104,14 @@ export const Chart = ({
     ? globalHoveredX
     : localHoveredX
 
+  const viewRange = useSelector((state: AppStateT) => selectChartViewRange(
+    state, { id: chartUuid },
+  ))
+  const viewAfter = Math.max(chartData.after * 1000, viewRange[0])
+  const viewBefore = viewRange[1] > 0
+    ? Math.min(chartData.before * 1000, viewRange[1])
+    : chartData.before * 1000 // when 'before' is 0 or negative
+
   const selectAssignedColors = createSelectAssignedColors({
     chartContext: chartDetails.context,
     chartUuid,
@@ -128,6 +141,8 @@ export const Chart = ({
         setHoveredX={handleSetHoveredX}
         setMinMax={([min, max]) => { legendFormatValueDecimalsFromMinMax(min, max) }}
         unitsCurrent={unitsCurrent}
+        viewAfter={viewAfter}
+        viewBefore={viewBefore}
       />
       {hasLegend && (
         <ChartLegend
@@ -141,6 +156,7 @@ export const Chart = ({
           selectedDimensions={selectedDimensions}
           setSelectedDimensions={setSelectedDimensions}
           unitsCurrent={unitsCurrent}
+          viewBefore={viewBefore}
         />
       )}
       {shouldDisplayToolbox && (

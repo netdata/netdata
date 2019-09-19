@@ -9,7 +9,9 @@ export interface UpdateChartDataAction {
   chartData: ChartData
   id: string
 }
-export const updateChartDataAction = createAction<UpdateChartDataAction>(`${storeKey}/updateChartData`)
+export const updateChartDataAction = createAction<UpdateChartDataAction>(
+  `${storeKey}/updateChartData`,
+)
 
 export interface UpdateChartDetailsAction {
   chartDetails: ChartDetails
@@ -31,8 +33,9 @@ export interface FetchDataPayload {
   dimensions?: string,
 
   id: string,
+  viewRange: [number, number]
 }
 export const fetchDataAction = createRequestAction<
   FetchDataPayload,
-  { id: string, chartData: ChartData }
+  { id: string, chartData: ChartData, viewRange: [number, number] }
 >(`${storeKey}/fetchDataAction`)

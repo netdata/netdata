@@ -104,20 +104,20 @@ export const ChartContainer = ({
 
       let after
       let before
+      let viewRange
       let pointsMultiplier = 1
 
-      let requestedPadding = 0
       if (globalPanAndZoom) {
-        // if (globalPanAndZoom.before !== null && globalPanAndZoom.after !== null) {
         if (isGlobalPanAndZoomMaster) {
-          before = Math.round(globalPanAndZoom.before / 1000)
           after = Math.round(globalPanAndZoom.after / 1000)
+          before = Math.round(globalPanAndZoom.before / 1000)
+
+          viewRange = [after, before]
 
           if (window.NETDATA.options.current.pan_and_zoom_data_padding) {
-            requestedPadding = Math.round((before - after) / 2)
+            const requestedPadding = Math.round((before - after) / 2)
             after -= requestedPadding
             before += requestedPadding
-            requestedPadding *= 1000
             pointsMultiplier = 2
           }
         } else {
@@ -131,6 +131,8 @@ export const ChartContainer = ({
         after = initialAfter
         pointsMultiplier = 1
       }
+
+      viewRange = ((viewRange || [after, before]).map((x) => x * 1000)) as [number, number]
 
       const dataPoints = attributes.points
         || (Math.round(chartWidth / getChartPixelsPerPoint({ attributes, chartSettings })))
@@ -152,6 +154,7 @@ export const ChartContainer = ({
 
         // properties for the reducer
         id: chartUuid,
+        viewRange,
       }))
     }
   }, [attributes, chartDetails, chartSettings, chartUuid, chartWidth, dispatch, globalPanAndZoom,

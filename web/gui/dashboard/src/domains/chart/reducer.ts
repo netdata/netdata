@@ -12,6 +12,7 @@ const initialState = {
 export const initialSingleState = {
   chartData: null,
   chartDetails: null,
+  viewRange: null,
 }
 
 export const chartReducer = createReducer<StateT>(
@@ -21,11 +22,12 @@ export const chartReducer = createReducer<StateT>(
 
 const getSubstate = (state: StateT, id: string) => state[id] || initialSingleState
 
-chartReducer.on(fetchDataAction.success, (state, { id, chartData }) => ({
+chartReducer.on(fetchDataAction.success, (state, { id, chartData, viewRange }) => ({
   ...state,
   [id]: {
     ...getSubstate(state, id),
     chartData,
+    viewRange, // milliseconds
   },
 }))
 

@@ -20,3 +20,8 @@ export const selectChartDetails = createSelector(
   selectSingleChartState,
   (chartState) => chartState.chartDetails,
 )
+
+export const selectChartViewRange = createSelector(
+  selectSingleChartState,
+  (chartState) => chartState.viewRange,
+)
