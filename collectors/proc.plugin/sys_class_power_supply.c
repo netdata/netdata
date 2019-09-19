@@ -248,7 +248,8 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         ps = NULL;
                     }
                 }
-                else
+
+                if (ps)
                 {
                     ssize_t r = read(ps->capacity->fd, buffer, 30);
                     if(unlikely(r < 1)) {
@@ -256,8 +257,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                         power_supply_free(ps);
                         ps = NULL;
                     }
-                    else
-                    {
+                    else {
                         buffer[r] = '\0';
                         ps->capacity->value = str2ull(buffer);
 
@@ -291,7 +291,6 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                     error("Cannot open file '%s'", pd->filename);
                                     read_error = 1;
                                     power_supply_free(ps);
-                                    ps = NULL;
                                     break;
                                 }
                             }
@@ -301,7 +300,6 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                 error("Cannot read file '%s'", pd->filename);
                                 read_error = 1;
                                 power_supply_free(ps);
-                                ps = NULL;
                                 break;
                             }
                             buffer[r] = '\0';
