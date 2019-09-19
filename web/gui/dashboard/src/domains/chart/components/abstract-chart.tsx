@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from "react"
 
-import { setGlobalPanAndZoomAction } from "domains/global/actions"
+import { setGlobalChartUnderlayAction, setGlobalPanAndZoomAction } from "domains/global/actions"
 import { useDispatch } from "react-redux"
 import { Attributes } from "../utils/transformDataAttributes"
 import { ChartData, ChartDetails } from "../chart-types"
@@ -123,6 +123,17 @@ export const AbstractChart = ({
     }
   }, [chartData, chartUuid, dispatch, fixedMinDuration])
 
+
+  const setGlobalChartUnderlay = useCallback(({ after, before, masterID }) => {
+    dispatch(setGlobalChartUnderlayAction({ after, before, masterID }))
+
+    // freeze charts
+    const viewAfter = chartData.after * 1000
+    const viewBefore = chartData.before * 1000
+    dispatch(setGlobalPanAndZoomAction({ after: viewAfter, before: viewBefore, masterID }))
+  }, [chartData, dispatch])
+
+
   return (
     <DygraphChart
       attributes={attributes}
@@ -132,6 +143,7 @@ export const AbstractChart = ({
       colors={colors}
       chartUuid={chartUuid}
       dimensionsVisibility={dimensionsVisibility}
+      setGlobalChartUnderlay={setGlobalChartUnderlay}
       legendFormatValue={legendFormatValue}
       orderedColors={orderedColors}
       hoveredX={hoveredX}

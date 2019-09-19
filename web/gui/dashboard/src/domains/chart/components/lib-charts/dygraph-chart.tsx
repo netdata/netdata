@@ -1,4 +1,4 @@
-import { findIndex } from "ramda"
+import { findIndex, sortBy } from "ramda"
 import React, {
   useLayoutEffect, useRef, useState, useCallback,
 } from "react"
@@ -7,9 +7,9 @@ import classNames from "classnames"
 import Dygraph from "dygraphs"
 import "dygraphs/src/extras/smooth-plotter"
 
-import { NetdataDygraph } from "types/vendor-overrides"
+import { DygraphArea, NetdataDygraph } from "types/vendor-overrides"
 import { useDateTime } from "utils/date-time"
-import { selectGlobalSelectionMaster } from "domains/global/selectors"
+import { selectGlobalChartUnderlay, selectGlobalSelectionMaster } from "domains/global/selectors"
 
 import { Attributes } from "../../utils/transformDataAttributes"
 import {
@@ -276,6 +276,7 @@ interface Props {
   orderedColors: string[]
 
   hoveredX: number | null
+  setGlobalChartUnderlay: (arg: { after: number, before: number, masterID: string }) => void
   setHoveredX: (hoveredX: number | null) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
@@ -293,6 +294,7 @@ export const DygraphChart = ({
   orderedColors,
 
   hoveredX,
+  setGlobalChartUnderlay,
   setHoveredX,
   setMinMax,
   unitsCurrent,
@@ -312,11 +314,14 @@ export const DygraphChart = ({
       masterID: chartUuid,
     })
   }, [chartUuid, updateChartPanAndZoom])
+  const globalChartUnderlay = useSelector(selectGlobalChartUnderlay)
 
   // state.tmp.dygraph_user_action in old dashboard
   const latestIsUserAction = useRef(false)
   // state.tmp.dygraph_mouse_down in old dashboard
   const isMouseDown = useRef(false)
+  // state.tmp.dygraph_highlight_after in old dashboard
+  const dygraphHighlightAfter = useRef<null | number>(null)
 
   useLayoutEffect(() => {
     if (chartElement && chartElement.current && !dygraphInstance) {
@@ -377,56 +382,92 @@ export const DygraphChart = ({
 
             if (event.button && event.button === 1) {
               // middle mouse button
+
               if (event.shiftKey) {
                 // panning
+                dygraphHighlightAfter.current = null
                 // @ts-ignore
                 Dygraph.startPan(event, dygraph, context)
+
               } else if (event.altKey || event.ctrlKey || event.metaKey) {
                 // middle mouse button highlight
-                noop()
+                dygraphHighlightAfter.current = dygraph.toDataXCoord(event.offsetX)
+                // @ts-ignore
+                Dygraph.startZoom(event, dygraph, context)
+
               } else {
                 // middle mouse button selection for zoom
                 noop()
               }
+
             } else if (event.shiftKey) {
               // left mouse button selection for zoom (ZOOM)
+              dygraphHighlightAfter.current = null
               // @ts-ignore
               Dygraph.startZoom(event, dygraph, context)
+
             } else if (event.altKey || event.ctrlKey || event.metaKey) {
               // left mouse button highlight
-              noop()
+              dygraphHighlightAfter.current = dygraph.toDataXCoord(event.offsetX)
+              // @ts-ignore
+              Dygraph.startZoom(event, dygraph, context)
+
             } else {
               // left mouse button dragging (PAN)
               // @ts-ignore
               Dygraph.startPan(event, dygraph, context)
             }
           },
+
           mousemove(event: MouseEvent, dygraph: Dygraph, context: any) {
             // if (state.tmp.dygraph_highlight_after !== null) {
             // else if (
-            if (context.isPanning) {
+            if (dygraphHighlightAfter.current !== null) {
+              // highlight selection
+              latestIsUserAction.current = true
+              // @ts-ignore
+              Dygraph.moveZoom(event, dygraph, context)
+              event.preventDefault()
+
+            } else if (context.isPanning) {
               latestIsUserAction.current = true
               // eslint-disable-next-line no-param-reassign
               context.is2DPan = false
               // @ts-ignore
               Dygraph.movePan(event, dygraph, context)
+
             } else if (context.isZooming) {
               // @ts-ignore
               Dygraph.moveZoom(event, dygraph, context)
             }
           },
+
           mouseup(event: MouseEvent, dygraph: Dygraph, context: any) {
             isMouseDown.current = false
-            if (context.isPanning) {
+            if (dygraphHighlightAfter.current !== null) {
+              const sortedRange = sortBy((x) => +x, [
+                dygraphHighlightAfter.current,
+                dygraph.toDataXCoord(event.offsetX),
+              ])
+
+              setGlobalChartUnderlay({
+                after: sortedRange[0],
+                before: sortedRange[1],
+                masterID: chartUuid,
+              })
+
+            } else if (context.isPanning) {
               latestIsUserAction.current = true
               // @ts-ignore
               Dygraph.endPan(event, dygraph, context)
+
             } else if (context.isZooming) {
               latestIsUserAction.current = true
               // @ts-ignore
               Dygraph.endZoom(event, dygraph, context)
             }
           },
+
           click(event: MouseEvent, dygraph: Dygraph, context: any) {
             event.preventDefault()
             noop(dygraph, context)
@@ -446,8 +487,9 @@ export const DygraphChart = ({
       setMinMax(extremes)
     }
   }, [attributes, chartData, chartDetails, chartSettings, chartUuid, dimensionsVisibility,
-    dygraphInstance, hiddenLabelsElementId, orderedColors, setHoveredX, setMinMax,
-    unitsCurrent, updateChartPanOrZoom, xAxisTimeString])
+    dygraphInstance, globalChartUnderlay, hiddenLabelsElementId, orderedColors,
+    setGlobalChartUnderlay, setHoveredX, setMinMax, unitsCurrent, updateChartPanOrZoom,
+    xAxisTimeString])
 
   useLayoutEffect(() => {
     if (dygraphInstance && legendFormatValue) {
@@ -466,6 +508,34 @@ export const DygraphChart = ({
   }, [attributes.dygraphTheme, dimensionsVisibility, dygraphInstance, legendFormatValue,
     unitsCurrent])
 
+  // update chartOverlay
+  useLayoutEffect(() => {
+    if (dygraphInstance) {
+      dygraphInstance.updateOptions({
+        underlayCallback(canvas: CanvasRenderingContext2D, area: DygraphArea, g: Dygraph) {
+          // the chart is about to be drawn
+          // this function renders global highlighted time-frame
+
+          if (globalChartUnderlay) {
+            const { after, before } = globalChartUnderlay
+            // todo limit that to view_after, view_before
+
+            if (after < before) {
+              const bottomLeft = g.toDomCoords(after, -20)
+              const topRight = g.toDomCoords(before, +20)
+
+              const left = bottomLeft[0]
+              const right = topRight[0]
+
+              // eslint-disable-next-line no-param-reassign
+              canvas.fillStyle = window.NETDATA.themes.current.highlight
+              canvas.fillRect(left, area.y, right - left, area.h)
+            }
+          }
+        },
+      })
+    }
+  }, [dygraphInstance, globalChartUnderlay])
 
   // update data of the chart
   useLayoutEffect(() => {
