@@ -291,6 +291,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                     error("Cannot open file '%s'", pd->filename);
                                     read_error = 1;
                                     power_supply_free(ps);
+                                    ps = NULL;
                                     break;
                                 }
                             }
@@ -300,6 +301,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                 error("Cannot read file '%s'", pd->filename);
                                 read_error = 1;
                                 power_supply_free(ps);
+                                ps = NULL;
                                 break;
                             }
                             buffer[r] = '\0';
