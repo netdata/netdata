@@ -45,34 +45,32 @@ inline char *health_stock_config_dir(void) {
  * Function used to initialize the silencer structure.
  */
 void health_silencers_init(void) {
-    if (silencers_filename) {
-        FILE *fd = fopen(silencers_filename, "r");
-        if (fd) {
-            fseek(fd, 0 , SEEK_END);
-            off_t length = (off_t) ftell(fd);
-            fseek(fd, 0 , SEEK_SET);
+    FILE *fd = fopen(silencers_filename, "r");
+    if (fd) {
+        fseek(fd, 0 , SEEK_END);
+        off_t length = (off_t) ftell(fd);
+        fseek(fd, 0 , SEEK_SET);
 
-            if (length && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
-                char *str = mallocz((length+1)* sizeof(char));
-                if(str) {
-                    size_t copied;
-                    copied = fread(str, sizeof(char), length, fd);
-                    if (copied == (length* sizeof(char))) {
-                        str[length] = 0x00;
-                        json_parse(str, NULL, health_silencers_json_read_callback);
-                        info("Parsed health silencers file %s", silencers_filename);
-                    } else {
-                        error("Cannot read the data from health silencers file %s", silencers_filename);
-                    }
-                    freez(str);
+        if (length && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
+            char *str = mallocz((length+1)* sizeof(char));
+            if(str) {
+                size_t copied;
+                copied = fread(str, sizeof(char), length, fd);
+                if (copied == (length* sizeof(char))) {
+                    str[length] = 0x00;
+                    json_parse(str, NULL, health_silencers_json_read_callback);
+                    info("Parsed health silencers file %s", silencers_filename);
+                } else {
+                    error("Cannot read the data from health silencers file %s", silencers_filename);
                 }
-            } else {
-                error("Health silencers file %s has the size %ld that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, length, HEALTH_SILENCERS_MAX_FILE_LEN);
+                freez(str);
             }
-            fclose(fd);
         } else {
-            error("Cannot open the file %s",silencers_filename);
+            error("Health silencers file %s has the size %ld that is out of range[ 1 , %d ]. Aborting read.", silencers_filename, length, HEALTH_SILENCERS_MAX_FILE_LEN);
         }
+        fclose(fd);
+    } else {
+        error("Cannot open the file %s",silencers_filename);
     }
 }
 
