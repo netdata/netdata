@@ -32,7 +32,6 @@ interface GetInitialDygraphOptions {
   dimensionsVisibility: boolean[]
   hiddenLabelsElementId: string,
   orderedColors: string[],
-  setHoveredX: (hoveredX: number | null) => void
   unitsCurrent: string,
   xAxisTimeString: (d: Date) => string,
 }
@@ -44,7 +43,6 @@ const getInitialDygraphOptions = ({
   dimensionsVisibility,
   hiddenLabelsElementId,
   orderedColors,
-  setHoveredX,
   unitsCurrent,
   xAxisTimeString,
 }: GetInitialDygraphOptions) => {
@@ -222,43 +220,6 @@ const getInitialDygraphOptions = ({
         // axisLabelFormatter is added on the updates
       },
     },
-
-    highlightCallback(
-      event: MouseEvent, xval: number,
-    ) {
-      // todo
-      // state.pauseChart()
-
-      // todo dont know if that's still valid (following comment is from old code)
-      // there is a bug in dygraph when the chart is zoomed enough
-      // the time it thinks is selected is wrong
-      // here we calculate the time t based on the row number selected
-      // which is ok
-      // let t = state.data_after + row * state.data_update_every;
-      // console.log('row = ' + row + ', x = ' + x + ', t = ' + t + ' ' + ((t === x)?'SAME':(
-      // Math.abs(x-t)<=state.data_update_every)?'SIMILAR':'DIFFERENT') + ', rows in db: ' +
-      // state.data_points + ' visible(x) = ' + state.timeIsVisible(x) + ' visible(t) = ' +
-      // state.timeIsVisible(t) + ' r(x) = ' + state.calculateRowForTime(x) + ' r(t) = ' +
-      // state.calculateRowForTime(t) + ' range: ' + state.data_after + ' - ' + state.data_before +
-      // ' real: ' + state.data.after + ' - ' + state.data.before + ' every: ' +
-      // state.data_update_every);
-
-      // todo
-      // if (state.tmp.dygraph_mouse_down !== true) {
-      setHoveredX(xval)
-      // }
-    },
-
-    unhighlightCallback() {
-      // todo
-      // if (state.tmp.dygraph_mouse_down) {
-      //   return;
-      // }
-
-      // todo
-      // state.unpauseChart();
-      setHoveredX(null)
-    },
   }
 }
 
@@ -343,7 +304,6 @@ export const DygraphChart = ({
         dimensionsVisibility,
         hiddenLabelsElementId,
         orderedColors,
-        setHoveredX,
         unitsCurrent,
         xAxisTimeString,
       })
@@ -352,6 +312,29 @@ export const DygraphChart = ({
 
       const dygraphOptions = {
         ...dygraphOptionsStatic,
+
+        highlightCallback(
+          event: MouseEvent, xval: number,
+        ) {
+          // todo
+          // state.pauseChart()
+
+          // todo
+          // if (state.tmp.dygraph_mouse_down !== true) {
+          setHoveredX(xval)
+          // }
+        },
+
+        unhighlightCallback() {
+          // todo
+          // if (state.tmp.dygraph_mouse_down) {
+          //   return;
+          // }
+
+          // todo
+          // state.unpauseChart();
+          setHoveredX(null)
+        },
         drawCallback(dygraph: Dygraph) {
           // the user has panned the chart and this is called to re-draw the chart
           // 1. refresh this chart by adding data to it
