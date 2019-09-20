@@ -267,11 +267,13 @@ export const DygraphChart = ({
   // the newest callback. Unfortunately we cannot use Dygraph.updateOptions() (library restriction)
   // for interactionModel callbacks so we need to keep the callback in mutable ref
   const propsRef = useRef({
+    hoveredX,
     setGlobalChartUnderlay,
   })
   useLayoutEffect(() => {
+    propsRef.current.hoveredX = hoveredX
     propsRef.current.setGlobalChartUnderlay = setGlobalChartUnderlay
-  }, [setGlobalChartUnderlay])
+  }, [hoveredX, setGlobalChartUnderlay])
 
   const { xAxisTimeString } = useDateTime()
   const chartSettings = chartLibrariesSettings[chartLibrary]
@@ -321,21 +323,22 @@ export const DygraphChart = ({
           // todo
           // state.pauseChart()
 
-          // todo
-          // if (state.tmp.dygraph_mouse_down !== true) {
-          setHoveredX(xval)
-          // }
+          const newHoveredX = isMouseDown.current
+            ? null
+            : xval
+
+          const currentHoveredX = propsRef.current.hoveredX
+          if (newHoveredX !== currentHoveredX) {
+            setHoveredX(newHoveredX)
+          }
         },
 
         unhighlightCallback() {
           // todo
-          // if (state.tmp.dygraph_mouse_down) {
-          //   return;
-          // }
-
-          // todo
           // state.unpauseChart();
-          setHoveredX(null)
+          if (propsRef.current.hoveredX !== null) {
+            setHoveredX(null)
+          }
         },
         drawCallback(dygraph: Dygraph) {
           // the user has panned the chart and this is called to re-draw the chart
@@ -412,6 +415,7 @@ export const DygraphChart = ({
 
             } else {
               // left mouse button dragging (PAN)
+              dygraphHighlightAfter.current = null
               // @ts-ignore
               Dygraph.startPan(event, dygraph, context)
             }
@@ -485,7 +489,7 @@ export const DygraphChart = ({
       setMinMax(extremes)
     }
   }, [attributes, chartData, chartDetails, chartSettings, chartUuid, dimensionsVisibility,
-    dygraphInstance, globalChartUnderlay, hiddenLabelsElementId, orderedColors,
+    dygraphInstance, globalChartUnderlay, hiddenLabelsElementId, isMouseDown, orderedColors,
     setGlobalChartUnderlay, setHoveredX, setMinMax, unitsCurrent, updateChartPanOrZoom,
     xAxisTimeString])
 
@@ -559,7 +563,10 @@ export const DygraphChart = ({
       const hoveredRow = findIndex((x: any) => x[0] === hoveredX, chartData.result.data)
 
       if (hoveredX === null) {
-        dygraphInstance.clearSelection()
+        // getSelection is 100 times faster that clearSelection
+        if (dygraphInstance.getSelection() !== -1) {
+          dygraphInstance.clearSelection()
+        }
         return
       }
       dygraphInstance.setSelection(hoveredRow)
