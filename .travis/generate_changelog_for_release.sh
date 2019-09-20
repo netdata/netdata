@@ -25,7 +25,7 @@ fi
 echo "--- Creating changelog ---"
 git checkout master
 git pull
-#docker run -it --rm -v "$(pwd)":/usr/local/src/your-app ferrarimarco/github-changelog-generator:1.14.3 \
+
 docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest \
 	--user "${ORGANIZATION}" \
 	--project "${PROJECT}" \
@@ -34,4 +34,5 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 	--no-issues \
 	--unreleased-label "**Next release**" \
 	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
-	--no-compare-link ${OPTS}
+        --max-issues 500 \
+        --bug-labels IGNOREBUGS

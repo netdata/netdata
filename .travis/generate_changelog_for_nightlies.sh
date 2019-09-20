@@ -51,7 +51,8 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 	--unreleased-label "**Next release**" \
 	--no-issues \
 	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
-	--no-compare-link ${OPTS}
+	--max-issues 500 \
+	--bug-labels IGNOREBUGS
 
 echo "Changelog created! Adding packaging/version(${NEW_VERSION}) and CHANGELOG.md to the repository"
 echo "${NEW_VERSION}" > packaging/version

@@ -412,8 +412,6 @@ class PickNSort {
 		constructor (base_url, link_base_url) {
 			this.base_url = base_url; // URL of netdata host, with port
 			this.link_base_url = link_base_url || base_url; // Reverse proxy URL (Optional)
-			this.link_base_url;
-			this.netdata_info;
 			this.current_alarms = {};
 			this.new_alarms = {};
 			this.first_build = true;
