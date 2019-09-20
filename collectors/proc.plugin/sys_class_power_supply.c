@@ -245,67 +245,75 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     if(unlikely(ps->capacity->fd == -1)) {
                         error("Cannot open file '%s'", ps->capacity->filename);
                         power_supply_free(ps);
+                        ps = NULL;
                     }
                 }
 
-                ssize_t r = read(ps->capacity->fd, buffer, 30);
-                if(unlikely(r < 1)) {
-                    error("Cannot read file '%s'", ps->capacity->filename);
-                    power_supply_free(ps);
-                }
-                else {
-                    buffer[r] = '\0';
-                    ps->capacity->value = str2ull(buffer);
-                }
+                if (ps)
+                {
+                    ssize_t r = read(ps->capacity->fd, buffer, 30);
+                    if(unlikely(r < 1)) {
+                        error("Cannot read file '%s'", ps->capacity->filename);
+                        power_supply_free(ps);
+                        ps = NULL;
+                    }
+                    else {
+                        buffer[r] = '\0';
+                        ps->capacity->value = str2ull(buffer);
 
-                if(unlikely(!keep_fds_open)) {
-                    close(ps->capacity->fd);
-                    ps->capacity->fd = -1;
-                }
-                else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
-                    error("Cannot seek in file '%s'", ps->capacity->filename);
-                    close(ps->capacity->fd);
-                    ps->capacity->fd = -1;
+                        if(unlikely(!keep_fds_open)) {
+                            close(ps->capacity->fd);
+                            ps->capacity->fd = -1;
+                        }
+                        else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
+                            error("Cannot seek in file '%s'", ps->capacity->filename);
+                            close(ps->capacity->fd);
+                            ps->capacity->fd = -1;
+                        }
+                    }
                 }
             }
 
             // read property files
             int read_error = 0;
             struct ps_property *pr;
-            for(pr = ps->property_root; pr && !read_error; pr = pr->next) {
-                struct ps_property_dim *pd;
-                for(pd = pr->property_dim_root; pd; pd = pd->next) {
-                    if(likely(!pd->always_zero)) {
-                        char buffer[30 + 1];
+            if (ps)
+            {
+                for(pr = ps->property_root; pr && !read_error; pr = pr->next) {
+                    struct ps_property_dim *pd;
+                    for(pd = pr->property_dim_root; pd; pd = pd->next) {
+                        if(likely(!pd->always_zero)) {
+                            char buffer[30 + 1];
 
-                        if(unlikely(pd->fd == -1)) {
-                            pd->fd = open(pd->filename, O_RDONLY, 0666);
                             if(unlikely(pd->fd == -1)) {
-                                error("Cannot open file '%s'", pd->filename);
+                                pd->fd = open(pd->filename, O_RDONLY, 0666);
+                                if(unlikely(pd->fd == -1)) {
+                                    error("Cannot open file '%s'", pd->filename);
+                                    read_error = 1;
+                                    power_supply_free(ps);
+                                    break;
+                                }
+                            }
+
+                            ssize_t r = read(pd->fd, buffer, 30);
+                            if(unlikely(r < 1)) {
+                                error("Cannot read file '%s'", pd->filename);
                                 read_error = 1;
                                 power_supply_free(ps);
                                 break;
                             }
-                        }
+                            buffer[r] = '\0';
+                            pd->value = str2ull(buffer);
 
-                        ssize_t r = read(pd->fd, buffer, 30);
-                        if(unlikely(r < 1)) {
-                            error("Cannot read file '%s'", pd->filename);
-                            read_error = 1;
-                            power_supply_free(ps);
-                            break;
-                        }
-                        buffer[r] = '\0';
-                        pd->value = str2ull(buffer);
-
-                        if(unlikely(!keep_fds_open)) {
-                            close(pd->fd);
-                            pd->fd = -1;
-                        }
-                        else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
-                            error("Cannot seek in file '%s'", pd->filename);
-                            close(pd->fd);
-                            pd->fd = -1;
+                            if(unlikely(!keep_fds_open)) {
+                                close(pd->fd);
+                                pd->fd = -1;
+                            }
+                            else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
+                                error("Cannot seek in file '%s'", pd->filename);
+                                close(pd->fd);
+                                pd->fd = -1;
+                            }
                         }
                     }
                 }

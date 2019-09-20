@@ -197,7 +197,7 @@ int do_proc_mdstat(int update_every, usec_t dt) {
                 }
                 s++;
             }
-            if(unlikely(str_total[0] == '\0' || str_inuse[0] == '\0')) {
+            if(unlikely(str_total[0] == '\0' || !str_inuse || str_inuse[0] == '\0')) {
                 error("Cannot read /proc/mdstat raid health status. Unexpected format.");
                 continue;
             }
