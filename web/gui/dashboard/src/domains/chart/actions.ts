@@ -21,6 +21,10 @@ export const updateChartDetailsAction = createAction<UpdateChartDetailsAction>(
   `${storeKey}/updateChartDetails`,
 )
 
+export interface FetchDataParams {
+  isRemotelyControlled: boolean
+  viewRange: [number, number]
+}
 export interface FetchDataPayload {
   chart: string,
   format: string,
@@ -33,9 +37,10 @@ export interface FetchDataPayload {
   dimensions?: string,
 
   id: string,
-  viewRange: [number, number]
+  fetchDataParams: FetchDataParams
 }
+
 export const fetchDataAction = createRequestAction<
   FetchDataPayload,
-  { id: string, chartData: ChartData, viewRange: [number, number] }
+  { id: string, chartData: ChartData, fetchDataParams: FetchDataParams }
 >(`${storeKey}/fetchDataAction`)

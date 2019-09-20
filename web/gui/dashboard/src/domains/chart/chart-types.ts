@@ -56,5 +56,8 @@ export interface ChartDetails {
 export interface ChartState {
   chartData: ChartData | null
   chartDetails: ChartDetails | null
-  viewRange: [number, number]
+  fetchDataParams: {
+    isRemotelyControlled: boolean
+    viewRange: [number, number]
+  }
 }

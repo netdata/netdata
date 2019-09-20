@@ -18,6 +18,7 @@ interface Props {
   }
   chartUuid: string
   dimensionsVisibility: boolean[]
+  isRemotelyControlled: boolean
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
   hoveredX: number | null
@@ -37,6 +38,7 @@ export const AbstractChart = ({
   colors,
   chartUuid,
   dimensionsVisibility,
+  isRemotelyControlled,
   legendFormatValue,
   orderedColors,
   hoveredX,
@@ -142,10 +144,11 @@ export const AbstractChart = ({
       colors={colors}
       chartUuid={chartUuid}
       dimensionsVisibility={dimensionsVisibility}
-      setGlobalChartUnderlay={setGlobalChartUnderlay}
+      isRemotelyControlled={isRemotelyControlled}
       legendFormatValue={legendFormatValue}
       orderedColors={orderedColors}
       hoveredX={hoveredX}
+      setGlobalChartUnderlay={setGlobalChartUnderlay}
       setHoveredX={setHoveredX}
       setMinMax={setMinMax}
       unitsCurrent={unitsCurrent}

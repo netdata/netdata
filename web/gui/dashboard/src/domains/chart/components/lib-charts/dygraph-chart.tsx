@@ -233,6 +233,7 @@ interface Props {
     [key: string]: string
   }
   dimensionsVisibility: boolean[]
+  isRemotelyControlled: boolean
   legendFormatValue: ((v: number) => number | string) | undefined
   orderedColors: string[]
 
@@ -251,6 +252,7 @@ export const DygraphChart = ({
   // colors,
   chartUuid,
   dimensionsVisibility,
+  isRemotelyControlled,
   legendFormatValue,
   orderedColors,
 
@@ -536,11 +538,18 @@ export const DygraphChart = ({
   // update data of the chart
   useLayoutEffect(() => {
     if (dygraphInstance) {
+      // todo support state.tmp.dygraph_force_zoom
+      const optionsDateWindow = isRemotelyControlled ? { dateWindow: null } : {}
+
+      // ts accepts undefined (instead of null) as dateWindow. In old dashboard there was null
+      // and i'm not sure if Dygraph will treat it the same way as undefined
+      // @ts-ignore
       dygraphInstance.updateOptions({
+        ...optionsDateWindow,
         file: chartData.result.data,
       })
     }
-  }, [chartData.result.data, dygraphInstance])
+  }, [chartData.result.data, dygraphInstance, isRemotelyControlled])
 
 
   // set selection

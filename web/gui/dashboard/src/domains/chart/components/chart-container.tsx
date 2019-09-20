@@ -1,3 +1,4 @@
+import { forEachObjIndexed } from "ramda"
 import React, { useEffect, useState, useLayoutEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { useInterval, useThrottle } from "react-use"
@@ -5,14 +6,14 @@ import { useInterval, useThrottle } from "react-use"
 import { AppStateT } from "store/app-state"
 
 import { selectGlobalPanAndZoom } from "domains/global/selectors"
-import { forEachObjIndexed } from "ramda"
+
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { Attributes } from "../utils/transformDataAttributes"
 import { getChartPixelsPerPoint } from "../utils/get-chart-pixels-per-point"
 import { getPortalNodeStyles } from "../utils/get-portal-node-styles"
 
 import { fetchDataAction } from "../actions"
-import { selectChartData, selectChartDetails } from "../selectors"
+import { selectChartData, selectChartDetails, selectChartFetchDataParams } from "../selectors"
 
 import { Chart } from "./chart"
 
@@ -69,6 +70,10 @@ export const ChartContainer = ({
   // todo local state option
   const globalPanAndZoom = useSelector(selectGlobalPanAndZoom)
   const isGlobalPanAndZoomMaster = !!globalPanAndZoom && globalPanAndZoom.masterID === chartUuid
+  const isRemotelyControlled = !!globalPanAndZoom && !isGlobalPanAndZoomMaster
+  const fetchDataParams = useSelector((state: AppStateT) => selectChartFetchDataParams(
+    state, { id: chartUuid },
+  ))
 
   // don't send new requests too often (throttle)
   // corresponds to force_update_at in old dashboard
@@ -153,13 +158,18 @@ export const ChartContainer = ({
         before: before || null,
 
         // properties for the reducer
+        fetchDataParams: {
+          // we store it here so it is only available when data is fetched
+          // those params should be synced with data
+          isRemotelyControlled,
+          viewRange,
+        },
         id: chartUuid,
-        viewRange,
       }))
     }
   }, [attributes, chartDetails, chartSettings, chartUuid, chartWidth, dispatch, globalPanAndZoom,
     hasLegend, hasPortalNodeBeenStyled, initialAfter, initialBefore, isGlobalPanAndZoomMaster,
-    portalNode, shouldFetch])
+    isRemotelyControlled, portalNode, shouldFetch])
 
   // todo omit this for Cloud/Main Agent app
   useLayoutEffect(() => {
@@ -185,6 +195,7 @@ export const ChartContainer = ({
       chartDetails={chartDetails}
       chartUuid={chartUuid}
       chartWidth={chartWidth}
+      isRemotelyControlled={fetchDataParams.isRemotelyControlled}
     />
   )
 }

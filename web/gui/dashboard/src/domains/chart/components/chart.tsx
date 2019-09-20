@@ -18,7 +18,6 @@ import { ChartLegend } from "./chart-legend"
 import { LegendToolbox } from "./legend-toolbox"
 import { ResizeHandler } from "./resize-handler"
 import { AbstractChart } from "./abstract-chart"
-import { useFormatters } from "../utils/formatters"
 
 interface Props {
   chartData: ChartData
@@ -26,17 +25,19 @@ interface Props {
   chartUuid: string
   chartWidth: number
   attributes: Attributes
+  isRemotelyControlled: boolean
 }
 
 export const Chart = ({
+  attributes,
+  attributes: {
+    chartLibrary,
+  },
   chartData,
   chartDetails,
   chartUuid,
   chartWidth,
-  attributes: {
-    chartLibrary,
-  },
-  attributes,
+  isRemotelyControlled,
 }: Props) => {
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
@@ -135,6 +136,7 @@ export const Chart = ({
         chartUuid={chartUuid}
         chartWidth={chartWidth}
         dimensionsVisibility={dimensionsVisibility}
+        isRemotelyControlled={isRemotelyControlled}
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
         hoveredX={hoveredX}

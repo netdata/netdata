@@ -23,5 +23,10 @@ export const selectChartDetails = createSelector(
 
 export const selectChartViewRange = createSelector(
   selectSingleChartState,
-  (chartState) => chartState.viewRange,
+  (chartState) => chartState.fetchDataParams.viewRange,
+)
+
+export const selectChartFetchDataParams = createSelector(
+  selectSingleChartState,
+  (chartState) => chartState.fetchDataParams,
 )

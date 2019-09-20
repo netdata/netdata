@@ -10,7 +10,7 @@ function* fetchDataSaga({ payload }: FetchDataSaga) {
     // props for api
     chart, format, points, group, gtime, options, after, before,
     // props for the store
-    id, viewRange,
+    fetchDataParams, id,
   } = payload
   let response
   try {
@@ -35,8 +35,8 @@ function* fetchDataSaga({ payload }: FetchDataSaga) {
   // todo do xss check of data
   yield put(fetchDataAction.success({
     chartData: response.data,
+    fetchDataParams,
     id,
-    viewRange,
   }))
 }
 
