@@ -35,7 +35,6 @@
 #define NETDATA_CHART_PRIO_SYSTEM_PGPGIO               151
 #define NETDATA_CHART_PRIO_SYSTEM_RAM                  200
 #define NETDATA_CHART_PRIO_SYSTEM_SWAP                 201
-#define NETDATA_CHART_PRIO_SYSTEM_MEMFRAG              220
 #define NETDATA_CHART_PRIO_SYSTEM_SWAPIO               250
 #define NETDATA_CHART_PRIO_SYSTEM_NET                  500
 #define NETDATA_CHART_PRIO_SYSTEM_IPV4                 500 // freebsd only

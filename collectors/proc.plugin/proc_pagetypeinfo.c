@@ -208,7 +208,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 , "B"
                 , PLUGIN_PROC_NAME
                 , PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
-                , NETDATA_CHART_PRIO_SYSTEM_MEMFRAG
+                , NETDATA_CHART_PRIO_MEM_PAGEFRAG
                 , update_every
                 , RRDSET_TYPE_STACKED
             );
@@ -259,7 +259,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                     , "B"
                     , PLUGIN_PROC_NAME
                     , PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME
-                    , NETDATA_CHART_PRIO_MEM_PAGEFRAG + p
+                    , NETDATA_CHART_PRIO_MEM_PAGEFRAG + 1 + p
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
