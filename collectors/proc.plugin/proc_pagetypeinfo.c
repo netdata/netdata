@@ -21,10 +21,6 @@
 // Defined in include/linux/mmzone.h as MIGRATE_TYPES (last enum of migratetype)
 #define MAX_PAGETYPE  7
 
-// Defined as 2^CONFIG_cnt_nodes_SHIFT. We'll use 16 for now (8 max * 2 as margin):
-// - Up to 4 Intel Xeon, each with SNC (x2) = 8 cnt_nodes.
-// - Up to 2 AMD  EPYC, each with 4 CPUs = 8 cnt_nodes.
-#define MAX_NUMA_cnt_nodes 16
 
 //
 // /proc/pagetypeinfo is declared in mm/vmstat.c :: init_mm_internals
@@ -284,7 +280,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     }
 
     if(unlikely(!cnt_nodes)) {
-        error("PLUGIN: PROC_PAGETPEINFO: Cannot find the number of CPUs in %s", PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
+        error("PLUGIN: PROC_PAGETPEINFO: Cannot find the number of NUMA Nodes in %s", PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
         return 1;
     }
 
@@ -336,10 +332,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     if (do_detail) {
         for (p = 0; p < pagelines_cnt; p++) {
             // Skip empty graphs
-            if (!st_nodezonetype[p]) {
-                error("Skipping line %lu", p);
+            if (!st_nodezonetype[p])
                 continue;
-            }
 
             rrdset_next(st_nodezonetype[p]);
             for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
