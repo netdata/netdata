@@ -457,6 +457,18 @@ export const DygraphChart = ({
                 before: sortedRange[1],
                 masterID: chartUuid,
               })
+              dygraphHighlightAfter.current = null
+              // eslint-disable-next-line no-param-reassign
+              context.isZooming = false
+
+              // old dashboard code
+              // @ts-ignore
+              // eslint-disable-next-line no-underscore-dangle
+              dygraph.clearZoomRect_()
+              // this call probably fixes the broken selection circle during highlighting
+              // @ts-ignore
+              // eslint-disable-next-line no-underscore-dangle
+              dygraph.drawGraph_(false)
 
             } else if (context.isPanning) {
               latestIsUserAction.current = true
