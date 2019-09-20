@@ -55,9 +55,9 @@ echo "---- UPDATE VERSION FILE ----"
 echo "$GIT_TAG" >packaging/version
 git add packaging/version
 
-#echo "---- GENERATE CHANGELOG -----"
-#./.travis/generate_changelog_for_release.sh
-#git add CHANGELOG.md
+echo "---- GENERATE CHANGELOG -----"
+./.travis/generate_changelog_for_release.sh
+git add CHANGELOG.md
 
 echo "---- COMMIT AND PUSH CHANGES ----"
 git commit -m "[ci skip] release $GIT_TAG" --author "${GIT_USER} <${GIT_MAIL}>"
