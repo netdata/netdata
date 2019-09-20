@@ -24,7 +24,7 @@ export const setGlobalSelectionAction = createAction<SetGlobalSelectionAction>(
 interface SetGlobalPanAndZoomAction {
   after: number
   before: number
-  masterID: string
+  masterID?: string
 }
 export const setGlobalPanAndZoomAction = createAction<SetGlobalPanAndZoomAction>(
   `${storeKey}/setGlobalPanAndZoom`,

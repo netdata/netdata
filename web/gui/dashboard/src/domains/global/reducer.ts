@@ -25,7 +25,7 @@ export type StateT = {
   globalPanAndZoom: null | {
     after: number
     before: number
-    masterID: string
+    masterID?: string
   }
   globalChartUnderlay: null | {
     after: number

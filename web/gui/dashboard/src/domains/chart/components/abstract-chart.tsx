@@ -131,7 +131,8 @@ export const AbstractChart = ({
     dispatch(setGlobalChartUnderlayAction({ after, before, masterID }))
 
     // freeze charts
-    dispatch(setGlobalPanAndZoomAction({ after: viewAfter, before: viewBefore, masterID }))
+    // don't send masterID, so no padding is applied
+    dispatch(setGlobalPanAndZoomAction({ after: viewAfter, before: viewBefore }))
   }, [dispatch, viewAfter, viewBefore])
 
 
