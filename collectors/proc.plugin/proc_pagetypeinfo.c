@@ -206,7 +206,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         // Init the RRD graphs
 
         // Per-Order: sum of all node, zone, type Grouped by order
-        if (do_global == CONFIG_BOOLEAN_YES) {
+        if (do_global != CONFIG_BOOLEAN_NO) {
             st_order = rrdset_create_localhost(
                 "mem"
                 , "pagetype_global"
