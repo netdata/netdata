@@ -2,8 +2,6 @@
 
 #include "plugin_proc.h"
 
-// For PAGE_SIZE
-#include <sys/user.h>
 // For ULONG_MAX
 #include <limits.h>
 
@@ -50,10 +48,10 @@ struct systemorder {
 
 
 
-static inline uint64_t pageline_total_size(struct pageline *p) {
+static inline uint64_t pageline_total_size(struct pageline *p, long pagesize) {
     uint64_t sum = 0, o;
     for (o=0; o<MAX_PAGETYPE_ORDER; o++)
-        sum += p->free_pages_size[o] * (o+1) * PAGE_SIZE;
+        sum += p->free_pages_size[o] * (o+1) * pagesize;
     return sum;
 }
 
@@ -69,7 +67,7 @@ static inline uint64_t pageline_total_count(struct pageline *p) {
 #define pagetypeinfo_line_valid(ff, l) (strncmp(procfile_lineword(ff, l, 0), "Node", 4) == 0 && strncmp(procfile_lineword(ff, l, 4), "type", 4) == 0)
 
 // Dimension name from the order
-#define dim_name(s, o) (snprintfz(s, 16,"%luKB (%lu)", (1 << o) * PAGE_SIZE / 1024, o))
+#define dim_name(s, o, pagesize) (snprintfz(s, 16,"%luKB (%lu)", (1 << o) * pagesize / 1024, o))
 
 int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     (void)dt;
@@ -83,6 +81,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     static struct systemorder systemorders[MAX_PAGETYPE_ORDER] = {};
     static struct pageline* pagelines = NULL;
     static size_t pagelines_cnt = -1, lines = -1;
+    static long pagesize = 0;
 
     // Handle
     static procfile *ff = NULL;
@@ -96,7 +95,11 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     struct pageline *pgl = NULL;
 
     // --------------------------------------------------------------------
-    // Startup: Open /proc/pagetypeinfo
+    // Startup: Init arch and open /proc/pagetypeinfo
+    if (unlikely(!pagesize)) {
+        pagesize = sysconf(_SC_PAGESIZE);
+    }
+
     if(unlikely(!ff)) {
         ff = procfile_open(PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, " \t,", PROCFILE_FLAG_DEFAULT);
     }
@@ -217,9 +220,9 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 snprintfz(id, 3, "%lu", o);
 
                 char name[20+1];
-                dim_name(name, o);
+                dim_name(name, o, pagesize);
 
-                systemorders[o].rd = rrddim_add(st_order, id, name, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
+                systemorders[o].rd = rrddim_add(st_order, id, name, pagesize, 1, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
             }
         }
@@ -267,9 +270,9 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 char dimid[3+1];
                 snprintfz(dimid, 3, "%lu", o);
                 char dimname[20+1];
-                dim_name(dimname, o);
+                dim_name(dimname, o, pagesize);
 
-                pgl->rd[o] = rrddim_add(st_nodezonetype[p], dimid, dimname, PAGE_SIZE, 1, RRD_ALGORITHM_ABSOLUTE);
+                pgl->rd[o] = rrddim_add(st_nodezonetype[p], dimid, dimname, pagesize, 1, RRD_ALGORITHM_ABSOLUTE);
             }
         }
     }
