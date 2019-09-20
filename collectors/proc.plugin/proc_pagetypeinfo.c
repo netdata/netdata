@@ -101,7 +101,13 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     }
 
     if(unlikely(!ff)) {
-        ff = procfile_open(PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, " \t,", PROCFILE_FLAG_DEFAULT);
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+
+        if(unlikely(!ff)) {
+            ff = procfile_open(PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, " \t,", PROCFILE_FLAG_DEFAULT);
+        }
     }
     if(unlikely(!ff))
         return 1;
