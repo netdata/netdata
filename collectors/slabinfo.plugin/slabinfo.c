@@ -3,9 +3,6 @@
 #include "libnetdata/libnetdata.h"
 #include "daemon/common.h"
 
-// For PAGE_SIZE
-#include <sys/user.h>
-
 #define PLUGIN_SLABINFO_NAME "slabinfo.plugin"
 #define PLUGIN_SLABINFO_PROCFILE "/proc/slabinfo"
 
@@ -170,6 +167,12 @@ struct slabinfo *read_file_slabinfo() {
     slabdebug("-> Reading procfile %s", PLUGIN_SLABINFO_PROCFILE);
 
     static procfile *ff = NULL;
+	static long slab_pagesize = 0;
+
+	if (unlikely(!slab_pagesize)) {
+		slab_pagesize = sysconf(_SC_PAGESIZE);
+		slabdebug("   Discovered pagesize: %ld", slab_pagesize);
+	}
 
     if(unlikely(!ff)) {
         ff = procfile_reopen(ff, PLUGIN_SLABINFO_PROCFILE, " ,:" , PROCFILE_FLAG_DEFAULT);
@@ -213,7 +216,7 @@ struct slabinfo *read_file_slabinfo() {
         s->data_num_slabs    = str2uint64_t(procfile_lineword(ff, l, 12));
         s->data_shared_avail = str2uint64_t(procfile_lineword(ff, l, 13));
 
-        uint32_t memperslab = s->pages_per_slab * SLAB_PAGE_SIZE;
+        uint32_t memperslab = s->pages_per_slab * slab_pagesize;
         // Internal fragmentation: loss per slab, due to objects not being a multiple of pagesize
         //uint32_t lossperslab = memperslab - s->obj_per_slab * s->obj_size;
 
