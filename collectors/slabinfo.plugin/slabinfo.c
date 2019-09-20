@@ -10,10 +10,6 @@
 #define CHART_FAMILY "slab"
 #define CHART_PRIO 3000
 
-// As we're talking about kernel-pagesize, there's no hugepage.
-// So it's reliable to use it as an arch constant
-#define SLAB_PAGE_SIZE PAGE_SIZE
-
 // #define slabdebug(...) if (debug) { fprintf(stderr, __VA_ARGS__); }
 #define slabdebug(args...) if (debug) { \
     fprintf(stderr, "slabinfo.plugin DEBUG (%04d@%-10.10s:%-15.15s)::", __LINE__, __FILE__, __FUNCTION__); \
