@@ -235,6 +235,7 @@ interface Props {
   dimensionsVisibility: boolean[]
   isRemotelyControlled: boolean
   legendFormatValue: ((v: number) => number | string) | undefined
+  onUpdateChartPanAndZoom: (arg: { after: number, before: number, masterID: string }) => void
   orderedColors: string[]
 
   hoveredX: number | null
@@ -242,7 +243,6 @@ interface Props {
   setHoveredX: (hoveredX: number | null) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
-  updateChartPanAndZoom: (arg: { after: number, before: number, masterID: string }) => void
 }
 export const DygraphChart = ({
   attributes,
@@ -254,6 +254,7 @@ export const DygraphChart = ({
   dimensionsVisibility,
   isRemotelyControlled,
   legendFormatValue,
+  onUpdateChartPanAndZoom,
   orderedColors,
 
   hoveredX,
@@ -261,7 +262,6 @@ export const DygraphChart = ({
   setHoveredX,
   setMinMax,
   unitsCurrent,
-  updateChartPanAndZoom,
 }: Props) => {
   // setGlobalChartUnderlay is using state from closure (chartData.after), so we need to have always
   // the newest callback. Unfortunately we cannot use Dygraph.updateOptions() (library restriction)
@@ -283,12 +283,12 @@ export const DygraphChart = ({
   const [dygraphInstance, setDygraphInstance] = useState<Dygraph | null>(null)
 
   const updateChartPanOrZoom = useCallback(({ after, before }) => {
-    updateChartPanAndZoom({
+    onUpdateChartPanAndZoom({
       after,
       before,
       masterID: chartUuid,
     })
-  }, [chartUuid, updateChartPanAndZoom])
+  }, [chartUuid, onUpdateChartPanAndZoom])
   const globalChartUnderlay = useSelector(selectGlobalChartUnderlay)
 
   // state.tmp.dygraph_user_action in old dashboard

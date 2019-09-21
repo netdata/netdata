@@ -4,10 +4,15 @@ import React, {
 } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
-import { requestCommonColorsAction, setGlobalSelectionAction } from "domains/global/actions"
+import {
+  requestCommonColorsAction,
+  setGlobalPanAndZoomAction,
+  setGlobalSelectionAction,
+} from "domains/global/actions"
 import { createSelectAssignedColors, selectGlobalSelection } from "domains/global/selectors"
 import { AppStateT } from "store/app-state"
 
+import { getPanAndZoomStep } from "../utils/get-pan-and-zoom-step"
 import { Attributes } from "../utils/transformDataAttributes"
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { useFormatters } from "../utils/formatters"
@@ -113,6 +118,77 @@ export const Chart = ({
     ? Math.min(chartData.before * 1000, viewRange[1])
     : chartData.before * 1000 // when 'before' is 0 or negative
 
+
+  // old dashboard persists min duration based on first chartWidth, i assume it's a bug
+  // and will update fixedMinDuration when width changes
+  const fixedMinDuration = useMemo(() => (
+    Math.round((chartWidth / 30) * chartDetails.update_every * 1000)
+  ), [chartDetails.update_every, chartWidth])
+
+  const handleUpdateChartPanAndZoom = useCallback(({ after, before, callback }) => {
+    if (before < after) {
+      return
+    }
+    let minDuration = fixedMinDuration
+
+    const currentDuraton = Math.round(viewBefore - viewAfter)
+
+    let afterForced = Math.round(after)
+    let beforeForced = Math.round(before)
+    const viewUpdateEvery = chartData.view_update_every * 1000
+
+    // align them to update_every
+    // stretching them further away
+    afterForced -= afterForced % (viewUpdateEvery)
+    beforeForced += viewUpdateEvery - (beforeForced % viewUpdateEvery)
+
+    // the final wanted duration
+    let wantedDuration = beforeForced - afterForced
+
+    // to allow panning, accept just a point below our minimum
+    if ((currentDuraton - viewUpdateEvery) < minDuration) {
+      minDuration = currentDuraton - viewUpdateEvery
+    }
+
+    // we do it, but we adjust to minimum size and return false
+    // when the wanted size is below the current and the minimum
+    // and we zoom
+    let doCallback = true
+    if (wantedDuration < currentDuraton && wantedDuration < minDuration) {
+      minDuration = fixedMinDuration
+
+      const dt = (minDuration - wantedDuration) / 2
+      beforeForced += dt
+      afterForced -= dt
+      wantedDuration = beforeForced - afterForced
+      doCallback = false
+    }
+
+    const tolerance = viewUpdateEvery * 2
+    const movement = Math.abs(beforeForced - viewBefore)
+
+    if (
+      Math.abs(currentDuraton - wantedDuration) <= tolerance && movement <= tolerance && doCallback
+    ) {
+      return
+    }
+
+    // todo support force_update_at in some way
+    // this.current.force_update_at = Date.now() +
+    // window.NETDATA.options.current.pan_and_zoom_delay;
+    // this.current.force_after_ms = after;
+    // this.current.force_before_ms = before;
+    dispatch(setGlobalPanAndZoomAction({
+      after: afterForced,
+      before: beforeForced,
+      masterID: chartUuid,
+    }))
+
+    if (doCallback && typeof callback === "function") {
+      callback()
+    }
+  }, [chartData.view_update_every, chartUuid, dispatch, fixedMinDuration, viewAfter, viewBefore])
+
   const selectAssignedColors = createSelectAssignedColors({
     chartContext: chartDetails.context,
     chartUuid,
@@ -134,8 +210,8 @@ export const Chart = ({
         chartLibrary={chartLibrary}
         colors={colors}
         chartUuid={chartUuid}
-        chartWidth={chartWidth}
         dimensionsVisibility={dimensionsVisibility}
+        onUpdateChartPanAndZoom={handleUpdateChartPanAndZoom}
         isRemotelyControlled={isRemotelyControlled}
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
