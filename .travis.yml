@@ -53,8 +53,7 @@ stages:
 
     # Nightly operations
   - name: Nightly operations
-    #if: branch = master AND type = cron
-    if: branch =fix-coverity-toolkit
+    if: branch = master AND type = cron
   - name: Nightly release
     if: branch = master AND type = cron
 
