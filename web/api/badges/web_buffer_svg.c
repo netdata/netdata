@@ -696,7 +696,8 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             , label_color_escaped[COLOR_STRING_SIZE + 1]
             , value_color_escaped[COLOR_STRING_SIZE + 1];
 
-    double label_width = fixed_width_lbl, value_width = fixed_width_val, total_width, height = 20.0, font_size = 11.0, text_offset = 5.8, round_corner = 3.0;
+    double label_width = (double)fixed_width_lbl, value_width = (double)fixed_width_val, total_width;
+    double height = 20.0, font_size = 11.0, text_offset = 5.8, round_corner = 3.0;
 
     if(scale < 100) scale = 100;
 
