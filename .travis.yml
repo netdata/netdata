@@ -414,7 +414,7 @@ jobs:
 
       name: "Build & Publish RPM package for Enterprise Linux 7"
       <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) RPM( Enterprise Linux)?\]/
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
