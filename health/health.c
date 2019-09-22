@@ -51,7 +51,7 @@ void health_silencers_init(void) {
         off_t length = (off_t) ftell(fd);
         fseek(fd, 0 , SEEK_SET);
 
-        if (length && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
+        if (length > 0 && length < HEALTH_SILENCERS_MAX_FILE_LEN) {
             char *str = mallocz((length+1)* sizeof(char));
             if(str) {
                 size_t copied;
