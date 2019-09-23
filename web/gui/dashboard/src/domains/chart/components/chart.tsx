@@ -189,6 +189,61 @@ export const Chart = ({
     }
   }, [chartData.view_update_every, chartUuid, dispatch, fixedMinDuration, viewAfter, viewBefore])
 
+
+  /**
+   * toolbox handlers
+   */
+  const netdataFirst = chartData.first_entry * 1000
+  const netdataLast = chartData.last_entry * 1000
+
+  const handleToolBoxPanAndZoom = useCallback((after: number, before: number) => {
+    const newAfter = Math.max(after, netdataFirst)
+    const newBefore = Math.min(before, netdataLast)
+    handleUpdateChartPanAndZoom({
+      after: newAfter,
+      before: newBefore,
+      masterId: chartUuid,
+      shouldForceTimeRange: true,
+    })
+  }, [chartUuid, handleUpdateChartPanAndZoom, netdataFirst, netdataLast])
+
+  const handleToolboxLeftClick = useCallback((event: React.MouseEvent) => {
+    const step = (viewBefore - viewAfter) * getPanAndZoomStep(event)
+    const newBefore = viewBefore - step
+    const newAfter = viewAfter - step
+    if (newAfter >= netdataFirst) {
+      handleToolBoxPanAndZoom(newAfter, newBefore)
+    }
+  }, [handleToolBoxPanAndZoom, netdataFirst, viewAfter, viewBefore])
+
+  const handleToolboxRightClick = useCallback((event: React.MouseEvent) => {
+    const step = (viewBefore - viewAfter) * getPanAndZoomStep(event)
+    const newBefore = viewBefore + step
+    const newAfter = viewAfter + step
+    if (newBefore <= netdataLast) {
+      handleToolBoxPanAndZoom(newAfter, newBefore)
+    }
+  }, [handleToolBoxPanAndZoom, netdataLast, viewAfter, viewBefore])
+
+  const handleToolboxZoomInClick = useCallback((event: React.MouseEvent) => {
+    const dt = (viewBefore - viewAfter) * getPanAndZoomStep(event) * 0.8 / 2
+    const newAfter = viewAfter + dt
+    const newBefore = viewBefore - dt
+    handleToolBoxPanAndZoom(newAfter, newBefore)
+  }, [handleToolBoxPanAndZoom, viewAfter, viewBefore])
+
+  const handleToolboxZoomOutClick = useCallback((event: React.MouseEvent) => {
+    const dt = ((viewBefore - viewAfter) / (1.0 - (getPanAndZoomStep(event) * 0.8))
+      - (viewBefore - viewAfter)) / 2
+    const newAfter = viewAfter - dt;
+    const newBefore = viewBefore + dt
+    handleToolBoxPanAndZoom(newAfter, newBefore)
+  }, [handleToolBoxPanAndZoom, viewAfter, viewBefore])
+
+
+  /**
+   * assign colors
+   */
   const selectAssignedColors = createSelectAssignedColors({
     chartContext: chartDetails.context,
     chartUuid,
@@ -238,7 +293,13 @@ export const Chart = ({
         />
       )}
       {shouldDisplayToolbox && (
-        <LegendToolbox />
+        <LegendToolbox
+          onToolboxLeftClick={handleToolboxLeftClick}
+          onToolboxResetClick={() => {}}
+          onToolboxRightClick={handleToolboxRightClick}
+          onToolboxZoomInClick={handleToolboxZoomInClick}
+          onToolboxZoomOutClick={handleToolboxZoomOutClick}
+        />
       )}
       {window.NETDATA.options.current.resize_charts && (
         <ResizeHandler />
