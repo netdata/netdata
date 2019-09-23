@@ -26,6 +26,7 @@ export type StateT = {
     after: number
     before: number
     masterID?: string
+    shouldForceTimeRange?: boolean
   }
   globalChartUnderlay: null | {
     after: number
@@ -150,12 +151,15 @@ globalReducer.on(setGlobalSelectionAction, (state, { chartUuid, hoveredX }) => (
   currentSelectionMasterId: chartUuid,
 }))
 
-globalReducer.on(setGlobalPanAndZoomAction, (state, { after, before, masterID }) => ({
+globalReducer.on(setGlobalPanAndZoomAction, (state, {
+  after, before, masterID, shouldForceTimeRange,
+}) => ({
   ...state,
   globalPanAndZoom: {
     after,
     before,
     masterID,
+    shouldForceTimeRange,
   },
 }))
 

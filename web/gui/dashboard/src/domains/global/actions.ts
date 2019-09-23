@@ -25,6 +25,7 @@ interface SetGlobalPanAndZoomAction {
   after: number
   before: number
   masterID?: string
+  shouldForceTimeRange?: boolean
 }
 export const setGlobalPanAndZoomAction = createAction<SetGlobalPanAndZoomAction>(
   `${storeKey}/setGlobalPanAndZoom`,

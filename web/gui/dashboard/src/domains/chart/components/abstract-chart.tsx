@@ -78,6 +78,8 @@ export const AbstractChart = ({
       setHoveredX={setHoveredX}
       setMinMax={setMinMax}
       unitsCurrent={unitsCurrent}
+      viewAfter={viewAfter}
+      viewBefore={viewBefore}
     />
   )
 }

@@ -125,7 +125,13 @@ export const Chart = ({
     Math.round((chartWidth / 30) * chartDetails.update_every * 1000)
   ), [chartDetails.update_every, chartWidth])
 
-  const handleUpdateChartPanAndZoom = useCallback(({ after, before, callback }) => {
+
+  /**
+   * pan-and-zoom handler (both for toolbox and mouse events)
+   */
+  const handleUpdateChartPanAndZoom = useCallback(({
+    after, before, callback, shouldForceTimeRange,
+  }) => {
     if (before < after) {
       return
     }
@@ -173,15 +179,11 @@ export const Chart = ({
       return
     }
 
-    // todo support force_update_at in some way
-    // this.current.force_update_at = Date.now() +
-    // window.NETDATA.options.current.pan_and_zoom_delay;
-    // this.current.force_after_ms = after;
-    // this.current.force_before_ms = before;
     dispatch(setGlobalPanAndZoomAction({
       after: afterForced,
       before: beforeForced,
       masterID: chartUuid,
+      shouldForceTimeRange,
     }))
 
     if (doCallback && typeof callback === "function") {

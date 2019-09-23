@@ -243,6 +243,8 @@ interface Props {
   setHoveredX: (hoveredX: number | null) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
+  viewAfter: number
+  viewBefore: number
 }
 export const DygraphChart = ({
   attributes,
@@ -262,6 +264,8 @@ export const DygraphChart = ({
   setHoveredX,
   setMinMax,
   unitsCurrent,
+  viewAfter,
+  viewBefore
 }: Props) => {
   // setGlobalChartUnderlay is using state from closure (chartData.after), so we need to have always
   // the newest callback. Unfortunately we cannot use Dygraph.updateOptions() (library restriction)
@@ -555,17 +559,21 @@ export const DygraphChart = ({
   useLayoutEffect(() => {
     if (dygraphInstance) {
       // todo support state.tmp.dygraph_force_zoom
-      const optionsDateWindow = isRemotelyControlled ? { dateWindow: null } : {}
+      const forceDateWindow = [ viewAfter, viewBefore ]
 
-      // ts accepts undefined (instead of null) as dateWindow. In old dashboard there was null
-      // and i'm not sure if Dygraph will treat it the same way as undefined
-      // @ts-ignore
+      // in old dashboard, when chart needed to reset internal dateWindow state,
+      // dateWindow was set to null, and new dygraph got the new dateWindow from results.
+      // this caused small unsync between dateWindow of parent (master) and child charts
+      // i also detected that forceDateWindow timestamps have slightly better performance (10%)
+      // so if the chart needs to change local dateWindow, we'll always use timestamps
+      const optionsDateWindow = isRemotelyControlled ? { dateWindow: forceDateWindow } : {}
+
       dygraphInstance.updateOptions({
         ...optionsDateWindow,
         file: chartData.result.data,
       })
     }
-  }, [chartData.result.data, dygraphInstance, isRemotelyControlled])
+  }, [chartData.result.data, dygraphInstance, isRemotelyControlled, viewAfter, viewBefore])
 
 
   // set selection

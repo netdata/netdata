@@ -70,7 +70,8 @@ export const ChartContainer = ({
   // todo local state option
   const globalPanAndZoom = useSelector(selectGlobalPanAndZoom)
   const isGlobalPanAndZoomMaster = !!globalPanAndZoom && globalPanAndZoom.masterID === chartUuid
-  const isRemotelyControlled = !!globalPanAndZoom && !isGlobalPanAndZoomMaster
+  const isRemotelyControlled = !!globalPanAndZoom
+    && (!isGlobalPanAndZoomMaster || !!globalPanAndZoom.shouldForceTimeRange)
   const fetchDataParams = useSelector((state: AppStateT) => selectChartFetchDataParams(
     state, { id: chartUuid },
   ))

@@ -6,3 +6,10 @@ export declare class NetdataDygraph extends Dygraph {
    */
   yAxisExtremes(): [[number, number]];
 }
+
+export interface DygraphArea {
+  x: number
+  y: number
+  w: number
+  h: number
+}
