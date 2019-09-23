@@ -2,7 +2,7 @@ import React from "react"
 import classNames from "classnames"
 
 // todo add supoort for window.netdataIcons
-type IconType = "left" | "reset" | "right" | "zoomIn" | "zoomOut" | "resize" | "lineChart"
+export type IconType = "left" | "reset" | "right" | "zoomIn" | "zoomOut" | "resize" | "lineChart"
   | "areaChart" | "noChart" | "loading" | "noData"
 const typeToClassName = (iconType: IconType) => ({
   left: "fa-backward",

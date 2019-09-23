@@ -1,0 +1,19 @@
+.netdata-reset-button {
+  padding: 0;
+  border: none;
+  font: inherit;
+  color: inherit;
+  background-color: transparent;
+  /* show a hand cursor on hover; some argue that we
+  should keep the default arrow cursor for buttons */
+  cursor: pointer;
+}
+
+.netdata-reset-button:focus {
+  outline: none;
+}
+
+/* Firefox: remove the inner border shown on focus */
+.netdata-reset-button::-moz-focus-inner {
+  border: none;
+}
