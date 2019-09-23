@@ -72,7 +72,6 @@ dist_noinst_DATA= \
 # should be proper init.d/openrc/systemd usable
 dist_noinst_SCRIPTS= \
 	coverity-scan.sh \
-	coverity-install.sh \
 	packaging/installer/netdata-updater.sh \
 	packaging/installer/netdata-uninstaller.sh \
 	packaging/installer/kickstart.sh \
@@ -236,6 +235,11 @@ NFACCT_PLUGIN_FILES = \
 	collectors/nfacct.plugin/plugin_nfacct.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
+
+SLABINFO_PLUGIN_FILES = \
+	collectors/slabinfo.plugin/slabinfo.c \
+	$(LIBNETDATA_FILES)
+	$(NULL)
 
 XENSTAT_PLUGIN_FILES = \
     collectors/xenstat.plugin/xenstat_plugin.c \
@@ -597,6 +601,14 @@ if ENABLE_PLUGIN_PERF
     plugins_PROGRAMS += perf.plugin
     perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
     perf_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_SLABINFO
+    plugins_PROGRAMS += slabinfo.plugin
+    slabinfo_plugin_SOURCES = $(SLABINFO_PLUGIN_FILES)
+    slabinfo_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif

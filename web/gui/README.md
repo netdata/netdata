@@ -7,7 +7,7 @@ toolkit. You've probably seen it before:
 dashboard](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
 Learn more about how dashboards work and how they're populated using the
-`dashboards.js` file in our [web dashboards overview](../README.md).
+`dashboards.js` file in our [web dashboards overview](../).
 
 By default, Netdata starts a web server for its dashboard at port `19999`. Open
 up your web browser of choice and navigate to `http://SERVER-IP:19999`, or
@@ -34,8 +34,8 @@ dashboard](https://user-images.githubusercontent.com/1153921/62810777-ef681980-b
 
 Netdata is broken up into multiple **sections**, such as **System Overview**,
 **CPU**, **Disk**, and more. Inside each section you'll find a number of charts,
-broken down into [contexts](../README.md#contexts) and
-[families](../README.md#families).
+broken down into [contexts](../#contexts) and
+[families](../#families).
 
 An example of the **Memory** section on a Linux desktop system.
 
@@ -56,7 +56,7 @@ associated with.
 menu](https://user-images.githubusercontent.com/1153921/62811361-38b96880-bab6-11e9-8d41-4d9b29778e86.png)
 
 Most menu items will contain several **submenu** entries, which represent any
-[families](../README.md#families) from that section. Netdata automatically
+[families](../#families) from that section. Netdata automatically
 generates these submenu entries.
 
 Here's a **Disks** menu with several submenu entries for each disk drive and
@@ -129,11 +129,11 @@ Edit the file with your customizations. For example:
 
 ```javascript
 customDashboard.menu = {
-  'system': {
-    title: 'Testing, testing, 1 2 3',
+  system: {
+    title: "Testing, testing, 1 2 3",
     icon: '<i class="fas fa-thumbs-up"></i>',
-    info: 'This is overwritten info for the system overview section!'
-  },
+    info: "This is overwritten info for the system overview section!"
+  }
 };
 ```
 
@@ -156,4 +156,4 @@ file](https://user-images.githubusercontent.com/1153921/62798924-570e6c80-ba94-1
 For information on creating custom dashboards from scratch, see the [custom
 dashboards](custom/) or [Atlassian Confluence dashboards](confluence/) guides.
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fgui%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fweb%2Fgui%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)]()

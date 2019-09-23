@@ -995,20 +995,102 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
 }
 #endif
 
+/*
+ * ---------------------------------------------------------------------------------------------------------------------
+ * connection_allowed() - if there is an access list then check the connection matches a pattern.
+ *                        Numeric patterns are checked against the IP address first, only if they
+ *                        do not match is the hostname resolved (reverse-DNS) and checked. If the
+ *                        hostname matches then we perform forward DNS resolution to check the IP
+ *                        is really associated with the DNS record. This call is repeatable: the
+ *                        web server may check more refined matches against the connection. Will
+ *                        update the client_host if uninitialized - ensure the hostsize is the number
+ *                        of *writable* bytes (i.e. be aware of the strdup used to compact the pollinfo).
+ */
+extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
+                              const char *patname) {
+    if (!access_list)
+        return 1;
+    if (simple_pattern_matches(access_list, client_ip))
+        return 1;
+    // If the hostname is unresolved (and needed) then attempt the DNS lookups.
+    if (client_host[0]==0)
+    {
+        struct sockaddr_storage sadr;
+        socklen_t addrlen = sizeof(sadr);
+        int err = getpeername(fd, (struct sockaddr*)&sadr, &addrlen);
+        if (err != 0 ||
+            (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
+                              NULL, 0, NI_NAMEREQD)) != 0) {
+            error("Incoming connection on '%s' does not match a numeric pattern, "
+                  "and host could not be resolved (err=%s)", client_ip, gai_strerror(err));
+            if (hostsize >= 8)
+                strcpy(client_host,"UNKNOWN");
+            return 0;
+        }
+        struct addrinfo *addr_infos = NULL;
+        if (getaddrinfo(client_host, NULL, NULL, &addr_infos) !=0 ) {
+            error("LISTENER: cannot validate hostname '%s' from '%s' by resolving it",
+                  client_host, client_ip);
+            if (hostsize >= 8)
+                strcpy(client_host,"UNKNOWN");
+            return 0;
+        }
+        struct addrinfo *scan = addr_infos;
+        int    validated = 0;
+        while (scan) {
+            char address[INET6_ADDRSTRLEN];
+            address[0] = 0;
+            switch (scan->ai_addr->sa_family) {
+                case AF_INET:
+                    inet_ntop(AF_INET, &((struct sockaddr_in*)(scan->ai_addr))->sin_addr, address, INET6_ADDRSTRLEN);
+                    break;
+                case AF_INET6:
+                    inet_ntop(AF_INET6, &((struct sockaddr_in6*)(scan->ai_addr))->sin6_addr, address, INET6_ADDRSTRLEN);
+                    break;
+            }
+            debug(D_LISTENER, "Incoming ip %s rev-resolved onto %s, validating against forward-resolution %s",
+                  client_ip, client_host, address);
+            if (!strcmp(client_ip, address)) {
+                validated = 1;
+                break;
+            }
+            scan = scan->ai_next;
+        }
+        if (!validated) {
+            error("LISTENER: Cannot validate '%s' as ip of '%s', not listed in DNS", client_ip, client_host);
+            if (hostsize >= 8)
+                strcpy(client_host,"UNKNOWN");
+        }
+        if (addr_infos!=NULL)
+            freeaddrinfo(addr_infos);
+    }
+    if (!simple_pattern_matches(access_list, client_host)) {
+        debug(D_LISTENER, "Incoming connection on '%s' (%s) does not match allowed pattern for %s",
+              client_ip, client_host, patname);
+        return 0;
+    }
+    return 1;
+}
 
 // --------------------------------------------------------------------------------------------------------------------
 // accept_socket() - accept a socket and store client IP and port
 
-int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, SIMPLE_PATTERN *access_list) {
+int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
+                  char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list) {
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
 
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags);
     if (likely(nfd >= 0)) {
-        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize, client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
+        if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
+                        client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
             error("LISTENER: cannot getnameinfo() on received client connection.");
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
+        }
+        if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+            strncpy(client_ip, "localhost", ipsize);
+            client_ip[ipsize - 1] = '\0';
         }
 
 #ifdef __FreeBSD__
@@ -1044,21 +1126,12 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
-
-        if(access_list) {
-            if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
-                strncpy(client_ip, "localhost", ipsize);
-                client_ip[ipsize - 1] = '\0';
-            }
-
-            if(unlikely(!simple_pattern_matches(access_list, client_ip))) {
-                errno = 0;
-                debug(D_LISTENER, "Permission denied for client '%s', port '%s'", client_ip, client_port);
-                error("DENIED ACCESS to client '%s'", client_ip);
-                close(nfd);
-                nfd = -1;
-                errno = EPERM;
-            }
+        if(!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection")) {
+            errno = 0;
+            error("Permission denied for client '%s', port '%s'", client_ip, client_port);
+            close(nfd);
+            nfd = -1;
+            errno = EPERM;
         }
     }
 #ifdef HAVE_ACCEPT4
@@ -1084,6 +1157,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port
+                             , const char *client_host
                              , void *(*add_callback)(POLLINFO * /*pi*/, short int * /*events*/, void * /*data*/)
                              , void  (*del_callback)(POLLINFO * /*pi*/)
                              , int   (*rcv_callback)(POLLINFO * /*pi*/, short int * /*events*/)
@@ -1123,6 +1197,7 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
 
             p->inf[i].client_ip = NULL;
             p->inf[i].client_port = NULL;
+            p->inf[i].client_host = NULL;
             p->inf[i].del_callback = p->del_callback;
             p->inf[i].rcv_callback = p->rcv_callback;
             p->inf[i].snd_callback = p->snd_callback;
@@ -1153,8 +1228,9 @@ inline POLLINFO *poll_add_fd(POLLJOB *p
     pi->port_acl = port_acl;
     pi->flags = flags;
     pi->next = NULL;
-    pi->client_ip = strdupz(client_ip);
+    pi->client_ip   = strdupz(client_ip);
     pi->client_port = strdupz(client_port);
+    pi->client_host = strdupz(client_host);
 
     pi->del_callback = del_callback;
     pi->rcv_callback = rcv_callback;
@@ -1356,13 +1432,16 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 
                     int nfd;
                     do {
-                        char client_ip[NI_MAXHOST + 1];
-                        char client_port[NI_MAXSERV + 1];
-                        client_ip[0] = 0x00;
-                        client_port[0] = 0x00;
+                        char client_ip[INET6_ADDRSTRLEN];
+                        char client_port[NI_MAXSERV];
+                        char client_host[NI_MAXHOST];
+                        client_host[0] = 0;
+                        client_ip[0]   = 0;
+                        client_port[0] = 0;
 
                         debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
-                        nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, NI_MAXHOST + 1, client_port, NI_MAXSERV + 1, p->access_list);
+                        nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, INET6_ADDRSTRLEN, client_port, NI_MAXSERV,
+                                            client_host, NI_MAXHOST, p->access_list);
                         if (unlikely(nfd < 0)) {
                             // accept failed
 
@@ -1387,6 +1466,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
                                         , POLLINFO_FLAG_CLIENT_SOCKET
                                         , client_ip
                                         , client_port
+                                        , client_host
                                         , p->add_callback
                                         , p->del_callback
                                         , p->rcv_callback
@@ -1529,6 +1609,7 @@ void poll_events(LISTEN_SOCKETS *sockets
                                    , sockets->fds_acl_flags[i]
                                    , POLLINFO_FLAG_SERVER_SOCKET
                                    , (sockets->fds_names[i])?sockets->fds_names[i]:"UNKNOWN"
+                                   , ""
                                    , ""
                                    , p.add_callback
                                    , p.del_callback

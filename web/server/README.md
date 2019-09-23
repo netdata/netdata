@@ -79,14 +79,14 @@ Both files must be readable by the `netdata` user. If either of these files do n
 For test purposes, you can generate self-signed certificates with the following command:
 
 ```bash
-$ openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
+openssl req -newkey rsa:2048 -nodes -sha512 -x509 -days 365 -keyout key.pem -out cert.pem
 ```
 
 !!! note
     If you use 4096 bits for your key and the certificate, Netdata will need more CPU to process the communication. `rsa4096` can be up to 4 times slower than `rsa2048`, so we recommend using 2048 bits. You can verify the difference by running:
 
 ```sh
-$ openssl speed rsa2048 rsa4096
+openssl speed rsa2048 rsa4096
 ```
 
 #### TLS/SSL enforcement
@@ -98,11 +98,11 @@ When the certificates are defined and unless any other options are provided, a N
 
 To change this behavior, you need to modify the `bind to` setting in the `[web]` section of `netdata.conf`. At the end of each port definition, you can append `^SSL=force` or `^SSL=optional`. What happens with these settings differs, depending on whether the port is used for HTTP/S requests, or for streaming.
 
-|SSL setting|HTTP requests|HTTPS requests|Unencrypted Streams|Encrypted Streams|
+| SSL setting | HTTP requests|HTTPS requests|Unencrypted Streams|Encrypted Streams|
 |:---------:|:-----------:|:------------:|:-----------------:|:----------------|
-|none|Redirected to HTTPS|Accepted|Accepted|Accepted|
-|`force`|Redirected to HTTPS|Accepted|Denied|Accepted|
-|`optional`|Accepted|Accepted|Accepted|Accepted|
+| none | Redirected to HTTPS|Accepted|Accepted|Accepted|
+| `force`| Redirected to HTTPS|Accepted|Denied|Accepted|
+| `optional`| Accepted|Accepted|Accepted|Accepted|
 
 Example:
 

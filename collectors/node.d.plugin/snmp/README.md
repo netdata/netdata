@@ -96,8 +96,8 @@ In this example:
 
 <details markdown="1"><summary><b>Caution: Counter64 metrics do not support `offset` (issue #5028).</b></summary>
 The SNMP plugin supports Counter64 metrics with the only limitation that the `offset` parameter should not be defined. Due to the way Javascript handles large numbers and the fact that the offset is applied to metrics inside the plugin, the offset will be ignored silently.
-</details> 
-<br>
+</details>
+
 If you need to define many charts using incremental OIDs, you can use something like this:
 
 ```json
@@ -356,8 +356,7 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                 }
             }
         }
-    }
-    ]
+    }],
 }
 ```
 

@@ -11,10 +11,7 @@ know to get the most of out Netdata based on your needs.
 
 ## Access the dashboard
 
-Open up your web browser of choice and navigate to `http://SYSTEM-IP:19999/`, replacing `SYSTEM-IP` with the remote
-system's IP address, or with `localhost` for local installations.
-
-Welcome to Netdata!
+Open up your web browser of choice and navigate to `http://YOUR-HOST:19999`. Welcome to Netdata!
 
 ![Animated GIF of navigating to the
 dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c412-11e9-8f67-8fe182e8b0d2.gif)

@@ -676,7 +676,7 @@ void timer_cb(uv_timer_t* handle)
 /* Flushes dirty pages when timer expires */
 #define TIMER_PERIOD_MS (1000)
 
-#define CMD_BATCH_SIZE (256)
+#define MAX_CMD_BATCH_SIZE (256)
 
 void rrdeng_worker(void* arg)
 {
@@ -687,6 +687,7 @@ void rrdeng_worker(void* arg)
     enum rrdeng_opcode opcode;
     uv_timer_t timer_req;
     struct rrdeng_cmd cmd;
+    unsigned cmd_batch_size;
 
     rrdeng_init_cmd_queue(wc);
 
@@ -723,10 +724,20 @@ void rrdeng_worker(void* arg)
     shutdown = 0;
     while (shutdown == 0 || uv_loop_alive(loop)) {
         uv_run(loop, UV_RUN_DEFAULT);
+
         /* wait for commands */
+        cmd_batch_size = 0;
         do {
+            /*
+             * Avoid starving the loop when there are too many commands coming in.
+             * timer_cb will interrupt the loop again to allow serving more commands.
+             */
+            if (unlikely(cmd_batch_size >= MAX_CMD_BATCH_SIZE))
+                break;
+
             cmd = rrdeng_deq_cmd(wc);
             opcode = cmd.opcode;
+            ++cmd_batch_size;
 
             switch (opcode) {
             case RRDENG_NOOP:

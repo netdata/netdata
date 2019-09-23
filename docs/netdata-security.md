@@ -86,6 +86,41 @@ In Netdata v1.9+ there is also access list support, like this:
 	allow connections from = localhost 10.* 192.168.*
 ```
 
+#### Fine-grainined access control
+
+The access list support allows filtering of all incoming connections, by specific IP addresses, ranges
+or validated DNS lookups. Only connections that match an entry on the list will be allowed:
+
+```
+[web]
+	allow connections from = localhost 192.168.* 1.2.3.4 homeip.net
+```
+
+Connections from the IP addresses are allowed if the connection IP matches one of the patterns given.
+The alias localhost is alway checked against 127.0.0.1, any other symbolic names need to resolve in
+both directions using DNS. In the above example the IP address of `homeip.net` must reverse DNS resolve
+to the incoming IP address and a DNS lookup on `homeip.net` must return the incoming IP address as
+one of the resolved addresses.
+
+More specific control of what each incoming connection can do can be specified through the access control
+list settings:
+
+```
+[web]
+	allow connections from = 160.1.*
+	allow badges from = 160.1.1.2
+	allow streaming from = 160.1.2.*
+	allow management from = control.subnet.ip
+	allow netdata.conf from = updates.subnet.ip
+	allow dashboard from = frontend.subnet.ip
+```
+
+In this example only connections from `160.1.x.x` are allowed, only the specific IP address `160.1.1.2`
+can access badges, only IP addresses in the smaller range `160.1.2.x` can stream data. The three
+hostnames shown can access specific features, this assumes that DNS is setup to resolve these names
+to IP addresses within the `160.1.x.x` range and that reverse DNS is setup for these hosts.
+
+
 #### Use an authenticating web server in proxy mode
 
 Use one web server to provide authentication in front of **all your Netdata servers**. So, you will be accessing all your Netdata with URLs like `http://{HOST}/netdata/{NETDATA_HOSTNAME}/` and authentication will be shared among all of them (you will sign-in once for all your servers). Instructions are provided on how to set the proxy configuration to have Netdata run behind [nginx](Running-behind-nginx.md), [Apache](Running-behind-apache.md), [lighthttpd](Running-behind-lighttpd.md#netdata-via-lighttpd-v14x) and [Caddy](Running-behind-caddy.md#netdata-via-caddy).

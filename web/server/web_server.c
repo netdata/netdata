@@ -86,22 +86,34 @@ SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
 void web_client_update_acl_matches(struct web_client *w) {
     w->acl = WEB_CLIENT_ACL_NONE;
 
-    if(!web_allow_dashboard_from || simple_pattern_matches(web_allow_dashboard_from, w->client_ip))
+    if (!web_allow_dashboard_from ||
+        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                           web_allow_dashboard_from, "dashboard"))
         w->acl |= WEB_CLIENT_ACL_DASHBOARD;
 
-    if(!web_allow_registry_from || simple_pattern_matches(web_allow_registry_from, w->client_ip))
+    if (!web_allow_registry_from ||
+        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                           web_allow_registry_from, "registry"))
         w->acl |= WEB_CLIENT_ACL_REGISTRY;
 
-    if(!web_allow_badges_from || simple_pattern_matches(web_allow_badges_from, w->client_ip))
+    if (!web_allow_badges_from ||
+        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                           web_allow_badges_from, "badges"))
         w->acl |= WEB_CLIENT_ACL_BADGE;
 
-    if(!web_allow_mgmt_from || simple_pattern_matches(web_allow_mgmt_from, w->client_ip))
+    if (!web_allow_mgmt_from ||
+        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                           web_allow_mgmt_from, "management"))
         w->acl |= WEB_CLIENT_ACL_MGMT;
 
-    if(!web_allow_streaming_from || simple_pattern_matches(web_allow_streaming_from, w->client_ip))
+    if (!web_allow_streaming_from ||
+        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                           web_allow_streaming_from, "streaming"))
         w->acl |= WEB_CLIENT_ACL_STREAMING;
 
-    if(!web_allow_netdataconf_from || simple_pattern_matches(web_allow_netdataconf_from, w->client_ip))
+    if (!web_allow_netdataconf_from ||
+       connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
+                          web_allow_netdataconf_from, "netdata.conf"))
         w->acl |= WEB_CLIENT_ACL_NETDATACONF;
 
     w->acl &= w->port_acl;

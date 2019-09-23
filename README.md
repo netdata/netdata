@@ -152,6 +152,18 @@ not just visualize metrics.
 
 ## News
 
+`Sep 12th, 2019` - **[Netdata v1.17.1 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.17.1 contains 2 bug fixes, 6 improvements, and 2 documentation updates.
+
+The main reason for the patch release is an essential fix to the repeating alarm notifications we introduced in v1.17.0. If you enabled repeating notifications, Netdata would not then send CLEAR notifications for the selected alarms.
+
+The release also includes a significant improvement to Netdata's auto-detection capabilities, especially after a system restart. Netdata now remembers which `python.d` plugin jobs were successfully collecting data the last time it was running, and retries to run those jobs for 5 minutes before giving up. As a result, you no longer have to worry if your system starts Netdata before the monitored services have had a chance to start properly. We will complete the same improvement for `go.d` plugins in v1.18.0.
+
+We also made some improvements to our binary packages and added a [neat sample custom dashboard](https://docs.netdata.cloud/web/gui/custom/#dash-multi-host-dashboard) that can show charts from multiple Netdata agents. 
+
+---
+
 `Sep 3rd, 2019` - **[Netdata v1.17.0 released!](https://github.com/netdata/netdata/releases)**
 
 Release v1.17.0 contains 38 bug fixes, 33 improvements, and 20 documentation updates.

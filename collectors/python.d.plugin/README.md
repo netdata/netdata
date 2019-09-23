@@ -223,12 +223,12 @@ This is a generic checklist for submitting a new Python plugin for Netdata.  It 
 
 At minimum, to be buildable and testable, the PR needs to include:
 
--   The module itself, following proper naming conventions: `python.d/<module_dir>/<module_name>.chart.py`
--   A README.md file for the plugin under `python.d/<module_dir>`. 
--   The configuration file for the module: `conf.d/python.d/<module_name>.conf`. Python config files are in YAML format, and should include comments describing what options are present. The instructions are also needed in the configuration section of the README.md 
--   A basic configuration for the plugin in the appropriate global config file: `conf.d/python.d.conf`, which is also in YAML format.  Either add a line that reads `# <module_name>: yes` if the module is to be enabled by default, or one that reads `<module_name>: no` if it is to be disabled by default.
--   A line for the plugin in `python.d/Makefile.am` under `dist_python_DATA`.
--   A line for the plugin configuration file in `conf.d/Makefile.am`, under `dist_pythonconfig_DATA`
--   Optionally, chart information in `web/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
+-   The module itself, following proper naming conventions: `collectors/python.d.plugin/<module_dir>/<module_name>.chart.py`
+-   A README.md file for the plugin under `collectors/python.d.plugin/<module_dir>`. 
+-   The configuration file for the module: `collectors/python.d.plugin/<module_dir>/<module_name>.conf`. Python config files are in YAML format, and should include comments describing what options are present. The instructions are also needed in the configuration section of the README.md 
+-   A basic configuration for the plugin in the appropriate global config file: `collectors/python.d.plugin/python.d.conf`, which is also in YAML format.  Either add a line that reads `# <module_name>: yes` if the module is to be enabled by default, or one that reads `<module_name>: no` if it is to be disabled by default.
+-   A makefile for the plugin at `collectors/python.d.plugin/<module_dir>/Makefile.inc`.  Check an existing plugin for what this should look like.
+-   A line in `collectors/python.d.plugin/Makefile.am` including the above-mentioned makefile. Place it with the other plugin includes (please keep the includes sorted alphabetically).
+-   Optionally, chart information in `web/gui/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

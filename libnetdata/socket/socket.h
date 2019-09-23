@@ -72,7 +72,10 @@ extern int sock_setreuse_port(int fd, int reuse);
 extern int sock_enlarge_in(int fd);
 extern int sock_enlarge_out(int fd);
 
-extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize, SIMPLE_PATTERN *access_list);
+extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize,
+                              SIMPLE_PATTERN *access_list, const char *patname);
+extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
+                         char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list);
 
 #ifndef HAVE_ACCEPT4
 extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
@@ -104,8 +107,9 @@ typedef struct pollinfo {
     int fd;                 // the file descriptor
     int socktype;           // the client socket type
     WEB_CLIENT_ACL port_acl; // the access lists permitted on this web server port (it's -1 for client sockets)
-    char *client_ip;        // the connected client IP
-    char *client_port;      // the connected client port
+    char *client_ip;         // Max INET6_ADDRSTRLEN bytes
+    char *client_port;       // Max NI_MAXSERV bytes
+    char *client_host;       // Max NI_MAXHOST bytes
 
     time_t connected_t;     // the time the socket connected
     time_t last_received_t; // the time the socket last received data
@@ -173,6 +177,7 @@ extern POLLINFO *poll_add_fd(POLLJOB *p
                              , uint32_t flags
                              , const char *client_ip
                              , const char *client_port
+                             , const char *client_host
                              , void *(*add_callback)(POLLINFO *pi, short int *events, void *data)
                              , void  (*del_callback)(POLLINFO *pi)
                              , int   (*rcv_callback)(POLLINFO *pi, short int *events)
