@@ -93,8 +93,8 @@ Prometheus understands. Let’s take a look at one of these metrics.
 `netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="system"}
 0.0831255 1501271696000` This metric is representing several things which I will
 go in more details in the section on prometheus. For now understand that this
-metric: `netdata_system_cpu_percentage_average` has several labels: [chart,
-family, dimension]. This corresponds with the first cpu chart you see on the
+metric: `netdata_system_cpu_percentage_average` has several labels: (chart,
+family, dimension). This corresponds with the first cpu chart you see on the
 Netdata dashboard.
 
 ![](https://github.com/ldelossa/NetdataTutorial/raw/master/Screen%20Shot%202017-07-28%20at%204.00.45%20PM.png)
@@ -118,7 +118,8 @@ docker run -it --name prometheus --hostname prometheus
 --network=netdata-tutorial -p 9090:9090  centos:latest '/bin/bash'
 ``` 
 
-This should drop you into a shell once again. Once there quickly install your favorite editor as we will be editing files later in this tutorial. 
+This should drop you into a shell once again. 
+Once there quickly install your favorite editor as we will be editing files later in this tutorial. 
 
 ```sh
 yum install vim -y
@@ -139,7 +140,8 @@ mkdir /opt/prometheus
 sudo tar -xvf /tmp/prometheus-*linux-amd64.tar.gz -C /opt/prometheus --strip=1
 ```
 
-This should get prometheus installed into the container. Let’s test that we can run prometheus and connect to it’s web interface.
+This should get prometheus installed into the container. 
+Let’s test that we can run prometheus and connect to it’s web interface.
 
 ```sh
 /opt/prometheus/prometheus
@@ -152,15 +154,14 @@ explained we have two key elements in Prometheus metrics. We have the ‘metric�
 and its ‘labels’. Labels allow for granularity between metrics. Let’s use our
 previous example to further explain.
 
-```
+```conf
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="system"} 0.0831255 1501271696000
 ```
 
-Here our metric is
-‘netdata_system_cpu_percentage_average’ and our labels are ‘chart’, ‘family’,
-and ‘dimension. The last two values constitute the actual metric value for the
-metric type (gauge, counter, etc…). We can begin graphing system metrics with
-this information, but first we need to hook up Prometheus to poll Netdata stats.
+Here our metric is ‘netdata_system_cpu_percentage_average’ and our labels are ‘chart’, ‘family’, and ‘dimension. 
+The last two values constitute the actual metric value for the metric type (gauge, counter, etc…). 
+We can begin graphing system metrics with this information, 
+but first we need to hook up Prometheus to poll Netdata stats.
 
 Let’s move our attention to Prometheus’s configuration. Prometheus gets it
 config from the file located (in our example) at
@@ -171,7 +172,7 @@ going over the configuration values documented here:
 like this (we can use the dns name Netdata due to the custom user-defined
 network we created in docker beforehand).
 
-```yml
+```yaml
 scrape_configs:
   # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
   - job_name: 'prometheus'
@@ -206,7 +207,7 @@ Let’s now start exploring how we can graph some metrics. Back in our NetData
 container lets get the CPU spinning with a pointless busy loop. On the shell do
 the following:
 
-```
+```sh
 [root@netdata /]# while true; do echo "HOT HOT HOT CPU"; done
 ```
 
@@ -219,7 +220,7 @@ comments  `# COMMENT homogeneous chart "system.cpu", context "system.cpu", famil
 "cpu", units "percentage"` Followed by the metrics. This is a good start now let
 us drill down to the specific metric we would like to graph.
 
-```
+```conf
 # COMMENT
 netdata_system_cpu_percentage_average: dimension "system", value is percentage, gauge, dt 1501275951 to 1501275951 inclusive
 netdata_system_cpu_percentage_average{chart="system.cpu",family="cpu",dimension="system"} 0.0000000 1501275951000
@@ -269,7 +270,7 @@ Finally we make it to grafana. This is the easiest part in my opinion. This time
 we will actually run the official grafana docker container as all configuration
 we need to do is done via the GUI. Let’s run the following command:
 
-```
+```sh
 docker run -i -p 3000:3000 --network=netdata-tutorial grafana/grafana
 ```
 
