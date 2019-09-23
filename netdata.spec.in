@@ -192,7 +192,9 @@ Requires: freeipmi
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 BuildRequires: cups-devel
+%endif
 # end - cups plugin dependencies
 
 # Prometheus remote write dependencies
@@ -277,7 +279,9 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install cups.plugin
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/cups.plugin"
+%endif
 
 # ###########################################################
 # Install slabinfo.plugin
@@ -493,6 +497,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
 # CUPS belongs to a different sub package
+%if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
 
 %package plugin-cups
@@ -507,8 +512,11 @@ Use this plugin to enable metrics collection from cupsd, the daemon running when
 
 %files plugin-cups
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
+%endif
 
 %changelog
+* Mon Sep 23 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-9
+- Do not build CUPS plugin subpackage on CentOS 6 and CentOS 7
 * Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdat.acloud> - 0.0.0-8
 - Split CUPS functionality on separate package
 * Fri Jun 28 2019 Pavlos Emm. Katsoulakis <paul@netdata.cloud> - 0.0.0-7
