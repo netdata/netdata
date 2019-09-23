@@ -12,22 +12,22 @@ has to be available in the root of the Netdata source. The easiest
 way to do this is with a symlink:
 
 ```sh
-~/netdata$ ln -s contrib/debian
+ln -s contrib/debian
 ```
 
 Then build the debian package:
 
 ```sh
-~/netdata$ dpkg-buildpackage -us -uc -rfakeroot
+dpkg-buildpackage -us -uc -rfakeroot
 ```
 
 This should give a package that can be installed in the parent
 directory, which you can install manually with dpkg.
 
 ```sh
-~/netdata$ ls ../*.deb
+ls ../*.deb
 ../netdata_1.0.0_amd64.deb
-~/netdata$ sudo dpkg -i ../netdata_1.0.0_amd64.deb
+sudo dpkg -i ../netdata_1.0.0_amd64.deb
 ```
 
 ### Building for a Debian system without systemd
