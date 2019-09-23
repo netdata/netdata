@@ -24,11 +24,6 @@ GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
 PUSH_URL=$(git config --get remote.origin.url | sed -e 's/^https:\/\///')
 FAIL=0
-if [ -z ${GIT_TAG+x} ]; then
-	OPTS=""
-else
-	OPTS="--future-release ${GIT_TAG}"
-fi
 
 if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
 	echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing else to do here"

@@ -19,7 +19,6 @@ PROJECT=$(echo "$TRAVIS_REPO_SLUG" | awk -F '/' '{print $2}')
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
 
-# TODO: OPTS wasn't passed any more to the changelog generator. Either remove or reinstate it?
 if [ -z ${GIT_TAG+x} ]; then
 	OPTS=""
 else
@@ -44,4 +43,4 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 	--no-issues \
 	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
 	--max-issues 500 \
-	--bug-labels IGNOREBUGS
+	--bug-labels IGNOREBUGS ${OPTS}
