@@ -239,43 +239,46 @@ All the dimensions of a chart have the same units of measurement, and are contex
 Netdata can send metrics to prometheus from 3 data sources:
 
 -   `as collected` or `raw` - this data source sends the metrics to prometheus as they are collected. 
-No conversion is done by Netdata. The latest value for each metric is just given to prometheus. 
-This is the most preferred method by prometheus, but it is also the harder to work with. 
-To work with this data source, you will need to understand how to get meaningful values out of them.
+    No conversion is done by Netdata. The latest value for each metric is just given to prometheus. 
+    This is the most preferred method by prometheus, but it is also the harder to work with. 
+    To work with this data source, you will need to understand how to get meaningful values out of them.
 
-The format of the metrics is: `CONTEXT{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
+    The format of the metrics is: `CONTEXT{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
-If the metric is a counter (`incremental` in Netdata lingo), `_total` is appended the context.
+    If the metric is a counter (`incremental` in Netdata lingo), `_total` is appended the context.
 
-Unlike prometheus, Netdata allows each dimension of a chart to have a different algorithm and conversion constants 
-(`multiplier` and `divisor`). 
-In this case, that the dimensions of a charts are heterogeneous, Netdata will use this format: `CONTEXT_DIMENSION{chart="CHART",family="FAMILY"}`
+    Unlike prometheus, Netdata allows each dimension of a chart to have a different algorithm and conversion constants 
+    (`multiplier` and `divisor`). 
+    In this case, that the dimensions of a charts are heterogeneous, Netdata will use this format: `CONTEXT_DIMENSION{chart="CHART",family="FAMILY"}`
 
 -   `average` - this data source uses the Netdata database to send the metrics to prometheus as they are presented 
-on the Netdata dashboard. 
-So, all the metrics are sent as gauges, at the units they are presented in the Netdata dashboard charts. 
-This is the easiest to work with.
+    on the Netdata dashboard. 
+    So, all the metrics are sent as gauges, at the units they are presented in the Netdata dashboard charts. 
+    This is the easiest to work with.
 
-The format of the metrics is: `CONTEXT_UNITS_average{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
+    The format of the metrics is: `CONTEXT_UNITS_average{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
 
-When this source is used, Netdata keeps track of the last access time for each prometheus server fetching the metrics. 
-This last access time is used at the subsequent queries of the same prometheus server 
-to identify the time-frame the `average` will be calculated. 
-So, no matter how frequently prometheus scrapes Netdata, it will get all the database data. 
-To identify each prometheus server, Netdata uses by default the IP of the client fetching the metrics. 
-If there are multiple prometheus servers fetching data from the same Netdata, using the same IP, 
-each prometheus server can append `server=NAME` to the URL. 
-Netdata will use this `NAME` to uniquely identify the prometheus server.
+    When this source is used, Netdata keeps track of the last access time for each 
+    prometheus server fetching the metrics. 
+    This last access time is used at the subsequent queries of the same prometheus server 
+    to identify the time-frame the `average` will be calculated.
+
+    So, no matter how frequently prometheus scrapes Netdata, it will get all the database data. 
+    To identify each prometheus server, Netdata uses by default the IP of the client fetching the metrics.
+     
+    If there are multiple prometheus servers fetching data from the same Netdata, using the same IP, 
+    each prometheus server can append `server=NAME` to the URL. 
+    Netdata will use this `NAME` to uniquely identify the prometheus server.
 
 -   `sum` or `volume`, is like `average` but instead of averaging the values, it sums them.
 
-The format of the metrics is: `CONTEXT_UNITS_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
-All the other operations are the same with `average`. 
+    The format of the metrics is: `CONTEXT_UNITS_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`.
+    All the other operations are the same with `average`. 
 
-To change the data source to `sum` or `as-collected` you need to provide the `source` parameter in the request URL. 
-e.g.: `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`
+    To change the data source to `sum` or `as-collected` you need to provide the `source` parameter in the request URL. 
+    e.g.: `http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&help=yes&source=as-collected`
 
-Keep in mind that early versions of Netdata were sending the metrics as: `CHART_DIMENSION{}`.
+    Keep in mind that early versions of Netdata were sending the metrics as: `CHART_DIMENSION{}`.
 
 ### Querying Metrics
 
