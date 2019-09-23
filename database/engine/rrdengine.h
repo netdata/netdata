@@ -148,6 +148,8 @@ struct rrdengine_statistics {
     rrdeng_stats_t page_cache_descriptors;
     rrdeng_stats_t io_errors;
     rrdeng_stats_t fs_errors;
+    rrdeng_stats_t pg_cache_warnings;
+    rrdeng_stats_t pg_cache_errors;
 };
 
 /* I/O errors global counter */

@@ -194,15 +194,20 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, 1);
 
         if (unlikely(((unsigned long)ctx->stats.metric_API_producers) >= ctx->max_cache_pages)) {
+            if (0 == (unsigned long)ctx->stats.pg_cache_errors) {
+                /* only print the first time */
+                error("Deadlock detected in dbengine instance \"%s\", metric data will not be stored in the database"
+                      ", please increase page cache size.", ctx->dbfiles_path);
+            }
+            rrd_stat_atomic_add(&ctx->stats.pg_cache_errors, 1);
             rrd_stat_atomic_add(&global_pg_cache_errors, 1);
-            error("Deadlock detected in dbengine instance \"%s\", metric data will not be stored in the database"
-                  ", please increase page cache size.", ctx->dbfiles_path);
             /* Resolve deadlock */
             descr->page_length = 0; /* make sure the page descriptor is deconstructed */
             rrdeng_store_metric_flush_current_page(rd);
             rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
             return;
         } else if (unlikely(((unsigned long)ctx->stats.metric_API_producers) >= ctx->cache_pages_low_watermark)) {
+            rrd_stat_atomic_add(&ctx->stats.pg_cache_warnings, 1);
             rrd_stat_atomic_add(&global_pg_cache_warnings, 1);
         }
 
