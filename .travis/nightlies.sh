@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This is the nightly changelog generation script
 # It is responsible for two major activities:
@@ -29,7 +29,7 @@ PREVIOUS_NIGHTLY_COUNT="$(rev <packaging/version | cut -d- -f 2 | rev)"
 
 # If no commits since release, just stop
 if [ "${COMMITS_SINCE_RELEASE}" == "${PREVIOUS_NIGHTLY_COUNT}" ]; then
-	echo "No changes since last nighthly release"
+	echo "No changes since last nighthly release, nothing else to do"
 	exit 0
 fi
 
@@ -39,6 +39,7 @@ if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
 fi
 
 echo "--- Running Changelog generation ---"
+echo "We got $COMMITS_SINCE_RELEASE changes since $LAST_TAG, re-generating changelog"
 NIGHTLIES_CHANGELOG_FAILED=0
 .travis/generate_changelog_for_nightlies.sh "${LAST_TAG}" "${COMMITS_SINCE_RELEASE}" || NIGHTLIES_CHANGELOG_FAILED=1
 

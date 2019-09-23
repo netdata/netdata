@@ -53,7 +53,7 @@ echo "$GIT_TAG" >packaging/version
 git add packaging/version
 
 echo "---- Create CHANGELOG -----"
-./.travis/create_changelog_for_release.sh
+./.travis/create_changelog.sh
 git add CHANGELOG.md
 
 echo "---- COMMIT AND PUSH CHANGES ----"
