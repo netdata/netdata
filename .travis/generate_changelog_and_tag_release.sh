@@ -30,14 +30,11 @@ if [ ! -f .gitignore ]; then
 	exit 1
 fi
 
-echo "--- Executing Tagging facility to determine TAG ---"
-source .travis/tagger.sh
-
-echo "--- Changelog generator and tagger script starting ---"
-# If tagger script hasn't produced a TAG, there is nothing to do so bail out happy
+echo "--- Changelog generator script starting ---"
+# If we dont have a produced TAG there is nothing to do, so bail out happy
 if [ -z "${GIT_TAG}" ]; then
-	echo "GIT_TAG is empty, nothing to do for now (Value: $GIT_TAG)"
-	exit 0
+	echo "GIT_TAG is empty, that is not suppose to happen (Value: $GIT_TAG)"
+	exit 1
 fi
 
 if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
@@ -55,8 +52,8 @@ echo "---- UPDATE VERSION FILE ----"
 echo "$GIT_TAG" >packaging/version
 git add packaging/version
 
-echo "---- GENERATE CHANGELOG -----"
-./.travis/generate_changelog_for_release.sh
+echo "---- Create CHANGELOG -----"
+./.travis/create_changelog.sh
 git add CHANGELOG.md
 
 echo "---- COMMIT AND PUSH CHANGES ----"
