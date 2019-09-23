@@ -24,7 +24,7 @@ dashboard](https://user-images.githubusercontent.com/1153921/63463901-fcb9c800-c
 
 ## Configuration basics
 
-Netdata primarily uses the `netdata.conf` for custom configurations.
+Netdata primarily uses the `netdata.conf` file for custom configurations.
 
 On most systems, you can find that file at `/etc/netdata/netdata.conf`.
 
