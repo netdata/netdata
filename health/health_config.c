@@ -823,7 +823,7 @@ static int health_readfile(const char *filename, void *data) {
                 health_parse_db_lookup(line, filename, value, &rt->group, &rt->after, &rt->before,
                         &rt->update_every, &rt->options, &rt->dimensions, &rt->foreachdim);
                 if(rt->foreachdim) {
-                    health_pattern_from_foreach(rt->foreachdim);
+                    rt->spdim = health_pattern_from_foreach(rt->foreachdim);
                 }
             }
             else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
