@@ -19,7 +19,7 @@ In this example:
 -   the SNMP device is `10.11.12.8`.
 -   the SNMP community is `public`.
 -   we will update the values every 10 seconds (`update_every: 10` under the server `10.11.12.8`).
--   we define 2 charts `snmp_switch.bandwidth_port1` and `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`.
+-   we define 2 charts `snmp_switch.bandwidth_port1` and `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`. Note that the charts and dimensions must not contain any white space or special characters, other than `.` and `_`.
 
 ```json
 {
