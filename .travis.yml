@@ -31,6 +31,10 @@ install:
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
   - export PACKAGE_CLOUD_RETENTION_DAYS=30
   - if [ ! "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export DEPLOY_REPO="netdata-devel";  fi;
+  # These are release-related artifacts and have to be evaluated before we start doing conditional checks inside stages
+  - source ".travis/tagger.sh"
+  - export GIT_TAG="$(git tag --points-at)"
+  - if [[ -z "${GIT_TAG}" ]]; then  echo "Running set tag for release" && set_tag_for_release; fi;
 
 
 
@@ -58,7 +62,7 @@ stages:
     if: branch = master AND type = cron
 
     # Scheduled releases
-  - name: Packaging for release
+  - name: Support activities on main branch
     if: branch = master AND type != pull_request AND type != cron
 
   - name: Publish for release
@@ -240,22 +244,22 @@ jobs:
 
 
 
-    - stage: Packaging for release
+    - stage: Support activities on main branch
+      name: Run labeler on github issues
+      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
 
-      name: Generate changelog and TAG the release (only on special commit msg)
-      before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated" "${NOTIF_CHANNEL}"
+    - name: Generate changelog for release (only on special and tagged commit msg)
+      before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
         - echo "Last commit:" && git log -1
         - echo "GIT Describe:" && git describe
         - echo "packaging/version:" && cat packaging/version
         - .travis/generate_changelog_and_tag_release.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Packaging for release failed"
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Changelog generation and tag of release, failed"
       git:
         depth: false
-
-    - name: Run labeler on github issues
-      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
+      if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(GIT_TAG) IS present AND NOT env(GIT_TAG) IS blank)
 
 
 
@@ -411,19 +415,19 @@ jobs:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
-      name: "Build & Publish RPM package for Enterprise Linux 7"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Enterprise Linux 6"
+      name: "Build & Publish RPM package for Enterprise Linux 6"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) RPM( Enterprise Linux)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+    - name: "Build & Publish RPM package for Enterprise Linux 7"
+      <<: *RPM_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
 

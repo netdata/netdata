@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# Changelog generation scriptlet.
+# Changelog generation scriptlet, for nightlies
 #
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
@@ -20,39 +20,18 @@ fi
 LAST_TAG="$1"
 COMMITS_SINCE_RELEASE="$2"
 NEW_VERSION="${LAST_TAG}-$((COMMITS_SINCE_RELEASE + 1))-nightly"
-ORG=$(echo "$TRAVIS_REPO_SLUG" | cut -d '/' -f1)
-PROJECT=$(echo "$TRAVIS_REPO_SLUG" | cut -d '/' -f 2)
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
 PUSH_URL=$(git config --get remote.origin.url | sed -e 's/^https:\/\///')
 FAIL=0
-if [ -z ${GIT_TAG+x} ]; then
-	OPTS=""
-else
-	OPTS="--future-release ${GIT_TAG}"
-fi
-echo "We got $COMMITS_SINCE_RELEASE changes since $LAST_TAG, re-generating changelog"
 
 if [ ! "${TRAVIS_REPO_SLUG}" == "netdata/netdata" ]; then
 	echo "Beta mode on ${TRAVIS_REPO_SLUG}, nothing else to do here"
 	exit 0
 fi
 
-git checkout master
-git pull
-
-echo "Running project markmandel for github changelog generation"
-#docker run -it --rm -v "$(pwd)":/usr/local/src/your-app ferrarimarco/github-changelog-generator:1.14.3 \
-docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest \
-	--user "${ORG}" \
-	--project "${PROJECT}" \
-	--token "${GITHUB_TOKEN}" \
-	--since-tag "v1.10.0" \
-	--unreleased-label "**Next release**" \
-	--no-issues \
-	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
-	--max-issues 500 \
-	--bug-labels IGNOREBUGS
+echo "Running changelog creation mechanism"
+.travis/create_changelog.sh
 
 echo "Changelog created! Adding packaging/version(${NEW_VERSION}) and CHANGELOG.md to the repository"
 echo "${NEW_VERSION}" > packaging/version
