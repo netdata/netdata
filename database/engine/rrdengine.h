@@ -154,6 +154,17 @@ struct rrdengine_statistics {
 extern rrdeng_stats_t global_io_errors;
 /* File-System errors global counter */
 extern rrdeng_stats_t global_fs_errors;
+/*
+ * Page cache warnings global counter.
+ * Some page cache instance is near critical utilization where metrics will fail to be stored.
+ */
+extern rrdeng_stats_t global_pg_cache_warnings;
+/*
+ * Page cache errors global counter.
+ * Some page cache instance has hit critical utilization where metrics failed to be stored as a deadlock resolution
+ * measure.
+ */
+extern rrdeng_stats_t global_pg_cache_errors;
 /* number of File-Descriptors that have been reserved by dbengine */
 extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
 

@@ -192,9 +192,20 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
         descr->start_time = point_in_time;
 
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, 1);
+
         if (unlikely(((unsigned long)ctx->stats.metric_API_producers) >= ctx->max_cache_pages)) {
-            error("Deadlock detected in dbengine instance \"%s\", please increase page cache size.", ctx->dbfiles_path);
+            rrd_stat_atomic_add(&global_pg_cache_errors, 1);
+            error("Deadlock detected in dbengine instance \"%s\", metric data will not be stored in the database"
+                  ", please increase page cache size.", ctx->dbfiles_path);
+            /* Resolve deadlock */
+            descr->page_length = 0; /* make sure the page descriptor is deconstructed */
+            rrdeng_store_metric_flush_current_page(rd);
+            rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
+            return;
+        } else if (unlikely(((unsigned long)ctx->stats.metric_API_producers) >= ctx->cache_pages_low_watermark)) {
+            rrd_stat_atomic_add(&global_pg_cache_warnings, 1);
         }
+
         pg_cache_insert(ctx, handle->page_index, descr);
     } else {
         pg_cache_add_new_metric_time(handle->page_index, descr);
@@ -672,7 +683,7 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
  * You must not change the indices of the statistics or user code will break.
  * You must not exceed RRDENG_NR_STATS or it will crash.
  */
-void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
+void rrdeng_get_35_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
@@ -709,7 +720,9 @@ void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[30] = (uint64_t)global_io_errors;
     array[31] = (uint64_t)global_fs_errors;
     array[32] = (uint64_t)rrdeng_reserved_file_descriptors;
-    assert(RRDENG_NR_STATS == 33);
+    array[33] = (uint64_t)global_pg_cache_warnings;
+    array[34] = (uint64_t)global_pg_cache_errors;
+    assert(RRDENG_NR_STATS == 35);
 }
 
 /* Releases reference to page */
