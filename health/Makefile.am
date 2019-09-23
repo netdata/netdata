@@ -44,6 +44,7 @@ dist_healthconfig_DATA = \
     health.d/fronius.conf \
     health.d/gearman.conf \
     health.d/haproxy.conf \
+    health.d/hdfs.conf \
     health.d/httpcheck.conf \
     health.d/ipc.conf \
     health.d/ipfs.conf \
