@@ -255,7 +255,7 @@ jobs:
         - echo "Last commit:" && git log -1
         - echo "GIT Describe:" && git describe
         - echo "packaging/version:" && cat packaging/version
-        - .travis/generate_changelog_for_release.sh
+        - .travis/generate_changelog_and_tag_release.sh
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Changelog generation and tag of release, failed"
       git:
         depth: false
