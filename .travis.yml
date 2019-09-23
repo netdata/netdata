@@ -411,19 +411,19 @@ jobs:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
-      name: "Build & Publish RPM package for Enterprise Linux 7"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Enterprise Linux 6"
+      name: "Build & Publish RPM package for Enterprise Linux 6"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) RPM( Enterprise Linux)?\]/
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+    - name: "Build & Publish RPM package for Enterprise Linux 7"
+      <<: *RPM_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
 
