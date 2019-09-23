@@ -33,7 +33,7 @@ The ports to bind are controlled via `[web].bind to`, like this:
 ```
 [web]
    default port = 19999
-   bind to = 127.0.0.1=dashboard^SSL=optional 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming^SSL=force localhost:19995=registry *:http=dashboard unix:/tmp/netdata.sock
+   bind to = 127.0.0.1=dashboard^SSL=optional 10.1.1.1:19998=management|netdata.conf hostname:19997=badges [::]:19996=streaming^SSL=force localhost:19995=registry *:http=dashboard unix:/run/netdata/netdata.sock
 ```
 
 Using the above, Netdata will bind to:
@@ -44,7 +44,7 @@ Using the above, Netdata will bind to:
 -   All IPv6 IPs at port 19996. Only metric streaming requests from other Netdata agents will be accepted on this port. Only encrypted streams will be allowed (i.e. slaves also need to be [configured for TLS](../../streaming).
 -   All the IPs `localhost` resolves to (both IPv4 and IPv6 depending the resolved IPs) at port 19996. This port will only accept registry API requests.
 -   All IPv4 and IPv6 IPs at port `http` as set in `/etc/services`. Only the UI (dashboard) and the read API will be accessible on this port. 
--   Unix domain socket `/tmp/netdata.sock`. All requests are serviceable on this socket.
+-   Unix domain socket `/run/netdata/netdata.sock`. All requests are serviceable on this socket. Note that in some OSs like Fedora, every service sees a different `/tmp`, so don't create a Unix socket under `/tmp`. `/run` or `/var/run` is suggested.
 
 The option `[web].default port` is used when an entries in `[web].bind to` do not specify a port.
 
