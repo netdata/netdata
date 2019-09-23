@@ -29,6 +29,14 @@ static inline void _buffer_overflow_check(BUFFER *b, const char *file, const cha
     }
 }
 
+//to know how we are configured at runtime
+char *buffer_mempool_status() {
+#ifdef BUFFER_USE_MEMPOOL
+    return "ACTIVE";
+#else
+    return "DISABLED";
+#endif
+}
 
 void buffer_reset(BUFFER *wb)
 {
@@ -353,22 +361,165 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
     buffer_overflow_check(wb);
 }
 
-BUFFER *buffer_create(size_t size)
-{
+static inline void _buffer_free(BUFFER *b) {
+    freez(b->buffer);
+    freez(b);
+}
+
+#ifdef BUFFER_USE_MEMPOOL_PER_THREAD
+static pthread_key_t buffer_mempool_key;
+pthread_once_t buffer_mempool_once = PTHREAD_ONCE_INIT; //libuv_migration uv_once_t
+
+typedef struct {
+    BUFFER *pooled_buffers[BUFFER_MEMPOOL_SIZE];
+#ifdef BUFFER_MEMPOOL_STATS
+    int reclaimed_count;
+    int allocation_count;
+    int deletes_prevented;
+#endif
+}buffer_mempool_thread_local_t;
+
+static void buffer_mempool_perthread_destructor(void *b_mempool_key) {
+    buffer_mempool_thread_local_t *delete = b_mempool_key;
+
+    debug(D_BUFFER_MEMPOOL, "buffer_mempool: thread destructor.");
+
+    if(likely(delete)) {
+        int i;
+        for(i = 0; i < BUFFER_MEMPOOL_SIZE; i++) {
+            if(delete->pooled_buffers[i]) {
+                _buffer_free(delete->pooled_buffers[i]);
+                delete->pooled_buffers[i] = NULL;
+            }
+        }
+
+        freez(delete);
+    }
+}
+
+// Only called once per all threads
+static void buffer_mempool_once_init() {
+    pthread_key_create(&buffer_mempool_key, buffer_mempool_perthread_destructor); //libuv_migration uv_key_create
+}
+
+static inline buffer_mempool_thread_local_t *buffer_mempool_get() {
+    return pthread_getspecific(buffer_mempool_key); //libuv_migration uv_key_get
+}
+#endif //BUFFER_USE_MEMPOOL_PER_THREAD
+
+#ifdef BUFFER_USE_MEMPOOL
+
+static inline BUFFER *buffer_mempool_reclaim(size_t size) {
     BUFFER *b;
 
+#ifdef BUFFER_USE_MEMPOOL_PER_THREAD
+    if(unlikely( pthread_once(&buffer_mempool_once, buffer_mempool_once_init) != 0 )) { //libuv_migration uv_once
+        error("buffer_mempool: init fail.");
+        fatal("pthread_once failed to initialize per thread buffer mempool.");
+    }
+    buffer_mempool_thread_local_t *mempool = buffer_mempool_get();
+    // Create If not created for this thread yet
+    if(unlikely(!mempool)) {
+        mempool = callocz(1, sizeof(buffer_mempool_thread_local_t));
+        debug(D_BUFFER_MEMPOOL, "buffer_mempool: Initialized for this thread. mempoolid=%p", mempool);
+        pthread_setspecific(buffer_mempool_key, (void*)mempool);
+    }
+#endif //BUFFER_USE_MEMPOOL_PER_THREAD
+    int i;
+    for(i = 0; i < BUFFER_MEMPOOL_SIZE; i++) {
+        b = mempool->pooled_buffers[i];
+        if(b && b->size >= size) {
+            mempool->pooled_buffers[i] = NULL;
+            debug(D_BUFFER_MEMPOOL, "buffer_mempool: Reclaimed Buffer of size %zu for requested %zu. mempoolid=%p", b->size, size, mempool);
+            #ifdef BUFFER_MEMPOOL_STATS
+            mempool->reclaimed_count += 1;
+            #endif
+            return(b);
+        }
+    }
+
+    #ifdef BUFFER_MEMPOOL_STATS
+    mempool->allocation_count += 1;
+    #endif
+    debug(D_BUFFER_MEMPOOL, "buffer_mempool: Cache miss. Have to allocate new memory of %zu:/", size);
+    return NULL;
+}
+#endif //BUFFER_USE_MEMPOOL
+
+BUFFER *_buffer_create(size_t size, uint8_t options){
+    BUFFER *b;
     debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
 
+#ifdef BUFFER_USE_MEMPOOL
+    b = buffer_mempool_reclaim(size);
+    if(likely(b)) return(b);
+#endif //BUFFER_USE_MEMPOOL
+
     b = callocz(1, sizeof(BUFFER));
-    b->buffer = mallocz(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
+    size_t required_size = size + sizeof(BUFFER_OVERFLOW_EOF) + 2;
+    if(unlikely( options &  WB_ALWAYS_CLEAR )) {
+        b->buffer = callocz(1, required_size);
+        b->options |= WB_ALWAYS_CLEAR;
+    } else {
+        b->buffer = mallocz(required_size);
+    }
     b->buffer[0] = '\0';
     b->size = size;
     b->contenttype = CT_TEXT_PLAIN;
     buffer_overflow_init(b);
     buffer_overflow_check(b);
 
-    return(b);
+    return b;
 }
+
+#ifdef BUFFER_USE_MEMPOOL
+static inline void buffer_mempool_free(BUFFER *b) {
+    int i;
+    buffer_mempool_thread_local_t *mempool = buffer_mempool_get();
+    debug(D_BUFFER_MEMPOOL, "buffer_mempool_free: mempoolid=%p.", mempool);
+    if(b->size >= 100 && b->size <= BUFFER_MEMPOOL_MAXSIZE) {
+        for(i = 0; i < BUFFER_MEMPOOL_SIZE; i++) {
+            if(!mempool->pooled_buffers[i]) {
+                if(unlikely( b->options & WB_ALWAYS_CLEAR ))
+                    memset((void*)b->buffer, 0, b->size);
+
+                buffer_flush(b);
+
+                mempool->pooled_buffers[i] = b;
+                debug(D_BUFFER_MEMPOOL, "buffer_mempool: Caching buffer of size %zu.", b->size);
+                #ifdef BUFFER_MEMPOOL_STATS
+                    mempool->deletes_prevented += 1;
+                #endif
+                return;
+            }
+        }
+    }
+    //exchange already cached item if this one is bigger
+    //try to keep bigger ones towards the end
+    //although order is not guarateed as that is not neccessary now
+    //this prevents mempool getting bloated by smaller items and then
+    //the requirements change and we have need only for bigger ones
+    if( b->size <= BUFFER_MEMPOOL_MAXSIZE ) {
+        for(i = BUFFER_MEMPOOL_SIZE-1; i >= 0; i--) {
+            if(mempool->pooled_buffers[i]
+                && (mempool->pooled_buffers[i]->size + BUFFER_MEMPOOL_MIN_SWAP_GROWTH) < b->size
+            ) {
+                debug(D_BUFFER_MEMPOOL, "buffer_mempool: Swapping pos:%d Size:%zu with Size:%zu.",
+                    i, mempool->pooled_buffers[i]->size, b->size);
+                _buffer_free(mempool->pooled_buffers[i]);
+                mempool->pooled_buffers[i] = b;
+                #ifdef BUFFER_MEMPOOL_STATS
+                    mempool->deletes_prevented += 1;
+                #endif
+                return;
+            }
+        }
+    }
+
+    _buffer_free(b);
+    debug(D_BUFFER_MEMPOOL, "buffer_mempool: Deleting buffer mempool full.");
+}
+#endif
 
 void buffer_free(BUFFER *b) {
     if(unlikely(!b)) return;
@@ -377,8 +528,11 @@ void buffer_free(BUFFER *b) {
 
     debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
 
-    freez(b->buffer);
-    freez(b);
+#ifdef BUFFER_USE_MEMPOOL
+    buffer_mempool_free(b);
+#else
+    _buffer_free(b);
+#endif
 }
 
 void buffer_increase(BUFFER *b, size_t free_size_required) {
@@ -389,7 +543,12 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     if(left >= free_size_required) return;
 
     size_t increase = free_size_required - left;
-    if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
+    if(unlikely( b->size >= BUFFER_MEMPOOL_MAXSIZE )){
+        size_t min_increase = (b->size * BIG_BUFFER_GROWTH_RATIO) - b->size;
+        if(increase < min_increase) increase = min_increase;
+    } else {
+        if(increase < WEB_DATA_LENGTH_INCREASE_STEP) increase = WEB_DATA_LENGTH_INCREASE_STEP;
+    }
 
     debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + increase);
 

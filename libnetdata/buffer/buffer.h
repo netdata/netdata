@@ -6,6 +6,31 @@
 #include "../libnetdata.h"
 
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
+#define BIG_BUFFER_GROWTH_RATIO 1.25
+
+#define BUFFER_USE_MEMPOOL
+#define BUFFER_USE_MEMPOOL_PER_THREAD
+
+#define BUFFER_MEMPOOL_MAXSIZE 1024*16
+
+#ifdef BUFFER_USE_MEMPOOL_PER_THREAD
+    #ifndef BUFFER_USE_MEMPOOL
+        #define BUFFER_USE_MEMPOOL
+    #endif
+    #define BUFFER_MEMPOOL_SIZE 5
+#else
+    #define BUFFER_MEMPOOL_SIZE 25
+#endif
+
+#ifdef BUFFER_USE_MEMPOOL
+    #define BUFFER_MEMPOOL_MIN_SWAP_GROWTH 100
+#endif
+
+#ifdef BUFFER_USE_MEMPOOL
+    #ifndef BUFFER_USE_MEMPOOL_PER_THREAD
+        #error "Not implemented yet. To be implemented ASAP"
+    #endif
+#endif
 
 typedef struct web_buffer {
     size_t size;        	// allocation size of buffer, in bytes
@@ -20,6 +45,11 @@ typedef struct web_buffer {
 // options
 #define WB_CONTENT_CACHEABLE            1
 #define WB_CONTENT_NO_CACHEABLE         2
+// use for buffers where keys and/or passwords are expected to be stored
+// this will actually clear the memory before reuse of buffer
+// adding additional security in case of programming errors
+// at cost of some performance
+#define WB_ALWAYS_CLEAR                 4
 
 // content-types
 #define CT_APPLICATION_JSON             1
@@ -60,7 +90,16 @@ extern void buffer_rrd_value(BUFFER *wb, calculated_number value);
 extern void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 extern void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 
-extern BUFFER *buffer_create(size_t size);
+extern BUFFER *_buffer_create(size_t size, uint8_t options);
+static inline BUFFER *buffer_create(size_t size)
+{
+    return _buffer_create(size, 0);
+}
+
+static inline BUFFER *buffer_create_secure(size_t size) {
+    return _buffer_create(size, WB_ALWAYS_CLEAR);
+}
+
 extern void buffer_free(BUFFER *b);
 extern void buffer_increase(BUFFER *b, size_t free_size_required);
 
@@ -76,6 +115,8 @@ extern char *print_number_llu_r(char *str, unsigned long long uvalue);
 extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 
 extern void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
+
+extern char *buffer_mempool_status();
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->size - buffer->len < needed_free_size))

@@ -44,6 +44,9 @@ benchmark-value-pairs: benchmark-value-pairs.c
 statsd-stress: statsd-stress.c
 	gcc ${CFLAGS} -o $@ $^ ${COMMON_LDFLAGS}
 
+benchmark-buffer: benchmark-buffer.c
+	gcc ${CFLAGS} -o $@ $^ ${COMMON_LDFLAGS}
+
 test-eval: test-eval.c
 	gcc ${CFLAGS} -o $@ $^ ${COMMON_LDFLAGS}
 
