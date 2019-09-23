@@ -95,9 +95,8 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     if (likely(descr->page_length)) {
         int ret, page_is_empty;
 
-#ifdef NETDATA_INTERNAL_CHECKS
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
-#endif
+
         if (handle->prev_descr) {
             /* unpin old second page */
             pg_cache_put(ctx, handle->prev_descr);
@@ -192,9 +191,10 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     if (unlikely(INVALID_TIME == descr->start_time)) {
         descr->start_time = point_in_time;
 
-#ifdef NETDATA_INTERNAL_CHECKS
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, 1);
-#endif
+        if (unlikely(((unsigned long)ctx->stats.metric_API_producers) >= ctx->max_cache_pages)) {
+            error("Deadlock detected in dbengine instance \"%s\", please increase page cache size.", ctx->dbfiles_path);
+        }
         pg_cache_insert(ctx, handle->page_index, descr);
     } else {
         pg_cache_add_new_metric_time(handle->page_index, descr);
