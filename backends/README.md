@@ -56,21 +56,30 @@ X seconds (though, it can send them per second if you need it to).
 
     -   `as-collected` sends to backends the metrics as they are collected, in the units they are collected.
         So, counters are sent as counters and gauges are sent as gauges, much like all data collectors do.
-        For example, to calculate CPU utilization in this format, you need to know how to convert kernel ticks to percentage.
+        For example, to calculate CPU utilization in this format, 
+        you need to know how to convert kernel ticks to percentage.
 
     -   `average` sends to backends normalized metrics from the Netdata database.
-        In this mode, all metrics are sent as gauges, in the units Netdata uses. This abstracts data collection
-        and simplifies visualization, but you will not be able to copy and paste queries from other sources to convert units.
-        For example, CPU utilization percentage is calculated by Netdata, so Netdata will convert ticks to percentage and
-        send the average percentage to the backend.
+        In this mode, all metrics are sent as gauges, in the units Netdata uses. 
+        This abstracts data collection and simplifies visualization, 
+        but you will not be able to copy and paste queries from other sources to convert units.
+        For example, CPU utilization percentage is calculated by Netdata, 
+        so Netdata will convert ticks to percentage and send the average percentage to the backend.
 
     -   `sum` or `volume`: the sum of the interpolated values shown on the Netdata graphs is sent to the backend.
         So, if Netdata is configured to send data to the backend every 10 seconds, the sum of the 10 values shown on the
         Netdata charts will be used.
 
-Time-series databases suggest to collect the raw values (`as-collected`). If you plan to invest on building your monitoring around a time-series database and you already know (or you will invest in learning) how to convert units and normalize the metrics in Grafana or other visualization tools, we suggest to use `as-collected`.
+    Time-series databases suggest to collect the raw values (`as-collected`). 
+    If you plan to invest on building your monitoring around a time-series database and you already know 
+    (or you will invest in learning) how to convert units and normalize the metrics in Grafana 
+    or other visualization tools, we suggest to use `as-collected`.
 
-If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with Netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot simpler. Furthermore, if you use `average`, the charts shown in the back-end will match exactly what you see in Netdata, which is not necessarily true for the other modes of operation.
+    If, on the other hand, you just need long term archiving of Netdata metrics 
+    and you plan to mainly work with Netdata, we suggest to use `average`. 
+    It decouples visualization from data collection, so it will generally be a lot simpler.
+    Furthermore, if you use `average`, the charts shown in the back-end will match exactly what you see in Netdata, 
+    which is not necessarily true for the other modes of operation.
 
 5.  This code is smart enough, not to slow down Netdata, independently of the speed of the backend server.
 
@@ -79,7 +88,7 @@ If, on the other hand, you just need long term archiving of Netdata metrics and 
 In `/etc/netdata/netdata.conf` you should have something like this (if not download the latest version
 of `netdata.conf` from your Netdata):
 
-```
+```conf
 [backend]
     enabled = yes | no
     type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | prometheus_remote_write | json | kinesis | mongodb
@@ -98,7 +107,8 @@ of `netdata.conf` from your Netdata):
 
 -   `enabled = yes | no`, enables or disables sending data to a backend
 
--   `type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis | mongodb`, selects the backend type
+-   `type = graphite | opentsdb:telnet | opentsdb:http | opentsdb:https | json | kinesis | mongodb`, 
+selects the backend type
 
 -   `destination = host1 host2 host3 ...`, accepts **a space separated list** of hostnames,
      IPs (IPv4 and IPv6) and ports to connect to.
@@ -116,13 +126,13 @@ of `netdata.conf` from your Netdata):
 
      Example IPv4:
 
-```
+```conf
    destination = 10.11.14.2:4242 10.11.14.3:4242 10.11.14.4:4242
 ```
 
    Example IPv6 and IPv4 together:
 
-```
+```conf
    destination = [ffff:...:0001]:2003 10.11.12.1:2003
 ```
 
@@ -216,7 +226,8 @@ Netdata adds 4 alarms:
 1.  `backend_last_buffering`, number of seconds since the last successful buffering of backend data
 2.  `backend_metrics_sent`, percentage of metrics sent to the backend server
 3.  `backend_metrics_lost`, number of metrics lost due to repeating failures to contact the backend server
-4.  ~~`backend_slow`, the percentage of time between iterations needed by the backend time to process the data sent by Netdata~~ (this was misleading and has been removed).
+4.  ~~`backend_slow`, the percentage of time between iterations needed by the backend
+ time to process the data sent by Netdata~~ (this was misleading and has been removed).
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20463779/a46ed1c2-af43-11e6-91a5-07ca4533cac3.png)
 
