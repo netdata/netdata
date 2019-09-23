@@ -31,6 +31,7 @@ install:
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
   - export PACKAGE_CLOUD_RETENTION_DAYS=30
   - if [ ! "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export DEPLOY_REPO="netdata-devel";  fi;
+  - export COMMIT_TAG_POINTS_AT="$(git tag --points-at)"
 
 
 
@@ -58,7 +59,7 @@ stages:
     if: branch = master AND type = cron
 
     # Scheduled releases
-  - name: Packaging for release
+  - name: Support activities on main branch
     if: branch = master AND type != pull_request AND type != cron
 
   - name: Publish for release
@@ -240,22 +241,23 @@ jobs:
 
 
 
-    - stage: Packaging for release
+    - stage: Support activities on main branch
+      name: Run labeler on github issues
+      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
 
-      name: Generate changelog and TAG the release (only on special commit msg)
-      before_script: post_message "TRAVIS_MESSAGE" "Packaging step for release initiated" "${NOTIF_CHANNEL}"
+    - name: Generate changelog and TAG commit, for release (only on special commit msg)
+      before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
         - echo "Last commit:" && git log -1
         - echo "GIT Describe:" && git describe
         - echo "packaging/version:" && cat packaging/version
         - .travis/generate_changelog_and_tag_release.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Packaging for release failed"
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Changelog generation and tag of release, failed"
       git:
         depth: false
-
-    - name: Run labeler on github issues
-      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
+      # .travis/tagger.sh does similar confirmations before it does anything. Be sure to modify both when doing changes
+      if: commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/ OR (env(COMMIT_TAG_POINTS_AT) IS present AND NOT env(COMMIT_TAG_POINTS_AT) IS blank)
 
 
 
