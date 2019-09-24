@@ -3521,7 +3521,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "uptime_avg", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->processes?(w->uptime_sum / w->processes):0);
+            send_SET(w->name, w->uptime_sum / w->processes);
     }
     send_END();
 
