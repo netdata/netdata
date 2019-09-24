@@ -219,12 +219,11 @@ export const Chart = ({
   }, [handleToolBoxPanAndZoom, netdataFirst, viewAfter, viewBefore])
 
   const handleToolboxRightClick = useCallback((event: React.MouseEvent) => {
-    const step = (viewBefore - viewAfter) * getPanAndZoomStep(event)
-    const newBefore = viewBefore + step
-    const newAfter = viewAfter + step
-    if (newBefore <= netdataLast) {
-      handleToolBoxPanAndZoom(newAfter, newBefore)
-    }
+    const timeWindow = viewBefore - viewAfter
+    const step = timeWindow * getPanAndZoomStep(event)
+    const newBefore = Math.min(viewBefore + step, netdataLast)
+    const newAfter = newBefore - timeWindow
+    handleToolBoxPanAndZoom(newAfter, newBefore)
   }, [handleToolBoxPanAndZoom, netdataLast, viewAfter, viewBefore])
 
   const handleToolboxZoomInClick = useCallback((event: React.MouseEvent) => {
