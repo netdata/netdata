@@ -261,16 +261,14 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
  * Change the name of the current alarm appending a new diagram.
  *
  * @param name the alarm name
+ * @param namelen is the length of the previous vector.
  * @param dim the dimension of the chart.
+ * @param dimlen  is the length of the previous vector.
  *
  * @return It returns the new name on success and the old otherwise
  */
-char *alarm_name_with_dim(char *name, const char *dim) {
-    size_t namelen,dimlen;
-
+char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen) {
     char *newname,*move;
-    namelen = strlen(name);
-    dimlen = strlen(dim);
 
     newname = malloc(namelen + dimlen + 2);
     if(newname) {
