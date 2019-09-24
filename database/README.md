@@ -14,8 +14,8 @@ If you need 1.000 dimensions, they will occupy just 14.4MB.
 Of course, 3.600 entries is a very short history, especially if data collection frequency is set
 to 1 second. You will have just one hour of data.
 
-For a day of data and 1.000 dimensions, you will need: 86.400 seconds * 4 bytes * 1.000
-dimensions = 345MB of RAM.
+For a day of data and 1.000 dimensions, you will need: `86.400 seconds * 4 bytes * 1.000
+dimensions = 345MB of RAM`.
 
 One option you have to lower this number is to use
 **[Memory Deduplication - Kernel Same Page Merging - KSM](#ksm)**. Another possibility is to 
@@ -53,7 +53,7 @@ Currently Netdata supports 6 memory modes:
 
 You can select the memory mode by editing `netdata.conf` and setting:
 
-```
+```conf
 [global]
     # ram, save (the default, save on exit, load on start), map (swap like)
     memory mode = save
@@ -156,9 +156,10 @@ of system crash, data on disk will be up to 10 minutes old.
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/23835030/ba4bf506-0768-11e7-9bc6-3b23e080c69f.png)
 
-To have these settings automatically applied on boot, create the file `/etc/sysctl.d/netdata-memory.conf` with these contents:
+To have these settings automatically applied on boot, 
+create the file `/etc/sysctl.d/netdata-memory.conf` with these contents:
 
-```
+```conf
 vm.dirty_expire_centisecs = 60000
 vm.dirty_background_ratio = 80
 vm.dirty_ratio = 90
@@ -203,7 +204,9 @@ CONFIG_KSM=y
 
 When KSM is enabled at the kernel is just available for the user to enable it.
 
-So, if you build a kernel with `CONFIG_KSM=y` you will just get a few files in `/sys/kernel/mm/ksm`. Nothing else happens. There is no performance penalty (apart I guess from the memory this code occupies into the kernel).
+So, if you build a kernel with `CONFIG_KSM=y` you will just get a few files in `/sys/kernel/mm/ksm`. 
+Nothing else happens. 
+There is no performance penalty (apart I guess from the memory this code occupies into the kernel).
 
 The files that `CONFIG_KSM=y` offers include:
 
@@ -211,7 +214,8 @@ The files that `CONFIG_KSM=y` offers include:
 -   `/sys/kernel/mm/ksm/sleep_millisecs`, by default `20`. The frequency ksmd should evaluate memory for deduplication.
 -   `/sys/kernel/mm/ksm/pages_to_scan`, by default `100`. The amount of pages ksmd will evaluate on each run.
 
-So, by default `ksmd` is just disabled. It will not harm performance and the user/admin can control the CPU resources he/she is willing `ksmd` to use.
+So, by default `ksmd` is just disabled. 
+It will not harm performance and the user/admin can control the CPU resources he/she is willing `ksmd` to use.
 
 ### Run `ksmd` kernel daemon
 
@@ -222,7 +226,8 @@ echo 1 >/sys/kernel/mm/ksm/run
 echo 1000 >/sys/kernel/mm/ksm/sleep_millisecs
 ```
 
-With these settings ksmd does not even appear in the running process list (it will run once per second and evaluate 100 pages for de-duplication).
+With these settings ksmd does not even appear in the running process list 
+(it will run once per second and evaluate 100 pages for de-duplication).
 
 Put the above lines in your boot sequence (`/etc/rc.local` or equivalent) to have `ksmd` run at boot.
 
