@@ -12,7 +12,7 @@ This is the **only mode** that supports changing the data collection update freq
 With the DB engine memory mode the metric data are stored in database files. These files are
 organized in pairs, the datafiles and their corresponding journalfiles, e.g.:
 
-```
+```sh
 datafile-1-0000000001.ndf
 journalfile-1-0000000001.njf
 datafile-1-0000000002.ndf
@@ -36,7 +36,7 @@ per node, and all charts of `dbengine` memory mode in such a host share the same
 and DB engine instance memory state. You can select the memory mode for localhost by editing
 netdata.conf and setting:
 
-```
+```conf
 [global]
     memory mode = dbengine
 ```
@@ -50,7 +50,7 @@ for any metrics being stored in the DB engine.
 All DB engine instances, for localhost and all other streaming recipient nodes inherit their
 configuration from `netdata.conf`:
 
-```
+```conf
 [global]
     page cache size = 32
     dbengine disk space = 256
@@ -124,26 +124,28 @@ If for example one wants to allocate 65536 file descriptors to the Netdata servi
 one needs to override the Netdata service by running `sudo systemctl edit netdata` and creating a
 file with contents:
 
-```
+```sh
 [Service]
 LimitNOFILE=65536
 ```
 
 For other types of services one can add the line:
 
-```
+```sh
 ulimit -n 65536
 ```
 
-at the beginning of the service file. Alternatively you can change the system-wide limits of the kernel by changing `/etc/sysctl.conf`. For linux that would be:
+at the beginning of the service file. 
+Alternatively you can change the system-wide limits of the kernel by changing `/etc/sysctl.conf`. 
+For linux that would be:
 
-```
+```conf
 fs.file-max = 65536
 ```
 
 In FreeBSD and OS X you change the lines like this:
 
-```
+```conf
 kern.maxfilesperproc=65536
 kern.maxfiles=65536
 ```
