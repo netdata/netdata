@@ -95,9 +95,8 @@ void rrdeng_store_metric_flush_current_page(RRDDIM *rd)
     if (likely(descr->page_length)) {
         int ret, page_is_empty;
 
-#ifdef NETDATA_INTERNAL_CHECKS
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
-#endif
+
         if (handle->prev_descr) {
             /* unpin old second page */
             pg_cache_put(ctx, handle->prev_descr);
@@ -192,9 +191,26 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     if (unlikely(INVALID_TIME == descr->start_time)) {
         descr->start_time = point_in_time;
 
-#ifdef NETDATA_INTERNAL_CHECKS
         rrd_stat_atomic_add(&ctx->stats.metric_API_producers, 1);
-#endif
+
+        if (unlikely(((unsigned long)ctx->stats.metric_API_producers) >= ctx->max_cache_pages)) {
+            if (0 == (unsigned long)ctx->stats.pg_cache_errors) {
+                /* only print the first time */
+                error("Deadlock detected in dbengine instance \"%s\", metric data will not be stored in the database"
+                      ", please increase page cache size.", ctx->dbfiles_path);
+            }
+            rrd_stat_atomic_add(&ctx->stats.pg_cache_errors, 1);
+            rrd_stat_atomic_add(&global_pg_cache_errors, 1);
+            /* Resolve deadlock */
+            descr->page_length = 0; /* make sure the page descriptor is deconstructed */
+            rrdeng_store_metric_flush_current_page(rd);
+            rrd_stat_atomic_add(&ctx->stats.metric_API_producers, -1);
+            return;
+        } else if (unlikely(((unsigned long)ctx->stats.metric_API_producers) >= ctx->cache_pages_low_watermark)) {
+            rrd_stat_atomic_add(&ctx->stats.pg_cache_warnings, 1);
+            rrd_stat_atomic_add(&global_pg_cache_warnings, 1);
+        }
+
         pg_cache_insert(ctx, handle->page_index, descr);
     } else {
         pg_cache_add_new_metric_time(handle->page_index, descr);
@@ -672,7 +688,7 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
  * You must not change the indices of the statistics or user code will break.
  * You must not exceed RRDENG_NR_STATS or it will crash.
  */
-void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
+void rrdeng_get_35_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
@@ -709,7 +725,9 @@ void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[30] = (uint64_t)global_io_errors;
     array[31] = (uint64_t)global_fs_errors;
     array[32] = (uint64_t)rrdeng_reserved_file_descriptors;
-    assert(RRDENG_NR_STATS == 33);
+    array[33] = (uint64_t)global_pg_cache_warnings;
+    array[34] = (uint64_t)global_pg_cache_errors;
+    assert(RRDENG_NR_STATS == 35);
 }
 
 /* Releases reference to page */

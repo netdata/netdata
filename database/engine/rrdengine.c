@@ -5,6 +5,8 @@
 
 rrdeng_stats_t global_io_errors = 0;
 rrdeng_stats_t global_fs_errors = 0;
+rrdeng_stats_t global_pg_cache_warnings = 0;
+rrdeng_stats_t global_pg_cache_errors = 0;
 rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
 
 void sanity_check(void)
