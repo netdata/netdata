@@ -1554,6 +1554,10 @@ RRDR *rrd2rrdr(
     time_t first_entry_t = rrdset_first_entry_t(st);
     time_t last_entry_t  = rrdset_last_entry_t(st);
 
+    rrd_update_every = st->update_every;
+    absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
+                                                                      rrd_update_every, first_entry_t,
+                                                                      last_entry_t);
 #ifdef ENABLE_DBENGINE
     if ((st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)) {
         struct rrdeng_region_info *region_info_array;
@@ -1563,32 +1567,33 @@ RRDR *rrd2rrdr(
         regions = rrdeng_variable_step_boundaries(st, after_requested, before_requested,
                                                   &region_info_array, &max_interval);
         if (1 == regions) {
-            if (region_info_array)
-                rrd_update_every = region_info_array[0].update_every;
-            else
-                rrd_update_every = st->update_every;
-            if (region_info_array)
-                    freez(region_info_array);
-            absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
-                                                                              rrd_update_every, first_entry_t,
-                                                                              last_entry_t);
+            if (region_info_array) {
+                if (rrd_update_every != region_info_array[0].update_every) {
+                    rrd_update_every = region_info_array[0].update_every;
+                    /* recalculate query alignment */
+                    absolute_period_requested =
+                            rrdr_convert_before_after_to_absolute(&after_requested, &before_requested, rrd_update_every,
+                                                                  first_entry_t, last_entry_t);
+                }
+                freez(region_info_array);
+            }
             return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
                                       first_entry_t, last_entry_t, absolute_period_requested);
         } else {
-            rrd_update_every = (uint16_t)max_interval;
-            absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
-                                                                              rrd_update_every, first_entry_t,
-                                                                              last_entry_t);
+            if (rrd_update_every != (uint16_t)max_interval) {
+                rrd_update_every = (uint16_t) max_interval;
+                /* recalculate query alignment */
+                absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
+                                                                                  rrd_update_every, first_entry_t,
+                                                                                  last_entry_t);
+            }
             return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,
                                          first_entry_t, last_entry_t, absolute_period_requested, region_info_array);
         }
     }
 #endif
-    rrd_update_every = st->update_every;
-    absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
-                                                                      rrd_update_every, first_entry_t, last_entry_t);
     return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                               resampling_time_requested, options, dimensions,
                               rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested);
