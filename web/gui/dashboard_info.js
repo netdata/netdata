@@ -2644,10 +2644,10 @@ netdataDashboard.context = {
 
     'zookeeper.server_state': {
         info:
-            '<code>0</code>: unknown; ' +
-            '<code>1</code>: leader; ' +
-            '<code>2</code>: follower; ' +
-            '<code>3</code>: observer; ' +
+            '<code>0</code>: unknown, ' +
+            '<code>1</code>: leader, ' +
+            '<code>2</code>: follower, ' +
+            '<code>3</code>: observer, ' +
             '<code>4</code>: standalone.'
             }
 };
