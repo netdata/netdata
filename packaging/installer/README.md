@@ -428,7 +428,7 @@ sudo ./netdata-installer.sh --install /usr/local
 The installer will also install a startup plist to start Netdata when your Mac boots.
 
 **Note:** Should you wish to install Netdata with TLS support:
-1. Install open SSL using brew, by executing `brew install openssl`
+1. Install OpenSSL via brew by executing `brew install openssl`
 2. Run the installer with the extra CFLAGS and LDFLAGS, since open SSL installation is not automatically symlinked to /usr/local
 ```sh
 # install Netdata in /usr/local/netdata
