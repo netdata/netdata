@@ -65,7 +65,7 @@ override_dh_install: debian/netdata.postinst
 	for D in $$(find "$(TOP)/var/lib/netdata/www/" -maxdepth 1 -type d -printf '%f '); do \
 		echo Relocating $$D; \
 		mv "$(TOP)/var/lib/netdata/www/$$D" "$(TOP)/usr/share/netdata/www/$$D"; \
-		ln -s "/usr/share/netdata/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
+		ln -s "/usr/share/netdata/www/$$D" "$(TOP)/var/lib/netdata/www/$$D"; \
 	done
 
 	# Update postinst to set correct group for www files on installation.

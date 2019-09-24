@@ -588,16 +588,16 @@ class Plugin:
                 try:
                     job.init()
                 except Exception as error:
-                    self.log.warning("{0}[{1}] : unhandled exception on init : {2}, skipping the job",
-                                     job.module_name, job.real_name, repr(error))
+                    self.log.warning("{0}[{1}] : unhandled exception on init : {2}, skipping the job".format(
+                                     job.module_name, job.real_name, repr(error)))
                     job.status = JOB_STATUS_DROPPED
                     continue
 
             try:
                 ok = job.check()
             except Exception as error:
-                self.log.warning("{0}[{1}] : unhandled exception on check : {2}, skipping the job",
-                                 job.module_name, job.real_name, repr(error))
+                self.log.warning("{0}[{1}] : unhandled exception on check : {2}, skipping the job".format(
+                                 job.module_name, job.real_name, repr(error)))
                 job.status = JOB_STATUS_DROPPED
                 continue
             if not ok:
@@ -609,8 +609,8 @@ class Plugin:
             try:
                 job.create()
             except Exception as error:
-                self.log.error("{0}[{1}] : unhandled exception on create : {2}, skipping the job",
-                               job.module_name, job.real_name, repr(error))
+                self.log.warning("{0}[{1}] : unhandled exception on create : {2}, skipping the job".format(
+                               job.module_name, job.real_name, repr(error)))
                 job.status = JOB_STATUS_DROPPED
                 continue
 
