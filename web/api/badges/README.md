@@ -216,7 +216,11 @@ These are options dedicated to badges:
 
 -   `fixed_width_lbl=NUMBER` and `fixed_width_val=NUMBER`
 
-    Both values have to be set together otherwise value will be ignored. In case fixed width labels are necessary (e.g. badges in column should be same size) this option will override any autosizing of badge. In this case requester is responsible to provide enough space for all the possible values/contents of the badge. Parameter `scale` still applies on provided values. Parameter `fixed_width_lbl` determines size of left (label/name) side of label. Parameter `fixed_width_val` determines size of right (value) side of label.
+    This parameter overrides auto-sizing of badges and displays them at fixed widths. `fixed_width_lbl` determines the size of the label's left side (label/name). `fixed_width_val` determines the size of the the label's right side (value). You must set both parameters together, or they will be ignored.
+    
+    You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting.
+    
+    The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
 
 -   `refresh=auto` or `refresh=SECONDS`
 
