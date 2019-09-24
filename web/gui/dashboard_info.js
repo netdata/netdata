@@ -509,13 +509,13 @@ netdataDashboard.menu = {
     'zookeeper': {
         title: 'Zookeeper',
         icon: '<i class="fas fa-database"></i>',
-        info: 'Provides health statistics for <b><a href="https://zookeeper.apache.org/">Zookeeper</a></b> server. Data collected through the command port using <code><a href="https://zookeeper.apache.org/doc/r3.4.13/zookeeperAdmin.html#sc_zkCommands">mntr</a></code> command.'
+        info: 'Provides health statistics for <b><a href="https://zookeeper.apache.org/">Zookeeper</a></b> server. Data collected through the command port using <code><a href="https://zookeeper.apache.org/doc/r3.5.5/zookeeperAdmin.html#sc_zkCommands">mntr</a></code> command.'
     },
 
     'hdfs': {
         title: 'HDFS',
         icon: '<i class="fas fa-folder-open"></i>',
-        info: 'Provides <b><a href="https://hadoop.apache.org/docs/r1.2.1/hdfs_design.html">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
+        info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
     }
 };
 
