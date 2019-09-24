@@ -15,7 +15,7 @@ I'm assuming we are starting at a fresh ubuntu shell
 
 ### Installing Netdata
 
-There are number of ways to install Netdata according to [Installation](../../packaging/installer/#installation).
+There are number of ways to install Netdata according to [Installation](../../packaging/installer/).
 The suggested way of installing the latest Netdata and keep it upgrade automatically. Using one line installation:
 
 ```sh
