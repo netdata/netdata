@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- netdata/packaging: fix broken links on web files, for deb [\#6930](https://github.com/netdata/netdata/pull/6930) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- installer: include go.d.plugin version v0.10.0 [\#6929](https://github.com/netdata/netdata/pull/6929) ([ilyam8](https://github.com/ilyam8))
+- python.d: fix log warnings in start\_job [\#6928](https://github.com/netdata/netdata/pull/6928) ([ilyam8](https://github.com/ilyam8))
+- Fix remark lint for Contrib  [\#6921](https://github.com/netdata/netdata/pull/6921) ([prhomhyse](https://github.com/prhomhyse))
+- Suggest using /run or /var/run for the unix socket [\#6916](https://github.com/netdata/netdata/pull/6916) ([cakrit](https://github.com/cakrit))
+- Improve documentation for the SNMP collector [\#6915](https://github.com/netdata/netdata/pull/6915) ([cakrit](https://github.com/cakrit))
+- netdata/ci: nits and fixes around package release workflow [\#6914](https://github.com/netdata/netdata/pull/6914) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Correct read length of silencers file [\#6909](https://github.com/netdata/netdata/pull/6909) ([cakrit](https://github.com/cakrit))
 - netdata/ci: fix branch check [\#6905](https://github.com/netdata/netdata/pull/6905) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: remove rhel7 - i386, until its settled from bug \#6849 [\#6902](https://github.com/netdata/netdata/pull/6902) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Improve changelog generation and add it back to the pipeline [\#6900](https://github.com/netdata/netdata/pull/6900) ([cakrit](https://github.com/cakrit))
@@ -213,7 +221,6 @@
 - Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
 - Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
 - ZRAM info collector module \(proc.plugin\) [\#6276](https://github.com/netdata/netdata/pull/6276) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
-- Url parser refactoring [\#6247](https://github.com/netdata/netdata/pull/6247) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
@@ -273,9 +280,6 @@
 - Fix variable namespace in memory health check [\#6261](https://github.com/netdata/netdata/pull/6261) ([octomike](https://github.com/octomike))
 - Fix typo in nfacct.plugin [\#6260](https://github.com/netdata/netdata/pull/6260) ([vlvkobal](https://github.com/vlvkobal))
 - netdata/packaging: Fix netdata/netdata docker image failure, when users passing PGID that already exists on the system [\#6259](https://github.com/netdata/netdata/pull/6259) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- PR to fix issue \#6238 [\#6242](https://github.com/netdata/netdata/pull/6242) ([thiagoftsm](https://github.com/thiagoftsm))
-- Update CODEOWNERS [\#6241](https://github.com/netdata/netdata/pull/6241) ([cakrit](https://github.com/cakrit))
-- Force page alignment per dimension of chart. [\#6240](https://github.com/netdata/netdata/pull/6240) ([mfundul](https://github.com/mfundul))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
