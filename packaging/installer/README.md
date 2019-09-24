@@ -430,6 +430,7 @@ The installer will also install a startup plist to start Netdata when your Mac b
 **Note:** Should you wish to install Netdata with TLS support:
 1. Install OpenSSL via brew by executing `brew install openssl`
 2. Run the installer with the extra CFLAGS and LDFLAGS, since your OpenSSL installation is not automatically symlinked to `/usr/local`
+
 ```sh
 # install Netdata in /usr/local/netdata
 cd netdata
