@@ -10,3 +10,7 @@
 
   # Default build command.
   command = "./buildhtml.sh"
+
+[[redirects]]
+  from = "/docs/GettingStarted/"
+  to = "/docs/getting-started"
