@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- Restore original alignment behaviour of RRDR [\#6938](https://github.com/netdata/netdata/pull/6938) ([mfundul](https://github.com/mfundul))
+- minor - check for curl to not get wrong error message [\#6931](https://github.com/netdata/netdata/pull/6931) ([underhood](https://github.com/underhood))
 - netdata/packaging: fix broken links on web files, for deb [\#6930](https://github.com/netdata/netdata/pull/6930) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - installer: include go.d.plugin version v0.10.0 [\#6929](https://github.com/netdata/netdata/pull/6929) ([ilyam8](https://github.com/ilyam8))
 - python.d: fix log warnings in start\_job [\#6928](https://github.com/netdata/netdata/pull/6928) ([ilyam8](https://github.com/ilyam8))
+- zookeeper and hdfs: alarms and dashboard\_info [\#6927](https://github.com/netdata/netdata/pull/6927) ([ilyam8](https://github.com/ilyam8))
 - netdata.spec.in: Do not build CUPS plugin subpackage on CentOS 6 and CentOS 7 [\#6926](https://github.com/netdata/netdata/pull/6926) ([knatsakis](https://github.com/knatsakis))
 - Fix remark lint for Contrib  [\#6921](https://github.com/netdata/netdata/pull/6921) ([prhomhyse](https://github.com/prhomhyse))
 - Suggest using /run or /var/run for the unix socket [\#6916](https://github.com/netdata/netdata/pull/6916) ([cakrit](https://github.com/cakrit))
@@ -44,6 +47,7 @@
 - Add news of 1.17.1 to README [\#6836](https://github.com/netdata/netdata/pull/6836) ([cakrit](https://github.com/cakrit))
 - netdata/packaging: no need to overengineer with these checks [\#6834](https://github.com/netdata/netdata/pull/6834) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Buffer overflow [\#6817](https://github.com/netdata/netdata/pull/6817) ([amoss](https://github.com/amoss))
+- Docs: Overhaul of Getting started guide [\#6811](https://github.com/netdata/netdata/pull/6811) ([joelhans](https://github.com/joelhans))
 - NPM Packages version update [\#6801](https://github.com/netdata/netdata/pull/6801) ([prhomhyse](https://github.com/prhomhyse))
 - Collector slabinfo [\#6800](https://github.com/netdata/netdata/pull/6800) ([Saruspete](https://github.com/Saruspete))
 - Fix some errors reported by Coverity [\#6797](https://github.com/netdata/netdata/pull/6797) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -274,13 +278,6 @@
 - Add comments about AWS SDK for C++ installation [\#6277](https://github.com/netdata/netdata/pull/6277) ([vlvkobal](https://github.com/vlvkobal))
 - Fix devuan support for initd [\#6275](https://github.com/netdata/netdata/pull/6275) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Easily disable alarms, by persisting the silencers configuration [\#6274](https://github.com/netdata/netdata/pull/6274) ([thiagoftsm](https://github.com/thiagoftsm))
-- netdata/packaging: During install,  many file not found were raised [\#6272](https://github.com/netdata/netdata/pull/6272) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging/documentation: Its Redhat, then came the others [\#6271](https://github.com/netdata/netdata/pull/6271) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging: Adjust CI notification logic [\#6268](https://github.com/netdata/netdata/pull/6268) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Update README.md [\#6264](https://github.com/netdata/netdata/pull/6264) ([mfundul](https://github.com/mfundul))
-- UrlService: add min required version check [\#6263](https://github.com/netdata/netdata/pull/6263) ([ilyam8](https://github.com/ilyam8))
-- Fix variable namespace in memory health check [\#6261](https://github.com/netdata/netdata/pull/6261) ([octomike](https://github.com/octomike))
-- Fix typo in nfacct.plugin [\#6260](https://github.com/netdata/netdata/pull/6260) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
