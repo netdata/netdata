@@ -1,7 +1,21 @@
 #!/usr/bin/env bash
 '''':;
-exec "$(command -v python || command -v python3 || command -v python2 ||
-echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM")" "$0" "$@" # '''
+pybinary=$(which python || which python3 || which python2)
+filtered=()
+for arg in "$@"
+do
+    case $arg in
+        -p*) pybinary=${arg:2}
+              shift 1          ;;
+        *)  filtered+=("$arg") ;;
+    esac
+done
+if [ "$pybinary" = "" ]
+then
+    echo "ERROR python IS NOT AVAILABLE IN THIS SYSTEM"
+    exit 1
+fi
+exec "$pybinary"  "$0" "${filtered[@]}" # '''
 
 # -*- coding: utf-8 -*-
 # Description:
@@ -574,16 +588,16 @@ class Plugin:
                 try:
                     job.init()
                 except Exception as error:
-                    self.log.warning("{0}[{1}] : unhandled exception on init : {2}, skipping the job",
-                                     job.module_name, job.real_name, repr(error))
+                    self.log.warning("{0}[{1}] : unhandled exception on init : {2}, skipping the job".format(
+                                     job.module_name, job.real_name, repr(error)))
                     job.status = JOB_STATUS_DROPPED
                     continue
 
             try:
                 ok = job.check()
             except Exception as error:
-                self.log.warning("{0}[{1}] : unhandled exception on check : {2}, skipping the job",
-                                 job.module_name, job.real_name, repr(error))
+                self.log.warning("{0}[{1}] : unhandled exception on check : {2}, skipping the job".format(
+                                 job.module_name, job.real_name, repr(error)))
                 job.status = JOB_STATUS_DROPPED
                 continue
             if not ok:
@@ -595,8 +609,8 @@ class Plugin:
             try:
                 job.create()
             except Exception as error:
-                self.log.error("{0}[{1}] : unhandled exception on create : {2}, skipping the job",
-                               job.module_name, job.real_name, repr(error))
+                self.log.warning("{0}[{1}] : unhandled exception on create : {2}, skipping the job".format(
+                               job.module_name, job.real_name, repr(error)))
                 job.status = JOB_STATUS_DROPPED
                 continue
 

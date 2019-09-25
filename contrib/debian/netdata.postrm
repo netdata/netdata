@@ -15,6 +15,10 @@ case "$1" in
 			dpkg-statoverride --remove /var/lib/netdata/www
 		fi
 
+		if dpkg-statoverride --list | grep -qw /var/lib/netdata/registry; then
+			dpkg-statoverride --remove /var/lib/netdata/registry
+		fi
+
 		if dpkg-statoverride --list | grep -qw /var/lib/netdata; then
 			dpkg-statoverride --remove /var/lib/netdata
 		fi

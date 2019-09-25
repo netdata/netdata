@@ -149,7 +149,7 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'packaging/installer/UPDATE.md'
     - 'packaging/DISTRIBUTIONS.md'
     - 'packaging/installer/UNINSTALL.md'
-- 'docs/GettingStarted.md'
+- 'docs/getting-started.md'
 - Running Netdata:
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'
@@ -250,6 +250,7 @@ navpart 3 collectors/freeipmi.plugin
 navpart 3 collectors/nfacct.plugin
 navpart 3 collectors/xenstat.plugin
 navpart 3 collectors/perf.plugin
+navpart 3 collectors/slabinfo.plugin
 
 
 echo -ne "    - 'docs/Third-Party-Plugins.md'

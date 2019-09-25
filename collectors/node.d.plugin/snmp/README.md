@@ -19,7 +19,7 @@ In this example:
 -   the SNMP device is `10.11.12.8`.
 -   the SNMP community is `public`.
 -   we will update the values every 10 seconds (`update_every: 10` under the server `10.11.12.8`).
--   we define 2 charts `snmp_switch.bandwidth_port1` and `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`.
+-   we define 2 charts `snmp_switch.bandwidth_port1` and `snmp_switch.bandwidth_port2`, each having 2 dimensions: `in` and `out`. Note that the charts and dimensions must not contain any white space or special characters, other than `.` and `_`.
 
 ```json
 {
@@ -96,8 +96,8 @@ In this example:
 
 <details markdown="1"><summary><b>Caution: Counter64 metrics do not support `offset` (issue #5028).</b></summary>
 The SNMP plugin supports Counter64 metrics with the only limitation that the `offset` parameter should not be defined. Due to the way Javascript handles large numbers and the fact that the offset is applied to metrics inside the plugin, the offset will be ignored silently.
-</details> 
-<br>
+</details>
+
 If you need to define many charts using incremental OIDs, you can use something like this:
 
 ```json
@@ -356,8 +356,7 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
                 }
             }
         }
-    }
-    ]
+    }],
 }
 ```
 
