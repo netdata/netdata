@@ -18,6 +18,9 @@ OUTDIR="tests"
 OUTEDIR="encoded_tests"
 OUTOPTDIR="options"
 ERRDIR="etests"
+NOCOLOR='\033[0'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
 
 ################################################################################################
 ####																						####
@@ -27,7 +30,7 @@ ERRDIR="etests"
 
 # Print error message and close script
 netdata_print_error(){
-    echo "Closing due error \"$1\" code \"$2\""
+    echo "${RED} Closing due error \"$1\" code \"$2\" ${NOCOLOR}"
     exit 1
 }
 
@@ -299,7 +302,6 @@ for I in $CHARTS ; do
     break;
 done
 
-WHITE='\033[0;37m'
-echo -e "${WHITE}ALL the URLS got 200 as answer!"
+echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
 
 exit 0
