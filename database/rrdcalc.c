@@ -558,7 +558,7 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->source);
     freez(rc->units);
     freez(rc->info);
-    freez(rc->spdim);
+    simple_pattern_free(rc->spdim);
     freez(rc);
 }
 
