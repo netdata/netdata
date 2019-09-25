@@ -118,6 +118,8 @@ export const Chart = ({
     ? Math.min(chartData.before * 1000, viewRange[1])
     : chartData.before * 1000 // when 'before' is 0 or negative
 
+  const netdataFirst = chartData.first_entry * 1000
+  const netdataLast = chartData.last_entry * 1000
 
   // old dashboard persists min duration based on first chartWidth, i assume it's a bug
   // and will update fixedMinDuration when width changes
@@ -130,7 +132,7 @@ export const Chart = ({
    * pan-and-zoom handler (both for toolbox and mouse events)
    */
   const handleUpdateChartPanAndZoom = useCallback(({
-    after, before, callback, shouldForceTimeRange,
+    after, before, callback, shouldForceTimeRange, shouldNotExceedAvailableRange,
   }) => {
     if (before < after) {
       return
@@ -142,6 +144,21 @@ export const Chart = ({
     let afterForced = Math.round(after)
     let beforeForced = Math.round(before)
     const viewUpdateEvery = chartData.view_update_every * 1000
+
+    if (shouldNotExceedAvailableRange) {
+      const first = netdataFirst + viewUpdateEvery
+      const last = netdataLast + viewUpdateEvery
+      // first check "before"
+      if (beforeForced > last) {
+        afterForced -= (before - last)
+        beforeForced = last
+      }
+
+      if (afterForced < first) {
+        afterForced = first
+      }
+    }
+
 
     // align them to update_every
     // stretching them further away
@@ -187,27 +204,24 @@ export const Chart = ({
     }))
 
     if (doCallback && typeof callback === "function") {
-      callback()
+      callback(afterForced, beforeForced)
     }
-  }, [chartData.view_update_every, chartUuid, dispatch, fixedMinDuration, viewAfter, viewBefore])
+  }, [chartData.view_update_every, chartUuid, dispatch, fixedMinDuration, netdataFirst,
+    netdataLast, viewAfter, viewBefore])
 
 
   /**
    * toolbox handlers
    */
-  const netdataFirst = chartData.first_entry * 1000
-  const netdataLast = chartData.last_entry * 1000
-
   const handleToolBoxPanAndZoom = useCallback((after: number, before: number) => {
     const newAfter = Math.max(after, netdataFirst)
     const newBefore = Math.min(before, netdataLast)
     handleUpdateChartPanAndZoom({
       after: newAfter,
       before: newBefore,
-      masterId: chartUuid,
       shouldForceTimeRange: true,
     })
-  }, [chartUuid, handleUpdateChartPanAndZoom, netdataFirst, netdataLast])
+  }, [handleUpdateChartPanAndZoom, netdataFirst, netdataLast])
 
   const handleToolboxLeftClick = useCallback((event: React.MouseEvent) => {
     const step = (viewBefore - viewAfter) * getPanAndZoomStep(event)
@@ -236,7 +250,7 @@ export const Chart = ({
   const handleToolboxZoomOutClick = useCallback((event: React.MouseEvent) => {
     const dt = ((viewBefore - viewAfter) / (1.0 - (getPanAndZoomStep(event) * 0.8))
       - (viewBefore - viewAfter)) / 2
-    const newAfter = viewAfter - dt;
+    const newAfter = viewAfter - dt
     const newBefore = viewBefore + dt
     handleToolBoxPanAndZoom(newAfter, newBefore)
   }, [handleToolBoxPanAndZoom, viewAfter, viewBefore])
