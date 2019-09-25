@@ -98,9 +98,12 @@ export const Chart = ({
   const [localHoveredX, setLocalHoveredX] = useState<number | null>(null)
 
   const isGlobalSelectionSyncFlagTrue = true // todo
-  const handleSetHoveredX = useCallback((newHoveredX) => {
+  const handleSetHoveredX = useCallback((newHoveredX, noMaster) => {
     if (isGlobalSelectionSyncFlagTrue) {
-      dispatch(setGlobalSelectionAction({ chartUuid, hoveredX: newHoveredX }))
+      const action = noMaster
+        ? { chartUuid: null, hoveredX: newHoveredX }
+        : { chartUuid, hoveredX: newHoveredX }
+      dispatch(setGlobalSelectionAction(action))
     } else {
       setLocalHoveredX(newHoveredX)
     }

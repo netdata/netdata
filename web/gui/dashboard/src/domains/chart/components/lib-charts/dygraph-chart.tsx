@@ -245,7 +245,7 @@ interface Props {
 
   hoveredX: number | null
   setGlobalChartUnderlay: (arg: { after: number, before: number, masterID: string }) => void
-  setHoveredX: (hoveredX: number | null) => void
+  setHoveredX: (hoveredX: number | null, noMaster?: boolean) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
   viewAfter: number
@@ -278,11 +278,15 @@ export const DygraphChart = ({
   const propsRef = useRef({
     hoveredX,
     setGlobalChartUnderlay,
+    viewAfter,
+    viewBefore,
   })
   useLayoutEffect(() => {
     propsRef.current.hoveredX = hoveredX
     propsRef.current.setGlobalChartUnderlay = setGlobalChartUnderlay
-  }, [hoveredX, setGlobalChartUnderlay])
+    propsRef.current.viewAfter = viewAfter
+    propsRef.current.viewBefore = viewBefore
+  }, [hoveredX, setGlobalChartUnderlay, viewAfter, viewBefore])
 
   const { xAxisTimeString } = useDateTime()
   const chartSettings = chartLibrariesSettings[chartLibrary]
@@ -312,6 +316,12 @@ export const DygraphChart = ({
   const isMouseDown = useRef(false)
   // state.tmp.dygraph_highlight_after in old dashboard
   const dygraphHighlightAfter = useRef<null | number>(null)
+  // state.dygraph_last_touch_move in old dashboard
+  const dygraphLastTouchMove = useRef(0)
+  // state.dygraph_last_touch_page_x in old dashboard
+  const dygraphLastTouchPageX = useRef(0)
+  // state.dygraph_last_touch_end in old dashboard
+  const dygraphLastTouchEnd = useRef<undefined | number>()
 
   useLayoutEffect(() => {
     if (chartElement && chartElement.current && !dygraphInstance) {
@@ -602,8 +612,74 @@ export const DygraphChart = ({
             event.preventDefault()
             noop(dygraph, context)
           },
-          touchend(event: MouseEvent, dygraph: Dygraph, context: any) {
-            noop(event, dygraph, context)
+
+          touchstart(event: TouchEvent, dygraph: Dygraph, context: any) {
+            isMouseDown.current = true
+            latestIsUserAction.current = true
+
+            // todo
+            // state.pauseChart()
+
+            Dygraph.defaultInteractionModel.touchstart(event, dygraph, context)
+
+            // we overwrite the touch directions at the end, to overwrite
+            // the internal default of dygraph
+            // eslint-disable-next-line no-param-reassign
+            context.touchDirections = { x: true, y: false }
+
+            dygraphLastTouchMove.current = 0
+
+            if (typeof event.touches[0].pageX === "number") {
+              dygraphLastTouchPageX.current = event.touches[0].pageX
+            } else {
+              dygraphLastTouchPageX.current = 0
+            }
+          },
+          touchmove(event: TouchEvent, dygraph: Dygraph, context: any) {
+            latestIsUserAction.current = true
+            Dygraph.defaultInteractionModel.touchmove(event, dygraph, context)
+
+            dygraphLastTouchMove.current = Date.now()
+          },
+
+          touchend (event: TouchEvent, dygraph: Dygraph, context: any) {
+            isMouseDown.current = false
+            latestIsUserAction.current = true
+            Dygraph.defaultInteractionModel.touchend(event, dygraph, context)
+
+            // if it didn't move, it is a selection
+            if (dygraphLastTouchMove.current === 0 && dygraphLastTouchPageX.current !== 0
+              && chartElement.current // this is just for TS
+            ) {
+              // internal api of dygraph
+              // @ts-ignore
+              // eslint-disable-next-line no-underscore-dangle
+              const dygraphPlotter = dygraph.plotter_
+              const pct = (dygraphLastTouchPageX.current - (
+                dygraphPlotter.area.x + chartElement.current.getBoundingClientRect().left
+              )) / dygraphPlotter.area.w
+
+              const { current } = propsRef
+              const t = Math.round(current.viewAfter
+                + (current.viewBefore - current.viewAfter) * pct
+              )
+              setHoveredX(t, true)
+            }
+
+            // if it was double tap within double click time, reset the charts
+            const now = Date.now()
+            if (typeof dygraphLastTouchEnd.current !== "undefined") {
+              if (dygraphLastTouchMove.current === 0) {
+                const dt = now - dygraphLastTouchEnd.current
+                if (dt <= window.NETDATA.options.current.double_click_speed) {
+                  // todo (reset)
+                  // NETDATA.resetAllCharts(state)
+                }
+              }
+            }
+
+            // remember the timestamp of the last touch end
+            dygraphLastTouchEnd.current = now
           },
         },
       }
@@ -691,8 +767,7 @@ export const DygraphChart = ({
   // set selection
   const currentSelectionMasterId = useSelector(selectGlobalSelectionMaster)
   useLayoutEffect(() => {
-    if (dygraphInstance && currentSelectionMasterId && currentSelectionMasterId !== chartUuid) {
-      const hoveredRow = findIndex((x: any) => x[0] === hoveredX, chartData.result.data)
+    if (dygraphInstance && currentSelectionMasterId !== chartUuid) {
 
       if (hoveredX === null) {
         // getSelection is 100 times faster that clearSelection

@@ -16,7 +16,10 @@ export const requestCommonColorsAction = createAction<RequestCommonColors>(
 export const setTimezoneAction = createAction<{timezone: string}>(`${storeKey}/globalSetTmezone`)
 window.TEMPORARY_setTimezoneAction = setTimezoneAction
 
-interface SetGlobalSelectionAction { chartUuid: string; hoveredX: number }
+interface SetGlobalSelectionAction {
+  chartUuid: string | null
+  hoveredX: number
+}
 export const setGlobalSelectionAction = createAction<SetGlobalSelectionAction>(
   `${storeKey}/setGlobalSelection`,
 )

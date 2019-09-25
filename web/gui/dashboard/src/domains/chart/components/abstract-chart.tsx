@@ -23,7 +23,7 @@ interface Props {
   hoveredX: number | null
   onUpdateChartPanAndZoom: (arg: { after: number, before: number, masterID: string }) => void
 
-  setHoveredX: (hoveredX: number | null) => void
+  setHoveredX: (hoveredX: number | null, noMaster?: boolean) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
   viewAfter: number,
