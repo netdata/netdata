@@ -1,6 +1,12 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+if ! hash curl 2>/dev/null
+then
+	1>&2 echo "'curl' not found on system. Please install 'curl'."
+	exit 1
+fi
+
 # set the host to connect to
 if [ ! -z "$1" ]
 then
