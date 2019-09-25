@@ -731,6 +731,7 @@ static void rrd2rrdr_log_request_response_metdata(RRDR *r
 static int rrdr_convert_before_after_to_absolute(
         long long *after_requestedp
         , long long *before_requestedp
+        , int update_every
         , time_t first_entry_t
         , time_t last_entry_t
 ) {
@@ -749,6 +750,12 @@ static int rrdr_convert_before_after_to_absolute(
 
     // allow relative for before (smaller than API_RELATIVE_TIME_MAX)
     if(abs(before_requested) <= API_RELATIVE_TIME_MAX) {
+        if(abs(before_requested) % update_every) {
+            // make sure it is multiple of st->update_every
+            if(before_requested < 0) before_requested = before_requested - update_every -
+                                                        before_requested % update_every;
+            else before_requested = before_requested + update_every - before_requested % update_every;
+        }
         if(before_requested > 0) before_requested = first_entry_t + before_requested;
         else                     before_requested = last_entry_t  + before_requested; //last_entry_t is not really now_t
         //TODO: fix before_requested to be relative to now_t
@@ -757,6 +764,12 @@ static int rrdr_convert_before_after_to_absolute(
 
     // allow relative for after (smaller than API_RELATIVE_TIME_MAX)
     if(abs(after_requested) <= API_RELATIVE_TIME_MAX) {
+        if(after_requested == 0) after_requested = -update_every;
+        if(abs(after_requested) % update_every) {
+            // make sure it is multiple of st->update_every
+            if(after_requested < 0) after_requested = after_requested - update_every - after_requested % update_every;
+            else after_requested = after_requested + update_every - after_requested % update_every;
+        }
         after_requested = before_requested + after_requested;
         absolute_period_requested = 0;
     }
@@ -799,28 +812,6 @@ static RRDR *rrd2rrdr_fixedstep(
         , int absolute_period_requested
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
-
-    if(!absolute_period_requested) {
-        if(before_requested % update_every) {
-            // make sure it is multiple of update_every
-            if(before_requested > 0)
-                before_requested = before_requested - update_every + before_requested % update_every;
-            #ifdef NETDATA_INTERNAL_CHECKS
-            else
-                error("INTERNAL ERROR: rrd2rrdr() on %s, negative or zero before_requested", st->name);
-            #endif
-        }
-        if(after_requested % update_every) {
-            // make sure it is multiple of update_every
-            if(after_requested < 0)
-                after_requested = after_requested - update_every + after_requested % update_every;
-            #ifdef NETDATA_INTERNAL_CHECKS
-            else
-                error("INTERNAL ERROR: rrd2rrdr() on %s, negative or zero after_requested", st->name);
-            #endif
-        }
-        if(after_requested == before_requested) after_requested -= update_every;
-    }
 
     // the duration of the chart
     time_t duration = before_requested - after_requested;
@@ -1189,28 +1180,6 @@ static RRDR *rrd2rrdr_variablestep(
         , struct rrdeng_region_info *region_info_array
 ) {
     int aligned = !(options & RRDR_OPTION_NOT_ALIGNED);
-
-    if(!absolute_period_requested) {
-        if(before_requested % update_every) {
-            // make sure it is multiple of update_every
-            if(before_requested > 0)
-                before_requested = before_requested - before_requested % update_every;
-            #ifdef NETDATA_INTERNAL_CHECKS
-            else
-                error("INTERNAL ERROR: rrd2rrdr() on %s, negative or zero before_requested", st->name);
-            #endif
-        }
-        if(after_requested % update_every) {
-            // make sure it is multiple of update_every
-            if(after_requested < 0)
-                after_requested = after_requested - after_requested % update_every;
-            #ifdef NETDATA_INTERNAL_CHECKS
-            else
-                error("INTERNAL ERROR: rrd2rrdr() on %s, negative or zero after_requested", st->name);
-            #endif
-        }
-        if(after_requested == before_requested) after_requested -= update_every;
-    }
 
     // the duration of the chart
     time_t duration = before_requested - after_requested;
@@ -1585,9 +1554,10 @@ RRDR *rrd2rrdr(
     time_t first_entry_t = rrdset_first_entry_t(st);
     time_t last_entry_t  = rrdset_last_entry_t(st);
 
+    rrd_update_every = st->update_every;
     absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
-                                                                      first_entry_t, last_entry_t);
-
+                                                                      rrd_update_every, first_entry_t,
+                                                                      last_entry_t);
 #ifdef ENABLE_DBENGINE
     if ((st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)) {
         struct rrdeng_region_info *region_info_array;
@@ -1597,24 +1567,33 @@ RRDR *rrd2rrdr(
         regions = rrdeng_variable_step_boundaries(st, after_requested, before_requested,
                                                   &region_info_array, &max_interval);
         if (1 == regions) {
-            if (region_info_array)
-                rrd_update_every = region_info_array[0].update_every;
-            else
-                rrd_update_every = st->update_every;
-            if (region_info_array)
-                    freez(region_info_array);
+            if (region_info_array) {
+                if (rrd_update_every != region_info_array[0].update_every) {
+                    rrd_update_every = region_info_array[0].update_every;
+                    /* recalculate query alignment */
+                    absolute_period_requested =
+                            rrdr_convert_before_after_to_absolute(&after_requested, &before_requested, rrd_update_every,
+                                                                  first_entry_t, last_entry_t);
+                }
+                freez(region_info_array);
+            }
             return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                                       resampling_time_requested, options, dimensions, rrd_update_every,
                                       first_entry_t, last_entry_t, absolute_period_requested);
         } else {
-            rrd_update_every = (uint16_t)max_interval;
+            if (rrd_update_every != (uint16_t)max_interval) {
+                rrd_update_every = (uint16_t) max_interval;
+                /* recalculate query alignment */
+                absolute_period_requested = rrdr_convert_before_after_to_absolute(&after_requested, &before_requested,
+                                                                                  rrd_update_every, first_entry_t,
+                                                                                  last_entry_t);
+            }
             return rrd2rrdr_variablestep(st, points_requested, after_requested, before_requested, group_method,
                                          resampling_time_requested, options, dimensions, rrd_update_every,
                                          first_entry_t, last_entry_t, absolute_period_requested, region_info_array);
         }
     }
 #endif
-    rrd_update_every = st->update_every;
     return rrd2rrdr_fixedstep(st, points_requested, after_requested, before_requested, group_method,
                               resampling_time_requested, options, dimensions,
                               rrd_update_every, first_entry_t, last_entry_t, absolute_period_requested);
