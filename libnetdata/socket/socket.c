@@ -1300,6 +1300,9 @@ inline void poll_close_fd(POLLINFO *pi) {
     freez(pi->client_port);
     pi->client_port = NULL;
 
+    freez(pi->client_host);
+    pi->client_host = NULL;
+
     pi->next = p->first_free;
     p->first_free = pi;
 
