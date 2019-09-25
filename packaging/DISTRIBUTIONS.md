@@ -199,7 +199,7 @@ This is Netdata's TLS capability that incorporates encryption on the web server 
 
 -   **Flags/instructions to enable**: None
 -   **Flags to disable from source**: --disable-plugin-cups
--   **What packages required for auto-detect?**: `cups-devel`
+-   **What packages required for auto-detect?**: `cups-devel >= 1.7`
 
 #### FPING
 
