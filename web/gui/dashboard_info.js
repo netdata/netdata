@@ -504,6 +504,18 @@ netdataDashboard.menu = {
         title: 'VCSA',
         icon: '<i class="fas fa-server"></i>',
         info: 'vCenter Server Appliance health statistics. Data collected from <a href="https://vmware.github.io/vsphere-automation-sdk-rest/vsphere/index.html#SVC_com.vmware.appliance.health">Health API</a>.'
+    },
+
+    'zookeeper': {
+        title: 'Zookeeper',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Provides health statistics for <b><a href="https://zookeeper.apache.org/">Zookeeper</a></b> server. Data collected through the command port using <code><a href="https://zookeeper.apache.org/doc/r3.5.5/zookeeperAdmin.html#sc_zkCommands">mntr</a></code> command.'
+    },
+
+    'hdfs': {
+        title: 'HDFS',
+        icon: '<i class="fas fa-folder-open"></i>',
+        info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
     }
 };
 
@@ -2625,5 +2637,17 @@ netdataDashboard.context = {
             '<code>2</code>: non-security updates are available; ' +
             '<code>3</code>: security updates are available; ' +
             '<code>4</code>: an error retrieving information on software updates.'
+            },
+
+    // ------------------------------------------------------------------------
+    // Zookeeper
+
+    'zookeeper.server_state': {
+        info:
+            '<code>0</code>: unknown, ' +
+            '<code>1</code>: leader, ' +
+            '<code>2</code>: follower, ' +
+            '<code>3</code>: observer, ' +
+            '<code>4</code>: standalone.'
             }
 };

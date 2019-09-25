@@ -44,6 +44,7 @@ dist_healthconfig_DATA = \
     health.d/fronius.conf \
     health.d/gearman.conf \
     health.d/haproxy.conf \
+    health.d/hdfs.conf \
     health.d/httpcheck.conf \
     health.d/ipc.conf \
     health.d/ipfs.conf \
@@ -91,5 +92,6 @@ dist_healthconfig_DATA = \
     health.d/wmi.conf \
     health.d/x509check.conf \
     health.d/zfs.conf \
+    health.d/zookeeper.conf \
     health.d/dbengine.conf \
     $(NULL)
