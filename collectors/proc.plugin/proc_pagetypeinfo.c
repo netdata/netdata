@@ -187,6 +187,11 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             p++;
         }
 
+        if (p == 0) {
+            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse any valid line in %s", ff_path);
+            return 1;
+        }
+
         // Init the RRD graphs
 
         // Per-Order: sum of all node, zone, type Grouped by order
