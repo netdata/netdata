@@ -137,9 +137,17 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
         // 4th line is the "Free pages count per migrate type at order". Just substract these 8 words.
         pageorders_cnt = procfile_linewords(ff, 3);
-
+        if (pageorders_cnt < 9) {
+            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse Line 4 of %s", ff_path);
+            return 1;
+        }
 
         pageorders_cnt -= 9;
+
+        if (pageorders_cnt > MAX_PAGETYPE_ORDER) {
+            error("PLUGIN: PROC_PAGETYPEINFO: pageorder found (%lu) is higher than max %d", pageorders_cnt, MAX_PAGETYPE_ORDER);
+            return 1;
+        }
 
         // Init pagelines from scanned lines
         if (!pagelines) {
@@ -247,7 +255,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                     , update_every
                     , RRDSET_TYPE_STACKED
             );
-            for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
+            for (o = 0; o < pageorders_cnt; o++) {
                 char dimid[3+1];
                 snprintfz(dimid, 3, "%lu", o);
                 char dimname[20+1];
@@ -273,14 +281,14 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         if (!pagetypeinfo_line_valid(ff, l))
             continue;
 
-        int words = procfile_linewords(ff, l);
+        size_t words = procfile_linewords(ff, l);
 
-        if (words < 6+cnt_pageorders) {
-            error("Unable to read line %lu, only %d words found instead of %d", l, words, 6 + cnt_pageorders);
+        if (words != 7+pageorders_cnt) {
+            error("PLUGIN: PROC_PAGETYPEINFO: Unable to read line %lu, %lu words found instead of %lu", l+1, words, 7+pageorders_cnt);
             break;
         }
 
-        for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
+        for (o = 0; o < pageorders_cnt; o++) {
             // Reset counter
             if (p == 0)
                 systemorders[o].size = 0;
@@ -299,9 +307,9 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     // update RRD values
 
     // Global system per order
-    if (do_global) {
+    if (st_order) {
         rrdset_next(st_order);
-        for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
+        for (o = 0; o < pageorders_cnt; o++) {
             rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
         }
         rrdset_done(st_order);
@@ -315,7 +323,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 continue;
 
             rrdset_next(st_nodezonetype[p]);
-            for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
+            for (o = 0; o < pageorders_cnt; o++)
                 rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages_size[o]);
 
             rrdset_done(st_nodezonetype[p]);
