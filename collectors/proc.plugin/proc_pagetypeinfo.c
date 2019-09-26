@@ -181,7 +181,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             pgl->node = nodenum;
             pgl->type = typename;
             pgl->zone = zonename;
-            for (o = 0; o < MAX_PAGETYPE_ORDER; o++)
+            for (o = 0; o < pageorders_cnt; o++)
                 pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
 
             p++;
@@ -205,7 +205,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 , update_every
                 , RRDSET_TYPE_STACKED
             );
-            for (o = 0; o < MAX_PAGETYPE_ORDER; o++) {
+            for (o = 0; o < pageorder_cnt; o++) {
                 char id[3+1];
                 snprintfz(id, 3, "%lu", o);
 
