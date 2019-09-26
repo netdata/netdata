@@ -210,7 +210,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 , update_every
                 , RRDSET_TYPE_STACKED
             );
-            for (o = 0; o < pageorder_cnt; o++) {
+            for (o = 0; o < pageorders_cnt; o++) {
                 char id[3+1];
                 snprintfz(id, 3, "%lu", o);
 
