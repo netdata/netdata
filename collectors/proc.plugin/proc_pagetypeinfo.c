@@ -55,7 +55,7 @@ static inline uint64_t pageline_total_count(struct pageline *p) {
 #define pagetypeinfo_line_valid(ff, l) (strncmp(procfile_lineword(ff, l, 0), "Node", 4) == 0 && strncmp(procfile_lineword(ff, l, 4), "type", 4) == 0)
 
 // Dimension name from the order
-#define dim_name(s, o, pagesize) (snprintfz(s, 16,"%luKB (%lu)", (1 << o) * pagesize / 1024, o))
+#define dim_name(s, o, pagesize) (snprintfz(s, 16,"%ldKB (%lu)", (1 << o) * pagesize / 1024, o))
 
 int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     (void)dt;
@@ -65,14 +65,14 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     static SIMPLE_PATTERN *filter_types = NULL;
 
     // Counters from parsing the file, that doesn't change after boot
-    static int cnt_pageorders = -1;
     static struct systemorder systemorders[MAX_PAGETYPE_ORDER] = {};
     static struct pageline* pagelines = NULL;
-    static size_t pagelines_cnt = -1, lines = -1;
     static long pagesize = 0;
+    static size_t pageorders_cnt = 0, pagelines_cnt = 0, ff_lines = 0;
 
     // Handle
     static procfile *ff = NULL;
+    static char ff_path[FILENAME_MAX + 1];
 
     // RRD Sets
     static RRDSET *st_order = NULL;
@@ -89,11 +89,11 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     }
 
     if(unlikely(!ff)) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
-        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "filename to monitor", filename), " \t:", PROCFILE_FLAG_DEFAULT);
+        snprintfz(ff_path, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
+        ff = procfile_open(config_get(CONFIG_SECTION_PLUGIN_PROC_PAGETYPEINFO, "filename to monitor", ff_path), " \t:", PROCFILE_FLAG_DEFAULT);
 
         if(unlikely(!ff)) {
+            strncpyz(ff_path, PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, FILENAME_MAX);
             ff = procfile_open(PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME, " \t,", PROCFILE_FLAG_DEFAULT);
         }
     }
@@ -106,13 +106,13 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
     // --------------------------------------------------------------------
     // Init: find how many Nodes, Zones and Types
-    if(unlikely(pagelines_cnt == -1)) {
+    if(unlikely(pagelines_cnt == 0)) {
         size_t nodenumlast = -1;
         char *zonenamelast = NULL;
 
-        lines = procfile_lines(ff);
-        if(unlikely(!lines)) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
+        ff_lines = procfile_lines(ff);
+        if(unlikely(!ff_lines)) {
+            error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", ff_path);
             return 1;
         }
 
@@ -128,16 +128,18 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         pagelines_cnt = 0;
 
         // Pass 1: how many lines would be valid
-        for (l = 4; l < lines; l++) {
+        for (l = 4; l < ff_lines; l++) {
             if (!pagetypeinfo_line_valid(ff, l))
                 continue;
 
             pagelines_cnt++;
         }
 
-        // 4th line is the "Free pages count...". Just substract the 8 words.
-        cnt_pageorders = procfile_linewords(ff, 3) - 9;
+        // 4th line is the "Free pages count per migrate type at order". Just substract these 8 words.
+        pageorders_cnt = procfile_linewords(ff, 3);
 
+
+        pageorders_cnt -= 9;
 
         // Init pagelines from scanned lines
         if (!pagelines) {
@@ -150,7 +152,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
         // Pass 2: Scan the file again, with details
         p = 0;
-        for (l=4; l < lines; l++) {
+        for (l=4; l < ff_lines; l++) {
 
             if (!pagetypeinfo_line_valid(ff, l))
                 continue;
@@ -266,7 +268,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
     // Process each line
     p = 0;
-    for (l=4; l<lines; l++) {
+    for (l=4; l<ff_lines; l++) {
 
         if (!pagetypeinfo_line_valid(ff, l))
             continue;
