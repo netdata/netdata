@@ -1,1 +1,3 @@
-#include "../libnetdata.h"
+#include "network_viewer.h"
+
+

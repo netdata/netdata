@@ -108,6 +108,82 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 // --------------------------------------------------------------------------------------------------------------------
 // listening sockets
 
+#if defined(__linux) || defined(__linux__) || defined(linux)
+/**
+ * Create Network Link Socket
+ *
+ * Create a socket to read all sockets opened by Linux
+ *
+ * @return It returns the socket on success and -1 otherwise.
+ */
+int create_network_link_socket()
+{
+    int sd = socket(AF_NETLINK, SOCK_DGRAM, NETLINK_INET_DIAG);
+    if ( sd == -1)
+    {
+        error("Cannot create a socket with type AF_NETLINK.");
+    }
+
+    return sd;
+}
+
+/**
+ * Set sock diag
+ *
+ * @param sd is the socket descriptor
+ * @param family address family we are interested in. The possible values are AF_INET or AF_INET6
+ * @param protocol the protocol we will monitor.
+ *
+ * @return 0 on success and -1 otherwise
+ */
+int set_socket_diag(int sd, int family, int protocol)
+{
+    struct msghdr msg;
+    struct nlmsghdr nlh;
+    struct inet_diag_req_v2 conn_req;
+    struct sockaddr_nl sa;
+    struct iovec iov[4];
+    int retval = 0;
+
+    memset(&msg, 0, sizeof(msg));
+    memset(&sa, 0, sizeof(sa));
+    memset(&nlh, 0, sizeof(nlh));
+    memset(&conn_req, 0, sizeof(conn_req));
+
+    sa.nl_family = AF_NETLINK;
+
+    conn_req.sdiag_family = (__u8)family;
+    conn_req.sdiag_protocol = (__u8)protocol;
+
+    conn_req.idiag_states = (0xFFF & (1<<TCP_ESTABLISHED));
+
+    conn_req.idiag_ext |= (1 << (INET_DIAG_INFO - 1));
+
+    nlh.nlmsg_len = NLMSG_LENGTH(sizeof(conn_req));
+    nlh.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
+
+    nlh.nlmsg_type = SOCK_DIAG_BY_FAMILY;
+    iov[0].iov_base = (void*) &nlh;
+    iov[0].iov_len = sizeof(nlh);
+    iov[1].iov_base = (void*) &conn_req;
+    iov[1].iov_len = sizeof(conn_req);
+
+    msg.msg_name = (void*) &sa;
+    msg.msg_namelen = sizeof(sa);
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 2;
+
+    retval = sendmsg(sd, &msg, 0);
+    if(retval == -1)
+    {
+        error("Cannot send message to kernel to monitor the sockets on %d using family %d and protocol %d"
+              , sd, family, protocol);
+    }
+
+    return retval;
+}
+#endif
+
 int create_listen_socket_unix(const char *path, int listen_backlog) {
     int sock;
 
