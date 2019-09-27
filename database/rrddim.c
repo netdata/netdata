@@ -156,6 +156,35 @@ static time_t rrddim_query_oldest_time(RRDDIM *rd) {
 // ----------------------------------------------------------------------------
 // RRDDIM create a dimension
 
+void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
+    RRDCALC *rrdc;
+    for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
+        if (simple_pattern_matches(rrdc->spdim, rd->id) || simple_pattern_matches(rrdc->spdim, rd->name)) {
+            if (!strcmp(rrdc->chart, st->name)) {
+                char *usename = alarm_name_with_dim(rrdc->name, strlen(rrdc->name), rd->name, strlen(rd->name));
+                if (usename) {
+                    if(rrdcalc_exists(host, st->name, usename, 0, 0)){
+                        freez(usename);
+                        continue;
+                    }
+
+                    RRDCALC *child = rrdcalc_create_from_rrdcalc(rrdc, host, usename, rd->name);
+                    if (child) {
+                        rrdcalc_add_to_host(host, child);
+                        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)child);
+                        if (rdcmp != child) {
+                            error("Cannot insert the alarm index ID %s",child->name);
+                        }
+                    } else {
+                        error("Cannot allocate a new alarm.");
+                        rrdc->foreachcounter--;
+                    }
+                }
+            }
+        }
+    }
+}
+
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
     rrdset_wrlock(st);
 
@@ -371,6 +400,12 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
+    if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
+        rrdhost_wrlock(host);
+        rrdcalc_link_to_rrddim(rd, st, host);
+
+        rrdhost_unlock(host);
+    }
     rrdset_unlock(st);
     return(rd);
 }

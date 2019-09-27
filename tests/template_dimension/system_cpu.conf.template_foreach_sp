@@ -1,0 +1,8 @@
+ template: dev_dim_template
+       on: system.cpu
+       os: linux
+   lookup: sum -3s at 0 every 3 percentage foreach *
+    units: %
+    every: 1s
+     warn: $this > 1
+     crit: $this > 4

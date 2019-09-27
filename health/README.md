@@ -163,7 +163,7 @@ This line makes a database lookup to find a value. This result of this lookup is
 The format is:
 
 ```
-lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS]
+lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [foreach DIMENSIONS]
 ```
 
 Everything is the same with [badges](../web/api/badges/). In short:
@@ -189,6 +189,11 @@ Everything is the same with [badges](../web/api/badges/). In short:
      by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
      have spaces in their names). This accepts Netdata simple patterns and the `match-ids` and
      `match-names` options affect the searches for dimensions.
+
+-   `foreach DIMENSIONS` is optional, will always be the last parameter, and uses the same `,`/`|`
+     rules as the `of` parameter. Each dimension you specify in `foreach` will use the same rule
+     to trigger an alarm. If you set both `of` and `foreach`, Netdata will ignore the `of` parameter
+     and replace it with one of the dimensions you gave to `foreach`.
 
 The result of the lookup will be available as `$this` and `$NAME` in expressions.
 The timestamps of the timeframe evaluated by the database lookup is available as variables
@@ -659,6 +664,43 @@ The `crit` line will issue a critical alarm if even a single packet has been dro
 Note that the drops chart does not exist if a network interface has never dropped a single packet.
 When Netdata detects a dropped packet, it will add the chart and it will automatically attach this
 alarm to it.
+
+### Example 5
+
+Check if user or system dimension is using more than 50% of cpu:
+
+```
+ alarm: dim_template
+    on: system.cpu
+    os: linux
+lookup: average -3s percentage foreach system,user
+ units: %
+ every: 10s
+  warn: $this > 50
+  crit: $this > 80
+```
+
+The `lookup` line will calculate the average CPU usage from system and user in the last 3 seconds. Because we have
+the foreach in the `lookup` line, Netdata will create two independent alarms called `dim_template_system`
+and `dim_template_user` that will have all the other parameters shared among them.
+
+### Example 6
+
+Check if all dimensions are using more than 50% of cpu:
+
+```
+ alarm: dim_template
+    on: system.cpu
+    os: linux
+lookup: average -3s percentage foreach *
+ units: %
+ every: 10s
+  warn: $this > 50
+  crit: $this > 80
+```
+
+The `lookup` line will calculate the average of CPU usage from system and user in the last 3 seconds. In this case
+Netdata will create alarms for all dimensions of the chart.
 
 ## Troubleshooting
 
