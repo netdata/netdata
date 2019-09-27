@@ -744,7 +744,7 @@ class WSRepDataConverter:
     def convert(self, key, value):
         if key == 'wsrep_connected':
             return self.convert_connected(value)
-        if key == 'wsrep_ready':
+        elif key == 'wsrep_ready':
             return self.convert_ready(value)
         elif key == 'wsrep_cluster_status':
             return self.convert_cluster_status(value)
