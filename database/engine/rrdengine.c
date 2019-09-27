@@ -279,13 +279,6 @@ void flush_pages_cb(uv_fs_t* req)
         /* care, we don't hold the descriptor mutex */
         descr = xt_io_descr->descr_array[i];
 
-        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-        commit_id = xt_io_descr->descr_commit_idx_array[i];
-        ret = JudyLDel(&pg_cache->commited_page_index.JudyL_array, commit_id, PJE0);
-        assert(1 == ret);
-        --pg_cache->commited_page_index.nr_commited_pages;
-        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
-
         pg_cache_replaceQ_insert(ctx, descr);
 
         rrdeng_page_descr_mutex_lock(ctx, descr);
@@ -333,7 +326,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     if (force) {
         debug(D_RRDENGINE, "Asynchronous flushing of extent has been forced by page pressure.");
     }
-    uv_rwlock_rdlock(&pg_cache->commited_page_index.lock);
+    uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
     for (Index = 0, count = 0, uncompressed_payload_length = 0,
          PValue = JudyLFirst(pg_cache->commited_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue ;
@@ -342,11 +335,15 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 
          PValue = JudyLNext(pg_cache->commited_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
+        uint8_t page_write_pending;
+
         assert(0 != descr->page_length);
+        page_write_pending = 0;
 
         rrdeng_page_descr_mutex_lock(ctx, descr);
         pg_cache_descr = descr->pg_cache_descr;
         if (!(pg_cache_descr->flags & RRD_PAGE_WRITE_PENDING)) {
+            page_write_pending = 1;
             /* care, no reference being held */
             pg_cache_descr->flags |= RRD_PAGE_WRITE_PENDING;
             uncompressed_payload_length += descr->page_length;
@@ -354,8 +351,14 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
             eligible_pages[count++] = descr;
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
+
+        if (page_write_pending) {
+            ret = JudyLDel(&pg_cache->commited_page_index.JudyL_array, Index, PJE0);
+            assert(1 == ret);
+            --pg_cache->commited_page_index.nr_commited_pages;
+        }
     }
-    uv_rwlock_rdunlock(&pg_cache->commited_page_index.lock);
+    uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
 
     if (!count) {
         debug(D_RRDENGINE, "%s: no pages eligible for flushing.", __func__);
