@@ -253,13 +253,10 @@ void flush_pages_cb(uv_fs_t* req)
 {
     struct rrdengine_worker_config* wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
-    struct page_cache *pg_cache = &ctx->pg_cache;
     struct extent_io_descriptor *xt_io_descr;
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
-    int ret;
     unsigned i, count;
-    Word_t commit_id;
 
     xt_io_descr = req->data;
     if (req->result < 0) {
