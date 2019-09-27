@@ -303,6 +303,7 @@ extern char *netdata_configured_host_prefix;
 # include "socket/security.h"
 #endif
 #include "socket/socket.h"
+#include "network_viewer/network_viewer.h"
 #include "config/appconfig.h"
 #include "log/log.h"
 #include "procfile/procfile.h"

@@ -306,6 +306,8 @@ set(LIBNETDATA_FILES
         libnetdata/locks/locks.h
         libnetdata/log/log.c
         libnetdata/log/log.h
+        libnetdata/network_viewer/network_viewer.c
+        libnetdata/network_viewer/network_viewer.h
         libnetdata/os.c
         libnetdata/os.h
         libnetdata/popen/popen.c

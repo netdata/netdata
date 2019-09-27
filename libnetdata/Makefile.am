@@ -15,6 +15,7 @@ SUBDIRS = \
     health \
     locks \
     log \
+    network_viewer \
     popen \
     procfile \
     simple_pattern \
