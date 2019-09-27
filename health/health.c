@@ -113,8 +113,22 @@ void health_reload_host(RRDHOST *host) {
     while(host->templates)
         rrdcalctemplate_unlink_and_free(host, host->templates);
 
+    RRDCALCTEMPLATE *rt,*next;
+    for(rt = host->alarms_template_with_foreach; rt ; rt = next) {
+        next = rt->next;
+        rrdcalctemplate_free(rt);
+    }
+    host->alarms_template_with_foreach = NULL;
+
     while(host->alarms)
         rrdcalc_unlink_and_free(host, host->alarms);
+
+    RRDCALC *rc,*nc;
+    for(rc = host->alarms_with_foreach; rc ; rc = nc) {
+        nc = rc->next;
+        rrdcalc_free(rc);
+    }
+    host->alarms_with_foreach = NULL;
 
     rrdhost_unlock(host);
 
@@ -139,9 +153,17 @@ void health_reload_host(RRDHOST *host) {
     health_readdir(host, user_path, stock_path, NULL);
 
     // link the loaded alarms to their charts
+    RRDDIM *rd;
     rrdset_foreach_write(st, host) {
         rrdsetcalc_link_matching(st);
         rrdcalctemplate_link_matching(st);
+
+        //This loop must be the last, because ` rrdcalctemplate_link_matching` will create alarms related to it.
+        rrdset_rdlock(st);
+        rrddim_foreach_read(rd, st) {
+            rrdcalc_link_to_rrddim(rd, st, host);
+        }
+        rrdset_unlock(st);
     }
 
     rrdhost_unlock(host);
@@ -888,6 +910,7 @@ void *health_main(void *ptr) {
                             }
                         }
                     }
+
                     if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
                         rc->last_repeat = now;
                         ALARM_ENTRY *ae = health_create_alarm_entry(

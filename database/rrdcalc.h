@@ -37,7 +37,7 @@ struct rrdcalc {
     uint32_t next_event_id;         // the next event id that will be used for this alarm
 
     char *name;                     // the name of this alarm
-    uint32_t hash;
+    uint32_t hash;                  // the hash of the alarm name
 
     char *exec;                     // the command to execute when this alarm switches state
     char *recipient;                // the recipient of the alarm (the first parameter to exec)
@@ -59,7 +59,11 @@ struct rrdcalc {
     // database lookup settings
 
     char *dimensions;               // the chart dimensions
-    RRDR_GROUPING group;               // grouping method: average, max, etc.
+    char *foreachdim;               // the group of dimensions that the `foreach` will be applied.
+    SIMPLE_PATTERN *spdim;          // used if and only if there is a simple pattern for the chart.
+    int foreachcounter;             // the number of alarms created with foreachdim, this also works as an id of the
+                                    // children
+    RRDR_GROUPING group;            // grouping method: average, max, etc.
     int before;                     // ending point in time-series
     int after;                      // starting point in time-series
     uint32_t options;               // calculation options
@@ -148,7 +152,10 @@ extern void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc);
 extern int rrdcalc_exists(RRDHOST *host, const char *chart, const char *name, uint32_t hash_chart, uint32_t hash_name);
 extern uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const char *name, uint32_t *next_event_id);
 extern RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt, const char *chart);
+extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension);
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
+extern void dimension_remove_pipe_comma(char *str);
+extern char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {

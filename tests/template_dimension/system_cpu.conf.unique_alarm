@@ -1,0 +1,26 @@
+ alarm: dev_dim_template_system
+    on: system.cpu
+    os: linux
+lookup: sum -3s at 0 every 3 percentage of system
+ units: %
+ every: 1s
+  warn: $this > 1
+  crit: $this > 4
+
+ alarm: dev_dim_template_user
+    on: system.cpu
+    os: linux
+lookup: sum -3s at 0 every 3 percentage of user
+ units: %
+ every: 1s
+  warn: $this > 1
+  crit: $this > 4
+
+ alarm: dev_dim_template_nice
+    on: system.cpu
+    os: linux
+lookup: sum -3s at 0 every 3 percentage of nice
+ units: %
+ every: 1s
+  warn: $this > 1
+  crit: $this > 4

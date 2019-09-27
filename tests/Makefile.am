@@ -8,6 +8,7 @@ CLEANFILES = \
 	acls/acl.sh \
 	urls/request.sh \
 	alarm_repetition/alarm.sh \
+	template_dimension/template_dim.sh \
 	$(NULL)
 
 include $(top_srcdir)/build/subst.inc
@@ -28,6 +29,7 @@ dist_noinst_DATA = \
     acls/acl.sh.in \
     urls/request.sh.in \
     alarm_repetition/alarm.sh.in \
+    template_dimension/template_dim.sh.in \
 	$(NULL)
 
 dist_plugins_SCRIPTS = \
@@ -35,6 +37,7 @@ dist_plugins_SCRIPTS = \
 	acls/acl.sh \
 	urls/request.sh \
 	alarm_repetition/alarm.sh \
+	template_dimension/template_dim.sh \
 	$(NULL)
 
 dist_noinst_SCRIPTS = \

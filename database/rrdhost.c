@@ -598,8 +598,22 @@ void rrdhost_free(RRDHOST *host) {
     while(host->alarms)
         rrdcalc_unlink_and_free(host, host->alarms);
 
+    RRDCALC *rc,*nc;
+    for(rc = host->alarms_with_foreach; rc ; rc = nc) {
+        nc = rc->next;
+        rrdcalc_free(rc);
+    }
+    host->alarms_with_foreach = NULL;
+
     while(host->templates)
         rrdcalctemplate_unlink_and_free(host, host->templates);
+
+    RRDCALCTEMPLATE *rt,*next;
+    for(rt = host->alarms_template_with_foreach; rt ; rt = next) {
+        next = rt->next;
+        rrdcalctemplate_free(rt);
+    }
+    host->alarms_template_with_foreach = NULL;
 
     debug(D_RRD_CALLS, "RRDHOST: Cleaning up remaining host variables for host '%s'", host->hostname);
     rrdvar_free_remaining_variables(host, &host->rrdvar_root_index);

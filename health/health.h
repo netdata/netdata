@@ -48,6 +48,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_INFO_KEY "info"
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
+#define HEALTH_FOREACH_KEY "foreach"
 
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
@@ -105,5 +106,7 @@ extern void health_alarm_log_free(RRDHOST *host);
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
 extern void *health_cmdapi_thread(void *ptr);
+
+extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
 
 #endif //NETDATA_HEALTH_H

@@ -255,6 +255,53 @@ inline uint32_t rrdcalc_get_unique_id(RRDHOST *host, const char *chart, const ch
     return host->health_log.next_alarm_id++;
 }
 
+/**
+ * Alarm name with dimension
+ *
+ * Change the name of the current alarm appending a new diagram.
+ *
+ * @param name the alarm name
+ * @param namelen is the length of the previous vector.
+ * @param dim the dimension of the chart.
+ * @param dimlen  is the length of the previous vector.
+ *
+ * @return It returns the new name on success and the old otherwise
+ */
+char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen) {
+    char *newname,*move;
+
+    newname = malloc(namelen + dimlen + 2);
+    if(newname) {
+        move = newname;
+        memcpy(move, name, namelen);
+        move += namelen;
+
+        *move++ = '_';
+        memcpy(move, dim, dimlen);
+        move += dimlen;
+        *move = '\0';
+    } else {
+        newname = name;
+    }
+
+    return newname;
+}
+
+/**
+ * Remove pipe comma
+ *
+ * Remove the pipes and commas converting to space.
+ *
+ * @param str the string to change.
+ */
+void dimension_remove_pipe_comma(char *str) {
+    while(*str) {
+        if(*str == '|' || *str == ',') *str = ' ';
+
+        str++;
+    }
+}
+
 inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
     rrdhost_check_rdlock(host);
 
@@ -282,24 +329,39 @@ inline void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc) {
         rc->critical->rrdcalc = rc;
     }
 
-    // link it to the host
-    if(likely(host->alarms)) {
-        // append it
-        RRDCALC *t;
-        for(t = host->alarms; t && t->next ; t = t->next) ;
-        t->next = rc;
-    }
-    else {
-        host->alarms = rc;
-    }
-
-    // link it to its chart
-    RRDSET *st;
-    rrdset_foreach_read(st, host) {
-        if(rrdcalc_is_matching_this_rrdset(rc, st)) {
-            rrdsetcalc_link(st, rc);
-            break;
+    if(!rc->foreachdim) {
+        // link it to the host alarms list
+        if(likely(host->alarms)) {
+            // append it
+            RRDCALC *t;
+            for(t = host->alarms; t && t->next ; t = t->next) ;
+            t->next = rc;
         }
+        else {
+            host->alarms = rc;
+        }
+
+        // link it to its chart
+        RRDSET *st;
+        rrdset_foreach_read(st, host) {
+            if(rrdcalc_is_matching_this_rrdset(rc, st)) {
+                rrdsetcalc_link(st, rc);
+                break;
+            }
+        }
+    } else {
+        //link it case there is a foreach
+        if(likely(host->alarms_with_foreach)) {
+            // append it
+            RRDCALC *t;
+            for(t = host->alarms_with_foreach; t && t->next ; t = t->next) ;
+            t->next = rc;
+        }
+        else {
+            host->alarms_with_foreach = rc;
+        }
+
+        //I am not linking this alarm direct to the host here, this will be done when the children is created
     }
 }
 
@@ -311,13 +373,19 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
 
     RRDCALC *rc = callocz(1, sizeof(RRDCALC));
     rc->next_event_id = 1;
-    rc->id = rrdcalc_get_unique_id(host, chart, rt->name, &rc->next_event_id);
     rc->name = strdupz(rt->name);
     rc->hash = simple_hash(rc->name);
     rc->chart = strdupz(chart);
     rc->hash_chart = simple_hash(rc->chart);
 
+    rc->id = rrdcalc_get_unique_id(host, rc->chart, rc->name, &rc->next_event_id);
+
     if(rt->dimensions) rc->dimensions = strdupz(rt->dimensions);
+    if(rt->foreachdim) {
+        rc->foreachdim = strdupz(rt->foreachdim);
+        rc->spdim = health_pattern_from_foreach(rc->foreachdim);
+    }
+    rc->foreachcounter = rt->foreachcounter;
 
     rc->green = rt->green;
     rc->red = rt->red;
@@ -361,7 +429,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", chart, rt->name, rt->critical->source);
     }
 
-    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
+    debug(D_HEALTH, "Health runtime added alarm '%s.%s': exec '%s', recipient '%s', green " CALCULATED_NUMBER_FORMAT_AUTO ", red " CALCULATED_NUMBER_FORMAT_AUTO ", lookup: group %d, after %d, before %d, options %u, dimensions '%s', for each dimension '%s', update every %d, calculation '%s', warning '%s', critical '%s', source '%s', delay up %d, delay down %d, delay max %d, delay_multiplier %f, warn_repeat_every %u, crit_repeat_every %u",
             (rc->chart)?rc->chart:"NOCHART",
             rc->name,
             (rc->exec)?rc->exec:"DEFAULT",
@@ -373,6 +441,7 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
             rc->before,
             rc->options,
             (rc->dimensions)?rc->dimensions:"NONE",
+            (rc->foreachdim)?rc->foreachdim:"NONE",
             rc->update_every,
             (rc->calculation)?rc->calculation->parsed_as:"NONE",
             (rc->warning)?rc->warning->parsed_as:"NONE",
@@ -387,17 +456,93 @@ inline RRDCALC *rrdcalc_create_from_template(RRDHOST *host, RRDCALCTEMPLATE *rt,
     );
 
     rrdcalc_add_to_host(host, rc);
-    RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
-    if (rdcmp != rc) {
-        error("Cannot insert the alarm index ID %s",rc->name);
+    if(!rt->foreachdim) {
+        RRDCALC *rdcmp  = (RRDCALC *) avl_insert_lock(&(host)->alarms_idx_health_log,(avl *)rc);
+        if (rdcmp != rc) {
+            error("Cannot insert the alarm index ID %s",rc->name);
+        }
     }
 
     return rc;
 }
 
+/**
+ *  Create from RRDCALC
+ *
+ *  Create a new alarm using another alarm as template.
+ *
+ * @param rc is the alarm that will be used as source
+ * @param host is the host structure.
+ * @param name is the newest chart name.
+ * @param dimension is the current dimension
+ * @param foreachdim the whole list of dimension
+ *
+ * @return it returns the new alarm changed.
+ */
+inline RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const char *name, const char *dimension) {
+    RRDCALC *newrc = callocz(1, sizeof(RRDCALC));
+
+    newrc->next_event_id = 1;
+    newrc->id = rrdcalc_get_unique_id(host, rc->chart, name, &rc->next_event_id);
+    newrc->name = (char *)name;
+    newrc->hash = simple_hash(newrc->name);
+    newrc->chart = strdupz(rc->chart);
+    newrc->hash_chart = simple_hash(rc->chart);
+
+    newrc->dimensions = strdupz(dimension);
+    newrc->foreachdim = NULL;
+    rc->foreachcounter++;
+    newrc->foreachcounter = rc->foreachcounter;
+
+    newrc->green = rc->green;
+    newrc->red = rc->red;
+    newrc->value = NAN;
+    newrc->old_value = NAN;
+
+    newrc->delay_up_duration = rc->delay_up_duration;
+    newrc->delay_down_duration = rc->delay_down_duration;
+    newrc->delay_max_duration = rc->delay_max_duration;
+    newrc->delay_multiplier = rc->delay_multiplier;
+
+    newrc->last_repeat = 0;
+    newrc->warn_repeat_every = rc->warn_repeat_every;
+    newrc->crit_repeat_every = rc->crit_repeat_every;
+
+    newrc->group = rc->group;
+    newrc->after = rc->after;
+    newrc->before = rc->before;
+    newrc->update_every = rc->update_every;
+    newrc->options = rc->options;
+
+    if(rc->exec) newrc->exec = strdupz(rc->exec);
+    if(rc->recipient) newrc->recipient = strdupz(rc->recipient);
+    if(rc->source) newrc->source = strdupz(rc->source);
+    if(rc->units) newrc->units = strdupz(rc->units);
+    if(rc->info) newrc->info = strdupz(rc->info);
+
+    if(rc->calculation) {
+        newrc->calculation = expression_parse(rc->calculation->source, NULL, NULL);
+        if(!newrc->calculation)
+            error("Health alarm '%s.%s': failed to parse calculation expression '%s'", rc->chart, rc->name, rc->calculation->source);
+    }
+
+    if(rc->warning) {
+        newrc->warning = expression_parse(rc->warning->source, NULL, NULL);
+        if(!newrc->warning)
+            error("Health alarm '%s.%s': failed to re-parse warning expression '%s'", rc->chart, rc->name, rc->warning->source);
+    }
+
+    if(rc->critical) {
+        newrc->critical = expression_parse(rc->critical->source, NULL, NULL);
+        if(!newrc->critical)
+            error("Health alarm '%s.%s': failed to re-parse critical expression '%s'", rc->chart, rc->name, rc->critical->source);
+    }
+
+    return newrc;
+}
+
 void rrdcalc_free(RRDCALC *rc) {
     if(unlikely(!rc)) return;
-
 
     expression_free(rc->calculation);
     expression_free(rc->warning);
@@ -407,11 +552,13 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->chart);
     freez(rc->family);
     freez(rc->dimensions);
+    freez(rc->foreachdim);
     freez(rc->exec);
     freez(rc->recipient);
     freez(rc->source);
     freez(rc->units);
     freez(rc->info);
+    simple_pattern_free(rc->spdim);
     freez(rc);
 }
 

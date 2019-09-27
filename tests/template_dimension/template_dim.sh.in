@@ -1,0 +1,88 @@
+#!/bin/bash
+
+#The health directory to put the alarms
+HEALTHDIR="@configdir_POST@/health.d/"
+
+#the current time
+OUTDIR="alarms"
+QUERY="/api/v1/alarms?all"
+MURL="http://localhost:19999$QUERY"
+
+#error messages
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NOCOLOR='\033[0m'
+
+ALARMTEST="dev_dim_template"
+
+change_alarm_file() {
+  if [ -f "$1" ]; then
+    rm "$1"
+  fi
+
+  #copy keeping the permissions
+  cp -a "$2" "$3"
+}
+
+netdata_test_download() {
+   grep "HTTP/1.1 200 OK" "$1" 2>/dev/null 1>/dev/null
+   TEST="$?"
+   if [ "$TEST" -ne "0" ]; then
+      echo -e "${RED} Error to get the alarm log. ${NOCOLOR}"
+      exit 1
+   fi
+
+   TOTALARM=$(grep "$ALARMTEST" "$2" | grep name | cut -d: -f2 | grep -c "$ALARMTEST")
+
+  if [ "$TOTALARM" -ne "$3" ]; then
+     echo -e "${RED} The number of actives alarms with the name $SYSTEMALARM is wrong ${NOCOLOR}"
+     exit 1
+  fi
+}
+
+get_the_logs() {
+  curl -v -k --create-dirs -o "$OUTDIR/$1.out" "$MURL" 2> "$OUTDIR/$1.err"
+  netdata_test_download "$OUTDIR/$1.err" "$OUTDIR/$1.out" "$2"
+}
+
+process_data() {
+  netdata -D &
+  NETDATAPID=$!
+  echo -e "${NOCOLOR}Sleeping during 15 seconds to create alarms"
+  sleep 15
+  kill $NETDATAPID
+  get_the_logs "$1" "$2"
+}
+
+mkdir "$OUTDIR"
+CREATEDIR="$?"
+if [ "$CREATEDIR" -ne "0" ]; then
+  echo  -e "${RED}Cannot create the output directory, it already exists. The test will overwrite previous results. ${NOCOLOR}"
+fi
+
+if [ -n "$1" ]; then
+  MURL="$1$QUERY"
+fi
+
+change_alarm_file "./0" "system_cpu.conf.unique_alarm" "$HEALTHDIR/dim_double_without_template.conf"
+process_data "double_without_template" 3 "$HEALTHDIR/dim_double_without_template.conf"
+
+change_alarm_file "$HEALTHDIR/dim_double_without_template.conf" "system_cpu.conf.alarm_foreach" "$HEALTHDIR/dim_foreach_without_template.conf"
+process_data "foreach_without_template" 3 "$HEALTHDIR/dim_foreach_without_template.conf"
+
+change_alarm_file "$HEALTHDIR/dim_foreach_without_template.conf" "system_cpu.conf.alarm_foreach_sp" "$HEALTHDIR/dim_foreach_without_template_sp.conf"
+process_data "foreach_without_template" 10 "$HEALTHDIR/dim_foreach_without_template_sp.conf"
+
+change_alarm_file "$HEALTHDIR/dim_foreach_without_template_sp.conf" "system_cpu.conf.template_alarm" "$HEALTHDIR/dim_double_with_template.conf"
+process_data "double_with_template" 3 "$HEALTHDIR/dim_double_with_template.conf"
+
+change_alarm_file "$HEALTHDIR/dim_double_with_template.conf" "system_cpu.conf.template_foreach" "$HEALTHDIR/dim_foreach_with_template.conf"
+process_data "foreach_with_template" 3 "$HEALTHDIR/dim_foreach_with_template.conf"
+
+change_alarm_file "$HEALTHDIR/dim_foreach_with_template.conf" "system_cpu.conf.template_foreach_sp" "$HEALTHDIR/dim_foreach_with_template_sp.conf"
+process_data "foreach_with_template" 10 "$HEALTHDIR/dim_foreach_with_template_sp.conf"
+
+rm "$HEALTHDIR/dim_foreach_with_template_sp.conf"
+rm -rf "$OUTDIR"
+
+echo  -e "${GREEN} all the tests were sucessful ${NOCOLOR}"

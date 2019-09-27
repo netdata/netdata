@@ -697,6 +697,7 @@ struct rrdhost {
     // RRDCALCs may be linked to charts at any point
     // (charts may or may not exist when these are loaded)
     RRDCALC *alarms;
+    RRDCALC *alarms_with_foreach;
     avl_tree_lock alarms_idx_health_log;
     avl_tree_lock alarms_idx_name;
 
@@ -709,6 +710,7 @@ struct rrdhost {
     // these are used to create alarms when charts
     // are created or renamed, that match them
     RRDCALCTEMPLATE *templates;
+    RRDCALCTEMPLATE *alarms_template_with_foreach;
 
 
     // ------------------------------------------------------------------------
@@ -1008,6 +1010,7 @@ static inline time_t rrdset_slot2time(RRDSET *st, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
 
+extern void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host);
 extern RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode);
 #define rrddim_add(st, id, name, multiplier, divisor, algorithm) rrddim_add_custom(st, id, name, multiplier, divisor, algorithm, (st)->rrd_memory_mode)
 
