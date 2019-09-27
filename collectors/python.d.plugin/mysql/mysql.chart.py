@@ -140,7 +140,6 @@ GALERA_STATS = [
     'wsrep_local_state_comment',
     'wsrep_open_transactions',
     'wsrep_connected',
-    'wsrep_local_index',
     'wsrep_ready',
     'wsrep_thread_count'
 ]
@@ -846,25 +845,23 @@ class Service(MySQLService):
         return wsrep_converter.convert(key, value)
 
     def get_global_status(self, raw_global_status):
-        """
-        MariaDB [(none)]> show global status;
-        +--------------------------------------------------------------+-----------------------------------------------+
-        | Variable_name                                                | Value                                         |
-        +--------------------------------------------------------------+-----------------------------------------------+
-        | Aborted_clients                                              | 5                                             |
-        | Aborted_connects                                             | 20                                            |
-        | Access_denied_errors                                         | 22                                            |
-        | Acl_column_grants                                            | 0                                             |
-        | Acl_database_grants                                          | 0                                             |
-        | Acl_function_grants                                          | 0                                             |
-        ...
-        ...
-        | wsrep_ready                                                  | OFF                                           |
-        | wsrep_rollbacker_thread_count                                | 0                                             |
-        | wsrep_thread_count                                           | 0                                             |
-        +--------------------------------------------------------------+-----------------------------------------------+
-        """
-
+        # (
+        #     (
+        #         ('Aborted_clients', '18'),
+        #         ('Aborted_connects', '33'),
+        #         ('Access_denied_errors', '80'),
+        #         ('Acl_column_grants', '0'),
+        #         ('Acl_database_grants', '0'),
+        #         ('Acl_function_grants', '0'),
+        #         ('wsrep_ready', 'OFF'),
+        #         ('wsrep_rollbacker_thread_count', '0'),
+        #         ('wsrep_thread_count', '0')
+        #     ),
+        #     (
+        #         ('Variable_name', 253, 60, 64, 64, 0, 0),
+        #         ('Value', 253, 48, 2048, 2048, 0, 0),
+        #     )
+        # )
         rows = raw_global_status[0]
         if not rows:
             return
@@ -919,6 +916,39 @@ class Service(MySQLService):
         self.add_new_charts(slave_status_chart_template, name)
 
     def get_userstats(self, raw_data):
+        # (
+        #     (
+        #         ('netdata', 1L, 0L, 60L, 0.15842499999999984, 0.15767439999999996, 5206L, 963957L, 0L, 0L,
+        #          61L, 0L, 0L, 0L, 0L, 0L, 62L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
+        #     ),
+        #     (
+        #         ('User', 253, 7, 128, 128, 0, 0),
+        #         ('Total_connections', 3, 2, 11, 11, 0, 0),
+        #         ('Concurrent_connections', 3, 1, 11, 11, 0, 0),
+        #         ('Connected_time', 3, 2, 11, 11, 0, 0),
+        #         ('Busy_time', 5, 20, 21, 21, 31, 0),
+        #         ('Cpu_time', 5, 20, 21, 21, 31, 0),
+        #         ('Bytes_received', 8, 4, 21, 21, 0, 0),
+        #         ('Bytes_sent', 8, 6, 21, 21, 0, 0),
+        #         ('Binlog_bytes_written', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_read', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_sent', 8, 2, 21, 21, 0, 0),
+        #         ('Rows_deleted', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_inserted', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_updated', 8, 1, 21, 21, 0, 0),
+        #         ('Select_commands', 8, 2, 21, 21, 0, 0),
+        #         ('Update_commands', 8, 1, 21, 21, 0, 0),
+        #         ('Other_commands', 8, 2, 21, 21, 0, 0),
+        #         ('Commit_transactions', 8, 1, 21, 21, 0, 0),
+        #         ('Rollback_transactions', 8, 1, 21, 21, 0, 0),
+        #         ('Denied_connections', 8, 1, 21, 21, 0, 0),
+        #         ('Lost_connections', 8, 1, 21, 21, 0, 0),
+        #         ('Access_denied', 8, 1, 21, 21, 0, 0),
+        #         ('Empty_queries', 8, 2, 21, 21, 0, 0),
+        #         ('Total_ssl_connections', 8, 1, 21, 21, 0, 0),
+        #         ('Max_statement_time_exceeded', 8, 1, 21, 21, 0, 0)
+        #     )
+        # )
         data = dict()
         userstats_vars = [e[0] for e in raw_data['user_statistics'][1]]
         for i, _ in enumerate(raw_data['user_statistics'][0]):
