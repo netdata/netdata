@@ -653,8 +653,7 @@ CHARTS = {
         ]
     },
     'galera_open_transactions': {
-        'options': [None, 'The Number of Locally Running Registered Inside the WSRep Provider Transactions', 'num',
-                    'galera', 'mysql.galera_open_transactions', 'line'],
+        'options': [None, 'Open Transactions', 'num', 'galera', 'mysql.galera_open_transactions', 'line'],
         'lines': [
             ['wsrep_open_transactions', 'open transactions', 'absolute'],
         ]
@@ -771,23 +770,23 @@ class WSRepDataConverter:
     def convert_local_state_comment(self, value):
         # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_local_state_comment
         if value == 'Joining':
-            return 1
+            return 0
         elif value == 'Donor' or value == 'Desynced':
-            return 2
+            return 1
         elif value == 'Joined':
-            return 3
+            return 2
         elif value == 'Synced':
-            return 4
+            return 3
         return self.unknown_value
 
     def convert_cluster_status(self, value):
         # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_cluster_status
         if value == 'Primary':
-            return 1
+            return 0
         elif value == 'Non-Primary':
-            return 2
+            return 1
         elif value == 'Disconnected':
-            return 3
+            return 2
         return self.unknown_value
 
 
