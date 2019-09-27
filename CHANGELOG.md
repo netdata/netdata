@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix a memory leak [\#6945](https://github.com/netdata/netdata/pull/6945) ([vlvkobal](https://github.com/vlvkobal))
 - Restore original alignment behaviour of RRDR [\#6938](https://github.com/netdata/netdata/pull/6938) ([mfundul](https://github.com/mfundul))
 - minor - check for curl to not get wrong error message [\#6931](https://github.com/netdata/netdata/pull/6931) ([underhood](https://github.com/underhood))
 - netdata/packaging: fix broken links on web files, for deb [\#6930](https://github.com/netdata/netdata/pull/6930) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -226,7 +227,6 @@
 - Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
 - Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
 - Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
-- ZRAM info collector module \(proc.plugin\) [\#6276](https://github.com/netdata/netdata/pull/6276) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
@@ -272,12 +272,6 @@
 - \[freeipmi\] Remove id in sensor name when already unique [\#6296](https://github.com/netdata/netdata/pull/6296) ([Saruspete](https://github.com/Saruspete))
 - Agent Frontend footer hidden [\#6294](https://github.com/netdata/netdata/pull/6294) ([thiagoftsm](https://github.com/thiagoftsm))
 - doc: remove single/multi-threaded web server configuration [\#6291](https://github.com/netdata/netdata/pull/6291) ([nodiscc](https://github.com/nodiscc))
-- Add a riak plugin [\#6286](https://github.com/netdata/netdata/pull/6286) ([jchristgit](https://github.com/jchristgit))
-- netdata/packaging: Separate beta messages from production messages [\#6282](https://github.com/netdata/netdata/pull/6282) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Add more info on the stream.conf health enabled by default = auto option [\#6281](https://github.com/netdata/netdata/pull/6281) ([cakrit](https://github.com/cakrit))
-- Add comments about AWS SDK for C++ installation [\#6277](https://github.com/netdata/netdata/pull/6277) ([vlvkobal](https://github.com/vlvkobal))
-- Fix devuan support for initd [\#6275](https://github.com/netdata/netdata/pull/6275) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Easily disable alarms, by persisting the silencers configuration [\#6274](https://github.com/netdata/netdata/pull/6274) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
