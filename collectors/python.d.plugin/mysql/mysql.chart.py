@@ -628,7 +628,7 @@ CHARTS = {
     'galera_cluster_size': {
         'options': [None, 'Number of Nodes in the Cluster', 'num', 'galera', 'mysql.galera_cluster_size', 'line'],
         'lines': [
-            ['wsrep_cluster_size', 'size', 'absolute'],
+            ['wsrep_cluster_size', 'nodes', 'absolute'],
         ]
     },
     'galera_cluster_weight': {
