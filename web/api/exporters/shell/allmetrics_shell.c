@@ -108,6 +108,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
             buffer_sprintf(wb, "%s\n"
                                "\t\"%s\": {\n"
                                "\t\t\"name\":\"%s\",\n"
+                               "\t\t\"family\":\"%s\",\n"
                                "\t\t\"context\":\"%s\",\n"
                                "\t\t\"units\":\"%s\",\n"
                                "\t\t\"last_updated\": %ld,\n"
@@ -115,6 +116,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, BUFFER *wb) {
                            , chart_counter?",":""
                            , st->id
                            , st->name
+                           , st->family
                            , st->context
                            , st->units
                            , rrdset_last_entry_t(st)
