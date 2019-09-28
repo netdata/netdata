@@ -134,6 +134,10 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
             pagelines_cnt++;
         }
+        if (pagelines_cnt == 0) {
+            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse any valid line in %s", ff_path);
+            return 1;
+        }
 
         // 4th line is the "Free pages count per migrate type at order". Just substract these 8 words.
         pageorders_cnt = procfile_linewords(ff, 3);
@@ -185,11 +189,6 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
 
             p++;
-        }
-
-        if (p == 0) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse any valid line in %s", ff_path);
-            return 1;
         }
 
         // Init the RRD graphs
