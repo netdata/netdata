@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- web api: include family into allmetrics json response [\#6966](https://github.com/netdata/netdata/pull/6966) ([ilyam8](https://github.com/ilyam8))
+- Reduce overhead during write io [\#6964](https://github.com/netdata/netdata/pull/6964) ([mfundul](https://github.com/mfundul))
 - Fix a memory leak [\#6945](https://github.com/netdata/netdata/pull/6945) ([vlvkobal](https://github.com/vlvkobal))
 - Restore original alignment behaviour of RRDR [\#6938](https://github.com/netdata/netdata/pull/6938) ([mfundul](https://github.com/mfundul))
 - minor - check for curl to not get wrong error message [\#6931](https://github.com/netdata/netdata/pull/6931) ([underhood](https://github.com/underhood))
@@ -63,6 +65,7 @@
 - changed naming for redirect\_uri param [\#6663](https://github.com/netdata/netdata/pull/6663) ([jacekkolasa](https://github.com/jacekkolasa))
 - Fixes netdata group deletion on linux for uninstall script [\#6645](https://github.com/netdata/netdata/pull/6645) ([mbarper](https://github.com/mbarper))
 - Gearman plugin for Netdata [\#6567](https://github.com/netdata/netdata/pull/6567) ([agronick](https://github.com/agronick))
+- Create a template for all dimensions [\#6560](https://github.com/netdata/netdata/pull/6560) ([thiagoftsm](https://github.com/thiagoftsm))
 - Center the chart on timeframe when an alarm is raised [\#6391](https://github.com/netdata/netdata/pull/6391) ([thiagoftsm](https://github.com/thiagoftsm))
 - Cppcheck fixes [\#6386](https://github.com/netdata/netdata/pull/6386) ([ac000](https://github.com/ac000))
 
@@ -269,9 +272,6 @@
 - Handle file descriptors running out [\#6303](https://github.com/netdata/netdata/pull/6303) ([mfundul](https://github.com/mfundul))
 - Add note regarding libexecdir [\#6301](https://github.com/netdata/netdata/pull/6301) ([cakrit](https://github.com/cakrit))
 - stale bot limits update [\#6297](https://github.com/netdata/netdata/pull/6297) ([ilyam8](https://github.com/ilyam8))
-- \[freeipmi\] Remove id in sensor name when already unique [\#6296](https://github.com/netdata/netdata/pull/6296) ([Saruspete](https://github.com/Saruspete))
-- Agent Frontend footer hidden [\#6294](https://github.com/netdata/netdata/pull/6294) ([thiagoftsm](https://github.com/thiagoftsm))
-- doc: remove single/multi-threaded web server configuration [\#6291](https://github.com/netdata/netdata/pull/6291) ([nodiscc](https://github.com/nodiscc))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
