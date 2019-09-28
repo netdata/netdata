@@ -186,6 +186,10 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 }
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
+    RRDHOST *host = st->rrdhost;
+    if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
+        rrdhost_wrlock(host);
+    }
     rrdset_wrlock(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -204,7 +208,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         return rd;
     }
 
-    RRDHOST *host = st->rrdhost;
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
@@ -402,9 +405,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     rrdset_unlock(st);
     if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
-        rrdhost_wrlock(host);
         rrdcalc_link_to_rrddim(rd, st, host);
-
         rrdhost_unlock(host);
     }
     return(rd);
