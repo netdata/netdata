@@ -400,13 +400,13 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
+    rrdset_unlock(st);
     if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
         rrdhost_wrlock(host);
         rrdcalc_link_to_rrddim(rd, st, host);
 
         rrdhost_unlock(host);
     }
-    rrdset_unlock(st);
     return(rd);
 }
 
