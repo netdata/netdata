@@ -187,11 +187,6 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
     RRDHOST *host = st->rrdhost;
-    /*
-    if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
-        rrdhost_wrlock(host);
-    }
-     */
     rrdset_wrlock(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -407,9 +402,33 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
 
     rrdset_unlock(st);
     if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
-        rrdhost_wrlock(host);
-        rrdcalc_link_to_rrddim(rd, st, host);
-        rrdhost_unlock(host);
+        int count = 0;
+        int hostlocked;
+        trylockagain:
+        hostlocked = pthread_rwlock_trywrlock(&host->rrdhost_rwlock);
+        if(!hostlocked)
+        {
+            rrdcalc_link_to_rrddim(rd, st, host);
+            rrdhost_unlock(host);
+        }
+        else if (hostlocked == EBUSY)
+        {
+            if (count <= 5)
+            {
+                usleep(200000);
+                count++;
+                goto trylockagain;
+            }
+            else
+            {
+                error("After to try creating an alarm for dimension %s on chart %s 5 times without success, I am moving in front"
+                      , rd->name, st->name);
+            }
+        }
+        else
+        {
+            error("Cannot lock host to create an alarm for the dimension.");
+        }
     }
 
     return(rd);
