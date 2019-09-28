@@ -270,11 +270,6 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         }
     }
 
-    if(unlikely(!pagelines_cnt)) {
-        error("PLUGIN: PROC_PAGETPEINFO: Cannot find the number of NUMA Nodes in %s", PLUGIN_PROC_MODULE_PAGETYPEINFO_NAME);
-        return 1;
-    }
-
     // --------------------------------------------------------------------
     // Update pagelines
 
