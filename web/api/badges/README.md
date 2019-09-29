@@ -214,6 +214,14 @@ These are options dedicated to badges:
        <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=175"></img> `scale=175`<br/>
        <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60&scale=200"></img> `scale=200`
 
+-   `fixed_width_lbl=NUMBER` and `fixed_width_val=NUMBER`
+
+    This parameter overrides auto-sizing of badges and displays them at fixed widths. `fixed_width_lbl` determines the size of the label's left side (label/name). `fixed_width_val` determines the size of the the label's right side (value). You must set both parameters together, or they will be ignored.
+    
+    You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped.
+    
+    The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+
 -   `refresh=auto` or `refresh=SECONDS`
 
     This option enables auto-refreshing of images. Netdata will send the HTTP header `Refresh: SECONDS` to the web browser, thus requesting automatic refresh of the images at regular intervals.

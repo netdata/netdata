@@ -688,7 +688,7 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
-void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options) {
+void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options, int fixed_width_lbl, int fixed_width_val) {
     char    value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
             , label_escaped[LABEL_STRING_SIZE + 1]
@@ -696,7 +696,8 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
             , label_color_escaped[COLOR_STRING_SIZE + 1]
             , value_color_escaped[COLOR_STRING_SIZE + 1];
 
-    double label_width, value_width, total_width, height = 20.0, font_size = 11.0, text_offset = 5.8, round_corner = 3.0;
+    double label_width = (double)fixed_width_lbl, value_width = (double)fixed_width_val, total_width;
+    double height = 20.0, font_size = 11.0, text_offset = 5.8, round_corner = 3.0;
 
     if(scale < 100) scale = 100;
 
@@ -709,8 +710,10 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
     format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
 
-    label_width = verdana11_width(label, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
-    value_width = verdana11_width(value_string, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
+    if(fixed_width_lbl <= 0 || fixed_width_val <= 0) {
+        label_width = verdana11_width(label, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
+        value_width = verdana11_width(value_string, font_size) + (BADGE_HORIZONTAL_PADDING * 2);
+    }
     total_width = label_width + value_width;
 
     escape_xmlz(label_escaped, label, LABEL_STRING_SIZE);
@@ -740,16 +743,49 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
                 "<rect class=\"bdge-ttl-width\" width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
             "</mask>"
             "<g mask=\"url(#round)\">"
-                "<rect class=\"bdge-rect-lbl\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
-                "<rect class=\"bdge-rect-val\" x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>"
+                "<rect class=\"bdge-rect-lbl\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>",
+        total_width, height,
+        total_width, height, round_corner,
+        label_width, height, label_color_escaped); //<rect class="bdge-rect-lbl"
+
+    if(fixed_width_lbl > 0 && fixed_width_val > 0) {
+        buffer_sprintf(wb,
+                "<clipPath id=\"lbl-rect\">"
+                    "<rect class=\"bdge-rect-lbl\" width=\"%0.2f\" height=\"%0.2f\"/>"
+                "</clipPath>",
+        label_width, height); //<clipPath id="lbl-rect"> <rect class="bdge-rect-lbl"
+    }
+
+    buffer_sprintf(wb,
+                "<rect class=\"bdge-rect-val\" x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>",
+        label_width, value_width, height, value_color_escaped);
+    
+    if(fixed_width_lbl > 0 && fixed_width_val > 0) {
+        buffer_sprintf(wb,
+                "<clipPath id=\"val-rect\">"
+                    "<rect class=\"bdge-rect-val\" x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\"/>"
+                "</clipPath>",
+        label_width, value_width, height);
+    }
+
+    buffer_sprintf(wb,
                 "<rect class=\"bdge-ttl-width\" width=\"%0.2f\" height=\"%0.2f\" fill=\"url(#smooth)\"/>"
             "</g>"
             "<g fill=\"#fff\" text-anchor=\"middle\" font-family=\"DejaVu Sans,Verdana,Geneva,sans-serif\" font-size=\"%0.2f\">"
-                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\">%s</text>"
-                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\">%s</text>"
-                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\">%s</text>"
-            "</g>"
+                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\" clip-path=\"url(#lbl-rect)\">%s</text>"
+                "<text class=\"bdge-lbl-lbl\" x=\"%0.2f\" y=\"%0.0f\" clip-path=\"url(#lbl-rect)\">%s</text>"
+                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\" fill=\"#010101\" fill-opacity=\".3\" clip-path=\"url(#val-rect)\">%s</text>"
+                "<text class=\"bdge-lbl-val\" x=\"%0.2f\" y=\"%0.0f\" clip-path=\"url(#val-rect)\">%s</text>"
+            "</g>",
+        total_width, height,
+        font_size,
+        label_width / 2, ceil(height - text_offset), label_escaped,
+        label_width / 2, ceil(height - text_offset - 1.0), label_escaped,
+        label_width + value_width / 2 -1, ceil(height - text_offset), value_escaped,
+        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped);
+
+    if(fixed_width_lbl <= 0 || fixed_width_val <= 0){
+        buffer_sprintf(wb,
             "<script type=\"text/javascript\">"
                 "var bdg_horiz_padding = %d;"
                 "function netdata_bdge_each(list, attr, value){"
@@ -773,19 +809,10 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
                 "var width_update_elems = this_svg.getElementsByClassName(\"bdge-ttl-width\");"
                 "netdata_bdge_each(width_update_elems, \"width\", width_total);"
                 "this_svg.setAttribute(\"width\", width_total);"
-            "</script>"
-        "</svg>",
-        total_width, height,
-        total_width, height, round_corner,
-        label_width, height, label_color_escaped,
-        label_width, value_width, height, value_color_escaped,
-        total_width, height,
-        font_size,
-        label_width / 2, ceil(height - text_offset), label_escaped,
-        label_width / 2, ceil(height - text_offset - 1.0), label_escaped,
-        label_width + value_width / 2 -1, ceil(height - text_offset), value_escaped,
-        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), value_escaped,
-        BADGE_HORIZONTAL_PADDING );
+                "</script>",
+            BADGE_HORIZONTAL_PADDING);
+    }
+    buffer_sprintf(wb, "</svg>");
 }
 
 int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
@@ -807,7 +834,9 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     , *refresh_str = NULL
     , *precision_str = NULL
     , *scale_str = NULL
-    , *alarm = NULL;
+    , *alarm = NULL
+    , *fixed_width_lbl_str = NULL
+    , *fixed_width_val_str = NULL; 
 
     int group = RRDR_GROUPING_AVERAGE;
     uint32_t options = 0x00000000;
@@ -851,9 +880,20 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "refresh")) refresh_str = value;
         else if(!strcmp(name, "precision")) precision_str = value;
         else if(!strcmp(name, "scale")) scale_str = value;
+        else if(!strcmp(name, "fixed_width_lbl")) fixed_width_lbl_str = value;
+        else if(!strcmp(name, "fixed_width_val")) fixed_width_val_str = value;
         else if(!strcmp(name, "alarm")) alarm = value;
     }
 
+    int fixed_width_lbl = -1;
+    int fixed_width_val = -1;
+
+    if(fixed_width_lbl_str && *fixed_width_lbl_str
+        && fixed_width_val_str && *fixed_width_val_str) {
+        fixed_width_lbl = str2i(fixed_width_lbl_str);
+        fixed_width_val = str2i(fixed_width_val_str);
+    }
+    
     if(!chart || !*chart) {
         buffer_no_cacheable(w->response.data);
         buffer_sprintf(w->response.data, "No chart id is given at the request.");
@@ -866,7 +906,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
     if(!st) st = rrdset_find_byname(host, chart);
     if(!st) {
         buffer_no_cacheable(w->response.data);
-        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0);
+        buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1);
         ret = HTTP_RESP_OK;
         goto cleanup;
     }
@@ -877,7 +917,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         rc = rrdcalc_find(st, alarm);
         if (!rc) {
             buffer_no_cacheable(w->response.data);
-            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0);
+            buffer_svg(w->response.data, "alarm not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1);
             ret = HTTP_RESP_OK;
             goto cleanup;
         }
@@ -995,7 +1035,9 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 value_color,
                 precision,
                 scale,
-                options
+                options,
+                fixed_width_lbl,
+                fixed_width_val
         );
         ret = HTTP_RESP_OK;
     }
@@ -1032,7 +1074,9 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
                 value_color,
                 precision,
                 scale,
-                options
+                options,
+                fixed_width_lbl,
+                fixed_width_val
         );
     }
 
