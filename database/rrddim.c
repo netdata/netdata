@@ -400,7 +400,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    rrdset_unlock(st);
     if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
         int count = 0;
         int hostlocked;
@@ -430,6 +429,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             error("Cannot lock host to create an alarm for the dimension.");
         }
     }
+    rrdset_unlock(st);
 
     return(rd);
 }
