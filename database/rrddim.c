@@ -420,7 +420,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             }
             else
             {
-                error("After to try creating an alarm for dimension %s on chart %s 5 times without success, I am moving in front"
+                error("Failed to create an alarm for dimension %s of chart %s 5 times. Skipping alarm."
                       , rd->name, st->name);
             }
         }
