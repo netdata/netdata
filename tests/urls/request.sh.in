@@ -18,6 +18,9 @@ OUTDIR="tests"
 OUTEDIR="encoded_tests"
 OUTOPTDIR="options"
 ERRDIR="etests"
+NOCOLOR='\033[0'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
 
 ################################################################################################
 ####																						####
@@ -27,7 +30,7 @@ ERRDIR="etests"
 
 # Print error message and close script
 netdata_print_error(){
-    echo "Closing due error \"$1\" code \"$2\""
+    echo "${RED} Closing due error \"$1\" code \"$2\" ${NOCOLOR}"
     exit 1
 }
 
@@ -200,36 +203,40 @@ netdata_download_allmetrics() {
 }
 
 
-################################################################################################
+####################################################
 ####																						####
-####									MAIN ROUTINE										####
+####									MAIN ROUTINE              ####
 ####																						####
-################################################################################################
+####################################################
 MURL="http://127.0.0.1:19999"
+
+if [ -n "$1" ]; then
+    MURL="$1"
+fi
 
 netdata_create_directory $OUTDIR
 netdata_create_directory $OUTEDIR
 netdata_create_directory $OUTOPTDIR
 netdata_create_directory $ERRDIR
 
-wget --no-check-certificate --execute="robots = off" --mirror --convert-links --no-parent $MURL
+wget --no-check-certificate --execute="robots = off" --mirror --convert-links --no-parent "$MURL"
 TEST=$?
 if [ $TEST -ne "0" ] ; then
     echo "Cannot connect to Netdata"
     exit 1
 fi
 
-netdata_download_various $MURL "netdata.conf" "netdata.conf"
+netdata_download_various "$MURL" "netdata.conf" "netdata.conf"
 
-netdata_download_various_with_options $MURL "netdata.conf" "netdata.conf"
+netdata_download_various_with_options "$MURL" "netdata.conf" "netdata.conf"
 
-netdata_wrong_request_various $MURL "api/v15/info?this%20could%20not%20be%20here" "err_version"
+netdata_wrong_request_various "$MURL" "api/v15/info?this%20could%20not%20be%20here" "err_version"
 
-netdata_wrong_request_various $MURL "api/v1/\(*@&$\!$%%5E\)\!$*%&\)\!$*%%5E*\!%5E%\!%5E$%\!%5E%\(\!*%5E*%5E%\(*@&$%5E%\(\!%5E#*&\!^#$*&\!^%\)@\($%^\)\!*&^\(\!*&^#$&#$\)\!$%^\)\!$*%&\)#$\!^#*$^\!\(*#^#\)\!%^\!\)$*%&\!\(*&$\!^#$*&^\!*#^$\!*^\)%\(\!*&$%\)\(\!&#$\!^*#&$^\!*^%\)\!$%\)\!\(&#$\!^#*&^$" "err_version2"
+netdata_wrong_request_various "$MURL" "api/v1/\(*@&$\!$%%5E\)\!$*%&\)\!$*%%5E*\!%5E%\!%5E$%\!%5E%\(\!*%5E*%5E%\(*@&$%5E%\(\!%5E#*&\!^#$*&\!^%\)@\($%^\)\!*&^\(\!*&^#$&#$\)\!$%^\)\!$*%&\)#$\!^#*$^\!\(*#^#\)\!%^\!\)$*%&\!\(*&$\!^#$*&^\!*#^$\!*^\)%\(\!*&$%\)\(\!&#$\!^*#&$^\!*^%\)\!$%\)\!\(&#$\!^#*&^$" "err_version2"
 
-netdata_download_various $MURL "api/v1/info" "info"
-netdata_download_various_with_options $MURL "api/v1/info" "info"
-netdata_download_various $MURL "api/v1/info?this%20could%20not%20be%20here" "err_info"
+netdata_download_various "$MURL" "api/v1/info" "info"
+netdata_download_various_with_options "$MURL" "api/v1/info" "info"
+netdata_download_various "$MURL" "api/v1/info?this%20could%20not%20be%20here" "err_info"
 
 netdata_print_header "Getting all the netdata charts"
 CHARTS=$( netdata_download_charts "$MURL" "api/v1/charts" )
@@ -244,58 +251,57 @@ elif [ ${#CHARTS[@]} -ne ${#WCHARTS2[@]} ]; then
     exit 3;
 fi
 
-netdata_wrong_request_various $MURL "api/v1/chart" "err_chart_without_chart"
-netdata_wrong_request_various $MURL "api/v1/chart?_=234231424242" "err_chart_arg"
+netdata_wrong_request_various "$MURL" "api/v1/chart" "err_chart_without_chart"
+netdata_wrong_request_various "$MURL" "api/v1/chart?_=234231424242" "err_chart_arg"
 
-netdata_download_various $MURL "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
-netdata_download_various_with_options $MURL "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
+netdata_download_various "$MURL" "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
+netdata_download_various_with_options "$MURL" "api/v1/chart?chart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args"
 
-netdata_download_various $MURL "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
-netdata_download_various_with_options $MURL "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
-netdata_download_various $MURL "api/v1/chart%3Fchart=cpu.cpu0_interrupts%26_=234231424242" "chart_cpu_with_more_args_encoded2"
-netdata_download_various $MURL "api/v1/chart%3Fchart%3Dcpu.cpu0_interrupts%26_%3D234231424242" "chart_cpu_with_more_args_encoded3"
+netdata_download_various "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
+netdata_download_various_with_options "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts&_=234231424242" "chart_cpu_with_more_args_encoded"
+netdata_download_various "$MURL" "api/v1/chart%3Fchart=cpu.cpu0_interrupts%26_=234231424242" "chart_cpu_with_more_args_encoded2"
+netdata_download_various "$MURL" "api/v1/chart%3Fchart%3Dcpu.cpu0_interrupts%26_%3D234231424242" "chart_cpu_with_more_args_encoded3"
 
 netdata_create_directory "$OUTDIR/chart"
 for I in $CHARTS ; do
 	NAME=${I//\"/}
-    netdata_download_various $MURL "api/v1/chart?chart=$NAME"  "chart/$NAME"
+    netdata_download_various "$MURL" "api/v1/chart?chart=$NAME"  "chart/$NAME"
 done
 
-netdata_wrong_request_various $MURL "api/v1/alarm_variables" "err_alarm_variables_without_chart"
-netdata_wrong_request_various $MURL "api/v1/alarm_variables?_=234231424242" "err_alarm_variables_arg"
-netdata_download_various $MURL "api/v1/alarm_variables?chart=cpu.cpu0_interrupts&_=234231424242" "alarm_cpu_with_more_args"
+netdata_wrong_request_various "$MURL" "api/v1/alarm_variables" "err_alarm_variables_without_chart"
+netdata_wrong_request_various "$MURL" "api/v1/alarm_variables?_=234231424242" "err_alarm_variables_arg"
+netdata_download_various "$MURL" "api/v1/alarm_variables?chart=cpu.cpu0_interrupts&_=234231424242" "alarm_cpu_with_more_args"
 
 netdata_create_directory "$OUTDIR/alarm_variables"
 for I in $CHARTS ; do
 	NAME=${I//\"/}
-    netdata_download_various $MURL "api/v1/alarm_variables?chart=$NAME"  "alarm_variables/$NAME"
+    netdata_download_various "$MURL" "api/v1/alarm_variables?chart=$NAME"  "alarm_variables/$NAME"
 done
 
 netdata_create_directory "$OUTDIR/badge"
 netdata_create_directory "$OUTEDIR/badge"
 for I in $CHARTS ; do
-    netdata_download_chart $MURL "api/v1/badge.svg?chart" "$I" "badge"
+    netdata_download_chart "$MURL" "api/v1/badge.svg?chart" "$I" "badge"
 done
 
 netdata_create_directory "$OUTDIR/allmetrics"
-netdata_download_allmetrics $MURL "allmetrics"
+netdata_download_allmetrics "$MURL" "allmetrics"
 
-netdata_download_various $MURL "api/v1/alarms?all"  "alarms_all"
-netdata_download_various $MURL "api/v1/alarms?active"  "alarms_active"
-netdata_download_various $MURL "api/v1/alarms"  "alarms_nothing"
+netdata_download_various "$MURL" "api/v1/alarms?all"  "alarms_all"
+netdata_download_various "$MURL" "api/v1/alarms?active"  "alarms_active"
+netdata_download_various "$MURL" "api/v1/alarms"  "alarms_nothing"
 
-netdata_download_various $MURL "api/v1/alarm_log?after"  "alarm_without"
-netdata_download_various $MURL "api/v1/alarm_log"  "alarm_nothing"
-netdata_download_various $MURL "api/v1/alarm_log?after&_=$PT"  "alarm_log"
+netdata_download_various "$MURL" "api/v1/alarm_log?after"  "alarm_without"
+netdata_download_various "$MURL" "api/v1/alarm_log"  "alarm_nothing"
+netdata_download_various "$MURL" "api/v1/alarm_log?after&_=$PT"  "alarm_log"
 
 netdata_create_directory "$OUTDIR/data"
 netdata_create_directory "$OUTEDIR/data"
 for I in $CHARTS ; do
-    netdata_download_chart $MURL "api/v1/data?chart" "$I" "data"
+    netdata_download_chart "$MURL" "api/v1/data?chart" "$I" "data"
     break;
 done
 
-WHITE='\033[0;37m'
-echo -e "${WHITE}ALL the URLS got 200 as answer!"
+echo -e "${GREEN}ALL the URLS got 200 as answer! ${NOCOLOR}"
 
 exit 0
