@@ -502,7 +502,7 @@ CHARTS = {
         'lines': []
     },
     'index_health': {
-        'options': [None, 'Health', 'num', 'indices', 'elastic.index_health', 'line'],
+        'options': [None, 'Health', 'status', 'indices', 'elastic.index_health', 'line'],
         'lines': []
     },
 }
