@@ -25,6 +25,7 @@
 - Detect deadlock in dbengine page cache [\#6911](https://github.com/netdata/netdata/pull/6911) ([mfundul](https://github.com/mfundul))
 - Correct read length of silencers file [\#6909](https://github.com/netdata/netdata/pull/6909) ([cakrit](https://github.com/cakrit))
 - netdata/ci: fix branch check [\#6905](https://github.com/netdata/netdata/pull/6905) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- \#3925 implementation [\#6903](https://github.com/netdata/netdata/pull/6903) ([underhood](https://github.com/underhood))
 - netdata/packaging: remove rhel7 - i386, until its settled from bug \#6849 [\#6902](https://github.com/netdata/netdata/pull/6902) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Improve changelog generation and add it back to the pipeline [\#6900](https://github.com/netdata/netdata/pull/6900) ([cakrit](https://github.com/cakrit))
 - \[collector/slabinfo\] Fix pagesize not defined in non-x86 arches [\#6897](https://github.com/netdata/netdata/pull/6897) ([Saruspete](https://github.com/Saruspete))
