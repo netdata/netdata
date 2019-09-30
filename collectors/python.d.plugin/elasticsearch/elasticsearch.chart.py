@@ -200,7 +200,8 @@ CHARTS = {
         ]
     },
     'search_latency': {
-        'options': [None, 'Query And Fetch Latency', 'milliseconds', 'search performance', 'elastic.search_latency', 'stacked'],
+        'options': [None, 'Query And Fetch Latency', 'milliseconds', 'search performance', 'elastic.search_latency',
+                    'stacked'],
         'lines': [
             ['query_latency', 'query', 'absolute', 1, 1000],
             ['fetch_latency', 'fetch', 'absolute', 1, 1000]
@@ -525,6 +526,7 @@ def get_survive_any(method):
             self, queue, url = args[0], args[1], args[2]
             self.error("error during '{0}' : {1}".format(url, error))
             queue.put(dict())
+
     return w
 
 
@@ -587,8 +589,10 @@ class Service(UrlService):
         for method in self.methods:
             if not method.run:
                 continue
-            th = threading.Thread(target=method.get_data,
-                                  args=(queue, method.url))
+            th = threading.Thread(
+                target=method.get_data,
+                args=(queue, method.url),
+            )
             th.daemon = True
             th.start()
             threads.append(th)
@@ -661,9 +665,15 @@ class Service(UrlService):
             return queue.put(dict())
 
         data = fetch_data(raw_data=parsed, metrics=HEALTH_STATS)
-
-        data.update({'status_green': 0, 'status_red': 0, 'status_yellow': 0,
-                           'status_foo1': 0, 'status_foo2': 0, 'status_foo3': 0})
+        dummy = {
+            'status_green': 0,
+            'status_red': 0,
+            'status_yellow': 0,
+            'status_foo1': 0,
+            'status_foo2': 0,
+            'status_foo3': 0,
+        }
+        data.update(dummy)
         current_status = 'status_' + parsed['status']
         data[current_status] = 1
 
@@ -706,8 +716,8 @@ class Service(UrlService):
             except KeyError:
                 continue
         if 'process_open_file_descriptors' in data and 'process_max_file_descriptors' in data:
-            data['file_descriptors_used'] = round(float(data['process_open_file_descriptors'])
-                                                        / data['process_max_file_descriptors'] * 1000)
+            v = float(data['process_open_file_descriptors']) / data['process_max_file_descriptors'] * 1000
+            data['file_descriptors_used'] = round(v)
 
         return queue.put(data)
 
@@ -722,12 +732,15 @@ class Service(UrlService):
         if key not in self.latency:
             self.latency[key] = dict(total=total, spent_time=spent_time)
             return 0
+
         if self.latency[key]['total'] != total:
-            latency = float(spent_time - self.latency[key]['spent_time'])\
-                      / float(total - self.latency[key]['total']) * 1000
+            spent_diff = spent_time - self.latency[key]['spent_time']
+            total_diff = total - self.latency[key]['total']
+            latency = float(spent_diff) / float(total_diff) * 1000
             self.latency[key]['total'] = total
             self.latency[key]['spent_time'] = spent_time
             return latency
+
         self.latency[key]['spent_time'] = spent_time
         return 0
 
