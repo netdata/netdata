@@ -51,7 +51,7 @@ It produces:
     -   Store statistics
     -   Indices and shards statistics
 
-9.  **Indices** charts (per index statistics):
+9.  **Indices** charts (per index statistics, disabled by default):
 
     -   Docs count
     -   Store size
@@ -69,7 +69,7 @@ local:
   node_status        :  yes/no        # Get metrics from "/_nodes/_local/stats". Enabled by default.
   cluster_health     :  yes/no        # Get metrics from "/_cluster/health". Enabled by default.
   cluster_stats      :  yes/no        # Get metrics from "'/_cluster/stats". Enabled by default.
-  indices_stats      :  yes/no        # Get metrics from "/_cat/indices". Enabled by default.
+  indices_stats      :  yes/no        # Get metrics from "/_cat/indices". Disabled by default.
 ```
 
 If no configuration is given, module will try to connect to `http://127.0.0.1:9200`.

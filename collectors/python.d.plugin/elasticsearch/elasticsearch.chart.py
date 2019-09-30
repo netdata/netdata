@@ -576,7 +576,7 @@ class Service(UrlService):
             METHODS(
                 get_data=self._get_indices,
                 url=self.url + '/_cat/indices',
-                run=self.configuration.get('indices_stats', True),
+                run=self.configuration.get('indices_stats', False),
             ),
         ]
         return UrlService.check(self)
