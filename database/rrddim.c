@@ -403,30 +403,26 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
         int count = 0;
         int hostlocked;
-        trylockagain:
-        hostlocked = pthread_rwlock_trywrlock(&host->rrdhost_rwlock);
-        if(!hostlocked)
+        for (count = 0 ; count < 5 ; count++)
         {
-            rrdcalc_link_to_rrddim(rd, st, host);
-            rrdhost_unlock(host);
-        }
-        else if (hostlocked == EBUSY)
-        {
-            if (count <= 5)
+            hostlocked = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
+            if(!hostlocked)
             {
-                usleep(200000);
-                count++;
-                goto trylockagain;
+                rrdcalc_link_to_rrddim(rd, st, host);
+                rrdhost_unlock(host);
+                break;
             }
-            else
+            else if (hostlocked != EBUSY)
             {
-                error("Failed to create an alarm for dimension %s of chart %s 5 times. Skipping alarm."
-                      , rd->name, st->name);
+                error("Cannot lock host to create an alarm for the dimension.");
             }
+            usleep(200000);
         }
-        else
+
+        if (count == 5)
         {
-            error("Cannot lock host to create an alarm for the dimension.");
+            error("Failed to create an alarm for dimension %s of chart %s 5 times. Skipping alarm."
+            , rd->name, st->name);
         }
     }
     rrdset_unlock(st);
