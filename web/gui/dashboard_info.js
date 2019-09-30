@@ -1270,11 +1270,11 @@ netdataDashboard.context = {
 
     'mysql.galera_cluster_state': {
         info:
-            '<code>-1</code>: unknown, ' +
-            '<code>0</code>: joining, ' +
-            '<code>1</code>: donor or desynced, ' +
-            '<code>2</code>: joined, ' +
-            '<code>3</code>: synced.'
+            '<code>0</code>: undefined, ' +
+            '<code>1</code>: joining, ' +
+            '<code>2</code>: donor/desynced, ' +
+            '<code>3</code>: joined, ' +
+            '<code>4</code>: synced.'
     },
 
     'mysql.galera_cluster_weight': {
