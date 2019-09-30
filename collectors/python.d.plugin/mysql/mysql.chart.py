@@ -765,30 +765,6 @@ class WSRepDataConverter:
             return 1
         return self.unknown_value
 
-    def convert_local_state_comment(self, value):
-        # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_local_state_comment
-        # https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h
-        # typedef enum wsrep_member_status {
-        #     WSREP_MEMBER_UNDEFINED, //!< undefined state
-        #     WSREP_MEMBER_JOINER,    //!< incomplete state, requested state transfer
-        #     WSREP_MEMBER_DONOR,     //!< complete state, donates state transfer
-        #     WSREP_MEMBER_JOINED,    //!< complete state
-        #     WSREP_MEMBER_SYNCED,    //!< complete state, synchronized with group
-        #     WSREP_MEMBER_ERROR,     //!< this and above is provider-specific error code
-        #     WSREP_MEMBER_MAX
-        # } wsrep_member_status_t;
-        if value == 'Undefined':
-            return 0
-        elif value == 'Joining':
-            return 1
-        elif value == 'Donor/Desynced':
-            return 2
-        elif value == 'Joined':
-            return 3
-        elif value == 'Synced':
-            return 4
-        return self.unknown_value
-
     def convert_cluster_status(self, value):
         # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_cluster_status
         # https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h
@@ -798,11 +774,12 @@ class WSRepDataConverter:
         #     WSREP_VIEW_DISCONNECTED, //!< not connected to group, retrying.
         #     WSREP_VIEW_MAX
         # } wsrep_view_status_t;
-        if value == 'Primary':
+        value = value.lower()
+        if value == 'primary':
             return 0
-        elif value == 'Non-Primary' or value == 'non-Primary':
+        elif value == 'non-primary':
             return 1
-        elif value == 'Disconnected':
+        elif value == 'disconnected':
             return 2
         return self.unknown_value
 
