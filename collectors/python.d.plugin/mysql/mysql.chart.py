@@ -771,7 +771,7 @@ class WSRepDataConverter:
         # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_local_state_comment
         if value == 'Joining':
             return 0
-        elif value == 'Donor' or value == 'Desynced':
+        elif value == 'Donor/Desynced':
             return 1
         elif value == 'Joined':
             return 2
@@ -783,7 +783,7 @@ class WSRepDataConverter:
         # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_cluster_status
         if value == 'Primary':
             return 0
-        elif value == 'Non-Primary':
+        elif value == 'Non-Primary' or value == 'non-Primary':
             return 1
         elif value == 'Disconnected':
             return 2
