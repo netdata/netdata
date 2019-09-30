@@ -137,7 +137,7 @@ GALERA_STATS = [
     'wsrep_cluster_weight',
     'wsrep_cluster_size',
     'wsrep_cluster_status',
-    'wsrep_local_state_comment',
+    'wsrep_local_state',
     'wsrep_open_transactions',
     'wsrep_connected',
     'wsrep_ready',
@@ -622,7 +622,7 @@ CHARTS = {
     'galera_cluster_state': {
         'options': [None, 'Cluster Component State', 'state', 'galera', 'mysql.galera_cluster_state', 'line'],
         'lines': [
-            ['wsrep_local_state_comment', 'state', 'absolute'],
+            ['wsrep_local_state', 'state', 'absolute'],
         ]
     },
     'galera_cluster_size': {
@@ -747,8 +747,6 @@ class WSRepDataConverter:
             return self.convert_ready(value)
         elif key == 'wsrep_cluster_status':
             return self.convert_cluster_status(value)
-        elif key == 'wsrep_local_state_comment':
-            return self.convert_local_state_comment(value)
         return value
 
     def convert_connected(self, value):
@@ -769,18 +767,37 @@ class WSRepDataConverter:
 
     def convert_local_state_comment(self, value):
         # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_local_state_comment
-        if value == 'Joining':
+        # https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h
+        # typedef enum wsrep_member_status {
+        #     WSREP_MEMBER_UNDEFINED, //!< undefined state
+        #     WSREP_MEMBER_JOINER,    //!< incomplete state, requested state transfer
+        #     WSREP_MEMBER_DONOR,     //!< complete state, donates state transfer
+        #     WSREP_MEMBER_JOINED,    //!< complete state
+        #     WSREP_MEMBER_SYNCED,    //!< complete state, synchronized with group
+        #     WSREP_MEMBER_ERROR,     //!< this and above is provider-specific error code
+        #     WSREP_MEMBER_MAX
+        # } wsrep_member_status_t;
+        if value == 'Undefined':
             return 0
-        elif value == 'Donor/Desynced':
+        elif value == 'Joining':
             return 1
-        elif value == 'Joined':
+        elif value == 'Donor/Desynced':
             return 2
-        elif value == 'Synced':
+        elif value == 'Joined':
             return 3
+        elif value == 'Synced':
+            return 4
         return self.unknown_value
 
     def convert_cluster_status(self, value):
         # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_cluster_status
+        # https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h
+        # typedef enum wsrep_view_status {
+        #     WSREP_VIEW_PRIMARY,      //!< primary group configuration (quorum present)
+        #     WSREP_VIEW_NON_PRIMARY,  //!< non-primary group configuration (quorum lost)
+        #     WSREP_VIEW_DISCONNECTED, //!< not connected to group, retrying.
+        #     WSREP_VIEW_MAX
+        # } wsrep_view_status_t;
         if value == 'Primary':
             return 0
         elif value == 'Non-Primary' or value == 'non-Primary':
