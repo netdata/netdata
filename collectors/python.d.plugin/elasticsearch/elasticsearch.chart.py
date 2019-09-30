@@ -508,6 +508,19 @@ CHARTS = {
 }
 
 
+def convert_index_store_size(size):
+    # can be b, kb, mb, gb
+    if size.endswith('kb'):
+        return float(size[:-2]) * 1024 * 100
+    elif size.endswith('mb'):
+        return float(size[:-2]) * 1024 * 1024 * 100
+    elif size.endswith('gb'):
+        return float(size[:-2]) * 1024 * 1024 * 1024 * 100
+    elif size.endswith('b'):
+        return float(size[:-1]) * 100
+    return -1
+
+
 def convert_index_health(health):
     if health == 'green':
         return 0
@@ -604,10 +617,14 @@ class Service(UrlService):
         return result or None
 
     def add_index_to_charts(self, idx_name):
-        for name in ('index_docs_count', 'index_store_size', 'index_replica', 'index_health'):
+        for name in ('index_docs_count', 'index_replica', 'index_health'):
             chart = self.charts[name]
             dim = ['{0}_{1}'.format(idx_name, name), idx_name]
             chart.add_dimension(dim)
+
+        chart = self.charts['index_store_size']
+        dim = ['{0}_{1}'.format(idx_name, name), idx_name, 'absolute', 1, 100]
+        chart.add_dimension(dim)
 
     @get_survive_any
     def _get_indices(self, queue, url):
@@ -639,10 +656,12 @@ class Service(UrlService):
                 name = idx['index']
                 v = {
                     '{0}_index_docs_count'.format(name): idx['docs.count'],
-                    '{0}_index_store_size'.format(name): idx['store.size'][:-1],
                     '{0}_index_replica'.format(name): idx['rep'],
                     '{0}_index_health'.format(name): convert_index_health(idx['health']),
                 }
+                size = convert_index_store_size(idx['store.size'])
+                if size != -1:
+                    v['{0}_index_store_size'.format(name)] = size
             except KeyError as error:
                 self.debug("error on parsing index : {0}".format(repr(error)))
                 continue
