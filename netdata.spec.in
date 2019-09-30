@@ -193,7 +193,7 @@ Requires: freeipmi
 
 # CUPS plugin dependencies
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
-BuildRequires: cups-devel
+BuildRequires: cups-devel >= 1.7
 %endif
 # end - cups plugin dependencies
 
@@ -503,7 +503,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %package plugin-cups
 Summary: The Common Unix Printing System plugin for netdata
 Group: Applications/System
-Requires: cups
+Requires: cups >= 1.7
 Requires: netdata = %{version}
 
 %description plugin-cups

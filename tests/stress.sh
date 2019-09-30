@@ -8,7 +8,7 @@ then
 fi
 
 # set the host to connect to
-if [ ! -z "$1" ]
+if [ -n "$1" ]
 then
 	host="$1"
 else
@@ -17,17 +17,17 @@ fi
 echo "using netdata server at: $host"
 
 # shellcheck disable=SC2207 disable=SC1117
-charts=($(curl "$host/netdata.conf" 2>/dev/null | grep "^\[" | cut -d '[' -f 2 | cut -d ']' -f 1 | grep -v ^global$ | grep -v "^plugin" | sort -u))
+charts=($(curl -k "$host/netdata.conf" 2>/dev/null | grep "^\[" | cut -d '[' -f 2 | cut -d ']' -f 1 | grep -v ^global$ | grep -v "^plugin" | sort -u))
 if [ "${#charts[@]}" -eq 0 ]
 then
 	echo "Cannot download charts from server: $host"
 	exit 1
 fi
 
-update_every="$(curl "$host/netdata.conf" 2>/dev/null | grep "update every = " | head -n 1 | cut -d '=' -f 2)"
+update_every="$(curl -k "$host/netdata.conf" 2>/dev/null | grep "update every = " | head -n 1 | cut -d '=' -f 2)"
 [ $(( update_every + 1 - 1)) -eq 0 ] && update_every=1
 
-entries="$(curl "$host/netdata.conf" 2>/dev/null | grep "history = " | head -n 1 | cut -d '=' -f 2)"
+entries="$(curl -k "$host/netdata.conf" 2>/dev/null | grep "history = " | head -n 1 | cut -d '=' -f 2)"
 [ $(( entries + 1 - 1)) -eq 0 ] && entries=3600
 
 # to compare equal things, set the entries to 3600 max
@@ -55,7 +55,7 @@ trap cleanup EXIT
 
 while true
 do
-	echo "curl --compressed --keepalive-time 120 --header \"Connection: keep-alive\" \\" >"$file"
+	echo "curl -k --compressed --keepalive-time 120 --header \"Connection: keep-alive\" \\" >"$file"
 	# shellcheck disable=SC2034
 	for x in {1..100}
 	do
