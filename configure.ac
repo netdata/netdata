@@ -1130,6 +1130,30 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 
+# -----------------------------------------------------------------------------
+# Check if cmocka is available - needed for unit testing
+
+AC_ARG_ENABLE(
+     [unit-tests],
+     [AS_HELP_STRING([--disable-unit-tests],
+                     [Disables building and running the unit tests suite])],
+     [],
+     [enable_unit_tests="yes"]
+)
+
+PKG_CHECK_MODULES(
+    [CMOCKA], [cmocka],
+    [have_cmocka="yes"],
+    [AC_MSG_WARN([cmocka.pc not found on the system.  Unit tests disabled])]
+)
+AM_CONDITIONAL([ENABLE_UNITTESTS], [test "${enable_unit_tests}" = "yes" -a "${have_cmocka}" = "yes" ])
+AC_SUBST([ENABLE_UNITTESTS])
+
+TEST_CFLAGS="${CFLAGS} ${CMOCKA_CFLAGS}"
+TEST_LDFLAGS="${LDFLAGS} ${CMOCKA_LIBS}"
+
+AC_SUBST([TEST_LDFLAGS])
+AC_SUBST([TEST_CFLAGS])
 
 AC_CONFIG_FILES([
     Makefile
@@ -1166,6 +1190,7 @@ AC_CONFIG_FILES([
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
     daemon/Makefile
+    daemon/tests/Makefile
     database/Makefile
     database/engine/Makefile
     diagrams/Makefile
