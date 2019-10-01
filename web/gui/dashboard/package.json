@@ -39,8 +39,10 @@
     "@types/redux-saga": "^0.10.5",
     "@typescript-eslint/eslint-plugin": "^2.0.0",
     "@typescript-eslint/parser": "^2.0.0",
+    "canvas": "^2.6.0",
     "eslint-config-airbnb": "^18.0.1",
-    "eslint-plugin-react-hooks": "^2.0.1"
+    "eslint-plugin-react-hooks": "^2.0.1",
+    "jest-environment-jsdom-fourteen": "^0.1.0"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -48,7 +50,7 @@
     "start:tv": "cp ../tv.html public/index.html && yarn start",
     "start:index": "cp ../index.html public/index.html && yarn start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "test": "react-scripts test --env=jest-environment-jsdom-fourteen",
     "lint": "eslint --ext .jsx,.js,.tsx,.ts .",
     "eject": "react-scripts eject"
   },
