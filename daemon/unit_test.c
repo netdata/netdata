@@ -2097,7 +2097,7 @@ static void query_dbengine_chart(void *arg)
         j = random() % DSET_DIMS;
         rd = thread_info->chart_threads[i]->rd[j];
 
-        time_min = thread_info->time_present - thread_info->history_seconds;
+        time_min = thread_info->time_present - thread_info->history_seconds + 1;
         time_max = thread_info->chart_threads[i]->time_max;
         if (!time_max) {
             time_before = time_after = time_min;
