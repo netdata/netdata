@@ -186,6 +186,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 }
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
+    RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -204,7 +205,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         return rd;
     }
 
-    RRDHOST *host = st->rrdhost;
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
@@ -400,13 +400,28 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
-        rrdhost_wrlock(host);
-        rrdcalc_link_to_rrddim(rd, st, host);
+    if (host->alarms_with_foreach || host->alarms_template_with_foreach) {
+        int count = 0;
+        int hostlocked;
+        for (count = 0 ; count < 5 ; count++) {
+            hostlocked = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
+            if (!hostlocked) {
+                rrdcalc_link_to_rrddim(rd, st, host);
+                rrdhost_unlock(host);
+                break;
+            } else if (hostlocked != EBUSY) {
+                error("Cannot lock host to create an alarm for the dimension.");
+            }
+            usleep(200000);
+        }
 
-        rrdhost_unlock(host);
+        if (count == 5) {
+            error("Failed to create an alarm for dimension %s of chart %s 5 times. Skipping alarm."
+            , rd->name, st->name);
+        }
     }
     rrdset_unlock(st);
+
     return(rd);
 }
 
