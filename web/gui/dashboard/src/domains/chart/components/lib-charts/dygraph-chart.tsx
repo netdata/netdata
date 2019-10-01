@@ -5,7 +5,7 @@ import React, {
 import { useSelector } from "react-redux"
 import classNames from "classnames"
 import Dygraph from "dygraphs"
-import "dygraphs/src/extras/smooth-plotter"
+import "dygraphs/src-es5/extras/smooth-plotter"
 
 import { DygraphArea, NetdataDygraph } from "types/vendor-overrides"
 import { useDateTime } from "utils/date-time"
