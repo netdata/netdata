@@ -400,27 +400,22 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
+    if (host->alarms_with_foreach || host->alarms_template_with_foreach) {
         int count = 0;
         int hostlocked;
-        for (count = 0 ; count < 5 ; count++)
-        {
+        for (count = 0 ; count < 5 ; count++) {
             hostlocked = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
-            if(!hostlocked)
-            {
+            if (!hostlocked) {
                 rrdcalc_link_to_rrddim(rd, st, host);
                 rrdhost_unlock(host);
                 break;
-            }
-            else if (hostlocked != EBUSY)
-            {
+            } else if (hostlocked != EBUSY) {
                 error("Cannot lock host to create an alarm for the dimension.");
             }
             usleep(200000);
         }
 
-        if (count == 5)
-        {
+        if (count == 5) {
             error("Failed to create an alarm for dimension %s of chart %s 5 times. Skipping alarm."
             , rd->name, st->name);
         }
