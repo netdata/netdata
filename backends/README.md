@@ -137,7 +137,7 @@ of `netdata.conf` from your Netdata):
    For kinesis backend `destination` should be set to an AWS region (for example, `us-east-1`).
 
    The MongoDB backend doesn't use the `destination` option for its configuration. It uses the `mongodb.conf`
-   [configuration file](mongodb/README.md) instead.
+   [configuration file](../backends/mongodb/) instead.
 
 -   `data source = as collected`, or `data source = average`, or `data source = sum`, selects the kind of
      data that will be sent to the backend.
