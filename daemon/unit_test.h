@@ -11,6 +11,7 @@ extern int unit_test_buffer(void);
 #ifdef ENABLE_DBENGINE
 extern int test_dbengine(void);
 extern void generate_dbengine_dataset(unsigned history_seconds);
+extern void dbengine_stress_test(unsigned history_seconds);
 #endif
 
 #endif /* NETDATA_UNIT_TEST_H */

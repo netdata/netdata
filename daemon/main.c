@@ -307,6 +307,7 @@ int help(int exitcode) {
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
+            "  -W stresstest=N          Run a DB engine stress test for N seconds and exit.\n\n"
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
@@ -887,6 +888,7 @@ int main(int argc, char **argv) {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
                         char* createdataset_string = "createdataset=";
+                        char* stresstest_string = "stresstest=";
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -910,6 +912,14 @@ int main(int argc, char **argv) {
 #ifdef ENABLE_DBENGINE
                             unsigned history_seconds = (unsigned )strtoull(optarg, NULL, 0);
                             generate_dbengine_dataset(history_seconds);
+#endif
+                            return 0;
+                        }
+                        else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
+                            optarg += strlen(stresstest_string);
+#ifdef ENABLE_DBENGINE
+                            unsigned test_duration_sec = (unsigned )strtoull(optarg, NULL, 0);
+                            dbengine_stress_test(test_duration_sec);
 #endif
                             return 0;
                         }
