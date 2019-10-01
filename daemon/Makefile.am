@@ -10,8 +10,8 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 SUBDIRS = \
-    tests \
-    $(NULL)
+	tests \
+	$(NULL)
 
 dist_noinst_DATA = \
 	README.md \

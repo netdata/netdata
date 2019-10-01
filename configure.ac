@@ -1143,6 +1143,7 @@ NETDATA_COMMON_LIBS="\
 "
 
 AC_SUBST([NETDATA_COMMON_LIBS])
+AC_SUBST([LIBNETDATA_FILES])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1226,6 +1227,7 @@ AC_CONFIG_FILES([
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile
     libnetdata/storage_number/Makefile
+    libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
     libnetdata/json/Makefile
