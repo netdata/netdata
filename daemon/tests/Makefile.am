@@ -9,4 +9,5 @@ TESTS = $(check_PROGRAMS)
 
 str2ld_testdriver_CFLAGS  = @TEST_CFLAGS@
 str2ld_testdriver_LDFLAGS = @TEST_LDFLAGS@
+str2ld_testdriver_LDADD   = @NETDATA_COMMON_LIBS@
 str2ld_testdriver_SOURCES = test_str2ld.c
