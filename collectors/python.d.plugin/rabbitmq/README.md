@@ -1,6 +1,6 @@
 # rabbitmq
 
-Module monitor [`RabbitMQ`](https://www.rabbitmq.com/) performance and health metrics.
+This module monitors [RabbitMQ](https://www.rabbitmq.com/) performance and health metrics.
 
 Following charts are drawn:
 
