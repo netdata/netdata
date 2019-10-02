@@ -1,6 +1,6 @@
 # elasticsearch
 
-This module monitors `Elasticsearch` performance and health metrics.
+This module monitors [`Elasticsearch`](https://www.elastic.co/products/elasticsearch) performance and health metrics.
 
 It produces:
 
