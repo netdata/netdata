@@ -139,7 +139,7 @@ def vhost_chart_template(name):
     charts = {
         order[0]: {
             'options': [
-                None, 'Vhost "{0}" Messages'.format(name), 'msg/s', family, 'rabbitmq.vhost_messages', 'stacked'],
+                None, 'Vhost "{0}" Messages'.format(name), 'messages/s', family, 'rabbitmq.vhost_messages', 'stacked'],
             'lines': [
                 ['vhost_{0}_message_stats_ack'.format(name), 'ack', 'incremental'],
                 ['vhost_{0}_message_stats_confirm'.format(name), 'confirm', 'incremental'],
