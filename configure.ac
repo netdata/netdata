@@ -1130,21 +1130,6 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 
-NETDATA_COMMON_LIBS="\
-    ${OPTIONAL_MATH_LIBS} \
-    ${OPTIONAL_ZLIB_LIBS} \
-    ${OPTIONAL_SSL_LIBS} \
-    ${OPTIONAL_UUID_LIBS} \
-    ${OPTIONAL_UV_LIBS} \
-    ${OPTIONAL_LZ4_LIBS} \
-    ${OPTIONAL_JUDY_LIBS} \
-    ${OPTIONAL_SSL_LIBS} \
-    ${OPTIONAL_JSONC_LIBS} \
-"
-
-AC_SUBST([NETDATA_COMMON_LIBS])
-AC_SUBST([LIBNETDATA_FILES])
-
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
 
