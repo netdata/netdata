@@ -719,7 +719,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
                 char n[51], v[101];
                 snprintfz(n, 50,"%s",name);
-                snprintfz(v, 101,"%s",value);
+                snprintfz(v, 100,"%s",value);
                 if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
                     info("Unexpected environment variable %s=%s", n, v);
                 }

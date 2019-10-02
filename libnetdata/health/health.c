@@ -136,7 +136,8 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
                 else if (!strcmp(e->data.string,"DISABLE")) silencers->stype = STYPE_DISABLE_ALARMS;
             } else {
                 debug(D_HEALTH, "JSON: Adding %s=%s", e->name, e->data.string);
-                health_silencers_addparam(e->callback_data, e->name, e->data.string);
+                SILENCER *test = health_silencers_addparam(e->callback_data, e->name, e->data.string);
+                (void)test;
             }
             break;
 
