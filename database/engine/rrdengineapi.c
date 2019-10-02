@@ -184,8 +184,8 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
     }
     page = descr->pg_cache_descr->page;
     page[descr->page_length / sizeof(number)] = number;
-    descr->end_time = point_in_time;
-    descr->page_length += sizeof(number);
+    pg_cache_atomic_set_pg_info(descr, point_in_time, descr->page_length + sizeof(number));
+
     if (perfect_page_alignment)
         rd->rrdset->rrddim_page_alignment = descr->page_length;
     if (unlikely(INVALID_TIME == descr->start_time)) {
@@ -470,7 +470,8 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     struct rrdeng_page_descr *descr;
     storage_number *page, ret;
     unsigned position, entries;
-    usec_t next_page_time, current_position_time;
+    usec_t next_page_time, current_position_time, page_end_time;
+    uint32_t page_length;
 
     handle = &rrdimm_handle->rrdeng;
     if (unlikely(INVALID_TIME == handle->next_page_time)) {
@@ -480,15 +481,17 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
     if (unlikely(NULL == (descr = handle->descr))) {
         /* it's the first call */
         next_page_time = handle->next_page_time * USEC_PER_SEC;
+    } else {
+        pg_cache_atomic_get_pg_info(descr, &page_end_time, &page_length);
     }
     position = handle->position + 1;
 
     if (unlikely(NULL == descr ||
-                 position >= (descr->page_length / sizeof(storage_number)))) {
+                 position >= (page_length / sizeof(storage_number)))) {
         /* We need to get a new page */
         if (descr) {
             /* Drop old page's reference */
-            handle->next_page_time = (descr->end_time / USEC_PER_SEC) + 1;
+            handle->next_page_time = (page_end_time / USEC_PER_SEC) + 1;
             if (unlikely(handle->next_page_time > rrdimm_handle->end_time)) {
                 goto no_more_metrics;
             }
@@ -508,26 +511,27 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, 1);
 #endif
         handle->descr = descr;
+        pg_cache_atomic_get_pg_info(descr, &page_end_time, &page_length);
         if (unlikely(INVALID_TIME == descr->start_time ||
-                     INVALID_TIME == descr->end_time)) {
+                     INVALID_TIME == page_end_time)) {
             goto no_more_metrics;
         }
-        if (unlikely(descr->start_time != descr->end_time && next_page_time > descr->start_time)) {
+        if (unlikely(descr->start_time != page_end_time && next_page_time > descr->start_time)) {
             /* we're in the middle of the page somewhere */
-            entries = descr->page_length / sizeof(storage_number);
-            position = ((uint64_t)(next_page_time - descr->start_time)) * entries /
-                       (descr->end_time - descr->start_time + 1);
+            entries = page_length / sizeof(storage_number);
+            position = ((uint64_t)(next_page_time - descr->start_time)) * (entries - 1) /
+                       (page_end_time - descr->start_time);
         } else {
             position = 0;
         }
     }
     page = descr->pg_cache_descr->page;
     ret = page[position];
-    entries = descr->page_length / sizeof(storage_number);
+    entries = page_length / sizeof(storage_number);
     if (entries > 1) {
         usec_t dt;
 
-        dt = (descr->end_time - descr->start_time) / (entries - 1);
+        dt = (page_end_time - descr->start_time) / (entries - 1);
         current_position_time = descr->start_time + position * dt;
     } else {
         current_position_time = descr->start_time;
