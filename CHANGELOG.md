@@ -6,11 +6,14 @@
 
 **Merged pull requests:**
 
+- Fix dbengine consistency [\#6979](https://github.com/netdata/netdata/pull/6979) ([mfundul](https://github.com/mfundul))
+- Fix coverity erro \(CID 349552\) double lock [\#6970](https://github.com/netdata/netdata/pull/6970) ([thiagoftsm](https://github.com/thiagoftsm))
 - web api: include family into allmetrics json response [\#6966](https://github.com/netdata/netdata/pull/6966) ([ilyam8](https://github.com/ilyam8))
 - Reduce overhead during write io [\#6964](https://github.com/netdata/netdata/pull/6964) ([mfundul](https://github.com/mfundul))
 - netdata/packaging: Make spec file more consistent with version dependencies, plus some documentation nits [\#6948](https://github.com/netdata/netdata/pull/6948) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix a memory leak [\#6945](https://github.com/netdata/netdata/pull/6945) ([vlvkobal](https://github.com/vlvkobal))
 - Fix Remark Lint for READMEs in Database [\#6942](https://github.com/netdata/netdata/pull/6942) ([prhomhyse](https://github.com/prhomhyse))
+- Coverity 20190924 [\#6941](https://github.com/netdata/netdata/pull/6941) ([thiagoftsm](https://github.com/thiagoftsm))
 - Restore original alignment behaviour of RRDR [\#6938](https://github.com/netdata/netdata/pull/6938) ([mfundul](https://github.com/mfundul))
 - minor - check for curl to not get wrong error message [\#6931](https://github.com/netdata/netdata/pull/6931) ([underhood](https://github.com/underhood))
 - netdata/packaging: fix broken links on web files, for deb [\#6930](https://github.com/netdata/netdata/pull/6930) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -270,10 +273,6 @@
 - pihole collector: add alarms [\#6320](https://github.com/netdata/netdata/pull/6320) ([ilyam8](https://github.com/ilyam8))
 - dnsmasq\_dhcp: dhcp-range utilization alarm [\#6319](https://github.com/netdata/netdata/pull/6319) ([ilyam8](https://github.com/ilyam8))
 - Update the documentation on charts with zero metrics [\#6314](https://github.com/netdata/netdata/pull/6314) ([vlvkobal](https://github.com/vlvkobal))
-- fix elasticsearch plugin [\#6311](https://github.com/netdata/netdata/pull/6311) ([Wing924](https://github.com/Wing924))
-- Repeating alarm notifications [\#6309](https://github.com/netdata/netdata/pull/6309) ([thiagoftsm](https://github.com/thiagoftsm))
-- Chart name streaming [\#6304](https://github.com/netdata/netdata/pull/6304) ([vlvkobal](https://github.com/vlvkobal))
-- Handle file descriptors running out [\#6303](https://github.com/netdata/netdata/pull/6303) ([mfundul](https://github.com/mfundul))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
