@@ -2265,10 +2265,13 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         queries_nr += query_threads[i]->queries_nr;
         queried_metrics_nr += query_threads[i]->queried_metrics_nr;
     }
-    fprintf(stderr, "%lu metrics were stored (dataset size of %lu MiB) in %u charts by 1 writer thread per chart.\n",
-            stored_metrics_nr, stored_metrics_nr * sizeof(storage_number) / (1024 * 1024), DSET_CHARTS);
-    fprintf(stderr, "%lu metrics were queried by %u reader threads.\n", queried_metrics_nr, QUERY_THREADS);
-    fprintf(stderr, "Performance is %lu written metrics/sec and %lu read metrics/sec.\n",
+    fprintf(stderr, "%u metrics were stored (dataset size of %lu MiB) in %u charts by 1 writer thread per chart.\n",
+            DSET_CHARTS * DSET_DIMS, stored_metrics_nr * sizeof(storage_number) / (1024 * 1024), DSET_CHARTS);
+    fprintf(stderr, "Metrics were being generated per 1 emulated second and time was accelerated.\n");
+    fprintf(stderr, "%lu metric data points were queried by %u reader threads.\n", queried_metrics_nr, QUERY_THREADS);
+    fprintf(stderr, "Query starting time is randomly chosen from the beginning of the time-series up to the time of\n"
+                    "the latest data point, and ending time from 1 second up to 1 hour after the starting time\n.");
+    fprintf(stderr, "Performance is %lu written data points/sec and %lu read data points/sec.\n",
             stored_metrics_nr / (time_end - time_start), queried_metrics_nr / (time_end - time_start));
 
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
