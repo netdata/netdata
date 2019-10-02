@@ -626,16 +626,15 @@ if ENABLE_BACKEND_MONGODB
     netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif
 
-check_PROGRAMS = storage_number_testdriver
+check_PROGRAMS = libnetdata/storage_number/tests/storage_number_testdriver
 
 TESTS = $(check_PROGRAMS)
 
-storage_number_testdriver_SOURCES = \
+libnetdata_storage_number_tests_storage_number_testdriver_SOURCES = \
     libnetdata/storage_number/tests/test_storage_number.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
-# storage_number_testdriver_CFLAGS = $(TEST_CFLAGS)
-storage_number_testdriver_LDFLAGS = $(TEST_LDFLAGS)
-storage_number_testdriver_LDADD = \
+libnetdata_storage_number_tests_storage_number_testdriver_LDFLAGS = $(TEST_LDFLAGS)
+libnetdata_storage_number_tests_storage_number_testdriver_LDADD = \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
