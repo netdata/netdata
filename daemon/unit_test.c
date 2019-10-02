@@ -1688,7 +1688,8 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
             st[i]->usec_since_last_update = USEC_PER_SEC * update_every;
 
             for (j = 0; j < DIMS; ++j) {
-                next = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c;
+                next = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
+                       j * REGION_POINTS[current_region] + c;
                 rrddim_set_by_pointer_fake_time(rd[i][j], next, time_now);
             }
             rrdset_done(st[i]);
@@ -1719,7 +1720,8 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
             for (j = 0; j < DIMS; ++j) {
                 rd[i][j]->state->query_ops.init(rd[i][j], &handle, time_now, time_now + QUERY_BATCH * update_every);
                 for (k = 0; k < QUERY_BATCH; ++k) {
-                    last = i * DIMS * REGION_POINTS[current_region] + j * REGION_POINTS[current_region] + c + k;
+                    last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
+                           j * REGION_POINTS[current_region] + c + k;
                     expected = unpack_storage_number(pack_storage_number((calculated_number)last, SN_EXISTS));
 
                     n = rd[i][j]->state->query_ops.next_metric(&handle, &time_retrieved);

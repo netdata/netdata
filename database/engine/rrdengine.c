@@ -815,47 +815,6 @@ error_after_loop_init:
     complete(&ctx->rrdengine_completion);
 }
 
-
-#define NR_PAGES (256)
-static void basic_functional_test(struct rrdengine_instance *ctx)
-{
-    int i, j, failed_validations;
-    uuid_t uuid[NR_PAGES];
-    void *buf;
-    struct rrdeng_page_descr *handle[NR_PAGES];
-    char uuid_str[UUID_STR_LEN];
-    char backup[NR_PAGES][UUID_STR_LEN * 100]; /* backup storage for page data verification */
-
-    for (i = 0 ; i < NR_PAGES ; ++i) {
-        uuid_generate(uuid[i]);
-        uuid_unparse_lower(uuid[i], uuid_str);
-//      fprintf(stderr, "Generated uuid[%d]=%s\n", i, uuid_str);
-        buf = rrdeng_create_page(ctx, &uuid[i], &handle[i]);
-        /* Each page contains 10 times its own UUID stringified */
-        for (j = 0 ; j < 100 ; ++j) {
-            strcpy(buf + UUID_STR_LEN * j, uuid_str);
-            strcpy(backup[i] + UUID_STR_LEN * j, uuid_str);
-        }
-        rrdeng_commit_page(ctx, handle[i], (Word_t)i);
-    }
-    fprintf(stderr, "\n********** CREATED %d METRIC PAGES ***********\n\n", NR_PAGES);
-    failed_validations = 0;
-    for (i = 0 ; i < NR_PAGES ; ++i) {
-        buf = rrdeng_get_latest_page(ctx, &uuid[i], (void **)&handle[i]);
-        if (NULL == buf) {
-            ++failed_validations;
-            fprintf(stderr, "Page %d was LOST.\n", i);
-        }
-        if (memcmp(backup[i], buf, UUID_STR_LEN * 100)) {
-            ++failed_validations;
-            fprintf(stderr, "Page %d data comparison with backup FAILED validation.\n", i);
-        }
-        rrdeng_put_page(ctx, handle[i]);
-    }
-    fprintf(stderr, "\n********** CORRECTLY VALIDATED %d/%d METRIC PAGES ***********\n\n",
-            NR_PAGES - failed_validations, NR_PAGES);
-
-}
 /* C entry point for development purposes
  * make "LDFLAGS=-errdengine_main"
  */
@@ -868,8 +827,6 @@ void rrdengine_main(void)
     if (ret) {
         exit(ret);
     }
-    basic_functional_test(ctx);
-
     rrdeng_exit(ctx);
     fprintf(stderr, "Hello world!");
     exit(0);
