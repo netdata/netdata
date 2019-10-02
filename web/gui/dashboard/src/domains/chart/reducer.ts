@@ -7,7 +7,7 @@ export type StateT = {
   [chartId: string]: ChartState
 }
 
-const initialState = {
+export const initialState = {
 }
 export const initialSingleState = {
   chartData: null,
@@ -15,7 +15,7 @@ export const initialSingleState = {
   fetchDataParams: {
     isRemotelyControlled: false,
     viewRange: null,
-  }
+  },
 }
 
 export const chartReducer = createReducer<StateT>(

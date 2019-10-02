@@ -21,9 +21,11 @@
     "redux-act": "^1.7.7",
     "redux-saga": "^1.0.5",
     "reselect": "^4.0.0",
-    "typescript": "3.6.2"
+    "typescript": "3.6.3"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^4.1.0",
+    "@testing-library/react": "^9.2.0",
     "@types/bootstrap": "^3",
     "@types/classnames": "^2.2.9",
     "@types/dygraphs": "^1.1.8",

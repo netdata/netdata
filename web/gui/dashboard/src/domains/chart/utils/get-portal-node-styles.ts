@@ -23,9 +23,10 @@ export const getPortalNodeStyles: GetPortalNodeStyles = (attributes, chartSettin
       height = `${attributes.height.toString()}px`
     }
   }
-  const minWidth = window.NETDATA.chartDefaults.min_width !== null
-    ? window.NETDATA.chartDefaults.min_width
-    : undefined
+  const chartDefaultsMinWidth = window.NETDATA.chartDefaults.min_width
+  const minWidth = chartDefaultsMinWidth === null
+    ? undefined
+    : chartDefaultsMinWidth
   return {
     height,
     width,

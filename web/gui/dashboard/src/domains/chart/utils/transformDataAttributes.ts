@@ -83,73 +83,73 @@ export interface Attributes {
   after: number
   before: number
   legend: boolean
-  units: string
-  unitsCommon: string | undefined
-  unitsDesired: string | undefined
-  colors: string | undefined
-  commonColors: string | undefined
-  decimalDigits: number | undefined
+  units?: string
+  unitsCommon?: string
+  unitsDesired?: string
+  colors?: string
+  commonColors?: string
+  decimalDigits?: number
 
-  appendOptions: string | undefined
-  gtime: number | undefined
-  method: string | undefined
-  overrideOptions: string | undefined
-  pixelsPerPoint: number | undefined
-  points: number | undefined
+  appendOptions?: string | undefined
+  gtime?: number
+  method?: string
+  overrideOptions?: string
+  pixelsPerPoint?: number
+  points?: number
 
-  dygraphType: string | undefined
-  dygraphValueRange: any[] | undefined
-  dygraphTheme: string | undefined
-  dygraphSmooth: boolean | undefined
-  dygraphColors: string[] | undefined
-  dygraphRightGap: number | undefined
-  dygraphShowRangeSelector: boolean | undefined
-  dygraphShowRoller: boolean | undefined
-  dygraphTitle: string | undefined
-  dygraphTitleHeight: number | undefined
-  dygraphLegend: "always" | "follow" | "onmouseover" | "never" | undefined
-  dygraphLabelsDiv: string | undefined
-  dygraphLabelsSeparateLine: boolean | undefined
-  dygraphIncludeZero: boolean | undefined
-  dygraphShowZeroValues: boolean | undefined
-  dygraphShowLabelsOnHighLight: boolean | undefined
-  dygraphHideOverlayOnMouseOut: boolean | undefined
-  dygraphXRangePad: number | undefined
-  dygraphYRangePad: number | undefined
-  dygraphYLabelWidth: number | undefined
-  dygraphStrokeWidth: number | undefined
-  dygraphStrokePattern: number[] | undefined
-  dygraphDrawPoints: boolean | undefined
-  dygraphDrawGapEdgePoints: boolean | undefined
-  dygraphConnectSeparatedPoints: boolean | undefined
-  dygraphPointSize: number | undefined
-  dygraphStepPlot: boolean | undefined
-  dygraphStrokeBorderColor: string | undefined
-  dygraphStrokeBorderWidth: number | undefined
-  dygraphFillGraph: boolean | undefined
-  dygraphFillAlpha: number | undefined
-  dygraphStackedGraph: boolean | undefined
-  dygraphStackedGraphNanFill: string | undefined
-  dygraphAxisLabelFontSize: number | undefined
-  dygraphAxisLineColor: string | undefined
-  dygraphAxisLineWidth: number | undefined
-  dygraphDrawGrid: boolean | undefined
-  dygraphGridLinePattern: number[] | undefined
-  dygraphGridLineWidth: number | undefined
-  dygraphGridLineColor: string | undefined
-  dygraphMaxNumberWidth: number | undefined
-  dygraphSigFigs: number | undefined
-  dygraphDigitsAfterDecimal: number | undefined
-  dygraphHighlighCircleSize: number | undefined
-  dygraphHighlightSeriesOpts: {[options: string]: number} | undefined
-  dygraphHighlightSeriesBackgroundAlpha: number | undefined
-  dygraphXPixelsPerLabel: number | undefined
-  dygraphXAxisLabelWidth: number | undefined
-  dygraphDrawXAxis: boolean | undefined
-  dygraphYPixelsPerLabel: number | undefined
-  dygraphYAxisLabelWidth: number | undefined
-  dygraphDrawYAxis: boolean | undefined
-  dygraphDrawAxis: boolean | undefined
+  dygraphType?: string
+  dygraphValueRange?: any[]
+  dygraphTheme?: string
+  dygraphSmooth?: boolean
+  dygraphColors?: string[]
+  dygraphRightGap?: number
+  dygraphShowRangeSelector?: boolean
+  dygraphShowRoller?: boolean
+  dygraphTitle?: string
+  dygraphTitleHeight?: number
+  dygraphLegend?: "always" | "follow" | "onmouseover" | "never"
+  dygraphLabelsDiv?: string
+  dygraphLabelsSeparateLine?: boolean
+  dygraphIncludeZero?: boolean
+  dygraphShowZeroValues?: boolean
+  dygraphShowLabelsOnHighLight?: boolean
+  dygraphHideOverlayOnMouseOut?: boolean
+  dygraphXRangePad?: number
+  dygraphYRangePad?: number
+  dygraphYLabelWidth?: number
+  dygraphStrokeWidth?: number
+  dygraphStrokePattern?: number[]
+  dygraphDrawPoints?: boolean
+  dygraphDrawGapEdgePoints?: boolean
+  dygraphConnectSeparatedPoints?: boolean
+  dygraphPointSize?: number
+  dygraphStepPlot?: boolean
+  dygraphStrokeBorderColor?: string
+  dygraphStrokeBorderWidth?: number
+  dygraphFillGraph?: boolean
+  dygraphFillAlpha?: number
+  dygraphStackedGraph?: boolean
+  dygraphStackedGraphNanFill?: string
+  dygraphAxisLabelFontSize?: number
+  dygraphAxisLineColor?: string
+  dygraphAxisLineWidth?: number
+  dygraphDrawGrid?: boolean
+  dygraphGridLinePattern?: number[]
+  dygraphGridLineWidth?: number
+  dygraphGridLineColor?: string
+  dygraphMaxNumberWidth?: number
+  dygraphSigFigs?: number
+  dygraphDigitsAfterDecimal?: number
+  dygraphHighlighCircleSize?: number
+  dygraphHighlightSeriesOpts?: {[options: string]: number}
+  dygraphHighlightSeriesBackgroundAlpha?: number
+  dygraphXPixelsPerLabel?: number
+  dygraphXAxisLabelWidth?: number
+  dygraphDrawXAxis?: boolean
+  dygraphYPixelsPerLabel?: number
+  dygraphYAxisLabelWidth?: number
+  dygraphDrawYAxis?: boolean
+  dygraphDrawAxis?: boolean
 }
 
 export type AttributePropKeys = keyof Attributes

@@ -11,8 +11,10 @@ export interface ChartData {
   format: string
   id: string
   last_entry: number
+  latest_values: number[]
   max: number
   min: number
+  name: string
   points: number
   result: {
     data: (number[])[]
@@ -30,6 +32,9 @@ interface Dimension {
 export interface ChartDetails {
   alarms: {}
   chart_type: string
+  chart_variables: {
+    [key: string]: number
+  }
   context: string
   data_url: string
   dimensions: {
@@ -39,18 +44,19 @@ export interface ChartDetails {
   enabled: boolean
   family: string
   first_entry: number
-  // green: ?
+  green: string | null
   id: string
   last_entry: number
   module?: string
   name: string
   plugin?: string
   priority: number
-  // red: ?
+  red: string | null
   title: string
   type: string
   units: string
   update_every: number
+  url: string
 }
 
 export interface ChartState {

@@ -1,6 +1,6 @@
-import { findIndex, sortBy } from "ramda"
+import { sortBy } from "ramda"
 import React, {
-  useLayoutEffect, useRef, useState, useCallback,
+  useLayoutEffect, useRef, useCallback,
 } from "react"
 import { useSelector } from "react-redux"
 import classNames from "classnames"
@@ -270,7 +270,7 @@ export const DygraphChart = ({
   setMinMax,
   unitsCurrent,
   viewAfter,
-  viewBefore
+  viewBefore,
 }: Props) => {
   // setGlobalChartUnderlay is using state from closure (chartData.after), so we need to have always
   // the newest callback. Unfortunately we cannot use Dygraph.updateOptions() (library restriction)
@@ -293,7 +293,8 @@ export const DygraphChart = ({
   const hiddenLabelsElementId = `${chartUuid}-hidden-labels-id`
 
   const chartElement = useRef<HTMLDivElement>(null)
-  const [dygraphInstance, setDygraphInstance] = useState<Dygraph | null>(null)
+  // React.useState. so it can be mocked in test
+  const [dygraphInstance, setDygraphInstance] = React.useState<Dygraph | null>(null)
 
   const updateChartPanOrZoom = useCallback(({
     after, before,
