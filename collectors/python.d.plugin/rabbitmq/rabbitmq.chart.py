@@ -134,7 +134,7 @@ def vhost_chart_template(name):
     order = [
         'vhost_{0}_message_stats'.format(name),
     ]
-    family = name
+    family = 'vhost {0}'.format(name)
 
     charts = {
         order[0]: {
