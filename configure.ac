@@ -1205,13 +1205,13 @@ AC_CONFIG_FILES([
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
     daemon/Makefile
-    daemon/tests/Makefile
     database/Makefile
     database/engine/Makefile
     diagrams/Makefile
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile
+    libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile

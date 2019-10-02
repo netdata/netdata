@@ -9,10 +9,6 @@ CLEANFILES = \
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
-SUBDIRS = \
-	tests \
-	$(NULL)
-
 dist_noinst_DATA = \
 	README.md \
 	config/README.md \
