@@ -925,15 +925,15 @@ int main(int argc, char **argv) {
                             page_cache_mb = 0;
 
                             optarg += strlen(stresstest_string);
-                            test_duration_sec = strtoul(optarg, &endptr, 0);
+                            test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
                             if (',' == *endptr)
-                                dset_charts = strtoul(endptr + 1, &endptr, 0);
+                                dset_charts = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
-                                query_threads = strtoul(endptr + 1, &endptr, 0);
+                                query_threads = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
-                                ramp_up_seconds = strtoul(endptr + 1, &endptr, 0);
+                                ramp_up_seconds = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
-                                page_cache_mb = strtoul(endptr + 1, &endptr, 0);
+                                page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
                                                  page_cache_mb);
                             return 0;
