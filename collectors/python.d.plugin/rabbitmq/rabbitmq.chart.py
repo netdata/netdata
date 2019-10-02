@@ -123,15 +123,23 @@ CHARTS = {
 }
 
 
+def normalize_vhost_name(name):
+    if name.startswith('/') and len(name) > 1:
+        return name[1:]
+    return name
+
+
 def vhost_chart_template(name):
+    name = normalize_vhost_name(name)
     order = [
         'vhost_{0}_message_stats'.format(name),
     ]
+    family = name
 
     charts = {
         order[0]: {
             'options': [
-                None, 'Vhost "{0}" Messages'.format(name), 'msg/s', "vhosts", 'rabbitmq.vhost_messages', 'stacked'],
+                None, 'Vhost "{0}" Messages'.format(name), 'msg/s', family, 'rabbitmq.vhost_messages', 'stacked'],
             'lines': [
                 ['vhost_{0}_message_stats_ack'.format(name), 'ack', 'incremental'],
                 ['vhost_{0}_message_stats_confirm'.format(name), 'confirm', 'incremental'],
@@ -156,14 +164,15 @@ class VhostStatsBuilder:
         self.stats = raw_stats
 
     def name(self):
-        return self.stats['name']
+        return normalize_vhost_name(self.stats['name'])
 
     def has_msg_stats(self):
         return bool(self.stats.get('message_stats'))
 
     def msg_stats(self):
+        name = self.name()
         stats = fetch_data(raw_data=self.stats, metrics=VHOST_MESSAGE_STATS)
-        return dict(('vhost_{0}_{1}'.format(self.name(), k), v) for k, v in stats.items())
+        return dict(('vhost_{0}_{1}'.format(name, k), v) for k, v in stats.items())
 
 
 class Service(UrlService):
