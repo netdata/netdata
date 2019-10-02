@@ -2270,7 +2270,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
     fprintf(stderr, "Metrics were being generated per 1 emulated second and time was accelerated.\n");
     fprintf(stderr, "%lu metric data points were queried by %u reader threads.\n", queried_metrics_nr, QUERY_THREADS);
     fprintf(stderr, "Query starting time is randomly chosen from the beginning of the time-series up to the time of\n"
-                    "the latest data point, and ending time from 1 second up to 1 hour after the starting time\n.");
+                    "the latest data point, and ending time from 1 second up to 1 hour after the starting time.\n");
     fprintf(stderr, "Performance is %lu written data points/sec and %lu read data points/sec.\n",
             stored_metrics_nr / (time_end - time_start), queried_metrics_nr / (time_end - time_start));
 
