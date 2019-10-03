@@ -161,6 +161,15 @@ AC_ARG_ENABLE(
     ,
     [enable_jsonc="detect"]
 )
+AC_ARG_ENABLE(
+    [bufmempool],
+    [AS_HELP_STRING([--disable-bufmempool], [Disables mempooling of buffers.])],
+    ,
+    [
+        AC_DEFINE([BUFFER_USE_MEMPOOL], [1], [Using mempool for buffers])
+        AC_DEFINE([BUFFER_USE_MEMPOOL_PER_THREAD], [1], [Mempool per thread])
+    ]
+)
 
 # -----------------------------------------------------------------------------
 # netdata required checks
