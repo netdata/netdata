@@ -225,6 +225,7 @@ echo -ne "        - BASH:
                 - 'collectors/charts.d.plugin/libreswan/README.md'
                 - 'collectors/charts.d.plugin/nut/README.md'
                 - 'collectors/charts.d.plugin/opensips/README.md'
+                - 'collectors/charts.d.plugin/freeswitch/README.md'
             - Obsolete Modules:
                 - 'collectors/charts.d.plugin/mem_apps/README.md'
                 - 'collectors/charts.d.plugin/postfix/README.md'

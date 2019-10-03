@@ -368,6 +368,8 @@ Its [Plugin API](../collectors/plugins.d/) supports all programing languages (an
 #### Telephony Servers
 
 -   **[opensips](../collectors/charts.d.plugin/opensips/)** - connects to an opensips server (localhost only) to collect real-time performance metrics.
+-   **[freeswitch](../collectors/python.d.plugin/freeswitch/)** - calls, registrations, gateways and profile status.
+
 
 #### Household Appliances
 
