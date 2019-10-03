@@ -288,6 +288,7 @@ export const Chart = ({
         chartLibrary={chartLibrary}
         colors={colors}
         chartUuid={chartUuid}
+        chartWidth={chartWidth}
         dimensionsVisibility={dimensionsVisibility}
         onUpdateChartPanAndZoom={handleUpdateChartPanAndZoom}
         isRemotelyControlled={isRemotelyControlled}
@@ -300,7 +301,7 @@ export const Chart = ({
         viewAfter={viewAfter}
         viewBefore={viewBefore}
       />
-      {hasLegend && (
+      {hasLegend(attributes) && (
         <ChartLegend
           attributes={attributes}
           chartData={chartData as DygraphData}

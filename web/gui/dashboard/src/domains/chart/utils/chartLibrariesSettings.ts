@@ -43,7 +43,8 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     xssRegexIgnore: new RegExp("^/api/v1/data.result.data$"),
     format: "json",
     options(attributes: Attributes) {
-      if (this.isLogScale) {
+      if (typeof this.isLogScale === "function") {
+        // flip - in proper order (from oldest to newest)
         return `ms|flip${this.isLogScale(attributes) ? "|abs" : ""}`
       }
       return ""

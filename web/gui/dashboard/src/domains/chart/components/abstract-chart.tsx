@@ -7,7 +7,9 @@ import {
   ChartData, ChartDetails, DygraphData, EasyPieChartData,
 } from "../chart-types"
 import { ChartLibraryName } from "../utils/chartLibrariesSettings"
+
 import { DygraphChart } from "./lib-charts/dygraph-chart"
+import { EasyPieChart } from "./lib-charts/easy-pie-chart"
 
 interface Props {
   attributes: Attributes
@@ -18,9 +20,10 @@ interface Props {
     [key: string]: string
   }
   chartUuid: string
+  chartWidth: number
   dimensionsVisibility: boolean[]
   isRemotelyControlled: boolean
-  legendFormatValue: ((v: number) => number | string) | undefined
+  legendFormatValue: ((v: number | string) => number | string)
   orderedColors: string[]
   hoveredX: number | null
   onUpdateChartPanAndZoom: (arg: { after: number, before: number, masterID: string }) => void
@@ -39,6 +42,7 @@ export const AbstractChart = ({
   chartLibrary,
   colors,
   chartUuid,
+  chartWidth,
   dimensionsVisibility,
   isRemotelyControlled,
   legendFormatValue,
@@ -61,6 +65,31 @@ export const AbstractChart = ({
     dispatch(setGlobalPanAndZoomAction({ after: viewAfter, before: viewBefore }))
   }, [dispatch, viewAfter, viewBefore])
 
+  if (chartLibrary === "easypiechart") {
+    return (
+      <EasyPieChart
+        attributes={attributes}
+        chartData={chartData as EasyPieChartData}
+        chartDetails={chartDetails}
+        chartLibrary={chartLibrary}
+        chartWidth={chartWidth}
+        colors={colors}
+        chartUuid={chartUuid}
+        dimensionsVisibility={dimensionsVisibility}
+        isRemotelyControlled={isRemotelyControlled}
+        legendFormatValue={legendFormatValue}
+        orderedColors={orderedColors}
+        hoveredX={hoveredX}
+        onUpdateChartPanAndZoom={onUpdateChartPanAndZoom}
+        setGlobalChartUnderlay={setGlobalChartUnderlay}
+        setHoveredX={setHoveredX}
+        setMinMax={setMinMax}
+        unitsCurrent={unitsCurrent}
+        viewAfter={viewAfter}
+        viewBefore={viewBefore}
+      />
+    )
+  }
 
   return (
     <DygraphChart

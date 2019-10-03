@@ -26,7 +26,7 @@ const getChartURLOptions = (attributes: Attributes) => {
 
   ret += overrideOptions
     ? overrideOptions.toString()
-    : chartLibrariesSettings.dygraph.options(attributes)
+    : chartLibrariesSettings[attributes.chartLibrary].options(attributes)
 
   if (typeof appendOptions === "string") {
     ret += `|${encodeURIComponent(appendOptions)}`
@@ -103,7 +103,7 @@ export const ChartContainer = ({
   const [hasPortalNodeBeenStyled, setHasPortalNodeBeenStyled] = useState<boolean>(false)
   // todo take width via hook/HOC and put this into useMemo
   const chartWidth = portalNode.getBoundingClientRect().width
-    - (hasLegend ? 140 : 0)
+    - (hasLegend(attributes) ? 140 : 0)
 
   /**
    * fetch data

@@ -150,6 +150,20 @@ export interface Attributes {
   dygraphYAxisLabelWidth?: number
   dygraphDrawYAxis?: boolean
   dygraphDrawAxis?: boolean
+
+  easyPieChartMinValue?: number
+  easyPieChartMaxValue?: number
+  easyPieChartBarColor?: string
+  easyPieChartTrackColor?: string
+  easyPieChartScaleColor?: string,
+  easyPieChartScaleLength?: number,
+  easyPieChartLineCap?: string,
+  easyPieChartLineWidth?: string,
+  easyPieChartTrackWidth?: string,
+  easyPieChartSize?: string,
+  easyPieChartRotate?: number,
+  easyPieChartAnimate?: string,
+  easyPieChartEasing?: string,
 }
 
 export type AttributePropKeys = keyof Attributes
@@ -244,6 +258,20 @@ const getAttributesMap = (): AttributesMap => ({
   dygraphYAxisLabelWidth: { key: "dygraph-yaxislabelwidth" },
   dygraphDrawYAxis: { key: "dygraph-drawyaxis", type: "boolean" },
   dygraphDrawAxis: { key: "dygraph-drawaxis", type: "boolean" },
+
+  easyPieChartMinValue: { key: "easypiechart-min-value" },
+  easyPieChartMaxValue: { key: "easypiechart-max-value" },
+  easyPieChartBarColor: { key: "easypiechart-barcolor" },
+  easyPieChartTrackColor: { key: "easypiechart-trackcolor" },
+  easyPieChartScaleColor: { key: "easypiechart-scalecolor" },
+  easyPieChartScaleLength: { key: "easypiechart-scalelength" },
+  easyPieChartLineCap: { key: "easypiechart-linecap" },
+  easyPieChartLineWidth: { key: "easypiechart-linewidth" },
+  easyPieChartTrackWidth: { key: "easypiechart-trackwidth" },
+  easyPieChartSize: { key: "easypiechart-size" },
+  easyPieChartRotate: { key: "easypiechart-rotate" },
+  easyPieChartAnimate: { key: "easypiechart-animate" },
+  easyPieChartEasing: { key: "easypiechart-easing" },
 })
 
 export const getAttributes = (node: Element): Attributes => mapObjIndexed(
