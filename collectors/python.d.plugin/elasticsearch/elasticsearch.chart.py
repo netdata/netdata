@@ -505,16 +505,16 @@ CHARTS = {
 }
 
 
-def convert_index_store_size(size):
+def convert_index_store_size_to_bytes(size):
     # can be b, kb, mb, gb
     if size.endswith('kb'):
-        return float(size[:-2]) * 1024 * 100
+        return round(float(size[:-2]) * 1024)
     elif size.endswith('mb'):
-        return float(size[:-2]) * 1024 * 1024 * 100
+        return round(float(size[:-2]) * 1024 * 1024)
     elif size.endswith('gb'):
-        return float(size[:-2]) * 1024 * 1024 * 1024 * 100
+        return round(float(size[:-2]) * 1024 * 1024 * 1024)
     elif size.endswith('b'):
-        return float(size[:-1]) * 100
+        return round(float(size[:-1]))
     return -1
 
 
@@ -614,14 +614,10 @@ class Service(UrlService):
         return result or None
 
     def add_index_to_charts(self, idx_name):
-        for name in ('index_docs_count', 'index_replica', 'index_health'):
+        for name in ('index_docs_count', 'index_store_size', 'index_replica', 'index_health'):
             chart = self.charts[name]
             dim = ['{0}_{1}'.format(idx_name, name), idx_name]
             chart.add_dimension(dim)
-
-        chart = self.charts['index_store_size']
-        dim = ['{0}_{1}'.format(idx_name, name), idx_name, 'absolute', 1, 100]
-        chart.add_dimension(dim)
 
     @get_survive_any
     def _get_indices(self, queue, url):
@@ -651,12 +647,16 @@ class Service(UrlService):
         for idx in indices:
             try:
                 name = idx['index']
+                is_system_index = name.startswith('.')
+                if is_system_index:
+                    continue
+
                 v = {
                     '{0}_index_docs_count'.format(name): idx['docs.count'],
                     '{0}_index_replica'.format(name): idx['rep'],
                     '{0}_index_health'.format(name): convert_index_health(idx['health']),
                 }
-                size = convert_index_store_size(idx['store.size'])
+                size = convert_index_store_size_to_bytes(idx['store.size'])
                 if size != -1:
                     v['{0}_index_store_size'.format(name)] = size
             except KeyError as error:
