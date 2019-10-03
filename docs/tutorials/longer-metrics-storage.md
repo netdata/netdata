@@ -76,8 +76,8 @@ using this database, or if you would like to switch to it, see if your `memory m
     memory mode = save
 ```
 
-If `memory mode` is set to `save`, then you're using the round-robin database. If so, tweaking the `history` option will
-store historical metrics for a longer period of time. The default is `3600`, which is 3,600 seconds, or one hour.
+If `memory mode` is set to `save`, then you're using the round-robin database. If so, the `history` option is set to
+`3600`, which is the equivalent to 3,600 seconds, or one hour. 
 
 To increase your historical metrics, you can increase `history` to the number of seconds you'd like to store:
 
