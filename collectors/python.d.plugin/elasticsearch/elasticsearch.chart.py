@@ -402,9 +402,6 @@ CHARTS = {
         'lines': [
             ['status_green', 'green', 'absolute'],
             ['status_red', 'red', 'absolute'],
-            ['status_foo1', None, 'absolute'],
-            ['status_foo2', None, 'absolute'],
-            ['status_foo3', None, 'absolute'],
             ['status_yellow', 'yellow', 'absolute']
         ]
     },
@@ -688,9 +685,6 @@ class Service(UrlService):
             'status_green': 0,
             'status_red': 0,
             'status_yellow': 0,
-            'status_foo1': 0,
-            'status_foo2': 0,
-            'status_foo3': 0,
         }
         data.update(dummy)
         current_status = 'status_' + parsed['status']
