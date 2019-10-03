@@ -279,14 +279,18 @@ export const unitsConversionCreator = {
     }
 
     // check if we support units conversion
-    if (typeof scalableUnits[units] === "undefined" && typeof convertibleUnits[units] === "undefined") {
+    if (typeof scalableUnits[units] === "undefined"
+      && typeof convertibleUnits[units] === "undefined"
+    ) {
       // we can't convert these units
       // console.log('DEBUG: ' + uuid.toString() + ' can\'t convert units: ' + units.toString());
       return (value: number) => value
     }
 
     // check if the caller wants the original units
-    if (desiredUnits === undefined || desiredUnits === null || desiredUnits === "original" || desiredUnits === units) {
+    if (desiredUnits === undefined || desiredUnits === null || desiredUnits === "original"
+      || desiredUnits === units
+    ) {
       // console.log('DEBUG: ' + uuid.toString() + ' original units wanted');
       switchUnitsCallback(units)
       return identity
@@ -396,7 +400,9 @@ export const unitsConversionCreator = {
       }
       // oops! switch back to original units
       // eslint-disable-next-line no-console
-      console.log(`Units conversion from ${units.toString()} to ${desiredUnits.toString()} is not supported.`)
+      console.log(`Units conversion from ${units.toString()} to ${desiredUnits.toString()}
+       is not supported.`)
+
       switchUnitsCallback(units)
       return identity
     } if (typeof convertibleUnits[units] !== "undefined") {
@@ -420,7 +426,8 @@ export const unitsConversionCreator = {
         return convertibleUnits[units][desiredUnits].convert
       }
       // eslint-disable-next-line no-console
-      console.log(`Units conversion from ${units.toString()} to ${desiredUnits.toString()} is not supported.`)
+      console.log(`Units conversion from ${units.toString()} to ${desiredUnits.toString()}
+       is not supported.`)
       switchUnitsCallback(units)
       return identity
     }

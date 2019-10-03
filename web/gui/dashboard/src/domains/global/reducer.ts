@@ -7,6 +7,7 @@ import {
   setGlobalSelectionAction,
   setGlobalPanAndZoomAction,
   setTimezoneAction,
+  resetGlobalPanAndZoomAction,
 } from "./actions"
 
 export type StateT = {
@@ -37,7 +38,7 @@ export type StateT = {
   hoveredX: number | null
 }
 
-const initialState = {
+export const initialState = {
   commonColorsKeys: {},
   currentSelectionMasterId: null,
   globalPanAndZoom: null,
@@ -161,6 +162,11 @@ globalReducer.on(setGlobalPanAndZoomAction, (state, {
     masterID,
     shouldForceTimeRange,
   },
+}))
+
+globalReducer.on(resetGlobalPanAndZoomAction, (state) => ({
+  ...state,
+  globalPanAndZoom: initialState.globalPanAndZoom,
 }))
 
 globalReducer.on(setGlobalChartUnderlayAction, (state, { after, before, masterID }) => ({

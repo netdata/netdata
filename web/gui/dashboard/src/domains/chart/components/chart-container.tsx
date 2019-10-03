@@ -1,11 +1,11 @@
-import { forEachObjIndexed } from "ramda"
+import { forEachObjIndexed, propOr } from "ramda"
 import React, { useEffect, useState, useLayoutEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { useInterval, useThrottle } from "react-use"
 
 import { AppStateT } from "store/app-state"
 
-import { selectGlobalPanAndZoom } from "domains/global/selectors"
+import { selectGlobalPanAndZoom, selectGlobalSelection } from "domains/global/selectors"
 
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { Attributes } from "../utils/transformDataAttributes"
@@ -61,20 +61,27 @@ export const ChartContainer = ({
     state, { id: chartUuid },
   ))
 
-  const [shouldFetch, setShouldFetch] = useState<boolean>(true)
-  useInterval(() => {
-    setShouldFetch(true)
-  }, 2000)
-
 
   // todo local state option
   const globalPanAndZoom = useSelector(selectGlobalPanAndZoom)
   const isGlobalPanAndZoomMaster = !!globalPanAndZoom && globalPanAndZoom.masterID === chartUuid
-  const isRemotelyControlled = !!globalPanAndZoom
-    && (!isGlobalPanAndZoomMaster || !!globalPanAndZoom.shouldForceTimeRange)
+  const shouldForceTimeRange: boolean = propOr(false, "shouldForceTimeRange", globalPanAndZoom)
+  const isRemotelyControlled = !globalPanAndZoom
+    || !isGlobalPanAndZoomMaster
+    || shouldForceTimeRange
+
+
   const fetchDataParams = useSelector((state: AppStateT) => selectChartFetchDataParams(
     state, { id: chartUuid },
   ))
+
+  const hoveredX = useSelector(selectGlobalSelection)
+  const [shouldFetch, setShouldFetch] = useState<boolean>(true)
+  useInterval(() => {
+    if (!globalPanAndZoom && !hoveredX) {
+      setShouldFetch(true)
+    }
+  }, 2000) // todo add to config
 
   // don't send new requests too often (throttle)
   // corresponds to force_update_at in old dashboard

@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from "react-redux"
 
 import {
   requestCommonColorsAction,
+  resetGlobalPanAndZoomAction,
   setGlobalPanAndZoomAction,
   setGlobalSelectionAction,
 } from "domains/global/actions"
@@ -244,7 +245,7 @@ export const Chart = ({
   }, [handleToolBoxPanAndZoom, netdataLast, viewAfter, viewBefore])
 
   const handleToolboxZoomInClick = useCallback((event: React.MouseEvent) => {
-    const dt = (viewBefore - viewAfter) * getPanAndZoomStep(event) * 0.8 / 2
+    const dt = ((viewBefore - viewAfter) * getPanAndZoomStep(event) * 0.8) / 2
     const newAfter = viewAfter + dt
     const newBefore = viewBefore - dt
     handleToolBoxPanAndZoom(newAfter, newBefore)
@@ -257,6 +258,10 @@ export const Chart = ({
     const newBefore = viewBefore + dt
     handleToolBoxPanAndZoom(newAfter, newBefore)
   }, [handleToolBoxPanAndZoom, viewAfter, viewBefore])
+
+  const handleToolboxResetClick = useCallback(() => {
+    dispatch(resetGlobalPanAndZoomAction())
+  }, [dispatch])
 
 
   /**
@@ -313,7 +318,7 @@ export const Chart = ({
       {shouldDisplayToolbox && (
         <LegendToolbox
           onToolboxLeftClick={handleToolboxLeftClick}
-          onToolboxResetClick={() => {}}
+          onToolboxResetClick={handleToolboxResetClick}
           onToolboxRightClick={handleToolboxRightClick}
           onToolboxZoomInClick={handleToolboxZoomInClick}
           onToolboxZoomOutClick={handleToolboxZoomOutClick}

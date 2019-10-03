@@ -415,32 +415,27 @@ export const DygraphChart = ({
                 dygraphHighlightAfter.current = null
                 // @ts-ignore
                 Dygraph.startPan(event, dygraph, context)
-
               } else if (event.altKey || event.ctrlKey || event.metaKey) {
                 // middle mouse button highlight
                 dygraphHighlightAfter.current = dygraph.toDataXCoord(event.offsetX)
                 // @ts-ignore
                 Dygraph.startZoom(event, dygraph, context)
-
               } else {
                 // middle mouse button selection for zoom
                 dygraphHighlightAfter.current = null
                 // @ts-ignore
                 Dygraph.startZoom(event, dygraph, context)
               }
-
             } else if (event.shiftKey) {
               // left mouse button selection for zoom (ZOOM)
               dygraphHighlightAfter.current = null
               // @ts-ignore
               Dygraph.startZoom(event, dygraph, context)
-
             } else if (event.altKey || event.ctrlKey || event.metaKey) {
               // left mouse button highlight
               dygraphHighlightAfter.current = dygraph.toDataXCoord(event.offsetX)
               // @ts-ignore
               Dygraph.startZoom(event, dygraph, context)
-
             } else {
               // left mouse button dragging (PAN)
               dygraphHighlightAfter.current = null
@@ -458,14 +453,12 @@ export const DygraphChart = ({
               // @ts-ignore
               Dygraph.moveZoom(event, dygraph, context)
               event.preventDefault()
-
             } else if (context.isPanning) {
               latestIsUserAction.current = true
               // eslint-disable-next-line no-param-reassign
               context.is2DPan = false
               // @ts-ignore
               Dygraph.movePan(event, dygraph, context)
-
             } else if (context.isZooming) {
               // @ts-ignore
               Dygraph.moveZoom(event, dygraph, context)
@@ -497,12 +490,10 @@ export const DygraphChart = ({
               // @ts-ignore
               // eslint-disable-next-line no-underscore-dangle
               dygraph.drawGraph_(false)
-
             } else if (context.isPanning) {
               latestIsUserAction.current = true
               // @ts-ignore
               Dygraph.endPan(event, dygraph, context)
-
             } else if (context.isZooming) {
               latestIsUserAction.current = true
               // @ts-ignore
@@ -575,14 +566,12 @@ export const DygraphChart = ({
               // http://dygraphs.com/gallery/interaction-api.js
               let normalDef
               // @ts-ignore
-              if (typeof event.wheelDelta === "number" && !Number.isNaN(event.wheelDelta))
-              // chrome
-              {
+              if (typeof event.wheelDelta === "number" && !Number.isNaN(event.wheelDelta)) {
+                // chrome
                 // @ts-ignore
                 normalDef = event.wheelDelta / 40
-              } else
-              // firefox
-              {
+              } else {
+                // firefox
                 normalDef = event.deltaY * -1.2
               }
 
@@ -596,13 +585,14 @@ export const DygraphChart = ({
               const [after, before] = zoomRange(dygraph, percentage, xPct, yPct)
 
               updateChartPanOrZoom({
-                after, before,
+                after,
+                before,
                 shouldNotExceedAvailableRange: true,
                 callback: (updatedAfter: number, updatedBefore: number) => {
                   dygraph.updateOptions({
-                    dateWindow: [updatedAfter, updatedBefore]
+                    dateWindow: [updatedAfter, updatedBefore],
                   })
-                }
+                },
               })
 
               event.preventDefault()
@@ -643,7 +633,7 @@ export const DygraphChart = ({
             dygraphLastTouchMove.current = Date.now()
           },
 
-          touchend (event: TouchEvent, dygraph: Dygraph, context: any) {
+          touchend(event: TouchEvent, dygraph: Dygraph, context: any) {
             isMouseDown.current = false
             latestIsUserAction.current = true
             Dygraph.defaultInteractionModel.touchend(event, dygraph, context)
@@ -662,8 +652,7 @@ export const DygraphChart = ({
 
               const { current } = propsRef
               const t = Math.round(current.viewAfter
-                + (current.viewBefore - current.viewAfter) * pct
-              )
+                + (current.viewBefore - current.viewAfter) * pct)
               setHoveredX(t, true)
             }
 
@@ -748,7 +737,7 @@ export const DygraphChart = ({
   useLayoutEffect(() => {
     if (dygraphInstance) {
       // todo support state.tmp.dygraph_force_zoom
-      const forceDateWindow = [ viewAfter, viewBefore ]
+      const forceDateWindow = [viewAfter, viewBefore]
 
       // in old dashboard, when chart needed to reset internal dateWindow state,
       // dateWindow was set to null, and new dygraph got the new dateWindow from results.
@@ -762,14 +751,14 @@ export const DygraphChart = ({
         file: chartData.result.data,
       })
     }
-  }, [chartData.result.data, dygraphInstance, isRemotelyControlled, viewAfter, viewBefore])
+  }, [chartData.result.data, chartUuid, dygraphInstance, isRemotelyControlled, viewAfter,
+    viewBefore])
 
 
   // set selection
   const currentSelectionMasterId = useSelector(selectGlobalSelectionMaster)
   useLayoutEffect(() => {
     if (dygraphInstance && currentSelectionMasterId !== chartUuid) {
-
       if (hoveredX === null) {
         // getSelection is 100 times faster that clearSelection
         if (dygraphInstance.getSelection() !== -1) {
