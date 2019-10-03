@@ -150,8 +150,8 @@ Seagate Constellation ES.3 2TB magnetic HDD and a SAMSUNG MZQLB960HAJR-00007 960
 
 For our workload, we defined 32 charts with 128 metrics each, giving us a total of 4096 metrics. We defined 1 worker
 thread per chart (32 threads) that generates new data points with a data generation interval of 1 second. The time axis
-of our time-series data is emulated and accelerated so that the worker threads can generate as many data points as
-possible without delays. 
+of the time-series is emulated and accelerated so that the worker threads can generate as many data points as possible
+without delays. 
 
 We also defined 32 worker threads that perform queries on random metrics with semi-random time ranges. The
 starting time of the query is randomly selected between the beginning of the time-series and the time of the latest data
@@ -182,12 +182,12 @@ engine design being optimized for rotating media. In the database engine disk I/
 -   asynchronous to mask the high I/O latency of HDDs.
 -   mostly large to reduce the amount of HDD seeking time.
 -   mostly sequential to reduce the amount of HDD seeking time.
--   compressed to reduce the amount on required throughput.
+-   compressed to reduce the amount of required throughput.
 
 As a result, the HDD is not thousands of times slower than the SSD, which is typical for other workloads.
 
-An interesting observation to make is, that the CPU-bound run (16 GiB page cache) generates fewer data than the SSD run
-(6.8 GiB vs 9.8 GiB). The reason is that, the 32 reader threads in the SSD scenario are more frequently blocked for I/O,
+An interesting observation to make is that the CPU-bound run (16 GiB page cache) generates fewer data than the SSD run
+(6.8 GiB vs 9.8 GiB). The reason is that the 32 reader threads in the SSD scenario are more frequently blocked by I/O,
 and generate a read load of 1.7M/sec, whereas in the CPU-bound scenario the read load is 70 times higher at 118M/sec.
 Consequently, there is a significant degree of interference by the reader threads, that slow down the writer threads.
 This is also possible because the interference effects are greater than the SSD impact on data generation throughput.
