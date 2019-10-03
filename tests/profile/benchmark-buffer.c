@@ -10,7 +10,7 @@
 pthread_t threads[NUMTHREADS];
 
 //ugly workaround for missing symbol
-void send_statistics(const char *action, const char *action_result, const char *action_data){
+void send_statistics(__attribute__((unused)) const char *action, __attribute__((unused)) const char *action_result, __attribute__((unused)) const char *action_data){
 }
 
 void netdata_cleanup_and_exit(int ret) { exit(ret); }
@@ -31,7 +31,7 @@ typedef struct {
 
 //based on real life scenario
 //test run of full netdata and thread WEB static 3
-test_command test2_cmmds[] = {
+test_command real_life_scenario_1[] = {
     { '+',  16384 },
     { '+',  4096 },
     { '+',  4096 },
@@ -87,16 +87,16 @@ test_command test2_cmmds[] = {
     { '-', 16384 },
     { '-', 4096 },
     { '-', 16384 },
-    { NULL, 0}
+    { 0, 0}
 };
 
-#define TEST2_BUFFER_MAX_COUNT 100
-#define TEST2_REPEAT_COUNT 250000
+#define REAL_LIFE_TEST_BUFFER_MAX_COUNT 100
+#define REAL_LIFE_TEST_REPEAT_COUNT 250000
 
-int test2_insert_stack(BUFFER **stack, size_t size, BUFFER* buffer) {
+int real_life_test_insert(BUFFER **stack, size_t stack_size, BUFFER* buffer) {
     if(!buffer || !stack)
         return 1;
-    for(int i = 0; i < TEST2_BUFFER_MAX_COUNT; i++){
+    for(size_t i = 0; i < stack_size; i++){
         if(!stack[i]) {
             stack[i] = buffer;
             return 0;
@@ -105,24 +105,21 @@ int test2_insert_stack(BUFFER **stack, size_t size, BUFFER* buffer) {
     return 1;
 }
 
-void test2( void *name ) {
-    BUFFER **stack = calloc(TEST2_BUFFER_MAX_COUNT, sizeof(BUFFER*));
+void *real_life_sceario_test( void *name ) {
+    BUFFER **stack = calloc(REAL_LIFE_TEST_BUFFER_MAX_COUNT, sizeof(BUFFER*));
 
-    for(int repeat = 0; repeat < TEST2_REPEAT_COUNT; repeat++) {
+    for(int repeat = 0; repeat < REAL_LIFE_TEST_REPEAT_COUNT; repeat++) {
         int i = 0;
-        while(test2_cmmds[i].cmd) {
-            if(test2_cmmds[i].cmd == '+') {
-                BUFFER *new = buffer_create(test2_cmmds[i].size);
-                if(test2_insert_stack(stack, TEST2_BUFFER_MAX_COUNT, new)) {
-                    muprintf("%s: Out of space in working buffer.\n", name);
+        while(real_life_scenario_1[i].cmd) {
+            if(real_life_scenario_1[i].cmd == '+') {
+                BUFFER *new = buffer_create(real_life_scenario_1[i].size);
+                if(real_life_test_insert(stack, REAL_LIFE_TEST_BUFFER_MAX_COUNT, new)) {
+                    muprintf("%s: Out of space in working buffer.\n", (char*)name);
                     exit(1);
                 }
-            } else if (test2_cmmds[i].cmd == '-') {
-                for(int j = 0; j < TEST2_BUFFER_MAX_COUNT; j++){
-/*                    if(stack[j]) {
-                        muprintf("Alloc: Size req:%zu real:%zu\n", test2_cmmds[i].size, stack[j]->size);
-                    }*/
-                    if(stack[j] && stack[j]->size == test2_cmmds[i].size){
+            } else if (real_life_scenario_1[i].cmd == '-') {
+                for(int j = 0; j < REAL_LIFE_TEST_BUFFER_MAX_COUNT; j++){
+                    if(stack[j] && stack[j]->size == real_life_scenario_1[i].size){
                         buffer_free(stack[j]);
                         stack[j] = NULL;
                     }
@@ -132,49 +129,56 @@ void test2( void *name ) {
         }
     }
 
-    for(int j = 0; j < TEST2_BUFFER_MAX_COUNT; j++)
+    for(int j = 0; j < REAL_LIFE_TEST_BUFFER_MAX_COUNT; j++)
         if(stack[j])
             buffer_free(stack[j]);
 
     free((void*) stack);
+    return NULL;
 }
 
-#define TESTA_REPEAT_COUNT 10000000
-#define TESTA_BUF_SIZE 256
-void testA( void *tname ) {
+#define TEST_SYNTH_SIMPLE_COUNT     10000000
+#define TEST_SYNTH_SIMPLE_BUFSIZE   256
+void *synthetic_test_simple( void *tname ) {
     BUFFER* buffer;
-    for(long long int i = 0; i < TESTA_REPEAT_COUNT; i++) {
-        buffer = buffer_create(TESTA_BUF_SIZE);
-        buffer_snprintf(buffer, TESTA_BUF_SIZE, "Test1: %s", tname);
+    for(long long int i = 0; i < TEST_SYNTH_SIMPLE_COUNT; i++) {
+        buffer = buffer_create(TEST_SYNTH_SIMPLE_BUFSIZE);
+        buffer_snprintf(buffer, TEST_SYNTH_SIMPLE_BUFSIZE, "Test1: %s", (char*)tname);
         buffer_free(buffer);
     }
+    return NULL;
 }
 
 typedef void *(*test_fnc)(void*);
+typedef struct {
+    test_fnc fnc;
+    char* description;
+} test_run_definition;
 
-test_fnc test_list[] = {
-    testA,
-    test2,
-    testA,
-    NULL
+test_run_definition test_list[] = {
+    { synthetic_test_simple, "Synthetic" },
+    { real_life_sceario_test, "Real life based" },
+    { synthetic_test_simple, "Synthetic Run 2" },
+    { real_life_sceario_test, "Real life based Run 2" },
+    { NULL, NULL }
 };
 
 void *thread_test_worker( void *ptr ) {
     int i = 0;
-    test_fnc current_test = test_list[0];
-    while(test_list[i]) {
+    while(test_list[i].fnc) {
         threads_sync_next_test_start();
-        test_list[i](ptr);
+        test_list[i].fnc(ptr);
         threads_synce_test_end();
         i++;
     }
     free(ptr);
+    return NULL;
 }
 
 #define TNAME_BUFSIZE 100
-int main(int argc, char **argv) {
-    printf("Benchmarking netdata Buffer.c\n");
-    printf("Mempool is: %s\n", buffer_mempool_status());
+int main(__attribute__((unused)) int argc, __attribute__((unused)) char **argv) {
+    printf("Benchmarking netdata Buffer.c\n\tThreads: %d\n", NUMTHREADS);
+    printf("\tMempool is: %s\n", buffer_mempool_status());
 
     pthread_mutex_init(&mprintf_lock, NULL);
     pthread_barrier_init(&next_test_barrier, NULL, NUMTHREADS+1); //+1 is for main - to be able to synchronize tests
@@ -190,15 +194,13 @@ int main(int argc, char **argv) {
     }
 
     int i = 0;
-    test_fnc current_test = test_list[0];
-    while(test_list[i]) {
-        muprintf("Starting Test %d\n", i+1);
+    while(test_list[i].fnc) {
+        muprintf("Starting Test %d (\"%s\")\n", i+1, test_list[i].description);
         threads_sync_next_test_start();
         threads_synce_test_end();
         i++;
     }
 
-    BUFFER *buf = buffer_create(256);
     for(int i = 0; i < NUMTHREADS; i++) {
         if(pthread_join(threads[i], NULL)) {
             printf("Failed to join thread %d.\n", i);
