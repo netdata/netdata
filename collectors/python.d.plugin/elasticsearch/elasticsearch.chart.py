@@ -487,7 +487,7 @@ CHARTS = {
         ]
     },
     'index_docs_count': {
-        'options': [None, 'Docs Count', 'num', 'indices', 'elastic.index_docs_count', 'line'],
+        'options': [None, 'Docs Count', 'count', 'indices', 'elastic.index_docs', 'line'],
         'lines': []
     },
     'index_store_size': {
@@ -495,7 +495,7 @@ CHARTS = {
         'lines': []
     },
     'index_replica': {
-        'options': [None, 'Replica', 'num', 'indices', 'elastic.index_replica', 'line'],
+        'options': [None, 'Replica', 'count', 'indices', 'elastic.index_replica', 'line'],
         'lines': []
     },
     'index_health': {
