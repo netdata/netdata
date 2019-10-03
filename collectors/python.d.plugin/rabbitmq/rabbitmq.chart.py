@@ -123,14 +123,7 @@ CHARTS = {
 }
 
 
-def normalize_vhost_name(name):
-    if name.startswith('/') and len(name) > 1:
-        return name[1:]
-    return name
-
-
 def vhost_chart_template(name):
-    name = normalize_vhost_name(name)
     order = [
         'vhost_{0}_message_stats'.format(name),
     ]
@@ -164,7 +157,7 @@ class VhostStatsBuilder:
         self.stats = raw_stats
 
     def name(self):
-        return normalize_vhost_name(self.stats['name'])
+        return self.stats['name']
 
     def has_msg_stats(self):
         return bool(self.stats.get('message_stats'))
