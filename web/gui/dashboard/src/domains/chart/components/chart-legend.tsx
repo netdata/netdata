@@ -4,11 +4,11 @@ import classNames from "classnames"
 import { find } from "ramda"
 import { seconds4human } from "../utils/seconds4human"
 import { Attributes } from "../utils/transformDataAttributes"
-import { ChartData, ChartDetails } from "../chart-types"
+import { ChartData, ChartDetails, DygraphData } from "../chart-types"
 
 interface Props {
   attributes: Attributes
-  chartData: ChartData
+  chartData: DygraphData
   chartDetails: ChartDetails
   chartLibrary: string
   colors: {

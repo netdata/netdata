@@ -17,7 +17,7 @@ import { getPanAndZoomStep } from "../utils/get-pan-and-zoom-step"
 import { Attributes } from "../utils/transformDataAttributes"
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { useFormatters } from "../utils/formatters"
-import { ChartData, ChartDetails } from "../chart-types"
+import { ChartData, ChartDetails, DygraphData } from "../chart-types"
 import { selectChartViewRange } from "../selectors"
 
 import { ChartLegend } from "./chart-legend"
@@ -303,7 +303,7 @@ export const Chart = ({
       {hasLegend && (
         <ChartLegend
           attributes={attributes}
-          chartData={chartData}
+          chartData={chartData as DygraphData}
           chartDetails={chartDetails}
           chartLibrary={chartLibrary}
           colors={colors}

@@ -17,7 +17,7 @@ import {
   ChartLibraryConfig,
   ChartLibraryName,
 } from "../../utils/chartLibrariesSettings"
-import { ChartData, ChartDetails } from "../../chart-types"
+import { ChartDetails, DygraphData } from "../../chart-types"
 
 import "./dygraph-chart.css"
 
@@ -26,7 +26,7 @@ const noop: any = () => {}
 
 interface GetInitialDygraphOptions {
   attributes: Attributes,
-  chartData: ChartData,
+  chartData: DygraphData,
   chartDetails: ChartDetails,
   chartSettings: ChartLibraryConfig,
   dimensionsVisibility: boolean[]
@@ -225,7 +225,7 @@ const getInitialDygraphOptions = ({
 
 interface Props {
   attributes: Attributes
-  chartData: ChartData
+  chartData: DygraphData
   chartDetails: ChartDetails
   chartLibrary: ChartLibraryName
   chartUuid: string

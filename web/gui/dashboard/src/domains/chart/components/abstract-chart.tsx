@@ -3,7 +3,9 @@ import React, { useCallback } from "react"
 import { setGlobalChartUnderlayAction, setGlobalPanAndZoomAction } from "domains/global/actions"
 import { useDispatch } from "react-redux"
 import { Attributes } from "../utils/transformDataAttributes"
-import { ChartData, ChartDetails } from "../chart-types"
+import {
+  ChartData, ChartDetails, DygraphData, EasyPieChartData,
+} from "../chart-types"
 import { ChartLibraryName } from "../utils/chartLibrariesSettings"
 import { DygraphChart } from "./lib-charts/dygraph-chart"
 
@@ -63,7 +65,7 @@ export const AbstractChart = ({
   return (
     <DygraphChart
       attributes={attributes}
-      chartData={chartData}
+      chartData={chartData as DygraphData}
       chartDetails={chartDetails}
       chartLibrary={chartLibrary}
       colors={colors}

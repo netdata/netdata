@@ -1,6 +1,6 @@
 /* eslint-disable camelcase */
 
-export interface ChartData {
+export interface ChartDataBase {
   after: number
   api: number
   before: number
@@ -16,14 +16,24 @@ export interface ChartData {
   min: number
   name: string
   points: number
-  result: {
-    data: (number[])[]
-    labels: string[]
-  }
+
   update_every: number
   view_latest_values: number[]
   view_update_every: number
 }
+
+export interface DygraphData extends ChartDataBase{
+  result: {
+    data: (number[])[]
+    labels: string[]
+  }
+}
+
+export interface EasyPieChartData extends ChartDataBase{
+  result: number[]
+}
+
+export type ChartData = DygraphData | EasyPieChartData
 
 interface Dimension {
   name: string
