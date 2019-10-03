@@ -306,7 +306,13 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+#ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
+            "  -W stresstest=A,B,C,D,E  Run a DB engine stress test for A seconds,\n"
+            "                           with B writers and C readers, with a ramp up\n"
+            "                           time of D seconds for writers, a page cache\n"
+            "                           size of E MiB, and exit.\n\n"
+#endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
@@ -887,6 +893,7 @@ int main(int argc, char **argv) {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
                         char* createdataset_string = "createdataset=";
+                        char* stresstest_string = "stresstest=";
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -905,14 +912,33 @@ int main(int argc, char **argv) {
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
+#ifdef ENABLE_DBENGINE
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
-#ifdef ENABLE_DBENGINE
-                            unsigned history_seconds = (unsigned )strtoull(optarg, NULL, 0);
+                            unsigned history_seconds = strtoul(optarg, NULL, 0);
                             generate_dbengine_dataset(history_seconds);
-#endif
                             return 0;
                         }
+                        else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
+                            char *endptr;
+                            unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
+                            page_cache_mb = 0;
+
+                            optarg += strlen(stresstest_string);
+                            test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
+                            if (',' == *endptr)
+                                dset_charts = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                query_threads = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                ramp_up_seconds = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
+                                                 page_cache_mb);
+                            return 0;
+                        }
+#endif
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"
