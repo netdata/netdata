@@ -7,9 +7,8 @@ Many people think Netdata can only store about an hour's worth of real-time metr
 configuration today. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of
 historical, per-second metrics without having to rely on a [backend](../../backends/).
 
-This tutorial gives two options for configuring Netdata to store more metrics. We recommend the [**database
-engine**](#using-the-database-engine), as it will soon be the default configuration. However, you can stick with the
-current default **round-robin database** if you prefer.
+This tutorial gives two options for configuring Netdata to store more metrics. **We recommend the default [database
+engine](#using-the-database-engine)**, but you can stick with or switch to the round-robin database if you prefer.
 
 Let's get started.
 
@@ -69,15 +68,16 @@ aren't ready to make the move.
 
 ## Using the round-robin database
 
-By default, Netdata uses a round-robin database to store 1 hour of per-second metrics. Here's the default setting for
-`history` in the `netdata.conf` file that comes pre-installed with Netdata.
+In previous versions, Netdata used a round-robin database to store 1 hour of per-second metrics. To see if you're still
+using this database, or if you would like to switch to it, see if your `memory mode` option is set to `save`.
 
 ```conf
 [global]
-    history = 3600
+    memory mode = save
 ```
 
-One hour has 3,600 seconds, hence the `3600` value!
+If `memory mode` is set to `save`, then you're using the round-robin database. If so, tweaking the `history` option will
+store historical metrics for a longer period of time. The default is `3600`, which is 3,600 seconds, or one hour.
 
 To increase your historical metrics, you can increase `history` to the number of seconds you'd like to store:
 
