@@ -10,7 +10,9 @@
 
 We’re extremely grateful for security researchers and users that report vulnerabilities to Netdata Open Source Community. All reports are thoroughly investigated by a set of community volunteers.
 
-To make a report, please create a post [here](https://groups.google.com/a/netdata.cloud/forum/#!newtopic/security) with the vulnerability details and the details expected for [all Netdata bug reports](.github/ISSUE_TEMPLATE/bug_report.md).
+To make a report, please create a post [here](https://groups.google.com/a/netdata.cloud/forum/#!newtopic/security) with
+the vulnerability details and the details expected for [all Netdata bug
+reports](https://github.com/netdata/netdata/blob/c1f4c6cf503995cd4d896c5821b00d55afcbde87/.github/ISSUE_TEMPLATE/bug_report.md).
 
 ### When Should I Report a Vulnerability?
 

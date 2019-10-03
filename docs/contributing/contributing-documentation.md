@@ -19,7 +19,7 @@ followed by [Mastering Markdown](https://guides.github.com/features/mastering-ma
 
 There are two ways to contribute to Netdata's documentation: 
 
-1.  Edit documentation [directly in GitHub](#edit-documentation-directly-on-gitHub).
+1.  Edit documentation [directly in GitHub](#edit-documentation-directly-on-github).
 2.  Download the repository and [edit documentation locally](#edit-documentation-locally).
 
 Editing in GitHub is a simpler process and is perfect for quick edits to a single document, 
@@ -45,7 +45,7 @@ Start editing documentation on GitHub by clicking the small pencil icon on any p
 You can find them at the top of every page.
 
 Clicking on this icon will take you to the associated page in the `netdata/netdata` repository. 
-Then click the small pencil icon on any documentation file (those ending in the `.md` [Markdown] extension) in the `netdata/netdata` repository.
+Then click the small pencil icon on any documentation file (those ending in the `.md` Markdown extension) in the `netdata/netdata` repository.
 
 ![A screenshot of editing a Markdown file directly in the Netdata repository](https://user-images.githubusercontent.com/1153921/59637188-10426d00-910a-11e9-99f2-ec564d6fb7d5.png)
 
@@ -109,7 +109,8 @@ folder and either name it `README.md` for generic documentation, or with another
 
 At the root of the Netdata repository is a `docs/` folder. Inside this folder we place documentation that does not have
 a direct relationship to a specific component of Netdata. It's where we house our [getting started
-guide](../getting-started.md), guides on [running Netdata behind Nginx](../Running-behind-nginx.md), and more.
+guide](../../docs/getting-started.md), guides on [running Netdata behind Nginx](../../docs/Running-behind-nginx.md), and
+more.
 
 If the documentation you're working on doesn't have a direct relaionship to a component of Netdata, 
 it can be placed in this `docs/` folder.
@@ -168,7 +169,8 @@ cd docs/generator/build/
 python3 -m http.server 20000
 ```
 
-Feel free to replace the port number you want this web server to listen on (port `20000` in this case [only one higher than the agent!]).
+Feel free to replace the port number you want this web server to listen on (port `20000` in this case (only one higher
+than the agent!)).
 
 Open your web browser and navigate to `http://localhost:20000`. 
 If you replaced the port earlier, change it here as well. 
