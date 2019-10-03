@@ -881,7 +881,20 @@ progress "Install netdata at system init"
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 
 if grep -q docker /proc/1/cgroup >/dev/null 2>&1; then
-	echo >&2 "We are running within a docker container, will not be installing netdata service"
+	# If docker runs systemd for some weird reason, let the install proceed
+	is_systemd_running="NO"
+	if command -v pidof >/dev/null 2>&1; then
+		is_systemd_running="$(pidof /usr/sbin/init || pidof systemd || echo "NO")"
+	else
+		is_systemd_running="$( (ps -p 1 | grep -q systemd && echo "1") || echo "NO")"
+	fi
+
+	if [ "${is_systemd_running}" == "1" ]; then
+		echo >&2 "Found systemd within the docker container, running install_netdata_service() method"
+		install_netdata_service || run_failed "Cannot install netdata init service."
+	else
+		echo >&2 "We are running within a docker container, will not be installing netdata service"
+	fi
 	echo >&2
 else
 	install_netdata_service || run_failed "Cannot install netdata init service."
