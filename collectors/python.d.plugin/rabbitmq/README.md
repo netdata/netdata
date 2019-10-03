@@ -1,6 +1,6 @@
 # rabbitmq
 
-Module monitor rabbitmq performance and health metrics.
+This module monitors [RabbitMQ](https://www.rabbitmq.com/) performance and health metrics.
 
 Following charts are drawn:
 
@@ -47,6 +47,20 @@ Following charts are drawn:
 9.  **Disk Space**
 
     -   free disk space in gigabytes
+
+
+Per Vhost charts:
+
+1.  **Vhost Messages**
+
+    -   ack
+    -   confirm
+    -   deliver
+    -   get
+    -   get_no_ack
+    -   publish
+    -   redeliver
+    -   return_unroutable
 
 ## configuration
 
