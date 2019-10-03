@@ -1,4 +1,4 @@
-# Use dimension templates to mass-create alarms
+# Use dimension templates to create dynamic alarms
 
 Your ability to monitor the health of your systems and applications relies on your ability to create and maintain
 the best set of alarms for your particular needs.
