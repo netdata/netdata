@@ -15,21 +15,19 @@ Let's get started.
 ## Using the database engine
 
 The database engine uses RAM to store recent metrics while also using a "spill to disk" feature that takes advantage of
-available disk space for long-term metrics storage.This feature of the database engine allows you to store a much larger
-dataset than your system's available RAM.
+available disk space for long-term metrics storage. This feature of the database engine allows you to store a much
+larger dataset than your system's available RAM.
 
-The database engine will eventually become the default method of retaining metrics, but until then, you can switch to
-the database engine by changing a single option.
-
-Edit your `netdata.conf` file and change the `memory mode` setting to `dbengine`:
+The database engine is currently the default method of storing metrics, but if you're not sure which database you're
+using, check out your `netdata.conf` file and look for the `memory mode` setting:
 
 ```conf
 [global]
     memory mode = dbengine
 ```
 
-Next, restart Netdata. On Linux systems, we recommend running `sudo service netdata restart`. You're now using the
-database engine!
+If `memory mode` is set to anything but `dbengine`, change it and restart Netdata. On Linux systems, we recommend
+running `sudo service netdata restart`. You're now using the database engine!
 
 > Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
 > we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
@@ -55,9 +53,10 @@ size` and `dbengine disk space`.
 metrics.
 
 Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000
-metrics every second.
+metrics every second. If you increase either `page cache size` or `dbengine disk space`, Netdata will retain even more
+historical metrics.
 
-If you'd like to change these options, read more about the [database engine's memory
+But before you change these options too dramatically, read up on the [database engine's memory
 footprint](../../database/engine/README.md#memory-requirements).
 
 With the database engine active, you can back up your `/var/cache/netdata/dbengine/` folder to another location for
