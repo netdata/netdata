@@ -30,7 +30,7 @@ install:
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
   - if [ ! "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export DEPLOY_REPO="netdata-devel";  fi;
   - export PKG_DEPLOYMENT_GIT_REPO="master" # By default, we expect to publish from master branch
-  - if [ "${DEPLOY_REPO}" = "netdata-devel" -a "${TRAVIS_EVENT_TYPE}" = "push" ]; the export PKG_DEPLOYMENT_GIT_REPO="${TRAVIS_BRANCH}"; fi; # If netdata-devel and is not PR or api call, allow publishing from whatever that branch is
+  - if [ "${DEPLOY_REPO}" = "netdata-devel" -a "${TRAVIS_EVENT_TYPE}" = "push" ]; then export PKG_DEPLOYMENT_GIT_REPO="${TRAVIS_BRANCH}"; fi; # If netdata-devel and is not PR or api call, allow publishing from whatever that branch is
   - export PACKAGING_USER="netdata" # Standard package cloud account
   - export PACKAGE_CLOUD_RETENTION_DAYS=30
   # These are release-related artifacts and have to be evaluated before we start doing conditional checks inside stages
