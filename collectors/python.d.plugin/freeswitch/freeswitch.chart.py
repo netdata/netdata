@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Description: freeswitch netdata python.d module
-# Author: Koldo Aingeru Marcos (badcrc)
+# Description: nginx netdata python.d module
+# Author: Koldo Aingeru Marcos (paulfantom)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
@@ -11,8 +11,6 @@ except ImportError:
     HAS_ESL = False
 
 import json
-from random import randint
-
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
@@ -78,19 +76,19 @@ class Service(SimpleService):
         self.port = configuration.get('port', DEFAULT_PORT)
         self.password = configuration.get('password', DEFAULT_PASSWORD)
 
-        self.fs = ESL.ESLconnection(self.host, self.port, self.password)
 
-    def _check(self):
+    def check(self):
         if not HAS_ESL:
             self.error("'ESL' package is needed to use freeswitch module, you can install with with pip install python-ESL")
             return False
-        
+
         try:
             self.fs = ESL.ESLconnection(self.host, self.port, self.password)
-        except:
+            if not self.fs.connected():
+                raise ValueError('Not connected')
+        except ValueError:
             self.error("Cannot connect to FreeSwitch with provided data, check that the service is running")
             return False
-        
         return True
 
     def _get_data(self):
@@ -100,12 +98,35 @@ class Service(SimpleService):
         try:
             data = dict()
 
-            calls = self.fs.api('show calls as json').getBody()
-            registrations = self.fs.api('show registrations as json').getBody()
-            gateways_fs = self.fs.api('sofia status gateway').getBody().splitlines()
-            profiles_fs = self.fs.api('sofia status').getBody().splitlines()
+            data['calls']=self.get_calls()
+            data['registrations']=self.get_registrations()
 
-            gateways = {'UNREGED':0,
+            gateways = self.get_gateways()
+            profiles = self.get_profiles()
+
+            for gw_state in gateways:
+                data[gw_state]=int(gateways[gw_state])
+
+            for prof_state in profiles:
+                data[prof_state]=int(profiles[prof_state])
+
+            return data or None
+        except (ValueError, AttributeError):
+            return None
+    
+
+    def get_calls(self):
+        calls = self.fs.api('show calls as json').getBody()
+        return int(json.loads(calls)["row_count"])
+
+    def get_registrations(self):
+        registrations = self.fs.api('show registrations as json').getBody()
+        return int(json.loads(registrations)["row_count"])
+
+    def get_gateways(self):
+        gateways_fs = self.fs.api('sofia status gateway').getBody().splitlines()
+
+        gateways = {'UNREGED':0,
                         'TRYING':0,
                         'REGISTER':0,
                         'REGED':0,
@@ -115,36 +136,27 @@ class Service(SimpleService):
                         'EXPIRED':0,
                         'NOREG':0,
                         'TIMEOUT':0}
-            
-            profiles = {'RUNNING':0,
-                        'DOWN':0}
-            
-            for gateway in gateways_fs:
-                for gw_data in gateway.split():                    
-                    try:
-                        gateways[gw_data]+=1;
-                    except:
-                        continue
-            
-            for profile in profiles_fs:
-                for prof_data in profile.split():                    
-                    try:
-                        profiles[prof_data]+=1;
-                    except:
-                        continue
 
+        for gateway in gateways_fs:
+            for gw_data in gateway.split():
+                try:
+                    gateways[gw_data]+=1;
+                except KeyError:
+                    continue
+        
+        return gateways
 
-            data['calls']=int(json.loads(calls)["row_count"])
-            data['registrations']=int(json.loads(registrations)["row_count"])
-            for gw_state in gateways:
-                data[gw_state]=int(gateways[gw_state])
-            
-            for prof_state in profiles:
-                data[prof_state]=int(profiles[prof_state])
+    def get_profiles(self):
+        profiles_fs = self.fs.api('sofia status').getBody().splitlines()
 
-            return data or None
-        except (ValueError, AttributeError):
-            return None
+        profiles = {'RUNNING':0,
+                    'DOWN':0}
 
-
-
+        for profile in profiles_fs:
+            for prof_data in profile.split():
+                try:
+                    profiles[prof_data]+=1;
+                except KeyError:
+                    continue
+        
+        return profiles
