@@ -584,21 +584,19 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
             error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
     }
 
-    if (rc) {
-        RRDCALC *rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_health_log, (avl *)rc);
-        if (rdcmp) {
-            rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl *)rc);
-            if (!rdcmp) {
-                error("Cannot remove the health alarm index from health_log");
-            }
+    RRDCALC *rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_health_log, (avl *)rc);
+    if (rdcmp) {
+        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_health_log, (avl *)rc);
+        if (!rdcmp) {
+            error("Cannot remove the health alarm index from health_log");
         }
+    }
 
-        rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_name, (avl *)rc);
-        if (rdcmp) {
-            rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_name, (avl *)rc);
-            if (!rdcmp) {
-                error("Cannot remove the health alarm index from idx_name");
-            }
+    rdcmp = (RRDCALC *) avl_search_lock(&(host)->alarms_idx_name, (avl *)rc);
+    if (rdcmp) {
+        rdcmp = (RRDCALC *) avl_remove_lock(&(host)->alarms_idx_name, (avl *)rc);
+        if (!rdcmp) {
+            error("Cannot remove the health alarm index from idx_name");
         }
     }
 
