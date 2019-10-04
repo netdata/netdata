@@ -27,10 +27,12 @@ install:
   - export LATEST_RELEASE_DATE="$(git log -1 --format=%aD "${LATEST_RELEASE_VERSION}" | cat)"
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export BUILD_VERSION="$(cat packaging/version | cut -d'-' -f1,2 | sed -e 's/-/./g').latest"; fi;
   - export DEPLOY_REPO="netdata"  # Default production packaging repository
-  - export PACKAGING_USER="netdata" # Standard package cloud account
   - if [[ "${TRAVIS_COMMIT_MESSAGE}" = *"[Build latest]"* ]]; then export DEPLOY_REPO="netdata-edge"; fi;
-  - export PACKAGE_CLOUD_RETENTION_DAYS=30
   - if [ ! "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export DEPLOY_REPO="netdata-devel";  fi;
+  - export PKG_DEPLOYMENT_GIT_REPO="master" # By default, we expect to publish from master branch
+  - if [ "${DEPLOY_REPO}" = "netdata-devel" -a "${TRAVIS_EVENT_TYPE}" = "push" ]; the export PKG_DEPLOYMENT_GIT_REPO="${TRAVIS_BRANCH}"; fi; # If netdata-devel and is not PR or api call, allow publishing from whatever that branch is
+  - export PACKAGING_USER="netdata" # Standard package cloud account
+  - export PACKAGE_CLOUD_RETENTION_DAYS=30
   # These are release-related artifacts and have to be evaluated before we start doing conditional checks inside stages
   - source ".travis/tagger.sh"
   - export GIT_TAG="$(git tag --points-at)"
@@ -303,7 +305,7 @@ jobs:
             on:
               # Only deploy on ${USER}/netdata, master branch, when build-area directory is created
               repo: ${TRAVIS_REPO_SLUG}
-              branch: "master"
+              branch: "${PKG_DEPLOYMENT_GIT_REPO}"
               condition: -d "${PACKAGES_DIRECTORY}"
         after_deploy:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
@@ -409,7 +411,7 @@ jobs:
             on:
               # Only deploy on ${USER}/netdata, master branch, when packages directory is created
               repo: ${TRAVIS_REPO_SLUG}
-              branch: "master"
+              branch: "${PKG_DEPLOYMENT_GIT_REPO}"
               condition: -d "${PACKAGES_DIRECTORY}"
         after_deploy:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
