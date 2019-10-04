@@ -12,6 +12,9 @@
 - SLACK_CHANNEL - This is the channel that Travis will be posting messages
 - SLACK_NOTIFY_WEBHOOK_URL - This is the incoming URL webhook as provided by slack integration. Visit Apps integration in slack to generate the required hook
 - SLACK_BOT_NAME - This is the name your bot will appear with on slack
+- PKG_CLOUD_TOKEN - This is the token required to access package cloud services
+- REPOSITORY - This variable defines the netdata repository and is consumed by the docker build scripts in packaging/docker
+
 
 ## CI workflow details
 Our CI pipeline is designed to help us identify and mitigate risks at all stages of implementation.
@@ -27,14 +30,13 @@ Our main areas of concern are:
 
 4) We are an innovative company, so we love to automate :)
 
-
 Having said that, here's a brief introduction to Netdata's improved CI/CD pipeline with Travis.
 Our CI/CD lifecycle contains three different execution entry points:
 1) A user opens a pull request to netdata/master: Travis will run a pipeline on the branch under that PR
 2) A merge or commit happens on netdata/master. This will trigger travis to run, but we have two distinct cases in this scenario:
    a) A user merges a pull request to netdata/master: Travis will run on master, after the merge.
    b) A user runs a commit/merge with a special keyword (mentioned later).
-      This triggers a release for either minor, major or release candidate versions, depending the keyword
+      This triggers a release for either minor, major or release candidate versions or binary package generation, depending the keyword
 3) A scheduled job runs on master once per day: Travis will run on master at the scheduled interval
 
 To accommodate all three entry points our CI/CD workflow has a set of steps that run on all three entry points.
@@ -71,6 +73,12 @@ Briefly we currently evaluate the following activities:
 - Build and install on CentOS 7
 (More to come)
 
+## Artifacts validation on bare OS, stable to current lifecycle checks
+This stage was added to guarantee netdata can be installed, updated, started and uninstalled on all supported operating systems without problems.
+We intentionally use clean OS images here, to make sure that dependency management works fine too
+This step runs only on pull requests and during nightly cron, to make sure integrity is guaranteed on our code at the critical path (during pull requests or nightly)
+ and not mess with other workflows.
+
 ### Nightly operations: Stages that run daily under cronjob
 The nightly stages are related to the daily nightly activities, that produce our daily latest releases.
 We also maintain a couple of cronjobs that run during the night to provide us with deeper insights,
@@ -89,7 +97,7 @@ and deploy them (the artifacts) to our google cloud service provider.
 Publishing is responsible for executing the major/minor/patch releases and is separated
 in two stages: packaging preparation process and publishing.
 
-## Packaging for release
+## Support activities on main branch
 During packaging we are preparing the release changelog information and run the labeler.
 
 ## Publish for release
@@ -97,47 +105,17 @@ The publishing stage is the most complex part in publishing. This is the stage w
 prepare the release artifacts and get ready with the release draft.
 
 ### Package Management workflows
-As part of our goal to provide the best support to our customers, we have created a set of CI workflows to automatically produce
-DEB and RPM for multiple distributions. These workflows are implemented under the templated stages '_DEB_TEMPLATE' and '_RPM_TEMPLATE'.
-We currently plan to actively support the following Operating Systems, with a plan to further expand this list following our users needs.
+To provide the best support to our customers, we have automated the binary package release process for multiple distributions and architectures.
+This gives netdata the ability to provide cutting edge and stable releases through reliable and highly available distribution channels like [package cloud](https://packagecloud.io).
 
-### Operating systems supported
-The following distributions are supported
-- Debian versions
-  - Buster (TBD - not released yet, check [debian releases](https://www.debian.org/releases/) for details)
-  - Stretch
-  - Jessie
-  - Wheezy
+We build for DEB and RPM, across multiple distributions and architectures. The workflows were designed, having in mind that we intend to support all possible platforms on the market, thus we needed to keep things as simple as possible and as flexible as possible.
+Package deployment can be triggered manually by executing an empty commit, respecting this message pattern: `[Package PACKAGE_TYPE PACKAGE_ARCH]([Build latest])* DESCRIBE_THE_REASONING_HERE`.
+Travis Yaml configuration allows the user to combine package type and architecture as necessary to regenerate the current stable release (For example tag v1.15.0 as of 4th of May 2019).
+PACKAGE_TYPE may be either DEB or RPM, while PACKAGE_ARCH at the moment may be either amd64 or i386. If we omit "[Build latest]" string from the commit, then the latest code will be published, otherwise the latest stable tag will be built. Sample patterns to trigger building of packages for all amd64 supported architecture:
+- `[Package amd64 RPM] Building latest stable`: Build & publish all available amd64 RPM packages, from latest stable release
+- `[Package amd64 DEB] Building latest stable`: Build & publish all available amd64 DEB packages, from latest stable release
+- `[Package amd64 DEB][Build latest] Build nightlies`: Build & publish all available amd64 DEB packages, from latest nightly code
 
-- Ubuntu versions
-  - Disco
-  - Cosmic
-  - Bionic
-  - artful
+### Architectures and Operating systems supported
+To find out details about our distribution support, please visit our [distributions page](../packaging/DISTRIBUTIONS.md)
 
-- Enterprise Linux versions (Covers Redhat, CentOS, and Amazon Linux with version 6)
-  - Version 8 (TBD)
-  - Version 7
-  - Version 6
-
-- Fedora versions
-  - Version 31 (TBD)
-  - Version 30
-  - Version 29
-  - Version 28
-
-- OpenSuSE versions
-  - 15.1
-  - 15.0
-
-- Gentoo distributions
-  - TBD
-
-### Architectures supported
-We plan to support amd64, x86 and arm64 architectures. As of June 2019 only amd64 and x86 will become available, as we are still working on solving issues with the architecture.
-
-The Package deployment can be triggered manually by executing an empty commit with the following message pattern: `[Package PACKAGE_TYPE PACKAGE_ARCH] DESCRIBE_THE_REASONING_HERE`.
-Travis Yaml configuration allows the user to combine package type and architecture as necessary to regenerate the current stable release (For example tag v1.15.0 as of 4th of May 2019)
-Sample patterns to trigger building of packages for all amd64 supported architecture:
-- '[Package amd64 RPM]': Build & publish all amd64 available RPM packages
-- '[Package amd64 DEB]': Build & publish all amd64 available DEB packages
