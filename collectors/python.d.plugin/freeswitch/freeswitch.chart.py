@@ -127,15 +127,15 @@ class Service(SimpleService):
         gateways_fs = self.fs.api('sofia status gateway').getBody().splitlines()
 
         gateways = {'UNREGED':0,
-                        'TRYING':0,
-                        'REGISTER':0,
-                        'REGED':0,
-                        'UNREGISTER':0,
-                        'FAILED':0,
-                        'FAIL_WAIT':0,
-                        'EXPIRED':0,
-                        'NOREG':0,
-                        'TIMEOUT':0}
+                    'TRYING':0,
+                    'REGISTER':0,
+                    'REGED':0,
+                    'UNREGISTER':0,
+                    'FAILED':0,
+                    'FAIL_WAIT':0,
+                    'EXPIRED':0,
+                    'NOREG':0,
+                    'TIMEOUT':0}
 
         for gateway in gateways_fs:
             for gw_data in gateway.split():
@@ -143,7 +143,7 @@ class Service(SimpleService):
                     gateways[gw_data]+=1;
                 except KeyError:
                     continue
-        
+
         return gateways
 
     def get_profiles(self):
