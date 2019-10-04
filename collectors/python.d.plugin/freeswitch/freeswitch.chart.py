@@ -158,5 +158,5 @@ class Service(SimpleService):
                     profiles[prof_data]+=1;
                 except KeyError:
                     continue
-        
+
         return profiles
