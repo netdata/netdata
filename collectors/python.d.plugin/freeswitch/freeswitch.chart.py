@@ -113,7 +113,6 @@ class Service(SimpleService):
             return data or None
         except (ValueError, AttributeError):
             return None
-    
 
     def get_calls(self):
         calls = self.fs.api('show calls as json').getBody()
