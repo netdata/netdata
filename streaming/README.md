@@ -571,4 +571,28 @@ the SSL activated while the slave tries to send a plain text information. The co
 ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER HOSTNAME:MASTER PORT]: server is not replying properly (is it a netdata?).
 ```
 
+### Stream charts wrong
+
+When the slave is sending data to master it cannot have a different chart that it has locally, case the charts differ or you are seeing charts with strange
+behaviors like big gaps, this can mean that your master memory mode is not configured correctly.
+
+### Forbidding access
+
+This is an error reported in the master side of the stream. This error can also happen, because there is a slow connection between master and slave, but this
+is not the unique motive, so we decided to write a specific topic for it. The complete message that you will see in yor log file will be like this
+
+```
+STREAM [receive from [SLAVE HOSTNAME]:SLAVE IP]: `MESSAGE`. Forbidding access."
+```
+
+where `MESSAGE` will have one of the following patterns:
+
+- `request without KEY` : The message received is incomplete and the KEY value can be API, hostname, machine GUID.
+- `API key 'VALUE' is not valid GUID`: The UUID received from slave does not have the format defined by RFC 4122
+- `machine GUID 'VALUE' is not GUID.`: Here we have an error for machine GUID that has the  same motive of the previous API key.
+- `API key 'VALUE' is not allowed`: This stream has a wrong API key.
+- `API key 'VALUE' is not permitted from this IP`: The IP is not allowed to use STREAM with this master.
+- `machine GUID 'VALUE' is not allowed.`: The GUID that is trying to send stream is not allowed.
+- `Machine GUID 'VALUE' is not permitted from this IP. `: The IP does not match the pattern or IP allowed to connect to use stream.
+
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fstreaming%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
