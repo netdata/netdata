@@ -75,6 +75,7 @@ interface Props {
   }) => void
   orderedColors: string[]
 
+  hoveredRow: number
   hoveredX: number | null
   setGlobalChartUnderlay: (arg: { after: number, before: number, masterID: string }) => void
   setHoveredX: (hoveredX: number | null, noMaster?: boolean) => void
@@ -88,6 +89,7 @@ export const EasyPieChart = ({
   chartData,
   chartDetails,
   chartWidth,
+  hoveredRow,
   legendFormatValue,
   orderedColors,
   setMinMax,
@@ -96,7 +98,10 @@ export const EasyPieChart = ({
   const chartElement = useRef<HTMLDivElement>(null)
   const [chartInstance, setChartInstance] = useState()
 
-  const value = chartData.result[0]
+  const valueIndex = hoveredRow === -1
+    ? 0
+    : (chartData.result.length - 1 - hoveredRow) // because data for easy-pie-chart are flipped
+  const value = chartData.result[valueIndex]
 
   const {
     // if this is set, then we're overriding commonMin
@@ -161,9 +166,14 @@ export const EasyPieChart = ({
   // update with value
   useEffect(() => {
     if (chartInstance) {
+      if (hoveredRow === -1 && !chartInstance.options.animate.enabled) {
+        chartInstance.enableAnimation()
+      } else if (hoveredRow !== -1 && chartInstance.options.animate.enabled) {
+        chartInstance.disableAnimation()
+      }
       chartInstance.update(pcent)
     }
-  }, [chartInstance, pcent])
+  }, [chartInstance, hoveredRow, pcent])
 
   const valueFontSize = (chartWidth * 2) / 3 / 5
   const valuetop = Math.round((chartWidth - valueFontSize - (chartWidth / 40)) / 2)

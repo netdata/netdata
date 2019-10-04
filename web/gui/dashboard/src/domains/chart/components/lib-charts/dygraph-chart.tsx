@@ -243,6 +243,7 @@ interface Props {
   }) => void
   orderedColors: string[]
 
+  hoveredRow: number
   hoveredX: number | null
   setGlobalChartUnderlay: (arg: { after: number, before: number, masterID: string }) => void
   setHoveredX: (hoveredX: number | null, noMaster?: boolean) => void
@@ -264,6 +265,7 @@ export const DygraphChart = ({
   onUpdateChartPanAndZoom,
   orderedColors,
 
+  hoveredRow,
   hoveredX,
   setGlobalChartUnderlay,
   setHoveredX,
@@ -759,7 +761,7 @@ export const DygraphChart = ({
   const currentSelectionMasterId = useSelector(selectGlobalSelectionMaster)
   useLayoutEffect(() => {
     if (dygraphInstance && currentSelectionMasterId !== chartUuid) {
-      if (hoveredX === null) {
+      if (hoveredRow === -1) {
         // getSelection is 100 times faster that clearSelection
         if (dygraphInstance.getSelection() !== -1) {
           dygraphInstance.clearSelection()
@@ -768,7 +770,8 @@ export const DygraphChart = ({
       }
       dygraphInstance.setSelection(hoveredRow)
     }
-  }, [chartData.result.data, chartUuid, currentSelectionMasterId, dygraphInstance, hoveredX])
+  }, [chartData, chartUuid, currentSelectionMasterId, dygraphInstance, hoveredRow,
+    viewAfter, viewBefore])
 
 
   const chartElemId = `${chartLibrary}-${chartUuid}-chart`

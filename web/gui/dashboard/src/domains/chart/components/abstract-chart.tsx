@@ -28,6 +28,7 @@ interface Props {
   hoveredX: number | null
   onUpdateChartPanAndZoom: (arg: { after: number, before: number, masterID: string }) => void
 
+  hoveredRow: number
   setHoveredX: (hoveredX: number | null, noMaster?: boolean) => void
   setMinMax: (minMax: [number, number]) => void
   unitsCurrent: string
@@ -47,6 +48,7 @@ export const AbstractChart = ({
   isRemotelyControlled,
   legendFormatValue,
   orderedColors,
+  hoveredRow,
   hoveredX,
   onUpdateChartPanAndZoom,
   setHoveredX,
@@ -79,6 +81,7 @@ export const AbstractChart = ({
         isRemotelyControlled={isRemotelyControlled}
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
+        hoveredRow={hoveredRow}
         hoveredX={hoveredX}
         onUpdateChartPanAndZoom={onUpdateChartPanAndZoom}
         setGlobalChartUnderlay={setGlobalChartUnderlay}
@@ -103,6 +106,7 @@ export const AbstractChart = ({
       isRemotelyControlled={isRemotelyControlled}
       legendFormatValue={legendFormatValue}
       orderedColors={orderedColors}
+      hoveredRow={hoveredRow}
       hoveredX={hoveredX}
       onUpdateChartPanAndZoom={onUpdateChartPanAndZoom}
       setGlobalChartUnderlay={setGlobalChartUnderlay}

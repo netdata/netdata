@@ -14,6 +14,7 @@ interface Props {
   colors: {
     [key: string]: string
   }
+  hoveredRow: number
   hoveredX: number | null
   legendFormatValue: (value: number | string) => (number | string)
   selectedDimensions: string[]
@@ -105,6 +106,7 @@ export const ChartLegend = ({
   chartDetails,
   chartLibrary,
   colors,
+  hoveredRow,
   hoveredX,
   legendFormatValue,
   selectedDimensions,
@@ -120,6 +122,7 @@ export const ChartLegend = ({
   void (showUndefined)
   // todo make separate case for showUndefined
 
+  // todo support timezone
   const legendDate = new Date(hoveredX || viewBefore)
 
   // todo make a possibility to add chartLegened when there's not chartData
@@ -175,16 +178,10 @@ export const ChartLegend = ({
             || selectedDimensions.includes(dimensionName)
 
           let value
-          if (hoveredX) {
-            const hoveredValueArray = find(
-              (x: any) => x[0] === hoveredX,
-              chartData.result.data,
-            ) as number[]
-            if (!hoveredValueArray) {
-              value = ""
-            } else {
-              value = hoveredValueArray[i + 1]
-            }
+          if (hoveredRow !== -1) {
+            const hoveredValueArray = chartData.result.data[hoveredRow]
+            // [timestamp, valueDim1, valueDim2, ...]
+            value = hoveredValueArray[i + 1]
           } else {
             value = chartData.view_latest_values[i]
           }

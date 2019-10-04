@@ -279,6 +279,12 @@ export const Chart = ({
   }
   const orderedColors = chartData.dimension_names.map(prop(__, colors))
 
+  const isTimeVisible = hoveredX && hoveredX >= viewAfter && hoveredX <= viewBefore
+  const viewUpdateEvery = chartData.view_update_every * 1000
+  const hoveredRow = isTimeVisible
+    ? Math.floor(((hoveredX as number) - chartData.after * 1000) / viewUpdateEvery)
+    : -1
+
   return (
     <>
       <AbstractChart
@@ -295,6 +301,7 @@ export const Chart = ({
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
         hoveredX={hoveredX}
+        hoveredRow={hoveredRow}
         setHoveredX={handleSetHoveredX}
         setMinMax={([min, max]) => { legendFormatValueDecimalsFromMinMax(min, max) }}
         unitsCurrent={unitsCurrent}
@@ -309,6 +316,7 @@ export const Chart = ({
           chartLibrary={chartLibrary}
           colors={colors}
           hoveredX={hoveredX}
+          hoveredRow={hoveredRow}
           legendFormatValue={legendFormatValue}
           selectedDimensions={selectedDimensions}
           setSelectedDimensions={setSelectedDimensions}
