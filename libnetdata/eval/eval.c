@@ -1077,7 +1077,6 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
         // although there is an unknown variable
         // the expression was evaluated successfully
         expression->error = EVAL_ERROR_OK;
-        expression->result = NAN;
     }
 
     if(expression->error != EVAL_ERROR_OK) {
