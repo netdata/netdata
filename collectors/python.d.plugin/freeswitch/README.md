@@ -1,15 +1,15 @@
-# freeswitch
+# FreeSWITCH
 
-This module will monitor one freeswitch server. Server can be either local or remote.
+This module will monitor one FreeSWITCH server. Server can be either local or remote.
 
 **Requirements:**
 
--   freeswitch with configured 'Event Socket Library'
+-   FreeSWITCH with configured 'Event Socket Library'
 -   Python library for connecting to ESL
 
-Example freeswitch configuration can be found in 'python.d/freeswitch.conf'
+Example FreeSWITCH configuration can be found in 'python.d/freeswitch.conf'
 
-It produces following charts:
+This module produces the following charts:
 
 1.  **Active calls**
 
@@ -39,9 +39,9 @@ It produces following charts:
 
 ## configuration
 
-Needs only `url` to server's `stub_status`
+The module requires the host, port and password to the FreeSWITCH socket.
 
-Here is an example for local server:
+Here is an example for a local server:
 
 ```yaml
 update_every : 10
@@ -58,4 +58,4 @@ Without configuration, module attempts to connect to `localhost:8021` with `Clue
 
 ---
 
-[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2Ffreeswitch%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fcollectors%2Fpython.d.plugin%2FFreeSWITCH%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
