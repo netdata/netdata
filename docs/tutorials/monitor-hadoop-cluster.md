@@ -26,8 +26,9 @@ For more specifics on the collection modules used in this tutorial, read the res
 As with all data sources, Netdata can auto-detect HDFS and Zookeeper nodes if you installed them using the standard
 installation procedure.
 
-For HDFS, that means an accessible `/jmx` endpoint. You can test whether your JMX endpoint is accessible by using `curl
-HDFS-IP:PORT/jmx`. For a NameNode, you should see output similar to the following:
+For Netdata to collect HDFS metrics, it needs to be able to access the node's `/jmx` endpoint. You can test whether an
+JMX endpoint is accessible by using `curl HDFS-IP:PORT/jmx`. For a NameNode, you should see output similar to the
+following:
 
 ```json
 {
@@ -62,7 +63,7 @@ HDFS-IP:PORT/jmx`. For a NameNode, you should see output similar to the followin
 }
 ```
 
-The results on a DataNode's `/jmx` endpoint begins slightly differently:
+The JSON result for a DataNode's `/jmx` endpoint is slightly different:
 
 ```json
 {
@@ -87,7 +88,7 @@ al-9866",
 }
 ```
 
-If the `/jmx` endpoint for either a NameNode or DataNode is not accessible, Netdata will not be able to auto-detect and
+If Netdata can't access the `/jmx` endpoint for either a NameNode or DataNode, it will not be able to auto-detect and
 collect metrics from your HDFS implementation.
 
 Zookeeper auto-detection relies on an accessible client port and a whitelisted `mntr` command. For more details on
@@ -105,7 +106,7 @@ cd /etc/netdata/
 sudo ./edit-config go.d/hdfs.conf
 ```
 
-At the bottom of the file, you will see two example jobs:
+At the bottom of the file, you will see two example jobs, both of which are commented out:
 
 ```yaml
 # [ JOBS ]
@@ -118,8 +119,11 @@ At the bottom of the file, you will see two example jobs:
 ```
 
 Uncomment these lines and edit the `url` value(s) according to your setup. Now's the time to add any other configuration
-details, which you can find inside of the `hdfs.conf` file itself. The end result for a simple HDFS setup, running
-entirely on `localhost` and without certificate authentication, might look like this:
+details, which you can find inside of the `hdfs.conf` file itself. Most production implementations will require TLS
+certificates.
+
+The result for a simple HDFS setup, running entirely on `localhost` and without certificate authentication, might look
+like this:
 
 ```yaml
 # [ JOBS ]
@@ -141,7 +145,7 @@ sudo ./edit-config go.d/zookeeper.conf
 ```
 
 As with the `hdfs.conf` file, head to the bottom, uncomment the example jobs, and tweak the `address` values according
-to your setup.
+to your setup. Again, you may need to add additional configuration options, like TLS certificates.
 
 ```yaml
 jobs:
@@ -158,17 +162,18 @@ Finally, restart Netdata.
 sudo service restart netdata
 ```
 
-Upon restart, Netdata should recognize your HDFS/Zookeeper servers, enable the modules, and begin showing real-time
-metrics for both in your Netdata dashboard. 🎉
+Upon restart, Netdata should recognize your HDFS/Zookeeper servers, enable the HDFS and Zookeeper modules, and begin
+showing real-time metrics for both in your Netdata dashboard. 🎉
 
 ## What's next?
 
 If you're having issues with Netdata auto-detecting your HDFS/Zookeeper servers, or want to help improve how Netdata
-collects or presents metrics from these, feel free to [file an issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md).
+collects or presents metrics from these services, feel free to [file an
+issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md).
 
 -   Read up on the [HDFS configuration
     file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/hdfs.conf) to understand how to configure
-    global options or per-job options, such as username/password, TLS certificates, timeout, and more.
+    global options or per-job options, such as username/password, TLS certificates, timeouts, and more.
 -   Read up on the [Zookeeper configuration
     file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/zookeeper.conf) to understand how to configure
     global options or per-job options, timeouts, TLS certificates, and more.

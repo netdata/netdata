@@ -10,7 +10,7 @@ Dimension templates can condense many individual entities into one—no more cop
 `alarm`/`template` and `lookup` lines for each dimension you'd like to monitor.
 
 They are, however, an advanced health monitoring feature. For more basic instructions on creating your first alarm,
-check out our [health monitioring documentation](../../health/), which also includes
+check out our [health monitoring documentation](../../health/), which also includes
 [examples](../../health/README.md#examples).
 
 > For more information about dimension templates, including examples of before/after examples, see our [v1.18
@@ -18,7 +18,7 @@ check out our [health monitioring documentation](../../health/), which also incl
 
 ## The fundamentals of `foreach`
 
-Our dimension templates updates brings a new `foreach` parameter to the existing [`lookup`
+Our dimension templates update creates a new `foreach` parameter to the existing [`lookup`
 line](../../health/README.md#alarm-line-lookup). This is where the magic happens.
 
 You use the `foreach` parameter to specify which dimensions you want to monitor with this single alarm. You can separate
@@ -31,7 +31,7 @@ the same `lookup` line, Netdata will ignore the `of` parameter and use `foreach`
 Let's get into some examples so you can see how the new parameter works.
 
 > ⚠️ The following entities are examples to showcase the functionality and syntax of dimension templates. They are not
-> meant to be run as-is in production systems.
+> meant to be run as-is on production systems.
 
 ## Condensing entities with `foreach`
 
@@ -80,6 +80,11 @@ The `lookup` line has changed from `of` to `foreach`, and we're now passing thre
 In this example, Netdata will create three alarms with the names `cpu_template_system`, `cpu_template_user`, and
 `cpu_template_nice`. Every 10 seconds, each alarm will use the same database query to calculate the average CPU usage
 for the `system`, `user`, and `nice` dimensions over the last 3 seconds and send out alarms if necessary.
+
+You can find these three alarms active by clicking on the **Alarms** button in the top navigation, and then clicking on
+the **All** tab and scrolling to the **system - cpu** collapsible section.
+
+![Three new alarms created from the dimension template](https://user-images.githubusercontent.com/1153921/66218994-29523800-e67f-11e9-9bcb-9bca23e2c554.png)
 
 Let's look at some other examples of how `foreach` works so you can best apply it in your configurations.
 
@@ -144,6 +149,10 @@ dimensions:
     -   `cpu_template_user`
     -   `cpu_template_system`
     -   `cpu_template_nice`
+
+And how just a few of those dimension template-generated alarms look like in the Netdata dashboard.
+
+![A few of the created alarms in the Netdata dashboard](https://user-images.githubusercontent.com/1153921/66219669-708cf880-e680-11e9-8b3a-7bfe178fa28b.png)
 
 All in all, this single entity creates 36 individual alarms. Much easier than writing 36 separate entities in your
 health configuration files!
