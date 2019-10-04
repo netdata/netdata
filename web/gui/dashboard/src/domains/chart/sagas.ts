@@ -8,7 +8,7 @@ type FetchDataSaga = { payload: FetchDataPayload }
 function* fetchDataSaga({ payload }: FetchDataSaga) {
   const {
     // props for api
-    chart, format, points, group, gtime, options, after, before,
+    chart, format, points, group, gtime, options, after, before, dimensions,
     // props for the store
     fetchDataParams, id,
   } = payload
@@ -25,6 +25,7 @@ function* fetchDataSaga({ payload }: FetchDataSaga) {
         options,
         after,
         before,
+        dimensions,
       },
     })
   } catch (e) {

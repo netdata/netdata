@@ -164,6 +164,7 @@ export const ChartContainer = ({
         options: getChartURLOptions(attributes),
         after: after || null,
         before: before || null,
+        dimensions: attributes.dimensions,
 
         // properties for the reducer
         fetchDataParams: {

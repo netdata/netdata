@@ -89,6 +89,7 @@ export interface Attributes {
   colors?: string
   commonColors?: string
   decimalDigits?: number
+  dimensions?: string
 
   appendOptions?: string | undefined
   gtime?: number
@@ -191,6 +192,7 @@ const getAttributesMap = (): AttributesMap => ({
   colors: { key: "colors" },
   commonColors: { key: "common-colors" },
   decimalDigits: { key: "decimal-digits" },
+  dimensions: { key: "dimensions" },
 
   appendOptions: { key: "append-options" },
   gtime: { key: "gtime" },
