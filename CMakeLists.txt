@@ -894,5 +894,7 @@ if(BUILD_TESTING)
     add_executable(storage_number_testdriver libnetdata/storage_number/tests/test_storage_number.c)
     target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
+
+    set_target_properties(str2ld_testdriver storage_number_testdriver PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests)
 endif()
 endif()
