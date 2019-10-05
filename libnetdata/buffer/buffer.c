@@ -50,6 +50,22 @@ void buffer_reset(BUFFER *wb)
     buffer_overflow_check(wb);
 }
 
+#ifdef BUFFER_MEMPOOL_STATS
+volatile buffer_stat_cbfunc buffer_stats_callback_free_avoided = NULL;
+volatile buffer_stat_cbfunc buffer_stats_callback_reclaim = NULL;
+volatile buffer_stat_cbfunc buffer_stats_callback_alloc = NULL;
+volatile uint8_t buffer_stats_callback_init = 0;
+
+extern void buffer_mempool_stats_set_callbacks(buffer_stat_cbfunc free, buffer_stat_cbfunc reclaim, buffer_stat_cbfunc alloc)
+{
+    buffer_stats_callback_free_avoided = free;
+    buffer_stats_callback_reclaim = reclaim;
+    buffer_stats_callback_alloc = alloc;
+    buffer_stats_callback_init = 1;
+}
+
+#endif
+
 const char *buffer_tostring(BUFFER *wb)
 {
     buffer_need_bytes(wb, 1);
@@ -433,6 +449,8 @@ static inline BUFFER *buffer_mempool_reclaim(size_t size) {
             debug(D_BUFFER_MEMPOOL, "buffer_mempool: Reclaimed Buffer of size %zu for requested %zu. mempoolid=%p", b->size, size, mempool);
             #ifdef BUFFER_MEMPOOL_STATS
             mempool->reclaimed_count += 1;
+            if(buffer_stats_callback_init && buffer_stats_callback_reclaim)
+                buffer_stats_callback_reclaim();
             #endif
             return(b);
         }
@@ -440,6 +458,8 @@ static inline BUFFER *buffer_mempool_reclaim(size_t size) {
 
     #ifdef BUFFER_MEMPOOL_STATS
     mempool->allocation_count += 1;
+    if(buffer_stats_callback_init && buffer_stats_callback_alloc)
+        buffer_stats_callback_alloc();
     #endif
     debug(D_BUFFER_MEMPOOL, "buffer_mempool: Cache miss. Have to allocate new memory of %zu:/", size);
     return NULL;
@@ -489,6 +509,9 @@ static inline void buffer_mempool_free(BUFFER *b) {
                 debug(D_BUFFER_MEMPOOL, "buffer_mempool: Caching buffer of size %zu.", b->size);
                 #ifdef BUFFER_MEMPOOL_STATS
                     mempool->deletes_prevented += 1;
+                    if(buffer_stats_callback_init && buffer_stats_callback_free_avoided){
+                        buffer_stats_callback_free_avoided();
+                    }
                 #endif
                 return;
             }

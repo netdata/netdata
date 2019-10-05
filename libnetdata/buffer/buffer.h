@@ -113,6 +113,11 @@ extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 
 extern void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
 
+#ifdef BUFFER_MEMPOOL_STATS
+typedef void (*buffer_stat_cbfunc)(void);
+extern  void buffer_mempool_stats_set_callbacks(buffer_stat_cbfunc free, buffer_stat_cbfunc reclaim, buffer_stat_cbfunc alloc);
+#endif
+
 extern char *buffer_mempool_status();
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
