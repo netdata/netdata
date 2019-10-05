@@ -4,7 +4,7 @@
 /* Default global database instance */
 static struct rrdengine_instance default_global_ctx;
 
-int default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
+int default_rrdeng_page_cache_mb = 128;
 int default_rrdeng_disk_quota_mb = RRDENG_MIN_DISK_SPACE_MB;
 
 /*
