@@ -114,8 +114,15 @@ extern char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 extern void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
 
 #ifdef BUFFER_MEMPOOL_STATS
-typedef void (*buffer_stat_cbfunc)(void);
-extern  void buffer_mempool_stats_set_callbacks(buffer_stat_cbfunc free, buffer_stat_cbfunc reclaim, buffer_stat_cbfunc alloc);
+#define BUFFER_MEMPOOL_CALLBACK_EVENT_FREE_AVOID            0x00000001
+#define BUFFER_MEMPOOL_CALLBACK_EVENT_RECLAIM               0x00000002
+#define BUFFER_MEMPOOL_CALLBACK_EVENT_ALLOC_MISS            0x00000004
+#define BUFFER_MEMPOOL_CALLBACK_EVENT_SWAP                  0x00000008
+
+#define BUFFER_MEMPOOL_CALLBACK_EVENT_CANTCACHE_TOOBIG      0x00000100
+#define BUFFER_MEMPOOL_CALLBACK_EVENT_CANTCACHE_FULL        0x00000200
+
+extern void buffer_mempool_stats_set_callback(void (*callback)(uint32_t));
 #endif
 
 extern char *buffer_mempool_status();

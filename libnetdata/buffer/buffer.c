@@ -51,17 +51,11 @@ void buffer_reset(BUFFER *wb)
 }
 
 #ifdef BUFFER_MEMPOOL_STATS
-volatile buffer_stat_cbfunc buffer_stats_callback_free_avoided = NULL;
-volatile buffer_stat_cbfunc buffer_stats_callback_reclaim = NULL;
-volatile buffer_stat_cbfunc buffer_stats_callback_alloc = NULL;
-volatile uint8_t buffer_stats_callback_init = 0;
+void (*volatile buffer_stats_callback)(uint32_t events) = NULL;
 
-extern void buffer_mempool_stats_set_callbacks(buffer_stat_cbfunc free, buffer_stat_cbfunc reclaim, buffer_stat_cbfunc alloc)
+void buffer_mempool_stats_set_callback(void (*callback)(uint32_t))
 {
-    buffer_stats_callback_free_avoided = free;
-    buffer_stats_callback_reclaim = reclaim;
-    buffer_stats_callback_alloc = alloc;
-    buffer_stats_callback_init = 1;
+    buffer_stats_callback = callback;
 }
 
 #endif
@@ -449,8 +443,8 @@ static inline BUFFER *buffer_mempool_reclaim(size_t size) {
             debug(D_BUFFER_MEMPOOL, "buffer_mempool: Reclaimed Buffer of size %zu for requested %zu. mempoolid=%p", b->size, size, mempool);
             #ifdef BUFFER_MEMPOOL_STATS
             mempool->reclaimed_count += 1;
-            if(buffer_stats_callback_init && buffer_stats_callback_reclaim)
-                buffer_stats_callback_reclaim();
+            if(buffer_stats_callback)
+                buffer_stats_callback(BUFFER_MEMPOOL_CALLBACK_EVENT_RECLAIM);
             #endif
             return(b);
         }
@@ -458,8 +452,8 @@ static inline BUFFER *buffer_mempool_reclaim(size_t size) {
 
     #ifdef BUFFER_MEMPOOL_STATS
     mempool->allocation_count += 1;
-    if(buffer_stats_callback_init && buffer_stats_callback_alloc)
-        buffer_stats_callback_alloc();
+    if(buffer_stats_callback)
+        buffer_stats_callback(BUFFER_MEMPOOL_CALLBACK_EVENT_ALLOC_MISS);
     #endif
     debug(D_BUFFER_MEMPOOL, "buffer_mempool: Cache miss. Have to allocate new memory of %zu:/", size);
     return NULL;
@@ -509,9 +503,8 @@ static inline void buffer_mempool_free(BUFFER *b) {
                 debug(D_BUFFER_MEMPOOL, "buffer_mempool: Caching buffer of size %zu.", b->size);
                 #ifdef BUFFER_MEMPOOL_STATS
                     mempool->deletes_prevented += 1;
-                    if(buffer_stats_callback_init && buffer_stats_callback_free_avoided){
-                        buffer_stats_callback_free_avoided();
-                    }
+                    if(buffer_stats_callback)
+                        buffer_stats_callback(BUFFER_MEMPOOL_CALLBACK_EVENT_FREE_AVOID);
                 #endif
                 return;
             }
@@ -533,11 +526,23 @@ static inline void buffer_mempool_free(BUFFER *b) {
                 mempool->pooled_buffers[i] = b;
                 #ifdef BUFFER_MEMPOOL_STATS
                     mempool->deletes_prevented += 1;
+                    if(buffer_stats_callback)
+                            buffer_stats_callback(BUFFER_MEMPOOL_CALLBACK_EVENT_FREE_AVOID | BUFFER_MEMPOOL_CALLBACK_EVENT_SWAP);
                 #endif
                 return;
             }
         }
+        #ifdef BUFFER_MEMPOOL_STATS
+        if(buffer_stats_callback)
+            buffer_stats_callback(BUFFER_MEMPOOL_CALLBACK_EVENT_CANTCACHE_FULL);
+        #endif
     }
+#ifdef BUFFER_MEMPOOL_STATS
+    else {
+        if(buffer_stats_callback)
+            buffer_stats_callback(BUFFER_MEMPOOL_CALLBACK_EVENT_CANTCACHE_TOOBIG);
+    }
+#endif
 
     _buffer_free(b);
     debug(D_BUFFER_MEMPOOL, "buffer_mempool: Deleting buffer mempool full.");
