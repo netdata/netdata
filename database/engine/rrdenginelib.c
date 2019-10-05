@@ -8,7 +8,7 @@ void print_page_cache_descr(struct rrdeng_page_descr *descr)
 {
     struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
     char uuid_str[UUID_STR_LEN];
-    char str[BUFSIZE];
+    char str[BUFSIZE + 1];
     int pos = 0;
 
     uuid_unparse_lower(*descr->id, uuid_str);
@@ -31,7 +31,7 @@ void print_page_cache_descr(struct rrdeng_page_descr *descr)
 void print_page_descr(struct rrdeng_page_descr *descr)
 {
     char uuid_str[UUID_STR_LEN];
-    char str[BUFSIZE];
+    char str[BUFSIZE + 1];
     int pos = 0;
 
     uuid_unparse_lower(*descr->id, uuid_str);

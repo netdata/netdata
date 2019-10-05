@@ -241,12 +241,12 @@ It will produce following charts (if data is available):
     -   sql
     -   io
 
-42. **Replicated Writesets** in writesets/s
+42. **Galera Replicated Writesets** in writesets/s
 
     -   rx
     -   tx
 
-43. **Replicated Bytes** in KiB/s
+43. **Galera Replicated Bytes** in KiB/s
 
     -   rx
     -   tx
@@ -256,16 +256,48 @@ It will produce following charts (if data is available):
     -   rx
     -   tx
 
-45. **Replication Conflicts** in transactions
+45. **Galera Replication Conflicts** in transactions
 
     -   bf aborts
     -   cert fails
 
-46. **Flow Control** in ms
+46. **Galera Flow Control** in ms
 
     -   paused
 
-47. **Users CPU time** in percentage
+47. **Galera Cluster Status** in status
+
+    -   status
+
+48. **Galera Cluster State** in state
+
+    -   state
+
+49. **Galera Number of Nodes in the Cluster** in num
+
+    -   nodes
+
+50. **Galera Total Weight of the Current Members in the Cluster** in weight
+
+    -   weight
+
+51. **Galera Whether the Node is Connected to the Cluster** in boolean
+
+    -   connected
+
+52. **Galera Whether the Node is Ready to Accept Queries** in boolean
+
+    -   ready
+
+53. **Galera Open Transactions** in num
+
+    -   open transactions
+
+54. **Galera Total Number of WSRep (applier/rollbacker) Threads** in num
+
+    -   threads
+
+55. **Users CPU time** in percentage
 
     -   users
 

@@ -1,6 +1,6 @@
 # elasticsearch
 
-This module monitors Elasticsearch performance and health metrics.
+This module monitors [Elasticsearch](https://www.elastic.co/products/elasticsearch) performance and health metrics.
 
 It produces:
 
@@ -51,19 +51,28 @@ It produces:
     -   Store statistics
     -   Indices and shards statistics
 
+9.  **Indices** charts (per index statistics, disabled by default):
+
+    -   Docs count
+    -   Store size
+    -   Num of replicas
+    -   Health status
+
 ## configuration
 
 Sample:
 
 ```yaml
 local:
-  host               : 'ipaddress'    # Elasticsearch server ip address or hostname
-  port               : 'port'         # Port on which elasticsearch listens
-  cluster_health     :  True/False    # Calls to cluster health elasticsearch API. Enabled by default.
-  cluster_stats      :  True/False    # Calls to cluster stats elasticsearch API. Enabled by default.
+  host               : 'ipaddress'    # Elasticsearch server ip address or hostname.
+  port               : 'port'         # Port on which elasticsearch listens.
+  node_status        :  yes/no        # Get metrics from "/_nodes/_local/stats". Enabled by default.
+  cluster_health     :  yes/no        # Get metrics from "/_cluster/health". Enabled by default.
+  cluster_stats      :  yes/no        # Get metrics from "'/_cluster/stats". Enabled by default.
+  indices_stats      :  yes/no        # Get metrics from "/_cat/indices". Disabled by default.
 ```
 
-If no configuration is given, module will fail to run.
+If no configuration is given, module will try to connect to `http://127.0.0.1:9200`.
 
 ---
 
