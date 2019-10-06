@@ -6,8 +6,11 @@
 
 **Merged pull requests:**
 
+- Add Portuguese \(Brazil\) as a language option [\#7004](https://github.com/netdata/netdata/pull/7004) ([cakrit](https://github.com/cakrit))
+- fix issue \#7002 [\#7003](https://github.com/netdata/netdata/pull/7003) ([OneCodeMonkey](https://github.com/OneCodeMonkey))
 - Increase dbengine default cache size [\#6997](https://github.com/netdata/netdata/pull/6997) ([mfundul](https://github.com/mfundul))
 - Remove warning from Coverity [\#6992](https://github.com/netdata/netdata/pull/6992) ([thiagoftsm](https://github.com/thiagoftsm))
+- netdata/installer: allow netdata service install, when docker runs systemd [\#6987](https://github.com/netdata/netdata/pull/6987) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fixing broken links found via linkchecker [\#6983](https://github.com/netdata/netdata/pull/6983) ([joelhans](https://github.com/joelhans))
 - Fix dbengine consistency [\#6979](https://github.com/netdata/netdata/pull/6979) ([mfundul](https://github.com/mfundul))
 - Make dbengine the default memory mode [\#6977](https://github.com/netdata/netdata/pull/6977) ([mfundul](https://github.com/mfundul))
@@ -246,7 +249,6 @@
 - Change default installation to stable in documentation [\#6388](https://github.com/netdata/netdata/pull/6388) ([joelhans](https://github.com/joelhans))
 - Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
 - Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
-- Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
@@ -272,12 +274,6 @@
 - Easily disable alarms, by persisting the silencers configuration [\#6360](https://github.com/netdata/netdata/pull/6360) ([thiagoftsm](https://github.com/thiagoftsm))
 - Redirect old site to new site at www.netdata.cloud [\#6359](https://github.com/netdata/netdata/pull/6359) ([cakrit](https://github.com/cakrit))
 - Better checks for nfacct headers [\#6351](https://github.com/netdata/netdata/pull/6351) ([vlvkobal](https://github.com/vlvkobal))
-- Tomcat status invalid XML fix [\#6345](https://github.com/netdata/netdata/pull/6345) ([Danamir](https://github.com/Danamir))
-- netdata/packaging/docker: Fix docker documentation and a fix to avoid failures [\#6344](https://github.com/netdata/netdata/pull/6344) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- pihole: alarms delay fix [\#6342](https://github.com/netdata/netdata/pull/6342) ([ilyam8](https://github.com/ilyam8))
-- monit: obsolete service in runtime [\#6340](https://github.com/netdata/netdata/pull/6340) ([ilyam8](https://github.com/ilyam8))
-- adaptec\_raid: logical device regex fix [\#6338](https://github.com/netdata/netdata/pull/6338) ([ilyam8](https://github.com/ilyam8))
-- Better context name to client context [\#6336](https://github.com/netdata/netdata/pull/6336) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
