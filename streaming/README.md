@@ -518,7 +518,7 @@ describes these errors in the communication.
 
 ### Connection between slave and master is slow
 
-When we have a slow connection between master and `slave`, Netdata can raise different errors related to this problem,
+When we have a slow connection between master and slave, Netdata can raise different errors related to this problem,
 in the slave side we will have the following error message
 
 ```
@@ -528,7 +528,7 @@ Y unsent - we have sent Z bytes in total, W on this connection. Closing connecti
 
 where the value X, Y, Z and W are integer numbers.
 
-in the master side the we can have different reports when the master reads everything from the stream and it did not
+In the master side the we can have different reports when the master reads everything from the stream and it did not
 receive more data from Slave, the most common message that you can see is
 
 ```
