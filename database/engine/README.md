@@ -58,7 +58,7 @@ in **MiB**. All DB engine instances will allocate the configured resources separ
 
 The `page cache size` option determines the amount of RAM in **MiB** that is dedicated to caching Netdata metric values
 themselves as far as queries are concerned. The total page cache size will be greater since data collection itself will
-consume additional memory as is described in the [Memory requirements](#Memory requirements) section.
+consume additional memory as is described in the [Memory requirements](#memory-requirements) section.
 
 The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing Netdata
 metric values and all related metadata describing them.
