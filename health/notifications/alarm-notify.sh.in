@@ -194,7 +194,7 @@ fi
 # -----------------------------------------------------------------------------
 # parse command line parameters
 
-if [ ${1} = "unittest" ]; then
+if [[ ${1} = "unittest" ]]; then
 	unittest=1        # enable unit testing mode
 	roles="${2}"      # the role that should be used for unit testing
 	cfgfile="${3}"    # the location of the config file to use for unit testing
