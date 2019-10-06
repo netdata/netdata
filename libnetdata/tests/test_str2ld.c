@@ -7,7 +7,7 @@
 
 static void test_str2ld(void **state)
 {
-    (void) state;
+    (void)state;
     char *values[] = {
         "1.2345678",
         "-35.6",
@@ -22,24 +22,24 @@ static void test_str2ld(void **state)
         NULL
     };
 
-    for(int i = 0; values[i] ; i++) {
+    for (int i = 0; values[i]; i++) {
         char *e_mine = "hello", *e_sys = "world";
         LONG_DOUBLE mine = str2ld(values[i], &e_mine);
         LONG_DOUBLE sys = strtold(values[i], &e_sys);
 
-        if(isnan(mine))
+        if (isnan(mine))
             assert_true(isnan(sys));
-        else if(isinf(mine))
+        else if (isinf(mine))
             assert_true(isinf(sys));
-        else if(mine != sys)
-            assert_false(abs(mine-sys) > 0.000001);
+        else if (mine != sys)
+            assert_false(abs(mine - sys) > 0.000001);
 
         assert_ptr_equal(e_mine, e_sys);
     }
 }
 
-int
-main(void) {
+int main(void)
+{
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_str2ld)
     };
