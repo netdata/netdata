@@ -538,7 +538,7 @@ void global_statistics_charts(void) {
         unsigned long long stats_array[RRDENG_NR_STATS];
 
         /* get localhost's DB engine's statistics */
-        rrdeng_get_35_statistics(localhost->rrdeng_ctx, stats_array);
+        rrdeng_get_33_statistics(localhost->rrdeng_ctx, stats_array);
 
         // ----------------------------------------------------------------
 
@@ -756,8 +756,6 @@ void global_statistics_charts(void) {
             static RRDSET *st_errors = NULL;
             static RRDDIM *rd_fs_errors = NULL;
             static RRDDIM *rd_io_errors = NULL;
-            static RRDDIM *rd_pg_cache_warnings = NULL;
-            static RRDDIM *rd_pg_cache_errors = NULL;
 
             if (unlikely(!st_errors)) {
                 st_errors = rrdset_create_localhost(
@@ -777,17 +775,12 @@ void global_statistics_charts(void) {
 
                 rd_io_errors = rrddim_add(st_errors, "I/O errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rd_fs_errors = rrddim_add(st_errors, "FS errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_pg_cache_warnings = rrddim_add(st_errors, "Page-Cache warnings", NULL, 1, 1,
-                                                  RRD_ALGORITHM_INCREMENTAL);
-                rd_pg_cache_errors = rrddim_add(st_errors, "Page-Cache errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
             else
                 rrdset_next(st_errors);
 
             rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
             rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
-            rrddim_set_by_pointer(st_errors, rd_pg_cache_warnings, (collected_number)stats_array[33]);
-            rrddim_set_by_pointer(st_errors, rd_pg_cache_errors, (collected_number)stats_array[34]);
             rrdset_done(st_errors);
         }
 
