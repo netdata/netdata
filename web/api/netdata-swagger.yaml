@@ -189,7 +189,7 @@ paths:
         '200':
           description: 'The call was successful. The response should include the data.'
           schema:
-            $ref: '#/definitions/chart'
+            $ref: '#/definitions/json_wrap'
         '400':
           description: 'Bad request - the body will include a message stating what is wrong.'
         '404':
@@ -824,6 +824,18 @@ definitions:
           key:
             $ref: '#/definitions/chart_variables'
       result:
+        type: object
+        properties:
+          labels:
+            description: 'The dimensions retrieved from the chart.'
+            type: array
+            items: 
+              type: string
+          data:
+            description: 'The data requested, one element per sample with each element containing the values of the dimensions described in the labels value. '
+            type: array
+            items:
+              type: number
         description: 'The result requested, in the format requested.'
   alarms:
     type: object
