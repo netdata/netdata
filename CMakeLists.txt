@@ -897,6 +897,17 @@ if(BUILD_TESTING)
     target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
 
-    set_target_properties(str2ld_testdriver storage_number_testdriver PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests)
+    set(TEST_NAME exporting_engine)
+    add_executable(${TEST_NAME}_testdriver exporting/tests/test_${TEST_NAME}.c)
+    target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)
+
+    set_target_properties(
+        str2ld_testdriver
+        storage_number_testdriver
+        exporting_engine_testdriver
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests
+    )
+
 endif()
 endif()

@@ -644,6 +644,7 @@ if ENABLE_UNITTESTS
     check_PROGRAMS = \
         libnetdata/tests/str2ld_testdriver \
         libnetdata/storage_number/tests/storage_number_testdriver \
+        exporting/tests/exporting_engine_testdriver \
         $(NULL)
 
     TESTS = $(check_PROGRAMS)
@@ -659,4 +660,10 @@ if ENABLE_UNITTESTS
         $(LIBNETDATA_FILES) \
         $(NULL)
     libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+
+    exporting_tests_exporting_engine_testdriver_SOURCES = \
+        exporting/tests/test_exporting_engine.c \
+        $(LIBNETDATA_FILES) \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 endif
