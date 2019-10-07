@@ -13,17 +13,14 @@ They are, however, an advanced health monitoring feature. For more basic instruc
 check out our [health monitoring documentation](../../health/), which also includes
 [examples](../../health/README.md#examples).
 
-> For more information about dimension templates, including examples of before/after examples, see our [v1.18
-> announcement post](https://blog.netdata.cloud/posts/release-1.18/).
-
 ## The fundamentals of `foreach`
 
 Our dimension templates update creates a new `foreach` parameter to the existing [`lookup`
 line](../../health/README.md#alarm-line-lookup). This is where the magic happens.
 
 You use the `foreach` parameter to specify which dimensions you want to monitor with this single alarm. You can separate
-them with a comma (`,`) or a pipe (`|`), or you can use a wildcard (`*`) to say that you want an alarm for every
-dimension the chart has to offer.
+them with a comma (`,`) or a pipe (`|`). You can also use a [Netdata simple pattern](../../libnetdata/simple_pattern/README.md)
+to create many alarms with a regex-like syntax.
 
 The `foreach` parameter _has_ to be the last parameter in your `lookup` line, and if you have both `of` and `foreach` in
 the same `lookup` line, Netdata will ignore the `of` parameter and use `foreach` instead.
@@ -88,15 +85,16 @@ the **All** tab and scrolling to the **system - cpu** collapsible section.
 
 Let's look at some other examples of how `foreach` works so you can best apply it in your configurations.
 
-### Using the wildcard in `foreach`
+### Using a Netdata simple pattern in `foreach`
 
 In the last example, we used `foreach system,user,nice` to create three distinct alarms using dimension templates. But
 what if you want to quickly create alarms for _all_ the dimensions of a given chart? 
 
-Use a wildcard `*`!
+Use a [simple pattern](../../libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
+(`*`).
 
-Instead of monitoring system CPU usage, let's monitor per-application CPU usage using the `apps.cpu` chart. The wildcard
-tells Netdata to create a separate alarm for _every_ process on your system:
+Instead of monitoring system CPU usage, let's monitor per-application CPU usage using the `apps.cpu` chart. Passing a
+wildcard as the simple pattern tells Netdata to create a separate alarm for _every_ process on your system:
 
 ```yaml
  alarm: app_cpu
@@ -109,6 +107,9 @@ lookup: average -3s percentage foreach *
 
 This entity will now create alarms for every dimension in the `apps.cpu` chart. Given that most `apps.cpu` charts have
 10 or more dimensions, using the wildcard ensures you catch every CPU-hogging process.
+
+To learn more about how to use simple patterns with dimension templates, see our [simple patterns
+documentation](../../libnetdata/simple_pattern/README.md).
 
 ## Using `foreach` with alarm templates
 

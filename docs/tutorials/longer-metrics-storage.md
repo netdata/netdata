@@ -26,8 +26,8 @@ using, check out your `netdata.conf` file and look for the `memory mode` setting
     memory mode = dbengine
 ```
 
-If `memory mode` is set to anything but `dbengine`, change it and restart Netdata. On Linux systems, we recommend
-running `sudo service netdata restart`. You're now using the database engine!
+If `memory mode` is set to anything but `dbengine`, change it and restart Netdata using the standard command for
+restarting services on your system. You're now using the database engine!
 
 > Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
 > we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
@@ -67,8 +67,10 @@ aren't ready to make the move.
 
 ## Using the round-robin database
 
-In previous versions, Netdata used a round-robin database to store 1 hour of per-second metrics. To see if you're still
-using this database, or if you would like to switch to it, see if your `memory mode` option is set to `save`.
+In previous versions, Netdata used a round-robin database to store 1 hour of per-second metrics. 
+
+To see if you're still using this database, or if you would like to switch to it, open your `netdata.conf` file and see
+if `memory mode` option is set to `save`.
 
 ```conf
 [global]

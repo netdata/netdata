@@ -111,10 +111,10 @@ At the bottom of the file, you will see two example jobs, both of which are comm
 ```yaml
 # [ JOBS ]
 #jobs:
-#  - name: master
+#  - name: namenode
 #    url: http://127.0.0.1:9870/jmx
 #
-#  - name: slave
+#  - name: datanode
 #    url: http://127.0.0.1:9864/jmx
 ```
 
@@ -128,10 +128,10 @@ like this:
 ```yaml
 # [ JOBS ]
 jobs:
-  - name: master
+  - name: namenode
     url: http://127.0.0.1:9870/jmx
 
-  - name: slave
+  - name: datanode
     url: http://127.0.0.1:9864/jmx
 ```
 
@@ -164,6 +164,24 @@ sudo service restart netdata
 
 Upon restart, Netdata should recognize your HDFS/Zookeeper servers, enable the HDFS and Zookeeper modules, and begin
 showing real-time metrics for both in your Netdata dashboard. 🎉
+
+## Configuring HDFS and Zookeeper alarms
+
+The Netdata community helped us create sane defaults for alarms related to both HDFS and Zookeeper. You may want to
+investigate these to ensure they work well with your Hadoop implementation.
+
+-   [HDFS alarms](https://github.com/netdata/netdata/blob/master/health/health.d/hdfs.conf)
+-   [Zookeeper alarms](https://github.com/netdata/netdata/blob/master/health/health.d/zookeeper.conf)
+
+You can also access/edit these files directly with `edit-config`:
+
+```bash
+sudo /etc/netdata/edit-config health.d/hdfs.conf
+sudo /etc/netdata/edit-config health.d/zookeeper.conf
+```
+
+For more information about editing the defaults or writing new alarm entities, see our [health monitoring
+documentation](../../health/README.md).
 
 ## What's next?
 
