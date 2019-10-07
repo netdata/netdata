@@ -1260,6 +1260,39 @@ netdataDashboard.context = {
         info: 'A deadlock happens when two or more transactions mutually hold and request for locks, creating a cycle of dependencies. For more information about <a href="https://dev.mysql.com/doc/refman/5.7/en/innodb-deadlocks-handling.html" target="_blank">how to minimize and handle deadlocks</a>.'
     },
 
+    'mysql.galera_cluster_status': {
+        info:
+            '<code>-1</code>: unknown, ' +
+            '<code>0</code>: primary (primary group configuration, quorum present), ' +
+            '<code>1</code>: non-primary (non-primary group configuration, quorum lost), ' +
+            '<code>2</code>: disconnected(not connected to group, retrying).'
+    },
+
+    'mysql.galera_cluster_state': {
+        info:
+            '<code>0</code>: undefined, ' +
+            '<code>1</code>: joining, ' +
+            '<code>2</code>: donor/desynced, ' +
+            '<code>3</code>: joined, ' +
+            '<code>4</code>: synced.'
+    },
+
+    'mysql.galera_cluster_weight': {
+        info: 'The value is counted as a sum of <code>pc.weight</code> of the nodes in the current Primary Component.'
+    },
+
+    'mysql.galera_connected': {
+        info: '<code>0</code> means that the node has not yet connected to any of the cluster components. ' +
+            'This may be due to misconfiguration.'
+    },
+
+    'mysql.open_transactions': {
+        info: 'The number of locally running transactions which have been registered inside the wsrep provider. ' +
+            'This means transactions which have made operations which have caused write set population to happen. ' +
+            'Transactions which are read only are not counted.'
+    },
+
+
     // ------------------------------------------------------------------------
     // POSTGRESQL
 

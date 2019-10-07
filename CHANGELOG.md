@@ -6,10 +6,22 @@
 
 **Merged pull requests:**
 
+- Remove hard cap from page cache size to eliminate deadlocks. [\#7006](https://github.com/netdata/netdata/pull/7006) ([mfundul](https://github.com/mfundul))
+- Add Portuguese \(Brazil\) as a language option [\#7004](https://github.com/netdata/netdata/pull/7004) ([cakrit](https://github.com/cakrit))
+- fix issue \#7002 [\#7003](https://github.com/netdata/netdata/pull/7003) ([OneCodeMonkey](https://github.com/OneCodeMonkey))
+- Increase dbengine default cache size [\#6997](https://github.com/netdata/netdata/pull/6997) ([mfundul](https://github.com/mfundul))
+- Remove warning from Coverity [\#6992](https://github.com/netdata/netdata/pull/6992) ([thiagoftsm](https://github.com/thiagoftsm))
+- netdata/installer: allow netdata service install, when docker runs systemd [\#6987](https://github.com/netdata/netdata/pull/6987) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Fixing broken links found via linkchecker [\#6983](https://github.com/netdata/netdata/pull/6983) ([joelhans](https://github.com/joelhans))
 - Fix dbengine consistency [\#6979](https://github.com/netdata/netdata/pull/6979) ([mfundul](https://github.com/mfundul))
+- Make dbengine the default memory mode [\#6977](https://github.com/netdata/netdata/pull/6977) ([mfundul](https://github.com/mfundul))
+- rabbitmq: collect vhosts msg metrics from `/api/vhosts` [\#6976](https://github.com/netdata/netdata/pull/6976) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity erro \(CID 349552\) double lock [\#6970](https://github.com/netdata/netdata/pull/6970) ([thiagoftsm](https://github.com/thiagoftsm))
 - web api: include family into allmetrics json response [\#6966](https://github.com/netdata/netdata/pull/6966) ([ilyam8](https://github.com/ilyam8))
+- elasticsearch: collect metrics from \_cat/indices [\#6965](https://github.com/netdata/netdata/pull/6965) ([ilyam8](https://github.com/ilyam8))
 - Reduce overhead during write io [\#6964](https://github.com/netdata/netdata/pull/6964) ([mfundul](https://github.com/mfundul))
+- mysql: collect galera cluster metrics [\#6962](https://github.com/netdata/netdata/pull/6962) ([ilyam8](https://github.com/ilyam8))
+- Clarification on configuring notification recipients [\#6961](https://github.com/netdata/netdata/pull/6961) ([cakrit](https://github.com/cakrit))
 - netdata/packaging: Make spec file more consistent with version dependencies, plus some documentation nits [\#6948](https://github.com/netdata/netdata/pull/6948) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix a memory leak [\#6945](https://github.com/netdata/netdata/pull/6945) ([vlvkobal](https://github.com/vlvkobal))
 - Fix Remark Lint for READMEs in Database [\#6942](https://github.com/netdata/netdata/pull/6942) ([prhomhyse](https://github.com/prhomhyse))
@@ -22,6 +34,8 @@
 - zookeeper and hdfs: alarms and dashboard\_info [\#6927](https://github.com/netdata/netdata/pull/6927) ([ilyam8](https://github.com/ilyam8))
 - netdata.spec.in: Do not build CUPS plugin subpackage on CentOS 6 and CentOS 7 [\#6926](https://github.com/netdata/netdata/pull/6926) ([knatsakis](https://github.com/knatsakis))
 - Fix remark lint for Contrib  [\#6921](https://github.com/netdata/netdata/pull/6921) ([prhomhyse](https://github.com/prhomhyse))
+- Fix remark warnings for Daemon README [\#6920](https://github.com/netdata/netdata/pull/6920) ([prhomhyse](https://github.com/prhomhyse))
+- Fix Remark Lint Warnings for Backends [\#6917](https://github.com/netdata/netdata/pull/6917) ([prhomhyse](https://github.com/prhomhyse))
 - Suggest using /run or /var/run for the unix socket [\#6916](https://github.com/netdata/netdata/pull/6916) ([cakrit](https://github.com/cakrit))
 - Improve documentation for the SNMP collector [\#6915](https://github.com/netdata/netdata/pull/6915) ([cakrit](https://github.com/cakrit))
 - netdata/ci: nits and fixes around package release workflow [\#6914](https://github.com/netdata/netdata/pull/6914) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -236,7 +250,6 @@
 - Change default installation to stable in documentation [\#6388](https://github.com/netdata/netdata/pull/6388) ([joelhans](https://github.com/joelhans))
 - Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
 - Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
-- Reimplemented mypopen\(\) function family [\#6339](https://github.com/netdata/netdata/pull/6339) ([mfundul](https://github.com/mfundul))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
@@ -262,17 +275,6 @@
 - Easily disable alarms, by persisting the silencers configuration [\#6360](https://github.com/netdata/netdata/pull/6360) ([thiagoftsm](https://github.com/thiagoftsm))
 - Redirect old site to new site at www.netdata.cloud [\#6359](https://github.com/netdata/netdata/pull/6359) ([cakrit](https://github.com/cakrit))
 - Better checks for nfacct headers [\#6351](https://github.com/netdata/netdata/pull/6351) ([vlvkobal](https://github.com/vlvkobal))
-- Tomcat status invalid XML fix [\#6345](https://github.com/netdata/netdata/pull/6345) ([Danamir](https://github.com/Danamir))
-- netdata/packaging/docker: Fix docker documentation and a fix to avoid failures [\#6344](https://github.com/netdata/netdata/pull/6344) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- pihole: alarms delay fix [\#6342](https://github.com/netdata/netdata/pull/6342) ([ilyam8](https://github.com/ilyam8))
-- monit: obsolete service in runtime [\#6340](https://github.com/netdata/netdata/pull/6340) ([ilyam8](https://github.com/ilyam8))
-- adaptec\_raid: logical device regex fix [\#6338](https://github.com/netdata/netdata/pull/6338) ([ilyam8](https://github.com/ilyam8))
-- Better context name to client context [\#6336](https://github.com/netdata/netdata/pull/6336) ([thiagoftsm](https://github.com/thiagoftsm))
-- installer: include go.d.plugin version v0.7.0 [\#6328](https://github.com/netdata/netdata/pull/6328) ([ilyam8](https://github.com/ilyam8))
-- pihole: add to the dashboard\_info [\#6325](https://github.com/netdata/netdata/pull/6325) ([ilyam8](https://github.com/ilyam8))
-- pihole collector: add alarms [\#6320](https://github.com/netdata/netdata/pull/6320) ([ilyam8](https://github.com/ilyam8))
-- dnsmasq\_dhcp: dhcp-range utilization alarm [\#6319](https://github.com/netdata/netdata/pull/6319) ([ilyam8](https://github.com/ilyam8))
-- Update the documentation on charts with zero metrics [\#6314](https://github.com/netdata/netdata/pull/6314) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 

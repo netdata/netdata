@@ -25,7 +25,7 @@ Currently Netdata supports 6 memory modes:
 
 1.  `ram`, data are purely in memory. Data are never saved on disk. This mode uses `mmap()` and supports [KSM](#ksm).
 
-2.  `save`, (the default) data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata
+2.  `save`, data are only in RAM while Netdata runs and are saved to / loaded from disk on Netdata
     restart. It also uses `mmap()` and supports [KSM](#ksm).
 
 3.  `map`, data are in memory mapped files. This works like the swap. Keep in mind though, this will have a constant
@@ -39,11 +39,12 @@ Currently Netdata supports 6 memory modes:
 5.  `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all
     others except `none`.
 
-6.  `dbengine`, data are in database files. The [Database Engine](engine/) works like a traditional database. There is
-    some amount of RAM dedicated to data caching and indexing and the rest of the data reside compressed on disk. The
-    number of history entries is not fixed in this case, but depends on the configured disk space and the effective
-    compression ratio of the data stored. This is the **only mode** that supports changing the data collection update
-    frequency (`update_every`) **without losing** the previously stored metrics. For more details see [here](engine/).
+6.  `dbengine`, (the default) data are in database files. The [Database Engine](engine/) works like a traditional
+    database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data reside
+    compressed on disk. The number of history entries is not fixed in this case, but depends on the configured disk
+    space and the effective compression ratio of the data stored. This is the **only mode** that supports changing the
+    data collection update frequency (`update_every`) **without losing** the previously stored metrics. For more details
+    see [here](engine/).
 
 You can select the memory mode by editing `netdata.conf` and setting:
 
@@ -63,7 +64,7 @@ Embedded devices usually have very limited RAM resources available.
 There are 2 settings for you to tweak:
 
 1.  `update every`, which controls the data collection frequency
-2.  `history`, which controls the size of the database in RAM
+2.  `history`, which controls the size of the database in RAM (except for `memory mode = dbengine`)
 
 By default `update every = 1` and `history = 3600`. This gives you an hour of data with per second updates.
 

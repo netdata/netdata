@@ -151,5 +151,5 @@ probably want to see it in action!
 For more information about how to pan charts to view historical metrics, see our documentation on [using
 charts](../../web/README.md#using-charts).
 
-And if you'd now like to reduce Netdata's resource usage, view our [performance guide](../Performance.md) for our best
-practices on optimization.
+And if you'd now like to reduce Netdata's resource usage, view our [performance guide](../../docs/Performance.md) for
+our best practices on optimization.

@@ -9,6 +9,7 @@ from bases.FrameworkServices.UrlService import UrlService
 
 API_NODE = 'api/nodes'
 API_OVERVIEW = 'api/overview'
+API_VHOSTS = 'api/vhosts'
 
 NODE_STATS = [
     'fd_used',
@@ -31,6 +32,17 @@ OVERVIEW_STATS = [
     'message_stats.redeliver',
     'message_stats.deliver',
     'message_stats.publish'
+]
+
+VHOST_MESSAGE_STATS = [
+    'message_stats.ack',
+    'message_stats.confirm',
+    'message_stats.deliver',
+    'message_stats.get',
+    'message_stats.get_no_ack',
+    'message_stats.publish',
+    'message_stats.redeliver',
+    'message_stats.return_unroutable',
 ]
 
 ORDER = [
@@ -111,6 +123,51 @@ CHARTS = {
 }
 
 
+def vhost_chart_template(name):
+    order = [
+        'vhost_{0}_message_stats'.format(name),
+    ]
+    family = 'vhost {0}'.format(name)
+
+    charts = {
+        order[0]: {
+            'options': [
+                None, 'Vhost "{0}" Messages'.format(name), 'messages/s', family, 'rabbitmq.vhost_messages', 'stacked'],
+            'lines': [
+                ['vhost_{0}_message_stats_ack'.format(name), 'ack', 'incremental'],
+                ['vhost_{0}_message_stats_confirm'.format(name), 'confirm', 'incremental'],
+                ['vhost_{0}_message_stats_deliver'.format(name), 'deliver', 'incremental'],
+                ['vhost_{0}_message_stats_get'.format(name), 'get', 'incremental'],
+                ['vhost_{0}_message_stats_get_no_ack'.format(name), 'get_no_ack', 'incremental'],
+                ['vhost_{0}_message_stats_publish'.format(name), 'publish', 'incremental'],
+                ['vhost_{0}_message_stats_redeliver'.format(name), 'redeliver', 'incremental'],
+                ['vhost_{0}_message_stats_return_unroutable'.format(name), 'return_unroutable', 'incremental'],
+            ]
+        },
+    }
+
+    return order, charts
+
+
+class VhostStatsBuilder:
+    def __init__(self):
+        self.stats = None
+
+    def set(self, raw_stats):
+        self.stats = raw_stats
+
+    def name(self):
+        return self.stats['name']
+
+    def has_msg_stats(self):
+        return bool(self.stats.get('message_stats'))
+
+    def msg_stats(self):
+        name = self.name()
+        stats = fetch_data(raw_data=self.stats, metrics=VHOST_MESSAGE_STATS)
+        return dict(('vhost_{0}_{1}'.format(name, k), v) for k, v in stats.items())
+
+
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
@@ -122,19 +179,25 @@ class Service(UrlService):
             configuration.get('port', 15672),
         )
         self.node_name = str()
+        self.vhost = VhostStatsBuilder()
+        self.collected_vhosts = set()
 
     def _get_data(self):
         data = dict()
 
         stats = self.get_overview_stats()
-
         if not stats:
             return None
 
         data.update(stats)
 
         stats = self.get_nodes_stats()
+        if not stats:
+            return None
 
+        data.update(stats)
+
+        stats = self.get_vhosts_stats()
         if not stats:
             return None
 
@@ -144,41 +207,67 @@ class Service(UrlService):
 
     def get_overview_stats(self):
         url = '{0}/{1}'.format(self.url, API_OVERVIEW)
-
         raw = self._get_raw_data(url)
-
         if not raw:
             return None
 
         data = loads(raw)
-
         self.node_name = data['node']
-
         return fetch_data(raw_data=data, metrics=OVERVIEW_STATS)
 
     def get_nodes_stats(self):
         url = '{0}/{1}/{2}'.format(self.url, API_NODE, self.node_name)
-
         raw = self._get_raw_data(url)
-
         if not raw:
             return None
 
         data = loads(raw)
-
         return fetch_data(raw_data=data, metrics=NODE_STATS)
+
+    def get_vhosts_stats(self):
+        url = '{0}/{1}'.format(self.url, API_VHOSTS)
+        raw = self._get_raw_data(url)
+        if not raw:
+            return None
+
+        data = dict()
+        vhosts = loads(raw)
+        charts_initialized = len(self.charts) > 0
+
+        for vhost in vhosts:
+            self.vhost.set(vhost)
+            if not self.vhost.has_msg_stats():
+                continue
+
+            if charts_initialized and self.vhost.name() not in self.collected_vhosts:
+                self.collected_vhosts.add(self.vhost.name())
+                self.add_vhost_charts(self.vhost.name())
+
+            data.update(self.vhost.msg_stats())
+
+        return data
+
+    def add_vhost_charts(self, vhost_name):
+        order, charts = vhost_chart_template(vhost_name)
+
+        for chart_name in order:
+            params = [chart_name] + charts[chart_name]['options']
+            dimensions = charts[chart_name]['lines']
+
+            new_chart = self.charts.add_chart(params)
+            for dimension in dimensions:
+                new_chart.add_dimension(dimension)
 
 
 def fetch_data(raw_data, metrics):
     data = dict()
-
     for metric in metrics:
         value = raw_data
         metrics_list = metric.split('.')
         try:
             for m in metrics_list:
                 value = value[m]
-        except KeyError:
+        except (KeyError, TypeError):
             continue
         data['_'.join(metrics_list)] = value
 

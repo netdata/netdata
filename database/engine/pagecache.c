@@ -209,9 +209,31 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
     pg_cache_release_pages_unsafe(ctx, number);
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 }
+
+/*
+ * This function returns the maximum number of pages allowed in the page cache.
+ * The caller must hold the page cache lock.
+ */
+static inline unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
+{
+    /* it's twice the number of producers since we pin 2 pages per producer */
+    return ctx->max_cache_pages + 2 * (unsigned long)ctx->stats.metric_API_producers;
+}
+
+/*
+ * This function returns the low watermark number of pages in the page cache. The page cache should strive to keep the
+ * number of pages below that number.
+ * The caller must hold the page cache lock.
+ */
+static inline unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
+{
+    /* it's twice the number of producers since we pin 2 pages per producer */
+    return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->stats.metric_API_producers;
+}
+
 /*
  * This function will block until it reserves #number populated pages.
- * It will trigger evictions or dirty page flushing if the ctx->max_cache_pages limit is hit.
+ * It will trigger evictions or dirty page flushing if the pg_cache_hard_limit() limit is hit.
  */
 static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
 {
@@ -223,10 +245,10 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
     assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1)
+    if (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1)
         debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
                 number);
-    while (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1) {
+    while (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1) {
 
         if (!pg_cache_try_evict_one_page_unsafe(ctx)) {
             /* failed to evict */
@@ -260,7 +282,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 
 /*
  * This function will attempt to reserve #number populated pages.
- * It may trigger evictions if the ctx->cache_pages_low_watermark limit is hit.
+ * It may trigger evictions if the pg_cache_soft_limit() limit is hit.
  * Returns 0 on failure and 1 on success.
  */
 static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
@@ -272,7 +294,7 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
     assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= ctx->cache_pages_low_watermark + 1) {
+    if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
         debug(D_RRDENGINE,
               "==Page cache full. Trying to reserve %u pages.==",
               number);
@@ -280,11 +302,11 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
             if (!pg_cache_try_evict_one_page_unsafe(ctx))
                 break;
             ++count;
-        } while (pg_cache->populated_pages + number >= ctx->cache_pages_low_watermark + 1);
+        } while (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1);
         debug(D_RRDENGINE, "Evicted %u pages.", count);
     }
 
-    if (pg_cache->populated_pages + number < ctx->max_cache_pages + 1) {
+    if (pg_cache->populated_pages + number < pg_cache_hard_limit(ctx) + 1) {
         pg_cache->populated_pages += number;
         ret = 1; /* success */
     }
