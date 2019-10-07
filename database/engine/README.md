@@ -57,7 +57,8 @@ The above values are the default and minimum values for Page Cache size and DB e
 in **MiB**. All DB engine instances will allocate the configured resources separately.
 
 The `page cache size` option determines the amount of RAM in **MiB** that is dedicated to caching Netdata metric values
-themselves.
+themselves as far as queries are concerned. The total page cache size will be greater since data collection itself will
+consume additional memory as is described in the [Memory requirements](#memory-requirements) section.
 
 The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing Netdata
 metric values and all related metadata describing them.
@@ -88,7 +89,8 @@ available memory.
 There are explicit memory requirements **per** DB engine **instance**, meaning **per** Netdata **node** (e.g. localhost
 and streaming recipient nodes):
 
--   `page cache size` must be at least `#dimensions-being-collected x 4096 x 2` bytes.
+-   The total page cache memory footprint will be an additional `#dimensions-being-collected x 4096 x 2` bytes over what
+    the user configured with `page cache size`.
 
 -   an additional `#pages-on-disk x 4096 x 0.03` bytes of RAM are allocated for metadata.
 
