@@ -170,8 +170,8 @@ showing real-time metrics for both in your Netdata dashboard. 🎉
 The Netdata community helped us create sane defaults for alarms related to both HDFS and Zookeeper. You may want to
 investigate these to ensure they work well with your Hadoop implementation.
 
--   [HDFS alarms](https://github.com/netdata/netdata/blob/master/health/health.d/hdfs.conf)
--   [Zookeeper alarms](https://github.com/netdata/netdata/blob/master/health/health.d/zookeeper.conf)
+-   [HDFS alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/hdfs.conf)
+-   [Zookeeper alarms](https://raw.githubusercontent.com/netdata/netdata/master/health/health.d/zookeeper.conf)
 
 You can also access/edit these files directly with `edit-config`:
 
