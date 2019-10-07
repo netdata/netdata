@@ -309,8 +309,9 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
         curr = &page_info_array[i];
         *pginfo_to_points(curr) = 0; /* initialize to invalid page */
         *pginfo_to_dt(curr) = 0; /* no known data collection interval yet */
-        if (unlikely(INVALID_TIME == curr->start_time || INVALID_TIME == curr->end_time)) {
-            info("Ignoring page with invalid timestamp.");
+        if (unlikely(INVALID_TIME == curr->start_time || INVALID_TIME == curr->end_time ||
+                     curr->end_time < curr->start_time)) {
+            info("Ignoring page with invalid timestamps.");
             prev = old_prev;
             continue;
         }
@@ -363,7 +364,7 @@ unsigned rrdeng_variable_step_boundaries(RRDSET *st, time_t start_time, time_t e
             continue;
         }
 
-        if (unlikely(0 == dt)) { /* unknown data collection interval */
+        if (unlikely(0 == *pginfo_to_dt(curr))) { /* unknown data collection interval */
             assert(1 == page_points);
 
             if (likely(NULL != prev)) { /* get interval from previous page */
