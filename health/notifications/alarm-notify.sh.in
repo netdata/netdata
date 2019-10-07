@@ -1797,7 +1797,7 @@ send_hangouts() {
 	esac
 
 	for room in ${rooms}; do
-		if [ ! -n "${HANGOUTS_WEBHOOK_URI[$room]}" ] ; then
+		if [ -z "${HANGOUTS_WEBHOOK_URI[$room]}" ] ; then
 			info "Can't send Hangouts notification for: ${host} ${chart}.${name} to room ${room}. HANGOUTS_WEBHOOK_URI[$room] not defined"
 		else
 			webhook="${HANGOUTS_WEBHOOK_URI[$room]}"
