@@ -181,10 +181,14 @@ static inline int read_mm_stat(procfile *ff, MM_STAT *stats) {
     ff = procfile_readall(ff);
     if (!ff)
         return -1;
-    if (procfile_lines(ff) < 1)
+    if (procfile_lines(ff) < 1) {
+        procfile_close(ff);
         return -1;
-    if (procfile_linewords(ff, 0) < 7)
+    }
+    if (procfile_linewords(ff, 0) < 7) {
+        procfile_close(ff);
         return -1;
+    }
 
     stats->orig_data_size = str2ull(procfile_word(ff, 0));
     stats->compr_data_size = str2ull(procfile_word(ff, 1));
