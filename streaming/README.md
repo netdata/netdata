@@ -574,8 +574,8 @@ ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER HO
 
 ### Stream charts wrong
 
-When the slave is sending data to master it cannot have a different chart that it has locally, case there are differences between the charts, this can mean that your master
-memory mode is not configured correctly.
+When the slave sends data to master, the charts need to be aligned during the same interval of time. If there are gaps in metrics collection,
+these gaps need to be consistent between slave and master nodes. If there are differences between charts, it often means that your master's memory mode is not configured correctly.
 
 ### Forbidding access
 
