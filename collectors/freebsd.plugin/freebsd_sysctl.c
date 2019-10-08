@@ -470,7 +470,7 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
         pcpu_temperature = reallocz(pcpu_temperature, sizeof(int) * number_of_cpus);
         mib = reallocz(mib, sizeof(int) * number_of_cpus * 4);
         if (unlikely(number_of_cpus > old_number_of_cpus))
-            memset(&mib[old_number_of_cpus * 4], 0, sizeof(RRDDIM) * (number_of_cpus - old_number_of_cpus));
+            memset(&mib[old_number_of_cpus * 4], 0, 4 * (number_of_cpus - old_number_of_cpus));
     }
     for (i = 0; i < number_of_cpus; i++) {
         if (unlikely(!(mib[i * 4])))
