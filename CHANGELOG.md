@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix crash on FreeBSD due to do\_dev\_cpu\_temperature stack corruption [\#7014](https://github.com/netdata/netdata/pull/7014) ([samm-git](https://github.com/samm-git))
+- Fix handling of illegal metric timestamps in database engine [\#7008](https://github.com/netdata/netdata/pull/7008) ([mfundul](https://github.com/mfundul))
+- Fix a resource leak [\#7007](https://github.com/netdata/netdata/pull/7007) ([vlvkobal](https://github.com/vlvkobal))
 - Remove hard cap from page cache size to eliminate deadlocks. [\#7006](https://github.com/netdata/netdata/pull/7006) ([mfundul](https://github.com/mfundul))
 - Add Portuguese \(Brazil\) as a language option [\#7004](https://github.com/netdata/netdata/pull/7004) ([cakrit](https://github.com/cakrit))
 - fix issue \#7002 [\#7003](https://github.com/netdata/netdata/pull/7003) ([OneCodeMonkey](https://github.com/OneCodeMonkey))
@@ -274,7 +277,6 @@
 - apps.plugin: detect openldap server processes by default on Debian [\#6364](https://github.com/netdata/netdata/pull/6364) ([nodiscc](https://github.com/nodiscc))
 - Easily disable alarms, by persisting the silencers configuration [\#6360](https://github.com/netdata/netdata/pull/6360) ([thiagoftsm](https://github.com/thiagoftsm))
 - Redirect old site to new site at www.netdata.cloud [\#6359](https://github.com/netdata/netdata/pull/6359) ([cakrit](https://github.com/cakrit))
-- Better checks for nfacct headers [\#6351](https://github.com/netdata/netdata/pull/6351) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
