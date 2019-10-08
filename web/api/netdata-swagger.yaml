@@ -62,6 +62,8 @@ paths:
           description: A javascript object with detailed information about the chart.
           schema:
             $ref: '#/definitions/chart'
+        '400':
+          description: No chart id was supplied in the request
         '404':
           description: No chart with the given id is found.
   /alarm_variables:
@@ -830,6 +832,13 @@ definitions:
       version:
         type: string
         description: netdata version of the server.
+      release_channel:
+        type: string
+        description: The release channel of the build on the server
+        example: nightly
+      timezone:
+        type: string
+        description: The current timezone on the server
       os:
         type: string
         description: The netdata server host operating system.
@@ -842,6 +851,9 @@ definitions:
         description: >-
           The duration, in seconds, of the round robin database maintained by
           netdata.
+      memory_mode:
+        type: string
+        description: The name of the database memory mode on the server
       update_every:
         type: number
         description: >-
