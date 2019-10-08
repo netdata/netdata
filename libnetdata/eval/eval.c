@@ -176,7 +176,8 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
 
     *error = EVAL_ERROR_UNKNOWN_VARIABLE;
     buffer_sprintf(exp->error_msg, "[ undefined variable '%s' ] ", v->name);
-    return 0;
+    //return 0; KILLME
+    return -1;
 }
 
 static inline calculated_number eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, int *error) {
@@ -1077,7 +1078,8 @@ int expression_evaluate(EVAL_EXPRESSION *expression) {
         // although there is an unknown variable
         // the expression was evaluated successfully
         expression->error = EVAL_ERROR_OK;
-        expression->result = NAN;
+        fprintf(stderr, "KILLME UNKOWN VARIABLE SET "CALCULATED_NUMBER_FORMAT" \n",expression->result );
+    //    expression->result = NAN;
     }
 
     if(expression->error != EVAL_ERROR_OK) {
