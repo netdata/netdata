@@ -513,29 +513,29 @@ For a practical example see [Monitoring ephemeral nodes](#monitoring-ephemeral-n
 
 ## Troubleshooting streaming connections
 
-Sometimes when we are configuring master and slave nodes we can have some errors in our log files, in this section we are
-describing the most common errors that you can see.
+Sometimes when you are configuring master and slave nodes you can have some errors in your log files, in this section it
+is described the most common errors.
 
 ### Connection between slave and master is slow
 
-When we have a slow connection between master and slave, Netdata can raise different errors related to this problem,
-in the slave side we will have for the majority of the cases the error message
+When you have a slow connection between master and slave, Netdata can raise different errors related to this problem.
+The slave Netdata will log a majority of error messages.
 
 ```
 netdata ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER IP:MASTER PORT]: too many data pending - buffer is X bytes long,
 Y unsent - we have sent Z bytes in total, W on this connection. Closing connection to flush the data.
 ```
 
-where the value X, Y, Z and W are integer numbers.
+The the value X, Y, Z and W are integer numbers.
 
-On the other hand, in the master side we can have different reports where the most common message that you can see is
+On the other hand, in the master side you can have different reports where the most common message that you can see is
 
 ```
 netdata ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : read failed: end of file
 ```
 
-Another common problem that can happen is the slave sends only part of the message for the master, in this case the master
-will not have condition to understand the message received and it will write inside error.log
+Another common problem is the slave sends only part of the message for the master. In this case, the master
+will not have condition to understand the message received and it will write the following inside `error.log`:
 
 ```
 ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
@@ -553,7 +553,8 @@ ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : requested a SET 
 
 ### Slave cannot connect to master
 
-Sometimes we are type writing the address and port of the master inside stream.conf and we write a wrong information, Netdata will write a message like this in the slave log
+Sometimes you are type writing the address and port of the master inside stream.conf and you write a wrong information,
+Netdata will write a message like this in the slave log
 
 ```
 ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'MASTER IP', port 'MASTER PORT' (errno 113, No route to host)
@@ -578,8 +579,8 @@ memory mode is not configured correctly.
 
 ### Forbidding access
 
-These are error reported in the master side, they can also happen because there is a slow connection between master and slave, but this
-is not the unique motive, so we decided to write a specific topic for them. The complete message that you will see in your log file will be like this
+If the master reports errors about forbidding access, it could be because of a slow connection between the master and slave nodes.
+But, there are other reasons for this error. The complete message you would see in your log file would look something like this:
 
 ```
 STREAM [receive from [SLAVE HOSTNAME]:SLAVE IP]: `MESSAGE`. Forbidding access."
@@ -597,13 +598,13 @@ where `MESSAGE` will have one of the following patterns:
 
 ### Netdata could not create a stream
 
-The connection between master and slave is a stream by definition, when the master has problems to convert the initial connection
-to a stream, it will write the following messages inside error.log:
+The connection between master and slave is a stream. When the master has problems to convert the initial connection
+to a stream, it will write the following messages inside `error.log`:
 
 ```
 file descriptor given is not a valid stream
 ```
 
-and after this it will close the stream.
+After logging this error, Netdata will close the stream.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fstreaming%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
