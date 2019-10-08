@@ -198,10 +198,8 @@ class Service(UrlService):
         data.update(stats)
 
         stats = self.get_vhosts_stats()
-        if stats is None:
-            return None
-
-        data.update(stats)
+        if stats:
+            data.update(stats)
 
         return data or None
 
