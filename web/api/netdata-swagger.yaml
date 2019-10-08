@@ -464,7 +464,7 @@ paths:
     get:
       summary: Get a value of all the metrics maintained by netdata
       description: >-
-        The charts endpoint returns the latest value of all charts and
+        The allmetrics endpoint returns the latest value of all charts and
         dimensions stored in the netdata server.
       parameters:
         - name: format
