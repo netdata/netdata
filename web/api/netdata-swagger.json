@@ -1262,7 +1262,7 @@
       ]
     },
     "data_flat": {
-      "description": "Data response in csv / tsv / tsv-excel / ssv / ssv-comma formats",
+      "description": "Data response in csv / tsv / tsv-excel / ssv / ssv-comma / markdown / html formats",
       "allOf": [
         {
           "$ref": "#/definitions/data"
@@ -1276,8 +1276,46 @@
         }
       ]
     },
+    "data_array": {
+      "description": "Data response in array format",
+      "allOf": [
+        {
+          "$ref": "#/definitions/data"
+        },
+        {
+          "properties": {
+            "result": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "data_csvjsonarray": {
+      "description": "Data response in csvjsonarray format",
+      "allOf": [
+        {
+          "$ref": "#/definitions/data"
+        },
+        {
+          "properties": {
+            "result": {
+              "description": "The first inner array contains strings showing the labels of each column, each subsequent array contains the values for each point in time",
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {}
+              }
+            }
+          }
+        }
+      ]
+    },
     "data_datatable": {
-      "description": "Data response in datatable format",
+      "description": "Data response in datatable / datasource formats (suitable for Google Charts)",
       "allOf": [
         {
           "$ref": "#/definitions/data"
@@ -1292,11 +1330,21 @@
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": {},
-                      "label": {},
-                      "pattern": {},
-                      "type": {},
-                      "p": {}
+                      "id": {
+                        "description": "Always empty - for future use"
+                      },
+                      "label": {
+                        "description": "The dimension returned from the chart"
+                      },
+                      "pattern": {
+                        "description": "Always empty - for future use"
+                      },
+                      "type": {
+                        "description": "The type of data in the column / chart-dimension"
+                      },
+                      "p": {
+                        "description": "Contains any annotations for the column"
+                      }
                     },
                     "required": [
                       "id",
@@ -1308,7 +1356,21 @@
                 },
                 "rows": {
                   "type": "array",
-                  "items": {}
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "c": {
+                        "type": "array",
+                        "items": {
+                          "properties": {
+                            "v": {
+                              "description": "Each value in the row is represented by a c value with five v fields: data, null, null, 0, the value. This format is fixed by the Google Charts API."
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
