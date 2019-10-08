@@ -281,9 +281,9 @@
         ],
         "responses": {
           "200": {
-            "description": "The call was successful. The response should include the data.",
+            "description": "The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of  the data-schema according to the chosen format, e.g. json -> data_json",
             "schema": {
-              "$ref": "#/definitions/json_wrap"
+              "$ref": "#/definitions/data"
             }
           },
           "400": {
@@ -1130,8 +1130,10 @@
         }
       }
     },
-    "json_wrap": {
+    "data": {
       "type": "object",
+      "discriminator": "format",
+      "description": "Response will contain the appropriate subtype, e.g. data_json depending on the requested format.",
       "properties": {
         "api": {
           "type": "number",
@@ -1224,28 +1226,71 @@
               "$ref": "#/definitions/chart_variables"
             }
           }
-        },
-        "result": {
-          "type": "object",
-          "properties": {
-            "labels": {
-              "description": "The dimensions retrieved from the chart.",
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "data": {
-              "description": "The data requested, one element per sample with each element containing the values of the dimensions described in the labels value. ",
-              "type": "array",
-              "items": {
-                "type": "number"
-              }
-            }
-          },
-          "description": "The result requested, in the format requested."
         }
       }
+    },
+    "data_json": {
+      "description": "Data response in json format",
+      "allOf": [
+        {
+          "$ref": "#/definitions/data"
+        },
+        {
+          "properties": {
+            "result": {
+              "type": "object",
+              "properties": {
+                "labels": {
+                  "description": "The dimensions retrieved from the chart.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "data": {
+                  "description": "The data requested, one element per sample with each element containing the values of the dimensions described in the labels value. ",
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              },
+              "description": "The result requested, in the format requested."
+            }
+          }
+        }
+      ]
+    },
+    "data_flat": {
+      "description": "Data response in csv / tsv / tsv-excel / ssv / ssv-comma formats",
+      "allOf": [
+        {
+          "$ref": "#/definitions/data"
+        },
+        {
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "data_datatable": {
+      "description": "Data response in datatable format",
+      "allOf": [
+        {
+          "$ref": "#/definitions/data"
+        },
+        {
+          "properties": {
+            "result": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      ]
     },
     "alarms": {
       "type": "object",
