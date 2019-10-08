@@ -38,22 +38,22 @@ Before dimension templates, you would need the following three entities:
 ```yaml
  alarm: cpu_system
     on: system.cpu
-lookup: average -3s percentage of system
- every: 10s
+lookup: average -10m percentage of system
+ every: 1m
   warn: $this > 50
   crit: $this > 80
 
  alarm: cpu_user
     on: system.cpu
-lookup: average -3s percentage of user
- every: 10s
+lookup: average -10m percentage of user
+ every: 1m
   warn: $this > 50
   crit: $this > 80
 
  alarm: cpu_nice
     on: system.cpu
-lookup: average -3s percentage of nice
- every: 10s
+lookup: average -10m percentage of nice
+ every: 1m
   warn: $this > 50
   crit: $this > 80
 ```
@@ -63,8 +63,8 @@ With dimension templates, you can condense these into a single alarm. Take note 
 ```yaml
  alarm: cpu_template
     on: system.cpu
-lookup: average -3s percentage foreach system,user,nice
- every: 10s
+lookup: average -10m percentage foreach system,user,nice
+ every: 1m
   warn: $this > 50
   crit: $this > 80
 ```
@@ -75,8 +75,8 @@ and `_` being the only allowed symbols.
 The `lookup` line has changed from `of` to `foreach`, and we're now passing three dimensions.
 
 In this example, Netdata will create three alarms with the names `cpu_template_system`, `cpu_template_user`, and
-`cpu_template_nice`. Every 10 seconds, each alarm will use the same database query to calculate the average CPU usage
-for the `system`, `user`, and `nice` dimensions over the last 3 seconds and send out alarms if necessary.
+`cpu_template_nice`. Every minute, each alarm will use the same database query to calculate the average CPU usage for
+the `system`, `user`, and `nice` dimensions over the last 10 minutes and send out alarms if necessary.
 
 You can find these three alarms active by clicking on the **Alarms** button in the top navigation, and then clicking on
 the **All** tab and scrolling to the **system - cpu** collapsible section.
@@ -99,8 +99,8 @@ wildcard as the simple pattern tells Netdata to create a separate alarm for _eve
 ```yaml
  alarm: app_cpu
     on: apps.cpu
-lookup: average -3s percentage foreach *
- every: 10s
+lookup: average -10m percentage foreach *
+ every: 1m
   warn: $this > 50
   crit: $this > 80
 ```
@@ -124,8 +124,8 @@ words, every CPU core.
 ```yaml
 template: cpu_template
       on: cpu.cpu
-  lookup: average -3s percentage foreach system,user,nice
-   every: 10s
+  lookup: average -10m percentage foreach system,user,nice
+   every: 1m
     warn: $this > 50
     crit: $this > 80
 ```

@@ -52,9 +52,9 @@ size` and `dbengine disk space`.
 `dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
 metrics.
 
-Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000
-metrics every second. If you increase either `page cache size` or `dbengine disk space`, Netdata will retain even more
-historical metrics.
+Based on our testing, these default settings will retain about a day's worth of metrics when Netdata collects roughly
+4,000 metrics every second. If you increase either `page cache size` or `dbengine disk space`, Netdata will retain even
+more historical metrics.
 
 But before you change these options too dramatically, read up on the [database engine's memory
 footprint](../../database/engine/README.md#memory-requirements).
