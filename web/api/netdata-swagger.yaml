@@ -1143,7 +1143,25 @@ definitions:
       - properties:
           result:
             type: object
-            properties: {}
+            properties:
+              cols:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: {}
+                    label: {}
+                    pattern: {}
+                    type: {}
+                    p: {}
+                  required:
+                    - id
+                    - label
+                    - pattern
+                    - type
+              rows:
+                type: array
+                items: {}
   alarms:
     type: object
     properties:
