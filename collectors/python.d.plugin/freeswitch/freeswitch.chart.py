@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Description: nginx netdata python.d module
-# Author: Koldo Aingeru Marcos (paulfantom)
+# Description: FreeSWITCH netdata python.d module
+# Author: Koldo Aingeru Marcos (badcrc)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 
@@ -79,21 +79,24 @@ class Service(SimpleService):
 
     def check(self):
         if not HAS_ESL:
-            self.error("'ESL' package is needed to use freeswitch module, you can install with with pip install python-ESL")
+            self.error("'ESL' package is needed to use FreeSWITCH module, you can install with with pip install python-ESL")
             return False
 
-        try:
-            self.fs = ESL.ESLconnection(self.host, self.port, self.password)
-            if not self.fs.connected():
-                raise ValueError('Not connected')
-        except ValueError:
-            self.error("Cannot connect to FreeSwitch with provided data, check that the service is running")
+        self.fs = ESL.ESLconnection(self.host, self.port, self.password)
+
+        if not self.fs.connected():
+            self.error("Cannot connect to FreeSWITCH with provided data, check that the service is running")
             return False
+
         return True
 
     def _get_data(self):
         if not self.fs.connected():
             self.fs = ESL.ESLconnection(self.host, self.port, self.password)
+
+            if not self.fs.connected():
+                self.error("Cannot connect to FreeSWITCH with provided data, check that the service is running")
+                return False
 
         try:
             data = dict()
@@ -111,7 +114,8 @@ class Service(SimpleService):
                 data[prof_state]=int(profiles[prof_state])
 
             return data or None
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as error:
+            self.error("Error getting data from FreeSWITCH: %s" % error)
             return None
 
     def get_calls(self):
@@ -126,15 +130,15 @@ class Service(SimpleService):
         gateways_fs = self.fs.api('sofia status gateway').getBody().splitlines()
 
         gateways = {'UNREGED':0,
-                    'TRYING':0,
-                    'REGISTER':0,
-                    'REGED':0,
-                    'UNREGISTER':0,
-                    'FAILED':0,
-                    'FAIL_WAIT':0,
-                    'EXPIRED':0,
-                    'NOREG':0,
-                    'TIMEOUT':0}
+                        'TRYING':0,
+                        'REGISTER':0,
+                        'REGED':0,
+                        'UNREGISTER':0,
+                        'FAILED':0,
+                        'FAIL_WAIT':0,
+                        'EXPIRED':0,
+                        'NOREG':0,
+                        'TIMEOUT':0}
 
         for gateway in gateways_fs:
             for gw_data in gateway.split():
@@ -142,7 +146,7 @@ class Service(SimpleService):
                     gateways[gw_data]+=1;
                 except KeyError:
                     continue
-
+        
         return gateways
 
     def get_profiles(self):
@@ -157,5 +161,5 @@ class Service(SimpleService):
                     profiles[prof_data]+=1;
                 except KeyError:
                     continue
-
+        
         return profiles
