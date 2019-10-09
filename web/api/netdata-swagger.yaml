@@ -27,11 +27,11 @@ paths:
           * number of alarms in critical state
       responses:
         '200':
-          description: netdata basic information
+          description: netdata basic information.
           schema:
             $ref: '#/definitions/info'
         '503':
-          description: netdata daemon not ready (used for health checks)
+          description: netdata daemon not ready (used for health checks).
   /charts:
     get:
       summary: Get a list of all charts available at the server
@@ -40,7 +40,7 @@ paths:
         netdata server.
       responses:
         '200':
-          description: An array of charts
+          description: An array of charts.
           schema:
             type: array
             items:
@@ -63,7 +63,7 @@ paths:
           schema:
             $ref: '#/definitions/chart'
         '400':
-          description: No chart id was supplied in the request
+          description: No chart id was supplied in the request.
         '404':
           description: No chart with the given id is found.
   /alarm_variables:
@@ -72,7 +72,7 @@ paths:
       description: >-
         Returns the basic information of a chart and all the variables that can
         be used in alarm and template health configurations for the particular
-        chart or family
+        chart or family.
       parameters:
         - name: chart
           in: query
@@ -84,7 +84,7 @@ paths:
         '200':
           description: >-
             A javascript object with information about the chart and the
-            available variables
+            available variables.
           schema:
             $ref: '#/definitions/alarm_variables'
         '400':
@@ -98,7 +98,7 @@ paths:
   /data:
     get:
       summary: Get collected data for a specific chart
-      description: >
+      description: >-
         The Data endpoint returns data stored in the round robin database of a
         chart.
       parameters:
@@ -113,7 +113,7 @@ paths:
         - name: dimension
           in: query
           description: >-
-            zero, one or more dimension ids or names, as returned by the /chart
+            Zero, one or more dimension ids or names, as returned by the /chart
             call, separated with comma or pipe. Netdata simple patterns are
             supported.
           required: false
@@ -279,7 +279,7 @@ paths:
             format requested. Swagger2.0 does not process the discriminator
             field to show polymorphism. The response will be one of the
             sub-types of  the data-schema according to the chosen format, e.g.
-            json -> data_json
+            json -> data_json.
           schema:
             $ref: '#/definitions/data'
         '400':
@@ -293,8 +293,7 @@ paths:
   /badge.svg:
     get:
       summary: Generate a SVG image for a chart (or dimension)
-      description: |
-        Successful responses are SVG images
+      description: Successful responses are SVG images.
       parameters:
         - name: chart
           in: query
@@ -306,7 +305,7 @@ paths:
           default: system.cpu
         - name: alarm
           in: query
-          description: the name of an alarm linked to the chart
+          description: the name of an alarm linked to the chart.
           required: false
           type: string
           format: any text
@@ -394,21 +393,21 @@ paths:
           allowEmptyValue: true
         - name: label
           in: query
-          description: a text to be used as the label
+          description: A text to be used as the label.
           required: false
           type: string
           format: any text
           allowEmptyValue: true
         - name: units
           in: query
-          description: a text to be used as the units
+          description: A text to be used as the units.
           required: false
           type: string
           format: any text
           allowEmptyValue: true
         - name: label_color
           in: query
-          description: a color to be used for the background of the label
+          description: A color to be used for the background of the label.
           required: false
           type: string
           format: any text
@@ -416,7 +415,7 @@ paths:
         - name: value_color
           in: query
           description: >-
-            a color to be used for the background of the label. You can set
+            A color to be used for the background of the label. You can set
             multiple using a pipe with a condition each, like this:
             color<value|color>value|color:null The following operators are
             supported: >, <, >=, <=, =, :null (to check if no value exists).
@@ -427,8 +426,8 @@ paths:
         - name: multiply
           in: query
           description: >-
-            multiply the value with this number for rendering it at the image
-            (integer value required)
+            Multiply the value with this number for rendering it at the image
+            (integer value required).
           required: false
           type: number
           format: integer
@@ -436,15 +435,15 @@ paths:
         - name: divide
           in: query
           description: >-
-            divide the value with this number for rendering it at the image
-            (integer value required)
+            Divide the value with this number for rendering it at the image
+            (integer value required).
           required: false
           type: number
           format: integer
           allowEmptyValue: true
         - name: scale
           in: query
-          description: set the scale of the badge (greater or equal to 100)
+          description: Set the scale of the badge (greater or equal to 100).
           required: false
           type: number
           format: integer
@@ -469,7 +468,7 @@ paths:
       parameters:
         - name: format
           in: query
-          description: The format of the response to be returned
+          description: The format of the response to be returned.
           required: true
           type: string
           enum:
@@ -480,7 +479,7 @@ paths:
           default: shell
         - name: help
           in: query
-          description: enable or disable HELP lines in prometheus output
+          description: Enable or disable HELP lines in prometheus output.
           required: false
           type: string
           enum:
@@ -489,7 +488,7 @@ paths:
           default: 'no'
         - name: types
           in: query
-          description: enable or disable TYPE lines in prometheus output
+          description: Enable or disable TYPE lines in prometheus output.
           required: false
           type: string
           enum:
@@ -498,7 +497,7 @@ paths:
           default: 'no'
         - name: timestamps
           in: query
-          description: enable or disable timestamps in prometheus output
+          description: Enable or disable timestamps in prometheus output.
           required: false
           type: string
           enum:
@@ -522,7 +521,7 @@ paths:
           description: >-
             When enabled, netdata will show metric names for the default
             source=average as they appeared before 1.12, by using the legacy
-            unit naming conventions
+            unit naming conventions.
           required: false
           type: string
           enum:
@@ -557,8 +556,8 @@ paths:
         - name: data
           in: query
           description: >-
-            Select the prometheus response data source. The default is
-            controlled in netdata.conf
+            Select the prometheus response data source. There is a setting in
+            netdata.conf for the default.
           required: false
           type: string
           enum:
@@ -568,9 +567,9 @@ paths:
           default: average
       responses:
         '200':
-          description: All the metrics returned in the format requested
+          description: All the metrics returned in the format requested.
         '400':
-          description: The format requested is not supported
+          description: The format requested is not supported.
   /alarms:
     get:
       summary: Get a list of active or raised alarms on the server
@@ -582,13 +581,13 @@ paths:
       parameters:
         - name: all
           in: query
-          description: 'If passed, all enabled alarms are returned'
+          description: 'If passed, all enabled alarms are returned.'
           required: false
           type: boolean
           allowEmptyValue: true
       responses:
         '200':
-          description: An object containing general info and a linked list of alarms
+          description: An object containing general info and a linked list of alarms.
           schema:
             $ref: '#/definitions/alarms'
   /alarm_log:
@@ -605,12 +604,12 @@ paths:
             alarm log that occurred after UNIQUEID. An automated series of calls
             would call the interface once without after=, store the last
             UNIQUEID of the returned set, and give it back to get incrementally
-            the next events
+            the next events.
           required: false
           type: integer
       responses:
         '200':
-          description: An array of alarm log entries
+          description: An array of alarm log entries.
           schema:
             type: array
             items:
@@ -624,7 +623,7 @@ paths:
       parameters:
         - in: query
           name: context
-          description: Specify context which should be checked
+          description: Specify context which should be checked.
           required: false
           allowEmptyValue: true
           type: array
@@ -635,7 +634,7 @@ paths:
             - system.cpu
         - in: query
           name: status
-          description: Specify alarm status to count
+          description: Specify alarm status to count.
           required: false
           allowEmptyValue: true
           type: string
@@ -652,7 +651,7 @@ paths:
         '200':
           description: >-
             An object containing a count of alarms with given status for given
-            contexts
+            contexts.
           schema:
             type: array
             items:
@@ -703,7 +702,7 @@ paths:
           in: query
           description: >-
             Chart ids/names, as shown on the dashboard. These will match the
-            `on` entry of a configured `alarm`
+            `on` entry of a configured `alarm`.
           type: string
         - name: context
           in: query
@@ -721,7 +720,7 @@ paths:
           type: string
       responses:
         '200':
-          description: A plain text response based on the result of the command
+          description: A plain text response based on the result of the command.
         '403':
           description: Bearer authentication error.
 definitions:
@@ -746,69 +745,69 @@ definitions:
           - host2.example.com
       os_name:
         type: string
-        description: Operating System Name
+        description: Operating System Name.
         example: Manjaro Linux
       os_id:
         type: string
-        description: Operating System ID
+        description: Operating System ID.
         example: manjaro
       os_id_like:
         type: string
-        description: Known OS similar to this OS
+        description: Known OS similar to this OS.
         example: arch
       os_version:
         type: string
-        description: Operating System Version
+        description: Operating System Version.
         example: 18.0.4
       os_version_id:
         type: string
-        description: Operating System Version ID
+        description: Operating System Version ID.
         example: unknown
       os_detection:
         type: string
-        description: OS parameters detection method
+        description: OS parameters detection method.
         example: Mixed
       kernel_name:
         type: string
-        description: Kernel Name
+        description: Kernel Name.
         example: Linux
       kernel_version:
         type: string
-        description: Kernel Version
+        description: Kernel Version.
         example: 4.19.32-1-MANJARO
       architecture:
         type: string
-        description: Kernel architecture
+        description: Kernel architecture.
         example: x86_64
       virtualization:
         type: string
-        description: Virtualization Type
+        description: Virtualization Type.
         example: kvm
       virt_detection:
         type: string
-        description: Virtualization detection method
+        description: Virtualization detection method.
         example: systemd-detect-virt
       container:
         type: string
-        description: Container technology
+        description: Container technology.
         example: docker
       container_detection:
         type: string
-        description: Container technology detection method
+        description: Container technology detection method.
         example: dockerenv
       collectors:
         type: array
         items:
           type: object
-          description: Array of collector plugins and modules
+          description: Array of collector plugins and modules.
           properties:
             plugin:
               type: string
-              description: Collector plugin
+              description: Collector plugin.
               example: python.d.plugin
             module:
               type: string
-              description: Module of the collector plugin
+              description: Module of the collector plugin.
               example: dockerd
       alarms:
         type: object
@@ -834,11 +833,11 @@ definitions:
         description: netdata version of the server.
       release_channel:
         type: string
-        description: The release channel of the build on the server
+        description: The release channel of the build on the server.
         example: nightly
       timezone:
         type: string
-        description: The current timezone on the server
+        description: The current timezone on the server.
       os:
         type: string
         description: The netdata server host operating system.
@@ -853,7 +852,7 @@ definitions:
           netdata.
       memory_mode:
         type: string
-        description: The name of the database memory mode on the server
+        description: The name of the database memory mode on the server.
       update_every:
         type: number
         description: >-
@@ -885,10 +884,10 @@ definitions:
     properties:
       id:
         type: string
-        description: The unique id of the chart
+        description: The unique id of the chart.
       name:
         type: string
-        description: The name of the chart
+        description: The name of the chart.
       type:
         type: string
         description: >-
@@ -965,24 +964,24 @@ definitions:
             $ref: '#/definitions/chart_variables'
       green:
         type: number
-        description: Chart health green threshold
+        description: Chart health green threshold.
       red:
         type: number
-        description: Chart health red trheshold
+        description: Chart health red trheshold.
   alarm_variables:
     type: object
     properties:
       chart:
         type: string
-        description: The unique id of the chart
+        description: The unique id of the chart.
       chart_name:
         type: string
-        description: The name of the chart
+        description: The name of the chart.
       cnart_context:
         type: string
         description: >-
           The context of the chart. It is shared across multiple monitored
-          software or hardware instances and used in alarm templates
+          software or hardware instances and used in alarm templates.
       family:
         type: string
         description: The family of the chart.
@@ -1026,7 +1025,7 @@ definitions:
     properties:
       name:
         type: string
-        description: The name of the dimension
+        description: The name of the dimension.
   data:
     type: object
     discriminator: format
@@ -1036,13 +1035,13 @@ definitions:
     properties:
       api:
         type: number
-        description: 'The API version this conforms to, currently 1'
+        description: 'The API version this conforms to, currently 1.'
       id:
         type: string
-        description: The unique id of the chart
+        description: The unique id of the chart.
       name:
         type: string
-        description: The name of the chart
+        description: The name of the chart.
       update_every:
         type: number
         description: >-
@@ -1120,7 +1119,7 @@ definitions:
           key:
             $ref: '#/definitions/chart_variables'
   data_json:
-    description: Data response in json format
+    description: Data response in json format.
     allOf:
       - $ref: '#/definitions/data'
       - properties:
@@ -1144,14 +1143,14 @@ definitions:
   data_flat:
     description: >-
       Data response in csv / tsv / tsv-excel / ssv / ssv-comma / markdown / html
-      formats
+      formats.
     allOf:
       - $ref: '#/definitions/data'
       - properties:
           result:
             type: string
   data_array:
-    description: Data response in array format
+    description: Data response in array format.
     allOf:
       - $ref: '#/definitions/data'
       - properties:
@@ -1160,7 +1159,7 @@ definitions:
             items:
               type: number
   data_csvjsonarray:
-    description: Data response in csvjsonarray format
+    description: Data response in csvjsonarray format.
     allOf:
       - $ref: '#/definitions/data'
       - properties:
@@ -1168,7 +1167,7 @@ definitions:
             description: >-
               The first inner array contains strings showing the labels of each
               column, each subsequent array contains the values for each point
-              in time
+              in time.
             type: array
             items:
               type: array
@@ -1176,7 +1175,7 @@ definitions:
   data_datatable:
     description: >-
       Data response in datatable / datasource formats (suitable for Google
-      Charts)
+      Charts).
     allOf:
       - $ref: '#/definitions/data'
       - properties:
@@ -1189,15 +1188,15 @@ definitions:
                   type: object
                   properties:
                     id:
-                      description: Always empty - for future use
+                      description: Always empty - for future use.
                     label:
-                      description: The dimension returned from the chart
+                      description: The dimension returned from the chart.
                     pattern:
-                      description: Always empty - for future use
+                      description: Always empty - for future use.
                     type:
-                      description: The type of data in the column / chart-dimension
+                      description: The type of data in the column / chart-dimension.
                     p:
-                      description: Contains any annotations for the column
+                      description: Contains any annotations for the column.
                   required:
                     - id
                     - label
@@ -1214,10 +1213,10 @@ definitions:
                         properties:
                           v:
                             description: >-
-                              Each value in the row is represented by a c value
-                              with five v fields: data, null, null, 0, the
-                              value. This format is fixed by the Google Charts
-                              API.
+                              Each value in the row is represented by an object
+                              named `c` with five v fields: data, null, null, 0,
+                              the value. This format is fixed by the Google
+                              Charts API.
   alarms:
     type: object
     properties:
@@ -1242,7 +1241,7 @@ definitions:
                 format: int32
               name:
                 type: string
-                description: Full alarm name
+                description: Full alarm name.
               chart:
                 type: string
               family:
@@ -1251,7 +1250,7 @@ definitions:
                 type: boolean
                 description: >-
                   Will be false only if the alarm is disabled in the
-                  configuration
+                  configuration.
               disabled:
                 type: boolean
                 description: >-
