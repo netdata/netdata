@@ -31,6 +31,7 @@ interface Props {
   hoveredRow: number
   setHoveredX: (hoveredX: number | null, noMaster?: boolean) => void
   setMinMax: (minMax: [number, number]) => void
+  showLatestOnBlur: boolean
   unitsCurrent: string
   viewAfter: number,
   viewBefore: number,

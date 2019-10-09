@@ -1,7 +1,6 @@
 import React, { Fragment } from "react"
 import classNames from "classnames"
 
-import { find } from "ramda"
 import { seconds4human } from "../utils/seconds4human"
 import { Attributes } from "../utils/transformDataAttributes"
 import { ChartData, ChartDetails, DygraphData } from "../chart-types"
@@ -19,6 +18,7 @@ interface Props {
   legendFormatValue: (value: number | string) => (number | string)
   selectedDimensions: string[]
   setSelectedDimensions: (selectedDimensions: string[]) => void
+  showLatestOnBlur: boolean
   unitsCurrent: string
   viewBefore: number
 }
@@ -111,16 +111,15 @@ export const ChartLegend = ({
   legendFormatValue,
   selectedDimensions,
   setSelectedDimensions,
+  showLatestOnBlur,
   unitsCurrent,
   viewBefore,
 }: Props) => {
-  const netdataLast = chartData.last_entry * 1000
-  const dataUpdateEvery = chartData.view_update_every * 1000
-
-  const showUndefined = Math.abs(netdataLast - viewBefore) > dataUpdateEvery
-  // eslint-disable-next-line no-void
-  void (showUndefined)
-  // todo make separate case for showUndefined
+  // todo handle also this case:
+  // const netdataLast = chartData.last_entry * 1000
+  // const dataUpdateEvery = chartData.view_update_every * 1000
+  // showUndefined = Math.abs(netdataLast - viewBefore) > dataUpdateEvery
+  const showUndefined = hoveredRow === -1 && !showLatestOnBlur
 
   // todo support timezone
   const legendDate = new Date(hoveredX || viewBefore)
@@ -155,14 +154,18 @@ export const ChartLegend = ({
         className="netdata-legend-title-date"
         title={legendPluginModuleString(true, chartDetails)}
       >
-        {window.NETDATA.dateTime.localeDateString(legendDate)}
+        {showUndefined
+          ? legendPluginModuleString(false, chartDetails)
+          : window.NETDATA.dateTime.localeDateString(legendDate)}
       </span>
       <br />
       <span
         className="netdata-legend-title-time"
         title={legendResolutionTooltip(chartData, chartDetails)}
       >
-        {window.NETDATA.dateTime.localeTimeString(legendDate)}
+        {showUndefined
+          ? chartDetails.context.toString()
+          : window.NETDATA.dateTime.localeTimeString(legendDate)}
       </span>
       <br />
       <span className="netdata-legend-title-units">{unitsCurrent}</span>

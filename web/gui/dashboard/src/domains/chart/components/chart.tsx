@@ -32,6 +32,7 @@ interface Props {
   chartWidth: number
   attributes: Attributes
   isRemotelyControlled: boolean
+  showLatestOnBlur: boolean
 }
 
 export const Chart = ({
@@ -44,6 +45,7 @@ export const Chart = ({
   chartUuid,
   chartWidth,
   isRemotelyControlled,
+  showLatestOnBlur,
 }: Props) => {
   const chartSettings = chartLibrariesSettings[chartLibrary]
   const { hasLegend } = chartSettings
@@ -304,6 +306,7 @@ export const Chart = ({
         hoveredRow={hoveredRow}
         setHoveredX={handleSetHoveredX}
         setMinMax={([min, max]) => { legendFormatValueDecimalsFromMinMax(min, max) }}
+        showLatestOnBlur={showLatestOnBlur}
         unitsCurrent={unitsCurrent}
         viewAfter={viewAfter}
         viewBefore={viewBefore}
@@ -320,6 +323,7 @@ export const Chart = ({
           legendFormatValue={legendFormatValue}
           selectedDimensions={selectedDimensions}
           setSelectedDimensions={setSelectedDimensions}
+          showLatestOnBlur={showLatestOnBlur}
           unitsCurrent={unitsCurrent}
           viewBefore={viewBefore}
         />

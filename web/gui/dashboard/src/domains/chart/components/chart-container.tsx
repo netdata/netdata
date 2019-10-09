@@ -205,6 +205,7 @@ export const ChartContainer = ({
       chartUuid={chartUuid}
       chartWidth={chartWidth}
       isRemotelyControlled={fetchDataParams.isRemotelyControlled}
+      showLatestOnBlur={!globalPanAndZoom}
     />
   )
 }
