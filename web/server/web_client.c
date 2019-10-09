@@ -1064,7 +1064,14 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
-                strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+                if(strchr(w->decoded_url,"/workspaces/")) {
+                    strncpyz(w->last_url,"/console.html",13);
+                    w->last_url[13] = 0x00;
+                    strncpyz(w->decoded_url,"/console.html",13);
+                    w->decoded_url[13] = 0x00;
+                } else {
+                    strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+                }
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
