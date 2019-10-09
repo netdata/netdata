@@ -832,7 +832,7 @@ void global_statistics_charts(void) {
 
             if (unlikely(!st_ram_usage)) {
                 st_ram_usage = rrdset_create_localhost(
-                        "netdata"
+                "netdata"
                 , "dbengine_ram"
                 , NULL
                 , "dbengine"
