@@ -319,7 +319,7 @@
           {
             "name": "alarm",
             "in": "query",
-            "description": "the name of an alarm linked to the chart.",
+            "description": "The name of an alarm linked to the chart.",
             "required": false,
             "type": "string",
             "format": "any text",
@@ -328,7 +328,7 @@
           {
             "name": "dimension",
             "in": "query",
-            "description": "zero, one or more dimension ids, as returned by the /chart call.",
+            "description": "Zero, one or more dimension ids, as returned by the /chart call.",
             "required": false,
             "type": "array",
             "items": {
@@ -793,7 +793,7 @@
         },
         "mirrored_hosts": {
           "type": "array",
-          "description": "list of hosts mirrored of the server (include itself).",
+          "description": "List of hosts mirrored of the server (include itself).",
           "items": {
             "type": "string"
           },
@@ -888,19 +888,19 @@
         },
         "alarms": {
           "type": "object",
-          "description": "number of alarms in the server.",
+          "description": "Number of alarms in the server.",
           "properties": {
             "normal": {
               "type": "integer",
-              "description": "number of alarms in normal state."
+              "description": "Number of alarms in normal state."
             },
             "warning": {
               "type": "integer",
-              "description": "number of alarms in warning state."
+              "description": "Number of alarms in warning state."
             },
             "critical": {
               "type": "integer",
-              "description": "number of alarms in critical state."
+              "description": "Number of alarms in critical state."
             }
           }
         }
