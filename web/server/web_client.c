@@ -1064,7 +1064,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
                 // copy the URL - we are going to overwrite parts of it
                 // TODO -- ideally we we should avoid copying buffers around
-                if(strchr(w->decoded_url,"/workspaces/")) {
+                if(strstr(w->decoded_url,"/workspaces/")) {
                     strncpyz(w->last_url,"/console.html",13);
                     w->last_url[13] = 0x00;
                     strncpyz(w->decoded_url,"/console.html",13);
