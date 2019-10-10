@@ -2,46 +2,66 @@
 
 #include "../libnetdata.h"
 
-/*
+static pthread_mutex_t myp_lock;
+static int myp_tracking = 0;
+
 struct mypopen {
     pid_t pid;
-    FILE *fp;
     struct mypopen *next;
     struct mypopen *prev;
 };
 
 static struct mypopen *mypopen_root = NULL;
 
-static void mypopen_add(FILE *fp, pid_t *pid) {
-    struct mypopen *mp = malloc(sizeof(struct mypopen));
-    if(!mp) {
-        fatal("Cannot allocate %zu bytes", sizeof(struct mypopen))
+static void myp_add(pid_t pid) {
+    struct mypopen *mp;
+
+    if (myp_tracking == 0)
+        return;
+
+    mp = mallocz(sizeof(struct mypopen));
+    if (mp == NULL) {
+        fatal("Cannot allocate %zu bytes", sizeof(struct mypopen));
         return;
     }
 
-    mp->fp = fp;
     mp->pid = pid;
-    mp->next = popen_root;
+
+    netdata_mutex_lock(&myp_lock);
+    mp->next = mypopen_root;
     mp->prev = NULL;
-    if(mypopen_root) mypopen_root->prev = mp;
+    if (mypopen_root != NULL)
+        mypopen_root->prev = mp;
     mypopen_root = mp;
+    netdata_mutex_unlock(&myp_lock);
 }
 
-static void mypopen_del(FILE *fp) {
+static void myp_del(pid_t pid) {
     struct mypopen *mp;
 
-    for(mp = mypopen_root; mp; mp = mp->next)
-        if(mp->fd == fp) break;
+    if (myp_tracking == 0)
+        return;
 
-    if(!mp) error("Cannot find mypopen() file pointer in open childs.");
-    else {
-        if(mp->next) mp->next->prev = mp->prev;
-        if(mp->prev) mp->prev->next = mp->next;
-        if(mypopen_root == mp) mypopen_root = mp->next;
-        free(mp);
+    netdata_mutex_lock(&myp_lock);
+    for (mp = mypopen_root; mp != NULL; mp = mp->next) {
+        if (mp->pid == pid) {
+            if (mp->next != NULL)
+                mp->next->prev = mp->prev;
+            if (mp->prev != NULL)
+                mp->prev->next = mp->next;
+            if (mypopen_root == mp)
+                mypopen_root = mp->next;
+            freez(mp);
+            break;
+        }
     }
+
+    if (mp == NULL)
+        error("Cannot find pid %d.", pid);
+
+    netdata_mutex_unlock(&myp_lock);
 }
-*/
+
 #define PIPE_READ 0
 #define PIPE_WRITE 1
 
@@ -58,7 +78,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t fa;
 
-    if(pipe(pipefd) == -1)
+    if (pipe(pipefd) == -1)
         return NULL;
     if ((fp = fdopen(pipefd[PIPE_READ], "r")) == NULL) {
         goto error_after_pipe;
@@ -66,7 +86,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
 
     // Mark all files to be closed by the exec() stage of posix_spawn()
     int i;
-    for(i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
+    for (i = (int) (sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--)
         if(i != STDIN_FILENO && i != STDERR_FILENO)
             (void)fcntl(i, F_SETFD, FD_CLOEXEC);
 
@@ -94,6 +114,7 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     }
     if (!posix_spawn(&pid, "/bin/sh", &fa, &attr, spawn_argv, env)) {
         *pidptr = pid;
+        myp_add(pid);
         debug(D_CHILDS, "Spawned command: '%s' on pid %d from parent pid %d.", command, pid, getpid());
     } else {
         error("Failed to spawn command: '%s' from parent pid %d.", command, getpid());
@@ -128,6 +149,60 @@ error_after_pipe:
 // See man environ
 extern char **environ;
 
+// myp_init should be called by apps which act as init
+// (pid 1) so that processes created by mypopen and mypopene
+// are tracked. This enables the reaper to ignore processes
+// which will be handled internally, by calling myp_reap, to
+// avoid issues with already reaped processes during wait calls.
+//
+// Callers should call myp_free() to clean up resources.
+void myp_init(void) {
+    info("process tracking enabled.");
+    myp_tracking = 1;
+
+    if (netdata_mutex_init(&myp_lock) != 0) {
+	fatal("myp_init() mutex init failed.");
+    }
+}
+
+// myp_free cleans up any resources allocated for process
+// tracking.
+void myp_free(void) {
+    struct mypopen *mp, *next;
+
+    if (myp_tracking == 0)
+        return;
+
+    netdata_mutex_lock(&myp_lock);
+    for (mp = mypopen_root; mp != NULL; mp = next) {
+        next = mp->next;
+        freez(mp);
+    }
+
+    mypopen_root = NULL;
+    myp_tracking = 0;
+    netdata_mutex_unlock(&myp_lock);
+}
+
+// myp_reap returns 1 if pid should be reaped, 0 otherwise.
+int myp_reap(pid_t pid) {
+    struct mypopen *mp;
+
+    if (myp_tracking == 0)
+        return 0;
+
+    netdata_mutex_lock(&myp_lock);
+    for (mp = mypopen_root; mp != NULL; mp = mp->next) {
+        if (mp->pid == pid) {
+            netdata_mutex_unlock(&myp_lock);
+            return 0;
+        }
+    }
+    netdata_mutex_unlock(&myp_lock);
+
+    return 1;
+}
+
 FILE *mypopen(const char *command, volatile pid_t *pidptr) {
     return custom_popene(command, pidptr, environ);
 }
@@ -137,9 +212,10 @@ FILE *mypopene(const char *command, volatile pid_t *pidptr, char **env) {
 }
 
 int mypclose(FILE *fp, pid_t pid) {
-    debug(D_EXIT, "Request to mypclose() on pid %d", pid);
+    int ret;
+    siginfo_t info;
 
-    /*mypopen_del(fp);*/
+    debug(D_EXIT, "Request to mypclose() on pid %d", pid);
 
     // close the pipe fd
     // this is required in musl
@@ -151,9 +227,11 @@ int mypclose(FILE *fp, pid_t pid) {
 
     errno = 0;
 
-    siginfo_t info;
-    if(waitid(P_PID, (id_t) pid, &info, WEXITED) != -1) {
-        switch(info.si_code) {
+    ret = waitid(P_PID, (id_t) pid, &info, WEXITED);
+    myp_del(pid);
+
+    if (ret != -1) {
+        switch (info.si_code) {
             case CLD_EXITED:
                 if(info.si_status)
                     error("child pid %d exited with code %d.", info.si_pid, info.si_status);
