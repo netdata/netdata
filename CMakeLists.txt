@@ -598,6 +598,15 @@ set(BACKENDS_PLUGIN_FILES
         backends/prometheus/backend_prometheus.h
         )
 
+set(EXPORTING_ENGINE_FILES
+        exporting/exporting_engine.c
+        exporting/exporting_engine.h
+        exporting/read_config.c
+        exporting/init_connectors.c
+        exporting/process_data.c
+        exporting/send_internal_metrics.c
+        )
+
 set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis.c
         backends/aws_kinesis/aws_kinesis.h
@@ -898,7 +907,23 @@ if(BUILD_TESTING)
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
 
     set(TEST_NAME exporting_engine)
-    add_executable(${TEST_NAME}_testdriver exporting/tests/test_${TEST_NAME}.c)
+    add_executable(${TEST_NAME}_testdriver exporting/tests/test_${TEST_NAME}.c ${EXPORTING_ENGINE_FILES})
+    target_compile_options(
+        ${TEST_NAME}_testdriver
+        PRIVATE
+        -DUNIT_TESTING
+    )
+    target_link_options(
+        ${TEST_NAME}_testdriver
+        PRIVATE
+        -Wl,--wrap=read_exporting_config
+        -Wl,--wrap=init_connectors
+        -Wl,--wrap=mark_scheduled_instances
+        -Wl,--wrap=prepare_buffers
+        -Wl,--wrap=notify_workers
+        -Wl,--wrap=send_internal_metrics
+        -Wl,--wrap=now_realtime_sec
+    )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)
 

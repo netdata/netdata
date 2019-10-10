@@ -451,6 +451,15 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
+EXPORTING_ENGINE_FILES = \
+    exporting/exporting_engine.c \
+    exporting/exporting_engine.h \
+    exporting/read_config.c \
+    exporting/init_connectors.c \
+    exporting/process_data.c \
+    exporting/send_internal_metrics.c \
+    $(NULL)
+
 KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis.c \
     backends/aws_kinesis/aws_kinesis.h \
@@ -490,6 +499,7 @@ NETDATA_FILES = \
 	$(LIBNETDATA_FILES) \
 	$(API_PLUGIN_FILES) \
 	$(BACKENDS_PLUGIN_FILES) \
+    $(EXPORTING_ENGINE_FILES) \
 	$(CHECKS_PLUGIN_FILES) \
 	$(HEALTH_PLUGIN_FILES) \
 	$(IDLEJITTER_PLUGIN_FILES) \
@@ -663,7 +673,22 @@ if ENABLE_UNITTESTS
 
     exporting_tests_exporting_engine_testdriver_SOURCES = \
         exporting/tests/test_exporting_engine.c \
+        $(EXPORTING_ENGINE_FILES) \
         $(LIBNETDATA_FILES) \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_CFLAGS = \
+        $(AM_CFLAGS) \
+        -DUNIT_TESTING \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS = \
+        -Wl,--wrap=read_exporting_config \
+        -Wl,--wrap=init_connectors \
+        -Wl,--wrap=mark_scheduled_instances \
+        -Wl,--wrap=prepare_buffers \
+        -Wl,--wrap=notify_workers \
+        -Wl,--wrap=send_internal_metrics \
+        -Wl,--wrap=now_realtime_sec \
+        $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 endif

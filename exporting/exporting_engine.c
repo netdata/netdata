@@ -13,4 +13,54 @@
  */
 void *exporting_main(void *ptr)
 {
+    (void)ptr;
+
+    struct engine *engine = read_exporting_config();
+    if (!engine) {
+        info("EXPORTING: no exporting connectors configured");
+        return NULL;
+    }
+
+    if (init_connectors(engine) != 0) {
+        error("EXPORTING: cannot initialize exporting connectors");
+        return NULL;
+    }
+
+    usec_t step_ut = USEC_PER_SEC;
+    engine->after = now_realtime_sec();
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    while (!netdata_exit) {
+        heartbeat_next(&hb, step_ut);
+        engine->before = now_realtime_sec();
+
+        if (mark_scheduled_instances(engine) != 0) {
+            error("EXPORTING: cannot mark scheduled exporting connector instanses");
+            return NULL;
+        }
+
+        if (prepare_buffers(engine) != 0) {
+            error("EXPORTING: cannot prepare data to send");
+            return NULL;
+        }
+
+        if (notify_workers(engine) != 0) {
+            error("EXPORTING: cannot communicate with exporting connector instance working threads");
+            return NULL;
+        }
+
+        if (send_internal_metrics(engine) != 0) {
+            error("EXPORTING: cannot send metrics for the operation of exporting engine");
+            return NULL;
+        }
+
+        engine->after = engine->before;
+
+#ifdef UNIT_TESTING
+        break;
+#endif
+    }
+
+    return NULL;
 }
