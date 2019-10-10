@@ -14,6 +14,7 @@ export interface ChartLibraryConfig {
   trackColors: boolean
   pixelsPerPoint: (attributes: Attributes) => number
   xssRegexIgnore: RegExp
+  containerClass: (attributes: Attributes) => string
 }
 export type ChartLibrariesSettings = {
   [key in ChartLibraryName]: ChartLibraryConfig
@@ -69,6 +70,11 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     // },
     isLogScale(attributes: Attributes) {
       return attributes.dygraphTheme === "logscale"
+    },
+    containerClass(attributes: Attributes) {
+      return this.hasLegend(attributes)
+        ? "netdata-container-with-legend"
+        : "netdata-container"
     },
     // container_class(state) {
     //   if (this.legend(state) !== null) {
@@ -326,10 +332,7 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     trackColors: true,
     pixelsPerPoint: () => 3,
     aspectRatio: 100,
-  //   container_class(state) {
-  //     void (state)
-  //     return "netdata-container-easypiechart"
-  //   },
+    containerClass: () => "netdata-container-easypiechart",
   },
   // gauge: {
   //   initialize: window.NETDATA.gaugeInitialize,

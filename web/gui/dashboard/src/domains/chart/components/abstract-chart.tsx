@@ -1,12 +1,14 @@
 import React, { useCallback } from "react"
+import { useDispatch } from "react-redux"
+import classNames from "classnames"
 
 import { setGlobalChartUnderlayAction, setGlobalPanAndZoomAction } from "domains/global/actions"
-import { useDispatch } from "react-redux"
+
 import { Attributes } from "../utils/transformDataAttributes"
 import {
   ChartData, ChartDetails, DygraphData, EasyPieChartData,
 } from "../chart-types"
-import { ChartLibraryName } from "../utils/chartLibrariesSettings"
+import { chartLibrariesSettings, ChartLibraryName } from "../utils/chartLibrariesSettings"
 
 import { DygraphChart } from "./lib-charts/dygraph-chart"
 import { EasyPieChart } from "./lib-charts/easy-pie-chart"
@@ -69,12 +71,28 @@ export const AbstractChart = ({
     dispatch(setGlobalPanAndZoomAction({ after: viewAfter, before: viewBefore }))
   }, [dispatch, viewAfter, viewBefore])
 
+  const chartSettings = chartLibrariesSettings[chartLibrary]
+  const { hasLegend } = chartSettings
+  const chartElementClassName = hasLegend(attributes)
+    ? classNames(
+      "netdata-chart-with-legend-right",
+      `netdata-${chartLibrary}-chart-with-legend-right`,
+    )
+    : classNames(
+      "netdata-chart",
+      `netdata-${chartLibrary}-chart`,
+    )
+  const chartElementId = `${chartLibrary}-${chartUuid}-chart`
+  const showUndefined = hoveredRow === -1 && !showLatestOnBlur
+
   if (chartLibrary === "easypiechart") {
     return (
       <EasyPieChart
         attributes={attributes}
         chartData={chartData as EasyPieChartData}
         chartDetails={chartDetails}
+        chartElementClassName={chartElementClassName}
+        chartElementId={chartElementId}
         chartLibrary={chartLibrary}
         chartWidth={chartWidth}
         colors={colors}
@@ -100,6 +118,8 @@ export const AbstractChart = ({
       attributes={attributes}
       chartData={chartData as DygraphData}
       chartDetails={chartDetails}
+      chartElementClassName={chartElementClassName}
+      chartElementId={chartElementId}
       chartLibrary={chartLibrary}
       colors={colors}
       chartUuid={chartUuid}

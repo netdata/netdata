@@ -3,7 +3,6 @@ import React, {
   useLayoutEffect, useRef, useCallback,
 } from "react"
 import { useSelector } from "react-redux"
-import classNames from "classnames"
 import Dygraph from "dygraphs"
 import "dygraphs/src-es5/extras/smooth-plotter"
 
@@ -227,6 +226,8 @@ interface Props {
   attributes: Attributes
   chartData: DygraphData
   chartDetails: ChartDetails
+  chartElementClassName: string
+  chartElementId: string
   chartLibrary: ChartLibraryName
   chartUuid: string
   colors: {
@@ -234,7 +235,7 @@ interface Props {
   }
   dimensionsVisibility: boolean[]
   isRemotelyControlled: boolean
-  legendFormatValue: ((v: number) => number | string) | undefined
+  legendFormatValue: (v: number) => number | string
   onUpdateChartPanAndZoom: (arg: {
     after: number, before: number,
     callback: (after: number, before: number) => void,
@@ -256,6 +257,8 @@ export const DygraphChart = ({
   attributes,
   chartData,
   chartDetails,
+  chartElementClassName,
+  chartElementId,
   chartLibrary,
   // colors,
   chartUuid,
@@ -773,23 +776,12 @@ export const DygraphChart = ({
   }, [chartData, chartUuid, currentSelectionMasterId, dygraphInstance, hoveredRow,
     viewAfter, viewBefore])
 
-
-  const chartElemId = `${chartLibrary}-${chartUuid}-chart`
-  const { hasLegend } = chartSettings
   return (
     <>
       <div
         ref={chartElement}
-        id={chartElemId}
-        className={hasLegend
-          ? classNames(
-            "netdata-chart-with-legend-right",
-            `netdata-${chartLibrary}-chart-with-legend-right`,
-          )
-          : classNames(
-            "netdata-chart",
-            `netdata-${chartLibrary}-chart`,
-          )}
+        id={chartElementId}
+        className={chartElementClassName}
       />
       <div className="dygraph-chart__labels-hidden" id={hiddenLabelsElementId} />
     </>

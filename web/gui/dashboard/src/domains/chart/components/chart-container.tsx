@@ -189,7 +189,7 @@ export const ChartContainer = ({
       }
     }, styles)
     // eslint-disable-next-line no-param-reassign
-    portalNode.className = hasLegend ? "netdata-container-with-legend" : "netdata-container"
+    portalNode.className = chartSettings.containerClass(attributes)
     setHasPortalNodeBeenStyled(true)
   }, [attributes, chartSettings, hasLegend, portalNode, setHasPortalNodeBeenStyled])
 

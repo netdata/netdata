@@ -58,6 +58,8 @@ interface Props {
   attributes: Attributes
   chartData: EasyPieChartData
   chartDetails: ChartDetails
+  chartElementClassName: string
+  chartElementId: string
   chartLibrary: ChartLibraryName
   chartUuid: string
   colors: {
@@ -87,6 +89,8 @@ export const EasyPieChart = ({
   attributes,
   chartData,
   chartDetails,
+  chartElementClassName,
+  chartElementId,
   chartWidth,
   hoveredRow,
   legendFormatValue,
@@ -191,7 +195,7 @@ export const EasyPieChart = ({
   // to update, just label innerText and pcent are changed
 
   return (
-    <div ref={chartElement}>
+    <div ref={chartElement} id={chartElementId} className={chartElementClassName}>
       <span
         className="easyPieChartLabel"
         style={{
