@@ -152,6 +152,26 @@ not just visualize metrics.
 
 ## News
 
+`Oct 10th, 2019` - **[Netdata v1.18.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.18.0 contains 5 new collectors, 16 bug fixes, 27 improvements, and 20 documentation updates.
+
+The **database engine** is now the default method of storing metrics in Netdata. You immediately get more efficient and configurable long-term metrics storage without any work on your part. By saving recent metrics in RAM and "spilling" historical metrics to disk for long-term storage, the database engine is laying the foundation for many more improvements to distributed metrics.
+
+We even have a [tutorial](https://docs.netdata.cloud/docs/tutorials/longer-metrics-storage/) on switching to the database engine and getting the most from it. Or, just read up on [how performant](https://docs.netdata.cloud/database/engine/#evaluation) the database engine really is.
+
+Both our `python.d` and `go.d` plugins now have more **intelligent auto-detection** by periodically dump a list of active modules to disk. When Netdata starts, such as after a reboot, the plugins use this list of known services to re-establish metrics collection much more reliably. No more worrying if the service or application you need to monitor starts up minutes after Netdata.
+
+Two of our new collectors will help those with Hadoop big data infrastructures. The **HDFS and Zookeeper collection modules** come with essential alarms requested by our community and Netdata's auto-detection capabilities to keep the required configuration to an absolute minimum. Read up on the process via our [HDFS and Zookeeper tutorial](https://docs.netdata.cloud/docs/tutorials/monitor-hadoop-cluster/).
+
+Speaking of new collectors—we also added the ability to collect metrics from SLAB cache, Gearman, and vCenter Server Appliances.
+
+Before v1.18, if you wanted to create alarms for each dimension in a single chart, you need to write separate entities for each dimension—not very efficient or user-friendly. New **dimension templates** fix that hassle. Now, a single entity can automatically generate alarms for any number of dimensions in a chart, even those you weren't aware of! Our [tutorial on dimension templates](https://docs.netdata.cloud/docs/tutorials/dimension-templates/) has all the details.
+
+v1.18 brings support for installing Netdata on offline or air-gapped systems. To help users comply with strict security policies, our installation scripts can now install Netdata using previously-downloaded tarball and checksums instead of downloading them at runtime. We have guides for installing offline via `kickstart.sh` or `kickstart-static64.sh` in our [installation documentation](https://docs.netdata.cloud/packaging/installer/#offline-installations). We're excited to bring real-time monitoring to once-inaccessible systems!
+
+---
+
 `Sep 12th, 2019` - **[Netdata v1.17.1 released!](https://github.com/netdata/netdata/releases)**
 
 Release v1.17.1 contains 2 bug fixes, 6 improvements, and 2 documentation updates.
