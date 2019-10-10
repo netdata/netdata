@@ -7,7 +7,9 @@ Each internal structure (process, file descriptor, inode...) is stored within a 
 
 ## configuring Netdata for slabinfo
 
-There is currently no configuration needed.
+The plugin is disabled by default because it collects and displays a huge amount of metrics.
+
+There is currently no configuration needed for the plugin itself.
 
 As `/proc/slabinfo` is only readable by root, this plugin is setuid root.
 
