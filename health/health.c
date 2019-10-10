@@ -752,11 +752,9 @@ void *health_main(void *ptr) {
                     // check the warning expression
 
                     if (likely(rc->warning)) {
-                        fprintf(stderr,"KILLME WARNING %s\n", rc->name);
                         if (unlikely(!expression_evaluate(rc->warning))) {
                             // calculation failed
                             rc->rrdcalc_flags |= RRDCALC_FLAG_WARN_ERROR;
-                            fprintf(stderr,"KILLME ERR WARNING %s\n", rc->name);
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': warning expression failed with error: %s",
@@ -778,11 +776,9 @@ void *health_main(void *ptr) {
                     // check the critical expression
 
                     if (likely(rc->critical)) {
-                        fprintf(stderr,"KILLME CRITICAL %s\n", rc->name);
                         if (unlikely(!expression_evaluate(rc->critical))) {
                             // calculation failed
                             rc->rrdcalc_flags |= RRDCALC_FLAG_CRIT_ERROR;
-                            fprintf(stderr,"KILLME ERR CRITICAL %s \n", rc->name);
 
                             debug(D_HEALTH,
                                   "Health on host '%s', alarm '%s.%s': critical expression failed with error: %s",
