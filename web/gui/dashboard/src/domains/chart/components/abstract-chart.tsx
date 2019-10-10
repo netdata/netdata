@@ -12,6 +12,7 @@ import { chartLibrariesSettings, ChartLibraryName } from "../utils/chartLibrarie
 
 import { DygraphChart } from "./lib-charts/dygraph-chart"
 import { EasyPieChart } from "./lib-charts/easy-pie-chart"
+import { GaugeChart } from "./lib-charts/gauge-chart"
 
 interface Props {
   attributes: Attributes
@@ -22,6 +23,7 @@ interface Props {
     [key: string]: string
   }
   chartUuid: string
+  chartHeight: number
   chartWidth: number
   dimensionsVisibility: boolean[]
   isRemotelyControlled: boolean
@@ -46,6 +48,7 @@ export const AbstractChart = ({
   chartLibrary,
   colors,
   chartUuid,
+  chartHeight,
   chartWidth,
   dimensionsVisibility,
   isRemotelyControlled,
@@ -104,6 +107,37 @@ export const AbstractChart = ({
         hoveredRow={hoveredRow}
         onUpdateChartPanAndZoom={onUpdateChartPanAndZoom}
         setGlobalChartUnderlay={setGlobalChartUnderlay}
+        setMinMax={setMinMax}
+        showUndefined={showUndefined}
+        unitsCurrent={unitsCurrent}
+        viewAfter={viewAfter}
+        viewBefore={viewBefore}
+      />
+    )
+  }
+
+  if (chartLibrary === "gauge") {
+    return (
+      <GaugeChart
+        attributes={attributes}
+        chartData={chartData as EasyPieChartData}
+        chartDetails={chartDetails}
+        chartElementClassName={chartElementClassName}
+        chartElementId={chartElementId}
+        chartLibrary={chartLibrary}
+        chartHeight={chartHeight}
+        chartWidth={chartWidth}
+        colors={colors}
+        chartUuid={chartUuid}
+        dimensionsVisibility={dimensionsVisibility}
+        isRemotelyControlled={isRemotelyControlled}
+        legendFormatValue={legendFormatValue}
+        orderedColors={orderedColors}
+        hoveredRow={hoveredRow}
+        hoveredX={hoveredX}
+        onUpdateChartPanAndZoom={onUpdateChartPanAndZoom}
+        setGlobalChartUnderlay={setGlobalChartUnderlay}
+        setHoveredX={setHoveredX}
         setMinMax={setMinMax}
         showUndefined={showUndefined}
         unitsCurrent={unitsCurrent}

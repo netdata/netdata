@@ -28,6 +28,7 @@ import { AbstractChart } from "./abstract-chart"
 interface Props {
   chartData: ChartData
   chartDetails: ChartDetails
+  chartHeight: number
   chartUuid: string
   chartWidth: number
   attributes: Attributes
@@ -42,6 +43,7 @@ export const Chart = ({
   },
   chartData,
   chartDetails,
+  chartHeight,
   chartUuid,
   chartWidth,
   isRemotelyControlled,
@@ -296,6 +298,7 @@ export const Chart = ({
         chartLibrary={chartLibrary}
         colors={colors}
         chartUuid={chartUuid}
+        chartHeight={chartHeight}
         chartWidth={chartWidth}
         dimensionsVisibility={dimensionsVisibility}
         onUpdateChartPanAndZoom={handleUpdateChartPanAndZoom}
@@ -337,7 +340,7 @@ export const Chart = ({
           onToolboxZoomOutClick={handleToolboxZoomOutClick}
         />
       )}
-      {window.NETDATA.options.current.resize_charts && (
+      {shouldDisplayToolbox && window.NETDATA.options.current.resize_charts && (
         <ResizeHandler />
       )}
     </>

@@ -2,8 +2,8 @@ import { Attributes } from "./transformDataAttributes"
 
 export type ChartLibraryName = "dygraph"
 // | "sparkline" | "peity" | "google" | "d3pie" | "d3"
-  | "easypiechart"
-// | "gauge" | "textonly"
+  | "easypiechart" | "gauge"
+// | "textonly"
 export interface ChartLibraryConfig {
   aspectRatio?: number
   format: string
@@ -334,51 +334,33 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     aspectRatio: 100,
     containerClass: () => "netdata-container-easypiechart",
   },
-  // gauge: {
-  //   initialize: window.NETDATA.gaugeInitialize,
-  //   create: window.NETDATA.gaugeChartCreate,
-  //   update: window.NETDATA.gaugeChartUpdate,
-  //   resize: null,
-  //   setSelection: window.NETDATA.gaugeSetSelection,
-  //   clearSelection: window.NETDATA.gaugeClearSelection,
-  //   toolboxPanAndZoom: null,
-  //   initialized: false,
-  //   enabled: true,
-  //   xssRegexIgnore: new RegExp("^/api/v1/data\.result$"),
-  //   format(state) {
-  //     void (state)
-  //     return "array"
-  //   },
-  //   options(state) {
-  //     void (state)
-  //     return "absolute"
-  //   },
-  //   legend(state) {
-  //     void (state)
-  //     return null
-  //   },
-  //   autoresize(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   max_updates_to_recreate(state) {
-  //     void (state)
-  //     return 5000
-  //   },
-  //   track_colors(state) {
-  //     void (state)
-  //     return true
-  //   },
-  //   pixels_per_point(state) {
-  //     void (state)
-  //     return 3
-  //   },
-  //   aspect_ratio: 60,
-  //   container_class(state) {
-  //     void (state)
-  //     return "netdata-container-gauge"
-  //   },
-  // },
+  gauge: {
+    // initialize: window.NETDATA.gaugeInitialize,
+    // create: window.NETDATA.gaugeChartCreate,
+    // update: window.NETDATA.gaugeChartUpdate,
+    // resize: null,
+    // setSelection: window.NETDATA.gaugeSetSelection,
+    // clearSelection: window.NETDATA.gaugeClearSelection,
+    hasToolboxPanAndZoom: false,
+    // initialized: false,
+    // enabled: true,
+    xssRegexIgnore: new RegExp("^/api/v1/data.result$"),
+    format: "array",
+    options: () => "absolute",
+    hasLegend: () => false,
+    // autoresize(state) {
+    //   void (state)
+    //   return false
+    // },
+    // max_updates_to_recreate(state) {
+    //   void (state)
+    //   return 5000
+    // },
+    trackColors: true,
+    pixelsPerPoint: () => 3,
+    aspectRatio: 60,
+    containerClass: () => "netdata-container-gauge",
+  },
   // textonly: {
   //   autoresize(state) {
   //     void (state)

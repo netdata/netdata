@@ -16,6 +16,7 @@ import { fetchDataAction } from "../actions"
 import { selectChartData, selectChartDetails, selectChartFetchDataParams } from "../selectors"
 
 import { Chart } from "./chart"
+import "./chart-container.css"
 
 const getChartURLOptions = (attributes: Attributes) => {
   const {
@@ -101,9 +102,11 @@ export const ChartContainer = ({
   const { hasLegend } = chartSettings
 
   const [hasPortalNodeBeenStyled, setHasPortalNodeBeenStyled] = useState<boolean>(false)
-  // todo take width via hook/HOC and put this into useMemo
-  const chartWidth = portalNode.getBoundingClientRect().width
-    - (hasLegend(attributes) ? 140 : 0)
+  // todo optimize by using resizeObserver (optionally)
+  const boundingClientRect = portalNode.getBoundingClientRect()
+  const chartWidth = boundingClientRect.width
+    - (hasLegend(attributes) ? 140 : 0) // from old dashboard
+  const chartHeight = boundingClientRect.height
 
   /**
    * fetch data
@@ -195,7 +198,7 @@ export const ChartContainer = ({
 
 
   if (!chartData || !chartDetails) {
-    return <span>loading...</span>
+    return <div className="chart-container__loader">loading...</div>
   }
   return (
     <Chart
@@ -203,6 +206,7 @@ export const ChartContainer = ({
       chartData={chartData}
       chartDetails={chartDetails}
       chartUuid={chartUuid}
+      chartHeight={chartHeight}
       chartWidth={chartWidth}
       isRemotelyControlled={fetchDataParams.isRemotelyControlled}
       showLatestOnBlur={!globalPanAndZoom}

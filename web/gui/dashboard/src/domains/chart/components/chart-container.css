@@ -1,0 +1,6 @@
+.chart-container__loader {
+  /* absolute, because to create GaugeChart the height of container is calculated during loading of data
+     and loader cannot have any impact on chart size
+   */
+  position: absolute;
+}

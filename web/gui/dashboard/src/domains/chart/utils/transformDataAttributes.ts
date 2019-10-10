@@ -165,6 +165,14 @@ export interface Attributes {
   easyPieChartRotate?: number,
   easyPieChartAnimate?: string,
   easyPieChartEasing?: string,
+
+  gaugeMinValue?: number,
+  gaugeMaxValue?: number,
+  gaugePointerColor?: string,
+  gaugeStrokeColor?: string,
+  gaugeStartColor?: string,
+  gaugeStopColor?: string,
+  gaugeGenerateGradient?: boolean | string[],
 }
 
 export type AttributePropKeys = keyof Attributes
@@ -274,6 +282,14 @@ const getAttributesMap = (): AttributesMap => ({
   easyPieChartRotate: { key: "easypiechart-rotate" },
   easyPieChartAnimate: { key: "easypiechart-animate" },
   easyPieChartEasing: { key: "easypiechart-easing" },
+
+  gaugeMinValue: { key: "gauge-min-value" },
+  gaugeMaxValue: { key: "gauge-max-value" },
+  gaugePointerColor: { key: "gauge-pointer-color" },
+  gaugeStrokeColor: { key: "gauge-stroke-color" },
+  gaugeStartColor: { key: "gauge-start-color" },
+  gaugeStopColor: { key: "gauge-stop-color" },
+  gaugeGenerateGradient: { key: "gauge-generate-gradient" },
 })
 
 export const getAttributes = (node: Element): Attributes => mapObjIndexed(
