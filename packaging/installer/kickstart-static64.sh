@@ -194,6 +194,7 @@ while [ -n "${1}" ]; do
 		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
+		inner_opts="${inner_opts} ${1}"
 		shift 1
 	elif [ "${1}" = "--local-files" ]; then
 		shift 1
