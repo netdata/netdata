@@ -4,10 +4,10 @@ SLAB is a cache mechanism used by the Kernel to avoid fragmentation.
 
 Each internal structure (process, file descriptor, inode...) is stored within a SLAB.
 
-
 ## configuring Netdata for slabinfo
 
 The plugin is disabled by default because it collects and displays a huge amount of metrics.
+To enable it set `slabinfo = yes` in the `plugins` section of the `netdata.conf` configuration file.
 
 There is currently no configuration needed for the plugin itself.
 
