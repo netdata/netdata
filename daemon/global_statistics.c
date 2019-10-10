@@ -534,11 +534,30 @@ void global_statistics_charts(void) {
     // ----------------------------------------------------------------
 
 #ifdef ENABLE_DBENGINE
-    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        unsigned long long stats_array[RRDENG_NR_STATS];
+    RRDHOST *host;
+    unsigned long long stats_array[RRDENG_NR_STATS] = {0};
+    unsigned long long local_stats_array[RRDENG_NR_STATS];
+    unsigned hosts_with_dbengine = 0, i;
 
-        /* get localhost's DB engine's statistics */
-        rrdeng_get_33_statistics(localhost->rrdeng_ctx, stats_array);
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            ++hosts_with_dbengine;
+            /* get localhost's DB engine's statistics */
+            rrdeng_get_33_statistics(host->rrdeng_ctx, local_stats_array);
+            for (i = 0 ; i < RRDENG_NR_STATS ; ++i) {
+                /* aggregate statistics across hosts */
+                stats_array[i] += local_stats_array[i];
+            }
+        }
+    }
+    rrd_unlock();
+
+    if (hosts_with_dbengine) {
+        /* deduplicate global statistics by getting the ones from the last host */
+        stats_array[30] = local_stats_array[30];
+        stats_array[31] = local_stats_array[31];
+        stats_array[32] = local_stats_array[32];
 
         // ----------------------------------------------------------------
 
