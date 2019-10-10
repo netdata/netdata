@@ -34,7 +34,6 @@ install:
   # These are release-related artifacts and have to be evaluated before we start doing conditional checks inside stages
   - source ".travis/tagger.sh"
   - export GIT_TAG="$(git tag --points-at)"
-  - if [[ -z "${GIT_TAG}" ]]; then  echo "Running set tag for release" && set_tag_for_release; fi;
 
 
 
@@ -255,6 +254,7 @@ jobs:
         - echo "Last commit:" && git log -1
         - echo "GIT Describe:" && git describe
         - echo "packaging/version:" && cat packaging/version
+        - if [[ -z "${GIT_TAG}" ]]; then  echo "Running set tag for release" && set_tag_for_release; fi;
         - .travis/generate_changelog_and_tag_release.sh
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Changelog generation and tag of release, failed"
       git:
