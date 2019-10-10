@@ -15,7 +15,7 @@ interface Props {
   }
   hoveredRow: number
   hoveredX: number | null
-  legendFormatValue: (value: number | string) => (number | string)
+  legendFormatValue: (value: number | string | null) => (number | string)
   selectedDimensions: string[]
   setSelectedDimensions: (selectedDimensions: string[]) => void
   showLatestOnBlur: boolean
@@ -181,7 +181,9 @@ export const ChartLegend = ({
             || selectedDimensions.includes(dimensionName)
 
           let value
-          if (hoveredRow !== -1) {
+          if (showUndefined) {
+            value = null
+          } else if (hoveredRow !== -1) {
             const hoveredValueArray = chartData.result.data[hoveredRow]
             // [timestamp, valueDim1, valueDim2, ...]
             value = hoveredValueArray[i + 1]

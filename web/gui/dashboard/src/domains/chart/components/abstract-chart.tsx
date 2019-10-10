@@ -23,7 +23,7 @@ interface Props {
   chartWidth: number
   dimensionsVisibility: boolean[]
   isRemotelyControlled: boolean
-  legendFormatValue: ((v: number | string) => number | string)
+  legendFormatValue: ((v: number | string | null) => number | string)
   orderedColors: string[]
   hoveredX: number | null
   onUpdateChartPanAndZoom: (arg: { after: number, before: number, masterID: string }) => void
@@ -54,6 +54,7 @@ export const AbstractChart = ({
   onUpdateChartPanAndZoom,
   setHoveredX,
   setMinMax,
+  showLatestOnBlur,
   unitsCurrent,
   viewAfter,
   viewBefore,
@@ -83,11 +84,10 @@ export const AbstractChart = ({
         legendFormatValue={legendFormatValue}
         orderedColors={orderedColors}
         hoveredRow={hoveredRow}
-        hoveredX={hoveredX}
         onUpdateChartPanAndZoom={onUpdateChartPanAndZoom}
         setGlobalChartUnderlay={setGlobalChartUnderlay}
-        setHoveredX={setHoveredX}
         setMinMax={setMinMax}
+        showUndefined={showUndefined}
         unitsCurrent={unitsCurrent}
         viewAfter={viewAfter}
         viewBefore={viewBefore}

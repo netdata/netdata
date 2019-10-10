@@ -9,7 +9,7 @@ type Converter = (v: number) => number | string
 
 const getLegendFormatValue = (
   convertUnits: Converter, intlNumberFormat: Intl.NumberFormat | null, valueDecimalDetail: number,
-) => (value: number | string) => {
+) => (value: number | string | null) => {
   if (typeof value !== "number") {
     return "-"
   }
@@ -53,6 +53,8 @@ const getLegendFormatValue = (
   return window.NETDATA.fastNumberFormat.get(dmin, dmax).format(value)
 }
 
+type LegendFormatValue = (value: string | number | null) => string | number
+
 interface Arguments {
   attributes: Attributes,
   data: ChartData,
@@ -71,8 +73,6 @@ export const useFormatters = ({
 }: Arguments) => {
   // previously _unitsConversion
   const [convertUnits, setConvertUnits] = useState<Converter>(() => identity)
-
-  type LegendFormatValue = (value: string | number) => string | number
 
   // probably can also be removed
   const [min, setMin] = useState<number>()
