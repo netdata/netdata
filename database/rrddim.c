@@ -217,9 +217,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
     if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+       memory_mode == RRD_MEMORY_MODE_RAM) {
         rd = (RRDDIM *)mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE)?NULL:fullfilename
+                  (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename
                 , size
                 , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
                 , 1
@@ -240,7 +240,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             struct timeval now;
             now_realtime_timeval(&now);
 
-            if(memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(rd, 0, size);
             }
             else {
@@ -292,7 +292,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
+        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        else
+            rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
     rd->memsize = size;
@@ -460,7 +463,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_RAM:
-        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
@@ -469,6 +471,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
+        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
