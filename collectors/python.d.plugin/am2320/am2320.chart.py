@@ -7,8 +7,7 @@ except ImportError:
     HAS_AM2320 = False
 
 
-#from bases.FrameworkServices.SimpleService import SimpleService
-from base import SimpleService
+from bases.FrameworkServices.SimpleService import SimpleService
 
 
 ORDER = [
