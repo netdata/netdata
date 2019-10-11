@@ -39,6 +39,5 @@ Software install:
 - find `[plugin:python.d]`
 - add  `command options = -ppython3`
 - Save the file.
-- move `am2320.chart.py` to `/usr/libexec/netdata/python.d`
 - restart the netdata service.
 - check the dashboard.
