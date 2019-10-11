@@ -1,16 +1,16 @@
 # Hangouts Chat
 
 This is what you will get:
-![Netdata on Hangouts](https://imgur.com/a/FVlZ3F0)
-You need:
+![Netdata on Hangouts](https://user-images.githubusercontent.com/1153921/66427166-47de6900-e9c8-11e9-8322-b4b03f084dc1.png)
+To receive notifications in Google Hangouts, you need the following in your Hangouts setup:
 
-1. A room or more rooms
-2. In each room create a **Incoming Webhooks**
+1. One or more rooms
+2. An **incoming webhook** for each room
 
-How to create a incoming webhooks: 
+How to create an incoming webhook: 
 https://developers.google.com/hangouts/chat/how-tos/webhooks
 
-Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
+Set the webhook URIs and room names in `health_alarm_notify.conf`. To edit it on your system, run `/etc/netdata/edit-config health_alarm_notify.conf`):
 
 ```
 #------------------------------------------------------------------------------
