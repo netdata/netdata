@@ -2,9 +2,9 @@ try:
     import board
     import busio
     import adafruit_am2320
-    HAS_STUFF = True
+    HAS_AM2320 = True
 except ImportError:
-    HAS_STUFF = False
+    HAS_AM2320 = False
 
 
 #from bases.FrameworkServices.SimpleService import SimpleService
@@ -40,8 +40,8 @@ class Service(SimpleService):
         self.am = None
 
     def check(self):
-        if not HAS_STUFF:
-            self.error("following libraries are needed to get module working: board, busio, adafruit_am2320")
+        if not HAS_AM2320:
+            self.error("Could not find the adafruit-circuitpython-am2320 package.")
             return False
 
         try:
@@ -54,7 +54,12 @@ class Service(SimpleService):
         return True
 
     def get_data(self):
-        return {
+        try:
+            return {
             'temperature': self.am.temperature,
             'humidity': self.am.relative_humidity,
-        }
+           }
+
+        except (OSError, RuntimeError) as error:
+            self.error(error)
+            return None
