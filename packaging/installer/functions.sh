@@ -742,7 +742,7 @@ check_crondir_permissions() {
 		return 1
 	elif [ "${UID}" -ne "0" ]; then
 		# We cant touch cron if we are not running as root
-		echo >&2 "You need to run the installer as root for auto-updating via cron."
+		echo >&2 "You need to run the installer as root for auto-updating via cron"
 		return 1
 	fi
 
@@ -769,7 +769,7 @@ install_netdata_updater() {
 
 cleanup_old_netdata_updater() {
 	if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh ]; then
-		echo >&2 "Removing updater from previous location"
+		echo >&2 "Removing updater from deprecated location"
 		rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
 	fi
 
@@ -777,7 +777,7 @@ cleanup_old_netdata_updater() {
 	check_crondir_permissions "${crondir}" || return 1
 
 	if [ -f "${crondir}/netdata-updater.sh" ]; then
-		progress "Removing incorrect netdata-updater filename in cron"
+		echo >&2 "Removing incorrect netdata-updater filename in cron"
 		rm -f "${crondir}/netdata-updater.sh"
 	fi
 
@@ -797,6 +797,7 @@ enable_netdata_updater() {
 	echo >&2
 	echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
 	echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
+	echo >&2
 
 	return 0
 }
@@ -810,9 +811,11 @@ disable_netdata_updater() {
 
 	if [ -f "${crondir}/netdata-updater" ]; then
 		echo >&2 "Removing cron reference: ${crondir}/netdata-updater"
+		echo >&2
 		rm -f "${crondir}/netdata-updater"
 	else
 		echo >&2 "Did not find any cron entries to remove"
+		echo >&2
 	fi
 
 	return 0
