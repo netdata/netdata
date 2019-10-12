@@ -141,8 +141,15 @@ install_netdata_service || run_failed "Cannot install netdata init service."
 
 # -----------------------------------------------------------------------------
 progress "Install netdata updater tool"
+cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
+install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
-install_or_remove_netdata_updater || run_failed "Cannot install netdata updater tool."
+progress "Check if we must enable/disable the netdata updater"
+if [ "${AUTOUPDATE}" = "1" ]; then
+	enable_netdata_updater || run_failed "Cannot enable netdata updater tool."
+else
+	disable_netdata_updater || run_failed "Cannot disable netdata updater tool."
+fi
 
 
 # -----------------------------------------------------------------------------
