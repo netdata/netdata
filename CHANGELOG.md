@@ -1,5 +1,17 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.18.0...HEAD)
+
+**Merged pull requests:**
+
+- Fix dbengine not working when mmap fails [\#7065](https://github.com/netdata/netdata/pull/7065) ([mfundul](https://github.com/mfundul))
+- Disable slabinfo plugin by default [\#7056](https://github.com/netdata/netdata/pull/7056) ([vlvkobal](https://github.com/vlvkobal))
+- Add release 1.18.0 to news [\#7054](https://github.com/netdata/netdata/pull/7054) ([cakrit](https://github.com/cakrit))
+- Fix BSD/pfSense documentation [\#7041](https://github.com/netdata/netdata/pull/7041) ([thiagoftsm](https://github.com/thiagoftsm))
+- Tutorials to support v1.18 features [\#6993](https://github.com/netdata/netdata/pull/6993) ([joelhans](https://github.com/joelhans))
+
 ## [v1.18.0](https://github.com/netdata/netdata/tree/v1.18.0) (2019-10-10)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.17.1...v1.18.0)
@@ -255,7 +267,6 @@
 - Make use of GCC's \_\_attribute\_\_\(\(unused\)\) [\#6392](https://github.com/netdata/netdata/pull/6392) ([ac000](https://github.com/ac000))
 - Change default installation to stable in documentation [\#6388](https://github.com/netdata/netdata/pull/6388) ([joelhans](https://github.com/joelhans))
 - Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
-- Add apps grouping debug messages [\#6375](https://github.com/netdata/netdata/pull/6375) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
@@ -268,15 +279,6 @@
 - Update apps\_groups.conf for time group [\#6397](https://github.com/netdata/netdata/pull/6397) ([mbarper](https://github.com/mbarper))
 - Update to icons [\#6396](https://github.com/netdata/netdata/pull/6396) ([ivorjvr](https://github.com/ivorjvr))
 - Changed links from my-netdata.io to netdata.cloud [\#6389](https://github.com/netdata/netdata/pull/6389) ([joelhans](https://github.com/joelhans))
-- alarm-notify.sh should respect the cloud base url setting  [\#6383](https://github.com/netdata/netdata/pull/6383) ([ladakis](https://github.com/ladakis))
-- Add a check for a macro declaration for the perf plugin [\#6382](https://github.com/netdata/netdata/pull/6382) ([vlvkobal](https://github.com/vlvkobal))
-- Add a .gitattributes file [\#6381](https://github.com/netdata/netdata/pull/6381) ([ac000](https://github.com/ac000))
-- Health fix double Free Corruption [\#6379](https://github.com/netdata/netdata/pull/6379) ([thiagoftsm](https://github.com/thiagoftsm))
-- Health giving wrong message [\#6377](https://github.com/netdata/netdata/pull/6377) ([thiagoftsm](https://github.com/thiagoftsm))
-- Health could not read properly the health silencers file [\#6374](https://github.com/netdata/netdata/pull/6374) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add more debug messages for pluginsd pipe errors [\#6373](https://github.com/netdata/netdata/pull/6373) ([vlvkobal](https://github.com/vlvkobal))
-- Improve documentation about file descriptors and systemd configuration. [\#6372](https://github.com/netdata/netdata/pull/6372) ([mfundul](https://github.com/mfundul))
-- netdata/packaging: Netdata binary packages generation - spec file refinement, support for nightlies \(RPM\) [\#6369](https://github.com/netdata/netdata/pull/6369) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
