@@ -183,7 +183,7 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 opts=
-NETDATA_INSTALLER_OPTIONS=
+NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="--auto-update"
 RELEASE_CHANNEL="nightly"
 while [ -n "${1}" ]; do
@@ -191,10 +191,10 @@ while [ -n "${1}" ]; do
 		opts="${opts} --accept"
 		shift 1
 	elif [ "${1}" = "--dont-start-it" ]; then
-		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
+		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
 		shift 1
 	elif [ "${1}" = "--no-updates" ]; then
-		NETDATA_UPDATES=
+		NETDATA_UPDATES=""
 		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
