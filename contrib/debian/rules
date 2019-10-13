@@ -52,7 +52,7 @@ override_dh_install: debian/netdata.postinst
 	mkdir -p $(TOP)/etc/netdata/health.d
 	mkdir -p $(TOP)/etc/netdata/python.d
 	mkdir -p $(TOP)/etc/netdata/charts.d
-	mkdir -p $(TOP)/etc/netdata/cystonm-plugins.d
+	mkdir -p $(TOP)/etc/netdata/custom-plugins.d
 	mkdir -p $(TOP)/etc/netdata/go.d
 	mkdir -p $(TOP)/etc/netdata/ssl
 	mkdir -p $(TOP)/etc/netdata/node.d
