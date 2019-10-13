@@ -9,7 +9,6 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
-AUTOUPDATE=0
 NETDATA_PREFIX="/opt/netdata"
 NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
 
@@ -25,6 +24,7 @@ if [ -d /opt/netdata/etc/netdata.old ]; then
 fi
 
 STARTIT=1
+AUTOUPDATE=0
 
 while [ "${1}" ]; do
 	case "${1}" in
