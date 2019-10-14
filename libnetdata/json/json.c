@@ -284,7 +284,7 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
  * @param t the tokens
  * @param nest the length of structure t
  * @param start the first position
- * @param e the output structure.
+ * @param e the structure with values and callback to be used inside the function.
  *
  * @return It returns the array length
  */
