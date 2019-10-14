@@ -7,6 +7,8 @@
 **Merged pull requests:**
 
 - Fix dbengine not working when mmap fails [\#7065](https://github.com/netdata/netdata/pull/7065) ([mfundul](https://github.com/mfundul))
+- Fix typo in health\_alarm\_notify.conf [\#7062](https://github.com/netdata/netdata/pull/7062) ([sz4bi](https://github.com/sz4bi))
+- Fix size of a zeroed block [\#7061](https://github.com/netdata/netdata/pull/7061) ([vlvkobal](https://github.com/vlvkobal))
 - Disable slabinfo plugin by default [\#7056](https://github.com/netdata/netdata/pull/7056) ([vlvkobal](https://github.com/vlvkobal))
 - Add release 1.18.0 to news [\#7054](https://github.com/netdata/netdata/pull/7054) ([cakrit](https://github.com/cakrit))
 - Fix BSD/pfSense documentation [\#7041](https://github.com/netdata/netdata/pull/7041) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -105,8 +107,6 @@
 - Fixes netdata group deletion on linux for uninstall script [\#6645](https://github.com/netdata/netdata/pull/6645) ([mbarper](https://github.com/mbarper))
 - Gearman plugin for Netdata [\#6567](https://github.com/netdata/netdata/pull/6567) ([agronick](https://github.com/agronick))
 - Create a template for all dimensions [\#6560](https://github.com/netdata/netdata/pull/6560) ([thiagoftsm](https://github.com/thiagoftsm))
-- Center the chart on timeframe when an alarm is raised [\#6391](https://github.com/netdata/netdata/pull/6391) ([thiagoftsm](https://github.com/thiagoftsm))
-- Cppcheck fixes [\#6386](https://github.com/netdata/netdata/pull/6386) ([ac000](https://github.com/ac000))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
@@ -265,8 +265,6 @@
 - Fix Web API Health documentation  [\#6404](https://github.com/netdata/netdata/pull/6404) ([thiagoftsm](https://github.com/thiagoftsm))
 - Snapshot uniqueId fix [\#6400](https://github.com/netdata/netdata/pull/6400) ([jacekkolasa](https://github.com/jacekkolasa))
 - Make use of GCC's \_\_attribute\_\_\(\(unused\)\) [\#6392](https://github.com/netdata/netdata/pull/6392) ([ac000](https://github.com/ac000))
-- Change default installation to stable in documentation [\#6388](https://github.com/netdata/netdata/pull/6388) ([joelhans](https://github.com/joelhans))
-- Daemon fix double kills of collection threads on shutdown [\#6387](https://github.com/netdata/netdata/pull/6387) ([emmrk](https://github.com/emmrk))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
@@ -278,7 +276,6 @@
 - Update favicon with new logo  [\#6398](https://github.com/netdata/netdata/pull/6398) ([cakrit](https://github.com/cakrit))
 - Update apps\_groups.conf for time group [\#6397](https://github.com/netdata/netdata/pull/6397) ([mbarper](https://github.com/mbarper))
 - Update to icons [\#6396](https://github.com/netdata/netdata/pull/6396) ([ivorjvr](https://github.com/ivorjvr))
-- Changed links from my-netdata.io to netdata.cloud [\#6389](https://github.com/netdata/netdata/pull/6389) ([joelhans](https://github.com/joelhans))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
