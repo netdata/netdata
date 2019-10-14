@@ -13,21 +13,33 @@ struct mypopen {
 
 static struct mypopen *mypopen_root = NULL;
 
-static void myp_add(pid_t pid) {
+// myp_add_lock takes the lock if we're tracking.
+static void myp_add_lock(void) {
+    if (myp_tracking == 0)
+        return;
+
+    netdata_mutex_lock(&myp_lock);
+}
+
+// myp_add_unlock release the lock if we're tracking.
+static void myp_add_unlock(void) {
+    if (myp_tracking == 0)
+        return;
+
+    netdata_mutex_unlock(&myp_lock);
+}
+
+// myp_add_locked adds pid if we're tracking.
+// myp_add_lock must have been called previously.
+static void myp_add_locked(pid_t pid) {
     struct mypopen *mp;
 
     if (myp_tracking == 0)
         return;
 
     mp = mallocz(sizeof(struct mypopen));
-    if (mp == NULL) {
-        fatal("Cannot allocate %zu bytes", sizeof(struct mypopen));
-        return;
-    }
-
     mp->pid = pid;
 
-    netdata_mutex_lock(&myp_lock);
     mp->next = mypopen_root;
     mp->prev = NULL;
     if (mypopen_root != NULL)
@@ -36,6 +48,7 @@ static void myp_add(pid_t pid) {
     netdata_mutex_unlock(&myp_lock);
 }
 
+// myp_del deletes pid if we're tracking.
 static void myp_del(pid_t pid) {
     struct mypopen *mp;
 
@@ -112,11 +125,16 @@ static inline FILE *custom_popene(const char *command, volatile pid_t *pidptr, c
     } else {
         error("posix_spawnattr_init() failed.");
     }
+
+    // Take the lock while we fork to ensure we don't race with SIGCHLD
+    // delivery on a process which exits quickly.
+    myp_add_lock();
     if (!posix_spawn(&pid, "/bin/sh", &fa, &attr, spawn_argv, env)) {
         *pidptr = pid;
-        myp_add(pid);
+        myp_add_locked(pid);
         debug(D_CHILDS, "Spawned command: '%s' on pid %d from parent pid %d.", command, pid, getpid());
     } else {
+        myp_add_unlock();
         error("Failed to spawn command: '%s' from parent pid %d.", command, getpid());
         fclose(fp);
         fp = NULL;

@@ -851,12 +851,11 @@ static void tc_main_cleanup(void *ptr) {
 
     if(tc_child_pid) {
         info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
-        if(killpid(tc_child_pid, SIGTERM) != -1) {
+        if(killpid(tc_child_pid) != -1) {
             siginfo_t info;
 
             info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
             waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
-            // info("TC: finished tc plugin child process pid %d.", tc_child_pid);
         }
 
         tc_child_pid = 0;

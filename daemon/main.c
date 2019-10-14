@@ -146,44 +146,26 @@ void web_server_config_options(void) {
 }
 
 
-int killpid(pid_t pid, int signal)
-{
-    int ret = -1;
+// killpid kills pid with SIGTERM.
+int killpid(pid_t pid) {
+    int ret;
     debug(D_EXIT, "Request to kill pid %d", pid);
 
     errno = 0;
-    if(kill(pid, 0) == -1) {
+    ret = kill(pid, SIGTERM);
+    if (ret == -1) {
         switch(errno) {
             case ESRCH:
-                error("Request to kill pid %d, but it is not running.", pid);
-                break;
+                // We wanted the process to exit so just let the caller handle.
+                return ret;
 
             case EPERM:
-                error("Request to kill pid %d, but I do not have enough permissions.", pid);
+                error("Cannot kill pid %d, but I do not have enough permissions.", pid);
                 break;
 
             default:
-                error("Request to kill pid %d, but I received an error.", pid);
+                error("Cannot kill pid %d, but I received an error.", pid);
                 break;
-        }
-    }
-    else {
-        errno = 0;
-        ret = kill(pid, signal);
-        if(ret == -1) {
-            switch(errno) {
-                case ESRCH:
-                    error("Cannot kill pid %d, but it is not running.", pid);
-                    break;
-
-                case EPERM:
-                    error("Cannot kill pid %d, but I do not have enough permissions.", pid);
-                    break;
-
-                default:
-                    error("Cannot kill pid %d, but I received an error.", pid);
-                    break;
-            }
         }
     }
 

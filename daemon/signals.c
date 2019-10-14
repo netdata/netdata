@@ -46,7 +46,7 @@ static void signal_handler(int signo) {
                 char buffer[200 + 1];
                 snprintfz(buffer, 200, "\nSIGNAL HANLDER: received: %s. Oops! This is bad!\n", signals_waiting[i].name);
                 if(write(STDERR_FILENO, buffer, strlen(buffer)) == -1) {
-                    // nothing to do - we cannot write but there is no way to complaint about it
+                    // nothing to do - we cannot write but there is no way to complain about it
                     ;
                 }
             }
@@ -93,10 +93,18 @@ void signals_init(void) {
 
     int i;
     for (i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
-        if(signals_waiting[i].action == NETDATA_SIGNAL_IGNORE)
+        switch (signals_waiting[i].action) {
+        case NETDATA_SIGNAL_IGNORE:
             sa.sa_handler = SIG_IGN;
-        else
+            break;
+        case NETDATA_SIGNAL_CHILD:
+            if (reaper_enabled == 0)
+                continue;
+            // FALLTHROUGH
+        default:
             sa.sa_handler = signal_handler;
+            break;
+        }
 
         if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
             error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
@@ -119,31 +127,17 @@ void signals_reset(void) {
         myp_free();
 }
 
-// reap_child attempts to reap a single child.
-void reap_child(void) {
+// reap_child reaps the child identified by pid.
+static void reap_child(pid_t pid) {
     siginfo_t i;
-    pid_t pid;
 
-    // Identify which process caused the signal so we can determine
-    // if we need to reap the re-parented process.
-    if (waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1) {
-        error("SIGNAL: failed to wait");
-        return;
-    } else if (i.si_pid == 0) {
-        // No child exited.
-        return;
-    } else if (myp_reap(i.si_pid) == 0) {
-        // myp managed process ignore.
-        return;
-    }
-
-    // Unknown process, likely a re-parented child, reap it.
     errno = 0;
-    pid = i.si_pid;
     info("SIGNAL: Reaping pid: %d...", pid);
-
     if (waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
-        error("SIGNAL: failed to wait for: %d", pid);
+        if (errno != ECHILD)
+            error("SIGNAL: Failed to wait for: %d", pid);
+        else
+            info("SIGNAL: Already reaped: %d", pid);
         return;
     } else if (i.si_pid == 0) {
         // Process didn't exit, this shouldn't happen.
@@ -171,6 +165,32 @@ void reap_child(void) {
         break;
     default:
         error("SIGNAL: Child %d gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
+    }
+}
+
+// reap_children reaps all pending children which are not managed by myp.
+static void reap_children() {
+    siginfo_t i;
+
+    while (1 == 1) {
+        // Identify which process caused the signal so we can determine
+        // if we need to reap a re-parented process.
+        i.si_pid = 0;
+        if (waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1) {
+            if (errno != ECHILD) // This shouldn't happen with WNOHANG but does.
+                error("SIGNAL: Failed to wait");
+            return;
+        } else if (i.si_pid == 0) {
+            // No child exited.
+            return;
+        } else if (myp_reap(i.si_pid) == 0) {
+            // myp managed, sleep for a short time to avoid busy wait while
+            // this is handled by myp.
+            usleep(10000);
+        } else {
+            // Unknown process, likely a re-parented child, reap it.
+            reap_child(i.si_pid);
+        }
     }
 }
 
@@ -230,8 +250,8 @@ void signals_handle(void) {
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
 
                             case NETDATA_SIGNAL_CHILD:
-                                if (reaper_enabled == 1)
-                                    reap_child();
+                                info("SIGNAL: Received %s. Reaping...", name);
+                                reap_children();
                                 break;
 
                             default:

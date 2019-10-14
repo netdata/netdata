@@ -647,7 +647,7 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
         if (cd->pid) {
             siginfo_t info;
             info("killing child process pid %d", cd->pid);
-            if (killpid(cd->pid, SIGTERM) != -1) {
+            if (killpid(cd->pid) != -1) {
                 info("waiting for child process pid %d to exit...", cd->pid);
                 waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
             }
@@ -738,7 +738,7 @@ void *pluginsd_worker_thread(void *arg) {
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
         count = pluginsd_process(localhost, cd, fp, 0);
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
-        killpid(cd->pid, SIGTERM);
+        killpid(cd->pid);
 
         int worker_ret_code = mypclose(fp, cd->pid);
 
