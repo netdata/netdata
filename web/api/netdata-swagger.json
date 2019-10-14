@@ -1061,7 +1061,7 @@
         },
         "red": {
           "type": "number",
-          "description": "Chart health red trheshold."
+          "description": "Chart health red threshold."
         }
       }
     },
