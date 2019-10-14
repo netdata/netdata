@@ -649,12 +649,10 @@ libnetdata_tests_str2ld_testdriver_SOURCES = \
     libnetdata/tests/test_str2ld.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
-libnetdata_tests_str2ld_testdriver_LDFLAGS = $(TEST_LDFLAGS)
-libnetdata_tests_str2ld_testdriver_LDADD = $(NETDATA_COMMON_LIBS)
+libnetdata_tests_str2ld_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
 libnetdata_storage_number_tests_storage_number_testdriver_SOURCES = \
     libnetdata/storage_number/tests/test_storage_number.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
-libnetdata_storage_number_tests_storage_number_testdriver_LDFLAGS = $(TEST_LDFLAGS)
-libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS)
+libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
