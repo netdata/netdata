@@ -112,7 +112,7 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
         case JSON_OBJECT:
 #ifndef ENABLE_JSONC
             e->callback_function = health_silencers_json_read_callback;
-            if(e->name && strcmp(e->name,"")) {
+            if(strcmp(e->name,"")) {
                 // init silencer
                 debug(D_HEALTH, "JSON: Got object with a name, initializing new silencer for %s",e->name);
 #endif
