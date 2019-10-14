@@ -315,7 +315,7 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
     start++;
     for(i = 0; i < size ; i++) {
         ne.pos = i;
-        if (!e->name || !e->fullname || strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
+        if (strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
             info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
             continue;
         }
