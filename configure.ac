@@ -1130,6 +1130,30 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 
+# -----------------------------------------------------------------------------
+# Check if cmocka is available - needed for unit testing
+
+AC_ARG_ENABLE(
+     [unit-tests],
+     [AS_HELP_STRING([--disable-unit-tests],
+                     [Disables building and running the unit tests suite])],
+     [],
+     [enable_unit_tests="yes"]
+)
+
+PKG_CHECK_MODULES(
+    [CMOCKA], [cmocka],
+    [have_cmocka="yes"],
+    [AC_MSG_WARN([cmocka.pc not found on the system.  Unit tests disabled])]
+)
+AM_CONDITIONAL([ENABLE_UNITTESTS], [test "${enable_unit_tests}" = "yes" -a "${have_cmocka}" = "yes" ])
+AC_SUBST([ENABLE_UNITTESTS])
+
+TEST_CFLAGS="${CFLAGS} ${CMOCKA_CFLAGS}"
+TEST_LIBS="${CMOCKA_LIBS}"
+
+AC_SUBST([TEST_CFLAGS])
+AC_SUBST([TEST_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
@@ -1172,6 +1196,7 @@ AC_CONFIG_FILES([
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile
+    libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
@@ -1187,6 +1212,7 @@ AC_CONFIG_FILES([
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile
     libnetdata/storage_number/Makefile
+    libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
     libnetdata/json/Makefile
