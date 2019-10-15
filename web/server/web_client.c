@@ -932,6 +932,27 @@ void web_client_split_path_query(struct web_client *w, char *s) {
 }
 
 /**
+ * Update Last URL
+ *
+ * Netdata stores the path received from the client, this function saves the URL received inside the variable
+ * last_url, it also changes the request case it is necessary.
+ *
+ * @param w is the structure with the information necessary for the algorithm works.
+ */
+void update_last_url(struct web_client *w) {
+    // copy the URL - we are going to overwrite parts of it
+    // TODO -- ideally we we should avoid copying buffers around
+    if(strstr(w->decoded_url,"/workspaces/")) {
+        strncpyz(w->last_url,"/console.html",13);
+        w->last_url[13] = 0x00;
+        strncpyz(w->decoded_url,"/console.html",13);
+        w->decoded_url[13] = 0x00;
+    } else {
+        strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
+    }
+}
+
+/**
  * Request validate
  *
  * @param w is the structure with the client request
@@ -1062,16 +1083,7 @@ static inline HTTP_VALIDATION http_request_validate(struct web_client *w) {
                 }
                 *ue = ' ';
 
-                // copy the URL - we are going to overwrite parts of it
-                // TODO -- ideally we we should avoid copying buffers around
-                if(strstr(w->decoded_url,"/workspaces/")) {
-                    strncpyz(w->last_url,"/console.html",13);
-                    w->last_url[13] = 0x00;
-                    strncpyz(w->decoded_url,"/console.html",13);
-                    w->decoded_url[13] = 0x00;
-                } else {
-                    strncpyz(w->last_url, w->decoded_url, NETDATA_WEB_REQUEST_URL_SIZE);
-                }
+                update_last_url(w);
 #ifdef ENABLE_HTTPS
                 if ( (!web_client_check_unix(w)) && (netdata_srv_ctx) ) {
                     if ((w->ssl.conn) && ((w->ssl.flags & NETDATA_SSL_NO_HANDSHAKE) && (web_client_is_using_ssl_force(w) || web_client_is_using_ssl_default(w)) && (w->mode != WEB_CLIENT_MODE_STREAM))  ) {
