@@ -637,3 +637,22 @@ if ENABLE_BACKEND_MONGODB
     netdata_SOURCES += $(MONGODB_BACKEND_FILES)
     netdata_LDADD += $(OPTIONAL_MONGOC_LIBS)
 endif
+
+check_PROGRAMS = \
+	libnetdata/tests/str2ld_testdriver \
+	libnetdata/storage_number/tests/storage_number_testdriver \
+	$(NULL)
+
+TESTS = $(check_PROGRAMS)
+
+libnetdata_tests_str2ld_testdriver_SOURCES = \
+    libnetdata/tests/test_str2ld.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+libnetdata_tests_str2ld_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+
+libnetdata_storage_number_tests_storage_number_testdriver_SOURCES = \
+    libnetdata/storage_number/tests/test_storage_number.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
