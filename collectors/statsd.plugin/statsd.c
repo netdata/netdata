@@ -2222,7 +2222,7 @@ void *statsd_main(void *ptr) {
     // ----------------------------------------------------------------------------------------------------------------
     // statsd setup
 
-    if(!statsd.enabled) return NULL;
+    if(!statsd.enabled) goto cleanup;
 
     statsd_listen_sockets_setup();
     if(!statsd.sockets.opened) {
