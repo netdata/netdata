@@ -6,12 +6,16 @@
 
 **Merged pull requests:**
 
+- SimpleService: change chart suppress msg level to info [\#7085](https://github.com/netdata/netdata/pull/7085) ([ilyam8](https://github.com/ilyam8))
+- fix\(freeipmi\): Update frequency config check [\#7078](https://github.com/netdata/netdata/pull/7078) ([stevenh](https://github.com/stevenh))
+- Fix problems with names when alarm is created [\#7069](https://github.com/netdata/netdata/pull/7069) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix dbengine not working when mmap fails [\#7065](https://github.com/netdata/netdata/pull/7065) ([mfundul](https://github.com/mfundul))
 - Fix typo in health\_alarm\_notify.conf [\#7062](https://github.com/netdata/netdata/pull/7062) ([sz4bi](https://github.com/sz4bi))
 - Fix size of a zeroed block [\#7061](https://github.com/netdata/netdata/pull/7061) ([vlvkobal](https://github.com/vlvkobal))
 - Disable slabinfo plugin by default [\#7056](https://github.com/netdata/netdata/pull/7056) ([vlvkobal](https://github.com/vlvkobal))
 - Add release 1.18.0 to news [\#7054](https://github.com/netdata/netdata/pull/7054) ([cakrit](https://github.com/cakrit))
 - Fix BSD/pfSense documentation [\#7041](https://github.com/netdata/netdata/pull/7041) ([thiagoftsm](https://github.com/thiagoftsm))
+- Add dbengine RAM usage statistics [\#7038](https://github.com/netdata/netdata/pull/7038) ([mfundul](https://github.com/mfundul))
 - Tutorials to support v1.18 features [\#6993](https://github.com/netdata/netdata/pull/6993) ([joelhans](https://github.com/joelhans))
 
 ## [v1.18.0](https://github.com/netdata/netdata/tree/v1.18.0) (2019-10-10)
@@ -263,19 +267,10 @@
 - Add news of v1.16.0 to main README [\#6411](https://github.com/netdata/netdata/pull/6411) ([cakrit](https://github.com/cakrit))
 - Update Running-behind-apache.md [\#6406](https://github.com/netdata/netdata/pull/6406) ([Steve8291](https://github.com/Steve8291))
 - Fix Web API Health documentation  [\#6404](https://github.com/netdata/netdata/pull/6404) ([thiagoftsm](https://github.com/thiagoftsm))
-- Snapshot uniqueId fix [\#6400](https://github.com/netdata/netdata/pull/6400) ([jacekkolasa](https://github.com/jacekkolasa))
-- Make use of GCC's \_\_attribute\_\_\(\(unused\)\) [\#6392](https://github.com/netdata/netdata/pull/6392) ([ac000](https://github.com/ac000))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.15.0...v1.16.0)
-
-**Merged pull requests:**
-
-- Ignore /dev and /run space/inode usage [\#6399](https://github.com/netdata/netdata/pull/6399) ([vlvkobal](https://github.com/vlvkobal))
-- Update favicon with new logo  [\#6398](https://github.com/netdata/netdata/pull/6398) ([cakrit](https://github.com/cakrit))
-- Update apps\_groups.conf for time group [\#6397](https://github.com/netdata/netdata/pull/6397) ([mbarper](https://github.com/mbarper))
-- Update to icons [\#6396](https://github.com/netdata/netdata/pull/6396) ([ivorjvr](https://github.com/ivorjvr))
 
 ## [v1.15.0](https://github.com/netdata/netdata/tree/v1.15.0) (2019-05-22)
 
