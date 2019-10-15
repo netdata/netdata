@@ -116,7 +116,7 @@
     "/data": {
       "get": {
         "summary": "Get collected data for a specific chart",
-        "description": "The Data endpoint returns data stored in the round robin database of a chart.",
+        "description": "The data endpoint returns data stored in the round robin database of a chart.",
         "parameters": [
           {
             "name": "chart",
@@ -284,7 +284,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of  the data-schema according to the chosen format, e.g. json -> data_json.",
+            "description": "The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of the data-schema according to the chosen format, e.g. json -> data_json.",
             "schema": {
               "$ref": "#/definitions/data"
             }
@@ -1264,7 +1264,7 @@
                   }
                 },
                 "data": {
-                  "description": "The data requested, one element per sample with each element containing the values of the dimensions described in the labels value. ",
+                  "description": "The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.",
                   "type": "array",
                   "items": {
                     "type": "number"
