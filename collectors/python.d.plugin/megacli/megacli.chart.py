@@ -164,7 +164,7 @@ class Megacli:
     def __init__(self):
         self.s = find_binary('sudo')
         self.m = find_binary('megacli') or find_binary('MegaCli')  # Binary on FreeBSD is MegaCli
-        self.sudo_check = [self.s, '-n', '-v']
+        self.sudo_check = [self.s, '-n', '-l']
         self.disk_info = [self.s, '-n', self.m, '-LDPDInfo', '-aAll', '-NoLog']
         self.battery_info = [self.s, '-n', self.m, '-AdpBbuCmd', '-a0', '-NoLog']
 
