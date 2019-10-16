@@ -210,22 +210,29 @@ class Service(SocketService):
         if self.ubconf and is_readable(self.ubconf):
             self.debug('Unbound config: {0}'.format(self.ubconf))
             conf = dict()
+
             try:
                 conf = load_config(self.ubconf)
             except Exception as error:
                 self.error("error on loading '{0}' : {1}".format(self.ubconf, error))
+
             if self.ext is None:
                 if 'extended-statistics' in conf['server']:
                     self.ext = conf['server']['extended-statistics']
-            if 'remote-control' in conf:
+
+            if 'remote-control' in conf and isinstance(conf['remote-control'], dict):
                 if conf['remote-control'].get('control-use-cert', False):
                     self.key = self.key or conf['remote-control'].get('control-key-file')
                     self.cert = self.cert or conf['remote-control'].get('control-cert-file')
                     self.port = self.port or conf['remote-control'].get('control-port')
                 else:
-                    self.unix_socket = self.unix_socket or conf['remote-control'].get('control-interface')
+                    ci = conf['remote-control'].get('control-interface', "")
+                    is_socket = "/" in ci
+                    if is_socket:
+                        self.unix_socket = ci
         else:
             self.debug('Unbound configuration not found.')
+
         if not self.key:
             self.key = '/etc/unbound/unbound_control.key'
         if not self.cert:
