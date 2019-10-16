@@ -780,7 +780,7 @@ int process_prometheus_remote_write_response(BUFFER *b) {
     const char *s = buffer_tostring(b);
     int len = buffer_strlen(b);
 
-    // do nothing with HTTP response 200
+    // do nothing with HTTP responses 200 or 204
 
     while(!isspace(*s) && len) {
         s++;
@@ -789,7 +789,7 @@ int process_prometheus_remote_write_response(BUFFER *b) {
     s++;
     len--;
 
-    if(likely(len > 4 && !strncmp(s, "200 ", 4)))
+    if(likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
         return 0;
     else
         return discard_response(b, "prometheus remote write");

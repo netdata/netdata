@@ -284,18 +284,13 @@ size_t json_walk_primitive(char *js, jsmntok_t *t, size_t start, JSON_ENTRY *e)
  * @param t the tokens
  * @param nest the length of structure t
  * @param start the first position
- * @param e the output structure.
+ * @param e the structure with values and callback to be used inside the function.
  *
  * @return It returns the array length
  */
 size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_ENTRY *e)
 {
-    JSON_ENTRY ne = {
-            .name = "",
-            .fullname = "",
-            .callback_data = NULL,
-            .callback_function = NULL
-    };
+    JSON_ENTRY ne;
 
     char old = js[t[start].end];
     js[t[start].end] = '\0';
@@ -315,7 +310,7 @@ size_t json_walk_array(char *js, jsmntok_t *t, size_t nest, size_t start, JSON_E
     start++;
     for(i = 0; i < size ; i++) {
         ne.pos = i;
-        if (!e->name || !e->fullname || strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
+        if (strlen(e->name) > JSON_NAME_LEN  - 24 || strlen(e->fullname) > JSON_FULLNAME_LEN -24) {
             info("JSON: JSON walk_array ignoring element with name:%s fullname:%s",e->name, e->fullname);
             continue;
         }

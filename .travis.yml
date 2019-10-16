@@ -57,16 +57,31 @@ stages:
     # Nightly operations
   - name: Nightly operations
     if: branch = master AND type = cron
+
   - name: Nightly release
+    if: branch = master AND type = cron
+  - name: Trigger deb and rpm package build (nightly release)
     if: branch = master AND type = cron
 
     # Scheduled releases
   - name: Support activities on main branch
     if: branch = master AND type != pull_request AND type != cron
 
-  - name: Publish for release
     # We don't run on release candidates
-    if: branch = master AND type != pull_request AND type != cron AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/ AND tag !~ /(-rc)/
+  - name: Publish for release
+    if: >-
+      branch = master
+      AND type != pull_request
+      AND type != cron
+      AND tag !~ /(-rc)/
+      AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/
+  - name: Trigger deb and rpm package build (release)
+    if: >-
+      branch = master
+      AND type != pull_request
+      AND type != cron
+      AND tag !~ /(-rc)/
+      AND commit_message =~ /\[netdata (release candidate|(major|minor|patch) release)\]/
 
     # Build DEB packages under special conditions
   - name: Package ubuntu/* and debian/*
@@ -522,14 +537,11 @@ jobs:
         - .travis/draft_release.sh
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Draft release submission failed"
 
-    - name: Trigger .RPM and .DEB package generation
-      before_script: post_message "TRAVIS_MESSAGE" "Starting RPM and DEB package generation for release" "${NOTIF_CHANNEL}"
-      script:
-        - .travis/trigger_package_generation.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Stable release package generation produced errors" "${NOTIF_CHANNEL}"
-      git:
-        depth: false
 
+    - stage: Trigger deb and rpm package build (release)
+      name: Trigger deb and rpm package build
+      script: .travis/trigger_package_generation.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during release" "${NOTIF_CHANNEL}"
 
 
     # This is the nightly pre-execution step (Jobs, preparatory steps for nightly, etc)
@@ -610,14 +622,6 @@ jobs:
         - ALLOW_SOFT_FAILURE_HERE=true
         - ARCHS=aarch64
 
-    - name: Trigger .RPM and .DEB package generation
-      before_script: post_message "TRAVIS_MESSAGE" "Starting RPM and DEB package generation for nightlies" "${NOTIF_CHANNEL}"
-      script:
-        - .travis/trigger_package_generation.sh "[Build latest]"
-      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Nightly package generation produced errors" "${NOTIF_CHANNEL}"
-      git:
-        depth: false
-
     - name: Create nightly release artifacts, publish to GCS
       before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies" "${NOTIF_CHANNEL}"
       script:
@@ -668,3 +672,8 @@ jobs:
             branch: master
             condition: -d "artifacts" && ${TRAVIS_REPO_SLUG} = "netdata/netdata"
       after_deploy: rm -f .travis/gcs-credentials.json
+
+    - stage: Trigger deb and rpm package build (nightly release)
+      name: Trigger deb and rpm package build
+      script: .travis/trigger_package_generation.sh "[Build latest]"
+      after_failure: post_message "TRAVIS_MESSAGE" "<!here> Failed to trigger deb and rpm package build during nightly release" "${NOTIF_CHANNEL}"
