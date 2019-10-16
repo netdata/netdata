@@ -147,6 +147,10 @@ PER_THREAD_STAT_MAP = {
 }
 
 
+def is_readable(name):
+    return os.access(name, os.R_OK)
+
+
 # Used to actually generate per-thread charts.
 def _get_perthread_info(thread):
     sname = 'thread{0}'.format(thread)
@@ -203,7 +207,7 @@ class Service(SocketService):
             self.debug('Using certificate: {0}'.format(self.cert))
 
     def _auto_config(self):
-        if self.ubconf and os.access(self.ubconf, os.R_OK):
+        if self.ubconf and is_readable(self.ubconf):
             self.debug('Unbound config: {0}'.format(self.ubconf))
             conf = dict()
             try:
@@ -239,6 +243,13 @@ class Service(SocketService):
         self.order.extend(sorted(tmporder))
 
     def check(self):
+        if self.key and not is_readable(self.key):
+            self.error("ssl key '{0}' is not readable".format(self.key))
+            return False
+        if self.cert and not is_readable(self.cert):
+            self.error("ssl certificate '{0}' is not readable".format(self.certificate))
+            return False
+
         # Check if authentication is working.
         self._connect()
         result = bool(self._sock)
