@@ -347,6 +347,11 @@ export const DygraphChart = ({
 
       const dygraphOptions = {
         ...dygraphOptionsStatic,
+        // set dateWindow on init - this is needed when chart is globalPanAndZoom-master
+        // and user scrolls down/up so the chart hides and then unhides. This causes the chart
+        // to re-create, but the data has additional padding which should be outside of
+        // visible range
+        dateWindow: [viewAfter, viewBefore],
 
         highlightCallback(
           event: MouseEvent, xval: number,
@@ -689,8 +694,8 @@ export const DygraphChart = ({
     }
   }, [attributes, chartData, chartDetails, chartSettings, chartUuid, dimensionsVisibility,
     dygraphInstance, globalChartUnderlay, hiddenLabelsElementId, isMouseDown, orderedColors,
-    setGlobalChartUnderlay, setHoveredX, setMinMax, unitsCurrent, updateChartPanOrZoom,
-    xAxisTimeString])
+    setGlobalChartUnderlay, setHoveredX, setMinMax, unitsCurrent, updateChartPanOrZoom, viewAfter,
+    viewBefore, xAxisTimeString])
 
   useLayoutEffect(() => {
     if (dygraphInstance && legendFormatValue) {
