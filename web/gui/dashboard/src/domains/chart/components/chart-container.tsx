@@ -1,7 +1,9 @@
-import { forEachObjIndexed, propOr } from "ramda"
-import React, { useEffect, useState, useLayoutEffect } from "react"
+import { forEachObjIndexed, propOr, path } from "ramda"
+import React, {
+  useEffect, useState, useLayoutEffect, useRef,
+} from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { useInterval, useThrottle } from "react-use"
+import { useIntersection, useInterval, useThrottle } from "react-use"
 
 import { AppStateT } from "store/app-state"
 
@@ -62,14 +64,24 @@ export const ChartContainer = ({
     state, { id: chartUuid },
   ))
 
+  const portalNodeRef = useRef(portalNode)
+  const intersection = useIntersection(portalNodeRef, {
+    root: null,
+    rootMargin: "0px",
+    threshold: undefined,
+  })
+  const shouldHide = path(["intersectionRatio"], intersection) === 0
 
   // todo local state option
   const globalPanAndZoom = useSelector(selectGlobalPanAndZoom)
   const isGlobalPanAndZoomMaster = !!globalPanAndZoom && globalPanAndZoom.masterID === chartUuid
   const shouldForceTimeRange: boolean = propOr(false, "shouldForceTimeRange", globalPanAndZoom)
+
+  // (isRemotelyControlled === false) only during globalPanAndZoom, when chart is panAndZoomMaster
+  // and when no toolbox is used at that time
   const isRemotelyControlled = !globalPanAndZoom
     || !isGlobalPanAndZoomMaster
-    || shouldForceTimeRange
+    || shouldForceTimeRange // used when zooming/shifting in toolbox
 
 
   const fetchDataParams = useSelector((state: AppStateT) => selectChartFetchDataParams(
@@ -114,7 +126,7 @@ export const ChartContainer = ({
   const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
   const dispatch = useDispatch()
   useEffect(() => {
-    if (shouldFetch && chartDetails && hasPortalNodeBeenStyled) {
+    if (shouldFetch && chartDetails && hasPortalNodeBeenStyled && !shouldHide) {
       // todo can be overriden by main.js
       const forceDataPoints = window.NETDATA.options.force_data_points
 
@@ -181,7 +193,7 @@ export const ChartContainer = ({
     }
   }, [attributes, chartDetails, chartSettings, chartUuid, chartWidth, dispatch, globalPanAndZoom,
     hasLegend, hasPortalNodeBeenStyled, initialAfter, initialBefore, isGlobalPanAndZoomMaster,
-    isRemotelyControlled, portalNode, shouldFetch])
+    isRemotelyControlled, portalNode, shouldFetch, shouldHide])
 
   // todo omit this for Cloud/Main Agent app
   useLayoutEffect(() => {
@@ -199,6 +211,10 @@ export const ChartContainer = ({
 
   if (!chartData || !chartDetails) {
     return <div className="chart-container__loader">loading...</div>
+  }
+  if (shouldHide) {
+    // no need to measure anything - old dashboard was adding display: none to all
+    return null
   }
   return (
     <Chart

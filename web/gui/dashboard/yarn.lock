@@ -9059,10 +9059,10 @@ react-test-renderer@^16.0.0-0:
     react-is "^16.9.0"
     scheduler "^0.15.0"
 
-react-use@^12.2.0:
-  version "12.2.0"
-  resolved "https://registry.yarnpkg.com/react-use/-/react-use-12.2.0.tgz#9e669ae591f7e3b4b323870e7ff0724f6f69710e"
-  integrity sha512-jawCKYQcWDqwA/LMjAEfost6YQnQ6wYtSt1iPWd92Q48OdRAjFqs/GDgZsSzZBl8KsZodJxwr5pCpDn7uxtDZg==
+react-use@^12.5.0:
+  version "12.5.0"
+  resolved "https://registry.yarnpkg.com/react-use/-/react-use-12.5.0.tgz#92dcb5f5c9477ab769bbfb88a35c86553c9ed74a"
+  integrity sha512-C7ccCfP40QsbdoxNmleprc1wp+8wUYd5xSkDXMQEDpIeQRYlgnUIf+l+kC75fJ1kEY8AHoTw9Ihw6MG4ufsCHA==
   dependencies:
     "@types/react-wait" "^0.3.0"
     copy-to-clipboard "^3.1.0"
@@ -9070,7 +9070,7 @@ react-use@^12.2.0:
     react-fast-compare "^2.0.4"
     react-wait "^0.3.0"
     resize-observer-polyfill "^1.5.1"
-    screenfull "^4.1.0"
+    screenfull "^5.0.0"
     set-harmonic-interval "^1.0.0"
     throttle-debounce "^2.0.1"
     ts-easing "^0.2.0"
@@ -9619,10 +9619,10 @@ schema-utils@^2.0.0, schema-utils@^2.0.1:
     ajv "^6.1.0"
     ajv-keywords "^3.1.0"
 
-screenfull@^4.1.0:
-  version "4.2.1"
-  resolved "https://registry.yarnpkg.com/screenfull/-/screenfull-4.2.1.tgz#3245b7bc73d2b7c9a15bd8caaf6965db7cbc7f04"
-  integrity sha512-PLSp6f5XdhvjCCCO8OjavRfzkSGL3Qmdm7P82bxyU8HDDDBhDV3UckRaYcRa/NDNTYt8YBpzjoLWHUAejmOjLg==
+screenfull@^5.0.0:
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/screenfull/-/screenfull-5.0.0.tgz#5c2010c0e84fd4157bf852877698f90b8cbe96f6"
+  integrity sha512-yShzhaIoE9OtOhWVyBBffA6V98CDCoyHTsp8228blmqYy1Z5bddzE/4FPiJKlr8DVR4VBiiUyfPzIQPIYDkeMA==
 
 select-hose@^2.0.0:
   version "2.0.0"

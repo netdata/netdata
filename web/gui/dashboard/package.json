@@ -18,7 +18,7 @@
     "react-dom": "^16.8.6",
     "react-redux": "^7.1.1",
     "react-scripts": "3.1.1",
-    "react-use": "^12.2.0",
+    "react-use": "^12.5.0",
     "redux": "^4.0.4",
     "redux-act": "^1.7.7",
     "redux-saga": "^1.0.5",
