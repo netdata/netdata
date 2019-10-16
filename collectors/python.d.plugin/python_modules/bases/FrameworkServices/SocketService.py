@@ -80,6 +80,9 @@ class SocketService(SimpleService):
         if self.tls:
             try:
                 self.debug('Encapsulating socket with TLS')
+                self.debug('Using keyfile: {0}, certfile: {1}, cert_reqs: {2}, ssl_version: {3}'.format(
+                    self.key, self.cert, ssl.CERT_NONE, ssl.PROTOCOL_TLS
+                ))
                 self._sock = ssl.wrap_socket(self._sock,
                                              keyfile=self.key,
                                              certfile=self.cert,
