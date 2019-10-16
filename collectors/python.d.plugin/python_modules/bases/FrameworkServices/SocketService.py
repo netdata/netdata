@@ -87,8 +87,8 @@ class SocketService(SimpleService):
                                              cert_reqs=ssl.CERT_NONE,
                                              ssl_version=ssl.PROTOCOL_TLS,
                                              )
-            except (socket.error, ssl.SSLError) as error:
-                self.error('failed to wrap socket : {0}'.format(error))
+            except (socket.error, ssl.SSLError, IOError, OSError) as error:
+                self.error('failed to wrap socket : {0}'.format(repr(error)))
                 self._disconnect()
                 self.__socket_config = None
                 return False
@@ -167,7 +167,8 @@ class SocketService(SimpleService):
                         if self._connect2socket(res):
                             break
 
-        except Exception:
+        except Exception as error:
+            self.error('unhandled exception during connect : {0}'.format(repr(error)))
             self._sock = None
             self.__socket_config = None
 
