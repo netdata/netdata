@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Add VMware VMXNET3 driver to the default interafaces list [\#7109](https://github.com/netdata/netdata/pull/7109) ([samm-git](https://github.com/samm-git))
+- megacli: search binary and sudo check fix [\#7108](https://github.com/netdata/netdata/pull/7108) ([ilyam8](https://github.com/ilyam8))
+- Run the triggers for deb and rpm package build in separate stages [\#7105](https://github.com/netdata/netdata/pull/7105) ([knatsakis](https://github.com/knatsakis))
+- Fix segmentation fault in FreeBSD when statsd is disabled [\#7102](https://github.com/netdata/netdata/pull/7102) ([vlvkobal](https://github.com/vlvkobal))
+- Clang warnings [\#7090](https://github.com/netdata/netdata/pull/7090) ([thiagoftsm](https://github.com/thiagoftsm))
 - SimpleService: change chart suppress msg level to info [\#7085](https://github.com/netdata/netdata/pull/7085) ([ilyam8](https://github.com/ilyam8))
 - fix\(freeipmi\): Update frequency config check [\#7078](https://github.com/netdata/netdata/pull/7078) ([stevenh](https://github.com/stevenh))
 - Fix problems with names when alarm is created [\#7069](https://github.com/netdata/netdata/pull/7069) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -16,7 +21,9 @@
 - Add release 1.18.0 to news [\#7054](https://github.com/netdata/netdata/pull/7054) ([cakrit](https://github.com/cakrit))
 - Fix BSD/pfSense documentation [\#7041](https://github.com/netdata/netdata/pull/7041) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add dbengine RAM usage statistics [\#7038](https://github.com/netdata/netdata/pull/7038) ([mfundul](https://github.com/mfundul))
+- Don't write an HTTP response 204 to logs [\#7035](https://github.com/netdata/netdata/pull/7035) ([vlvkobal](https://github.com/vlvkobal))
 - Tutorials to support v1.18 features [\#6993](https://github.com/netdata/netdata/pull/6993) ([joelhans](https://github.com/joelhans))
+- Add CMocka unit tests [\#6985](https://github.com/netdata/netdata/pull/6985) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.18.0](https://github.com/netdata/netdata/tree/v1.18.0) (2019-10-10)
 
@@ -259,14 +266,6 @@
 - Styling improvements to documentation [\#6425](https://github.com/netdata/netdata/pull/6425) ([joelhans](https://github.com/joelhans))
 - Netdata/packaging: Add documentation for binary packages, plus draft table for distributions support [\#6422](https://github.com/netdata/netdata/pull/6422) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging/doc: Update documentation dependencies [\#6421](https://github.com/netdata/netdata/pull/6421) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Add global configuration option for zero metrics [\#6419](https://github.com/netdata/netdata/pull/6419) ([vlvkobal](https://github.com/vlvkobal))
-- Updated logos in the infographic and remaining favicons [\#6417](https://github.com/netdata/netdata/pull/6417) ([cakrit](https://github.com/cakrit))
-- netdata/packaging: Fix RPM packaging workflow issues, plus draft changes for .DEB packaging [\#6415](https://github.com/netdata/netdata/pull/6415) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- SSL vs. TLS consistency and clarification in documentation [\#6414](https://github.com/netdata/netdata/pull/6414) ([joelhans](https://github.com/joelhans))
-- Add more codeowners to the core [\#6413](https://github.com/netdata/netdata/pull/6413) ([vlvkobal](https://github.com/vlvkobal))
-- Add news of v1.16.0 to main README [\#6411](https://github.com/netdata/netdata/pull/6411) ([cakrit](https://github.com/cakrit))
-- Update Running-behind-apache.md [\#6406](https://github.com/netdata/netdata/pull/6406) ([Steve8291](https://github.com/Steve8291))
-- Fix Web API Health documentation  [\#6404](https://github.com/netdata/netdata/pull/6404) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
