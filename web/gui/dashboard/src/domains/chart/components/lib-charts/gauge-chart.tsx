@@ -157,6 +157,7 @@ export const GaugeChart = ({
     if (chartInstance) {
       // gauge animation
       const shouldUseAnimation = hoveredRow === -1 && !showUndefined
+      // animation doesn't work in newest, 1.3.7 version!
       const speed = shouldUseAnimation ? 32 : 1000000000
       chartInstance.animationSpeed = speed
       setTimeout(() => {

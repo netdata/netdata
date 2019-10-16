@@ -10,6 +10,7 @@
     "easy-pie-chart": "^2.1.7",
     "enzyme": "^3.10.0",
     "enzyme-adapter-react-16": "^1.14.0",
+    "gaugeJS": "1.3.6",
     "jquery": "^2.2.4",
     "perfect-scrollbar": "0.6.15",
     "ramda": "^0.26.1",
