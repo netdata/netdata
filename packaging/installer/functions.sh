@@ -727,3 +727,96 @@ safe_sha256sum() {
 		fatal "I could not find a suitable checksum binary to use"
 	fi
 }
+
+get_crondir() {
+	crondir=
+	[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
+	[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
+
+	echo "${crondir}"
+}
+
+check_crondir_permissions() {
+	if [ -z "${1}" ]; then
+		echo >&2 "Cannot figure out the cron directory to handle netdata-updater.sh activation/deactivation"
+		return 1
+	elif [ "${UID}" -ne "0" ]; then
+		# We cant touch cron if we are not running as root
+		echo >&2 "You need to run the installer as root for auto-updating via cron"
+		return 1
+	fi
+
+	return 0
+}
+
+install_netdata_updater() {
+	if [ "${INSTALLER_DIR}" ] && [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
+		cat "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
+	fi
+
+	if [ "${NETDATA_SOURCE_DIR}" ] && [ -f "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" ]; then
+		cat "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
+	fi
+
+	sed -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" -i "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
+
+	chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh
+	echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh${TPUT_RESET}"
+	echo >&2
+
+	return 0
+}
+
+cleanup_old_netdata_updater() {
+	if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh ]; then
+		echo >&2 "Removing updater from deprecated location"
+		rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
+	fi
+
+	crondir="$(get_crondir)"
+	check_crondir_permissions "${crondir}" || return 1
+
+	if [ -f "${crondir}/netdata-updater.sh" ]; then
+		echo >&2 "Removing incorrect netdata-updater filename in cron"
+		rm -f "${crondir}/netdata-updater.sh"
+	fi
+
+	return 0
+}
+
+enable_netdata_updater() {
+	crondir="$(get_crondir)"
+	check_crondir_permissions "${crondir}" || return 1
+
+	echo >&2 "Adding to cron"
+
+	rm -f "${crondir}/netdata-updater"
+	ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "${crondir}/netdata-updater"
+
+	echo >&2 "Auto-updating has been enabled. Updater script linked to: ${TPUT_RED}${TPUT_BOLD}${crondir}/netdata-update${TPUT_RESET}"
+	echo >&2
+	echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
+	echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
+	echo >&2
+
+	return 0
+}
+
+disable_netdata_updater() {
+	crondir="$(get_crondir)"
+	check_crondir_permissions "${crondir}" || return 1
+
+	echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
+	echo >&2
+
+	if [ -f "${crondir}/netdata-updater" ]; then
+		echo >&2 "Removing cron reference: ${crondir}/netdata-updater"
+		echo >&2
+		rm -f "${crondir}/netdata-updater"
+	else
+		echo >&2 "Did not find any cron entries to remove"
+		echo >&2
+	fi
+
+	return 0
+}

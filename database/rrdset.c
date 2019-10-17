@@ -369,13 +369,13 @@ void rrdset_free(RRDSET *st) {
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_RAM:
-        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Unmapping stats '%s'.", st->name);
             munmap(st, st->memsize);
             break;
 
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
+        case RRD_MEMORY_MODE_DBENGINE:
             freez(st);
             break;
     }
@@ -569,9 +569,9 @@ RRDSET *rrdset_create_custom(
 
     snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", cache_dir);
     if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+       memory_mode == RRD_MEMORY_MODE_RAM) {
         st = (RRDSET *) mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE)?NULL:fullfilename
+                  (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename
                 , size
                 , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
                 , 0
@@ -602,7 +602,7 @@ RRDSET *rrdset_create_custom(
             st->alarms = NULL;
             st->flags = 0x00000000;
 
-            if(memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(st, 0, size);
             }
             else {

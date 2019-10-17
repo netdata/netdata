@@ -103,7 +103,6 @@ PER_THREAD_CHARTS = {
     }
 }
 
-
 # This maps the Unbound stat names to our names and precision requiremnets.
 STAT_MAP = {
     'total.num.queries_ip_ratelimited': ('ratelimit', 1),
@@ -145,6 +144,10 @@ PER_THREAD_STAT_MAP = {
     '{shortname}.recursion.time.avg': ('{shortname}_recursive_avg', PRECISION),
     '{shortname}.recursion.time.median': ('{shortname}_recursive_med', PRECISION)
 }
+
+
+def is_readable(name):
+    return os.access(name, os.R_OK)
 
 
 # Used to actually generate per-thread charts.
@@ -203,31 +206,46 @@ class Service(SocketService):
             self.debug('Using certificate: {0}'.format(self.cert))
 
     def _auto_config(self):
-        if self.ubconf and os.access(self.ubconf, os.R_OK):
-            self.debug('Unbound config: {0}'.format(self.ubconf))
-            conf = dict()
-            try:
-                conf = load_config(self.ubconf)
-            except Exception as error:
-                self.error("error on loading '{0}' : {1}".format(self.ubconf, error))
-            if self.ext is None:
-                if 'extended-statistics' in conf['server']:
-                    self.ext = conf['server']['extended-statistics']
-            if 'remote-control' in conf:
-                if conf['remote-control'].get('control-use-cert', False):
-                    self.key = self.key or conf['remote-control'].get('control-key-file')
-                    self.cert = self.cert or conf['remote-control'].get('control-cert-file')
-                    self.port = self.port or conf['remote-control'].get('control-port')
-                else:
-                    self.unix_socket = self.unix_socket or conf['remote-control'].get('control-interface')
-        else:
-            self.debug('Unbound configuration not found.')
+        self.load_unbound_config()
+
         if not self.key:
             self.key = '/etc/unbound/unbound_control.key'
         if not self.cert:
             self.cert = '/etc/unbound/unbound_control.pem'
         if not self.port:
             self.port = 8953
+
+    def load_unbound_config(self):
+        if not (self.ubconf and is_readable(self.ubconf)):
+            self.debug('Unbound configuration not found.')
+            return
+
+        self.debug('Loading Unbound config: {0}'.format(self.ubconf))
+
+        try:
+            conf = load_config(self.ubconf)
+        except Exception as error:
+            self.error("error on loading '{0}' : {1}".format(self.ubconf, error))
+            return
+
+        srv = conf.get('server')
+        if self.ext is None:
+            if srv and 'extended-statistics' in srv:
+                self.ext = srv['extended-statistics']
+
+        rc = conf.get('remote-control')
+        if not (rc and isinstance(rc, dict)):
+            return
+
+        if rc.get('control-use-cert', False):
+            self.key = self.key or rc.get('control-key-file')
+            self.cert = self.cert or rc.get('control-cert-file')
+            self.port = self.port or rc.get('control-port')
+        else:
+            ci = rc.get('control-interface', str())
+            is_socket = '/' in ci
+            if is_socket:
+                self.unix_socket = ci
 
     def _generate_perthread_charts(self):
         tmporder = list()
@@ -239,6 +257,14 @@ class Service(SocketService):
         self.order.extend(sorted(tmporder))
 
     def check(self):
+        if not is_readable(self.key):
+            self.error("ssl key '{0}' is not readable".format(self.key))
+            return False
+
+        if not is_readable(self.cert):
+            self.error("ssl certificate '{0}' is not readable".format(self.certificate))
+            return False
+
         # Check if authentication is working.
         self._connect()
         result = bool(self._sock)
@@ -268,12 +294,6 @@ class Service(SocketService):
                 self.request = tmp
         return result
 
-    @staticmethod
-    def _check_raw_data(data):
-        # The server will close the connection when it's done sending
-        # data, so just keep looping until that happens.
-        return False
-
     def _get_data(self):
         raw = self._get_raw_data()
         data = dict()
@@ -288,3 +308,9 @@ class Service(SocketService):
         else:
             self.warning('Received no data from socket.')
         return data
+
+    @staticmethod
+    def _check_raw_data(data):
+        # The server will close the connection when it's done sending
+        # data, so just keep looping until that happens.
+        return False

@@ -2569,7 +2569,7 @@ static int collect_data_for_all_processes(void) {
 
     size_t new_procbase_size;
 
-    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
+    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
     if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
         error("sysctl error: Can't get processes data size");
         return 0;

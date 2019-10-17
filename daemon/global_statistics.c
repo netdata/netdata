@@ -534,11 +534,30 @@ void global_statistics_charts(void) {
     // ----------------------------------------------------------------
 
 #ifdef ENABLE_DBENGINE
-    if (localhost->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-        unsigned long long stats_array[RRDENG_NR_STATS];
+    RRDHOST *host;
+    unsigned long long stats_array[RRDENG_NR_STATS] = {0};
+    unsigned long long local_stats_array[RRDENG_NR_STATS];
+    unsigned hosts_with_dbengine = 0, i;
 
-        /* get localhost's DB engine's statistics */
-        rrdeng_get_33_statistics(localhost->rrdeng_ctx, stats_array);
+    rrd_rdlock();
+    rrdhost_foreach_read(host) {
+        if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            ++hosts_with_dbengine;
+            /* get localhost's DB engine's statistics */
+            rrdeng_get_33_statistics(host->rrdeng_ctx, local_stats_array);
+            for (i = 0 ; i < RRDENG_NR_STATS ; ++i) {
+                /* aggregate statistics across hosts */
+                stats_array[i] += local_stats_array[i];
+            }
+        }
+    }
+    rrd_unlock();
+
+    if (hosts_with_dbengine) {
+        /* deduplicate global statistics by getting the ones from the last host */
+        stats_array[30] = local_stats_array[30];
+        stats_array[31] = local_stats_array[31];
+        stats_array[32] = local_stats_array[32];
 
         // ----------------------------------------------------------------
 
@@ -639,7 +658,7 @@ void global_statistics_charts(void) {
             static RRDSET *st_pg_cache_pages = NULL;
             static RRDDIM *rd_descriptors = NULL;
             static RRDDIM *rd_populated = NULL;
-            static RRDDIM *rd_commited = NULL;
+            static RRDDIM *rd_committed = NULL;
             static RRDDIM *rd_insertions = NULL;
             static RRDDIM *rd_deletions = NULL;
             static RRDDIM *rd_backfills = NULL;
@@ -663,7 +682,7 @@ void global_statistics_charts(void) {
 
                 rd_descriptors = rrddim_add(st_pg_cache_pages, "descriptors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_populated = rrddim_add(st_pg_cache_pages, "populated", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                rd_commited = rrddim_add(st_pg_cache_pages, "commited", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rd_committed = rrddim_add(st_pg_cache_pages, "committed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_insertions = rrddim_add(st_pg_cache_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rd_deletions = rrddim_add(st_pg_cache_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rd_backfills = rrddim_add(st_pg_cache_pages, "backfills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -674,7 +693,7 @@ void global_statistics_charts(void) {
 
             rrddim_set_by_pointer(st_pg_cache_pages, rd_descriptors, (collected_number)stats_array[27]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_populated, (collected_number)stats_array[3]);
-            rrddim_set_by_pointer(st_pg_cache_pages, rd_commited, (collected_number)stats_array[4]);
+            rrddim_set_by_pointer(st_pg_cache_pages, rd_committed, (collected_number)stats_array[4]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_insertions, (collected_number)stats_array[5]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_deletions, (collected_number)stats_array[6]);
             rrddim_set_by_pointer(st_pg_cache_pages, rd_backfills, (collected_number)stats_array[9]);
@@ -817,6 +836,63 @@ void global_statistics_charts(void) {
             /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
             rrddim_set_by_pointer(st_fd, rd_fd_max, (collected_number)rlimit_nofile.rlim_cur / 4);
             rrdset_done(st_fd);
+        }
+
+        // ----------------------------------------------------------------
+
+        {
+            static RRDSET *st_ram_usage = NULL;
+            static RRDDIM *rd_cached = NULL;
+            static RRDDIM *rd_pinned = NULL;
+            static RRDDIM *rd_metadata = NULL;
+
+            collected_number cached_pages, pinned_pages, API_producers, populated_pages, metadata, pages_on_disk,
+            page_cache_descriptors;
+
+            if (unlikely(!st_ram_usage)) {
+                st_ram_usage = rrdset_create_localhost(
+                "netdata"
+                , "dbengine_ram"
+                , NULL
+                , "dbengine"
+                , NULL
+                , "NetData DB engine RAM usage"
+                , "MiB"
+                , "netdata"
+                , "stats"
+                , 130509
+                , localhost->rrd_update_every
+                , RRDSET_TYPE_STACKED
+                );
+
+                rd_cached = rrddim_add(st_ram_usage, "cache", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
+                rd_pinned = rrddim_add(st_ram_usage, "collectors", NULL, 1, 256, RRD_ALGORITHM_ABSOLUTE);
+                rd_metadata = rrddim_add(st_ram_usage, "metadata", NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
+            }
+            else
+                rrdset_next(st_ram_usage);
+
+            API_producers = (collected_number)stats_array[0];
+            pages_on_disk = (collected_number)stats_array[2];
+            populated_pages = (collected_number)stats_array[3];
+            page_cache_descriptors = (collected_number)stats_array[27];
+
+            if (API_producers * 2 > populated_pages) {
+                pinned_pages = API_producers;
+            } else{
+                pinned_pages = API_producers * 2;
+            }
+            cached_pages = populated_pages - pinned_pages;
+
+            metadata = page_cache_descriptors * sizeof(struct page_cache_descr);
+            metadata += pages_on_disk * sizeof(struct rrdeng_page_descr);
+            /* This is an empirical estimation for Judy array indexing and extent structures */
+            metadata += pages_on_disk * 58;
+
+            rrddim_set_by_pointer(st_ram_usage, rd_cached, cached_pages);
+            rrddim_set_by_pointer(st_ram_usage, rd_pinned, pinned_pages);
+            rrddim_set_by_pointer(st_ram_usage, rd_metadata, metadata);
+            rrdset_done(st_ram_usage);
         }
     }
 #endif

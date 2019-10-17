@@ -1790,7 +1790,7 @@ int main (int argc, char **argv) {
 
     errno = 0;
 
-    if(freq > netdata_update_every)
+    if(freq >= netdata_update_every)
         netdata_update_every = freq;
 
     else if(freq)

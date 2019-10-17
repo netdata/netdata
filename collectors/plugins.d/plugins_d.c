@@ -647,7 +647,7 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
         if (cd->pid) {
             siginfo_t info;
             info("killing child process pid %d", cd->pid);
-            if (killpid(cd->pid, SIGTERM) != -1) {
+            if (killpid(cd->pid) != -1) {
                 info("waiting for child process pid %d to exit...", cd->pid);
                 waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
             }
@@ -738,7 +738,7 @@ void *pluginsd_worker_thread(void *arg) {
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
         count = pluginsd_process(localhost, cd, fp, 0);
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
-        killpid(cd->pid, SIGTERM);
+        killpid(cd->pid);
 
         int worker_ret_code = mypclose(fp, cd->pid);
 
@@ -778,6 +778,9 @@ void *pluginsd_main(void *ptr) {
     int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
     int scan_frequency = (int) config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
     if(scan_frequency < 1) scan_frequency = 1;
+
+    // disable some plugins by default
+    config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop

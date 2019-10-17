@@ -1559,7 +1559,7 @@ RRDR *rrd2rrdr(
                                                                       rrd_update_every, first_entry_t,
                                                                       last_entry_t);
 #ifdef ENABLE_DBENGINE
-    if ((st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)) {
+    if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         struct rrdeng_region_info *region_info_array;
         unsigned regions, max_interval;
 

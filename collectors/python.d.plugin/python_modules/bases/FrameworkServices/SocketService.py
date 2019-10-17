@@ -14,6 +14,12 @@ except ImportError:
 else:
     _TLS_SUPPORT = True
 
+if _TLS_SUPPORT:
+    try:
+        PROTOCOL_TLS = ssl.PROTOCOL_TLS
+    except AttributeError:
+        PROTOCOL_TLS = ssl.PROTOCOL_SSLv23
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 
@@ -80,15 +86,18 @@ class SocketService(SimpleService):
         if self.tls:
             try:
                 self.debug('Encapsulating socket with TLS')
+                self.debug('Using keyfile: {0}, certfile: {1}, cert_reqs: {2}, ssl_version: {3}'.format(
+                    self.key, self.cert, ssl.CERT_NONE, PROTOCOL_TLS
+                ))
                 self._sock = ssl.wrap_socket(self._sock,
                                              keyfile=self.key,
                                              certfile=self.cert,
                                              server_side=False,
                                              cert_reqs=ssl.CERT_NONE,
-                                             ssl_version=ssl.PROTOCOL_TLS,
+                                             ssl_version=PROTOCOL_TLS,
                                              )
-            except (socket.error, ssl.SSLError) as error:
-                self.error('failed to wrap socket : {0}'.format(error))
+            except (socket.error, ssl.SSLError, IOError, OSError) as error:
+                self.error('failed to wrap socket : {0}'.format(repr(error)))
                 self._disconnect()
                 self.__socket_config = None
                 return False
@@ -167,7 +176,8 @@ class SocketService(SimpleService):
                         if self._connect2socket(res):
                             break
 
-        except Exception:
+        except Exception as error:
+            self.error('unhandled exception during connect : {0}'.format(repr(error)))
             self._sock = None
             self.__socket_config = None
 

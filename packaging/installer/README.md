@@ -333,7 +333,7 @@ This is how to install the latest Netdata version from sources on FreeBSD:
 
 ```sh
 # install required packages
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof
+pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c
 
 # download Netdata
 git clone https://github.com/netdata/netdata.git --depth=100
@@ -347,15 +347,17 @@ cd netdata
 
 To install Netdata on pfSense, run the following commands (within a shell or under the **Diagnostics/Command** prompt within the pfSense web interface).
 
-Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata and Python are downloaded from the FreeBSD repository.
+Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata, Judy and Python are downloaded from the FreeBSD repository.
 
 ```sh
 pkg install pkgconf
 pkg install bash
 pkg install e2fsprogs-libuuid
 pkg install libuv
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.9.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.15.0.txz
+ln -s /usr/local/lib/libjson-c.so /usr/local/lib/libjson-c.so.4
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.17.1.txz
 ```
 **Note:** If you receive a ` Not Found` error during the last two commands above, you will either need to manually look in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its URL instead, or you can try manually changing the netdata version in the URL to the latest version.  
 

@@ -2,6 +2,8 @@
 
 #include "common.h"
 
+static int reaper_enabled = 0;
+
 typedef enum signal_action {
     NETDATA_SIGNAL_END_OF_LIST,
     NETDATA_SIGNAL_IGNORE,
@@ -10,6 +12,7 @@ typedef enum signal_action {
     NETDATA_SIGNAL_LOG_ROTATE,
     NETDATA_SIGNAL_RELOAD_HEALTH,
     NETDATA_SIGNAL_FATAL,
+    NETDATA_SIGNAL_CHILD,
 } SIGNAL_ACTION;
 
 static struct {
@@ -26,6 +29,7 @@ static struct {
         { SIGUSR1, "SIGUSR1", 0, NETDATA_SIGNAL_SAVE_DATABASE },
         { SIGUSR2, "SIGUSR2", 0, NETDATA_SIGNAL_RELOAD_HEALTH },
         { SIGBUS,  "SIGBUS",  0, NETDATA_SIGNAL_FATAL         },
+        { SIGCHLD, "SIGCHLD", 0, NETDATA_SIGNAL_CHILD         },
 
         // terminator
         { 0,       "NONE",    0, NETDATA_SIGNAL_END_OF_LIST   }
@@ -42,7 +46,7 @@ static void signal_handler(int signo) {
                 char buffer[200 + 1];
                 snprintfz(buffer, 200, "\nSIGNAL HANLDER: received: %s. Oops! This is bad!\n", signals_waiting[i].name);
                 if(write(STDERR_FILENO, buffer, strlen(buffer)) == -1) {
-                    // nothing to do - we cannot write but there is no way to complaint about it
+                    // nothing to do - we cannot write but there is no way to complain about it
                     ;
                 }
             }
@@ -74,15 +78,33 @@ void signals_init(void) {
     struct sigaction sa;
     sa.sa_flags = 0;
 
+    // Enable process tracking / reaper if running as init (pid == 1).
+    // This prevents zombie processes when running in a container.
+    if (getpid() == 1) {
+        info("SIGNAL: Enabling reaper");
+        myp_init();
+        reaper_enabled = 1;
+    } else {
+        info("SIGNAL: Not enabling reaper");
+    }
+
     // ignore all signals while we run in a signal handler
     sigfillset(&sa.sa_mask);
 
     int i;
     for (i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
-        if(signals_waiting[i].action == NETDATA_SIGNAL_IGNORE)
+        switch (signals_waiting[i].action) {
+        case NETDATA_SIGNAL_IGNORE:
             sa.sa_handler = SIG_IGN;
-        else
+            break;
+        case NETDATA_SIGNAL_CHILD:
+            if (reaper_enabled == 0)
+                continue;
+            // FALLTHROUGH
+        default:
             sa.sa_handler = signal_handler;
+            break;
+        }
 
         if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
             error("SIGNAL: Failed to change signal handler for: %s", signals_waiting[i].name);
@@ -99,6 +121,76 @@ void signals_reset(void) {
     for (i = 0; signals_waiting[i].action != NETDATA_SIGNAL_END_OF_LIST; i++) {
         if(sigaction(signals_waiting[i].signo, &sa, NULL) == -1)
             error("SIGNAL: Failed to reset signal handler for: %s", signals_waiting[i].name);
+    }
+
+    if (reaper_enabled == 1)
+        myp_free();
+}
+
+// reap_child reaps the child identified by pid.
+static void reap_child(pid_t pid) {
+    siginfo_t i;
+
+    errno = 0;
+    debug(D_CHILDS, "SIGNAL: Reaping pid: %d...", pid);
+    if (waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
+        if (errno != ECHILD)
+            error("SIGNAL: Failed to wait for: %d", pid);
+        else
+            debug(D_CHILDS, "SIGNAL: Already reaped: %d", pid);
+        return;
+    } else if (i.si_pid == 0) {
+        // Process didn't exit, this shouldn't happen.
+        return;
+    }
+
+    switch (i.si_code) {
+    case CLD_EXITED:
+        debug(D_CHILDS, "SIGNAL: Child %d exited: %d", pid, i.si_status);
+        break;
+    case CLD_KILLED:
+        debug(D_CHILDS, "SIGNAL: Child %d killed by signal: %d", pid, i.si_status);
+        break;
+    case CLD_DUMPED:
+        debug(D_CHILDS, "SIGNAL: Child %d dumped core by signal: %d", pid, i.si_status);
+        break;
+    case CLD_STOPPED:
+        debug(D_CHILDS, "SIGNAL: Child %d stopped by signal: %d", pid, i.si_status);
+        break;
+    case CLD_TRAPPED:
+        debug(D_CHILDS, "SIGNAL: Child %d trapped by signal: %d", pid, i.si_status);
+        break;
+    case CLD_CONTINUED:
+        debug(D_CHILDS, "SIGNAL: Child %d continued by signal: %d", pid, i.si_status);
+        break;
+    default:
+        debug(D_CHILDS, "SIGNAL: Child %d gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
+    }
+}
+
+// reap_children reaps all pending children which are not managed by myp.
+static void reap_children() {
+    siginfo_t i;
+
+    while (1 == 1) {
+        // Identify which process caused the signal so we can determine
+        // if we need to reap a re-parented process.
+        i.si_pid = 0;
+        if (waitid(P_ALL, (id_t)0, &i, WEXITED|WNOHANG|WNOWAIT) == -1) {
+            if (errno != ECHILD) // This shouldn't happen with WNOHANG but does.
+                error("SIGNAL: Failed to wait");
+            return;
+        } else if (i.si_pid == 0) {
+            // No child exited.
+            return;
+        } else if (myp_reap(i.si_pid) == 0) {
+            // myp managed, sleep for a short time to avoid busy wait while
+            // this is handled by myp.
+            usleep(10000);
+        } else {
+            // Unknown process, likely a re-parented child, reap it.
+            reap_child(i.si_pid);
+        }
     }
 }
 
@@ -156,6 +248,11 @@ void signals_handle(void) {
 
                             case NETDATA_SIGNAL_FATAL:
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
+
+                            case NETDATA_SIGNAL_CHILD:
+                                debug(D_CHILDS, "SIGNAL: Received %s. Reaping...", name);
+                                reap_children();
+                                break;
 
                             default:
                                 info("SIGNAL: Received %s. No signal handler configured. Ignoring it.", name);
