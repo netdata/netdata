@@ -32,10 +32,10 @@ CHARTS = {
         ]
     },
     'recursion': {
-        'options': [None, 'Recursion Timings', 'seconds', 'Unbound', 'unbound.recursion', 'line'],
+        'options': [None, 'Recursion Timings', 'milliseconds', 'Unbound', 'unbound.recursion', 'line'],
         'lines': [
-            ['recursive_avg', 'average', 'absolute', 1, PRECISION],
-            ['recursive_med', 'median', 'absolute', 1, PRECISION]
+            ['recursive_avg', 'average', 'absolute', 1, 1],
+            ['recursive_med', 'median', 'absolute', 1, 1]
         ]
     },
     'reqlist': {
@@ -83,11 +83,11 @@ PER_THREAD_CHARTS = {
         ]
     },
     '_recursion': {
-        'options': [None, '{longname} Recursion Timings', 'seconds', 'Recursive Timings',
+        'options': [None, '{longname} Recursion Timings', 'milliseconds', 'Recursive Timings',
                     'unbound.threads.recursion', 'line'],
         'lines': [
-            ['{shortname}_recursive_avg', 'average', 'absolute', 1, PRECISION],
-            ['{shortname}_recursive_med', 'median', 'absolute', 1, PRECISION]
+            ['{shortname}_recursive_avg', 'average', 'absolute', 1, 1],
+            ['{shortname}_recursive_med', 'median', 'absolute', 1, 1]
         ]
     },
     '_reqlist': {
@@ -117,6 +117,7 @@ STAT_MAP = {
     'total.requestlist.exceeded': ('reqlist_exceeded', 1),
     'total.requestlist.current.all': ('reqlist_current', 1),
     'total.requestlist.current.user': ('reqlist_user', 1),
+    # Unbound reports recursion timings as fractional seconds, but we want to show them as milliseconds.
     'total.recursion.time.avg': ('recursive_avg', PRECISION),
     'total.recursion.time.median': ('recursive_med', PRECISION),
     'msg.cache.count': ('cache_message', 1),
@@ -141,6 +142,7 @@ PER_THREAD_STAT_MAP = {
     '{shortname}.requestlist.exceeded': ('{shortname}_reqlist_exceeded', 1),
     '{shortname}.requestlist.current.all': ('{shortname}_reqlist_current', 1),
     '{shortname}.requestlist.current.user': ('{shortname}_reqlist_user', 1),
+    # Unbound reports recursion timings as fractional seconds, but we want to show them as milliseconds.
     '{shortname}.recursion.time.avg': ('{shortname}_recursive_avg', PRECISION),
     '{shortname}.recursion.time.median': ('{shortname}_recursive_med', PRECISION)
 }
