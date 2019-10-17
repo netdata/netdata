@@ -22,6 +22,7 @@
 - Fix BSD/pfSense documentation [\#7041](https://github.com/netdata/netdata/pull/7041) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add dbengine RAM usage statistics [\#7038](https://github.com/netdata/netdata/pull/7038) ([mfundul](https://github.com/mfundul))
 - Don't write an HTTP response 204 to logs [\#7035](https://github.com/netdata/netdata/pull/7035) ([vlvkobal](https://github.com/vlvkobal))
+- Documenting the structure of the data responses. [\#7012](https://github.com/netdata/netdata/pull/7012) ([amoss](https://github.com/amoss))
 - Tutorials to support v1.18 features [\#6993](https://github.com/netdata/netdata/pull/6993) ([joelhans](https://github.com/joelhans))
 - Add CMocka unit tests [\#6985](https://github.com/netdata/netdata/pull/6985) ([vlvkobal](https://github.com/vlvkobal))
 
@@ -264,8 +265,6 @@
 - New 'homepage' for documentation site [\#6428](https://github.com/netdata/netdata/pull/6428) ([joelhans](https://github.com/joelhans))
 - Utf8 Badge Fix And URL Parser International Support \(initial\) [\#6426](https://github.com/netdata/netdata/pull/6426) ([underhood](https://github.com/underhood))
 - Styling improvements to documentation [\#6425](https://github.com/netdata/netdata/pull/6425) ([joelhans](https://github.com/joelhans))
-- Netdata/packaging: Add documentation for binary packages, plus draft table for distributions support [\#6422](https://github.com/netdata/netdata/pull/6422) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging/doc: Update documentation dependencies [\#6421](https://github.com/netdata/netdata/pull/6421) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
