@@ -569,12 +569,13 @@ ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER HO
 ### Stream charts wrong
 
 When the slave sends data to master, the charts need to be aligned during the same interval of time. If there are gaps in metrics collection,
-these gaps need to be consistent between slave and master nodes. If there are differences between charts, it often means that your master's `memory mode` is not configured correctly.
+these gaps need to be consistent between slave and master nodes. If there are differences between charts, it often means that your master's `memory mode` is not adjusted 
+according the master necessity, check the [memory mode documentation](../database).  
 
 ### Forbidding access
 
 If the master reports errors about forbidding access, it could be because of a slow connection between the master and slave nodes.
-But, there are other reasons for this error. The complete message you would see in your log file would look something like this:
+But, it also can be because errors that we show in this subsection. The complete message you would see in your log file would look something like this:
 
 ```
 STREAM [receive from [SLAVE HOSTNAME]:SLAVE IP]: `MESSAGE`. Forbidding access."
