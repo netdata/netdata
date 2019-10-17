@@ -16,9 +16,9 @@ else:
 
 if _TLS_SUPPORT:
     try:
-        from ssl import PROTOCOL_TLS
-    except ImportError:
-        from ssl import PROTOCOL_SSLv23 as PROTOCOL_TLS
+        PROTOCOL_TLS = ssl.PROTOCOL_TLS
+    except AttributeError:
+        PROTOCOL_TLS = ssl.PROTOCOL_SSLv23
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
