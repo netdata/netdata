@@ -99,7 +99,7 @@ paths:
     get:
       summary: Get collected data for a specific chart
       description: >-
-        The Data endpoint returns data stored in the round robin database of a
+        The data endpoint returns data stored in the round robin database of a
         chart.
       parameters:
         - name: chart
@@ -278,7 +278,7 @@ paths:
             The call was successful. The response includes the data in the
             format requested. Swagger2.0 does not process the discriminator
             field to show polymorphism. The response will be one of the
-            sub-types of  the data-schema according to the chosen format, e.g.
+            sub-types of the data-schema according to the chosen format, e.g.
             json -> data_json.
           schema:
             $ref: '#/definitions/data'
@@ -967,7 +967,7 @@ definitions:
         description: Chart health green threshold.
       red:
         type: number
-        description: Chart health red trheshold.
+        description: Chart health red threshold.
   alarm_variables:
     type: object
     properties:
@@ -1135,7 +1135,7 @@ definitions:
                 description: >-
                   The data requested, one element per sample with each element
                   containing the values of the dimensions described in the
-                  labels value. 
+                  labels value.
                 type: array
                 items:
                   type: number
