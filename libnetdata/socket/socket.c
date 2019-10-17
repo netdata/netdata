@@ -1021,8 +1021,8 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
         if (err != 0 ||
             (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
                               NULL, 0, NI_NAMEREQD)) != 0) {
-            error("Incoming connection on '%s' does not match a numeric pattern, "
-                  "and host could not be resolved (err=%s)", client_ip, gai_strerror(err));
+            error("Incoming %s on '%s' does not match a numeric pattern, "
+                  "and host could not be resolved (err=%s)", patname, client_ip, gai_strerror(err));
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
             return 0;

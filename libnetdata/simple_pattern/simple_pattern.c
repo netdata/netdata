@@ -260,3 +260,22 @@ void simple_pattern_free(SIMPLE_PATTERN *list) {
 
     free_pattern(((struct simple_pattern *)list));
 }
+
+/* Don't call this in production code - it is useful for debugging
+*/
+extern void simple_pattern_dump(SIMPLE_PATTERN *p) {
+    struct simple_pattern *root = (struct simple_pattern *)p;
+    if(root==NULL) {
+        error("dump_pattern(NULL)");
+        return;
+    }
+    /*if(root->match==NULL) {
+        error("dump_pattern(%p)->NULL",root);
+        return;
+    }*/
+    error("dump_pattern(%p) child=%p next=%p mode=%d match=%s",root,root->child,root->next,root->mode,root->match);
+    if(root->child!=NULL)
+        simple_pattern_dump((SIMPLE_PATTERN*)root->child);
+    if(root->next!=NULL)
+        simple_pattern_dump((SIMPLE_PATTERN*)root->next);
+}
