@@ -541,11 +541,11 @@ will not have condition to understand the message received and it will write the
 ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
 ```
 
-in this example, 'B' was part of a 'BEGIN' message that was cut due connection problems.
+In this example, 'B' was part of a 'BEGIN' message that was cut due connection problems.
 
 The last problem related to slow connections happens when some message was missed and the following commands received had a
-direct connection with it, for example, when the slave could not send the list of charts available on its host and it
-sends in the sequence a 'SET' message on a chart that was missed, the master will show a messages like this
+direct connection with it. For example, when the slave could not send the list of charts available on its host and it
+sends in the sequence a 'SET' message on a chart that was missed, the master will show a messages like this:
 
 ```
 ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
@@ -560,13 +560,13 @@ Netdata will write a message like this in the slave log
 ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'MASTER IP', port 'MASTER PORT' (errno 113, No route to host)
 ```
 
-this error can also happen case the firewall on master is not allowing connections to the master port.
+This error can also happen case the firewall on master is not allowing connections to the master port.
 
 ### Is this a Netdata?
 
-The question that names this section can appear when Netdata is starting the stream, this happens when the slave does not receive the
-expected return for the beginning of the communication. There are different motives for this happen and the main motive among them is the fact that master was
-configured with SSL activated while the slave tried to send a plain text information. The complete error message will have the format
+This question can appear when Netdata starts the stream and receives an unexpected response when connecting to the slave for the first time. 
+This error can appear for a number of different reasons, but the most common is that the master node has SSL activated and the slave sent a plain text response. 
+The complete error message will look like this:
 
 ```
 ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER HOSTNAME:MASTER PORT]: server is not replying properly (is it a netdata?).
@@ -586,7 +586,7 @@ But, there are other reasons for this error. The complete message you would see 
 STREAM [receive from [SLAVE HOSTNAME]:SLAVE IP]: `MESSAGE`. Forbidding access."
 ```
 
-where `MESSAGE` will have one of the following patterns:
+`MESSAGE` will have one of the following patterns:
 
 - `request without KEY` : The message received is incomplete and the KEY value can be API, hostname, machine GUID.
 - `API key 'VALUE' is not valid GUID`: The UUID received from slave does not have the format defined in RFC 4122(https://tools.ietf.org/html/rfc4122)
