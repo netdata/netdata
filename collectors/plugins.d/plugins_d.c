@@ -779,6 +779,9 @@ void *pluginsd_main(void *ptr) {
     int scan_frequency = (int) config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
     if(scan_frequency < 1) scan_frequency = 1;
 
+    // disable some plugins by default
+    config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
+
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
     int directory_errors[PLUGINSD_MAX_DIRECTORIES] =  { 0 };

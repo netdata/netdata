@@ -7,30 +7,27 @@ Many people think Netdata can only store about an hour's worth of real-time metr
 configuration today. With the right settings, Netdata is quite capable of efficiently storing hours or days worth of
 historical, per-second metrics without having to rely on a [backend](../../backends/).
 
-This tutorial gives two options for configuring Netdata to store more metrics. We recommend the [**database
-engine**](#using-the-database-engine), as it will soon be the default configuration. However, you can stick with the
-current default **round-robin database** if you prefer.
+This tutorial gives two options for configuring Netdata to store more metrics. **We recommend the default [database
+engine](#using-the-database-engine)**, but you can stick with or switch to the round-robin database if you prefer.
 
 Let's get started.
 
 ## Using the database engine
 
 The database engine uses RAM to store recent metrics while also using a "spill to disk" feature that takes advantage of
-available disk space for long-term metrics storage.This feature of the database engine allows you to store a much larger
-dataset than your system's available RAM.
+available disk space for long-term metrics storage. This feature of the database engine allows you to store a much
+larger dataset than your system's available RAM.
 
-The database engine will eventually become the default method of retaining metrics, but until then, you can switch to
-the database engine by changing a single option.
-
-Edit your `netdata.conf` file and change the `memory mode` setting to `dbengine`:
+The database engine is currently the default method of storing metrics, but if you're not sure which database you're
+using, check out your `netdata.conf` file and look for the `memory mode` setting:
 
 ```conf
 [global]
     memory mode = dbengine
 ```
 
-Next, restart Netdata. On Linux systems, we recommend running `sudo service netdata restart`. You're now using the
-database engine!
+If `memory mode` is set to anything but `dbengine`, change it and restart Netdata using the standard command for
+restarting services on your system. You're now using the database engine!
 
 > Learn more about how we implemented the database engine, and our vision for its future, on our blog: [_How and why
 > we're bringing long-term storage to Netdata_](https://blog.netdata.cloud/posts/db-engine/).
@@ -55,10 +52,11 @@ size` and `dbengine disk space`.
 `dbengine disk space` sets the maximum disk space (again, in MiB) the database engine will use for storing compressed
 metrics.
 
-Based on our testing, these default settings will retain about two day's worth of metrics when Netdata collects 2,000
-metrics every second.
+Based on our testing, these default settings will retain about a day's worth of metrics when Netdata collects roughly
+4,000 metrics every second. If you increase either `page cache size` or `dbengine disk space`, Netdata will retain even
+more historical metrics.
 
-If you'd like to change these options, read more about the [database engine's memory
+But before you change these options too dramatically, read up on the [database engine's memory
 footprint](../../database/engine/README.md#memory-requirements).
 
 With the database engine active, you can back up your `/var/cache/netdata/dbengine/` folder to another location for
@@ -69,15 +67,18 @@ aren't ready to make the move.
 
 ## Using the round-robin database
 
-By default, Netdata uses a round-robin database to store 1 hour of per-second metrics. Here's the default setting for
-`history` in the `netdata.conf` file that comes pre-installed with Netdata.
+In previous versions, Netdata used a round-robin database to store 1 hour of per-second metrics. 
+
+To see if you're still using this database, or if you would like to switch to it, open your `netdata.conf` file and see
+if `memory mode` option is set to `save`.
 
 ```conf
 [global]
-    history = 3600
+    memory mode = save
 ```
 
-One hour has 3,600 seconds, hence the `3600` value!
+If `memory mode` is set to `save`, then you're using the round-robin database. If so, the `history` option is set to
+`3600`, which is the equivalent to 3,600 seconds, or one hour. 
 
 To increase your historical metrics, you can increase `history` to the number of seconds you'd like to store:
 

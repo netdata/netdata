@@ -173,6 +173,9 @@ tests/alarm_repetition/alarm.sh
 tests/template_dimension/template_dim.sh
 
 # tests and temp files
+test-driver
+**/tests/*_testdriver
+**/tests/*_testdriver.trs
 python.d/python-modules-installer.sh
 
 # documentation generated files

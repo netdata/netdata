@@ -5,14 +5,14 @@
 * @ktsaou @cakrit @cosmix
 
 # Ownership by directory structure
-.travis/ @cakrit @cosmix
-.github/ @cakrit @cosmix
+.travis/ @cakrit @cosmix @knatsakis
+.github/ @cakrit @cosmix @knatsakis
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @cakrit @cosmix
+build/ @cakrit @cosmix @knatsakis
 collectors/ @vlvkobal @mfundul @cakrit @cosmix
 collectors/charts.d.plugin/ @cakrit @cosmix
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cakrit @cosmix
@@ -30,9 +30,7 @@ health/ @thiagoftsm @vlvkobal @cakrit @cosmix
 health/health.d/ @thiagoftsm @vlvkobal @cakrit @cosmix
 health/notifications/ @Ferroin @thiagoftsm @cakrit @cosmix
 libnetdata/ @thiagofsm @mfundul @cakrit @cosmix
-packaging/ @cakrit @cosmix
-packaging/installer/ @cakrit @cosmix
-packaging/makeself/ @cakrit @cosmix
+packaging/ @cakrit @cosmix @knatsakis
 registry/ @VLegakis @cakrit @cosmix
 streaming/ @thiagoftsm @vlvkobal @cakrit @cosmix
 web/ @thiagoftsm @mfundul @vlvkobal @cakrit @cosmix
@@ -40,19 +38,19 @@ web/gui/ @VLegakis @cakrit @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @cakrit @cosmix @joelhans
-*.am @cakrit @cosmix
+*.am @cakrit @cosmix @knatsakis
 
 # Ownership of specific files
-.gitignore @cakrit @cosmix
-.travis.yml @cakrit @cosmix
-.lgtm.yml @cakrit @cosmix
-.eslintrc @cakrit @cosmix
-.eslintignore @cakrit @cosmix
-.csslintrc @cakrit @cosmix
-.codeclimate.yml @cakrit @cosmix
-.codacy.yml @cakrit @cosmix
-netdata.spec.in @cakrit @cosmix
-netdata-installer.sh @cakrit @cosmix
+.gitignore @cakrit @cosmix @knatsakis
+.travis.yml @cakrit @cosmix @knatsakis
+.lgtm.yml @cakrit @cosmix @knatsakis
+.eslintrc @cakrit @cosmix @knatsakis
+.eslintignore @cakrit @cosmix @knatsakis
+.csslintrc @cakrit @cosmix @knatsakis
+.codeclimate.yml @cakrit @cosmix @knatsakis
+.codacy.yml @cakrit @cosmix @knatsakis
+netdata.spec.in @cakrit @cosmix @knatsakis
+netdata-installer.sh @cakrit @cosmix @knatsakis
 netlify.toml @cakrit @cosmix
 package.json @VLegakis
 packaging/version @netdatabot

@@ -198,34 +198,45 @@ class Service(UrlService):
         data.update(stats)
 
         stats = self.get_vhosts_stats()
-        if not stats:
-            return None
-
-        data.update(stats)
+        if stats:
+            data.update(stats)
 
         return data or None
 
     def get_overview_stats(self):
         url = '{0}/{1}'.format(self.url, API_OVERVIEW)
+        self.debug("doing http request to '{0}'".format(url))
         raw = self._get_raw_data(url)
         if not raw:
             return None
 
         data = loads(raw)
         self.node_name = data['node']
-        return fetch_data(raw_data=data, metrics=OVERVIEW_STATS)
+        self.debug("found node name: '{0}'".format(self.node_name))
+
+        stats = fetch_data(raw_data=data, metrics=OVERVIEW_STATS)
+        self.debug("number of metrics: {0}".format(len(stats)))
+        return stats
 
     def get_nodes_stats(self):
+        if self.node_name == "":
+            self.error("trying to get node stats, but node name is not set")
+            return None
+
         url = '{0}/{1}/{2}'.format(self.url, API_NODE, self.node_name)
+        self.debug("doing http request to '{0}'".format(url))
         raw = self._get_raw_data(url)
         if not raw:
             return None
 
         data = loads(raw)
-        return fetch_data(raw_data=data, metrics=NODE_STATS)
+        stats = fetch_data(raw_data=data, metrics=NODE_STATS)
+        self.debug("number of metrics: {0}".format(len(stats)))
+        return stats
 
     def get_vhosts_stats(self):
         url = '{0}/{1}'.format(self.url, API_VHOSTS)
+        self.debug("doing http request to '{0}'".format(url))
         raw = self._get_raw_data(url)
         if not raw:
             return None
@@ -245,6 +256,7 @@ class Service(UrlService):
 
             data.update(self.vhost.msg_stats())
 
+        self.debug("number of vhosts: {0}, metrics: {1}".format(len(vhosts), len(data)))
         return data
 
     def add_vhost_charts(self, vhost_name):
