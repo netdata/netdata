@@ -132,12 +132,12 @@ static void reap_child(pid_t pid) {
     siginfo_t i;
 
     errno = 0;
-    info("SIGNAL: Reaping pid: %d...", pid);
+    debug("SIGNAL: Reaping pid: %d...", pid);
     if (waitid(P_PID, (id_t)pid, &i, WEXITED|WNOHANG) == -1) {
         if (errno != ECHILD)
             error("SIGNAL: Failed to wait for: %d", pid);
         else
-            info("SIGNAL: Already reaped: %d", pid);
+            debug("SIGNAL: Already reaped: %d", pid);
         return;
     } else if (i.si_pid == 0) {
         // Process didn't exit, this shouldn't happen.
@@ -146,25 +146,25 @@ static void reap_child(pid_t pid) {
 
     switch (i.si_code) {
     case CLD_EXITED:
-        info("SIGNAL: Child %d exited: %d", pid, i.si_status);
+        debug("SIGNAL: Child %d exited: %d", pid, i.si_status);
         break;
     case CLD_KILLED:
-        info("SIGNAL: Child %d killed by signal: %d", pid, i.si_status);
+        debug("SIGNAL: Child %d killed by signal: %d", pid, i.si_status);
         break;
     case CLD_DUMPED:
-        info("SIGNAL: Child %d dumped core by signal: %d", pid, i.si_status);
+        debug("SIGNAL: Child %d dumped core by signal: %d", pid, i.si_status);
         break;
     case CLD_STOPPED:
-        info("SIGNAL: Child %d stopped by signal: %d", pid, i.si_status);
+        debug("SIGNAL: Child %d stopped by signal: %d", pid, i.si_status);
         break;
     case CLD_TRAPPED:
-        info("SIGNAL: Child %d trapped by signal: %d", pid, i.si_status);
+        debug("SIGNAL: Child %d trapped by signal: %d", pid, i.si_status);
         break;
     case CLD_CONTINUED:
-        info("SIGNAL: Child %d continued by signal: %d", pid, i.si_status);
+        debug("SIGNAL: Child %d continued by signal: %d", pid, i.si_status);
         break;
     default:
-        error("SIGNAL: Child %d gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
+        debug("SIGNAL: Child %d gave us a SIGCHLD with code %d and status %d.", pid, i.si_code, i.si_status);
     }
 }
 
@@ -250,7 +250,7 @@ void signals_handle(void) {
                                 fatal("SIGNAL: Received %s. netdata now exits.", name);
 
                             case NETDATA_SIGNAL_CHILD:
-                                info("SIGNAL: Received %s. Reaping...", name);
+                                debug("SIGNAL: Received %s. Reaping...", name);
                                 reap_children();
                                 break;
 
