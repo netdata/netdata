@@ -513,29 +513,25 @@ For a practical example see [Monitoring ephemeral nodes](#monitoring-ephemeral-n
 
 ## Troubleshooting streaming connections
 
-Sometimes when you are configuring master and slave nodes you can have some errors in your log files, in this section it
-is described the most common errors.
+This section describes the most common issues you may encounter in a connection between a slave and a master.
 
 ### Connection between slave and master is slow
 
 When you have a slow connection between master and slave, Netdata can raise different errors related to this problem.
-The slave Netdata will log a majority of error messages.
+Most of the errors will appear in the slave's `error.log`
 
 ```
 netdata ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER IP:MASTER PORT]: too many data pending - buffer is X bytes long,
 Y unsent - we have sent Z bytes in total, W on this connection. Closing connection to flush the data.
 ```
 
-The the value X, Y, Z and W are integer numbers.
-
-On the other hand, in the master side you can have different reports where the most common message that you can see is
+On the master side you may see various different error messages, but the most common one is the following:
 
 ```
 netdata ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : read failed: end of file
 ```
 
-Another common problem is the slave sends only part of the message for the master. In this case, the master
-will not have condition to understand the message received and it will write the following inside `error.log`:
+Another common problem in slow connections is the slave sending a partial the message to the master. In this case, the master will write the following inside `error.log`:
 
 ```
 ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
@@ -543,8 +539,8 @@ ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : sent command 'B'
 
 In this example, 'B' was part of a 'BEGIN' message that was cut due connection problems.
 
-The last problem related to slow connections happens when some message was missed and the following commands received had a
-direct connection with it. For example, when the slave could not send the list of charts available on its host and it
+The last problem related to slow connections happens when messages were missed and the following commands received had a
+direct connection with them. For example, when the slave could not send the list of charts available on its host and it
 sends in the sequence a 'SET' message on a chart that was missed, the master will show a messages like this:
 
 ```
@@ -553,19 +549,17 @@ ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : requested a SET 
 
 ### Slave cannot connect to master
 
-Sometimes you are type writing the address and port of the master inside stream.conf and you write a wrong information,
-Netdata will write a message like this in the slave log
+When the slave can't connect to a master for any reason (misconfiguration, networking, firewalls, master down), you will see the following in the slave's `error.log`.
 
 ```
 ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'MASTER IP', port 'MASTER PORT' (errno 113, No route to host)
 ```
 
-This error can also happen case the firewall on master is not allowing connections to the master port.
-
 ### Is this a Netdata?
 
-This question can appear when Netdata starts the stream and receives an unexpected response when connecting to the slave for the first time. 
-This error can appear for a number of different reasons, but the most common is that the master node has SSL activated and the slave sent a plain text response. 
+This question can appear when Netdata starts the stream and receives an unexpected response. 
+Between netdata master and slave this error can appear when the master node has SSL activated and the slave tries to connect using plain text. 
+You will also receive this message when netdata slave connects with other server that are not netdata.
 The complete error message will look like this:
 
 ```
