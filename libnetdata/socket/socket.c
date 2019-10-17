@@ -1008,6 +1008,8 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
  */
 extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
                               const char *patname) {
+    debug(D_LISTENER,"checking %s...", patname);
+    simple_pattern_dump(D_LISTENER,access_list);
     if (!access_list)
         return 1;
     if (simple_pattern_matches(access_list, client_ip))

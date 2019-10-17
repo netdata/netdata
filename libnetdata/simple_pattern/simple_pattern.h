@@ -30,6 +30,6 @@ extern int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str,
 // list can be NULL, in which case, this does nothing.
 extern void simple_pattern_free(SIMPLE_PATTERN *list);
 
-extern void simple_pattern_dump(SIMPLE_PATTERN *p);
+extern void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p) ;
 
 #endif //NETDATA_SIMPLE_PATTERN_H
