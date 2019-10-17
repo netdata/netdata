@@ -33,6 +33,7 @@
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
 #  - RocketChat notifications by @Hermsi1337 #3777
+#  - Google Hangouts Chat notifications by @EnzoAkira and @hendrikhofstadt
 
 # -----------------------------------------------------------------------------
 # testing notifications
@@ -166,6 +167,7 @@ prowl
 awssns
 rocketchat
 sms
+hangouts
 "
 
 # -----------------------------------------------------------------------------
@@ -359,6 +361,9 @@ IRC_NICKNAME=
 IRC_REALNAME=
 IRC_NETWORK=
 
+# hangouts configs
+declare -A HANGOUTS_WEBHOOK_URI
+
 # load the stock and user configuration files
 # these will overwrite the variables above
 
@@ -491,6 +496,9 @@ filter_recipient_by_criticality() {
 # check irc
 [ -z "${IRC_NETWORK}" ] && SEND_IRC="NO"
 
+# check hangouts
+[ ${#HANGOUTS_WEBHOOK_URI[@]} -eq 0 ] && SEND_HANGOUTS="NO"
+
 # check fleep
 #shellcheck disable=SC2153
 { [ -z "${FLEEP_SERVER}" ] || [ -z "${FLEEP_SENDER}" ]; } && SEND_FLEEP="NO"
@@ -511,6 +519,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 	[ "${SEND_KAFKA}" = "YES" ] ||
 	[ "${SEND_FLEEP}" = "YES" ] ||
 	[ "${SEND_PROWL}" = "YES" ] ||
+	[ "${SEND_HANGOUTS}" = "YES" ] ||
 	[ "${SEND_CUSTOM}" = "YES" ] ||
 	[ "${SEND_MSTEAM}" = "YES" ]; then
 	# if we need curl, check for the curl command
@@ -536,6 +545,7 @@ if [ "${SEND_PUSHOVER}" = "YES" ] ||
 		SEND_KAFKA="NO"
 		SEND_FLEEP="NO"
 		SEND_PROWL="NO"
+		SEND_HANGOUTS="NO"
 		SEND_CUSTOM="NO"
 	fi
 fi
@@ -659,6 +669,7 @@ for method in "${SEND_EMAIL}" \
 	"${SEND_PROWL}" \
 	"${SEND_CUSTOM}" \
 	"${SEND_IRC}" \
+	"${SEND_HANGOUTS}" \
 	"${SEND_AWSSNS}" \
 	"${SEND_SYSLOG}" \
 	"${SEND_SMS}" \
@@ -1771,6 +1782,112 @@ send_sms() {
 }
 
 # -----------------------------------------------------------------------------
+# hangouts sender
+
+send_hangouts() {
+	local rooms="${1}" httpcode sent=0 room color payload webhook
+
+	[ "${SEND_HANGOUTS}" != "YES" ] && return 1
+
+	case "${status}" in
+	WARNING) color="#ffa700" ;;
+	CRITICAL) color="#d62d20" ;;
+	CLEAR) color="#008744" ;;
+	*) color="#777777" ;;
+	esac
+
+	for room in ${rooms}; do
+		if [ -z "${HANGOUTS_WEBHOOK_URI[$room]}" ] ; then
+			info "Can't send Hangouts notification for: ${host} ${chart}.${name} to room ${room}. HANGOUTS_WEBHOOK_URI[$room] not defined"
+		else
+			webhook="${HANGOUTS_WEBHOOK_URI[$room]}"
+			payload="$(
+				cat <<EOF
+				{
+					"cards": [
+						{
+							"header": {
+								"title": "Netdata on ${host}",
+								"imageUrl": "${images_base_url}/images/banner-icon-144x144.png",
+								"imageStyle": "IMAGE"
+							},
+							"sections": [
+								{
+									"header": "<b>${host}</b>",
+									"widgets": [
+										{
+											"keyValue": {
+												"topLabel": "Status Message",
+												"content": "<b>${status_message}</b>",
+												"contentMultiline": "true",
+												"iconUrl": "${image}",
+												"onClick": {
+													"openLink": {
+														"url": "${goto_url}"
+													}
+												}
+											}
+										},
+										{
+											"keyValue": {
+												"topLabel": "${chart} | ${family}",
+												"content": "<font color=${color}>${alarm}</font>",
+												"contentMultiline": "true"
+											}
+										}
+									]
+								},
+								{
+									"widgets": [
+										{
+											"textParagraph": {
+											"text": "<font color=\"#0057e7\">@ ${date}\n<b>${info}</b></font>"
+											}
+										}
+									]
+								},
+								{
+									"widgets": [
+										{
+											"buttons": [
+												{
+													"textButton": {
+														"text": "Go to ${host}",
+														"onClick": {
+															"openLink": {
+																"url": "${goto_url}"
+															}
+														}
+													}
+												}
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+EOF
+				)"
+
+			httpcode=$(docurl -H "Content-Type: application/json" -X POST -d "${payload}" "${webhook}")
+
+			if [ "${httpcode}" = "200" ]; then
+				info "sent hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
+				sent=$((sent + 1))
+			else
+				error "failed to send hangouts notification for: ${host} ${chart}.${name} is ${status} to '${room}', with HTTP error code ${httpcode}."
+			fi
+		fi
+	done
+
+	[ ${sent} -gt 0 ] && return 0
+
+	return 1
+}
+
+# -----------------------------------------------------------------------------
 # prepare the content of the notification
 
 # the url to send the user on click
@@ -1887,6 +2004,15 @@ raised_for_html=
 
 send_slack "${SLACK_WEBHOOK_URL}" "${to_slack}"
 SENT_SLACK=$?
+
+# -----------------------------------------------------------------------------
+# send the hangouts notification
+
+# hangouts aggregates posts from the same room
+# so we use "${host} ${status}" as the room, to make them diff
+
+send_hangouts "${to_hangouts}"
+SENT_HANGOUTS=$?
 
 # -----------------------------------------------------------------------------
 # send the Microsoft notification
@@ -2270,6 +2396,7 @@ for state in "${SENT_EMAIL}" \
 	"${SENT_PUSHOVER}" \
 	"${SENT_TELEGRAM}" \
 	"${SENT_SLACK}" \
+	"${SENT_HANGOUTS}" \
 	"${SENT_ROCKETCHAT}" \
 	"${SENT_ALERTA}" \
 	"${SENT_FLOCK}" \
