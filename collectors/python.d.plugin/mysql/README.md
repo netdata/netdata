@@ -7,7 +7,7 @@ Module monitors one or more mysql servers
 -   python library [MySQLdb](https://github.com/PyMySQL/mysqlclient-python) (faster) or [PyMySQL](https://github.com/PyMySQL/PyMySQL) (slower)
 -   `netdata` local user to connect to the MySQL server. 
 
-To create the `netdata` user, execute the following:
+To create the `netdata` user, execute the following in the MySQL shell:
 
 ```sh
 create user 'netdata'@'localhost';
