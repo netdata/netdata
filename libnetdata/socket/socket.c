@@ -1015,7 +1015,7 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
     if (simple_pattern_matches(access_list, client_ip))
         return 1;
     // If the hostname is unresolved (and needed) then attempt the DNS lookups.
-    if (client_host[0]==0)
+    if (client_host[0]==0 && simple_pattern_is_potential_name(access_list))
     {
         struct sockaddr_storage sadr;
         socklen_t addrlen = sizeof(sadr);

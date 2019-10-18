@@ -31,5 +31,6 @@ extern int simple_pattern_matches_extract(SIMPLE_PATTERN *list, const char *str,
 extern void simple_pattern_free(SIMPLE_PATTERN *list);
 
 extern void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p) ;
+extern int simple_pattern_is_potential_name(SIMPLE_PATTERN *p) ;
 
 #endif //NETDATA_SIMPLE_PATTERN_H
