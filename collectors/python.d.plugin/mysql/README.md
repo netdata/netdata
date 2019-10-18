@@ -370,7 +370,7 @@ remote:
   port     : 9000
 ```
 
-If no configuration is given, module will attempt to connect to mysql server via unix socket at
+If no configuration is given, the module will attempt to connect to MySQL server via a unix socket at
 `/var/run/mysqld/mysqld.sock` without password and with username `root`.
 
 `userstats` graph works only if you enable such plugin in MariaDB server and set proper mysql priviliges (SUPER or
