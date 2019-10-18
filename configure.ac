@@ -341,6 +341,20 @@ AC_DEFINE([NETDATA_WITH_UUID], [1], [uuid usability])
 OPTIONAL_UUID_CFLAGS="${UUID_CFLAGS}"
 OPTIONAL_UUID_LIBS="${UUID_LIBS}"
 
+# -----------------------------------------------------------------------------
+# libmosquitto
+
+PKG_CHECK_MODULES(
+    [MQTT],
+    [libmosquitto],
+    [have_mqtt=yes],
+    [AC_MSG_ERROR([libmosquitto required but not found. Try installing 'libmosquitto'])]
+)
+AC_DEFINE([NETDATA_WITH_MQTT], [1], [mqtt usability])
+OPTIONAL_MQTT_CFLAGS="${MQTT_CFLAGS}"
+OPTIONAL_MQTT_LIBS="${MQTT_LIBS}"
+
+
 
 # -----------------------------------------------------------------------------
 # OpenSSL Cryptography and SSL/TLS Toolkit
@@ -1130,6 +1144,7 @@ AC_SUBST([OPTIONAL_ZLIB_CFLAGS])
 AC_SUBST([OPTIONAL_ZLIB_LIBS])
 AC_SUBST([OPTIONAL_UUID_CFLAGS])
 AC_SUBST([OPTIONAL_UUID_LIBS])
+AC_SUBST([OPTIONAL_MQTT_LIBS])
 AC_SUBST([OPTIONAL_LIBCAP_CFLAGS])
 AC_SUBST([OPTIONAL_LIBCAP_LIBS])
 AC_SUBST([OPTIONAL_IPMIMONITORING_CFLAGS])
