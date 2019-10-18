@@ -101,7 +101,7 @@ int make_dns_decision(const char *config_name, const char *default_value, SIMPLE
     if(!strcmp("yes",value))
         return 1;
     if(!strcmp("no",value))
-        return 1;
+        return 0;
     return simple_pattern_is_potential_name(p);
 }
 
