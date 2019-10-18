@@ -48,6 +48,7 @@ Depends: adduser,
          libprotoc8,
          ${misc:Depends},
          ${shlibs:Depends}
+Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation
