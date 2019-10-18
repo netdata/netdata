@@ -73,7 +73,7 @@ extern int sock_enlarge_in(int fd);
 extern int sock_enlarge_out(int fd);
 
 extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize,
-                              SIMPLE_PATTERN *access_list, const char *patname);
+                              SIMPLE_PATTERN *access_list, const char *patname, int allow_dns);
 extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
                          char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list);
 

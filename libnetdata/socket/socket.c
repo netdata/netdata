@@ -1007,15 +1007,15 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
  *                        of *writable* bytes (i.e. be aware of the strdup used to compact the pollinfo).
  */
 extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
-                              const char *patname) {
-    debug(D_LISTENER,"checking %s...", patname);
-    simple_pattern_dump(D_LISTENER,access_list);
+                              const char *patname, int allow_dns) {
+    debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
     if (!access_list)
         return 1;
     if (simple_pattern_matches(access_list, client_ip))
         return 1;
     // If the hostname is unresolved (and needed) then attempt the DNS lookups.
-    if (client_host[0]==0 && simple_pattern_is_potential_name(access_list))
+    //if (client_host[0]==0 && simple_pattern_is_potential_name(access_list))
+    if (client_host[0]==0 && allow_dns)
     {
         struct sockaddr_storage sadr;
         socklen_t addrlen = sizeof(sadr);
@@ -1076,7 +1076,7 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
 
 // --------------------------------------------------------------------------------------------------------------------
 // accept_socket() - accept a socket and store client IP and port
-
+extern int web_allow_connections_dns;      // web/server/web_server.c common config cache
 int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
                   char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list) {
     struct sockaddr_storage sadr;
@@ -1128,7 +1128,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
-        if(!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection")) {
+        if(!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection",web_allow_connections_dns)) {
             errno = 0;
             error("Permission denied for client '%s', port '%s'", client_ip, client_port);
             close(nfd);
