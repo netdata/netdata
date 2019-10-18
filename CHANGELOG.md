@@ -1,27 +1,37 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.18.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.18.0...v1.18.1)
 
 **Merged pull requests:**
 
+- Fix build when CMocka isn't installed [\#7129](https://github.com/netdata/netdata/pull/7129) ([vlvkobal](https://github.com/vlvkobal))
+- Fixing broken links in docs [\#7123](https://github.com/netdata/netdata/pull/7123) ([joelhans](https://github.com/joelhans))
+- Convert recursion timings to miliseconds. [\#7121](https://github.com/netdata/netdata/pull/7121) ([Ferroin](https://github.com/Ferroin))
+- Fix upgrade path from v1.17.1 to v1.18.x for deb packages [\#7118](https://github.com/netdata/netdata/pull/7118) ([knatsakis](https://github.com/knatsakis))
+- Fix CPU charts in apps plugin on FreeBSD [\#7115](https://github.com/netdata/netdata/pull/7115) ([vlvkobal](https://github.com/vlvkobal))
+- unbound: fix init [\#7112](https://github.com/netdata/netdata/pull/7112) ([ilyam8](https://github.com/ilyam8))
 - Add VMware VMXNET3 driver to the default interafaces list [\#7109](https://github.com/netdata/netdata/pull/7109) ([samm-git](https://github.com/samm-git))
 - megacli: search binary and sudo check fix [\#7108](https://github.com/netdata/netdata/pull/7108) ([ilyam8](https://github.com/ilyam8))
 - Run the triggers for deb and rpm package build in separate stages [\#7105](https://github.com/netdata/netdata/pull/7105) ([knatsakis](https://github.com/knatsakis))
 - Fix segmentation fault in FreeBSD when statsd is disabled [\#7102](https://github.com/netdata/netdata/pull/7102) ([vlvkobal](https://github.com/vlvkobal))
 - Clang warnings [\#7090](https://github.com/netdata/netdata/pull/7090) ([thiagoftsm](https://github.com/thiagoftsm))
 - SimpleService: change chart suppress msg level to info [\#7085](https://github.com/netdata/netdata/pull/7085) ([ilyam8](https://github.com/ilyam8))
+- 7040 enable stable channel option [\#7082](https://github.com/netdata/netdata/pull/7082) ([knatsakis](https://github.com/knatsakis))
 - fix\(freeipmi\): Update frequency config check [\#7078](https://github.com/netdata/netdata/pull/7078) ([stevenh](https://github.com/stevenh))
 - Fix problems with names when alarm is created [\#7069](https://github.com/netdata/netdata/pull/7069) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix dbengine not working when mmap fails [\#7065](https://github.com/netdata/netdata/pull/7065) ([mfundul](https://github.com/mfundul))
 - Fix typo in health\_alarm\_notify.conf [\#7062](https://github.com/netdata/netdata/pull/7062) ([sz4bi](https://github.com/sz4bi))
 - Fix size of a zeroed block [\#7061](https://github.com/netdata/netdata/pull/7061) ([vlvkobal](https://github.com/vlvkobal))
+- Partial fix for \#7039 [\#7060](https://github.com/netdata/netdata/pull/7060) ([knatsakis](https://github.com/knatsakis))
+- feat\(reaper\): Add process reaper support [\#7059](https://github.com/netdata/netdata/pull/7059) ([stevenh](https://github.com/stevenh))
 - Disable slabinfo plugin by default [\#7056](https://github.com/netdata/netdata/pull/7056) ([vlvkobal](https://github.com/vlvkobal))
 - Add release 1.18.0 to news [\#7054](https://github.com/netdata/netdata/pull/7054) ([cakrit](https://github.com/cakrit))
 - Fix BSD/pfSense documentation [\#7041](https://github.com/netdata/netdata/pull/7041) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add dbengine RAM usage statistics [\#7038](https://github.com/netdata/netdata/pull/7038) ([mfundul](https://github.com/mfundul))
 - Don't write an HTTP response 204 to logs [\#7035](https://github.com/netdata/netdata/pull/7035) ([vlvkobal](https://github.com/vlvkobal))
+- Implement hangouts chat notifications [\#7013](https://github.com/netdata/netdata/pull/7013) ([hendrikhofstadt](https://github.com/hendrikhofstadt))
 - Documenting the structure of the data responses. [\#7012](https://github.com/netdata/netdata/pull/7012) ([amoss](https://github.com/amoss))
 - Tutorials to support v1.18 features [\#6993](https://github.com/netdata/netdata/pull/6993) ([joelhans](https://github.com/joelhans))
 - Add CMocka unit tests [\#6985](https://github.com/netdata/netdata/pull/6985) ([vlvkobal](https://github.com/vlvkobal))
@@ -213,8 +223,6 @@
 - mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
 - Add MongoDB backend [\#6524](https://github.com/netdata/netdata/pull/6524) ([vlvkobal](https://github.com/vlvkobal))
 - Netdata Cloud documentation [\#6476](https://github.com/netdata/netdata/pull/6476) ([joelhans](https://github.com/joelhans))
-- Variable Granularity support for data collection [\#6430](https://github.com/netdata/netdata/pull/6430) ([mfundul](https://github.com/mfundul))
-- \(re-open\) ZRAM info collector module \(proc.plugin\) [\#6424](https://github.com/netdata/netdata/pull/6424) ([RaZeR-RBI](https://github.com/RaZeR-RBI))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
@@ -255,16 +263,6 @@
 - Fix nodes menu sizing \(responsive\) [\#6455](https://github.com/netdata/netdata/pull/6455) ([builat](https://github.com/builat))
 - Add netdata haproxy documentation page [\#6454](https://github.com/netdata/netdata/pull/6454) ([johnramsden](https://github.com/johnramsden))
 - Fix CRC and I/O error handling in dbengine [\#6452](https://github.com/netdata/netdata/pull/6452) ([mfundul](https://github.com/mfundul))
-- Stop docs icon from linking to streaming page instead of docs root [\#6445](https://github.com/netdata/netdata/pull/6445) ([joelhans](https://github.com/joelhans))
-- Add more supported backends to the documentation [\#6443](https://github.com/netdata/netdata/pull/6443) ([vlvkobal](https://github.com/vlvkobal))
-- netdata/packaging: Remove Ventureer from demo sites [\#6442](https://github.com/netdata/netdata/pull/6442) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Safer container names [\#6441](https://github.com/netdata/netdata/pull/6441) ([ViViDboarder](https://github.com/ViViDboarder))
-- Update docs health monitoring and health management api [\#6435](https://github.com/netdata/netdata/pull/6435) ([jghaanstra](https://github.com/jghaanstra))
-- Fix issue with HTML docs generation [\#6433](https://github.com/netdata/netdata/pull/6433) ([cakrit](https://github.com/cakrit))
-- rethinkdb collector new driver support [\#6431](https://github.com/netdata/netdata/pull/6431) ([ilyam8](https://github.com/ilyam8))
-- New 'homepage' for documentation site [\#6428](https://github.com/netdata/netdata/pull/6428) ([joelhans](https://github.com/joelhans))
-- Utf8 Badge Fix And URL Parser International Support \(initial\) [\#6426](https://github.com/netdata/netdata/pull/6426) ([underhood](https://github.com/underhood))
-- Styling improvements to documentation [\#6425](https://github.com/netdata/netdata/pull/6425) ([joelhans](https://github.com/joelhans))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
