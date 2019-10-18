@@ -14,7 +14,7 @@ create user 'netdata'@'localhost';
 grant usage on *.* to 'netdata'@'localhost';
 flush privileges;
 ```
-The `netdata` user will have the ability to connect to the MySQL server on the localhost without a password. 
+The `netdata` user will have the ability to connect to the MySQL server on `localhost` without a password. 
 It will only be able to gather MySQL statistics without being able to alter or affect MySQL operations in any way. 
 
 This module will produce following charts (if data is available):
