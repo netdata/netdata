@@ -44,3 +44,10 @@ interface SetGlobalChartUnderlayAction {
 export const setGlobalChartUnderlayAction = createAction<SetGlobalChartUnderlayAction>(
   `${storeKey}/setGlobalChartUnderlay`,
 )
+
+interface WindowFocusChangeAction {
+  hasWindowFocus: boolean
+}
+export const windowFocusChangeAction = createAction<WindowFocusChangeAction>(
+  `${storeKey}/windowFocusChangeAction`,
+)

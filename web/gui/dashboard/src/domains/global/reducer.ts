@@ -8,6 +8,7 @@ import {
   setGlobalPanAndZoomAction,
   setTimezoneAction,
   resetGlobalPanAndZoomAction,
+  windowFocusChangeAction,
 } from "./actions"
 
 export type StateT = {
@@ -36,6 +37,7 @@ export type StateT = {
   }
   timezone: string | undefined
   hoveredX: number | null
+  hasWindowFocus: boolean
 }
 
 export const initialState = {
@@ -45,6 +47,7 @@ export const initialState = {
   globalChartUnderlay: null,
   timezone: window.NETDATA.options.current.timezone,
   hoveredX: null,
+  hasWindowFocus: true,
 }
 
 export const globalReducer = createReducer<StateT>(
@@ -73,6 +76,7 @@ export const getKeyForCommonColorsState = ({
   return commonColorsAttribute
     || (hasCustomColors ? chartUuid : chartContext)
 }
+
 const hasLastOnly = (array: string[]) => last(array) === "ONLY"
 const removeLastOnly = (array: string[]) => (hasLastOnly(array) ? init(array) : array)
 const createCommonColorsKeysSubstate = (
@@ -176,4 +180,9 @@ globalReducer.on(setGlobalChartUnderlayAction, (state, { after, before, masterID
     before,
     masterID,
   },
+}))
+
+globalReducer.on(windowFocusChangeAction, (state, { hasWindowFocus }) => ({
+  ...state,
+  hasWindowFocus,
 }))

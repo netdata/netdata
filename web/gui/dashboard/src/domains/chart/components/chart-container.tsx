@@ -3,11 +3,12 @@ import React, {
   useEffect, useState, useLayoutEffect, useRef,
 } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { useIntersection, useInterval, useThrottle } from "react-use"
+import { useIntersection, useThrottle } from "react-use"
 
 import { AppStateT } from "store/app-state"
 
 import { selectGlobalPanAndZoom, selectGlobalSelection } from "domains/global/selectors"
+import { useFetchNewDataClock } from "../hooks/use-fetch-new-data-clock"
 
 import { chartLibrariesSettings } from "../utils/chartLibrariesSettings"
 import { Attributes } from "../utils/transformDataAttributes"
@@ -70,6 +71,7 @@ export const ChartContainer = ({
     rootMargin: "0px",
     threshold: undefined,
   })
+  // should be throttled when NETDATA.options.current.async_on_scroll is on
   const shouldHide = path(["intersectionRatio"], intersection) === 0
 
   // todo local state option
@@ -89,14 +91,15 @@ export const ChartContainer = ({
   ))
 
   const hoveredX = useSelector(selectGlobalSelection)
-  const [shouldFetch, setShouldFetch] = useState<boolean>(true)
-  useInterval(() => {
-    if (!globalPanAndZoom && !hoveredX) {
-      setShouldFetch(true)
-    }
-  }, 2000) // todo add to config
 
-  // don't send new requests too often (throttle)
+  // periodical update of newest data
+  const [shouldFetch, setShouldFetch] = useFetchNewDataClock({
+    areCriteriaMet: !globalPanAndZoom && !hoveredX,
+    preferedIntervalTime: chartDetails
+      ? chartDetails.update_every * 1000
+      : 2000,
+  })
+
   // corresponds to force_update_at in old dashboard
   // + 50 is because normal loop only happened there once per 100ms anyway..
   const globalPanAndZoomThrottled = useThrottle(globalPanAndZoom,
@@ -193,7 +196,7 @@ export const ChartContainer = ({
     }
   }, [attributes, chartDetails, chartSettings, chartUuid, chartWidth, dispatch, globalPanAndZoom,
     hasLegend, hasPortalNodeBeenStyled, initialAfter, initialBefore, isGlobalPanAndZoomMaster,
-    isRemotelyControlled, portalNode, shouldFetch, shouldHide])
+    isRemotelyControlled, portalNode, setShouldFetch, shouldFetch, shouldHide])
 
   // todo omit this for Cloud/Main Agent app
   useLayoutEffect(() => {

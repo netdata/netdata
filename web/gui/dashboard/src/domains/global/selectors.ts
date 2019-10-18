@@ -38,3 +38,8 @@ export const selectGlobalChartUnderlay = createSelector(
   selectGlobal,
   prop("globalChartUnderlay"),
 )
+
+export const selectHasWindowFocus = createSelector(
+  selectGlobal,
+  prop("hasWindowFocus"),
+)
