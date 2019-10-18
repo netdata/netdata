@@ -1,6 +1,6 @@
 import { createReducer } from "redux-act"
 
-import { fetchDataAction, updateChartDetailsAction } from "./actions"
+import { fetchDataAction, fetchChartAction } from "./actions"
 import { ChartState } from "./chart-types"
 
 export type StateT = {
@@ -16,6 +16,7 @@ export const initialSingleState = {
     isRemotelyControlled: false,
     viewRange: null,
   },
+  isFetchingDetails: false,
 }
 
 export const chartReducer = createReducer<StateT>(
@@ -34,10 +35,28 @@ chartReducer.on(fetchDataAction.success, (state, { id, chartData, fetchDataParam
   },
 }))
 
-chartReducer.on(updateChartDetailsAction, (state, { id, chartDetails }) => ({
+chartReducer.on(fetchChartAction.request, (state, { id }) => ({
+  ...state,
+  [id]: {
+    ...getSubstate(state, id),
+    isFetchingDetails: true,
+  },
+}))
+
+chartReducer.on(fetchChartAction.success, (state, { id, chartDetails }) => ({
   ...state,
   [id]: {
     ...getSubstate(state, id),
     chartDetails,
+    isFetchingDetails: false,
   },
 }))
+
+// todo handle errors without creating a loop
+// chartReducer.on(fetchChartAction.failure, (state, { id }) => ({
+//   ...state,
+//   [id]: {
+//     ...getSubstate(state, id),
+//     isFetchingDetails: false,
+//   },
+// }))

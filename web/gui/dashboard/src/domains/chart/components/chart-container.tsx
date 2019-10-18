@@ -1,4 +1,4 @@
-import { forEachObjIndexed, propOr, path } from "ramda"
+import { forEachObjIndexed, propOr, pathOr } from "ramda"
 import React, {
   useEffect, useState, useLayoutEffect, useRef,
 } from "react"
@@ -15,8 +15,10 @@ import { Attributes } from "../utils/transformDataAttributes"
 import { getChartPixelsPerPoint } from "../utils/get-chart-pixels-per-point"
 import { getPortalNodeStyles } from "../utils/get-portal-node-styles"
 
-import { fetchDataAction } from "../actions"
-import { selectChartData, selectChartDetails, selectChartFetchDataParams } from "../selectors"
+import { fetchChartAction, fetchDataAction } from "../actions"
+import {
+  selectChartData, selectChartFetchDataParams, selectChartDetailsRequest,
+} from "../selectors"
 
 import { Chart } from "./chart"
 import "./chart-container.css"
@@ -49,7 +51,6 @@ const getChartURLOptions = (attributes: Attributes) => {
   return ret
 }
 
-
 export type Props = {
   attributes: Attributes
   chartUuid: string
@@ -61,10 +62,6 @@ export const ChartContainer = ({
   chartUuid,
   portalNode,
 }: Props) => {
-  const chartDetails = useSelector((state: AppStateT) => selectChartDetails(
-    state, { id: chartUuid },
-  ))
-
   const portalNodeRef = useRef(portalNode)
   const intersection = useIntersection(portalNodeRef, {
     root: null,
@@ -72,7 +69,24 @@ export const ChartContainer = ({
     threshold: undefined,
   })
   // should be throttled when NETDATA.options.current.async_on_scroll is on
-  const shouldHide = path(["intersectionRatio"], intersection) === 0
+  const shouldHide = pathOr(0, ["intersectionRatio"], intersection) === 0
+
+  /**
+   * fetch chart details
+   */
+  const dispatch = useDispatch()
+  const { chartDetails, isFetchingDetails } = useSelector((state: AppStateT) => (
+    selectChartDetailsRequest(state, { id: chartUuid })
+  ))
+  useEffect(() => {
+    if (!chartDetails && !isFetchingDetails && !shouldHide) {
+      dispatch(fetchChartAction.request({
+        chart: attributes.id,
+        id: chartUuid,
+      }))
+    }
+  }, [attributes.id, chartDetails, chartUuid, dispatch, isFetchingDetails, shouldHide])
+
 
   // todo local state option
   const globalPanAndZoom = useSelector(selectGlobalPanAndZoom)
@@ -106,7 +120,7 @@ export const ChartContainer = ({
     window.NETDATA.options.current.pan_and_zoom_delay + 50)
   useEffect(() => {
     setShouldFetch(true)
-  }, [globalPanAndZoomThrottled])
+  }, [globalPanAndZoomThrottled, setShouldFetch])
 
   const {
     after: initialAfter = window.NETDATA.chartDefaults.after,
@@ -127,7 +141,6 @@ export const ChartContainer = ({
    * fetch data
    */
   const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
-  const dispatch = useDispatch()
   useEffect(() => {
     if (shouldFetch && chartDetails && hasPortalNodeBeenStyled && !shouldHide) {
       // todo can be overriden by main.js

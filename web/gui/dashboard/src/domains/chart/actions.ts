@@ -44,3 +44,13 @@ export const fetchDataAction = createRequestAction<
   FetchDataPayload,
   { id: string, chartData: ChartData, fetchDataParams: FetchDataParams }
 >(`${storeKey}/fetchDataAction`)
+
+export interface FetchChartPayload {
+  chart: string
+  id: string
+}
+
+export const fetchChartAction = createRequestAction<
+  FetchChartPayload,
+  { chartDetails: ChartDetails, id: string }
+>(`${storeKey}/fetchChartAction`)

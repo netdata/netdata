@@ -76,4 +76,5 @@ export interface ChartState {
     isRemotelyControlled: boolean
     viewRange: [number, number]
   }
+  isFetchingDetails: boolean
 }
