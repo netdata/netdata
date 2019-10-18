@@ -374,7 +374,7 @@ If no configuration is given, the module will attempt to connect to MySQL server
 `/var/run/mysqld/mysqld.sock` without password and with username `root`.
 
 `userstats` graph works only if you enable the plugin in MariaDB server and set proper MySQL privileges (SUPER or
-PROCESS). For more detail please check [MariaDB User Statistics
+PROCESS). For more details, please check the [MariaDB User Statistics
 page](https://mariadb.com/kb/en/library/user-statistics/)
 
 ---
