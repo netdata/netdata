@@ -302,6 +302,7 @@ set(LIBNETDATA_FILES
         libnetdata/inlined.h
         libnetdata/libnetdata.c
         libnetdata/libnetdata.h
+        libnetdata/required_dummies.h
         libnetdata/locks/locks.c
         libnetdata/locks/locks.h
         libnetdata/log/log.c
