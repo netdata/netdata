@@ -33,6 +33,6 @@ Software install:
 - edit `/etc/netdata/netdata.conf`
 - find `[plugin:python.d]`
 - add  `command options = -ppython3`
-- Save the file.
+- save the file.
 - restart the netdata service.
 - check the dashboard.
