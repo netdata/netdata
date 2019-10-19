@@ -1,8 +1,3 @@
-# _*_ coding: utf-8 _*_
-# Description: AM2320 netdata module
-# Author: tommybuck
-# SPDX-License-Identifier: GPL-3.0-or-Later
-
 # AM2320
 This module will display a graph of the temperture and humity from a AM2320 sensor.
 

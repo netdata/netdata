@@ -1,3 +1,8 @@
+# _*_ coding: utf-8 _*_
+# Description: AM2320 netdata module
+# Author: tommybuck
+# SPDX-License-Identifier: GPL-3.0-or-Later
+
 try:
     import board
     import busio
@@ -46,7 +51,7 @@ class Service(SimpleService):
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
             self.am = adafruit_am2320.AM2320(i2c)
-        except Exception as error:
+        except ValueError as error:
             self.error("error on creating I2C shared bus : {0}".format(error))
             return False
 
