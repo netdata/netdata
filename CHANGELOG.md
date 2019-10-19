@@ -262,7 +262,6 @@
 - json function could create overflow [\#6460](https://github.com/netdata/netdata/pull/6460) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix nodes menu sizing \(responsive\) [\#6455](https://github.com/netdata/netdata/pull/6455) ([builat](https://github.com/builat))
 - Add netdata haproxy documentation page [\#6454](https://github.com/netdata/netdata/pull/6454) ([johnramsden](https://github.com/johnramsden))
-- Fix CRC and I/O error handling in dbengine [\#6452](https://github.com/netdata/netdata/pull/6452) ([mfundul](https://github.com/mfundul))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
