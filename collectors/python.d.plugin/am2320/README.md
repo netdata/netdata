@@ -29,7 +29,6 @@ You may also need to add two I2C pullup resistors if your board does not already
 
 Software install:
 - `sudo pip3 install adafruit-circuitpython-am2320`
-- `sudo usermod -G I2C netdata`
 - edit `/etc/netdata/netdata.conf`
 - find `[plugin:python.d]`
 - add  `command options = -ppython3`
