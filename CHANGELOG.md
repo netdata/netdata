@@ -261,7 +261,6 @@
 - Fix broken links [\#6461](https://github.com/netdata/netdata/pull/6461) ([TheLovinator1](https://github.com/TheLovinator1))
 - json function could create overflow [\#6460](https://github.com/netdata/netdata/pull/6460) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix nodes menu sizing \(responsive\) [\#6455](https://github.com/netdata/netdata/pull/6455) ([builat](https://github.com/builat))
-- Add netdata haproxy documentation page [\#6454](https://github.com/netdata/netdata/pull/6454) ([johnramsden](https://github.com/johnramsden))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
