@@ -648,6 +648,9 @@ void async_cb(uv_async_t *handle)
     debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
+/* Flushes dirty pages when timer expires */
+#define TIMER_PERIOD_MS (1000)
+
 void timer_cb(uv_timer_t* handle)
 {
     struct rrdengine_worker_config* wc = handle->data;
@@ -657,12 +660,31 @@ void timer_cb(uv_timer_t* handle)
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
     if (likely(!wc->now_deleting.data)) {
-        unsigned total_bytes, bytes_written;
-
         /* There is free space so we can write to disk */
+        struct rrdengine_instance *ctx = wc->ctx;
+        struct page_cache *pg_cache = &ctx->pg_cache;
+        unsigned long total_bytes, bytes_written, nr_committed_pages, bytes_to_write = 0, producers, low_watermark,
+                      high_watermark;
+
+        uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
+        nr_committed_pages = pg_cache->committed_page_index.nr_committed_pages;
+        uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
+        producers = ctx->stats.metric_API_producers;
+        /* are flushable pages more than 25% of the maximum page cache size */
+        low_watermark = (ctx->max_cache_pages * 25LLU) / 100;
+        high_watermark = (ctx->max_cache_pages * 33LLU) / 100; /* 33%, must be greater than low_watermark */
+
+        if (nr_committed_pages > 2 * producers &&
+            /* committed to be written pages are over twice the produced number */
+            nr_committed_pages - producers > high_watermark) {
+            /* Flushing speed must increase to stop page cache from filling with dirty pages */
+            bytes_to_write = (nr_committed_pages - producers - low_watermark) * RRDENG_BLOCK_SIZE;
+        }
+        bytes_to_write = MAX(DATAFILE_IDEAL_IO_SIZE, bytes_to_write);
+
         debug(D_RRDENGINE, "Flushing pages to disk.");
         for (total_bytes = bytes_written = do_flush_pages(wc, 0, NULL) ;
-             bytes_written && (total_bytes < DATAFILE_IDEAL_IO_SIZE) ;
+             bytes_written && (total_bytes < bytes_to_write) ;
              total_bytes += bytes_written) {
             bytes_written = do_flush_pages(wc, 0, NULL);
         }
@@ -674,9 +696,6 @@ void timer_cb(uv_timer_t* handle)
     }
 #endif
 }
-
-/* Flushes dirty pages when timer expires */
-#define TIMER_PERIOD_MS (1000)
 
 #define MAX_CMD_BATCH_SIZE (256)
 
@@ -771,8 +790,8 @@ void rrdeng_worker(void* arg)
                 /* First I/O should be enough to call completion */
                 bytes_written = do_flush_pages(wc, 1, cmd.completion);
                 if (bytes_written) {
-                    while (do_flush_pages(wc, 1, NULL)) {
-                        ; /* Force flushing of all committed pages. */
+                    while (do_flush_pages(wc, 1, NULL) && likely(!wc->now_deleting.data)) {
+                        ; /* Force flushing of all committed pages if there is free space. */
                     }
                 }
                 break;
