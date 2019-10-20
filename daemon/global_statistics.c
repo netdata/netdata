@@ -544,7 +544,7 @@ void global_statistics_charts(void) {
         if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
             ++hosts_with_dbengine;
             /* get localhost's DB engine's statistics */
-            rrdeng_get_33_statistics(host->rrdeng_ctx, local_stats_array);
+            rrdeng_get_35_statistics(host->rrdeng_ctx, local_stats_array);
             for (i = 0 ; i < RRDENG_NR_STATS ; ++i) {
                 /* aggregate statistics across hosts */
                 stats_array[i] += local_stats_array[i];

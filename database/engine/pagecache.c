@@ -214,7 +214,7 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
  * This function returns the maximum number of pages allowed in the page cache.
  * The caller must hold the page cache lock.
  */
-static inline unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
+unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 {
     /* it's twice the number of producers since we pin 2 pages per producer */
     return ctx->max_cache_pages + 2 * (unsigned long)ctx->stats.metric_API_producers;
@@ -225,7 +225,7 @@ static inline unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
  * number of pages below that number.
  * The caller must hold the page cache lock.
  */
-static inline unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
+unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
 {
     /* it's twice the number of producers since we pin 2 pages per producer */
     return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->stats.metric_API_producers;
