@@ -131,7 +131,7 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               "page_cache_total_pages: %ld\n"
               "page_cache_descriptors: %ld\n"
               "page_cache_populated_pages: %ld\n"
-              "page_cache_commited_pages: %ld\n"
+              "page_cache_committed_pages: %ld\n"
               "page_cache_insertions: %ld\n"
               "page_cache_deletions: %ld\n"
               "page_cache_hits: %ld\n"
@@ -159,7 +159,7 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               (long)pg_cache->page_descriptors,
               (long)ctx->stats.page_cache_descriptors,
               (long)pg_cache->populated_pages,
-              (long)pg_cache->commited_page_index.nr_commited_pages,
+              (long)pg_cache->committed_page_index.nr_committed_pages,
               (long)ctx->stats.pg_cache_insertions,
               (long)ctx->stats.pg_cache_deletions,
               (long)ctx->stats.pg_cache_hits,

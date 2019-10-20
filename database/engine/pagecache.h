@@ -110,7 +110,7 @@ struct pg_cache_metrics_index {
 };
 
 /* gathers dirty pages to be written on disk */
-struct pg_cache_commited_page_index {
+struct pg_cache_committed_page_index {
     uv_rwlock_t lock;
 
     Pvoid_t JudyL_array;
@@ -122,7 +122,7 @@ struct pg_cache_commited_page_index {
      */
     Word_t latest_corr_id;
 
-    unsigned nr_commited_pages;
+    unsigned nr_committed_pages;
 };
 
 /*
@@ -140,7 +140,7 @@ struct page_cache { /* TODO: add statistics */
     uv_rwlock_t pg_cache_rwlock; /* page cache lock */
 
     struct pg_cache_metrics_index metrics_index;
-    struct pg_cache_commited_page_index commited_page_index;
+    struct pg_cache_committed_page_index committed_page_index;
     struct pg_cache_replaceQ replaceQ;
 
     unsigned page_descriptors;

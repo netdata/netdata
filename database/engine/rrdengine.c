@@ -323,14 +323,14 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     if (force) {
         debug(D_RRDENGINE, "Asynchronous flushing of extent has been forced by page pressure.");
     }
-    uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
+    uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
     for (Index = 0, count = 0, uncompressed_payload_length = 0,
-         PValue = JudyLFirst(pg_cache->commited_page_index.JudyL_array, &Index, PJE0),
+         PValue = JudyLFirst(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue ;
 
          descr != NULL && count != MAX_PAGES_PER_EXTENT ;
 
-         PValue = JudyLNext(pg_cache->commited_page_index.JudyL_array, &Index, PJE0),
+         PValue = JudyLNext(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         uint8_t page_write_pending;
 
@@ -350,12 +350,12 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         rrdeng_page_descr_mutex_unlock(ctx, descr);
 
         if (page_write_pending) {
-            ret = JudyLDel(&pg_cache->commited_page_index.JudyL_array, Index, PJE0);
+            ret = JudyLDel(&pg_cache->committed_page_index.JudyL_array, Index, PJE0);
             assert(1 == ret);
-            --pg_cache->commited_page_index.nr_commited_pages;
+            --pg_cache->committed_page_index.nr_committed_pages;
         }
     }
-    uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+    uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
     if (!count) {
         debug(D_RRDENGINE, "%s: no pages eligible for flushing.", __func__);
@@ -772,7 +772,7 @@ void rrdeng_worker(void* arg)
                 bytes_written = do_flush_pages(wc, 1, cmd.completion);
                 if (bytes_written) {
                     while (do_flush_pages(wc, 1, NULL)) {
-                        ; /* Force flushing of all commited pages. */
+                        ; /* Force flushing of all committed pages. */
                     }
                 }
                 break;
@@ -789,7 +789,7 @@ void rrdeng_worker(void* arg)
     }
     info("Shutting down RRD engine event loop.");
     while (do_flush_pages(wc, 1, NULL)) {
-        ; /* Force flushing of all commited pages. */
+        ; /* Force flushing of all committed pages. */
     }
     wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);

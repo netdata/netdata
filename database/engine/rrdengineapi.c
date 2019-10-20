@@ -173,9 +173,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
         handle->descr = descr;
 
-        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-        handle->page_correlation_id = pg_cache->commited_page_index.latest_corr_id++;
-        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+        uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
+        handle->page_correlation_id = pg_cache->committed_page_index.latest_corr_id++;
+        uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
         if (0 == rd->rrdset->rrddim_page_alignment) {
             /* this is the leading dimension that defines chart alignment */
@@ -616,16 +616,16 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     Pvoid_t *PValue;
 
     if (unlikely(NULL == descr)) {
-        debug(D_RRDENGINE, "%s: page descriptor is NULL, page has already been force-commited.", __func__);
+        debug(D_RRDENGINE, "%s: page descriptor is NULL, page has already been force-committed.", __func__);
         return;
     }
     assert(descr->page_length);
 
-    uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-    PValue = JudyLIns(&pg_cache->commited_page_index.JudyL_array, page_correlation_id, PJE0);
+    uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
+    PValue = JudyLIns(&pg_cache->committed_page_index.JudyL_array, page_correlation_id, PJE0);
     *PValue = descr;
-    ++pg_cache->commited_page_index.nr_commited_pages;
-    uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+    ++pg_cache->committed_page_index.nr_committed_pages;
+    uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
     pg_cache_put(ctx, descr);
 }
@@ -682,7 +682,7 @@ void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[1] = (uint64_t)ctx->stats.metric_API_consumers;
     array[2] = (uint64_t)pg_cache->page_descriptors;
     array[3] = (uint64_t)pg_cache->populated_pages;
-    array[4] = (uint64_t)pg_cache->commited_page_index.nr_commited_pages;
+    array[4] = (uint64_t)pg_cache->committed_page_index.nr_committed_pages;
     array[5] = (uint64_t)ctx->stats.pg_cache_insertions;
     array[6] = (uint64_t)ctx->stats.pg_cache_deletions;
     array[7] = (uint64_t)ctx->stats.pg_cache_hits;

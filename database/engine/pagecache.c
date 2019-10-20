@@ -1029,14 +1029,14 @@ static void init_replaceQ(struct rrdengine_instance *ctx)
     assert(0 == uv_rwlock_init(&pg_cache->replaceQ.lock));
 }
 
-static void init_commited_page_index(struct rrdengine_instance *ctx)
+static void init_committed_page_index(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
-    pg_cache->commited_page_index.JudyL_array = (Pvoid_t) NULL;
-    assert(0 == uv_rwlock_init(&pg_cache->commited_page_index.lock));
-    pg_cache->commited_page_index.latest_corr_id = 0;
-    pg_cache->commited_page_index.nr_commited_pages = 0;
+    pg_cache->committed_page_index.JudyL_array = (Pvoid_t) NULL;
+    assert(0 == uv_rwlock_init(&pg_cache->committed_page_index.lock));
+    pg_cache->committed_page_index.latest_corr_id = 0;
+    pg_cache->committed_page_index.nr_committed_pages = 0;
 }
 
 void init_page_cache(struct rrdengine_instance *ctx)
@@ -1049,7 +1049,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
 
     init_metrics_index(ctx);
     init_replaceQ(ctx);
-    init_commited_page_index(ctx);
+    init_committed_page_index(ctx);
 }
 
 void free_page_cache(struct rrdengine_instance *ctx)
@@ -1062,9 +1062,9 @@ void free_page_cache(struct rrdengine_instance *ctx)
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
-    /* Free commited page index */
-    ret_Judy = JudyLFreeArray(&pg_cache->commited_page_index.JudyL_array, PJE0);
-    assert(NULL == pg_cache->commited_page_index.JudyL_array);
+    /* Free committed page index */
+    ret_Judy = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
+    assert(NULL == pg_cache->committed_page_index.JudyL_array);
     bytes_freed += ret_Judy;
 
     for (page_index = pg_cache->metrics_index.last_page_index ;
