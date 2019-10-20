@@ -628,7 +628,8 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     nr_committed_pages = ++pg_cache->committed_page_index.nr_committed_pages;
     uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
-    if (nr_committed_pages >= pg_cache_hard_limit(ctx)) {
+    if (nr_committed_pages >= (pg_cache_hard_limit(ctx) - (unsigned long)ctx->stats.metric_API_producers) / 2) {
+        /* 50% of pages have not been committed yet */
         if (0 == (unsigned long)ctx->stats.flushing_errors) {
             /* only print the first time */
             error("Failed to flush quickly enough in dbengine instance \"%s\""
