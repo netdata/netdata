@@ -671,11 +671,11 @@ void timer_cb(uv_timer_t* handle)
         uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
         producers = ctx->stats.metric_API_producers;
         /* are flushable pages more than 25% of the maximum page cache size */
-        low_watermark = (ctx->max_cache_pages * 25LLU) / 100;
-        high_watermark = (ctx->max_cache_pages * 33LLU) / 100; /* 33%, must be greater than low_watermark */
+        high_watermark = (ctx->max_cache_pages * 25LLU) / 100;
+        low_watermark = (ctx->max_cache_pages * 5LLU) / 100; /* 5%, must be smaller than high_watermark */
 
-        if (nr_committed_pages > 2 * producers &&
-            /* committed to be written pages are over twice the produced number */
+        if (nr_committed_pages > producers &&
+            /* committed to be written pages are more than the produced number */
             nr_committed_pages - producers > high_watermark) {
             /* Flushing speed must increase to stop page cache from filling with dirty pages */
             bytes_to_write = (nr_committed_pages - producers - low_watermark) * RRDENG_BLOCK_SIZE;
