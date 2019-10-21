@@ -33,6 +33,8 @@ interface Props {
   chartWidth: number
   attributes: Attributes
   isRemotelyControlled: boolean
+  selectedDimensions: string[]
+  setSelectedDimensions: (newState: string[]) => void
   showLatestOnBlur: boolean
 }
 
@@ -47,6 +49,8 @@ export const Chart = ({
   chartUuid,
   chartWidth,
   isRemotelyControlled,
+  selectedDimensions,
+  setSelectedDimensions,
   showLatestOnBlur,
 }: Props) => {
   const chartSettings = chartLibrariesSettings[chartLibrary]
@@ -61,7 +65,6 @@ export const Chart = ({
   const dimensionNamesFlatString = chartData.dimension_names.join("")
   // we need to have empty selectedDimensions work as {all enabled}, in case
   // new dimensions show up (when all are enabled, the new dimensions should also auto-enable)
-  const [selectedDimensions, setSelectedDimensions] = useState<string[]>([])
   const dimensionsVisibility = useMemo(() => chartData.dimension_names.map(
     (dimensionName) => (selectedDimensions.length === 0
       ? true

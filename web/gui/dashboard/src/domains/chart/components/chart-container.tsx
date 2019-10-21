@@ -224,6 +224,7 @@ export const ChartContainer = ({
     setHasPortalNodeBeenStyled(true)
   }, [attributes, chartSettings, hasLegend, portalNode, setHasPortalNodeBeenStyled])
 
+  const [selectedDimensions, setSelectedDimensions] = useState<string[]>([])
 
   if (!chartData || !chartDetails) {
     return <div className="chart-container__loader">loading...</div>
@@ -241,6 +242,8 @@ export const ChartContainer = ({
       chartHeight={chartHeight}
       chartWidth={chartWidth}
       isRemotelyControlled={fetchDataParams.isRemotelyControlled}
+      selectedDimensions={selectedDimensions}
+      setSelectedDimensions={setSelectedDimensions}
       showLatestOnBlur={!globalPanAndZoom}
     />
   )
