@@ -96,8 +96,8 @@ void web_server_threading_selection(void) {
     }
 }
 
-int make_dns_decision(const char *config_name, const char *default_value, SIMPLE_PATTERN *p) {
-    char *value = config_get(CONFIG_SECTION_WEB,config_name,default_value);
+int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p) {
+    char *value = config_get(section_name,config_name,default_value);
     if(!strcmp("yes",value))
         return 1;
     if(!strcmp("no",value))
@@ -115,20 +115,20 @@ void web_server_config_options(void) {
     if(!*web_x_frame_options) web_x_frame_options = NULL;
 
     web_allow_connections_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_connections_dns  = make_dns_decision("allow connections by dns","heuristic",web_allow_connections_from);
+    web_allow_connections_dns  = make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
     web_allow_dashboard_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_dashboard_dns  = make_dns_decision("allow dashboard by dns","heuristic",web_allow_dashboard_from);
+    web_allow_dashboard_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
     web_allow_badges_from      = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_badges_dns  = make_dns_decision("allow badges by dns","heuristic",web_allow_badges_from);
+    web_allow_badges_dns       = make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
     web_allow_registry_from    = simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_registry_dns  = make_dns_decision("allow registry by dns","heuristic",web_allow_registry_from);
+    web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow registry by dns", "heuristic", web_allow_registry_from);
     web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_streaming_dns  = make_dns_decision("allow streaming by dns","heuristic",web_allow_streaming_from);
+    web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic", web_allow_streaming_from);
     // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
     web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from", "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_netdataconf_dns  = make_dns_decision("allow netdata.conf by dns","no",web_allow_mgmt_from);
+    web_allow_netdataconf_dns  = make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_mgmt_from);
     web_allow_mgmt_from        = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_mgmt_dns  = make_dns_decision("allow management by dns","heuristic",web_allow_mgmt_from);
+    web_allow_mgmt_dns         = make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
 
 #ifdef NETDATA_WITH_ZLIB
