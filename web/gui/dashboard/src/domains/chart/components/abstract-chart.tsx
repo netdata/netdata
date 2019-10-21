@@ -13,9 +13,11 @@ import { chartLibrariesSettings, ChartLibraryName } from "../utils/chartLibrarie
 import { DygraphChart } from "./lib-charts/dygraph-chart"
 import { EasyPieChart } from "./lib-charts/easy-pie-chart"
 import { GaugeChart } from "./lib-charts/gauge-chart"
+import { SparklineChart } from "./lib-charts/sparkline-chart"
 
 interface Props {
   attributes: Attributes
+  chartContainerElement: HTMLElement
   chartData: ChartData
   chartDetails: ChartDetails
   chartLibrary: ChartLibraryName
@@ -43,6 +45,7 @@ interface Props {
 
 export const AbstractChart = ({
   attributes,
+  chartContainerElement,
   chartData,
   chartDetails,
   chartLibrary,
@@ -143,6 +146,23 @@ export const AbstractChart = ({
         unitsCurrent={unitsCurrent}
         viewAfter={viewAfter}
         viewBefore={viewBefore}
+      />
+    )
+  }
+
+  if (chartLibrary === "sparkline") {
+    return (
+      <SparklineChart
+        attributes={attributes}
+        chartContainerElement={chartContainerElement}
+        chartData={chartData as EasyPieChartData}
+        chartDetails={chartDetails}
+        chartElementClassName={chartElementClassName}
+        chartElementId={chartElementId}
+        dimensionsVisibility={dimensionsVisibility}
+        isRemotelyControlled={isRemotelyControlled}
+        orderedColors={orderedColors}
+        unitsCurrent={unitsCurrent}
       />
     )
   }

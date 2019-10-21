@@ -1,7 +1,7 @@
 import { Attributes } from "./transformDataAttributes"
 
-export type ChartLibraryName = "dygraph"
-// | "sparkline" | "peity" | "google" | "d3pie" | "d3"
+export type ChartLibraryName = "dygraph" | "sparkline"
+// | "peity" | "google" | "d3pie" | "d3"
   | "easypiechart" | "gauge"
 // | "textonly"
 export interface ChartLibraryConfig {
@@ -83,29 +83,20 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     //   return "netdata-container"
     // },
   },
-  // sparkline: {
+  sparkline: {
   //   initialize: window.NETDATA.sparklineInitialize,
   //   create: window.NETDATA.sparklineChartCreate,
   //   update: window.NETDATA.sparklineChartUpdate,
   //   resize: null,
   //   setSelection: undefined, // function(state, t) { void(state); return true; },
   //   clearSelection: undefined, // function(state) { void(state); return true; },
-  //   hasToolboxPanAndZoom: false,
+    hasToolboxPanAndZoom: false,
   //   initialized: false,
   //   enabled: true,
-  //   xssRegexIgnore: new RegExp("^/api/v1/data\.result$"),
-  //   format(state) {
-  //     void (state)
-  //     return "array"
-  //   },
-  //   options(state) {
-  //     void (state)
-  //     return "flip" + "%7C" + "abs"
-  //   },
-  //   legend(state) {
-  //     void (state)
-  //     return null
-  //   },
+    xssRegexIgnore: new RegExp("^/api/v1/data.result$"),
+    format: "array",
+    options: () => "flip|abs",
+    hasLegend: () => false,
   //   autoresize(state) {
   //     void (state)
   //     return false
@@ -114,19 +105,10 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
   //     void (state)
   //     return 5000
   //   },
-  //   track_colors(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   pixels_per_point(state) {
-  //     void (state)
-  //     return 3
-  //   },
-  //   container_class(state) {
-  //     void (state)
-  //     return "netdata-container"
-  //   },
-  // },
+    trackColors: false,
+    pixelsPerPoint: () => 3,
+    containerClass: () => "netdata-container",
+  },
   // peity: {
   //   initialize: window.NETDATA.peityInitialize,
   //   create: window.NETDATA.peityChartCreate,

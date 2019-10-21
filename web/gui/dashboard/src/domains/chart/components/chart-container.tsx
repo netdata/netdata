@@ -236,6 +236,7 @@ export const ChartContainer = ({
   return (
     <Chart
       attributes={attributes}
+      chartContainerElement={portalNode}
       chartData={chartData}
       chartDetails={chartDetails}
       chartUuid={chartUuid}

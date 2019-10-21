@@ -26,6 +26,7 @@ import { ResizeHandler } from "./resize-handler"
 import { AbstractChart } from "./abstract-chart"
 
 interface Props {
+  chartContainerElement: HTMLElement
   chartData: ChartData
   chartDetails: ChartDetails
   chartHeight: number
@@ -43,6 +44,7 @@ export const Chart = ({
   attributes: {
     chartLibrary,
   },
+  chartContainerElement,
   chartData,
   chartDetails,
   chartHeight,
@@ -296,6 +298,7 @@ export const Chart = ({
     <>
       <AbstractChart
         attributes={attributes}
+        chartContainerElement={chartContainerElement}
         chartData={chartData}
         chartDetails={chartDetails}
         chartLibrary={chartLibrary}
