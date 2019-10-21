@@ -1,6 +1,6 @@
 import { __, prop } from "ramda"
 import React, {
-  useEffect, useState, useCallback, useMemo,
+  useEffect, useState, useCallback, useMemo, memo,
 } from "react"
 import { useDispatch, useSelector } from "react-redux"
 
@@ -39,7 +39,7 @@ interface Props {
   showLatestOnBlur: boolean
 }
 
-export const Chart = ({
+export const Chart = memo(({
   attributes,
   attributes: {
     chartLibrary,
@@ -276,12 +276,12 @@ export const Chart = ({
   /**
    * assign colors
    */
-  const selectAssignedColors = createSelectAssignedColors({
+  const selectAssignedColors = useMemo(() => createSelectAssignedColors({
     chartContext: chartDetails.context,
     chartUuid,
     colorsAttribute: attributes.colors,
     commonColorsAttribute: attributes.commonColors,
-  })
+  }), [attributes.colors, attributes.commonColors, chartDetails, chartUuid])
   const colors = useSelector(selectAssignedColors)
   if (!colors) {
     return null // wait for createSelectAssignedColors reducer result to come back
@@ -351,4 +351,4 @@ export const Chart = ({
       )}
     </>
   )
-}
+})

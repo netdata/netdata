@@ -1,4 +1,4 @@
-import { pick } from "ramda"
+import { prop } from "ramda"
 import { createSelector } from "reselect"
 
 import { AppStateT } from "store/app-state"
@@ -17,9 +17,13 @@ export const selectChartData = createSelector(
   (chartState) => chartState.chartData,
 )
 
+const selectChartDetails = createSelector(selectSingleChartState, prop("chartDetails"))
+const selectIsFetchingDetails = createSelector(selectSingleChartState, prop("isFetchingDetails"))
+
 export const selectChartDetailsRequest = createSelector(
-  selectSingleChartState,
-  pick(["chartDetails", "isFetchingDetails"]),
+  selectChartDetails,
+  selectIsFetchingDetails,
+  (chartDetails, isFetchingDetails) => ({ chartDetails, isFetchingDetails }),
 )
 
 export const selectChartViewRange = createSelector(
