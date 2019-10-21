@@ -102,6 +102,8 @@ int make_dns_decision(const char *section_name, const char *config_name, const c
         return 1;
     if(!strcmp("no",value))
         return 0;
+    if(strcmp("heuristic",value))
+        error("Unexpected configuration option '%s' for '%s'/'%s' -> defaulting to heuristic", value, section_name, config_name);
     return simple_pattern_is_potential_name(p);
 }
 
@@ -121,7 +123,7 @@ void web_server_config_options(void) {
     web_allow_badges_from      = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
     web_allow_badges_dns       = make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
     web_allow_registry_from    = simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow registry by dns", "heuristic", web_allow_registry_from);
+    web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow by dns", "heuristic", web_allow_registry_from);
     web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"), NULL, SIMPLE_PATTERN_EXACT);
     web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic", web_allow_streaming_from);
     // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
