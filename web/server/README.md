@@ -175,6 +175,7 @@ a forward DNS resolution is made to validate the IP address against the name-pat
 
 Please note that this process can be expensive on a machine that is serving many connections. Each access list has an
 associated configuration option to turn off DNS-based patterns completely to avoid incurring this cost at run-time:
+
 ```
 	allow connections by dns = heuristic
 	allow dashboard by dns = heuristic
@@ -186,7 +187,7 @@ associated configuration option to turn off DNS-based patterns completely to avo
 
 The three possible values for each of these options are `yes`, `no` and `heuristic`. The `heuristic` option disables
 the check when the pattern only contains IPv4/IPv6 addresses or `localhost`, and enables it when wildcards are
-present that may match DNS FQDNs. 
+present that may match DNS FQDNs.
 
 ### Other netdata.conf [web] section options
 
