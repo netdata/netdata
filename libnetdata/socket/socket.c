@@ -1007,7 +1007,8 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
  *                        of *writable* bytes (i.e. be aware of the strdup used to compact the pollinfo).
  */
 extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
-                              const char *patname, int allow_dns) {
+                              const char *patname, int allow_dns) 
+{
     debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
     if (!access_list)
         return 1;
@@ -1023,8 +1024,8 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
         if (err != 0 ||
             (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
                               NULL, 0, NI_NAMEREQD)) != 0) {
-            error("Incoming %s on '%s' does not match a numeric pattern, "
-                  "and host could not be resolved (err=%s)", patname, client_ip, gai_strerror(err));
+            error("Incoming %s on '%s' does not match a numeric pattern, and host could not be resolved (err=%s)",
+                  patname, client_ip, gai_strerror(err));
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
             return 0;
@@ -1090,7 +1091,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
-        if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+        if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
             strncpy(client_ip, "localhost", ipsize);
             client_ip[ipsize - 1] = '\0';
         }
@@ -1128,7 +1129,8 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
-        if(!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection",web_allow_connections_dns)) {
+        if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection",
+            web_allow_connections_dns)) {
             errno = 0;
             error("Permission denied for client '%s', port '%s'", client_ip, client_port);
             close(nfd);
@@ -1137,7 +1139,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         }
     }
 #ifdef HAVE_ACCEPT4
-    else if(errno == ENOSYS)
+    else if (errno == ENOSYS)
         error("netdata has been compiled with the assumption that the system has the accept4() call, but it is not here. Recompile netdata like this: ./configure --disable-accept4 ...");
 #endif
 
