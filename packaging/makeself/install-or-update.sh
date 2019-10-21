@@ -25,11 +25,13 @@ fi
 
 STARTIT=1
 AUTOUPDATE=0
+RELEASE_CHANNEL="nightly"
 
 while [ "${1}" ]; do
 	case "${1}" in
 		"--dont-start-it") STARTIT=0;;
 		"--auto-update"|"-u") AUTOUPDATE=1;;
+		"--stable-channel") RELEASE_CHANNEL="stable";;
 		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
 	esac
 	shift 1
@@ -137,6 +139,9 @@ install_netdata_logrotate || run_failed "Cannot install logrotate file for netda
 progress "Install netdata at system init"
 
 install_netdata_service || run_failed "Cannot install netdata init service."
+
+
+set_netdata_updater_channel || run_failed "Cannot set netdata updater tool release channel to '${RELEASE_CHANNEL}'"
 
 
 # -----------------------------------------------------------------------------

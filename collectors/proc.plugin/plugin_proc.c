@@ -32,6 +32,7 @@ static struct proc_module {
         { .name = "/sys/block/zram", .dim = "zram", .func = do_sys_block_zram },
         { .name = "/sys/devices/system/edac/mc", .dim = "ecc", .func = do_proc_sys_devices_system_edac_mc },
         { .name = "/sys/devices/system/node", .dim = "numa", .func = do_proc_sys_devices_system_node },
+        { .name = "/proc/pagetypeinfo", .dim = "pagetypeinfo", .func = do_proc_pagetypeinfo },
 
         // network metrics
         { .name = "/proc/net/dev", .dim = "netdev", .func = do_proc_net_dev },

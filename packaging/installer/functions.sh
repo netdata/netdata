@@ -820,3 +820,7 @@ disable_netdata_updater() {
 
 	return 0
 }
+
+set_netdata_updater_channel() {
+	sed -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" -i "${NETDATA_USER_CONFIG_DIR}/.environment"
+}

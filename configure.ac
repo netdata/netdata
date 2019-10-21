@@ -1142,9 +1142,10 @@ AC_ARG_ENABLE(
 )
 
 PKG_CHECK_MODULES(
-    [CMOCKA], [cmocka],
+    [CMOCKA],
+    [cmocka],
     [have_cmocka="yes"],
-    [AC_MSG_WARN([cmocka.pc not found on the system.  Unit tests disabled])]
+    [AC_MSG_NOTICE([CMocka not found on the system. Unit tests disabled])]
 )
 AM_CONDITIONAL([ENABLE_UNITTESTS], [test "${enable_unit_tests}" = "yes" -a "${have_cmocka}" = "yes" ])
 AC_SUBST([ENABLE_UNITTESTS])
