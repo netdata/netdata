@@ -333,7 +333,11 @@ static int vbd_metrics_collect(struct domain_metrics *d, xenstat_domain *domain)
             return 1;
         }
 
+#ifdef HAVE_XENSTAT_VBD_ERROR
         vbd_m->error    = xenstat_vbd_error(vbd);
+#else
+        vbd_m->error    = 0;
+#endif
         vbd_m->oo_reqs  = xenstat_vbd_oo_reqs(vbd);
         vbd_m->rd_reqs  = xenstat_vbd_rd_reqs(vbd);
         vbd_m->wr_reqs  = xenstat_vbd_wr_reqs(vbd);
