@@ -252,6 +252,7 @@ void flush_pages_cb(uv_fs_t* req)
 {
     struct rrdengine_worker_config* wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     struct extent_io_descriptor *xt_io_descr;
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
@@ -289,6 +290,10 @@ void flush_pages_cb(uv_fs_t* req)
     uv_fs_req_cleanup(req);
     free(xt_io_descr->buf);
     freez(xt_io_descr);
+
+    uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
+    pg_cache->committed_page_index.nr_committed_pages -= count;
+    uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 }
 
 /*
@@ -351,7 +356,6 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
         if (page_write_pending) {
             ret = JudyLDel(&pg_cache->committed_page_index.JudyL_array, Index, PJE0);
             assert(1 == ret);
-            --pg_cache->committed_page_index.nr_committed_pages;
         }
     }
     uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
