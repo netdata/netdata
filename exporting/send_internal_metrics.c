@@ -7,8 +7,8 @@
  *
  * Send performance metrics for the operation of exporting engine itself to the Netdata database.
  *
- * @param engine an engine data structure
- * @return Returns 0 on success, 1 on failure
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
  */
 int send_internal_metrics(struct engine *engine)
 {

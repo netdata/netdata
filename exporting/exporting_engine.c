@@ -9,7 +9,7 @@
  *
  * @param ptr a pointer to netdata_static_structure.
  *
- * @return It always return NULL.
+ * @return It always returns NULL.
  */
 void *exporting_main(void *ptr)
 {

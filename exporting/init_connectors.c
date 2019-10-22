@@ -5,8 +5,8 @@
 /**
  * Initialize connectors
  *
- * @param engine an engine data structure
- * @return Returns 0 on success, 1 on failure
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
  */
 int init_connectors(struct engine *engine)
 {
