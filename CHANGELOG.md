@@ -1,5 +1,18 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.18.1...HEAD)
+
+**Merged pull requests:**
+
+- Results of the spike investigation into CMake. [\#7114](https://github.com/netdata/netdata/pull/7114) ([amoss](https://github.com/amoss))
+- xenstat.plugin: check xenstat\_vbd\_error presence [\#7103](https://github.com/netdata/netdata/pull/7103) ([arkamar](https://github.com/arkamar))
+- telegram: fix broken links, add setup instructions [\#7033](https://github.com/netdata/netdata/pull/7033) ([half-duplex](https://github.com/half-duplex))
+- mysql: add cluster\_status alarm [\#6989](https://github.com/netdata/netdata/pull/6989) ([ilyam8](https://github.com/ilyam8))
+- Netdata not returning correct value for unknow variables [\#6984](https://github.com/netdata/netdata/pull/6984) ([thiagoftsm](https://github.com/thiagoftsm))
+- \[collector/proc.plugin\] Add /proc/pagetypeinfo parser [\#6843](https://github.com/netdata/netdata/pull/6843) ([Saruspete](https://github.com/Saruspete))
+
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.18.0...v1.18.1)
@@ -255,12 +268,6 @@
 - Add a statement about permissions for the diskspace plugin [\#6474](https://github.com/netdata/netdata/pull/6474) ([vlvkobal](https://github.com/vlvkobal))
 - Get user and group names from files  [\#6472](https://github.com/netdata/netdata/pull/6472) ([vlvkobal](https://github.com/vlvkobal))
 - Fix parsing SSL ACL along with others [\#6468](https://github.com/netdata/netdata/pull/6468) ([thiagoftsm](https://github.com/thiagoftsm))
-- update Nginx guide with changes [\#6466](https://github.com/netdata/netdata/pull/6466) ([prhomhyse](https://github.com/prhomhyse))
-- netdata/packaging: Binary distributions - clean up .DEB package generation process [\#6465](https://github.com/netdata/netdata/pull/6465) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- python sensors collector: sensor chips filtering fix [\#6463](https://github.com/netdata/netdata/pull/6463) ([ilyam8](https://github.com/ilyam8))
-- Fix broken links [\#6461](https://github.com/netdata/netdata/pull/6461) ([TheLovinator1](https://github.com/TheLovinator1))
-- json function could create overflow [\#6460](https://github.com/netdata/netdata/pull/6460) ([thiagoftsm](https://github.com/thiagoftsm))
-- Fix nodes menu sizing \(responsive\) [\#6455](https://github.com/netdata/netdata/pull/6455) ([builat](https://github.com/builat))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
