@@ -93,6 +93,7 @@ SUBDIRS += \
     collectors \
     daemon \
     database \
+    exporting \
     health \
     libnetdata \
     registry \
