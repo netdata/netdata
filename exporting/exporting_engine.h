@@ -5,6 +5,8 @@
 
 #include "daemon/common.h"
 
+struct engine;
+
 struct instance_config {
     const char *source;
     SIMPLE_PATTERN *charts_pattern;
@@ -29,6 +31,15 @@ struct instance {
     struct instance_config *config;
     void *buffer;
     void *stats;
+
+    int (*start_batch_formatting)(struct engine *);
+    int (*start_host_formatting)(struct engine *);
+    int (*start_chart_formatting)(struct engine *);
+    int (*metric_formatting)(struct engine *);
+    int (*end_chart_formatting)(struct engine *);
+    int (*end_host_formatting)(struct engine *);
+    int (*end_batch_formatting)(struct engine *);
+
     struct instance *next;
 };
 
@@ -47,11 +58,14 @@ struct engine {
 };
 
 void *exporting_main(void *ptr);
+
 struct engine *read_exporting_config();
 int init_connectors(struct engine *);
+
 int mark_scheduled_instances(struct engine *);
 int prepare_buffers(struct engine *);
 int notify_workers(struct engine *);
+
 int send_internal_metrics(struct engine *);
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */
