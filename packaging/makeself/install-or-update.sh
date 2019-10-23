@@ -84,7 +84,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Attempt to create user/group netdata/netadata"
 
-NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
 NETDATA_ADDED_TO_GROUPS=""
 # Default user/group
 NETDATA_USER="root"
