@@ -1,4 +1,4 @@
-# Writing Metrics from Netdata to TimescaleDB
+# Writing metrics to TimescaleDB
 
 Thanks to Netdata's community of developers and system administrators, and Mahlon Smith
 ([GitHub](https://github.com/mahlonsmith)/[Website](http://www.martini.nu/)) in particular, Netdata now supports
