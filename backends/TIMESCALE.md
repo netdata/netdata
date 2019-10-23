@@ -11,18 +11,18 @@ What's TimescaleDB? Here's how their team defines the project on their [GitHub p
 
 ## Quickstart
 
-To get started on archiving metrics to TimescaleDB right away, check out Mahlon's [`netdata-timescale-relay`
+To get started archiving metrics to TimescaleDB right away, check out Mahlon's [`netdata-timescale-relay`
 repository](https://github.com/mahlonsmith/netdata-timescale-relay) on GitHub. 
 
-This small program, which operates outside of Netdata, takes JSON streams from a Netdata client and writes them to a
-PostgreSQL (aka TimescaleDB) table. You'll run this program in parallel with Netdata, and after a short [configuration
+This small program takes JSON streams from a Netdata client and writes them to a PostgreSQL (aka TimescaleDB) table.
+You'll run this program in parallel with Netdata, and after a short [configuration
 process](https://github.com/mahlonsmith/netdata-timescale-relay#configuration), your metrics should start populating
 TimescaleDB.
 
-Finally, another member of Netdata's community has built a "complete system for testing, experimentation and playing
-around with netdata, TimescaleDB and Grafana." Rune Juhl Jacobsen's [GitHub
-project](https://github.com/runejuhl/grafana-timescaledb) built a `Makefile` that launches everything for you in
-easy-to-manage Docker containers.
+Finally, another member of Netdata's community has built a project that quickly launches Netdata, TimescaleDB, and
+Grafana in easy-to-manage Docker containers. Rune Juhl Jacobsen's
+[project](https://github.com/runejuhl/grafana-timescaledb) uses a `Makefile` to create everything, which makes it
+perferct for testing and experimentation.
 
 ## Netdata&#8596;TimescaleDB in action
 
@@ -38,7 +38,7 @@ sources.
 > with their use case of time-based logging, where they record over 8 million metrics an hour for netdata content alone.
 
 By archiving Netdata metrics to a backend like TimescaleDB, LAIKA can consolidate metrics data from distributed machines
-in an efficient manner. They can then correlate that data with other sources directly in TimescaleDB.
+efficiently. Mahlon can then correlate Netdata metrics with other sources directly in TimescaleDB.
 
 And, because LAIKA will soon be storing years worth of Netdata metrics data in TimescaleDB, they can analyze long-term
 metrics as their films move from concept to final cut.
@@ -48,3 +48,5 @@ blog](https://blog.timescale.com/blog/writing-it-metrics-from-netdata-to-timesca
 
 Thank you to Mahlon, Rune, TimescaleDB, and the members of the Netdata community that requested and then built this
 backend connection between Netdata and TimescaleDB!
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fbackends%2FTIMESCALE&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
