@@ -9,6 +9,7 @@
 - Results of the spike investigation into CMake. [\#7114](https://github.com/netdata/netdata/pull/7114) ([amoss](https://github.com/amoss))
 - xenstat.plugin: check xenstat\_vbd\_error presence [\#7103](https://github.com/netdata/netdata/pull/7103) ([arkamar](https://github.com/arkamar))
 - telegram: fix broken links, add setup instructions [\#7033](https://github.com/netdata/netdata/pull/7033) ([half-duplex](https://github.com/half-duplex))
+- add support for am2320 sensor [\#7024](https://github.com/netdata/netdata/pull/7024) ([tommybuck](https://github.com/tommybuck))
 - mysql: add cluster\_status alarm [\#6989](https://github.com/netdata/netdata/pull/6989) ([ilyam8](https://github.com/ilyam8))
 - Netdata not returning correct value for unknow variables [\#6984](https://github.com/netdata/netdata/pull/6984) ([thiagoftsm](https://github.com/thiagoftsm))
 - \[collector/proc.plugin\] Add /proc/pagetypeinfo parser [\#6843](https://github.com/netdata/netdata/pull/6843) ([Saruspete](https://github.com/Saruspete))
@@ -235,7 +236,6 @@
 - netdata/packaging: Documentation on distribution support matrix and functionality availability [\#6552](https://github.com/netdata/netdata/pull/6552) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
 - Add MongoDB backend [\#6524](https://github.com/netdata/netdata/pull/6524) ([vlvkobal](https://github.com/vlvkobal))
-- Netdata Cloud documentation [\#6476](https://github.com/netdata/netdata/pull/6476) ([joelhans](https://github.com/joelhans))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
@@ -265,9 +265,6 @@
 - Add support for plain text only emails [\#6485](https://github.com/netdata/netdata/pull/6485) ([leo-lb](https://github.com/leo-lb))
 - netdata/packaging: Enable built-in support for prometheus remote write in packaging [\#6480](https://github.com/netdata/netdata/pull/6480) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix the snappy library check [\#6479](https://github.com/netdata/netdata/pull/6479) ([vlvkobal](https://github.com/vlvkobal))
-- Add a statement about permissions for the diskspace plugin [\#6474](https://github.com/netdata/netdata/pull/6474) ([vlvkobal](https://github.com/vlvkobal))
-- Get user and group names from files  [\#6472](https://github.com/netdata/netdata/pull/6472) ([vlvkobal](https://github.com/vlvkobal))
-- Fix parsing SSL ACL along with others [\#6468](https://github.com/netdata/netdata/pull/6468) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
