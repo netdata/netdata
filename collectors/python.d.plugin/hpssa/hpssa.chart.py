@@ -336,9 +336,9 @@ class Service(ExecutableService):
                 self.error('Cannot locate "{}" binary'.format('sudo'))
                 return False
 
-            err = self._get_raw_data(command=[sudo, '-n', '-v'], stderr=True)
-            if err:
-                self.error('Could not run sudo: {}'.format(' '.join(err)))
+            allowed = self._get_raw_data(command=[sudo, '-n', '-l', self.ssacli_path])
+            if not allowed or allowed[0].strip() != os.path.realpath(self.ssacli_path):
+                self.error('Not allowed to run sudo for command {}'.format(self.ssacli_path))
                 return False
 
             self.cmd = [sudo, '-n']
