@@ -79,8 +79,8 @@ CHARTS = {
     }
 }
 
-_adapter_regex = re.compile(r'^(?P<adapter_type>.+) in Slot (?P<slot>\d+)')
-_ignored_sections_regex = re.compile(
+adapter_regex = re.compile(r'^(?P<adapter_type>.+) in Slot (?P<slot>\d+)')
+ignored_sections_regex = re.compile(
     r'''
     ^
         Physical[ ]Drives
@@ -92,9 +92,9 @@ _ignored_sections_regex = re.compile(
     ''',
     re.X
 )
-_mirror_group_regex = re.compile(r'^Mirror Group \d+:$')
-_array_regex = re.compile(r'^Array: (?P<id>[A-Z]+)$')
-_drive_regex = re.compile(
+mirror_group_regex = re.compile(r'^Mirror Group \d+:$')
+array_regex = re.compile(r'^Array: (?P<id>[A-Z]+)$')
+drive_regex = re.compile(
     r'''
     ^
         Logical[ ]Drive:[ ](?P<logical_drive_id>\d+)
@@ -103,9 +103,9 @@ _drive_regex = re.compile(
     ''',
     re.X
 )
-_key_value_regex = re.compile(r'^(?P<key>[^:]+): ?(?P<value>.*)$')
-_status_complete_regex = re.compile(r'^(?P<status>[^,]+), (?P<percentage>[0-9.]+)% complete$')
-_error_match = re.compile(r'Error:')
+key_value_regex = re.compile(r'^(?P<key>[^:]+): ?(?P<value>.*)$')
+status_complete_regex = re.compile(r'^(?P<status>[^,]+), (?P<percentage>[0-9.]+)% complete$')
+error_match = re.compile(r'Error:')
 
 
 class HPSSAException(Exception):
@@ -114,20 +114,20 @@ class HPSSAException(Exception):
 
 class HPSSA(object):
     def __init__(self, lines):
-        self._lines = [line.strip() for line in lines if line.strip()]
-        self._current_line = 0
+        self.lines = [line.strip() for line in lines if line.strip()]
+        self.current_line = 0
         self.adapters = []
-        self._parse()
+        self.parse()
 
     def __iter__(self):
         return self
 
     def __next__(self):
-        if self._current_line == len(self._lines):
+        if self.current_line == len(self.lines):
             raise StopIteration
 
-        line = self._lines[self._current_line]
-        self._current_line += 1
+        line = self.lines[self.current_line]
+        self.current_line += 1
 
         return line
 
@@ -137,16 +137,16 @@ class HPSSA(object):
         """
         return self.__next__()
 
-    def _rewind(self):
-        self._current_line = max(self._current_line - 1, 0)
+    def rewind(self):
+        self.current_line = max(self.current_line - 1, 0)
 
-    def _parse(self):
+    def parse(self):
         for line in self:
-            match = _adapter_regex.match(line)
+            match = adapter_regex.match(line)
             if match:
-                self.adapters.append(self._parse_adapter(**match.groupdict()))
+                self.adapters.append(self.parse_adapter(**match.groupdict()))
 
-    def _parse_adapter(self, slot, adapter_type):
+    def parse_adapter(self, slot, adapter_type):
         adapter = {
             'slot': int(slot),
             'type': adapter_type,
@@ -170,16 +170,16 @@ class HPSSA(object):
         }
 
         for line in self:
-            if _error_match.match(line):
+            if error_match.match(line):
                 raise HPSSAException('Error: {}'.format(line))
-            elif _array_regex.match(line):
-                self._parse_array(adapter)
+            elif array_regex.match(line):
+                self.parse_array(adapter)
             elif line == 'Unassigned':
-                self._parse_unassigned_physical_drives(adapter)
-            elif _ignored_sections_regex.match(line):
-                self._parse_ignored_section()
+                self.parse_unassigned_physical_drives(adapter)
+            elif ignored_sections_regex.match(line):
+                self.parse_ignored_section()
             else:
-                match = _key_value_regex.match(line)
+                match = key_value_regex.match(line)
                 if match:
                     key, value = match.group('key', 'value')
                     if key == 'Controller Status':
@@ -201,33 +201,33 @@ class HPSSA(object):
 
         return adapter
 
-    def _parse_array(self, adapter):
+    def parse_array(self, adapter):
         for line in self:
-            if _adapter_regex.match(line) or _array_regex.match(line) or _ignored_sections_regex.match(line):
-                self._rewind()
+            if adapter_regex.match(line) or array_regex.match(line) or ignored_sections_regex.match(line):
+                self.rewind()
                 break
 
-            match = _drive_regex.match(line)
+            match = drive_regex.match(line)
             if match:
                 data = match.groupdict()
                 if data['logical_drive_id']:
-                    self._parse_logical_drive(adapter, int(data['logical_drive_id']))
+                    self.parse_logical_drive(adapter, int(data['logical_drive_id']))
                 else:
-                    self._parse_physical_drive(adapter, data['fqn'])
-            elif not _key_value_regex.match(line):
-                self._rewind()
+                    self.parse_physical_drive(adapter, data['fqn'])
+            elif not key_value_regex.match(line):
+                self.rewind()
                 break
 
-    def _parse_unassigned_physical_drives(self, adapter):
+    def parse_unassigned_physical_drives(self, adapter):
         for line in self:
-            match = _drive_regex.match(line)
+            match = drive_regex.match(line)
             if match:
-                self._parse_physical_drive(adapter, match.group('fqn'))
+                self.parse_physical_drive(adapter, match.group('fqn'))
             else:
-                self._rewind()
+                self.rewind()
                 break
 
-    def _parse_logical_drive(self, adapter, logical_drive_id):
+    def parse_logical_drive(self, adapter, logical_drive_id):
         ld = {
             'id': logical_drive_id,
             'status': None,
@@ -235,32 +235,32 @@ class HPSSA(object):
         }
 
         for line in self:
-            if _mirror_group_regex.match(line):
-                self._parse_ignored_section()
-            elif _adapter_regex.match(line) \
-                    or _array_regex.match(line) \
-                    or _drive_regex.match(line) \
-                    or _ignored_sections_regex.match(line):
-                self._rewind()
+            if mirror_group_regex.match(line):
+                self.parse_ignored_section()
+            elif adapter_regex.match(line) \
+                    or array_regex.match(line) \
+                    or drive_regex.match(line) \
+                    or ignored_sections_regex.match(line):
+                self.rewind()
                 break
             else:
-                match = _key_value_regex.match(line)
+                match = key_value_regex.match(line)
                 if match:
                     key, value = match.group('key', 'value')
                     if key == 'Status':
-                        status_match = _status_complete_regex.match(value)
+                        status_match = status_complete_regex.match(value)
                         if status_match:
                             ld['status'] = status_match.group('status') == 'OK'
                             ld['status_complete'] = float(status_match.group('percentage')) / 100
                         else:
                             ld['status'] = value == 'OK'
                 else:
-                    self._rewind()
+                    self.rewind()
                     break
 
         adapter['logical_drives'].append(ld)
 
-    def _parse_physical_drive(self, adapter, fqn):
+    def parse_physical_drive(self, adapter, fqn):
         pd = {
             'fqn': fqn,
             'status': None,
@@ -268,14 +268,14 @@ class HPSSA(object):
         }
 
         for line in self:
-            if _adapter_regex.match(line) or \
-                    _array_regex.match(line) or \
-                    _drive_regex.search(line) or \
-                    _ignored_sections_regex.match(line):
-                self._rewind()
+            if adapter_regex.match(line) or \
+                    array_regex.match(line) or \
+                    drive_regex.search(line) or \
+                    ignored_sections_regex.match(line):
+                self.rewind()
                 break
 
-            match = _key_value_regex.match(line)
+            match = key_value_regex.match(line)
             if match:
                 key, value = match.group('key', 'value')
                 if key == 'Status':
@@ -283,19 +283,19 @@ class HPSSA(object):
                 elif key == 'Current Temperature (C)':
                     pd['temperature'] = int(value)
             else:
-                self._rewind()
+                self.rewind()
                 break
 
         adapter['physical_drives'].append(pd)
 
-    def _parse_ignored_section(self):
+    def parse_ignored_section(self):
         for line in self:
-            if _adapter_regex.match(line) \
-                    or _array_regex.match(line) \
-                    or _drive_regex.match(line) \
-                    or _ignored_sections_regex.match(line) \
-                    or not _key_value_regex.match(line):
-                self._rewind()
+            if adapter_regex.match(line) \
+                    or array_regex.match(line) \
+                    or drive_regex.match(line) \
+                    or ignored_sections_regex.match(line) \
+                    or not key_value_regex.match(line):
+                self.rewind()
                 break
 
 
@@ -308,7 +308,7 @@ class Service(ExecutableService):
         self.use_sudo = self.configuration.get('use_sudo', True)
         self.cmd = []
 
-    def _get_adapters(self):
+    def get_adapters(self):
         try:
             adapters = HPSSA(self._get_raw_data(command=self.cmd)).adapters
             if not adapters:
@@ -346,7 +346,7 @@ class Service(ExecutableService):
         self.cmd.extend([self.ssacli_path, 'ctrl', 'all', 'show', 'config', 'detail'])
         self.info('Command: {}'.format(self.cmd))
 
-        adapters = self._get_adapters()
+        adapters = self.get_adapters()
 
         self.info('Discovered adapters: {}'.format([adapter['type'] for adapter in adapters]))
         if not adapters:
@@ -358,7 +358,7 @@ class Service(ExecutableService):
     def get_data(self):
         netdata = {}
 
-        for adapter in self._get_adapters():
+        for adapter in self.get_adapters():
             status_key = '{}_status'.format(adapter['slot'])
             temperature_key = '{}_temperature'.format(adapter['slot'])
             ld_key = 'ld_{}_'.format(adapter['slot'])
