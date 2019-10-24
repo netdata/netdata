@@ -91,7 +91,8 @@
             "description": "The id of the chart as returned by the /charts call.",
             "required": true,
             "type": "string",
-            "format": "as returned by /charts"
+            "format": "as returned by /charts",
+            "default": "system.cpu"
           }
         ],
         "responses": {

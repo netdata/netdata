@@ -80,6 +80,7 @@ paths:
           required: true
           type: string
           format: as returned by /charts
+          default: system.cpu
       responses:
         '200':
           description: >-
