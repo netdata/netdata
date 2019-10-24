@@ -67,6 +67,7 @@ include litespeed/Makefile.inc
 include logind/Makefile.inc
 include megacli/Makefile.inc
 include memcached/Makefile.inc
+include memcachier/Makefile.inc
 include mongodb/Makefile.inc
 include monit/Makefile.inc
 include mysql/Makefile.inc
