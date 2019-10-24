@@ -1,12 +1,13 @@
 import argparse
 import json
+import random
 import requests
 import sys
 import posixpath
 import urllib.parse
 
 def some(s):
-    return sorted(s)[0]
+    return random.choice(sorted(s))
 
 class Param(object):
     def __init__(self, name, location, kind):
@@ -23,6 +24,8 @@ class GetPath(object):
         self.url    = url
         self.req_params = {}
         self.opt_params = {}
+        self.success    = None
+        self.failures   = {}
         if 'parameters' in spec.keys():
             for p in spec['parameters']:
                 name = p['name']
@@ -36,14 +39,45 @@ class GetPath(object):
                             target[name].values.add(d)
                     else:
                         target[name].values.add(defs)
+                if 'enum' in p:
+                    for v in p['enum']:
+                        target[name].values.add(v)
                 if req and len(target[name].values)==0:
                     print(f"FAIL: No default values in swagger for required parameter {name} in {self.url}")
+            for code,schema in spec['responses'].items():
+                if code=="200":
+                    self.success = schema
+                else:
+                    self.failures[code] = schema
 
-    def generate(self, host):
+    def generate_success(self, host):
         args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
         base_url = urllib.parse.urljoin(host,self.url)
         test_url = f"{base_url}?{args}"
         print(f"TEST: {test_url}")
+        #for p in self.req_params.values():
+        #    p.dump()
+        #for p in self.opt_params.values():
+        #    p.dump()
+        return requests.get(url=test_url)
+
+    def generate_failure(self, host):
+        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
+        base_url = urllib.parse.urljoin(host,self.url)
+        test_url = f"{base_url}?{args}"
+        print(f"TEST: {test_url}")
+        #for p in self.req_params.values():
+        #    p.dump()
+        #for p in self.opt_params.values():
+        #    p.dump()
+        return requests.get(url=test_url)
+
+    def validate(self, res, expect_success):
+        print(dir(resp))
+        if resp.status_code==200:
+            print(self.success)
+            #print(json.loads(resp.text))
+
 
 
 def get_the_spec(url):
@@ -52,6 +86,14 @@ def get_the_spec(url):
             return f.read()
     return requests.get(url=url).text
 
+# Swagger paths look absolute but they are relative to the base.
+def not_absolute(path):
+    return path[1:] if path[0] == '/' else path
+
+#######################################################################################################################
+# Initialization
+
+random.seed(7)      # Default is reproducible sequences
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--url', type=str,
@@ -60,9 +102,13 @@ parser.add_argument('--url', type=str,
                          'from the main branch.')
 parser.add_argument('--host', type=str,
                     help='The URL of the target host to fuzz. The default will read the host from the swagger ' +
-                         'defintion.')
+                         'definition.')
+parser.add_argument('--reseed', action='store_true',
+                    help="Pick a random seed for the PRNG. The default uses a constant seed for reproducibility.")
 
 args = parser.parse_args()
+if args.reseed:
+    random.seed()
 spec = json.loads( get_the_spec(args.url) )
 
 if spec['swagger'] != '2.0':
@@ -77,10 +123,15 @@ print(f"INFO: Target host is {host}")
 paths = []
 for name,p in spec['paths'].items():
     if 'get' in p:
+        name = not_absolute(name)
         paths.append(GetPath(posixpath.join(spec['basePath'],name), p['get']))
     elif 'put' in p:
         print(f"FAIL: Generation of PUT methods (for {name} is unimplemented")
 
 for s in spec['schemes']:
     for p in paths:
-        p.generate(s+"://"+host)
+        resp = p.generate_success(s+"://"+host)
+        p.validate(resp, True)
+        resp = p.generate_failure(s+"://"+host)
+        p.validate(resp, False)
+
