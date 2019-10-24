@@ -149,7 +149,7 @@ Netdata supports access lists in `netdata.conf`:
 	allow management from = localhost
 ```
 
-`*` does string matches on the IPs of the clients.
+`*` does string matches on the IPs or FQDNs of the clients.
 
 -   `allow connections from` matches anyone that connects on the Netdata port(s).
      So, if someone is not allowed, it will be connected and disconnected immediately, without reading even
@@ -168,6 +168,26 @@ Netdata supports access lists in `netdata.conf`:
      The IPs listed are all the private IPv4 addresses, including link local IPv6 addresses. Keep in mind that connections to Netdata API ports are filtered by `allow connections from`. So, IPs allowed by `allow netdata.conf from` should also be allowed by `allow connections from`.
 
 -   `allow management from` checks the IPs to allow API management calls. Management via the API is currently supported for [health](../api/health/#health-management-api)
+
+In order to check the FQDN of the connection without opening the Netdata agent to DNS-spoofing, a reverse-dns record
+must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and
+a forward DNS resolution is made to validate the IP address against the name-pattern.
+
+Please note that this process can be expensive on a machine that is serving many connections. Each access list has an
+associated configuration option to turn off DNS-based patterns completely to avoid incurring this cost at run-time:
+
+```
+	allow connections by dns = heuristic
+	allow dashboard by dns = heuristic
+	allow badges by dns = heuristic
+	allow streaming by dns = heuristic
+	allow netdata.conf by dns = no
+	allow management by dns = heuristic
+```
+
+The three possible values for each of these options are `yes`, `no` and `heuristic`. The `heuristic` option disables
+the check when the pattern only contains IPv4/IPv6 addresses or `localhost`, and enables it when wildcards are
+present that may match DNS FQDNs.
 
 ### Other netdata.conf [web] section options
 
