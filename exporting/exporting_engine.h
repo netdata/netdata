@@ -8,27 +8,29 @@
 struct engine;
 
 struct instance_config {
-    const char *source;
-    SIMPLE_PATTERN *charts_pattern;
-    SIMPLE_PATTERN *hosts_pattern;
+    const char *destination;
+    int update_every;
     int buffer_on_failures;
     long timeoutms;
+    SIMPLE_PATTERN *charts_pattern;
+    SIMPLE_PATTERN *hosts_pattern;
+    int send_names_instead_of_ids;
     void *connector_specific_config;
 };
 
 struct connector_config {
-    void *connector_specific_config;
+    BACKEND_TYPE type;
 };
 
 struct engine_config {
     const char *prefix;
+    const char *hostname;
     int update_every;
     BACKEND_OPTIONS options; // TODO: Rename to EXPORTING_OPTIONS
-    const char *hostname;
 };
 
 struct instance {
-    struct instance_config *config;
+    struct instance_config config;
     void *buffer;
     void *stats;
 
@@ -44,14 +46,13 @@ struct instance {
 };
 
 struct connector {
-    int type;
-    struct connector_config *config;
+    struct connector_config config;
     struct instance *instance_root;
     struct connector *next;
 };
 
 struct engine {
-    struct engine_config *config;
+    struct engine_config config;
     struct connector *connector_root;
     time_t after;
     time_t before;

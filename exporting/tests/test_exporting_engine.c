@@ -14,6 +14,7 @@ time_t __wrap_now_realtime_sec(void)
     return mock_type(time_t);
 }
 
+struct engine *__real_read_exporting_config();
 struct engine *__wrap_read_exporting_config()
 {
     function_called();
@@ -239,10 +240,42 @@ static void test_prepare_buffers(void **state)
     free(engine);
 }
 
+static void test_read_exporting_config(void **state)
+{
+    (void)state;
+
+    struct engine *engine = __real_read_exporting_config();
+
+    assert_ptr_not_equal(engine, NULL);
+    assert_string_equal(engine->config.prefix, "netdata");
+    assert_string_equal(engine->config.hostname, "test-host");
+    assert_int_equal(engine->config.update_every, 3);
+    assert_int_equal(engine->config.options, BACKEND_OPTION_SEND_NAMES);
+
+    struct connector *connector = engine->connector_root;
+    assert_ptr_not_equal(connector, NULL);
+    assert_ptr_equal(connector->next, NULL);
+    assert_int_equal(connector->config.type, BACKEND_TYPE_GRAPHITE);
+
+    struct instance *instance = connector->instance_root;
+    assert_ptr_not_equal(instance, NULL);
+    assert_ptr_equal(instance->next, NULL);
+    assert_string_equal(instance->config.destination, "localhost");
+    assert_int_equal(instance->config.update_every, 1);
+    assert_int_equal(instance->config.buffer_on_failures, 10);
+    assert_int_equal(instance->config.timeoutms, 10000);
+    assert_string_equal(instance->config.charts_pattern, "*");
+    assert_string_equal(instance->config.hosts_pattern, "localhost *");
+    assert_int_equal(instance->config.send_names_instead_of_ids, 1);
+}
+
 int main(void)
 {
-    const struct CMUnitTest tests[] = { cmocka_unit_test(test_exporting_engine),
-                                        cmocka_unit_test(test_prepare_buffers) };
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_exporting_engine),
+        cmocka_unit_test(test_prepare_buffers),
+        cmocka_unit_test(test_read_exporting_config)
+    };
 
     return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL);
 }
