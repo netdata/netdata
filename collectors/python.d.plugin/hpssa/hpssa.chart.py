@@ -104,7 +104,7 @@ drive_regex = re.compile(
     re.X
 )
 key_value_regex = re.compile(r'^(?P<key>[^:]+): ?(?P<value>.*)$')
-status_complete_regex = re.compile(r'^(?P<status>[^,]+), (?P<percentage>[0-9.]+)% complete$')
+ld_status_regex = re.compile(r'^Status: (?P<status>[^,]+)(?:, (?P<percentage>[0-9.]+)% complete)?$')
 error_match = re.compile(r'Error:')
 
 
@@ -241,23 +241,18 @@ class HPSSA(object):
         for line in self:
             if mirror_group_regex.match(line):
                 self.parse_ignored_section()
-            elif HPSSA.match_any(line, adapter_regex, array_regex, drive_regex, ignored_sections_regex):
+                continue
+
+            match = ld_status_regex.match(line)
+            if match:
+                ld['status'] = match.group('status') == 'OK'
+
+                if match.group('percentage'):
+                    ld['status_complete'] = float(match.group('percentage')) / 100
+            elif HPSSA.match_any(line, adapter_regex, array_regex, drive_regex, ignored_sections_regex) \
+                    or not key_value_regex.match(line):
                 self.rewind()
                 break
-            else:
-                match = key_value_regex.match(line)
-                if match:
-                    key, value = match.group('key', 'value')
-                    if key == 'Status':
-                        status_match = status_complete_regex.match(value)
-                        if status_match:
-                            ld['status'] = status_match.group('status') == 'OK'
-                            ld['status_complete'] = float(status_match.group('percentage')) / 100
-                        else:
-                            ld['status'] = value == 'OK'
-                else:
-                    self.rewind()
-                    break
 
         adapter['logical_drives'].append(ld)
 
