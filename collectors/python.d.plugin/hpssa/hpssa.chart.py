@@ -140,6 +140,10 @@ class HPSSA(object):
     def rewind(self):
         self.current_line = max(self.current_line - 1, 0)
 
+    @staticmethod
+    def match_any(line, *regexes):
+        return any([regex.match(line) for regex in regexes])
+
     def parse(self):
         for line in self:
             match = adapter_regex.match(line)
@@ -203,7 +207,7 @@ class HPSSA(object):
 
     def parse_array(self, adapter):
         for line in self:
-            if adapter_regex.match(line) or array_regex.match(line) or ignored_sections_regex.match(line):
+            if HPSSA.match_any(line, adapter_regex, array_regex, ignored_sections_regex):
                 self.rewind()
                 break
 
@@ -237,10 +241,7 @@ class HPSSA(object):
         for line in self:
             if mirror_group_regex.match(line):
                 self.parse_ignored_section()
-            elif adapter_regex.match(line) \
-                    or array_regex.match(line) \
-                    or drive_regex.match(line) \
-                    or ignored_sections_regex.match(line):
+            elif HPSSA.match_any(line, adapter_regex, array_regex, drive_regex, ignored_sections_regex):
                 self.rewind()
                 break
             else:
@@ -268,10 +269,7 @@ class HPSSA(object):
         }
 
         for line in self:
-            if adapter_regex.match(line) or \
-                    array_regex.match(line) or \
-                    drive_regex.search(line) or \
-                    ignored_sections_regex.match(line):
+            if HPSSA.match_any(line, adapter_regex, array_regex, drive_regex, ignored_sections_regex):
                 self.rewind()
                 break
 
@@ -290,10 +288,7 @@ class HPSSA(object):
 
     def parse_ignored_section(self):
         for line in self:
-            if adapter_regex.match(line) \
-                    or array_regex.match(line) \
-                    or drive_regex.match(line) \
-                    or ignored_sections_regex.match(line) \
+            if HPSSA.match_any(line, adapter_regex, array_regex, drive_regex, ignored_sections_regex) \
                     or not key_value_regex.match(line):
                 self.rewind()
                 break
