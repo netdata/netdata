@@ -110,7 +110,7 @@ struct pg_cache_metrics_index {
 };
 
 /* gathers dirty pages to be written on disk */
-struct pg_cache_commited_page_index {
+struct pg_cache_committed_page_index {
     uv_rwlock_t lock;
 
     Pvoid_t JudyL_array;
@@ -122,7 +122,7 @@ struct pg_cache_commited_page_index {
      */
     Word_t latest_corr_id;
 
-    unsigned nr_commited_pages;
+    unsigned nr_committed_pages;
 };
 
 /*
@@ -140,7 +140,7 @@ struct page_cache { /* TODO: add statistics */
     uv_rwlock_t pg_cache_rwlock; /* page cache lock */
 
     struct pg_cache_metrics_index metrics_index;
-    struct pg_cache_commited_page_index commited_page_index;
+    struct pg_cache_committed_page_index committed_page_index;
     struct pg_cache_replaceQ replaceQ;
 
     unsigned page_descriptors;
@@ -182,6 +182,8 @@ extern void init_page_cache(struct rrdengine_instance *ctx);
 extern void free_page_cache(struct rrdengine_instance *ctx);
 extern void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr);
 extern void pg_cache_update_metric_times(struct pg_cache_page_index *page_index);
+extern unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx);
+extern unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx);
 
 static inline void
     pg_cache_atomic_get_pg_info(struct rrdeng_page_descr *descr, usec_t *end_timep, uint32_t *page_lengthp)

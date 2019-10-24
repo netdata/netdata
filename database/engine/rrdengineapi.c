@@ -173,9 +173,9 @@ void rrdeng_store_metric_next(RRDDIM *rd, usec_t point_in_time, storage_number n
 
         handle->descr = descr;
 
-        uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-        handle->page_correlation_id = pg_cache->commited_page_index.latest_corr_id++;
-        uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+        uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
+        handle->page_correlation_id = pg_cache->committed_page_index.latest_corr_id++;
+        uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
         if (0 == rd->rrdset->rrddim_page_alignment) {
             /* this is the leading dimension that defines chart alignment */
@@ -614,18 +614,31 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
+    unsigned nr_committed_pages;
 
     if (unlikely(NULL == descr)) {
-        debug(D_RRDENGINE, "%s: page descriptor is NULL, page has already been force-commited.", __func__);
+        debug(D_RRDENGINE, "%s: page descriptor is NULL, page has already been force-committed.", __func__);
         return;
     }
     assert(descr->page_length);
 
-    uv_rwlock_wrlock(&pg_cache->commited_page_index.lock);
-    PValue = JudyLIns(&pg_cache->commited_page_index.JudyL_array, page_correlation_id, PJE0);
+    uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
+    PValue = JudyLIns(&pg_cache->committed_page_index.JudyL_array, page_correlation_id, PJE0);
     *PValue = descr;
-    ++pg_cache->commited_page_index.nr_commited_pages;
-    uv_rwlock_wrunlock(&pg_cache->commited_page_index.lock);
+    nr_committed_pages = ++pg_cache->committed_page_index.nr_committed_pages;
+    uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
+
+    if (nr_committed_pages >= (pg_cache_hard_limit(ctx) - (unsigned long)ctx->stats.metric_API_producers) / 2) {
+        /* 50% of pages have not been committed yet */
+        if (0 == (unsigned long)ctx->stats.flushing_errors) {
+            /* only print the first time */
+            error("Failed to flush quickly enough in dbengine instance \"%s\""
+                  ". Metric data will not be stored in the database"
+                  ", please reduce disk load or use a faster disk.", ctx->dbfiles_path);
+        }
+        rrd_stat_atomic_add(&ctx->stats.flushing_errors, 1);
+        rrd_stat_atomic_add(&global_flushing_errors, 1);
+    }
 
     pg_cache_put(ctx, descr);
 }
@@ -674,7 +687,7 @@ void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_i
  * You must not change the indices of the statistics or user code will break.
  * You must not exceed RRDENG_NR_STATS or it will crash.
  */
-void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
+void rrdeng_get_35_statistics(struct rrdengine_instance *ctx, unsigned long long *array)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
@@ -682,7 +695,7 @@ void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[1] = (uint64_t)ctx->stats.metric_API_consumers;
     array[2] = (uint64_t)pg_cache->page_descriptors;
     array[3] = (uint64_t)pg_cache->populated_pages;
-    array[4] = (uint64_t)pg_cache->commited_page_index.nr_commited_pages;
+    array[4] = (uint64_t)pg_cache->committed_page_index.nr_committed_pages;
     array[5] = (uint64_t)ctx->stats.pg_cache_insertions;
     array[6] = (uint64_t)ctx->stats.pg_cache_deletions;
     array[7] = (uint64_t)ctx->stats.pg_cache_hits;
@@ -711,7 +724,9 @@ void rrdeng_get_33_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[30] = (uint64_t)global_io_errors;
     array[31] = (uint64_t)global_fs_errors;
     array[32] = (uint64_t)rrdeng_reserved_file_descriptors;
-    assert(RRDENG_NR_STATS == 33);
+    array[33] = (uint64_t)ctx->stats.flushing_errors;
+    array[34] = (uint64_t)global_flushing_errors;
+    assert(RRDENG_NR_STATS == 35);
 }
 
 /* Releases reference to page */
