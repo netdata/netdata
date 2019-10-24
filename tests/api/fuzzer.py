@@ -43,11 +43,13 @@ class GetPath(object):
         else:
             print(f"{url} GET No params {spec}")
 
-    def generate(self):
-            print("&".join([f"{p.name}={some(p.values)})" for p in self.req_params.values() ]))
+    def generate(self, host):
+        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
+        base_url = urllib.parse.urljoin(host,self.url)
+        print(f"{base_url}?{args}")
 
     #def generate...
-    #base_url = urllib.parse.urljoin(host,base)
+    #base_url = 
 
 def get_the_spec(url):
     if url[:7] == "file://":
@@ -84,5 +86,4 @@ for name,p in spec['paths'].items():
         print(f"FAIL: Generation of PUT methods (for {name} is unimplemented")
 
 for p in paths:
-    p.generate()
-    #fuzz_path(host, spec['basePath'], name, p)
+    p.generate(host)
