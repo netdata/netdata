@@ -222,7 +222,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
 
         // Per-Numa Node & Zone & Type (full detail). Only if sum(line) > 0
-        st_nodezonetype = callocz(pagelines_cnt, sizeof(RRDSET));
+        st_nodezonetype = callocz(pagelines_cnt, sizeof(RRDSET *));
         for (p = 0; p < pagelines_cnt; p++) {
             pgl = &pagelines[p];
 
