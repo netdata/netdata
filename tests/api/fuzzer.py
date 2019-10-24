@@ -24,7 +24,6 @@ class GetPath(object):
         self.req_params = {}
         self.opt_params = {}
         if 'parameters' in spec.keys():
-            print(f"{url} GET")
             for p in spec['parameters']:
                 name = p['name']
                 req  = p.get('required',False)
@@ -37,19 +36,15 @@ class GetPath(object):
                             target[name].values.add(d)
                     else:
                         target[name].values.add(defs)
-                    target[name].dump()
                 if req and len(target[name].values)==0:
                     print(f"FAIL: No default values in swagger for required parameter {name} in {self.url}")
-        else:
-            print(f"{url} GET No params {spec}")
 
     def generate(self, host):
         args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
         base_url = urllib.parse.urljoin(host,self.url)
-        print(f"{base_url}?{args}")
+        test_url = f"{base_url}?{args}"
+        print(f"TEST: {test_url}")
 
-    #def generate...
-    #base_url = 
 
 def get_the_spec(url):
     if url[:7] == "file://":
