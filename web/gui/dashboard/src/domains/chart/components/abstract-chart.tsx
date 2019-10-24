@@ -6,7 +6,7 @@ import { setGlobalChartUnderlayAction, setGlobalPanAndZoomAction } from "domains
 
 import { Attributes } from "../utils/transformDataAttributes"
 import {
-  ChartData, ChartDetails, DygraphData, EasyPieChartData,
+  ChartData, ChartDetails, DygraphData, EasyPieChartData, D3pieChartData,
 } from "../chart-types"
 import { chartLibrariesSettings, ChartLibraryName } from "../utils/chartLibrariesSettings"
 
@@ -14,6 +14,7 @@ import { DygraphChart } from "./lib-charts/dygraph-chart"
 import { EasyPieChart } from "./lib-charts/easy-pie-chart"
 import { GaugeChart } from "./lib-charts/gauge-chart"
 import { SparklineChart } from "./lib-charts/sparkline-chart"
+import { D3pieChart } from "./lib-charts/d3pie-chart"
 
 interface Props {
   attributes: Attributes
@@ -162,6 +163,28 @@ export const AbstractChart = ({
         dimensionsVisibility={dimensionsVisibility}
         isRemotelyControlled={isRemotelyControlled}
         orderedColors={orderedColors}
+        unitsCurrent={unitsCurrent}
+      />
+    )
+  }
+
+  if (chartLibrary === "d3pie") {
+    return (
+      <D3pieChart
+        attributes={attributes}
+        chartContainerElement={chartContainerElement}
+        chartData={chartData as D3pieChartData}
+        chartDetails={chartDetails}
+        chartElementClassName={chartElementClassName}
+        chartElementId={chartElementId}
+        dimensionsVisibility={dimensionsVisibility}
+        hoveredRow={hoveredRow}
+        hoveredX={hoveredX}
+        isRemotelyControlled={isRemotelyControlled}
+        legendFormatValue={legendFormatValue}
+        orderedColors={orderedColors}
+        setMinMax={setMinMax}
+        showUndefined={showUndefined}
         unitsCurrent={unitsCurrent}
       />
     )

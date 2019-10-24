@@ -1,8 +1,8 @@
 import { Attributes } from "./transformDataAttributes"
 
 export type ChartLibraryName = "dygraph" | "sparkline"
-// | "peity" | "google" | "d3pie" | "d3"
-  | "easypiechart" | "gauge"
+// | "peity" | "google" | "d3"
+  | "d3pie" | "easypiechart" | "gauge"
 // | "textonly"
 export interface ChartLibraryConfig {
   aspectRatio?: number
@@ -197,50 +197,30 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
   //     return "netdata-container"
   //   },
   // },
-  // d3pie: {
-  //   initialize: window.NETDATA.d3pieInitialize,
-  //   create: window.NETDATA.d3pieChartCreate,
-  //   update: window.NETDATA.d3pieChartUpdate,
-  //   resize: null,
-  //   setSelection: window.NETDATA.d3pieSetSelection,
-  //   clearSelection: window.NETDATA.d3pieClearSelection,
-  //   toolboxPanAndZoom: null,
-  //   initialized: false,
-  //   enabled: true,
-  //   xssRegexIgnore: new RegExp("^/api/v1/data\.result.data$"),
-  //   format(state) {
-  //     void (state)
-  //     return "json"
-  //   },
-  //   options(state) {
-  //     void (state)
-  //     return "objectrows" + "%7C" + "ms"
-  //   },
-  //   legend(state) {
-  //     void (state)
-  //     return null
-  //   },
-  //   autoresize(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   max_updates_to_recreate(state) {
-  //     void (state)
-  //     return 5000
-  //   },
-  //   track_colors(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   pixels_per_point(state) {
-  //     void (state)
-  //     return 15
-  //   },
-  //   container_class(state) {
-  //     void (state)
-  //     return "netdata-container"
-  //   },
-  // },
+  d3pie: {
+    // initialize: window.NETDATA.d3pieInitialize,
+    // create: window.NETDATA.d3pieChartCreate,
+    // update: window.NETDATA.d3pieChartUpdate,
+    // resize: null,
+    // setSelection: window.NETDATA.d3pieSetSelection,
+    // clearSelection: window.NETDATA.d3pieClearSelection,
+    hasToolboxPanAndZoom: false,
+    xssRegexIgnore: new RegExp("^/api/v1/data.result.data$"),
+    format: "json",
+    hasLegend: () => false,
+    options: () => "objectrows|ms",
+    // autoresize(state) {
+    //   void (state)
+    //   return false
+    // },
+    // max_updates_to_recreate(state) {
+    //   void (state)
+    //   return 5000
+    // },
+    trackColors: false,
+    pixelsPerPoint: () => 15,
+    containerClass: () => "netdata-container",
+  },
   // d3: {
   //   initialize: window.NETDATA.d3Initialize,
   //   create: window.NETDATA.d3ChartCreate,

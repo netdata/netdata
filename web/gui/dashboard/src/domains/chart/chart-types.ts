@@ -29,11 +29,18 @@ export interface DygraphData extends ChartDataBase{
   }
 }
 
+export interface D3pieChartData extends ChartDataBase{
+  result: {
+    data: {[label: string]: number}[]
+    labels: string[]
+  }
+}
+
 export interface EasyPieChartData extends ChartDataBase{
   result: number[]
 }
 
-export type ChartData = DygraphData | EasyPieChartData
+export type ChartData = DygraphData | EasyPieChartData | D3pieChartData
 
 interface Dimension {
   name: string
