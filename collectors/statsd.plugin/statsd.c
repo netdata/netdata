@@ -1014,7 +1014,8 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_rcv_callback
             , statsd_snd_callback
             , statsd_timer_callback
-            , NULL
+            , NULL                     // No access control pattern
+            , 0                        // No dns lookups for access control pattern
             , (void *)d
             , 0                        // tcp request timeout, 0 = disabled
             , statsd.tcp_idle_timeout  // tcp idle timeout, 0 = disabled
