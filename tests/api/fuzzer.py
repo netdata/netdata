@@ -77,6 +77,7 @@ print(f"INFO: Fuzzing {spec['info']['title']} / {spec['info']['version']}")
 host = spec['host']
 if args.host is not None:
     host = args.host
+    print(host)
 print(f"INFO: Target host is {host}")
 paths = []
 for name,p in spec['paths'].items():
@@ -85,5 +86,6 @@ for name,p in spec['paths'].items():
     elif 'put' in p:
         print(f"FAIL: Generation of PUT methods (for {name} is unimplemented")
 
-for p in paths:
-    p.generate(host)
+for s in spec['schemes']:
+    for p in paths:
+        p.generate(s+"://"+host)
