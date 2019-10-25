@@ -6,11 +6,12 @@
 
 **Netdata** is **distributed, real-time, performance and health monitoring for systems and applications**. It is a highly optimized monitoring agent you install on all your systems and containers.
 
-Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**. It can run autonomously, without any third-party components, or it can be integrated to existing monitoring tool chains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, etc).
+Netdata provides **unparalleled insights**, **in real-time**, of everything happening on the systems it runs (including web servers, databases, applications), using **highly interactive web dashboards**. It can run autonomously, without any third-party components, or it can be integrated to existing monitoring toolchains (Prometheus, Graphite, OpenTSDB, Kafka, Grafana, and more).
 
-*Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers, **containers**, **IoT** devices), without disrupting their core function.*
+_Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers,
+**containers**, **IoT** devices), without disrupting their core function._
 
-Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**.
+Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**, among others.
 
 Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars).
 
@@ -25,23 +26,23 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 
 ## Contents
 
-1.  [How it looks](#how-it-looks) - have a quick look at it
-2.  [User base](#user-base) - who uses Netdata?
-3.  [Quick Start](#quick-start) - try it now on your systems
-4.  [Why Netdata](#why-netdata) - why people love Netdata, how it compares with other solutions
-5.  [News](#news) - latest news about Netdata
-6.  [How it works](#how-it-works) - high level diagram of how Netdata works
-7.  [infographic](#infographic) - everything about Netdata, in a page
-8.  [Features](#features) - what features does it have
-9.  [Visualization](#visualization) - unique visualization features
-10. [What does it monitor](#what-does-it-monitor) - which metrics it collects
-11. [Documentation](#documentation) - read the docs
-12. [Community](#community) - discuss with others and get support
-13. [License](#license) - check the license of Netdata
-14. [Is it any good?](#is-it-any-good) - Yes
-15. [Is it awesome?](#is-it-awesome) - Yes
+1.  [What does it look like?](#what-does-it-look-like?) - Take a quick tour through the dashboard
+2.  [Our userbase](#user-base) - Numbers and enterprises we help monitor
+3.  [Quick Start](#quick-start) - How to try it now on your systems
+4.  [Why Netdata](#why-netdata) - Why people love Netdata, how it compares with other solutions
+5.  [News](#news) - The latest news about Netdata
+6.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
+7.  [Infographic](#infographic) - Everything about Netdata in a single 
+8.  [Features](#features) - How you'll use Netdata on your systems
+9.  [Visualization](#visualization) - Learn about visual anomaly detection
+10. [What does it monitor?](#what-does-it-monitor) - See which apps/services Netdata auto-detects
+11. [Documentation](#documentation) - Read the documentation
+12. [Community](#community) - Discuss with others and get support
+13. [License](#license) - Check Netdata's licencing
+14. [Is it any good?](#is-it-any-good) - Yes.
+15. [Is it awesome?](#is-it-awesome) - Yes.
 
-## How it looks
+## What does it look like?
 
 The following animated image, shows the top part of a typical Netdata dashboard.
 
@@ -112,7 +113,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running Netdata in docker, check the [docker installation page](packaging/docker/).
+For more information about running Netdata with Docker, check the [docker installation page](packaging/docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
@@ -125,7 +126,8 @@ Netdata has a quite different approach to monitoring.
 Netdata is a monitoring agent you install on all your systems. It is:
 
 -   a **metrics collector** - for system and application metrics (including web servers, databases, containers, etc)
--   a **time-series database** - all stored in memory (does not touch the disks while it runs)
+-   a **database engine** - recent metrics stored in memory while historical metrics "spilled" to disk for 
+    long-term storage
 -   a **metrics visualizer** - super fast, interactive, modern, optimized for anomaly detection
 -   an **alarms notification engine** - an advanced watchdog for detecting performance and availability issues
 
@@ -375,18 +377,18 @@ This is how it works:
 |Function|Description|Documentation|
 |:------:|:----------|:-----------:|
 |**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[`collectors`](collectors/#data-collection-plugins)|
-|**Store**|Metrics are stored in RAM in a round-robin database (ring buffer), using a custom made floating point number for minimal footprint.|[`database`](database/#database)|
+|**Store**|Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage..|[`database`](database/#database)|
 |**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)|
-|**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.|[`streaming`](streaming/#streaming-and-replication)|
+|**Stream**|A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.|[`streaming`](streaming/#streaming-and-replication)|
 |**Archive**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)|
 |**Query**|Multiple independent workers are attached to the [internal web server](web/server/#web-server), servicing API requests, including [data queries](web/api/queries/#database-queries).|[`web/api`](web/api/#api)|
 
-The result is a highly efficient, low latency system, supporting multiple readers and one writer on each metric.
+The result is a highly efficient, low-latency system, supporting multiple readers and one writer on each metric.
 
 ## Infographic
 
 This is a high level overview of Netdata feature set and architecture.
-Click it to to interact with it (it has direct links to documentation).
+Click it to to interact with it (it has direct links to our documentation).
 
 [![image](https://user-images.githubusercontent.com/43294513/60951037-8ba5d180-a2f8-11e9-906e-e27356f168bc.png)](https://my-netdata.io/infographic.html)
 
@@ -398,15 +400,15 @@ This is what you should expect from Netdata:
 
 ### General
 
--   **1s granularity** - the highest possible resolution for all metrics.
--   **Unlimited metrics** - collects all the available metrics, the more the better.
--   **1% CPU utilization of a single core** - it is super fast, unbelievably optimized.
--   **A few MB of RAM** - by default it uses 25MB RAM. [You size it](database).
--   **Zero disk I/O** - while it runs, it does not load or save anything (except `error` and `access` logs).
--   **Zero configuration** - auto-detects everything, it can collect up to 10000 metrics per server out of the box.
--   **Zero maintenance** - You just run it, it does the rest.
+-   **1s granularity** - The highest possible resolution for all metrics.
+-   **Unlimited metrics** - Netdata collects all the available metrics—the more, the better.
+-   **1% CPU utilization of a single core** - It's unbelievably optimized.
+-   **A few MB of RAM** - The low-memory round-robin option uses 25MB RAM, and you can [resize it](database/).
+-   **Minimal disk I/O** - While running, Netdata only writes historical metrics and reads `error` and `access` logs.
+-   **Zero configuration** - Netdataa auto-detects everything, and can collect up to 10,000 metrics per server out of the box.
+-   **Zero maintenance** - You just run it. Netdata does the rest.
 -   **Zero dependencies** - Netdata runs a custom web server for its static web files and its web API (though its plugins may require additional libraries, depending on the applications monitored).
--   **Scales to infinity** - you can install it on all your servers, containers, VMs and IoTs. Metrics are not centralized by default, so there is no limit.
+-   **Scales to infinity** - You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not centralized by default, so there is no limit.
 -   **Several operating modes** - Autonomous host monitoring (the default), headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations. Each node may have different metrics retention policies and run with or without health monitoring.
 
 ### Health Monitoring & Alarms
