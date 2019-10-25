@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix sizeof inside callocz [\#7187](https://github.com/netdata/netdata/pull/7187) ([thiagoftsm](https://github.com/thiagoftsm))
+- contrib/debian: Fix typo in Description [\#7154](https://github.com/netdata/netdata/pull/7154) ([arkamar](https://github.com/arkamar))
+- detect if the disk cannot keep up with data collection [\#7139](https://github.com/netdata/netdata/pull/7139) ([mfundul](https://github.com/mfundul))
+- Fixing DNS-lookup performance issue on FreeBSD. [\#7132](https://github.com/netdata/netdata/pull/7132) ([amoss](https://github.com/amoss))
+- Add user information to MySQL Python module documentation [\#7128](https://github.com/netdata/netdata/pull/7128) ([prhomhyse](https://github.com/prhomhyse))
 - Results of the spike investigation into CMake. [\#7114](https://github.com/netdata/netdata/pull/7114) ([amoss](https://github.com/amoss))
 - xenstat.plugin: check xenstat\_vbd\_error presence [\#7103](https://github.com/netdata/netdata/pull/7103) ([arkamar](https://github.com/arkamar))
 - telegram: fix broken links, add setup instructions [\#7033](https://github.com/netdata/netdata/pull/7033) ([half-duplex](https://github.com/half-duplex))
@@ -261,10 +266,6 @@
 - Fixed broken left navbar links in translated docs [\#6505](https://github.com/netdata/netdata/pull/6505) ([cakrit](https://github.com/cakrit))
 - Update CLA with intention to keep netdata FOSS [\#6504](https://github.com/netdata/netdata/pull/6504) ([cakrit](https://github.com/cakrit))
 - netdata/docs: Add @joelhans as co-owner on documentation [\#6501](https://github.com/netdata/netdata/pull/6501) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Stop anonymous stats from writing log in /tmp [\#6491](https://github.com/netdata/netdata/pull/6491) ([cakrit](https://github.com/cakrit))
-- Add support for plain text only emails [\#6485](https://github.com/netdata/netdata/pull/6485) ([leo-lb](https://github.com/leo-lb))
-- netdata/packaging: Enable built-in support for prometheus remote write in packaging [\#6480](https://github.com/netdata/netdata/pull/6480) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Fix the snappy library check [\#6479](https://github.com/netdata/netdata/pull/6479) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
