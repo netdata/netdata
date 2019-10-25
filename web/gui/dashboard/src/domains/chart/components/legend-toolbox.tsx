@@ -1,50 +1,8 @@
-import React, { useRef, useEffect } from "react"
+import React from "react"
 
-import { Button } from "components/button"
-import { Icon, IconType } from "components/icon"
+import { ToolboxButton } from "./toolbox-button"
 
 type ClickCallback = (event: React.MouseEvent) => void
-interface ToolboxButtonProps {
-  iconType: IconType
-  onClick: ClickCallback
-  popoverContent: string
-  popoverTitle: string
-}
-const ToolboxButton = ({
-  iconType,
-  onClick,
-  popoverContent,
-  popoverTitle,
-}: ToolboxButtonProps) => {
-  const buttonRef = useRef(null)
-  useEffect(() => {
-    if (buttonRef.current) {
-      window.$(buttonRef.current).popover({
-        container: "body",
-        animation: false,
-        html: true,
-        trigger: "hover",
-        placement: "bottom",
-        delay: {
-          show: window.NETDATA.options.current.show_help_delay_show_ms,
-          hide: window.NETDATA.options.current.show_help_delay_hide_ms,
-        },
-        title: popoverTitle,
-        content: popoverContent,
-      })
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <Button
-      className="netdata-legend-toolbox-button"
-      onClick={onClick}
-      ref={buttonRef}
-    >
-      <Icon iconType={iconType} />
-    </Button>
-  )
-}
-
 interface Props {
   onToolboxLeftClick: ClickCallback
   onToolboxResetClick: ClickCallback
@@ -61,6 +19,7 @@ export const LegendToolbox = ({
 }: Props) => (
   <div className="netdata-legend-toolbox">
     <ToolboxButton
+      className="netdata-legend-toolbox-button"
       onClick={onToolboxLeftClick}
       iconType="left"
       popoverContent="Pan Left"
@@ -68,6 +27,7 @@ export const LegendToolbox = ({
        finger (on touch devices).<br/><small>Help can be disabled from the settings.</small>"
     />
     <ToolboxButton
+      className="netdata-legend-toolbox-button"
       onClick={onToolboxResetClick}
       iconType="reset"
       popoverContent="Chart Reset"
@@ -76,6 +36,7 @@ export const LegendToolbox = ({
        <br/><small>Help can be disabled from the settings.</small>"
     />
     <ToolboxButton
+      className="netdata-legend-toolbox-button"
       onClick={onToolboxRightClick}
       iconType="right"
       popoverContent="Pan Right"
@@ -83,6 +44,7 @@ export const LegendToolbox = ({
        finger (on touch devices).<br/><small>Help, can be disabled from the settings.</small>"
     />
     <ToolboxButton
+      className="netdata-legend-toolbox-button"
       onClick={onToolboxZoomInClick}
       iconType="zoomIn"
       popoverContent="Chart Zoom In"
@@ -91,6 +53,7 @@ export const LegendToolbox = ({
        <br/><small>Help, can be disabled from the settings.</small>"
     />
     <ToolboxButton
+      className="netdata-legend-toolbox-button"
       onClick={onToolboxZoomOutClick}
       iconType="zoomOut"
       popoverContent="Chart Zoom Out"
