@@ -27,24 +27,24 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 ## Contents
 
 1.  [What does it look like?](#what-does-it-look-like) - Take a quick tour through the dashboard
-2.  [Our userbase](#user-base) - Numbers and enterprises we help monitor
+2.  [Our userbase](#user-base) - Enterprises we help monitor and our userbase
 3.  [Quick Start](#quick-start) - How to try it now on your systems
-4.  [Why Netdata](#why-netdata) - Why people love Netdata, how it compares with other solutions
+4.  [Why Netdata](#why-netdata) - Why people love Netdata and how it compares with other solutions
 5.  [News](#news) - The latest news about Netdata
 6.  [How Netdata works](#how-it-works) - A high-level diagram of how Netdata works
-7.  [Infographic](#infographic) - Everything about Netdata in a single 
+7.  [Infographic](#infographic) - Everything about Netdata in a single graphic
 8.  [Features](#features) - How you'll use Netdata on your systems
 9.  [Visualization](#visualization) - Learn about visual anomaly detection
 10. [What does it monitor?](#what-does-it-monitor) - See which apps/services Netdata auto-detects
 11. [Documentation](#documentation) - Read the documentation
-12. [Community](#community) - Discuss with others and get support
+12. [Community](#community) - Discuss Netdata with others and get support
 13. [License](#license) - Check Netdata's licencing
 14. [Is it any good?](#is-it-any-good) - Yes.
 15. [Is it awesome?](#is-it-awesome) - Yes.
 
 ## What does it look like?
 
-The following animated image, shows the top part of a typical Netdata dashboard.
+The following animated GIF shows the top part of a typical Netdata dashboard.
 
 ![peek 2018-11-11 02-40](https://user-images.githubusercontent.com/2662304/48307727-9175c800-e55b-11e8-92d8-a581d60a4889.gif)
 
