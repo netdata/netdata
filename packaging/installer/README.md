@@ -109,7 +109,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "8a0c82abd3a7a70bf1c3e6360b06ada7" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "8ad43ff960bf6f2487233682909f7a87" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
