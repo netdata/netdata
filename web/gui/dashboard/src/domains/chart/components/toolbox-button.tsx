@@ -9,6 +9,9 @@ interface ToolboxButtonProps {
   className?: string
   iconType: IconType
   onClick?: ClickCallback
+  onDoubleClick?: (event: React.MouseEvent) => void
+  onMouseDown?: (event: React.MouseEvent) => void
+  onTouchStart?: (event: React.TouchEvent) => void
   popoverContent: string
   popoverTitle: string
 }
@@ -16,6 +19,9 @@ export const ToolboxButton = ({
   className,
   iconType,
   onClick,
+  onDoubleClick,
+  onMouseDown,
+  onTouchStart,
   popoverContent,
   popoverTitle,
 }: ToolboxButtonProps) => {
@@ -41,6 +47,9 @@ export const ToolboxButton = ({
     <Button
       className={classNames(className)}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      onMouseDown={onMouseDown}
+      onTouchStart={onTouchStart}
       ref={buttonRef}
     >
       <Icon iconType={iconType} />

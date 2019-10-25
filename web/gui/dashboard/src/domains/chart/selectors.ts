@@ -35,3 +35,8 @@ export const selectChartFetchDataParams = createSelector(
   selectSingleChartState,
   (chartState) => chartState.fetchDataParams,
 )
+
+export const selectResizeHeight = createSelector(
+  selectSingleChartState,
+  (chartState) => chartState.resizeHeight,
+)

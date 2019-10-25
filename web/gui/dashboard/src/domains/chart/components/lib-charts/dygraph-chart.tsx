@@ -6,6 +6,7 @@ import { useSelector } from "react-redux"
 import Dygraph from "dygraphs"
 import "dygraphs/src-es5/extras/smooth-plotter"
 
+import { AppStateT } from "store/app-state"
 import { DygraphArea, NetdataDygraph } from "types/vendor-overrides"
 import { useDateTime } from "utils/date-time"
 import { selectGlobalChartUnderlay, selectGlobalSelectionMaster } from "domains/global/selectors"
@@ -17,11 +18,9 @@ import {
   ChartLibraryName,
 } from "../../utils/chartLibrariesSettings"
 import { ChartDetails, DygraphData } from "../../chart-types"
+import { selectResizeHeight } from "../../selectors"
 
 import "./dygraph-chart.css"
-
-// all noops are just todos, places to not break linter
-const noop: any = () => {}
 
 interface GetInitialDygraphOptions {
   attributes: Attributes,
@@ -609,9 +608,9 @@ export const DygraphChart = ({
             }
           },
 
-          click(event: MouseEvent, dygraph: Dygraph, context: any) {
+          click(event: MouseEvent) {
             event.preventDefault()
-            noop(dygraph, context)
+            // todo
           },
 
           touchstart(event: TouchEvent, dygraph: Dygraph, context: any) {
@@ -780,6 +779,18 @@ export const DygraphChart = ({
     }
   }, [chartData, chartUuid, currentSelectionMasterId, dygraphInstance, hoveredRow,
     viewAfter, viewBefore])
+
+
+  // handle resizeHeight change
+  const resizeHeight = useSelector(
+    (state: AppStateT) => selectResizeHeight(state, { id: chartUuid }),
+  )
+  useLayoutEffect(() => {
+    if (dygraphInstance) {
+      (dygraphInstance as NetdataDygraph).resize()
+    }
+  }, [dygraphInstance, resizeHeight])
+
 
   return (
     <>

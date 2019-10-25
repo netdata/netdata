@@ -347,7 +347,10 @@ export const Chart = memo(({
         />
       )}
       {shouldDisplayToolbox && window.NETDATA.options.current.resize_charts && (
-        <ResizeHandler />
+        <ResizeHandler
+          chartContainerElement={chartContainerElement}
+          chartUuid={chartUuid}
+        />
       )}
     </>
   )
