@@ -26,7 +26,7 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 
 ## Contents
 
-1.  [What does it look like?](#what-does-it-look-like?) - Take a quick tour through the dashboard
+1.  [What does it look like?](#what-does-it-look-like) - Take a quick tour through the dashboard
 2.  [Our userbase](#user-base) - Numbers and enterprises we help monitor
 3.  [Quick Start](#quick-start) - How to try it now on your systems
 4.  [Why Netdata](#why-netdata) - Why people love Netdata, how it compares with other solutions
