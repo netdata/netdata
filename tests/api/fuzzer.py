@@ -73,7 +73,6 @@ class GetPath(object):
         return requests.get(url=test_url)
 
     def validate(self, res, expect_success):
-        print(dir(resp))
         if resp.status_code==200:
             print(self.success)
             #print(json.loads(resp.text))
@@ -90,6 +89,28 @@ def get_the_spec(url):
 def not_absolute(path):
     return path[1:] if path[0] == '/' else path
 
+def find_ref(spec, path) :
+    if len(path)>0 and path[0] == '#':
+        return find_ref(spec,path[1:])
+    if len(path)==1:
+        return spec[path[0]]
+    return find_ref(spec[path[0]], path[1:])
+
+def resolve_refs(spec, spec_root=None):
+    '''Find all "$ref" keys in the swagger spec and inline their target schemas.'''
+    if spec_root is None:
+        spec_root = spec
+    newspec = {}
+    for k,v in spec.items():
+        if k=="$ref":
+            path = v.split('/')
+            target = find_ref(spec_root, path)
+            newspec[k] = target
+        elif isinstance(v,dict):
+            newspec[k] = resolve_refs(v, spec_root)
+        else:
+            newspec[k] = v
+    return newspec
 #######################################################################################################################
 # Initialization
 
@@ -110,6 +131,7 @@ args = parser.parse_args()
 if args.reseed:
     random.seed()
 spec = json.loads( get_the_spec(args.url) )
+inlined_spec = resolve_refs(spec)
 
 if spec['swagger'] != '2.0':
     print("FAIL: Unexpected swagger version")
@@ -121,14 +143,14 @@ if args.host is not None:
     print(host)
 print(f"INFO: Target host is {host}")
 paths = []
-for name,p in spec['paths'].items():
+for name,p in inlined_spec['paths'].items():
     if 'get' in p:
         name = not_absolute(name)
-        paths.append(GetPath(posixpath.join(spec['basePath'],name), p['get']))
+        paths.append(GetPath(posixpath.join(inlined_spec['basePath'],name), p['get']))
     elif 'put' in p:
         print(f"FAIL: Generation of PUT methods (for {name} is unimplemented")
 
-for s in spec['schemes']:
+for s in inlined_spec['schemes']:
     for p in paths:
         resp = p.generate_success(s+"://"+host)
         p.validate(resp, True)
