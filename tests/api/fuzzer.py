@@ -105,7 +105,12 @@ def resolve_refs(spec, spec_root=None):
         if k=="$ref":
             path = v.split('/')
             target = find_ref(spec_root, path)
-            newspec[k] = target
+            # Unfold one level of the tree and erase the $ref if possible.
+            if isinstance(target,dict):
+                for kk,vv in target.items():
+                    newspec[kk] = vv
+            else:
+                newspec[k] = target
         elif isinstance(v,dict):
             newspec[k] = resolve_refs(v, spec_root)
         else:
