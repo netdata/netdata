@@ -45,23 +45,40 @@ def does_response_fit_schema(schema_path, schema, resp):
     '''The schema_path argument tells us where we are (globally) in the schema. The schema argument is the
        sub-tree within the schema json that we are validating against. The resp is the json subtree from the
        target host's response.
+
+       The basic idea is this: swagger defines a model of valid json trees. In this sense it is a formal
+       language and we can validate a given server response by checking if the language accepts a particular
+       server response. This is basically a parser, but instead of strings we are operating on languages
+       of trees.
+
+       This could probably be extended to arbitrary swagger definitions - but the amount of work increases
+       rapidly as we attempt to cover the full semantics of languages of trees defined in swagger. Instead
+       we have some special cases that describe the parts of the semantics that we've used to describe the
+       netdata API.
     '''
-    #print("Schema:")
-    #pretty_json(schema,max_depth=1)
-    #print("Response:")
-    #pretty_json(resp,max_depth=1)
     if "type" in schema  and  schema["type"]=="object":
         if isinstance(resp,dict)  and  "properties" in schema  and  isinstance(schema["properties"],dict):
             L.debug(f"Validate properties against dictionary at {schema_path}")
             for k,v in schema["properties"].items():
-                #print(f"Validate {k} received with {v}")
-                if not k in resp:
+                print(f"Validate {k} received with {v}")
+                if v.get("required",False)  and  not k in resp:
                     L.error(f"Missing {k} in response at {schema_path}")
                     pretty_json(resp)
                     return
-                does_response_fit_schema(posixpath.join(schema_path,k), v, resp[k])
+                if k in resp:
+                    does_response_fit_schema(posixpath.join(schema_path,k), v, resp[k])
             #pretty_json(schema,max_depth=1)
             #pretty_json(resp,max_depth=1)
+        elif isinstance(resp,dict)  and  "additionalProperties" in schema  and \
+             isinstance(schema["additionalProperties"],dict):
+            kv_schema = schema["additionalProperties"]
+            L.debug(f"Validate additionalProperties against every value in dictionary at {schema_path}")
+            if "type" in kv_schema  and  kv_schema["type"]=="object":
+                for k,v in resp.items():
+                    does_response_fit_schema(posixpath.join(schema_path,k), kv_schema, v)
+                    #L.debug(f"Validate {k}/{repr(v)} against {kv_schema}")
+            else:
+                L.error("Don't understand what the additionalProperties means?")
         else:
             L.error(f"Can't understand schema at {schema_path}")
             pretty_json(schema,max_depth=1)
@@ -76,6 +93,9 @@ def does_response_fit_schema(schema_path, schema, resp):
             return
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
     elif "type" in schema  and  schema["type"] in ("number","integer"):
+        if 'nullable' in schema  and  resp is None:
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
+            return
         if isinstance(resp, int):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
@@ -176,7 +196,10 @@ def find_ref(spec, path) :
     return find_ref(spec[path[0]], path[1:])
 
 def resolve_refs(spec, spec_root=None):
-    '''Find all "$ref" keys in the swagger spec and inline their target schemas.'''
+    '''Find all "$ref" keys in the swagger spec and inline their target schemas.
+
+       As with all inliners this will break if a definition recursively links to itself, but this should not
+       happen in swagger as embedding a structure inside itself would produce a record of infinite size.'''
     if spec_root is None:
         spec_root = spec
     newspec = {}
@@ -196,6 +219,17 @@ def resolve_refs(spec, spec_root=None):
         else:
             #print(f"COPY OVER {k}")
             newspec[k] = v
+    # This is an artifact of inline the $refs when they are inside a properties key as their children should be
+    # pushed up into the parent dictionary. They must be merged (union) rather than replace as we use this to
+    # implement polymorphism in the data-model.
+    if 'properties' in newspec  and  isinstance(newspec['properties'], dict)  and \
+       'properties' in newspec['properties']:
+        sub = newspec['properties']['properties']
+        del newspec['properties']['properties']
+        if 'type' in newspec['properties']:
+            del newspec['properties']['type']
+        for k,v in sub.items():
+            newspec['properties'][k] = v
     return newspec
 
 #######################################################################################################################
@@ -220,6 +254,8 @@ parser.add_argument('--detail', action='store_true',
 parser.add_argument('--filter', type=str,
                     default=".*",
                     help="Supply a regex used to filter the testing URLs generated")
+parser.add_argument('--dump-inlined', action='store_true',
+                    help='Dump the inlined swagger spec instead of fuzzing. For "reasons".')
 
 args = parser.parse_args()
 if args.reseed:
@@ -227,8 +263,9 @@ if args.reseed:
 spec = json.loads( get_the_spec(args.url) )
 inlined_spec = resolve_refs(spec)
 
-#pretty_json(inlined_spec)
-#sys.exit(-1)
+if args.dump_inlined:
+    pretty_json(inlined_spec)
+    sys.exit(-1)
 
 logging.addLevelName(40, "FAIL")
 logging.addLevelName(20, "PASS")

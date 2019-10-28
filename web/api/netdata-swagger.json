@@ -1039,9 +1039,15 @@
         },
         "dimensions": {
           "type": "object",
-          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is the name.",
+          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is a dictionary containing the name.",
           "additionalProperties" : {
-            "type" : "string"
+            "type" : "object",
+            "properties" : {
+              "name" : {
+                "type" : "string",
+                "description" : "The name of the dimension"
+              }
+            }
           }
         },
         "chart_variables": {
@@ -1052,10 +1058,12 @@
         },
         "green": {
           "type": "number",
+          "nullable": "true",
           "description": "Chart health green threshold."
         },
         "red": {
           "type": "number",
+          "nullable": "true",
           "description": "Chart health red threshold."
         }
       }
