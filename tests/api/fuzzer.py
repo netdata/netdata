@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import random
+import re
 import requests
 import sys
 import posixpath
@@ -117,12 +118,14 @@ class GetPath(object):
         args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
         base_url = urllib.parse.urljoin(host,self.url)
         test_url = f"{base_url}?{args}"
-        print(f"TEST: {test_url}")
+        if url_filter.match(test_url):
+            print(f"TEST: {test_url}")
+            return requests.get(url=test_url)
+        L.debug("url_filter skips {test_url}")
         #for p in self.req_params.values():
         #    p.dump()
         #for p in self.opt_params.values():
         #    p.dump()
-        return requests.get(url=test_url)
 
     def generate_failure(self, host):
         args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
@@ -207,6 +210,9 @@ parser.add_argument('--passes', action='store_true',
                     help="Log information about tests that pass")
 parser.add_argument('--detail', action='store_true',
                     help="Log information about the response/schema comparisons during each test")
+parser.add_argument('--filter', type=str,
+                    default=".*",
+                    help="Supply a regex used to filter the testing URLs generated")
 
 args = parser.parse_args()
 if args.reseed:
@@ -229,6 +235,7 @@ elif args.detail:
 handler.setFormatter(logging.Formatter(fmt="%(levelname)s %(message)s"))
 L.addHandler(handler)
 
+url_filter = re.compile(args.filter)
 
 if spec['swagger'] != '2.0':
     L.error(f"Unexpected swagger version")
@@ -249,7 +256,8 @@ for name,p in inlined_spec['paths'].items():
 for s in inlined_spec['schemes']:
     for p in paths:
         resp = p.generate_success(s+"://"+host)
-        p.validate(resp, True)
+        if resp is not None:
+            p.validate(resp, True)
         #resp = p.generate_failure(s+"://"+host)
         #p.validate(resp, False)
 
