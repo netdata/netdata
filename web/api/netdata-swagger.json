@@ -1039,9 +1039,9 @@
         },
         "dimensions": {
           "type": "object",
-          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. The key of the object the id of the dimension.",
-          "properties": {
-              "$ref": "#/definitions/dimension"
+          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is the name.",
+          "additionalProperties" : {
+            "type" : "string"
           }
         },
         "chart_variables": {
@@ -1127,15 +1127,6 @@
         "varname2": {
           "type": "number",
           "format": "float"
-        }
-      }
-    },
-    "dimension": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the dimension."
         }
       }
     },
