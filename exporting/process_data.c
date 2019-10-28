@@ -31,35 +31,42 @@ int prepare_buffers(struct engine *engine)
 {
     netdata_thread_disable_cancelability();
     // rrd_rdlock();
-    engine->connector_root->instance_root->start_batch_formatting(engine);
+    if (engine->connector_root->instance_root->start_batch_formatting)
+        engine->connector_root->instance_root->start_batch_formatting(engine);
 
     RRDHOST *host;
     rrdhost_foreach_read(host)
     {
         // rrdhost_rdlock(host);
-        engine->connector_root->instance_root->start_host_formatting(engine);
+        if (engine->connector_root->instance_root->start_host_formatting)
+            engine->connector_root->instance_root->start_host_formatting(engine);
 
         RRDSET *st;
         rrdset_foreach_read(st, host)
         {
             // rrdset_rdlock(st);
-            engine->connector_root->instance_root->start_chart_formatting(engine);
+            if (engine->connector_root->instance_root->start_chart_formatting)
+                engine->connector_root->instance_root->start_chart_formatting(engine);
 
             RRDDIM *rd;
             rrddim_foreach_read(rd, st)
             {
-                engine->connector_root->instance_root->metric_formatting(engine);
+                if (engine->connector_root->instance_root->metric_formatting)
+                    engine->connector_root->instance_root->metric_formatting(engine);
             }
 
-            engine->connector_root->instance_root->end_chart_formatting(engine);
+            if (engine->connector_root->instance_root->end_chart_formatting)
+                engine->connector_root->instance_root->end_chart_formatting(engine);
             // rrdset_unlock(st);
         }
 
-        engine->connector_root->instance_root->end_host_formatting(engine);
+        if (engine->connector_root->instance_root->end_host_formatting)
+            engine->connector_root->instance_root->end_host_formatting(engine);
         // rrdhost_unlock(host);
     }
 
-    engine->connector_root->instance_root->end_batch_formatting(engine);
+    if (engine->connector_root->instance_root->end_batch_formatting)
+        engine->connector_root->instance_root->end_batch_formatting(engine);
     // rrd_unlock();
     netdata_thread_enable_cancelability();
 

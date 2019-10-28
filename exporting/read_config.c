@@ -23,7 +23,7 @@ struct engine *read_exporting_config()
     engine->config.prefix = strdupz("netdata");
     engine->config.hostname = strdupz("test-host");
     engine->config.update_every = 3;
-    engine->config.options = BACKEND_OPTION_SEND_NAMES;
+    engine->config.options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
 
     engine->connector_root = (struct connector *)calloc(1, sizeof(struct connector));
     engine->connector_root->config.type = BACKEND_TYPE_GRAPHITE;

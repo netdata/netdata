@@ -232,6 +232,10 @@ static void test_prepare_buffers(void **state)
 
     assert_int_equal(__real_prepare_buffers(engine), 0);
 
+    // check with NULL functions
+    memset(engine->connector_root->instance_root, 0, sizeof(struct instance));
+    assert_int_equal(__real_prepare_buffers(engine), 0);
+
     free(localhost->rrdset_root->dimensions);
     free(localhost->rrdset_root);
     free(localhost);
@@ -250,7 +254,7 @@ static void test_read_exporting_config(void **state)
     assert_string_equal(engine->config.prefix, "netdata");
     assert_string_equal(engine->config.hostname, "test-host");
     assert_int_equal(engine->config.update_every, 3);
-    assert_int_equal(engine->config.options, BACKEND_OPTION_SEND_NAMES);
+    assert_int_equal(engine->config.options, BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES);
 
     struct connector *connector = engine->connector_root;
     assert_ptr_not_equal(connector, NULL);
