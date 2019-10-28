@@ -287,7 +287,7 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(instance->start_batch_formatting, NULL);
     assert_ptr_equal(instance->start_host_formatting, NULL);
     assert_ptr_equal(instance->start_chart_formatting, NULL);
-    assert_ptr_equal(instance->metric_formatting, exporting_format_dimension_collected_graphite_plaintext);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_graphite_plaintext);
     assert_ptr_equal(instance->end_chart_formatting, NULL);
     assert_ptr_equal(instance->end_host_formatting, NULL);
     assert_ptr_equal(instance->end_batch_formatting, NULL);

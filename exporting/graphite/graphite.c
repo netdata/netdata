@@ -2,7 +2,7 @@
 
 #include "graphite.h"
 
-int exporting_format_dimension_collected_graphite_plaintext(struct engine *engine)
+int format_dimension_collected_graphite_plaintext(struct engine *engine)
 {
     (void)engine;
 
@@ -19,7 +19,7 @@ int init_graphite_instance(struct instance *instance)
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = NULL;
     instance->start_chart_formatting = NULL;
-    instance->metric_formatting = exporting_format_dimension_collected_graphite_plaintext;
+    instance->metric_formatting = format_dimension_collected_graphite_plaintext;
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = NULL;
     instance->end_batch_formatting = NULL;
