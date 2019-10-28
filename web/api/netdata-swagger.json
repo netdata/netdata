@@ -952,9 +952,7 @@
           "type": "object",
           "description": "An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart"
-            }
           }
         },
         "charts_count": {
@@ -1049,9 +1047,7 @@
         "chart_variables": {
           "type": "object",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart_variables"
-            }
           }
         },
         "green": {
@@ -1090,9 +1086,7 @@
         "chart_variables": {
           "type": "object",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart_variables"
-            }
           }
         },
         "family_variables": {
@@ -1237,9 +1231,7 @@
         "chart_variables": {
           "type": "object",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart_variables"
-            }
           }
         }
       }
