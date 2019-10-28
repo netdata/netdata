@@ -80,10 +80,11 @@ int __mock_start_chart_formatting(struct instance *instance)
     return mock_type(int);
 }
 
-int __mock_metric_formatting(struct instance *instance)
+int __mock_metric_formatting(struct instance *instance, RRDDIM *rd)
 {
     function_called();
     check_expected_ptr(instance);
+    check_expected_ptr(rd);
     return mock_type(int);
 }
 
@@ -182,7 +183,7 @@ static void test_prepare_buffers(void **state)
     (void)state;
 
     struct engine *engine = (struct engine *)malloc(sizeof(struct engine));
-    memset(engine, 0xDB, sizeof(struct engine));
+    memset(engine, 0xD1, sizeof(struct engine));
     engine->after = 1;
     engine->before = 2;
 
@@ -202,6 +203,9 @@ static void test_prepare_buffers(void **state)
     localhost = (RRDHOST *)calloc(1, sizeof(RRDHOST));
     localhost->rrdset_root = (RRDSET *)calloc(1, sizeof(RRDSET));
     localhost->rrdset_root->dimensions = (RRDDIM *)calloc(1, sizeof(RRDDIM));
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    memset(rd, 0xD2, sizeof(RRDDIM));
+    rd->next = NULL;
 
     struct instance *instance = connector->instance_root;
     instance->next = NULL;
@@ -223,6 +227,7 @@ static void test_prepare_buffers(void **state)
 
     expect_function_call(__mock_metric_formatting);
     expect_memory(__mock_metric_formatting, instance, instance, sizeof(struct instance));
+    expect_memory(__mock_metric_formatting, rd, rd, sizeof(RRDDIM));
     will_return(__mock_metric_formatting, 0);
 
     expect_function_call(__mock_end_chart_formatting);

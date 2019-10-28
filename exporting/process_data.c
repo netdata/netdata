@@ -66,12 +66,12 @@ int start_chart_formatting(struct engine *engine)
     return 0;
 }
 
-int metric_formatting(struct engine *engine)
+int metric_formatting(struct engine *engine, RRDDIM *rd)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (connector->metric_formatting) {
-                if (connector->metric_formatting(instance) != 0) {
+                if (connector->metric_formatting(instance, rd) != 0) {
                     error("EXPORTING: cannot format metric for %s", instance->config.name);
                     return 1;
                 }
@@ -162,7 +162,7 @@ int prepare_buffers(struct engine *engine)
             RRDDIM *rd;
             rrddim_foreach_read(rd, st)
             {
-                if (metric_formatting(engine) != 0)
+                if (metric_formatting(engine, rd) != 0)
                     return 1;
             }
 

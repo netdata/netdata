@@ -42,13 +42,13 @@ struct instance {
 struct connector {
     struct connector_config config;
 
-    int (*start_batch_formatting)(struct instance *);
-    int (*start_host_formatting)(struct instance *);
-    int (*start_chart_formatting)(struct instance *);
-    int (*metric_formatting)(struct instance *);
-    int (*end_chart_formatting)(struct instance *);
-    int (*end_host_formatting)(struct instance *);
-    int (*end_batch_formatting)(struct instance *);
+    int (*start_batch_formatting)(struct instance *instance);
+    int (*start_host_formatting)(struct instance *instance);
+    int (*start_chart_formatting)(struct instance *instance);
+    int (*metric_formatting)(struct instance *instance, RRDDIM *rd);
+    int (*end_chart_formatting)(struct instance *instance);
+    int (*end_host_formatting)(struct instance *instance);
+    int (*end_batch_formatting)(struct instance *instance);
 
     struct instance *instance_root;
     struct connector *next;
@@ -75,7 +75,7 @@ int notify_workers(struct engine *);
 int start_batch_formatting(struct engine *engine);
 int start_host_formatting(struct engine *engine);
 int start_chart_formatting(struct engine *engine);
-int metric_formatting(struct engine *engine);
+int metric_formatting(struct engine *engine, RRDDIM *rd);
 int end_chart_formatting(struct engine *engine);
 int end_host_formatting(struct engine *engine);
 int end_batch_formatting(struct engine *engine);
