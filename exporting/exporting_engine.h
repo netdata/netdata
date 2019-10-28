@@ -8,6 +8,7 @@
 struct engine;
 
 struct instance_config {
+    const char *name;
     const char *destination;
     int update_every;
     int buffer_on_failures;
@@ -41,13 +42,13 @@ struct instance {
 struct connector {
     struct connector_config config;
 
-    int (*start_batch_formatting)(struct engine *);
-    int (*start_host_formatting)(struct engine *);
-    int (*start_chart_formatting)(struct engine *);
-    int (*metric_formatting)(struct engine *);
-    int (*end_chart_formatting)(struct engine *);
-    int (*end_host_formatting)(struct engine *);
-    int (*end_batch_formatting)(struct engine *);
+    int (*start_batch_formatting)(struct instance *);
+    int (*start_host_formatting)(struct instance *);
+    int (*start_chart_formatting)(struct instance *);
+    int (*metric_formatting)(struct instance *);
+    int (*end_chart_formatting)(struct instance *);
+    int (*end_host_formatting)(struct instance *);
+    int (*end_batch_formatting)(struct instance *);
 
     struct instance *instance_root;
     struct connector *next;
@@ -70,6 +71,14 @@ int init_connectors(struct engine *);
 int mark_scheduled_instances(struct engine *);
 int prepare_buffers(struct engine *);
 int notify_workers(struct engine *);
+
+int start_batch_formatting(struct engine *engine);
+int start_host_formatting(struct engine *engine);
+int start_chart_formatting(struct engine *engine);
+int metric_formatting(struct engine *engine);
+int end_chart_formatting(struct engine *engine);
+int end_host_formatting(struct engine *engine);
+int end_batch_formatting(struct engine *engine);
 
 int send_internal_metrics(struct engine *);
 

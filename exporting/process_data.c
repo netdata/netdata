@@ -18,6 +18,118 @@ int mark_scheduled_instances(struct engine *engine)
     return 0;
 }
 
+int start_batch_formatting(struct engine *engine)
+{
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (connector->start_batch_formatting) {
+                if (connector->start_batch_formatting(instance) != 0) {
+                    error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int start_host_formatting(struct engine *engine)
+{
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (connector->start_host_formatting) {
+                if (connector->start_host_formatting(instance) != 0) {
+                    error("EXPORTING: cannot start host formatting for %s", instance->config.name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int start_chart_formatting(struct engine *engine)
+{
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (connector->start_chart_formatting) {
+                if (connector->start_chart_formatting(instance) != 0) {
+                    error("EXPORTING: cannot start chart formatting for %s", instance->config.name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int metric_formatting(struct engine *engine)
+{
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (connector->metric_formatting) {
+                if (connector->metric_formatting(instance) != 0) {
+                    error("EXPORTING: cannot format metric for %s", instance->config.name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int end_chart_formatting(struct engine *engine)
+{
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (connector->end_chart_formatting) {
+                if (connector->end_chart_formatting(instance) != 0) {
+                    error("EXPORTING: cannot end chart formatting for %s", instance->config.name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int end_host_formatting(struct engine *engine)
+{
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (connector->end_host_formatting) {
+                if (connector->end_host_formatting(instance) != 0) {
+                    error("EXPORTING: cannot end host formatting for %s", instance->config.name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int end_batch_formatting(struct engine *engine)
+{
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (connector->end_batch_formatting) {
+                if (connector->end_batch_formatting(instance) != 0) {
+                    error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
 /**
  * Prepare buffers
  *
@@ -31,42 +143,41 @@ int prepare_buffers(struct engine *engine)
 {
     netdata_thread_disable_cancelability();
     // rrd_rdlock();
-    if (engine->connector_root->start_batch_formatting)
-        engine->connector_root->start_batch_formatting(engine);
+    if (start_batch_formatting(engine) != 0)
+        return 1;
 
     RRDHOST *host;
     rrdhost_foreach_read(host)
     {
         // rrdhost_rdlock(host);
-        if (engine->connector_root->start_host_formatting)
-            engine->connector_root->start_host_formatting(engine);
-
+        if (start_host_formatting(engine) != 0)
+            return 1;
         RRDSET *st;
         rrdset_foreach_read(st, host)
         {
             // rrdset_rdlock(st);
-            if (engine->connector_root->start_chart_formatting)
-                engine->connector_root->start_chart_formatting(engine);
+            if (start_chart_formatting(engine) != 0)
+                return 1;
 
             RRDDIM *rd;
             rrddim_foreach_read(rd, st)
             {
-                if (engine->connector_root->metric_formatting)
-                    engine->connector_root->metric_formatting(engine);
+                if (metric_formatting(engine) != 0)
+                    return 1;
             }
 
-            if (engine->connector_root->end_chart_formatting)
-                engine->connector_root->end_chart_formatting(engine);
+            if (end_chart_formatting(engine) != 0)
+                return 1;
             // rrdset_unlock(st);
         }
 
-        if (engine->connector_root->end_host_formatting)
-            engine->connector_root->end_host_formatting(engine);
+        if (end_host_formatting(engine) != 0)
+            return 1;
         // rrdhost_unlock(host);
     }
 
-    if (engine->connector_root->end_batch_formatting)
-        engine->connector_root->end_batch_formatting(engine);
+    if (end_batch_formatting(engine) != 0)
+        return 1;
     // rrd_unlock();
     netdata_thread_enable_cancelability();
 

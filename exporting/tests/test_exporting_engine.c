@@ -59,52 +59,52 @@ int __wrap_send_internal_metrics(struct engine *engine)
     return mock_type(int);
 }
 
-int __mock_start_batch_formatting(struct engine *engine)
+int __mock_start_batch_formatting(struct instance *instance)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
-int __mock_start_host_formatting(struct engine *engine)
+int __mock_start_host_formatting(struct instance *instance)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
-int __mock_start_chart_formatting(struct engine *engine)
+int __mock_start_chart_formatting(struct instance *instance)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
-int __mock_metric_formatting(struct engine *engine)
+int __mock_metric_formatting(struct instance *instance)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
-int __mock_end_chart_formatting(struct engine *engine)
+int __mock_end_chart_formatting(struct instance *instance)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
-int __mock_end_host_formatting(struct engine *engine)
+int __mock_end_host_formatting(struct instance *instance)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
-int __mock_end_batch_formatting(struct engine *engine)
+int __mock_end_batch_formatting(struct instance *instance)
 {
     function_called();
-    check_expected_ptr(engine);
+    check_expected_ptr(instance);
     return mock_type(int);
 }
 
@@ -188,6 +188,7 @@ static void test_prepare_buffers(void **state)
 
     engine->connector_root = (struct connector *)malloc(sizeof(struct connector));
     struct connector *connector = engine->connector_root;
+    connector->next = NULL;
     connector->start_batch_formatting = __mock_start_batch_formatting;
     connector->start_host_formatting = __mock_start_host_formatting;
     connector->start_chart_formatting = __mock_start_chart_formatting;
@@ -202,35 +203,38 @@ static void test_prepare_buffers(void **state)
     localhost->rrdset_root = (RRDSET *)calloc(1, sizeof(RRDSET));
     localhost->rrdset_root->dimensions = (RRDDIM *)calloc(1, sizeof(RRDDIM));
 
+    struct instance *instance = connector->instance_root;
+    instance->next = NULL;
+
     expect_function_call(__mock_start_batch_formatting);
-    expect_memory(__mock_start_batch_formatting, engine, engine, sizeof(struct engine));
+    expect_memory(__mock_start_batch_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_start_batch_formatting, 0);
 
     // ignore_function_calls(__wrap_now_realtime_sec);
     // will_return_always(__wrap_now_realtime_sec, 1);
 
     expect_function_call(__mock_start_host_formatting);
-    expect_memory(__mock_start_host_formatting, engine, engine, sizeof(struct engine));
+    expect_memory(__mock_start_host_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_start_host_formatting, 0);
 
     expect_function_call(__mock_start_chart_formatting);
-    expect_memory(__mock_start_chart_formatting, engine, engine, sizeof(struct engine));
+    expect_memory(__mock_start_chart_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_start_chart_formatting, 0);
 
     expect_function_call(__mock_metric_formatting);
-    expect_memory(__mock_metric_formatting, engine, engine, sizeof(struct engine));
+    expect_memory(__mock_metric_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_metric_formatting, 0);
 
     expect_function_call(__mock_end_chart_formatting);
-    expect_memory(__mock_end_chart_formatting, engine, engine, sizeof(struct engine));
+    expect_memory(__mock_end_chart_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_end_chart_formatting, 0);
 
     expect_function_call(__mock_end_host_formatting);
-    expect_memory(__mock_end_host_formatting, engine, engine, sizeof(struct engine));
+    expect_memory(__mock_end_host_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_end_host_formatting, 0);
 
     expect_function_call(__mock_end_batch_formatting);
-    expect_memory(__mock_end_batch_formatting, engine, engine, sizeof(struct engine));
+    expect_memory(__mock_end_batch_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_end_batch_formatting, 0);
 
     assert_int_equal(__real_prepare_buffers(engine), 0);
