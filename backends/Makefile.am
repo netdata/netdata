@@ -4,7 +4,6 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
-    graphite \
     json \
     opentsdb \
     prometheus \
