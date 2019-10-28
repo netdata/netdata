@@ -7,6 +7,7 @@
 #include "exporting/exporting_engine.h"
 
 int format_dimension_collected_graphite_plaintext(struct engine *engine);
+int init_graphite_connector(struct connector *connector);
 int init_graphite_instance(struct instance *instance);
 
 #endif //NETDATA_EXPORTING_GRAPHITE_H
