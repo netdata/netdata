@@ -27,9 +27,11 @@ struct engine *read_exporting_config()
 
     engine->connector_root = (struct connector *)calloc(1, sizeof(struct connector));
     engine->connector_root->config.type = BACKEND_TYPE_GRAPHITE;
+    engine->connector_root->engine = engine;
 
     engine->connector_root->instance_root = (struct instance *)calloc(1, sizeof(struct instance));
     struct instance *instance = engine->connector_root->instance_root;
+    instance->connector = engine->connector_root;
     instance->config.destination = strdupz("localhost");
     instance->config.update_every = 1;
     instance->config.buffer_on_failures = 10;

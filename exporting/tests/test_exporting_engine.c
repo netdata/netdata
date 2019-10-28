@@ -261,11 +261,13 @@ static void test_read_exporting_config(void **state)
     struct connector *connector = engine->connector_root;
     assert_ptr_not_equal(connector, NULL);
     assert_ptr_equal(connector->next, NULL);
+    assert_ptr_equal(connector->engine, engine);
     assert_int_equal(connector->config.type, BACKEND_TYPE_GRAPHITE);
 
     struct instance *instance = connector->instance_root;
     assert_ptr_not_equal(instance, NULL);
     assert_ptr_equal(instance->next, NULL);
+    assert_ptr_equal(instance->connector, connector);
     assert_string_equal(instance->config.destination, "localhost");
     assert_int_equal(instance->config.update_every, 1);
     assert_int_equal(instance->config.buffer_on_failures, 10);
