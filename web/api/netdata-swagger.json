@@ -999,7 +999,7 @@
           "description": "The title of the chart."
         },
         "priority": {
-          "type": "string",
+          "type": "number",
           "description": "The relative priority of the chart. NetData does not care about priorities. This is just an indication of importance for the chart viewers to sort charts of higher priority (lower number) closer to the top. Priority sorting should only be used among charts of the same type or family."
         },
         "enabled": {
@@ -1043,9 +1043,7 @@
           "type": "object",
           "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. The key of the object the id of the dimension.",
           "properties": {
-            "key": {
               "$ref": "#/definitions/dimension"
-            }
           }
         },
         "chart_variables": {
