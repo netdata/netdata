@@ -1,10 +1,12 @@
 import argparse
 import json
+import logging
 import random
 import requests
 import sys
 import posixpath
 import urllib.parse
+
 
 #######################################################################################################################
 ### Utilities
@@ -45,30 +47,35 @@ def does_response_fit_schema(schema, resp):
     #pretty_json(resp,max_depth=1)
     if "type" in schema  and  schema["type"]=="object":
         if isinstance(resp,dict)  and  "properties" in schema  and  isinstance(schema["properties"],dict):
-            print(f"Validate properties against dictionary")
+            L.debug(f"Validate properties against dictionary")
             for k,v in schema["properties"].items():
                 #print(f"Validate {k} received with {v}")
                 if not k in resp:
-                    print(f"Missing {k} in response")
+                    L.error(f"Missing {k} in response")
                     return
                 does_response_fit_schema(v, resp[k])
             #pretty_json(schema,max_depth=1)
             #pretty_json(resp,max_depth=1)
         else:
-            print(f"Can't understand schema")
+            L.error(f"Can't understand schema")
             pretty_json(schema,max_depth=1)
     elif "type" in schema  and  schema["type"]=="string":
         if isinstance(resp, str):
-            print(f"{repr(resp)} matches {repr(schema)}")
+            L.debug(f"{repr(resp)} matches {repr(schema)}")
             return
-        print(f"FAIL: {repr(resp)} does not match schema {repr(schema)}")
+        L.error(f"{repr(resp)} does not match schema {repr(schema)}")
     elif "type" in schema  and  schema["type"]=="boolean":
         if isinstance(resp, bool):
-            print(f"{repr(resp)} matches {repr(schema)}")
+            L.debug(f"{repr(resp)} matches {repr(schema)}")
             return
-        print(f"Bool check against {repr(resp)}")
+        L.error(f"{repr(resp)} does not match schema {repr(schema)}")
+    elif "type" in schema  and  schema["type"] in ("number","integer"):
+        if isinstance(resp, int):
+            L.debug(f"{repr(resp)} matches {repr(schema)}")
+            return
+        L.error(f"{repr(resp)} does not match schema {repr(schema)}")
     else:
-        print(f"What to do with the schema?")
+        L.error(f"What to do with the schema? {type(resp)}")
         pretty_json(schema,max_depth=1)
 
 
@@ -102,7 +109,7 @@ class GetPath(object):
                 if code=="200" and 'schema' in schema:
                     self.success = schema['schema']
                 elif code=="200":
-                    print(f"200 reponse with no schema in {self.url}")
+                    L.error(f"200 reponse with no schema in {self.url}")
                 else:
                     self.failures[code] = schema
 
@@ -132,13 +139,13 @@ class GetPath(object):
         try:
             resp_json = json.loads(resp.text)
         except json.decoder.JSONDecodeError as e:
-            print("Non-json response - how to validate?")
+            L.error("Non-json response - how to validate?")
             return
         if resp.status_code==200:
             if self.success is not None:
                 does_response_fit_schema(self.success, resp_json)
             else:
-                print("Missing schema?")
+                L.error("Missing schema?")
             #print(json.loads(resp.text))
 
 
@@ -196,6 +203,10 @@ parser.add_argument('--host', type=str,
                          'definition.')
 parser.add_argument('--reseed', action='store_true',
                     help="Pick a random seed for the PRNG. The default uses a constant seed for reproducibility.")
+parser.add_argument('--passes', action='store_true',
+                    help="Log information about tests that pass")
+parser.add_argument('--detail', action='store_true',
+                    help="Log information about the response/schema comparisons during each test")
 
 args = parser.parse_args()
 if args.reseed:
@@ -203,22 +214,37 @@ if args.reseed:
 spec = json.loads( get_the_spec(args.url) )
 inlined_spec = resolve_refs(spec)
 
+logging.addLevelName(40, "FAIL")
+logging.addLevelName(20, "PASS")
+logging.addLevelName(10, "DETAIL")
+
+L = logging.getLogger()
+handler = logging.StreamHandler(sys.stdout)
+if not args.passes and not args.detail:
+    L.setLevel(logging.ERROR)
+elif args.passes and not args.detail:
+    L.setLevel(logging.INFO)
+elif args.detail:
+    L.setLevel(logging.DEBUG)
+handler.setFormatter(logging.Formatter(fmt="%(levelname)s %(message)s"))
+L.addHandler(handler)
+
+
 if spec['swagger'] != '2.0':
-    print("FAIL: Unexpected swagger version")
+    L.error(f"Unexpected swagger version")
     sys.exit(-1)
-print(f"INFO: Fuzzing {spec['info']['title']} / {spec['info']['version']}")
+L.info(f"Fuzzing {spec['info']['title']} / {spec['info']['version']}")
 host = spec['host']
 if args.host is not None:
     host = args.host
-    print(host)
-print(f"INFO: Target host is {host}")
+L.info(f"Target host is {host}")
 paths = []
 for name,p in inlined_spec['paths'].items():
     if 'get' in p:
         name = not_absolute(name)
         paths.append(GetPath(posixpath.join(inlined_spec['basePath'],name), p['get']))
     elif 'put' in p:
-        print(f"FAIL: Generation of PUT methods (for {name} is unimplemented")
+        L.error(f"Generation of PUT methods (for {name} is unimplemented")
 
 for s in inlined_spec['schemes']:
     for p in paths:
