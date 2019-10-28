@@ -16,13 +16,15 @@ int init_graphite_instance(struct instance *instance)
         error("EXPORTING: cannot create buffer for graphite exporting connector instance");
         return 1;
     }
-    instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = NULL;
-    instance->start_chart_formatting = NULL;
-    instance->metric_formatting = format_dimension_collected_graphite_plaintext;
-    instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = NULL;
-    instance->end_batch_formatting = NULL;
+
+    // TODO: move to init_graphite_connector
+    instance->connector->start_batch_formatting = NULL;
+    instance->connector->start_host_formatting = NULL;
+    instance->connector->start_chart_formatting = NULL;
+    instance->connector->metric_formatting = format_dimension_collected_graphite_plaintext;
+    instance->connector->end_chart_formatting = NULL;
+    instance->connector->end_host_formatting = NULL;
+    instance->connector->end_batch_formatting = NULL;
 
     return 0;
 }

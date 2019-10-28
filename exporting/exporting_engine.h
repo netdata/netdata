@@ -34,6 +34,13 @@ struct instance {
     void *buffer;
     void *stats;
 
+    struct instance *next;
+    struct connector *connector;
+};
+
+struct connector {
+    struct connector_config config;
+
     int (*start_batch_formatting)(struct engine *);
     int (*start_host_formatting)(struct engine *);
     int (*start_chart_formatting)(struct engine *);
@@ -42,12 +49,6 @@ struct instance {
     int (*end_host_formatting)(struct engine *);
     int (*end_batch_formatting)(struct engine *);
 
-    struct instance *next;
-    struct connector *connector;
-};
-
-struct connector {
-    struct connector_config config;
     struct instance *instance_root;
     struct connector *next;
     struct engine *engine;

@@ -187,15 +187,16 @@ static void test_prepare_buffers(void **state)
     engine->before = 2;
 
     engine->connector_root = (struct connector *)malloc(sizeof(struct connector));
+    struct connector *connector = engine->connector_root;
+    connector->start_batch_formatting = __mock_start_batch_formatting;
+    connector->start_host_formatting = __mock_start_host_formatting;
+    connector->start_chart_formatting = __mock_start_chart_formatting;
+    connector->metric_formatting = __mock_metric_formatting;
+    connector->end_chart_formatting = __mock_end_chart_formatting;
+    connector->end_host_formatting = __mock_end_host_formatting;
+    connector->end_batch_formatting = __mock_end_batch_formatting;
 
-    engine->connector_root->instance_root = (struct instance *)malloc(sizeof(struct instance));
-    engine->connector_root->instance_root->start_batch_formatting = __mock_start_batch_formatting;
-    engine->connector_root->instance_root->start_host_formatting = __mock_start_host_formatting;
-    engine->connector_root->instance_root->start_chart_formatting = __mock_start_chart_formatting;
-    engine->connector_root->instance_root->metric_formatting = __mock_metric_formatting;
-    engine->connector_root->instance_root->end_chart_formatting = __mock_end_chart_formatting;
-    engine->connector_root->instance_root->end_host_formatting = __mock_end_host_formatting;
-    engine->connector_root->instance_root->end_batch_formatting = __mock_end_batch_formatting;
+    connector->instance_root = (struct instance *)malloc(sizeof(struct instance));
 
     localhost = (RRDHOST *)calloc(1, sizeof(RRDHOST));
     localhost->rrdset_root = (RRDSET *)calloc(1, sizeof(RRDSET));
@@ -235,7 +236,13 @@ static void test_prepare_buffers(void **state)
     assert_int_equal(__real_prepare_buffers(engine), 0);
 
     // check with NULL functions
-    memset(engine->connector_root->instance_root, 0, sizeof(struct instance));
+    connector->start_batch_formatting = NULL;
+    connector->start_host_formatting = NULL;
+    connector->start_chart_formatting = NULL;
+    connector->metric_formatting = NULL;
+    connector->end_chart_formatting = NULL;
+    connector->end_host_formatting = NULL;
+    connector->end_batch_formatting = NULL;
     assert_int_equal(__real_prepare_buffers(engine), 0);
 
     free(localhost->rrdset_root->dimensions);
@@ -285,14 +292,14 @@ static void test_init_connectors(void **state)
 
     assert_int_equal(__real_init_connectors(engine), 0);
 
-    struct instance *instance = engine->connector_root->instance_root;
-    assert_ptr_equal(instance->start_batch_formatting, NULL);
-    assert_ptr_equal(instance->start_host_formatting, NULL);
-    assert_ptr_equal(instance->start_chart_formatting, NULL);
-    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_graphite_plaintext);
-    assert_ptr_equal(instance->end_chart_formatting, NULL);
-    assert_ptr_equal(instance->end_host_formatting, NULL);
-    assert_ptr_equal(instance->end_batch_formatting, NULL);
+    struct connector *connector = engine->connector_root;
+    assert_ptr_equal(connector->start_batch_formatting, NULL);
+    assert_ptr_equal(connector->start_host_formatting, NULL);
+    assert_ptr_equal(connector->start_chart_formatting, NULL);
+    assert_ptr_equal(connector->metric_formatting, format_dimension_collected_graphite_plaintext);
+    assert_ptr_equal(connector->end_chart_formatting, NULL);
+    assert_ptr_equal(connector->end_host_formatting, NULL);
+    assert_ptr_equal(connector->end_batch_formatting, NULL);
 }
 
 int main(void)
