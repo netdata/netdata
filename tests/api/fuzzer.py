@@ -41,42 +41,47 @@ class Param(object):
     def dump(self):
         print(f"{self.name} in {self.location} is {self.kind} : {{{self.values}}}")
 
-def does_response_fit_schema(schema, resp):
+def does_response_fit_schema(schema_path, schema, resp):
+    '''The schema_path argument tells us where we are (globally) in the schema. The schema argument is the
+       sub-tree within the schema json that we are validating against. The resp is the json subtree from the
+       target host's response.
+    '''
     #print("Schema:")
     #pretty_json(schema,max_depth=1)
     #print("Response:")
     #pretty_json(resp,max_depth=1)
     if "type" in schema  and  schema["type"]=="object":
         if isinstance(resp,dict)  and  "properties" in schema  and  isinstance(schema["properties"],dict):
-            L.debug(f"Validate properties against dictionary")
+            L.debug(f"Validate properties against dictionary at {schema_path}")
             for k,v in schema["properties"].items():
                 #print(f"Validate {k} received with {v}")
                 if not k in resp:
-                    L.error(f"Missing {k} in response")
+                    L.error(f"Missing {k} in response at {schema_path}")
+                    pretty_json(resp)
                     return
-                does_response_fit_schema(v, resp[k])
+                does_response_fit_schema(posixpath.join(schema_path,k), v, resp[k])
             #pretty_json(schema,max_depth=1)
             #pretty_json(resp,max_depth=1)
         else:
-            L.error(f"Can't understand schema")
+            L.error(f"Can't understand schema at {schema_path}")
             pretty_json(schema,max_depth=1)
     elif "type" in schema  and  schema["type"]=="string":
         if isinstance(resp, str):
-            L.debug(f"{repr(resp)} matches {repr(schema)}")
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
-        L.error(f"{repr(resp)} does not match schema {repr(schema)}")
+        L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
     elif "type" in schema  and  schema["type"]=="boolean":
         if isinstance(resp, bool):
-            L.debug(f"{repr(resp)} matches {repr(schema)}")
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
-        L.error(f"{repr(resp)} does not match schema {repr(schema)}")
+        L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
     elif "type" in schema  and  schema["type"] in ("number","integer"):
         if isinstance(resp, int):
-            L.debug(f"{repr(resp)} matches {repr(schema)}")
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
-        L.error(f"{repr(resp)} does not match schema {repr(schema)}")
+        L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
     else:
-        L.error(f"What to do with the schema? {type(resp)}")
+        L.error(f"What to do with the schema? {type(resp)} at {schema_path}")
         pretty_json(schema,max_depth=1)
 
 
@@ -121,7 +126,7 @@ class GetPath(object):
         if url_filter.match(test_url):
             print(f"TEST: {test_url}")
             return requests.get(url=test_url)
-        L.debug("url_filter skips {test_url}")
+        L.debug(f"url_filter skips {test_url}")
         #for p in self.req_params.values():
         #    p.dump()
         #for p in self.opt_params.values():
@@ -146,7 +151,7 @@ class GetPath(object):
             return
         if resp.status_code==200:
             if self.success is not None:
-                does_response_fit_schema(self.success, resp_json)
+                does_response_fit_schema(posixpath.join(self.url,"200"), self.success, resp_json)
             else:
                 L.error("Missing schema?")
             #print(json.loads(resp.text))
@@ -177,17 +182,19 @@ def resolve_refs(spec, spec_root=None):
     newspec = {}
     for k,v in spec.items():
         if k=="$ref":
+            #print(f"CONVERTING {k} {v}")
             path = v.split('/')
             target = find_ref(spec_root, path)
             # Unfold one level of the tree and erase the $ref if possible.
             if isinstance(target,dict):
-                for kk,vv in target.items():
+                for kk,vv in resolve_refs(target,spec_root).items():
                     newspec[kk] = vv
             else:
                 newspec[k] = target
         elif isinstance(v,dict):
             newspec[k] = resolve_refs(v, spec_root)
         else:
+            #print(f"COPY OVER {k}")
             newspec[k] = v
     return newspec
 
@@ -219,6 +226,9 @@ if args.reseed:
     random.seed()
 spec = json.loads( get_the_spec(args.url) )
 inlined_spec = resolve_refs(spec)
+
+#pretty_json(inlined_spec)
+#sys.exit(-1)
 
 logging.addLevelName(40, "FAIL")
 logging.addLevelName(20, "PASS")
