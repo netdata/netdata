@@ -442,8 +442,6 @@ WEB_PLUGIN_FILES = \
 BACKENDS_PLUGIN_FILES = \
     backends/backends.c \
     backends/backends.h \
-    backends/graphite/graphite.c \
-    backends/graphite/graphite.h \
     backends/json/json.c \
     backends/json/json.h \
     backends/opentsdb/opentsdb.c \

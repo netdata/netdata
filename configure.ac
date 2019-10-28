@@ -1159,7 +1159,6 @@ AC_SUBST([TEST_LIBS])
 AC_CONFIG_FILES([
     Makefile
     netdata.spec
-    backends/graphite/Makefile
     backends/json/Makefile
     backends/Makefile
     backends/opentsdb/Makefile
