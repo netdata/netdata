@@ -43,12 +43,14 @@ struct instance {
     int (*end_batch_formatting)(struct engine *);
 
     struct instance *next;
+    struct connector *connector;
 };
 
 struct connector {
     struct connector_config config;
     struct instance *instance_root;
     struct connector *next;
+    struct engine *engine;
 };
 
 struct engine {
@@ -61,6 +63,7 @@ struct engine {
 void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
+
 int init_connectors(struct engine *);
 
 int mark_scheduled_instances(struct engine *);

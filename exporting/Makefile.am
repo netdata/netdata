@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
     tests \
+    graphite \
 	$(NULL)
 
 dist_noinst_DATA = \

@@ -601,6 +601,8 @@ set(BACKENDS_PLUGIN_FILES
 set(EXPORTING_ENGINE_FILES
         exporting/exporting_engine.c
         exporting/exporting_engine.h
+        exporting/graphite/graphite.c
+        exporting/graphite/graphite.h
         exporting/read_config.c
         exporting/init_connectors.c
         exporting/process_data.c

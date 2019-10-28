@@ -4,6 +4,7 @@
 #include "../../libnetdata/required_dummies.h"
 
 #include "../exporting_engine.h"
+#include "../graphite/graphite.h"
 
 #include <setjmp.h>
 #include <cmocka.h>
@@ -21,6 +22,7 @@ struct engine *__wrap_read_exporting_config()
     return mock_ptr_type(struct engine *);
 }
 
+int __real_init_connectors(struct engine *engine);
 int __wrap_init_connectors(struct engine *engine)
 {
     function_called();
@@ -273,12 +275,31 @@ static void test_read_exporting_config(void **state)
     assert_int_equal(instance->config.send_names_instead_of_ids, 1);
 }
 
+static void test_init_connectors(void **state)
+{
+    (void)state;
+
+    struct engine *engine = __real_read_exporting_config();
+
+    assert_int_equal(__real_init_connectors(engine), 0);
+
+    struct instance *instance = engine->connector_root->instance_root;
+    assert_ptr_equal(instance->start_batch_formatting, NULL);
+    assert_ptr_equal(instance->start_host_formatting, NULL);
+    assert_ptr_equal(instance->start_chart_formatting, NULL);
+    assert_ptr_equal(instance->metric_formatting, exporting_format_dimension_collected_graphite_plaintext);
+    assert_ptr_equal(instance->end_chart_formatting, NULL);
+    assert_ptr_equal(instance->end_host_formatting, NULL);
+    assert_ptr_equal(instance->end_batch_formatting, NULL);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_exporting_engine),
         cmocka_unit_test(test_prepare_buffers),
-        cmocka_unit_test(test_read_exporting_config)
+        cmocka_unit_test(test_read_exporting_config),
+        cmocka_unit_test(test_init_connectors)
     };
 
     return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL);

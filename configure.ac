@@ -1195,6 +1195,7 @@ AC_CONFIG_FILES([
     database/engine/Makefile
     diagrams/Makefile
     exporting/Makefile
+    exporting/graphite/Makefile
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
