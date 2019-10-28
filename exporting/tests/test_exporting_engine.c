@@ -300,6 +300,11 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(connector->end_chart_formatting, NULL);
     assert_ptr_equal(connector->end_host_formatting, NULL);
     assert_ptr_equal(connector->end_batch_formatting, NULL);
+
+    BUFFER *buffer = (BUFFER *)connector->instance_root->buffer;
+    assert_ptr_not_equal(buffer, NULL);
+    buffer_sprintf(buffer, "%s", "graphite test");
+    assert_string_equal(buffer_tostring(buffer), "graphite test");
 }
 
 int main(void)
