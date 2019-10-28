@@ -6,8 +6,27 @@ import sys
 import posixpath
 import urllib.parse
 
+#######################################################################################################################
+### Utilities
+
 def some(s):
     return random.choice(sorted(s))
+
+def pretty_json(tree, depth=0, max_depth=None):
+    if max_depth is not None  and  depth>=max_depth:
+        return
+    indent = "  "*depth
+    for k,v in tree.items():
+        if isinstance(v, int) or isinstance(v, str):
+            print(f"{indent}{k}: {v}")
+        elif isinstance(v, dict):
+            print(f"{indent}{k}: ->")
+            pretty_json(v, depth+1)
+        else:
+            print(f"{indent}{k}: {type(v)}")
+
+#######################################################################################################################
+### Data-model and processing
 
 class Param(object):
     def __init__(self, name, location, kind):
@@ -18,6 +37,41 @@ class Param(object):
 
     def dump(self):
         print(f"{self.name} in {self.location} is {self.kind} : {{{self.values}}}")
+
+def does_response_fit_schema(schema, resp):
+    #print("Schema:")
+    #pretty_json(schema,max_depth=1)
+    #print("Response:")
+    #pretty_json(resp,max_depth=1)
+    if "type" in schema  and  schema["type"]=="object":
+        if isinstance(resp,dict)  and  "properties" in schema  and  isinstance(schema["properties"],dict):
+            print(f"Validate properties against dictionary")
+            for k,v in schema["properties"].items():
+                #print(f"Validate {k} received with {v}")
+                if not k in resp:
+                    print(f"Missing {k} in response")
+                    return
+                does_response_fit_schema(v, resp[k])
+            #pretty_json(schema,max_depth=1)
+            #pretty_json(resp,max_depth=1)
+        else:
+            print(f"Can't understand schema")
+            pretty_json(schema,max_depth=1)
+    elif "type" in schema  and  schema["type"]=="string":
+        if isinstance(resp, str):
+            print(f"{repr(resp)} matches {repr(schema)}")
+            return
+        print(f"FAIL: {repr(resp)} does not match schema {repr(schema)}")
+    elif "type" in schema  and  schema["type"]=="boolean":
+        if isinstance(resp, bool):
+            print(f"{repr(resp)} matches {repr(schema)}")
+            return
+        print(f"Bool check against {repr(resp)}")
+    else:
+        print(f"What to do with the schema?")
+        pretty_json(schema,max_depth=1)
+
+
 
 class GetPath(object):
     def __init__(self, url, spec):
@@ -45,8 +99,10 @@ class GetPath(object):
                 if req and len(target[name].values)==0:
                     print(f"FAIL: No default values in swagger for required parameter {name} in {self.url}")
             for code,schema in spec['responses'].items():
-                if code=="200":
-                    self.success = schema
+                if code=="200" and 'schema' in schema:
+                    self.success = schema['schema']
+                elif code=="200":
+                    print(f"200 reponse with no schema in {self.url}")
                 else:
                     self.failures[code] = schema
 
@@ -72,9 +128,17 @@ class GetPath(object):
         #    p.dump()
         return requests.get(url=test_url)
 
-    def validate(self, res, expect_success):
+    def validate(self, resp, expect_success):
+        try:
+            resp_json = json.loads(resp.text)
+        except json.decoder.JSONDecodeError as e:
+            print("Non-json response - how to validate?")
+            return
         if resp.status_code==200:
-            print(self.success)
+            if self.success is not None:
+                does_response_fit_schema(self.success, resp_json)
+            else:
+                print("Missing schema?")
             #print(json.loads(resp.text))
 
 
@@ -116,6 +180,7 @@ def resolve_refs(spec, spec_root=None):
         else:
             newspec[k] = v
     return newspec
+
 #######################################################################################################################
 # Initialization
 
@@ -159,6 +224,6 @@ for s in inlined_spec['schemes']:
     for p in paths:
         resp = p.generate_success(s+"://"+host)
         p.validate(resp, True)
-        resp = p.generate_failure(s+"://"+host)
-        p.validate(resp, False)
+        #resp = p.generate_failure(s+"://"+host)
+        #p.validate(resp, False)
 
