@@ -251,15 +251,24 @@ if spec['swagger'] != '2.0':
     L.error(f"Unexpected swagger version")
     sys.exit(-1)
 L.info(f"Fuzzing {spec['info']['title']} / {spec['info']['version']}")
-host = spec['host']
-if args.host is not None:
-    host = args.host
-L.info(f"Target host is {host}")
+
+def build_url(host_maybe_scheme, base_path):
+    if not '//' in host_maybe_scheme:
+        host_maybe_scheme = '//' + host_maybe_scheme
+    url_tuple = urllib.parse.urlparse(host_maybe_scheme)
+    if base_path[0]=='/':
+        base_path = base_path[1:]
+    return url_tuple.netloc, posixpath.join(url_tuple.path, base_path)
+
+host, base_url = build_url(args.host or spec['host'], inlined_spec['basePath'])
+
+
+L.info(f"Target host is {base_url}")
 paths = []
 for name,p in inlined_spec['paths'].items():
     if 'get' in p:
         name = not_absolute(name)
-        paths.append(GetPath(posixpath.join(inlined_spec['basePath'],name), p['get']))
+        paths.append(GetPath(posixpath.join(base_url,name), p['get']))
     elif 'put' in p:
         L.error(f"Generation of PUT methods (for {name} is unimplemented")
 
