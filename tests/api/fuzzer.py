@@ -21,7 +21,8 @@ def not_some(s):
     test_set = random.choice([string.ascii_uppercase + string.ascii_lowercase,
                               string.digits,
                               string.digits + ".E-",
-                              string.printable.replace('&', '')])
+                              '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJK'
+                              'LMNOPQRSTUVWXYZ!"#$%\'()*+,-./:;<=>?@[\\]^_`{|}~ '])
     test_len = random.choice([1, 2, 3, 37, 61, 121])
     while True:
         x = ''.join([random.choice(test_set) for _ in range(test_len)])
@@ -209,8 +210,12 @@ class GetPath(object):
             L.debug(f"url_filter skips {test_url}")
 
     def generate_failure(self, host):
-        args = "&".join([f"{p.name}={not_some(p.values)}"
-                         for p in list(self.req_params.values()) + list(self.opt_params.values())])
+        all_params = list(self.req_params.values()) + list(self.opt_params.values())
+        bad_param = ''.join([random.choice(string.ascii_lowercase) for _ in range(5)])
+        while bad_param in all_params:
+            bad_param = ''.join([random.choice(string.ascii_lowercase) for _ in range(5)])
+        all_params.append(Param(bad_param, "query", "string"))
+        args = "&".join([f"{p.name}={not_some(p.values)}" for p in all_params])
         base_url = urllib.parse.urljoin(host, self.url)
         test_url = f"{base_url}?{args}"
         if url_filter.match(test_url):
@@ -223,14 +228,26 @@ class GetPath(object):
         except json.decoder.JSONDecodeError as e:
             L.error(f"Non-json response from {test_url}")
             return
-        if resp.status_code >= 200 and resp.status_code < 300:
+        success_code = resp.status_code >= 200 and resp.status_code < 300
+        if success_code and expect_success:
             if self.success is not None:
                 if does_response_fit_schema(posixpath.join(self.url, str(resp.status_code)), self.success, resp_json):
                     L.info(f"tested {test_url}")
                 else:
                     L.error(f"tested {test_url}")
             else:
-                L.error("Missing schema?")
+                L.error(f"Missing schema {test_url}")
+        elif not success_code and not expect_success:
+            schema = self.failures.get(str(resp.status_code), None)
+            if schema is not None:
+                if does_response_fit_schema(posixpath.join(self.url, str(resp.status_code)), schema, resp_json):
+                    L.info(f"tested {test_url}")
+                else:
+                    L.error(f"tested {test_url}")
+            else:
+                L.error("Missing schema for {resp.status_code} from {test_url}")
+        else:
+            L.error(f"Received incorrect status code {resp.status_code} against {test_url}")
 
 
 def get_the_spec(url):
