@@ -1463,10 +1463,14 @@ void rrdset_done(RRDSET *st) {
                     uint64_t max = (uint64_t)rd->collected_value_max;
                     uint64_t cap = 0;
 
-                    if (max > 0x00000000FFFFFFFFULL)
+                    if (max > 0x7FFFFFFFFFFFFFFFULL)
                         cap = 0xFFFFFFFFFFFFFFFFULL;
-                    else
+                    else if (max > 0x00000000FFFFFFFFULL)
+                        cap = 0x7FFFFFFFFFFFFFFFULL;
+                    else if (max > 0x000000007FFFFFFFULL)
                         cap = 0x00000000FFFFFFFFULL;
+                    else
+                        cap = 0x000000007FFFFFFFULL;
 
                     uint64_t delta = cap - last + new;
                     uint64_t max_acceptable_rate = (cap / 100) * MAX_INCREMENTAL_PERCENT_RATE;
