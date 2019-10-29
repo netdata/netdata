@@ -29,6 +29,16 @@ def pretty_json(tree, depth=0, max_depth=None):
         else:
             print(f"{indent}{k}: {type(v)}")
 
+
+def build_url(host_maybe_scheme, base_path):
+    if '//' not in host_maybe_scheme:
+        host_maybe_scheme = '//' + host_maybe_scheme
+    url_tuple = urllib.parse.urlparse(host_maybe_scheme)
+    if base_path[0] == '/':
+        base_path = base_path[1:]
+    return url_tuple.netloc, posixpath.join(url_tuple.path, base_path)
+
+
 #######################################################################################################################
 # Data-model and processing
 
@@ -58,11 +68,15 @@ def does_response_fit_schema(schema_path, schema, resp):
        rapidly as we attempt to cover the full semantics of languages of trees defined in swagger. Instead
        we have some special cases that describe the parts of the semantics that we've used to describe the
        netdata API.
+
+       If we hit an error (in the schema) that prevents further checks then we return early, otherwise we
+       try to collect as many errors as possible.
     '''
+    success = True
     if "type" not in schema:
         L.error(f"Cannot progress past {schema_path} -> no type specified in dictionary")
         pretty_json(schema)
-        return
+        return False
     if schema["type"] == "object":
         if isinstance(resp, dict) and "properties" in schema and isinstance(schema["properties"], dict):
             L.debug(f"Validate properties against dictionary at {schema_path}")
@@ -71,63 +85,71 @@ def does_response_fit_schema(schema_path, schema, resp):
                 if v.get("required", False) and k not in resp:
                     L.error(f"Missing {k} in response at {schema_path}")
                     pretty_json(resp)
-                    return
+                    return False
                 if k in resp:
-                    does_response_fit_schema(posixpath.join(schema_path, k), v, resp[k])
-            #pretty_json(schema,max_depth=1)
-            #pretty_json(resp,max_depth=1)
+                    if not does_response_fit_schema(posixpath.join(schema_path, k), v, resp[k]):
+                        success = False
         elif isinstance(resp, dict) and "additionalProperties" in schema \
                 and isinstance(schema["additionalProperties"], dict):
             kv_schema = schema["additionalProperties"]
             L.debug(f"Validate additionalProperties against every value in dictionary at {schema_path}")
             if "type" in kv_schema and kv_schema["type"] == "object":
                 for k, v in resp.items():
-                    does_response_fit_schema(posixpath.join(schema_path, k), kv_schema, v)
-                    #L.debug(f"Validate {k}/{repr(v)} against {kv_schema}")
+                    if not does_response_fit_schema(posixpath.join(schema_path, k), kv_schema, v):
+                        success = False
             else:
-                L.error("Don't understand what the additionalProperties means?")
+                L.error("Don't understand what the additionalProperties means (it has no type?)")
+                return False
         else:
             L.error(f"Can't understand schema at {schema_path}")
             pretty_json(schema, max_depth=1)
+            return False
     elif schema["type"] == "string":
         if isinstance(resp, str):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
-            return
+            return True
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
+        return False
     elif schema["type"] == "boolean":
         if isinstance(resp, bool):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
-            return
+            return True
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
+        return False
     elif schema["type"] == "number":
         if 'nullable' in schema and resp is None:
-            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
-            return
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable)")
+            return True
         if isinstance(resp, int) or isinstance(resp, float):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
-            return
+            return True
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
+        return False
     elif schema["type"] == "integer":
         if 'nullable' in schema and resp is None:
-            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
-            return
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable)")
+            return True
         if isinstance(resp, int):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
-            return
+            return True
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
+        return False
     elif schema["type"] == "array":
         if "items" not in schema:
             L.error(f"Schema for array at {schema_path} does not specify items!")
-            return
+            return False
         item_schema = schema["items"]
         if not isinstance(resp,list):
             L.error(f"Server did not return a list for {schema_path} (typed as array in schema)")
-            return
+            return False
         for i, item in enumerate(resp):
-            does_response_fit_schema(posixpath.join(schema_path, str(i)), item_schema, item)
+            if not does_response_fit_schema(posixpath.join(schema_path, str(i)), item_schema, item):
+                success = False
     else:
-        L.error(f"What to do with the schema? {type(resp)} at {schema_path}")
+        L.error(f"Invalid swagger type {schema["type"]} for {type(resp)} at {schema_path}")
         pretty_json(schema, max_depth=1)
+        return False
+    return success
 
 
 class GetPath(object):
@@ -198,7 +220,6 @@ class GetPath(object):
                 does_response_fit_schema(posixpath.join(self.url, "200"), self.success, resp_json)
             else:
                 L.error("Missing schema?")
-            #print(json.loads(resp.text))
 
 
 def get_the_spec(url):
@@ -231,7 +252,6 @@ def resolve_refs(spec, spec_root=None):
     newspec = {}
     for k, v in spec.items():
         if k == "$ref":
-            #print(f"CONVERTING {k} {v}")
             path = v.split('/')
             target = find_ref(spec_root, path)
             # Unfold one level of the tree and erase the $ref if possible.
@@ -243,7 +263,6 @@ def resolve_refs(spec, spec_root=None):
         elif isinstance(v, dict):
             newspec[k] = resolve_refs(v, spec_root)
         else:
-            #print(f"COPY OVER {k}")
             newspec[k] = v
     # This is an artifact of inline the $refs when they are inside a properties key as their children should be
     # pushed up into the parent dictionary. They must be merged (union) rather than replace as we use this to
@@ -287,9 +306,9 @@ parser.add_argument('--dump-inlined', action='store_true',
 args = parser.parse_args()
 if args.reseed:
     random.seed()
+
 spec = json.loads(get_the_spec(args.url))
 inlined_spec = resolve_refs(spec)
-
 if args.dump_inlined:
     pretty_json(inlined_spec)
     sys.exit(-1)
@@ -297,7 +316,6 @@ if args.dump_inlined:
 logging.addLevelName(40, "FAIL")
 logging.addLevelName(20, "PASS")
 logging.addLevelName(10, "DETAIL")
-
 L = logging.getLogger()
 handler = logging.StreamHandler(sys.stdout)
 if not args.passes and not args.detail:
@@ -316,18 +334,7 @@ if spec['swagger'] != '2.0':
     sys.exit(-1)
 L.info(f"Fuzzing {spec['info']['title']} / {spec['info']['version']}")
 
-
-def build_url(host_maybe_scheme, base_path):
-    if '//' not in host_maybe_scheme:
-        host_maybe_scheme = '//' + host_maybe_scheme
-    url_tuple = urllib.parse.urlparse(host_maybe_scheme)
-    if base_path[0] == '/':
-        base_path = base_path[1:]
-    return url_tuple.netloc, posixpath.join(url_tuple.path, base_path)
-
-
 host, base_url = build_url(args.host or spec['host'], inlined_spec['basePath'])
-
 
 L.info(f"Target host is {base_url}")
 paths = []
@@ -345,3 +352,11 @@ for s in inlined_spec['schemes']:
             p.validate(resp, True)
         #resp = p.generate_failure(s+"://"+host)
         #p.validate(resp, False)
+    elif schema["type"] in ("number", "integer"):
+        if 'nullable' in schema and resp is None:
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
+            return
+        if isinstance(resp, int):
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
+            return
+        L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
