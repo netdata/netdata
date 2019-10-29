@@ -59,11 +59,15 @@ def does_response_fit_schema(schema_path, schema, resp):
        we have some special cases that describe the parts of the semantics that we've used to describe the
        netdata API.
     '''
-    if "type" in schema and schema["type"] == "object":
+    if "type" not in schema:
+        L.error(f"Cannot progress past {schema_path} -> no type specified in dictionary")
+        pretty_json(schema)
+        return
+    if schema["type"] == "object":
         if isinstance(resp, dict) and "properties" in schema and isinstance(schema["properties"], dict):
             L.debug(f"Validate properties against dictionary at {schema_path}")
             for k, v in schema["properties"].items():
-                print(f"Validate {k} received with {v}")
+                L.debug(f"Validate {k} received with {v}")
                 if v.get("required", False) and k not in resp:
                     L.error(f"Missing {k} in response at {schema_path}")
                     pretty_json(resp)
@@ -85,17 +89,25 @@ def does_response_fit_schema(schema_path, schema, resp):
         else:
             L.error(f"Can't understand schema at {schema_path}")
             pretty_json(schema, max_depth=1)
-    elif "type" in schema and schema["type"] == "string":
+    elif schema["type"] == "string":
         if isinstance(resp, str):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
-    elif "type" in schema and schema["type"] == "boolean":
+    elif schema["type"] == "boolean":
         if isinstance(resp, bool):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
-    elif "type" in schema and schema["type"] in ("number", "integer"):
+    elif schema["type"] == "number":
+        if 'nullable' in schema and resp is None:
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
+            return
+        if isinstance(resp, int) or isinstance(resp, float):
+            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
+            return
+        L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
+    elif schema["type"] == "integer":
         if 'nullable' in schema and resp is None:
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
             return
@@ -103,6 +115,16 @@ def does_response_fit_schema(schema_path, schema, resp):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
+    elif schema["type"] == "array":
+        if "items" not in schema:
+            L.error(f"Schema for array at {schema_path} does not specify items!")
+            return
+        item_schema = schema["items"]
+        if not isinstance(resp,list):
+            L.error(f"Server did not return a list for {schema_path} (typed as array in schema)")
+            return
+        for i, item in enumerate(resp):
+            does_response_fit_schema(posixpath.join(schema_path, str(i)), item_schema, item)
     else:
         L.error(f"What to do with the schema? {type(resp)} at {schema_path}")
         pretty_json(schema, max_depth=1)
@@ -137,7 +159,7 @@ class GetPath(object):
                 if code == "200" and 'schema' in schema:
                     self.success = schema['schema']
                 elif code == "200":
-                    L.error(f"200 reponse with no schema in {self.url}")
+                    L.error(f"200 response with no schema in {self.url}")
                 else:
                     self.failures[code] = schema
 
