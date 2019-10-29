@@ -45,12 +45,16 @@ def pretty_json(tree, depth=0, max_depth=None):
 
 
 def build_url(host_maybe_scheme, base_path):
-    if '//' not in host_maybe_scheme:
-        host_maybe_scheme = '//' + host_maybe_scheme
-    url_tuple = urllib.parse.urlparse(host_maybe_scheme)
-    if base_path[0] == '/':
-        base_path = base_path[1:]
-    return url_tuple.netloc, posixpath.join(url_tuple.path, base_path)
+    try:
+        if '//' not in host_maybe_scheme:
+            host_maybe_scheme = '//' + host_maybe_scheme
+        url_tuple = urllib.parse.urlparse(host_maybe_scheme)
+        if base_path[0] == '/':
+            base_path = base_path[1:]
+        return url_tuple.netloc, posixpath.join(url_tuple.path, base_path)
+    except Exception as e:
+        L.error(f"Critical failure decoding arguments -> {e}")
+        sys.exit(-1)
 
 
 #######################################################################################################################
@@ -204,8 +208,11 @@ class GetPath(object):
         base_url = urllib.parse.urljoin(host, self.url)
         test_url = f"{base_url}?{args}"
         if url_filter.match(test_url):
-            resp = requests.get(url=test_url)
-            self.validate(test_url, resp, True)
+            try:
+                resp = requests.get(url=test_url)
+                self.validate(test_url, resp, True)
+            except Exception as e:
+                L.error(f"Network failure in test {e}")
         else:
             L.debug(f"url_filter skips {test_url}")
 
@@ -219,8 +226,11 @@ class GetPath(object):
         base_url = urllib.parse.urljoin(host, self.url)
         test_url = f"{base_url}?{args}"
         if url_filter.match(test_url):
-            resp = requests.get(url=test_url)
-            self.validate(test_url, resp, False)
+            try:
+                resp = requests.get(url=test_url)
+                self.validate(test_url, resp, False)
+            except Exception as e:
+                L.error(f"Network failure in test {e}")
 
     def validate(self, test_url, resp, expect_success):
         try:
