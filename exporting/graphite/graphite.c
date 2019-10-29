@@ -4,8 +4,33 @@
 
 int format_dimension_collected_graphite_plaintext(struct instance *instance, RRDDIM *rd)
 {
-    (void)instance;
-    (void)rd;
+    struct engine *engine = instance->connector->engine;
+    RRDSET *st = rd->rrdset;
+    RRDHOST *host = st->rrdhost;
+
+    char chart_name[RRD_ID_LENGTH_MAX + 1];
+    exporting_name_copy(
+        chart_name,
+        (engine->config.options & BACKEND_OPTION_SEND_NAMES && st->name) ? st->name : st->id,
+        RRD_ID_LENGTH_MAX);
+
+    char dimension_name[RRD_ID_LENGTH_MAX + 1];
+    exporting_name_copy(
+        dimension_name,
+        (engine->config.options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id,
+        RRD_ID_LENGTH_MAX);
+
+    buffer_sprintf(
+        instance->buffer,
+        "%s.%s.%s.%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
+        engine->config.prefix,
+        engine->config.hostname,
+        chart_name,
+        dimension_name,
+        (host->tags) ? ";" : "",
+        (host->tags) ? host->tags : "",
+        rd->last_collected_value,
+        (unsigned long long)rd->last_collected_time.tv_sec);
 
     return 0;
 }

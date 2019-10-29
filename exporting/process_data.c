@@ -3,6 +3,30 @@
 #include "exporting_engine.h"
 
 /**
+ * Normalize chart and dimension names
+ *
+ * Substitute '_' for any special character except '.'.
+ *
+ * @param dst where to copy name to.
+ * @param src where to copy name from.
+ * @param max_len the maximum size of copied name.
+ * @return Returns the size of the copied name.
+ */
+size_t exporting_name_copy(char *dst, const char *src, size_t max_len) {
+    size_t n;
+
+    for(n = 0; *src && n < max_len ; dst++, src++, n++) {
+        char c = *src;
+
+        if(c != '.' && !isalnum(c)) *dst = '_';
+        else *dst = c;
+    }
+    *dst = '\0';
+
+    return n;
+}
+
+/**
  * Mark scheduled instances
  *
  * Any instance can have its own update interval. On every exporting engine update only those instances are picked,

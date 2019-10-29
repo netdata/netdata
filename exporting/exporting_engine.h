@@ -66,11 +66,13 @@ void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
 
-int init_connectors(struct engine *);
+int init_connectors(struct engine *engine);
 
-int mark_scheduled_instances(struct engine *);
-int prepare_buffers(struct engine *);
-int notify_workers(struct engine *);
+int mark_scheduled_instances(struct engine *engine);
+int prepare_buffers(struct engine *engine);
+int notify_workers(struct engine *engine);
+
+size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 
 int start_batch_formatting(struct engine *engine);
 int start_host_formatting(struct engine *engine);
@@ -80,6 +82,6 @@ int end_chart_formatting(struct engine *engine);
 int end_host_formatting(struct engine *engine);
 int end_batch_formatting(struct engine *engine);
 
-int send_internal_metrics(struct engine *);
+int send_internal_metrics(struct engine *engine);
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */

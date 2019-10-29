@@ -316,13 +316,61 @@ static void test_init_connectors(void **state)
     assert_string_equal(buffer_tostring(buffer), "graphite test");
 }
 
+static void test_exporting_name_copy(void **state)
+{
+    (void)state;
+
+    char *source_name = "test.name-with/special#characters_";
+    char destination_name[RRD_ID_LENGTH_MAX + 1];
+
+    assert_int_equal(exporting_name_copy(destination_name, source_name, RRD_ID_LENGTH_MAX), 34);
+    assert_string_equal(destination_name, "test.name_with_special_characters_");
+}
+
+static void test_format_dimension_collected_graphite_plaintext(void **state)
+{
+    (void)state;
+
+    struct engine *engine = __real_read_exporting_config();
+    __real_init_connectors(engine);
+
+    localhost = (RRDHOST *)calloc(1, sizeof(RRDHOST));
+    localhost->tags = strdup("host_tag1 host_tag2");
+
+    localhost->rrdset_root = (RRDSET *)calloc(1, sizeof(RRDSET));
+    RRDSET *st = localhost->rrdset_root;
+    st->rrdhost = localhost;
+    strcpy(st->id, "chart_id");
+    st->name = strdup("chart_name");
+
+    localhost->rrdset_root->dimensions = (RRDDIM *)calloc(1, sizeof(RRDDIM));
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    rd->rrdset = st;
+    rd->id = strdup("dimension_id");
+    rd->name = strdup("dimension_name");
+    rd->last_collected_value = 123000321;
+    rd->last_collected_time.tv_sec = 15051;
+
+    assert_int_equal(format_dimension_collected_graphite_plaintext(engine->connector_root->instance_root, rd), 0);
+    printf(buffer_tostring(engine->connector_root->instance_root->buffer));
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "netdata.test-host.chart_name.dimension_name;host_tag1 host_tag2 123000321 15051\n");
+
+    free(rd);
+    free(st);
+    free(localhost);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_exporting_engine),
         cmocka_unit_test(test_prepare_buffers),
         cmocka_unit_test(test_read_exporting_config),
-        cmocka_unit_test(test_init_connectors)
+        cmocka_unit_test(test_init_connectors),
+        cmocka_unit_test(test_exporting_name_copy),
+        cmocka_unit_test(test_format_dimension_collected_graphite_plaintext)
     };
 
     return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL);
