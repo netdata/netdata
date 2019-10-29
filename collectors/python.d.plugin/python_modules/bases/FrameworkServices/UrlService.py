@@ -102,8 +102,7 @@ class UrlService(SimpleService):
         if tls_ca_file:
             params['ca_certs'] = tls_ca_file
         try:
-            url = header_kw.get('url') or self.url
-            if url.startswith('https') and not self.tls_verify and not tls_ca_file:
+            if self.tls_verify is False and not tls_ca_file:
                 params['ca_certs'] = None
                 return manager(assert_hostname=False, cert_reqs='CERT_NONE', **params)
             return manager(**params)
