@@ -15,7 +15,6 @@ try:
 except AttributeError:
     pass
 
-
 # https://github.com/urllib3/urllib3/blob/master/CHANGES.rst#19-2014-07-04
 # New retry logic and urllib3.util.retry.Retry configuration object. (Issue https://github.com/urllib3/urllib3/pull/326)
 URLLIB3_MIN_REQUIRED_VERSION = '1.9'
@@ -102,7 +101,8 @@ class UrlService(SimpleService):
         if tls_ca_file:
             params['ca_certs'] = tls_ca_file
         try:
-            if self.tls_verify is False and not tls_ca_file:
+            url = header_kw.get('url') or self.url
+            if skip_tls_verify(url, self.tls_verify, tls_ca_file):
                 params['ca_certs'] = None
                 return manager(assert_hostname=False, cert_reqs='CERT_NONE', **params)
             return manager(**params)
@@ -174,3 +174,11 @@ class UrlService(SimpleService):
             return True
         self.error('_get_data() returned no data or type is not <dict>')
         return False
+
+
+def skip_tls_verify(url, tls_verify, tls_ca_file):
+    if tls_ca_file:
+        return False
+    if url.startswith('https') and not tls_verify:
+        return True
+    return tls_verify is False
