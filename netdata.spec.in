@@ -17,6 +17,9 @@
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
+# Redefine centos_ver to standardize on a single macro
+%{?rhel:%global centos_ver %rhel}
+
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
