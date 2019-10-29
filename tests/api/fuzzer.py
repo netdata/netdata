@@ -139,14 +139,14 @@ def does_response_fit_schema(schema_path, schema, resp):
             L.error(f"Schema for array at {schema_path} does not specify items!")
             return False
         item_schema = schema["items"]
-        if not isinstance(resp,list):
+        if not isinstance(resp, list):
             L.error(f"Server did not return a list for {schema_path} (typed as array in schema)")
             return False
         for i, item in enumerate(resp):
             if not does_response_fit_schema(posixpath.join(schema_path, str(i)), item_schema, item):
                 success = False
     else:
-        L.error(f"Invalid swagger type {schema["type"]} for {type(resp)} at {schema_path}")
+        L.error(f"Invalid swagger type {schema['type']} for {type(resp)} at {schema_path}")
         pretty_json(schema, max_depth=1)
         return False
     return success
@@ -178,10 +178,10 @@ class GetPath(object):
                 if req and len(target[name].values) == 0:
                     print(f"FAIL: No default values in swagger for required parameter {name} in {self.url}")
             for code, schema in spec['responses'].items():
-                if code == "200" and 'schema' in schema:
+                if code[0] == "2" and 'schema' in schema:
                     self.success = schema['schema']
-                elif code == "200":
-                    L.error(f"200 response with no schema in {self.url}")
+                elif code[0] == "2":
+                    L.error(f"2xx response with no schema in {self.url}")
                 else:
                     self.failures[code] = schema
 
@@ -190,13 +190,10 @@ class GetPath(object):
         base_url = urllib.parse.urljoin(host, self.url)
         test_url = f"{base_url}?{args}"
         if url_filter.match(test_url):
-            print(f"TEST: {test_url}")
-            return requests.get(url=test_url)
-        L.debug(f"url_filter skips {test_url}")
-        #for p in self.req_params.values():
-        #    p.dump()
-        #for p in self.opt_params.values():
-        #    p.dump()
+            resp = requests.get(url=test_url)
+            self.validate(test_url, resp, True)
+        else:
+            L.debug(f"url_filter skips {test_url}")
 
     def generate_failure(self, host):
         args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values()])
@@ -209,15 +206,18 @@ class GetPath(object):
         #    p.dump()
         return requests.get(url=test_url)
 
-    def validate(self, resp, expect_success):
+    def validate(self, test_url, resp, expect_success):
         try:
             resp_json = json.loads(resp.text)
         except json.decoder.JSONDecodeError as e:
             L.error("Non-json response - how to validate?")
             return
-        if resp.status_code == 200:
+        if resp.status_code >= 200 and resp.status_code < 300:
             if self.success is not None:
-                does_response_fit_schema(posixpath.join(self.url, "200"), self.success, resp_json)
+                if does_response_fit_schema(posixpath.join(self.url, str(resp.status_code)), self.success, resp_json):
+                    L.info(f"tested {test_url}")
+                else:
+                    L.error(f"tested {test_url}")
             else:
                 L.error("Missing schema?")
 
@@ -348,15 +348,5 @@ for name, p in inlined_spec['paths'].items():
 for s in inlined_spec['schemes']:
     for p in paths:
         resp = p.generate_success(s + "://" + host)
-        if resp is not None:
-            p.validate(resp, True)
         #resp = p.generate_failure(s+"://"+host)
         #p.validate(resp, False)
-    elif schema["type"] in ("number", "integer"):
-        if 'nullable' in schema and resp is None:
-            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
-            return
-        if isinstance(resp, int):
-            L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
-            return
-        L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
