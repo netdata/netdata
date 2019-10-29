@@ -10,36 +10,39 @@ import urllib.parse
 
 
 #######################################################################################################################
-### Utilities
+# Utilities
 
 def some(s):
     return random.choice(sorted(s))
 
+
 def pretty_json(tree, depth=0, max_depth=None):
-    if max_depth is not None  and  depth>=max_depth:
+    if max_depth is not None and depth >= max_depth:
         return
-    indent = "  "*depth
-    for k,v in tree.items():
+    indent = "  " * depth
+    for k, v in tree.items():
         if isinstance(v, int) or isinstance(v, str):
             print(f"{indent}{k}: {v}")
         elif isinstance(v, dict):
             print(f"{indent}{k}: ->")
-            pretty_json(v, depth+1)
+            pretty_json(v, depth + 1)
         else:
             print(f"{indent}{k}: {type(v)}")
 
 #######################################################################################################################
-### Data-model and processing
+# Data-model and processing
+
 
 class Param(object):
     def __init__(self, name, location, kind):
         self.location = location
-        self.kind     = kind
-        self.name     = name
-        self.values   = set()
+        self.kind = kind
+        self.name = name
+        self.values = set()
 
     def dump(self):
         print(f"{self.name} in {self.location} is {self.kind} : {{{self.values}}}")
+
 
 def does_response_fit_schema(schema_path, schema, resp):
     '''The schema_path argument tells us where we are (globally) in the schema. The schema argument is the
@@ -56,44 +59,44 @@ def does_response_fit_schema(schema_path, schema, resp):
        we have some special cases that describe the parts of the semantics that we've used to describe the
        netdata API.
     '''
-    if "type" in schema  and  schema["type"]=="object":
-        if isinstance(resp,dict)  and  "properties" in schema  and  isinstance(schema["properties"],dict):
+    if "type" in schema and schema["type"] == "object":
+        if isinstance(resp, dict) and "properties" in schema and isinstance(schema["properties"], dict):
             L.debug(f"Validate properties against dictionary at {schema_path}")
-            for k,v in schema["properties"].items():
+            for k, v in schema["properties"].items():
                 print(f"Validate {k} received with {v}")
-                if v.get("required",False)  and  not k in resp:
+                if v.get("required", False) and k not in resp:
                     L.error(f"Missing {k} in response at {schema_path}")
                     pretty_json(resp)
                     return
                 if k in resp:
-                    does_response_fit_schema(posixpath.join(schema_path,k), v, resp[k])
+                    does_response_fit_schema(posixpath.join(schema_path, k), v, resp[k])
             #pretty_json(schema,max_depth=1)
             #pretty_json(resp,max_depth=1)
-        elif isinstance(resp,dict)  and  "additionalProperties" in schema  and \
-             isinstance(schema["additionalProperties"],dict):
+        elif isinstance(resp, dict) and "additionalProperties" in schema \
+                and isinstance(schema["additionalProperties"], dict):
             kv_schema = schema["additionalProperties"]
             L.debug(f"Validate additionalProperties against every value in dictionary at {schema_path}")
-            if "type" in kv_schema  and  kv_schema["type"]=="object":
-                for k,v in resp.items():
-                    does_response_fit_schema(posixpath.join(schema_path,k), kv_schema, v)
+            if "type" in kv_schema and kv_schema["type"] == "object":
+                for k, v in resp.items():
+                    does_response_fit_schema(posixpath.join(schema_path, k), kv_schema, v)
                     #L.debug(f"Validate {k}/{repr(v)} against {kv_schema}")
             else:
                 L.error("Don't understand what the additionalProperties means?")
         else:
             L.error(f"Can't understand schema at {schema_path}")
-            pretty_json(schema,max_depth=1)
-    elif "type" in schema  and  schema["type"]=="string":
+            pretty_json(schema, max_depth=1)
+    elif "type" in schema and schema["type"] == "string":
         if isinstance(resp, str):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
-    elif "type" in schema  and  schema["type"]=="boolean":
+    elif "type" in schema and schema["type"] == "boolean":
         if isinstance(resp, bool):
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path}")
             return
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
-    elif "type" in schema  and  schema["type"] in ("number","integer"):
-        if 'nullable' in schema  and  resp is None:
+    elif "type" in schema and schema["type"] in ("number", "integer"):
+        if 'nullable' in schema and resp is None:
             L.debug(f"{repr(resp)} matches {repr(schema)} at {schema_path} (because nullable!)")
             return
         if isinstance(resp, int):
@@ -102,26 +105,25 @@ def does_response_fit_schema(schema_path, schema, resp):
         L.error(f"{repr(resp)} does not match schema {repr(schema)} at {schema_path}")
     else:
         L.error(f"What to do with the schema? {type(resp)} at {schema_path}")
-        pretty_json(schema,max_depth=1)
-
+        pretty_json(schema, max_depth=1)
 
 
 class GetPath(object):
     def __init__(self, url, spec):
-        self.url    = url
+        self.url = url
         self.req_params = {}
         self.opt_params = {}
-        self.success    = None
-        self.failures   = {}
+        self.success = None
+        self.failures = {}
         if 'parameters' in spec.keys():
             for p in spec['parameters']:
                 name = p['name']
-                req  = p.get('required',False)
+                req = p.get('required', False)
                 target = self.req_params if req else self.opt_params
                 target[name] = Param(name, p['in'], p['type'])
                 if 'default' in p:
                     defs = p['default']
-                    if isinstance(defs,list):
+                    if isinstance(defs, list):
                         for d in defs:
                             target[name].values.add(d)
                     else:
@@ -129,19 +131,19 @@ class GetPath(object):
                 if 'enum' in p:
                     for v in p['enum']:
                         target[name].values.add(v)
-                if req and len(target[name].values)==0:
+                if req and len(target[name].values) == 0:
                     print(f"FAIL: No default values in swagger for required parameter {name} in {self.url}")
-            for code,schema in spec['responses'].items():
-                if code=="200" and 'schema' in schema:
+            for code, schema in spec['responses'].items():
+                if code == "200" and 'schema' in schema:
                     self.success = schema['schema']
-                elif code=="200":
+                elif code == "200":
                     L.error(f"200 reponse with no schema in {self.url}")
                 else:
                     self.failures[code] = schema
 
     def generate_success(self, host):
-        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
-        base_url = urllib.parse.urljoin(host,self.url)
+        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values()])
+        base_url = urllib.parse.urljoin(host, self.url)
         test_url = f"{base_url}?{args}"
         if url_filter.match(test_url):
             print(f"TEST: {test_url}")
@@ -153,8 +155,8 @@ class GetPath(object):
         #    p.dump()
 
     def generate_failure(self, host):
-        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values() ])
-        base_url = urllib.parse.urljoin(host,self.url)
+        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values()])
+        base_url = urllib.parse.urljoin(host, self.url)
         test_url = f"{base_url}?{args}"
         print(f"TEST: {test_url}")
         #for p in self.req_params.values():
@@ -169,13 +171,12 @@ class GetPath(object):
         except json.decoder.JSONDecodeError as e:
             L.error("Non-json response - how to validate?")
             return
-        if resp.status_code==200:
+        if resp.status_code == 200:
             if self.success is not None:
-                does_response_fit_schema(posixpath.join(self.url,"200"), self.success, resp_json)
+                does_response_fit_schema(posixpath.join(self.url, "200"), self.success, resp_json)
             else:
                 L.error("Missing schema?")
             #print(json.loads(resp.text))
-
 
 
 def get_the_spec(url):
@@ -184,16 +185,19 @@ def get_the_spec(url):
             return f.read()
     return requests.get(url=url).text
 
+
 # Swagger paths look absolute but they are relative to the base.
 def not_absolute(path):
     return path[1:] if path[0] == '/' else path
 
-def find_ref(spec, path) :
-    if len(path)>0 and path[0] == '#':
-        return find_ref(spec,path[1:])
-    if len(path)==1:
+
+def find_ref(spec, path):
+    if len(path) > 0 and path[0] == '#':
+        return find_ref(spec, path[1:])
+    if len(path) == 1:
         return spec[path[0]]
     return find_ref(spec[path[0]], path[1:])
+
 
 def resolve_refs(spec, spec_root=None):
     '''Find all "$ref" keys in the swagger spec and inline their target schemas.
@@ -203,18 +207,18 @@ def resolve_refs(spec, spec_root=None):
     if spec_root is None:
         spec_root = spec
     newspec = {}
-    for k,v in spec.items():
-        if k=="$ref":
+    for k, v in spec.items():
+        if k == "$ref":
             #print(f"CONVERTING {k} {v}")
             path = v.split('/')
             target = find_ref(spec_root, path)
             # Unfold one level of the tree and erase the $ref if possible.
-            if isinstance(target,dict):
-                for kk,vv in resolve_refs(target,spec_root).items():
+            if isinstance(target, dict):
+                for kk, vv in resolve_refs(target, spec_root).items():
                     newspec[kk] = vv
             else:
                 newspec[k] = target
-        elif isinstance(v,dict):
+        elif isinstance(v, dict):
             newspec[k] = resolve_refs(v, spec_root)
         else:
             #print(f"COPY OVER {k}")
@@ -222,15 +226,16 @@ def resolve_refs(spec, spec_root=None):
     # This is an artifact of inline the $refs when they are inside a properties key as their children should be
     # pushed up into the parent dictionary. They must be merged (union) rather than replace as we use this to
     # implement polymorphism in the data-model.
-    if 'properties' in newspec  and  isinstance(newspec['properties'], dict)  and \
+    if 'properties' in newspec and isinstance(newspec['properties'], dict) and \
        'properties' in newspec['properties']:
         sub = newspec['properties']['properties']
         del newspec['properties']['properties']
         if 'type' in newspec['properties']:
             del newspec['properties']['type']
-        for k,v in sub.items():
+        for k, v in sub.items():
             newspec['properties'][k] = v
     return newspec
+
 
 #######################################################################################################################
 # Initialization
@@ -240,10 +245,10 @@ random.seed(7)      # Default is reproducible sequences
 parser = argparse.ArgumentParser()
 parser.add_argument('--url', type=str,
                     default='https://raw.githubusercontent.com/netdata/netdata/master/web/api/netdata-swagger.json',
-                    help='The URL of the API definition in swagger. The default will pull the lastest version ' +
+                    help='The URL of the API definition in swagger. The default will pull the latest version '
                          'from the main branch.')
 parser.add_argument('--host', type=str,
-                    help='The URL of the target host to fuzz. The default will read the host from the swagger ' +
+                    help='The URL of the target host to fuzz. The default will read the host from the swagger '
                          'definition.')
 parser.add_argument('--reseed', action='store_true',
                     help="Pick a random seed for the PRNG. The default uses a constant seed for reproducibility.")
@@ -260,7 +265,7 @@ parser.add_argument('--dump-inlined', action='store_true',
 args = parser.parse_args()
 if args.reseed:
     random.seed()
-spec = json.loads( get_the_spec(args.url) )
+spec = json.loads(get_the_spec(args.url))
 inlined_spec = resolve_refs(spec)
 
 if args.dump_inlined:
@@ -289,31 +294,32 @@ if spec['swagger'] != '2.0':
     sys.exit(-1)
 L.info(f"Fuzzing {spec['info']['title']} / {spec['info']['version']}")
 
+
 def build_url(host_maybe_scheme, base_path):
-    if not '//' in host_maybe_scheme:
+    if '//' not in host_maybe_scheme:
         host_maybe_scheme = '//' + host_maybe_scheme
     url_tuple = urllib.parse.urlparse(host_maybe_scheme)
-    if base_path[0]=='/':
+    if base_path[0] == '/':
         base_path = base_path[1:]
     return url_tuple.netloc, posixpath.join(url_tuple.path, base_path)
+
 
 host, base_url = build_url(args.host or spec['host'], inlined_spec['basePath'])
 
 
 L.info(f"Target host is {base_url}")
 paths = []
-for name,p in inlined_spec['paths'].items():
+for name, p in inlined_spec['paths'].items():
     if 'get' in p:
         name = not_absolute(name)
-        paths.append(GetPath(posixpath.join(base_url,name), p['get']))
+        paths.append(GetPath(posixpath.join(base_url, name), p['get']))
     elif 'put' in p:
         L.error(f"Generation of PUT methods (for {name} is unimplemented")
 
 for s in inlined_spec['schemes']:
     for p in paths:
-        resp = p.generate_success(s+"://"+host)
+        resp = p.generate_success(s + "://" + host)
         if resp is not None:
             p.validate(resp, True)
         #resp = p.generate_failure(s+"://"+host)
         #p.validate(resp, False)
-
