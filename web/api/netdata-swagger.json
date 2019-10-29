@@ -1668,12 +1668,12 @@
           "type": "string"
         },
         "value": {
-          "type": "string",
-          "format": "nullable"
+          "type": "number",
+          "nullable" : "true"
         },
         "old_value": {
-          "type": "string",
-          "format": "nullable"
+          "type": "number",
+          "nullable" : "true"
         }
       }
     }
