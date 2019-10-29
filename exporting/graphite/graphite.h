@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
 #ifndef NETDATA_EXPORTING_GRAPHITE_H
 #define NETDATA_EXPORTING_GRAPHITE_H
 

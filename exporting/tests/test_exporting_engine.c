@@ -335,7 +335,7 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
     __real_init_connectors(engine);
 
     localhost = (RRDHOST *)calloc(1, sizeof(RRDHOST));
-    localhost->tags = strdup("host_tag1 host_tag2");
+    localhost->tags = strdup("TAG1=VALUE1 TAG2=VALUE2");
 
     localhost->rrdset_root = (RRDSET *)calloc(1, sizeof(RRDSET));
     RRDSET *st = localhost->rrdset_root;
@@ -355,7 +355,7 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
     printf(buffer_tostring(engine->connector_root->instance_root->buffer));
     assert_string_equal(
         buffer_tostring(engine->connector_root->instance_root->buffer),
-        "netdata.test-host.chart_name.dimension_name;host_tag1 host_tag2 123000321 15051\n");
+        "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
 
     free(rd);
     free(st);
@@ -370,7 +370,7 @@ int main(void)
         cmocka_unit_test(test_read_exporting_config),
         cmocka_unit_test(test_init_connectors),
         cmocka_unit_test(test_exporting_name_copy),
-        cmocka_unit_test(test_format_dimension_collected_graphite_plaintext)
+        cmocka_unit_test(test_format_dimension_collected_graphite_plaintext),
     };
 
     return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL);
