@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Suggest using /var/run/netdata for the unix socket [\#7206](https://github.com/netdata/netdata/pull/7206) ([CtrlAltDel64](https://github.com/CtrlAltDel64))
 - Fix sizeof inside callocz [\#7187](https://github.com/netdata/netdata/pull/7187) ([thiagoftsm](https://github.com/thiagoftsm))
 - contrib/debian: Fix typo in Description [\#7154](https://github.com/netdata/netdata/pull/7154) ([arkamar](https://github.com/arkamar))
 - detect if the disk cannot keep up with data collection [\#7139](https://github.com/netdata/netdata/pull/7139) ([mfundul](https://github.com/mfundul))
@@ -13,6 +14,8 @@
 - Add user information to MySQL Python module documentation [\#7128](https://github.com/netdata/netdata/pull/7128) ([prhomhyse](https://github.com/prhomhyse))
 - Results of the spike investigation into CMake. [\#7114](https://github.com/netdata/netdata/pull/7114) ([amoss](https://github.com/amoss))
 - xenstat.plugin: check xenstat\_vbd\_error presence [\#7103](https://github.com/netdata/netdata/pull/7103) ([arkamar](https://github.com/arkamar))
+- kickstart-static64.sh passes --auto-update to netdata-latest.gz.run [\#7076](https://github.com/netdata/netdata/pull/7076) ([knatsakis](https://github.com/knatsakis))
+- kickstart: pass options to installer [\#7051](https://github.com/netdata/netdata/pull/7051) ([oxplot](https://github.com/oxplot))
 - telegram: fix broken links, add setup instructions [\#7033](https://github.com/netdata/netdata/pull/7033) ([half-duplex](https://github.com/half-duplex))
 - add support for am2320 sensor [\#7024](https://github.com/netdata/netdata/pull/7024) ([tommybuck](https://github.com/tommybuck))
 - mysql: add cluster\_status alarm [\#6989](https://github.com/netdata/netdata/pull/6989) ([ilyam8](https://github.com/ilyam8))
@@ -262,10 +265,6 @@
 - .travis.yml: Fix some yamllint errors [\#6526](https://github.com/netdata/netdata/pull/6526) ([knatsakis](https://github.com/knatsakis))
 - netdata/packaging: Adopt netdata-updater to run properly for static64 installations. [\#6520](https://github.com/netdata/netdata/pull/6520) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mongodb: change `password` to `pass` in the module config [\#6518](https://github.com/netdata/netdata/pull/6518) ([ilyam8](https://github.com/ilyam8))
-- netdata/packaging: Do not deliver edit-config as part of the distribution tarball [\#6507](https://github.com/netdata/netdata/pull/6507) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Fixed broken left navbar links in translated docs [\#6505](https://github.com/netdata/netdata/pull/6505) ([cakrit](https://github.com/cakrit))
-- Update CLA with intention to keep netdata FOSS [\#6504](https://github.com/netdata/netdata/pull/6504) ([cakrit](https://github.com/cakrit))
-- netdata/docs: Add @joelhans as co-owner on documentation [\#6501](https://github.com/netdata/netdata/pull/6501) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
