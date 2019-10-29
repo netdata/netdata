@@ -191,13 +191,13 @@ class GetPath(object):
                         target[name].values.add(v)
                 if req and len(target[name].values) == 0:
                     print(f"FAIL: No default values in swagger for required parameter {name} in {self.url}")
-            for code, schema in spec['responses'].items():
-                if code[0] == "2" and 'schema' in schema:
-                    self.success = schema['schema']
-                elif code[0] == "2":
-                    L.error(f"2xx response with no schema in {self.url}")
-                else:
-                    self.failures[code] = schema
+        for code, schema in spec['responses'].items():
+            if code[0] == "2" and 'schema' in schema:
+                self.success = schema['schema']
+            elif code[0] == "2":
+                L.error(f"2xx response with no schema in {self.url}")
+            else:
+                self.failures[code] = schema
 
     def generate_success(self, host):
         args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values()])
