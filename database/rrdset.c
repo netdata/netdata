@@ -1469,11 +1469,22 @@ void rrdset_done(RRDSET *st) {
                         cap = 0x00000000FFFFFFFFULL;
 
                     uint64_t delta = cap - last + new;
+                    uint64_t max_acceptable_rate = (cap / 100) * MAX_INCREMENTAL_PERCENT_RATE;
 
-                    rd->calculated_value +=
-                            (calculated_number) delta
-                            * (calculated_number) rd->multiplier
-                            / (calculated_number) rd->divisor;
+                    // If the delta is less than the maximum acceptable rate and the previous value was near the cap
+                    // then this is an overflow. There can be false positives such that a reset is detected as an
+                    // overflow.
+                    // TODO: remember recent history of rates and compare with current rate to reduce this chance.
+                    if (delta < max_acceptable_rate) {
+                        rd->calculated_value +=
+                                (calculated_number) delta
+                                * (calculated_number) rd->multiplier
+                                / (calculated_number) rd->divisor;
+                    } else {
+                        // This is a reset. Any overflow with a rate greater than MAX_INCREMENTAL_PERCENT_RATE will also
+                        // be detected as a reset instead.
+                        rd->calculated_value += (calculated_number)0;
+                    }
                 }
                 else {
                     rd->calculated_value +=
