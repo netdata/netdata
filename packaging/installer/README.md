@@ -48,7 +48,7 @@ To learn more about the pros and cons of using *nightly* vs. *stable* releases, 
 Verify the integrity of the script with this:
 
 ```bash
-[ "735e9966a4cf0187863e06a5282b34a7" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "0ae8dd3c4c9b976c4342c9fc09d9afae" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 _It should print `OK, VALID` if the script is the one we ship._
@@ -109,7 +109,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "c529e4eb7ce201845cef605d450f8380" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "7c3471506f548968edbbf8d085fbea65" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -596,7 +596,11 @@ By default, Netdata's installation scripts enable automatic updates for both nig
 If you would prefer to manually update your Netdata agent, you can disable automatic updates by using the `--no-updates` option when you install or update Netdata using the [one-line installation script](#one-line-installation).
 
 ```bash
+# kickstart.sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
+
+# kickstart-static64.sh
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update Netdata](UPDATE.md).

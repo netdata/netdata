@@ -183,14 +183,18 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 opts=
-inner_opts=
+NETDATA_INSTALLER_OPTIONS=""
+NETDATA_UPDATES="--auto-update"
 RELEASE_CHANNEL="nightly"
 while [ -n "${1}" ]; do
 	if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]; then
 		opts="${opts} --accept"
 		shift 1
 	elif [ "${1}" = "--dont-start-it" ]; then
-		inner_opts="${inner_opts} ${1}"
+		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
+		shift 1
+	elif [ "${1}" = "--no-updates" ]; then
+		NETDATA_UPDATES=""
 		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
@@ -214,7 +218,6 @@ while [ -n "${1}" ]; do
 		exit 1
 	fi
 done
-[ -n "${inner_opts}" ] && inner_opts="-- ${inner_opts}"
 
 # ---------------------------------------------------------------------------------------------------------------------
 TMPDIR=$(create_tmp_directory)
@@ -238,7 +241,7 @@ fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 progress "Installing netdata"
-run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} ${inner_opts}
+run ${sudo} sh "${TMPDIR}/netdata-latest.gz.run" ${opts} -- ${NETDATA_UPDATES} ${NETDATA_INSTALLER_OPTIONS}
 
 #shellcheck disable=SC2181
 if [ $? -eq 0 ]; then
