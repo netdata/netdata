@@ -1,13 +1,13 @@
 import argparse
 import json
 import logging
+import posixpath
 import random
 import re
 import requests
+import string
 import sys
-import posixpath
 import urllib.parse
-
 
 #######################################################################################################################
 # Utilities
@@ -15,6 +15,16 @@ import urllib.parse
 def some(s):
     return random.choice(sorted(s))
 
+def not_some(s):
+    test_set = random.choice([string.ascii_uppercase + string.ascii_lowercase,
+                              string.digits,
+                              string.digits+".E-",
+                              string.printable.replace('&','')])
+    test_len = random.choice([1,2,3,37,61,121])
+    while True:
+        x = ''.join([random.choice(test_set) for _ in range(test_len)])
+        if x not in s:
+            return x
 
 def pretty_json(tree, depth=0, max_depth=None):
     if max_depth is not None and depth >= max_depth:
@@ -196,21 +206,19 @@ class GetPath(object):
             L.debug(f"url_filter skips {test_url}")
 
     def generate_failure(self, host):
-        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values()])
+        args = "&".join([f"{p.name}={not_some(p.values)}"
+                         for p in list(self.req_params.values()) + list(self.opt_params.values())])
         base_url = urllib.parse.urljoin(host, self.url)
         test_url = f"{base_url}?{args}"
-        print(f"TEST: {test_url}")
-        #for p in self.req_params.values():
-        #    p.dump()
-        #for p in self.opt_params.values():
-        #    p.dump()
-        return requests.get(url=test_url)
+        if url_filter.match(test_url):
+            resp = requests.get(url=test_url)
+            self.validate(test_url, resp, False)
 
     def validate(self, test_url, resp, expect_success):
         try:
             resp_json = json.loads(resp.text)
         except json.decoder.JSONDecodeError as e:
-            L.error("Non-json response - how to validate?")
+            L.error(f"Non-json response from {test_url}")
             return
         if resp.status_code >= 200 and resp.status_code < 300:
             if self.success is not None:
@@ -348,5 +356,4 @@ for name, p in inlined_spec['paths'].items():
 for s in inlined_spec['schemes']:
     for p in paths:
         resp = p.generate_success(s + "://" + host)
-        #resp = p.generate_failure(s+"://"+host)
-        #p.validate(resp, False)
+        resp = p.generate_failure(s+"://"+host)
