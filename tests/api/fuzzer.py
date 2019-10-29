@@ -12,19 +12,22 @@ import urllib.parse
 #######################################################################################################################
 # Utilities
 
+
 def some(s):
     return random.choice(sorted(s))
+
 
 def not_some(s):
     test_set = random.choice([string.ascii_uppercase + string.ascii_lowercase,
                               string.digits,
-                              string.digits+".E-",
-                              string.printable.replace('&','')])
-    test_len = random.choice([1,2,3,37,61,121])
+                              string.digits + ".E-",
+                              string.printable.replace('&', '')])
+    test_len = random.choice([1, 2, 3, 37, 61, 121])
     while True:
         x = ''.join([random.choice(test_set) for _ in range(test_len)])
         if x not in s:
             return x
+
 
 def pretty_json(tree, depth=0, max_depth=None):
     if max_depth is not None and depth >= max_depth:
