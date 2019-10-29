@@ -102,9 +102,12 @@ class UrlService(SimpleService):
             params['ca_certs'] = tls_ca_file
         try:
             url = header_kw.get('url') or self.url
-            if skip_tls_verify(url, self.tls_verify, tls_ca_file):
+            is_https = url.startswith('https')
+            if skip_tls_verify(is_https, self.tls_verify, tls_ca_file):
                 params['ca_certs'] = None
-                return manager(assert_hostname=False, cert_reqs='CERT_NONE', **params)
+                params['cert_reqs'] = 'CERT_NONE'
+                if is_https:
+                    params['assert_hostname'] = False
             return manager(**params)
         except (urllib3.exceptions.ProxySchemeUnknown, TypeError) as error:
             self.error('build_manager() error:', str(error))
@@ -176,9 +179,9 @@ class UrlService(SimpleService):
         return False
 
 
-def skip_tls_verify(url, tls_verify, tls_ca_file):
+def skip_tls_verify(is_https, tls_verify, tls_ca_file):
     if tls_ca_file:
         return False
-    if url.startswith('https') and not tls_verify:
+    if is_https and not tls_verify:
         return True
     return tls_verify is False
