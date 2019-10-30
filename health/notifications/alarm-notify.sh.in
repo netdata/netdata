@@ -29,6 +29,7 @@
 #  - hipchat notifications by @ktsaou #1561
 #  - fleep notifications by @Ferroin
 #  - prowlapp.com notifications by @Ferroin
+#  - irc notifications by @manosf
 #  - custom notifications by @ktsaou
 #  - syslog messages by @Ferroin
 #  - Microsoft Team notification by @tioumen
@@ -164,6 +165,7 @@ custom
 msteam
 kavenegar
 prowl
+irc
 awssns
 rocketchat
 sms
