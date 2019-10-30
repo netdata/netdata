@@ -904,6 +904,7 @@ class Service(SimpleService):
         if not self.alive and not self.reconnect():
             return None
 
+        self.data = dict()
         try:
             cursor = self.conn.cursor(cursor_factory=DictCursor)
 
