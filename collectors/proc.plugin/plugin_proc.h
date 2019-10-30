@@ -55,6 +55,7 @@ extern int do_proc_net_sockstat6(int update_every, usec_t dt);
 extern int do_proc_net_sctp_snmp(int update_every, usec_t dt);
 extern int do_ipc(int update_every, usec_t dt);
 extern int do_sys_class_power_supply(int update_every, usec_t dt);
+extern int do_proc_pagetypeinfo(int update_every, usec_t dt);
 extern int get_numa_node_count(void);
 
 // metrics that need to be shared among data collectors

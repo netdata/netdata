@@ -122,18 +122,20 @@ proc_pid_fdinfo_iff() {
 
 find_tun_tap_interfaces_for_cgroup() {
     local c="${1}" # the cgroup path
+    [ -d "${c}/emulator" ] && c="${c}/emulator" # check for 'emulator' subdirectory
+    c="${c}/cgroup.procs" # make full path 
 
     # for each pid of the cgroup
     # find any tun/tap devices linked to the pid
-    if [ -f "${c}/emulator/cgroup.procs" ]
+    if [ -f "${c}" ]
     then
         local p
-        for p in $(< "${c}/emulator/cgroup.procs" )
+        for p in $(< "${c}" )
         do
             proc_pid_fdinfo_iff "${p}"
         done
     else
-        debug "Cannot find file '${c}/emulator/cgroup.procs', not searching for tun/tap interfaces."
+        debug "Cannot find file '${c}', not searching for tun/tap interfaces."
     fi
 }
 

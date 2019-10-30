@@ -90,6 +90,7 @@
 #define NETDATA_CHART_PRIO_MEM_KSM_RATIOS             1302
 #define NETDATA_CHART_PRIO_MEM_NUMA                   1400
 #define NETDATA_CHART_PRIO_MEM_NUMA_NODES             1410
+#define NETDATA_CHART_PRIO_MEM_PAGEFRAG               1450
 #define NETDATA_CHART_PRIO_MEM_HW                     1500
 #define NETDATA_CHART_PRIO_MEM_HW_ECC_CE              1550
 #define NETDATA_CHART_PRIO_MEM_HW_ECC_UE              1560

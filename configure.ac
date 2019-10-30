@@ -748,6 +748,22 @@ fi
 AC_MSG_RESULT([${enable_plugin_xenstat}])
 AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"])
 
+if test "${enable_plugin_xenstat}" == "yes"; then
+    AC_MSG_CHECKING([for xenstat_vbd_error in -lxenstat])
+    AC_TRY_LINK(
+        [ #include <xenstat.h> ],
+        [
+            xenstat_vbd * vbd;
+            int out = xenstat_vbd_error(vbd);
+        ],
+        [
+            have_xenstat_vbd_error=yes
+            AC_DEFINE([HAVE_XENSTAT_VBD_ERROR], [1], [xenstat_vbd_error usability])
+        ],
+        [ have_xenstat_vbd_error=no ]
+    )
+    AC_MSG_RESULT([${have_xenstat_vbd_error}])
+fi
 
 # -----------------------------------------------------------------------------
 # perf.plugin
@@ -1142,9 +1158,10 @@ AC_ARG_ENABLE(
 )
 
 PKG_CHECK_MODULES(
-    [CMOCKA], [cmocka],
+    [CMOCKA],
+    [cmocka],
     [have_cmocka="yes"],
-    [AC_MSG_WARN([cmocka.pc not found on the system.  Unit tests disabled])]
+    [AC_MSG_NOTICE([CMocka not found on the system. Unit tests disabled])]
 )
 AM_CONDITIONAL([ENABLE_UNITTESTS], [test "${enable_unit_tests}" = "yes" -a "${have_cmocka}" = "yes" ])
 AC_SUBST([ENABLE_UNITTESTS])
