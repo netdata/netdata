@@ -204,12 +204,12 @@ class GetPath(object):
                 self.failures[code] = schema
 
     def generate_success(self, host):
-        args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values()])
+        url_args = "&".join([f"{p.name}={some(p.values)}" for p in self.req_params.values()])
         base_url = urllib.parse.urljoin(host, self.url)
-        test_url = f"{base_url}?{args}"
+        test_url = f"{base_url}?{url_args}"
         if url_filter.match(test_url):
             try:
-                resp = requests.get(url=test_url)
+                resp = requests.get(url=test_url,verify=(not args.tls_no_verify) )
                 self.validate(test_url, resp, True)
             except Exception as e:
                 L.error(f"Network failure in test {e}")
@@ -222,12 +222,12 @@ class GetPath(object):
         while bad_param in all_params:
             bad_param = ''.join([random.choice(string.ascii_lowercase) for _ in range(5)])
         all_params.append(Param(bad_param, "query", "string"))
-        args = "&".join([f"{p.name}={not_some(p.values)}" for p in all_params])
+        url_args = "&".join([f"{p.name}={not_some(p.values)}" for p in all_params])
         base_url = urllib.parse.urljoin(host, self.url)
-        test_url = f"{base_url}?{args}"
+        test_url = f"{base_url}?{url_args}"
         if url_filter.match(test_url):
             try:
-                resp = requests.get(url=test_url)
+                resp = requests.get(url=test_url,verify=(not args.tls_no_verify))
                 self.validate(test_url, resp, False)
             except Exception as e:
                 L.error(f"Network failure in test {e}")
@@ -338,6 +338,9 @@ parser.add_argument('--detail', action='store_true',
 parser.add_argument('--filter', type=str,
                     default=".*",
                     help="Supply a regex used to filter the testing URLs generated")
+parser.add_argument('--tls-no-verify', action='store_true',
+                    help="Disable TLS certification verification to allow connection to hosts that use"
+                         "self-signed certificates")
 parser.add_argument('--dump-inlined', action='store_true',
                     help='Dump the inlined swagger spec instead of fuzzing. For "reasons".')
 
