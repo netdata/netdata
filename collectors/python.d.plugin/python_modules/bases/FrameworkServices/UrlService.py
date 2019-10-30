@@ -180,6 +180,7 @@ class UrlService(SimpleService):
 
 
 def skip_tls_verify(is_https, tls_verify, tls_ca_file):
+    # default 'tls_verify' value is None
     # logic is:
     #   - never skip if there is 'tls_ca_file' file
     #   - skip by default for https
