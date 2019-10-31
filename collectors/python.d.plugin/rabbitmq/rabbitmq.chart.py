@@ -231,6 +231,7 @@ class Service(UrlService):
 
         data = loads(raw)
         stats = fetch_data(raw_data=data, metrics=NODE_STATS)
+        handle_disabled_disk_monitoring(stats)
         self.debug("number of metrics: {0}".format(len(stats)))
         return stats
 
@@ -284,3 +285,11 @@ def fetch_data(raw_data, metrics):
         data['_'.join(metrics_list)] = value
 
     return data
+
+
+def handle_disabled_disk_monitoring(node_stats):
+    # https://github.com/netdata/netdata/issues/7218
+    # can be "disk_free": "disk_free_monitoring_disabled"
+    v = node_stats.get('disk_free')
+    if v and isinstance(v, str):
+        del node_stats['disk_free']
