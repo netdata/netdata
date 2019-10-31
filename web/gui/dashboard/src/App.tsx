@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react"
 import { useStore } from "react-redux"
 import Ps from "perfect-scrollbar"
-import $ from "jquery"
 
+import "domains/chart/utils/jquery-loader"
 import { Portals } from "domains/chart/components/portals"
 import "./types/global"
 
@@ -16,8 +16,6 @@ if (!window.netdataNoBootstrap) {
 
 // support legacy code
 window.Ps = Ps
-window.$ = $
-window.jQuery = window.$
 
 const App: React.FC = () => { // eslint-disable-line arrow-body-style
   const store = useStore()
