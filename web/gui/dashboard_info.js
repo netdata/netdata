@@ -25,7 +25,7 @@ netdataDashboard.menu = {
             'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource.<br>' +
             'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on a given resource simultaneously. ' +
             'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing.<br>' +
-            'The ratios (in %) are tracked as recent trends over 10, 60 and 300 second windows.'
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'services': {
