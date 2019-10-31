@@ -272,6 +272,8 @@ export interface Attributes {
   d3PieMiscColorsPercentage?: string,
   d3PieMiscGradientColor?: string,
   d3PieCssprefix?: string,
+
+  peityStrokeWidth?: number,
 }
 
 export type AttributePropKeys = keyof Attributes
@@ -491,6 +493,8 @@ const getAttributesMap = (): AttributesMap => ({
   d3PieMiscColorsPercentage: { key: "d3pie-misc-colors-percentage" },
   d3PieMiscGradientColor: { key: "d3pie-misc-gradient-color" },
   d3PieCssprefix: { key: "d3pie-cssprefix" },
+
+  peityStrokeWidth: { key: "peity-strokewidth" },
 })
 
 export const getAttributes = (node: Element): Attributes => mapObjIndexed(

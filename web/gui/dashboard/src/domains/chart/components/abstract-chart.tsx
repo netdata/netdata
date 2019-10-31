@@ -15,6 +15,7 @@ import { EasyPieChart } from "./lib-charts/easy-pie-chart"
 import { GaugeChart } from "./lib-charts/gauge-chart"
 import { SparklineChart } from "./lib-charts/sparkline-chart"
 import { D3pieChart } from "./lib-charts/d3pie-chart"
+import { PeityChart } from "./lib-charts/peity-chart"
 
 interface Props {
   attributes: Attributes
@@ -185,6 +186,23 @@ export const AbstractChart = ({
         orderedColors={orderedColors}
         setMinMax={setMinMax}
         showUndefined={showUndefined}
+        unitsCurrent={unitsCurrent}
+      />
+    )
+  }
+
+  if (chartLibrary === "peity") {
+    return (
+      <PeityChart
+        attributes={attributes}
+        chartContainerElement={chartContainerElement}
+        chartData={chartData as EasyPieChartData}
+        chartDetails={chartDetails}
+        chartElementClassName={chartElementClassName}
+        chartElementId={chartElementId}
+        dimensionsVisibility={dimensionsVisibility}
+        isRemotelyControlled={isRemotelyControlled}
+        orderedColors={orderedColors}
         unitsCurrent={unitsCurrent}
       />
     )

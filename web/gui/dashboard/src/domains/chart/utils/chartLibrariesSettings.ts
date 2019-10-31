@@ -1,7 +1,7 @@
 import { Attributes } from "./transformDataAttributes"
 
-export type ChartLibraryName = "dygraph" | "sparkline"
-// | "peity" | "google" | "d3"
+export type ChartLibraryName = "dygraph" | "sparkline" | "peity"
+// | "google" | "d3"
   | "d3pie" | "easypiechart" | "gauge"
 // | "textonly"
 export interface ChartLibraryConfig {
@@ -91,68 +91,50 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
   //   setSelection: undefined, // function(state, t) { void(state); return true; },
   //   clearSelection: undefined, // function(state) { void(state); return true; },
     hasToolboxPanAndZoom: false,
-  //   initialized: false,
-  //   enabled: true,
+    //   initialized: false,
+    //   enabled: true,
     xssRegexIgnore: new RegExp("^/api/v1/data.result$"),
     format: "array",
     options: () => "flip|abs",
     hasLegend: () => false,
-  //   autoresize(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   max_updates_to_recreate(state) {
-  //     void (state)
-  //     return 5000
-  //   },
+    //   autoresize(state) {
+    //     void (state)
+    //     return false
+    //   },
+    //   max_updates_to_recreate(state) {
+    //     void (state)
+    //     return 5000
+    //   },
     trackColors: false,
     pixelsPerPoint: () => 3,
     containerClass: () => "netdata-container",
   },
-  // peity: {
-  //   initialize: window.NETDATA.peityInitialize,
-  //   create: window.NETDATA.peityChartCreate,
-  //   update: window.NETDATA.peityChartUpdate,
-  //   resize: null,
-  //   setSelection: undefined, // function(state, t) { void(state); return true; },
-  //   clearSelection: undefined, // function(state) { void(state); return true; },
-  //   toolboxPanAndZoom: null,
-  //   initialized: false,
-  //   enabled: true,
-  //   xssRegexIgnore: new RegExp("^/api/v1/data\.result$"),
-  //   format(state) {
-  //     void (state)
-  //     return "ssvcomma"
-  //   },
-  //   options(state) {
-  //     void (state)
-  //     return "null2zero" + "%7C" + "flip" + "%7C" + "abs"
-  //   },
-  //   legend(state) {
-  //     void (state)
-  //     return null
-  //   },
-  //   autoresize(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   max_updates_to_recreate(state) {
-  //     void (state)
-  //     return 5000
-  //   },
-  //   track_colors(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   pixels_per_point(state) {
-  //     void (state)
-  //     return 3
-  //   },
-  //   container_class(state) {
-  //     void (state)
-  //     return "netdata-container"
-  //   },
-  // },
+  peity: {
+    // initialize: window.NETDATA.peityInitialize,
+    // create: window.NETDATA.peityChartCreate,
+    // update: window.NETDATA.peityChartUpdate,
+    // resize: null,
+    // setSelection: undefined, // function(state, t) { void(state); return true; },
+    // clearSelection: undefined, // function(state) { void(state); return true; },
+    hasToolboxPanAndZoom: false,
+    // initialized: false,
+    // enabled: true,
+    xssRegexIgnore: new RegExp("^/api/v1/data.result$"),
+    format: "ssvcomma",
+    options: () => "null2zero|flip|abs",
+    hasLegend: () => false,
+    // autoresize(state) {
+    //   void (state)
+    //   return false
+    // },
+    // max_updates_to_recreate(state) {
+    //   void (state)
+    //   return 5000
+    // },
+    trackColors: false,
+    pixelsPerPoint: () => 3,
+    containerClass: () => "netdata-container",
+  },
   // google: {
   //   initialize: window.NETDATA.googleInitialize,
   //   create: window.NETDATA.googleChartCreate,
