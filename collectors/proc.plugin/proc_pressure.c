@@ -9,6 +9,7 @@
 // linux calculates this every 2 seconds, see kernel/sched/psi.c PSI_FREQ
 #define MIN_PRESSURE_UPDATE_EVERY 2
 
+
 struct pressure_chart {
     int enabled;
 
@@ -43,31 +44,7 @@ static struct {
         }},
 };
 
-void
-chart_pressure_information(struct pressure_chart *chart, int priority, double value10, double value60, double value300,
-                           int update_every, const char *family) {
-    if (unlikely(!chart->st)) {
-        chart->st = rrdset_create_localhost(
-                "pressure"
-                , chart->id
-                , NULL
-                , family
-                , NULL
-                , chart->title
-                , "percentage"
-                , PLUGIN_PROC_NAME
-                , PLUGIN_PROC_MODULE_PRESSURE_NAME
-                , NETDATA_CHART_PRIO_SYSTEM_PRESSURE + priority
-                , update_every
-                , RRDSET_TYPE_LINE
-        );
-        chart->rd10 = rrddim_add(chart->st, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-        chart->rd60 = rrddim_add(chart->st, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-        chart->rd300 = rrddim_add(chart->st, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-    } else {
-        rrdset_next(chart->st);
-    }
-
+void update_pressure_chart(struct pressure_chart *chart, double value10, double value60, double value300) {
     rrddim_set_by_pointer(chart->st, chart->rd10, (collected_number) (value10 * 100));
     rrddim_set_by_pointer(chart->st, chart->rd60, (collected_number) (value60 * 100));
     rrddim_set_by_pointer(chart->st, chart->rd300, (collected_number) (value300 * 100));
@@ -139,33 +116,65 @@ int do_proc_pressure(int update_every, usec_t dt) {
             continue;
         }
 
+        struct pressure_chart *chart;
         if (do_some) {
+            chart = &resources[i].charts.some;
+            if (unlikely(!chart->st)) {
+                chart->st = rrdset_create_localhost(
+                        "pressure"
+                        , chart->id
+                        , NULL
+                        , resources[i].family
+                        , NULL
+                        , chart->title
+                        , "percentage"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_PRESSURE_NAME
+                        , NETDATA_CHART_PRIO_SYSTEM_PRESSURE + 2 * i
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+                chart->rd10 = rrddim_add(chart->st, "some 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                chart->rd60 = rrddim_add(chart->st, "some 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                chart->rd300 = rrddim_add(chart->st, "some 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            } else {
+                rrdset_next(chart->st);
+            }
+
             double some10 = strtod(procfile_lineword(ff, 0, 2), NULL);
             double some60 = strtod(procfile_lineword(ff, 0, 4), NULL);
             double some300 = strtod(procfile_lineword(ff, 0, 6), NULL);
-
-            chart_pressure_information(&resources[i].charts.some
-                                       , NETDATA_CHART_PRIO_SYSTEM_PRESSURE + 2 * i
-                                       , some10
-                                       , some60
-                                       , some300
-                                       , update_every
-                                       , resources[i].family);
-
+            update_pressure_chart(chart, some10, some60, some300);
         }
 
         if (do_full && lines > 2) {
-            double full10 = -1., full60 = -1., full300 = -1.;
-            full10 = strtod(procfile_lineword(ff, 1, 2), NULL);
-            full60 = strtod(procfile_lineword(ff, 1, 4), NULL);
-            full300 = strtod(procfile_lineword(ff, 1, 6), NULL);
-            chart_pressure_information(&resources[i].charts.full
-                                       , NETDATA_CHART_PRIO_SYSTEM_PRESSURE + 2 * i + 1
-                                       , full10
-                                       , full60
-                                       , full300
-                                       , update_every
-                                       , resources[i].family);
+            chart = &resources[i].charts.full;
+            if (unlikely(!chart->st)) {
+                chart->st = rrdset_create_localhost(
+                        "pressure"
+                        , chart->id
+                        , NULL
+                        , resources[i].family
+                        , NULL
+                        , chart->title
+                        , "percentage"
+                        , PLUGIN_PROC_NAME
+                        , PLUGIN_PROC_MODULE_PRESSURE_NAME
+                        , NETDATA_CHART_PRIO_SYSTEM_PRESSURE + 2 * i + 1
+                        , update_every
+                        , RRDSET_TYPE_LINE
+                );
+                chart->rd10 = rrddim_add(chart->st, "full 10", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                chart->rd60 = rrddim_add(chart->st, "full 60", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+                chart->rd300 = rrddim_add(chart->st, "full 300", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            } else {
+                rrdset_next(chart->st);
+            }
+
+            double full10 = strtod(procfile_lineword(ff, 1, 2), NULL);
+            double full60 = strtod(procfile_lineword(ff, 1, 4), NULL);
+            double full300 = strtod(procfile_lineword(ff, 1, 6), NULL);
+            update_pressure_chart(&resources[i].charts.some, full10, full60, full300);
         }
     }
 
