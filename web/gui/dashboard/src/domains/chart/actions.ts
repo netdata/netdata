@@ -54,3 +54,12 @@ export const fetchChartAction = createRequestAction<
   FetchChartPayload,
   { chartDetails: ChartDetails, id: string }
 >(`${storeKey}/fetchChartAction`)
+
+
+export interface SetResizeHeightAction {
+  id: string
+  resizeHeight: number
+}
+export const setResizeHeightAction = createRequestAction<SetResizeHeightAction>(
+  `${storeKey}/setResizeHeight`,
+)

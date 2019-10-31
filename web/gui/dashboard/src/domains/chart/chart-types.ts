@@ -84,4 +84,5 @@ export interface ChartState {
     viewRange: [number, number]
   }
   isFetchingDetails: boolean
+  resizeHeight: number | null
 }

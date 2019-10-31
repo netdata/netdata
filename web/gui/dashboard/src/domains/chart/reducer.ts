@@ -1,6 +1,6 @@
 import { createReducer } from "redux-act"
 
-import { fetchDataAction, fetchChartAction } from "./actions"
+import { fetchDataAction, fetchChartAction, setResizeHeightAction } from "./actions"
 import { ChartState } from "./chart-types"
 
 export type StateT = {
@@ -17,6 +17,7 @@ export const initialSingleState = {
     viewRange: null,
   },
   isFetchingDetails: false,
+  resizeHeight: null,
 }
 
 export const chartReducer = createReducer<StateT>(
@@ -60,3 +61,11 @@ chartReducer.on(fetchChartAction.success, (state, { id, chartDetails }) => ({
 //     isFetchingDetails: false,
 //   },
 // }))
+
+chartReducer.on(setResizeHeightAction, (state, { id, resizeHeight }) => ({
+  ...state,
+  [id]: {
+    ...getSubstate(state, id),
+    resizeHeight,
+  },
+}))
