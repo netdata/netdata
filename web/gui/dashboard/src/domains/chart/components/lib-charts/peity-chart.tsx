@@ -1,14 +1,11 @@
 import "peity"
 import React, {
-  useRef, useEffect, useState, useLayoutEffect,
+  useRef, useState, useLayoutEffect,
 } from "react"
 
 import { Attributes } from "domains/chart/utils/transformDataAttributes"
 import { ChartDetails, EasyPieChartData } from "domains/chart/chart-types"
 import { colorLuminance } from "domains/chart/utils/color-luminance"
-
-// import "../../utils/peity-loader"
-
 
 interface Props {
   attributes: Attributes
@@ -17,10 +14,7 @@ interface Props {
   chartDetails: ChartDetails
   chartElementClassName: string
   chartElementId: string
-  dimensionsVisibility: boolean[]
-  isRemotelyControlled: boolean
   orderedColors: string[]
-  unitsCurrent: string
 }
 export const PeityChart = ({
   attributes,
@@ -30,7 +24,6 @@ export const PeityChart = ({
   chartElementClassName,
   chartElementId,
   orderedColors,
-  unitsCurrent,
 }: Props) => {
   const chartElement = useRef<HTMLDivElement>(null)
 
@@ -52,12 +45,9 @@ export const PeityChart = ({
 
       const { width, height } = chartContainerElement.getBoundingClientRect()
 
-      const strokeWidth2 = 1 // todo NETDATA.dataAttribute(state.element, 'peity-strokewidth', 1),
       const {
         peityStrokeWidth = 1,
       } = attributes
-      console.log("peityStrokeWidth", peityStrokeWidth) // eslint-disable-line no-console
-      console.log("typeof peityStrokeWidth", typeof peityStrokeWidth) // eslint-disable-line no-console
       const peityInitOptions = {
         stroke: window.NETDATA.themes.current.foreground,
         strokeWidth: peityStrokeWidth,
@@ -74,7 +64,6 @@ export const PeityChart = ({
   // update chart
   useLayoutEffect(() => {
     if ($chartElement && peityOptions.current) {
-      // if stroke is different than customColors, then if chart_type is 'line', then apply fill
       const getFillOverride = () => (
         chartDetails.chart_type === "line"
           ? window.NETDATA.themes.current.background

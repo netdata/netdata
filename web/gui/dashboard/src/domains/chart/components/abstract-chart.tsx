@@ -200,10 +200,7 @@ export const AbstractChart = ({
         chartDetails={chartDetails}
         chartElementClassName={chartElementClassName}
         chartElementId={chartElementId}
-        dimensionsVisibility={dimensionsVisibility}
-        isRemotelyControlled={isRemotelyControlled}
         orderedColors={orderedColors}
-        unitsCurrent={unitsCurrent}
       />
     )
   }
