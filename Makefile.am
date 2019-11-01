@@ -458,6 +458,7 @@ EXPORTING_ENGINE_FILES = \
     exporting/read_config.c \
     exporting/init_connectors.c \
     exporting/process_data.c \
+    exporting/send_data.c \
     exporting/send_internal_metrics.c \
     $(NULL)
 

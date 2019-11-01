@@ -149,7 +149,7 @@ void init_connectors_in_tests(struct engine *engine)
     expect_function_call(__wrap_uv_thread_create);
 
     expect_value(__wrap_uv_thread_create, thread, &engine->connector_root->instance_root->thread);
-    expect_value(__wrap_uv_thread_create, worker, graphite_connector_worker);
+    expect_value(__wrap_uv_thread_create, worker, simple_connector_worker);
     expect_value(__wrap_uv_thread_create, arg, engine->connector_root->instance_root);
 
     assert_int_equal(__real_init_connectors(engine), 0);
@@ -329,7 +329,11 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(connector->end_chart_formatting, NULL);
     assert_ptr_equal(connector->end_host_formatting, NULL);
     assert_ptr_equal(connector->end_batch_formatting, NULL);
-    assert_ptr_equal(connector->worker, graphite_connector_worker);
+    assert_ptr_equal(connector->worker, simple_connector_worker);
+
+    struct simple_connector_config *connector_specific_config =
+        (struct simple_connector_config *)connector->config.connector_specific_config;
+    assert_int_equal(connector_specific_config->default_port, 2003);
 
     BUFFER *buffer = (BUFFER *)connector->instance_root->buffer;
     assert_ptr_not_equal(buffer, NULL);
@@ -376,7 +380,6 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
     rd->last_collected_time.tv_sec = 15051;
 
     assert_int_equal(format_dimension_collected_graphite_plaintext(engine->connector_root->instance_root, rd), 0);
-    printf(buffer_tostring(engine->connector_root->instance_root->buffer));
     assert_string_equal(
         buffer_tostring(engine->connector_root->instance_root->buffer),
         "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
@@ -384,6 +387,16 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
     free(rd);
     free(st);
     free(localhost);
+}
+
+static void test_init_graphite_instance(void **state)
+{
+    (void)state;
+
+    // receive responce
+    // reconnect if it's needed
+    // send data
+    // process failures
 }
 
 int main(void)
@@ -395,6 +408,7 @@ int main(void)
         cmocka_unit_test(test_init_connectors),
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test(test_format_dimension_collected_graphite_plaintext),
+        cmocka_unit_test(test_init_graphite_instance),
     };
 
     return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL);
