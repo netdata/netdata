@@ -135,6 +135,26 @@ void __rrd_check_rdlock(const char *file, const char *function, const unsigned l
     (void)line;
 }
 
+void __wrap_uv_thread_create(uv_thread_t thread, void (*worker)(void *arg), void *arg)
+{
+    function_called();
+
+    check_expected_ptr(thread);
+    check_expected_ptr(worker);
+    check_expected_ptr(arg);
+}
+
+void init_connectors_in_tests(struct engine *engine)
+{
+    expect_function_call(__wrap_uv_thread_create);
+
+    expect_value(__wrap_uv_thread_create, thread, &engine->connector_root->instance_root->thread);
+    expect_value(__wrap_uv_thread_create, worker, graphite_connector_worker);
+    expect_value(__wrap_uv_thread_create, arg, engine->connector_root->instance_root);
+
+    assert_int_equal(__real_init_connectors(engine), 0);
+}
+
 static void test_exporting_engine(void **state)
 {
     (void)state;
@@ -299,7 +319,7 @@ static void test_init_connectors(void **state)
 
     struct engine *engine = __real_read_exporting_config();
 
-    assert_int_equal(__real_init_connectors(engine), 0);
+    init_connectors_in_tests(engine);
 
     struct connector *connector = engine->connector_root;
     assert_ptr_equal(connector->start_batch_formatting, NULL);
@@ -315,6 +335,9 @@ static void test_init_connectors(void **state)
     assert_ptr_not_equal(buffer, NULL);
     buffer_sprintf(buffer, "%s", "graphite test");
     assert_string_equal(buffer_tostring(buffer), "graphite test");
+
+    // expect_value(__wrap_uv_thread_create, thread, instance, sizeof(struct instance));
+    // expect_memory(__wrap_uv_thread_create, instance, instance, sizeof(struct instance));
 }
 
 static void test_exporting_name_copy(void **state)
@@ -333,7 +356,7 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
     (void)state;
 
     struct engine *engine = __real_read_exporting_config();
-    __real_init_connectors(engine);
+    init_connectors_in_tests(engine);
 
     localhost = (RRDHOST *)calloc(1, sizeof(RRDHOST));
     localhost->tags = strdup("TAG1=VALUE1 TAG2=VALUE2");
