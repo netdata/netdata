@@ -1,7 +1,5 @@
 dist: bionic
 language: c
-services:
-  - docker
 
 addons:
   apt:
