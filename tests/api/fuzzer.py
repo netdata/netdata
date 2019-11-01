@@ -30,20 +30,6 @@ def not_some(s):
             return x
 
 
-def pretty_json(tree, depth=0, max_depth=None):
-    if max_depth is not None and depth >= max_depth:
-        return
-    indent = "  " * depth
-    for k, v in tree.items():
-        if isinstance(v, int) or isinstance(v, str):
-            print(f"{indent}{k}: {v}")
-        elif isinstance(v, dict):
-            print(f"{indent}{k}: ->")
-            pretty_json(v, depth + 1)
-        else:
-            print(f"{indent}{k}: {type(v)}")
-
-
 def build_url(host_maybe_scheme, base_path):
     try:
         if '//' not in host_maybe_scheme:
@@ -93,7 +79,7 @@ def does_response_fit_schema(schema_path, schema, resp):
     success = True
     if "type" not in schema:
         L.error(f"Cannot progress past {schema_path} -> no type specified in dictionary")
-        pretty_json(schema)
+        print(json.dumps(schema, indent=2))
         return False
     if schema["type"] == "object":
         if isinstance(resp, dict) and "properties" in schema and isinstance(schema["properties"], dict):
@@ -102,7 +88,7 @@ def does_response_fit_schema(schema_path, schema, resp):
                 L.debug(f"Validate {k} received with {v}")
                 if v.get("required", False) and k not in resp:
                     L.error(f"Missing {k} in response at {schema_path}")
-                    pretty_json(resp)
+                    print(json.dumps(resp, indent=2))
                     return False
                 if k in resp:
                     if not does_response_fit_schema(posixpath.join(schema_path, k), v, resp[k]):
@@ -120,7 +106,7 @@ def does_response_fit_schema(schema_path, schema, resp):
                 return False
         else:
             L.error(f"Can't understand schema at {schema_path}")
-            pretty_json(schema, max_depth=1)
+            print(json.dumps(schema, indent=2))
             return False
     elif schema["type"] == "string":
         if isinstance(resp, str):
@@ -165,7 +151,7 @@ def does_response_fit_schema(schema_path, schema, resp):
                 success = False
     else:
         L.error(f"Invalid swagger type {schema['type']} for {type(resp)} at {schema_path}")
-        pretty_json(schema, max_depth=1)
+        print(json.dumps(schema, indent=2))
         return False
     return success
 
@@ -351,7 +337,7 @@ if args.reseed:
 spec = json.loads(get_the_spec(args.url))
 inlined_spec = resolve_refs(spec)
 if args.dump_inlined:
-    pretty_json(inlined_spec)
+    print(json.dumps(inlined_spec, indent=2))
     sys.exit(-1)
 
 logging.addLevelName(40, "FAIL")
