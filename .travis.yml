@@ -10,7 +10,8 @@ matrix:
   allow_failures:
     - env: ALLOW_SOFT_FAILURE_HERE=true
 
-
+before_install:
+  - source .travis/utils.sh
 
 # Install dependencies for all, once
 #
