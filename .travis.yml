@@ -13,7 +13,7 @@ matrix:
     - env: ALLOW_SOFT_FAILURE_HERE=true
 
 before_install:
-  - exec > >(ts -s %H:%M:%.S) 2>&1
+  - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
 
 # Install dependencies for all, once
