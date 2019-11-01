@@ -35,6 +35,8 @@ struct instance {
     void *buffer;
     void *stats;
 
+    uv_thread_t thread;
+
     struct instance *next;
     struct connector *connector;
 };
@@ -49,6 +51,8 @@ struct connector {
     int (*end_chart_formatting)(struct instance *instance);
     int (*end_host_formatting)(struct instance *instance);
     int (*end_batch_formatting)(struct instance *instance);
+
+    void (*worker)(void *instance_p);
 
     struct instance *instance_root;
     struct connector *next;

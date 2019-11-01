@@ -309,6 +309,7 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(connector->end_chart_formatting, NULL);
     assert_ptr_equal(connector->end_host_formatting, NULL);
     assert_ptr_equal(connector->end_batch_formatting, NULL);
+    assert_ptr_equal(connector->worker, graphite_connector_worker);
 
     BUFFER *buffer = (BUFFER *)connector->instance_root->buffer;
     assert_ptr_not_equal(buffer, NULL);

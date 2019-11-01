@@ -45,6 +45,12 @@ int mark_scheduled_instances(struct engine *engine)
     return 0;
 }
 
+/**
+ * Start batch formatting for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int start_batch_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
@@ -61,6 +67,12 @@ int start_batch_formatting(struct engine *engine)
     return 0;
 }
 
+/**
+ * Start host formatting for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int start_host_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
@@ -77,6 +89,12 @@ int start_host_formatting(struct engine *engine)
     return 0;
 }
 
+/**
+ * Start chart formatting for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int start_chart_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
@@ -93,6 +111,12 @@ int start_chart_formatting(struct engine *engine)
     return 0;
 }
 
+/**
+ * Format metric for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int metric_formatting(struct engine *engine, RRDDIM *rd)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
@@ -109,6 +133,12 @@ int metric_formatting(struct engine *engine, RRDDIM *rd)
     return 0;
 }
 
+/**
+ * End chart formatting for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int end_chart_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
@@ -125,6 +155,13 @@ int end_chart_formatting(struct engine *engine)
     return 0;
 }
 
+
+/**
+ * End host formatting for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int end_host_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
@@ -141,6 +178,12 @@ int end_host_formatting(struct engine *engine)
     return 0;
 }
 
+/**
+ * End batch formatting for every connector instance's buffer
+ *
+ * @param engine an engine data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int end_batch_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {

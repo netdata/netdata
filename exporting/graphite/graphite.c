@@ -2,6 +2,13 @@
 
 #include "graphite.h"
 
+/**
+ * Initialize connectors
+ *
+ * @param instance an instance data structure.
+ * @param rd a dimension.
+ * @return Always returns 0.
+ */
 int format_dimension_collected_graphite_plaintext(struct instance *instance, RRDDIM *rd)
 {
     struct engine *engine = instance->connector->engine;
@@ -35,6 +42,12 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
     return 0;
 }
 
+/**
+ * Initialize Grafite connector
+ *
+ * @param instance a connector data structure.
+ * @return Always returns 0.
+ */
 int init_graphite_connector(struct connector *connector)
 {
     connector->start_batch_formatting = NULL;
@@ -45,9 +58,17 @@ int init_graphite_connector(struct connector *connector)
     connector->end_host_formatting = NULL;
     connector->end_batch_formatting = NULL;
 
+    connector->worker = graphite_connector_worker;
+
     return 0;
 }
 
+/**
+ * Initialize Grafite connector instance
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
 int init_graphite_instance(struct instance *instance)
 {
     instance->buffer = (void *)buffer_create(0);
@@ -57,4 +78,16 @@ int init_graphite_instance(struct instance *instance)
     }
 
     return 0;
+}
+
+/**
+ * Grafite connector worker
+ *
+ * Runs in a separate thread for every instance.
+ *
+ * @param instance_p an instance data structure.
+ */
+void graphite_connector_worker(void *instance_p)
+{
+    (void)instance_p;
 }

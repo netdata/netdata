@@ -31,6 +31,9 @@ int init_connectors(struct engine *engine)
                     error("EXPORTING: unknown exporting connector type");
                     return 1;
             }
+
+            // dispatch the instance worker thread
+            uv_thread_create(&instance->thread, connector->worker, instance);
         }
     }
 
