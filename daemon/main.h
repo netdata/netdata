@@ -6,6 +6,9 @@
 #include "common.h"
 
 extern struct config netdata_config;
+extern struct engine *read_exporting_config();
+
+//extern struct config exporter_config;
 
 #define NETDATA_MAIN_THREAD_RUNNING   CONFIG_BOOLEAN_YES
 #define NETDATA_MAIN_THREAD_EXITING  (CONFIG_BOOLEAN_YES + 1)

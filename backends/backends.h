@@ -38,6 +38,7 @@ extern BACKEND_OPTIONS global_backend_options;
 extern const char *global_backend_prefix;
 
 extern void *backends_main(void *ptr);
+BACKEND_TYPE backend_select_type(const char *type);
 
 extern BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS backend_options);
 

@@ -2,6 +2,8 @@
 
 #include "../libnetdata.h"
 
+int     _backends=0;    // number of backend sections we have
+
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
 // ----------------------------------------------------------------------------
@@ -42,6 +44,64 @@ struct section {
                             // readers are protected using the rwlock in avl_tree_lock
 };
 
+// Get a list of instances and where do they refer
+struct _connector_instance {
+    struct section  *connector;        // actual connector
+    struct section  *instance;         // This instance
+    struct _connector_instance *next;   // Next instance
+};
+
+struct _connector_instance  *ci = NULL;
+
+int get_connector_instance(struct connector_instance *target_ci) {
+    static struct _connector_instance *local_ci = NULL;
+
+    if (target_ci == NULL) {
+        local_ci = ci;
+        return 1;
+    }
+    if (local_ci == NULL)
+        local_ci = ci;
+    else {
+        local_ci = local_ci->next;
+        if (local_ci == NULL)
+            return 0;
+    }
+
+    strcpy(target_ci->instance_name, local_ci->instance->name);
+    strcpy(target_ci->connector_name, local_ci->connector->name);
+
+    return 1;
+}
+
+int is_valid_connector(char *type){
+    if (unlikely(!type))
+        return 0;
+
+    if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
+            return 1;
+        }
+        else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+            return 1;
+        }
+        else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+            return 1;
+        }
+        else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
+            return 1;
+        }
+        else if (!strcmp(type, "prometheus_remote_write")) {
+            return  1;
+        }
+        else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
+            return 1;
+        }
+        else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
+            return 1;
+        }
+
+    return 0;
+}
 
 // ----------------------------------------------------------------------------
 // locking
@@ -239,6 +299,62 @@ cleanup:
         config_section_unlock(co_new);
     config_section_unlock(co_old);
     return ret;
+}
+
+
+//#define exporter_get(section, name, value) expconfig_get(&exporter_config, section, name, value)
+//#define exporter_get_number(section, name, value) expconfig_get_number(&exporter_config, section, name, value)
+//#define exporter_get_boolean(section, name, value) expconfig_get_boolean(&exporter_config, section, name, value)
+
+char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
+{
+    struct _connector_instance *local_ci;
+
+    local_ci = ci;
+    while(local_ci) {
+        if (strcmp(local_ci->instance->name, section) == 0)
+            break;
+        local_ci = local_ci->next;
+    }
+    if (!local_ci)
+        return NULL;
+    return appconfig_get(root, local_ci->instance->name, name,
+            appconfig_get(root, local_ci->connector->name, name,
+                    appconfig_get(root, "connector_global", name, default_value)));
+}
+
+int expconfig_get_boolean(struct config *root, const char *section, const char *name, int default_value)
+{
+    struct _connector_instance *local_ci;
+
+    local_ci = ci;
+    while(local_ci) {
+        if (strcmp(local_ci->instance->name, section) == 0)
+            break;
+        local_ci = local_ci->next;
+    }
+    if (!local_ci)
+        return 0;
+    return appconfig_get_boolean(root, local_ci->instance->name, name,
+                                 appconfig_get_boolean(root, local_ci->connector->name, name,
+                                                       appconfig_get_boolean(root, "connector_global", name, 0)));
+}
+
+long long  expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
+{
+    struct _connector_instance *local_ci;
+
+    local_ci = ci;
+    while(local_ci) {
+        if (strcmp(local_ci->instance->name, section) == 0)
+            break;
+        local_ci = local_ci->next;
+    }
+    if (!local_ci)
+        return 0;
+    return appconfig_get_number(root, local_ci->instance->name, name,
+                                appconfig_get_number(root, local_ci->connector->name, name,
+                                                     appconfig_get_number(root, "connector_global", name, 0)));
 }
 
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
@@ -440,12 +556,21 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 {
     int line = 0;
     struct section *co = NULL;
+    int   is_exporter_config = 0;
+    int   is_backend_config  = 0;
+    int   have_backend_config = 0;
+    int     item = 0;
+    char  items[120][CONFIG_MAX_NAME];
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
     if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 
     debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
+
+    //fprintf(stderr, "Calling appconfgload %s \n", filename);
+
+    is_exporter_config = (strstr(filename, "exporting.conf") != NULL);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
@@ -468,6 +593,18 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
             // new section
             s[len - 1] = '\0';
             s++;
+
+            is_backend_config = !(strcmp(s,CONFIG_SECTION_BACKEND));
+            if (!have_backend_config)
+                have_backend_config = is_backend_config;
+
+            if (is_backend_config) {
+                if (_backends) {
+                    sprintf(buffer, CONFIG_SECTION_BACKEND "/%d", _backends);
+                    s = buffer;
+                }
+                _backends++;
+            }
 
             co = appconfig_section_find(root, s);
             if(!co) co = appconfig_section_create(root, s);
@@ -502,7 +639,34 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         struct config_option *cv = appconfig_option_index_find(co, name, 0);
 
-        if(!cv) cv = appconfig_value_create(co, name, value);
+        if(!cv) {
+            cv = appconfig_value_create(co, name, value);
+            if (is_exporter_config || is_backend_config) {
+//                if (is_backend_config) {
+//                    fprintf(stderr, "Adding backend name = %s on %d\n", name, item);
+//                    strcpy(items[item], name);
+//                    item++;
+//                }
+                if (!strcmp(name,"type")) {
+                    if (is_valid_connector(value)) {
+                        struct section *local_connector = appconfig_section_find(root, value);
+                        if (local_connector == NULL)
+                            info("Instance %s will not take effect no connector defined for %s", co->name, value);
+                        else {
+                            info("Adding instance %s to connector %s", co->name, local_connector->name);
+                            struct _connector_instance *local_ci = callocz(1, sizeof(ci));
+                            local_ci->instance = co;
+                            local_ci->connector = local_connector;
+                            local_ci->next = ci;
+                            ci = local_ci;
+                        }
+                    }
+                    else  {
+                        info("Ignoring unknown connector %s specified for version " VERSION, value);
+                    }
+                }
+            }
+        }
         else {
             if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
                 debug(D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
@@ -516,6 +680,22 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
     }
 
     fclose(fp);
+
+    // Dump all the exporters
+
+//    if (is_exporter_config) {
+//        struct connector_instance local_ci;
+//
+//        while (get_connector_instance(&local_ci))
+//            fprintf(stderr, "Instance %s on %s\n", local_ci.instance_name, local_ci.connector_name);
+//    }
+
+//    if (have_backend_config) {
+//        fprintf(stderr,"Backend config items %d \n", item);
+//        for (int i=0; i < item; i++) {
+//            fprintf(stderr,"Backend config [%s]\n", items[i]);
+//        }
+//    }
 
     return 1;
 }

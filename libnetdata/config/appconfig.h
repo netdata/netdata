@@ -103,6 +103,11 @@ struct config {
     avl_tree_lock index;
 };
 
+struct connector_instance {
+    char    instance_name[CONFIG_MAX_NAME+1];
+    char    connector_name[CONFIG_MAX_NAME+1];
+};
+
 #define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
 
 #define CONFIG_BOOLEAN_NO   0       // disabled
@@ -135,5 +140,11 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
+
+extern char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
+extern long long expconfig_get_number(struct config *root, const char *section, const char *name, long long value);
+extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
+
+extern int get_connector_instance(struct connector_instance *target_ci);
 
 #endif /* NETDATA_CONFIG_H */
