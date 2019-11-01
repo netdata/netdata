@@ -195,7 +195,7 @@ class GetPath(object):
         test_url = f"{base_url}?{url_args}"
         if url_filter.match(test_url):
             try:
-                resp = requests.get(url=test_url,verify=(not args.tls_no_verify) )
+                resp = requests.get(url=test_url, verify=(not args.tls_no_verify))
                 self.validate(test_url, resp, True)
             except Exception as e:
                 L.error(f"Network failure in test {e}")
@@ -213,7 +213,7 @@ class GetPath(object):
         test_url = f"{base_url}?{url_args}"
         if url_filter.match(test_url):
             try:
-                resp = requests.get(url=test_url,verify=(not args.tls_no_verify))
+                resp = requests.get(url=test_url, verify=(not args.tls_no_verify))
                 self.validate(test_url, resp, False)
             except Exception as e:
                 L.error(f"Network failure in test {e}")
