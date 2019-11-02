@@ -10,6 +10,7 @@
 - Disable pagetypeinfo by default [\#7230](https://github.com/netdata/netdata/pull/7230) ([vlvkobal](https://github.com/vlvkobal))
 - postgres: do not return cached data [\#7228](https://github.com/netdata/netdata/pull/7228) ([ilyam8](https://github.com/ilyam8))
 - rabbitmq: handle "disk\_free": "disk\_free\_monitoring\_disabled" [\#7226](https://github.com/netdata/netdata/pull/7226) ([ilyam8](https://github.com/ilyam8))
+- Clarify database engine/RAM in getting started guide [\#7225](https://github.com/netdata/netdata/pull/7225) ([joelhans](https://github.com/joelhans))
 - database: include limits.h before using LONG\_MAX [\#7224](https://github.com/netdata/netdata/pull/7224) ([mniestroj](https://github.com/mniestroj))
 - UrlService: allow to skip tls\_verify for http scheme [\#7223](https://github.com/netdata/netdata/pull/7223) ([ilyam8](https://github.com/ilyam8))
 - Fix counter reset detection [\#7220](https://github.com/netdata/netdata/pull/7220) ([mfundul](https://github.com/mfundul))
@@ -265,7 +266,6 @@
 - netdata/packaging: Move tarball checksum information into lib dir of netdata [\#6555](https://github.com/netdata/netdata/pull/6555) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add configurable default locations for trusted CA certificates [\#6549](https://github.com/netdata/netdata/pull/6549) ([thiagoftsm](https://github.com/thiagoftsm))
 - smartd\_log: use `del\_dimension` instead of `hide\_dimension` to delete inactive disks [\#6547](https://github.com/netdata/netdata/pull/6547) ([ilyam8](https://github.com/ilyam8))
-- redirect after clicking Nodes \> SignIn [\#6544](https://github.com/netdata/netdata/pull/6544) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
