@@ -159,10 +159,11 @@ Find the `SEND_EMAIL="YES"` line and change it to `SEND_EMAIL="NO"`.
 
 ## Change how long Netdata stores metrics
 
-By default, Netdata uses a database engine uses RAM to store recent metrics. For long-term metrics storage, the database
-engine uses a "spill to disk" feature that also takes advantage of available disk space and keeps RAM usage low.
+By default, Netdata uses a custom database which uses both RAM and the disk to store metrics. Recent metrics are stored
+in the system's RAM to keep access fast, while historical metrics are "spilled" to disk to keep RAM usage low.
 
-The database engine allows you to store a much larger dataset than your system's available RAM.
+This custom database, which we call the _database engine_, allows you to store a much larger dataset than your system's
+available RAM.
 
 If you're not sure whether you're using the database engine, or want to tweak the default settings to store even more
 historical metrics, check out our tutorial: [**Changing how long Netdata stores
