@@ -244,19 +244,18 @@ fi
 
 
 # -----------------------------------------------------------------------------
-
 if [ ${STARTIT} -eq 0 ]; then
-    create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
-    netdata_banner "is installed now!"
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+	netdata_banner "is installed now!"
 else
-    progress "starting netdata"
+	progress "starting netdata"
 
-    if ! restart_netdata "${NETDATA_PREFIX}/bin/netdata"; then
-        create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
-        netdata_banner "is installed and running now!"
-    else
-        create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
-        netdata_banner "is installed now!"
-    fi
+	if ! restart_netdata "${NETDATA_PREFIX}/bin/netdata"; then
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+		netdata_banner "is installed and running now!"
+	else
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+		netdata_banner "is installed now!"
+	fi
 fi
 run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
