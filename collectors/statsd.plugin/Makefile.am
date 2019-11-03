@@ -9,13 +9,13 @@ dist_noinst_DATA = \
 
 statsdconfigdir=$(libconfigdir)/statsd.d
 dist_statsdconfig_DATA = \
-    example.conf \
-    $(NULL)
+	example.conf \
+	$(NULL)
 
 userstatsdconfigdir=$(configdir)/statsd.d
 dist_userstatsdconfig_DATA = \
-    .keep \
-    $(NULL)
+	.keep \
+	$(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask
 install-exec-local:
