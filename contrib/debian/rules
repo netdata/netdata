@@ -36,9 +36,9 @@ override_dh_install: debian/netdata.postinst
 
 	# Set the rest of the software in the main package
 	#
-	cp -rp $(TEMPTOP)/usr $(TOP)/usr
-	cp -rp $(TEMPTOP)/var $(TOP)/var
-	cp -rp $(TEMPTOP)/etc $(TOP)/etc
+	cp -rp $(TEMPTOP)/usr $(TOP)
+	cp -rp $(TEMPTOP)/var $(TOP)
+	cp -rp $(TEMPTOP)/etc $(TOP)
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
