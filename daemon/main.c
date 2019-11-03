@@ -677,36 +677,6 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
-static int load_exporter_conf(char *filename, char overwrite_used) {
-    errno = 0;
-
-    int ret = 0;
-
-    if(filename && *filename) {
-        ret = config_load(filename, overwrite_used);
-        if(!ret)
-            error("CONFIG: cannot load config file '%s'.", filename);
-    }
-    else {
-        filename = strdupz_path_subpath(netdata_configured_user_config_dir, "exporting.conf");
-
-        ret = config_load(filename, overwrite_used);
-        if(!ret) {
-            info("CONFIG: cannot load user exporter config '%s'. Will try the stock version.", filename);
-            freez(filename);
-
-            filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "exporting.conf");
-            ret = config_load(filename, overwrite_used);
-            if(!ret)
-                info("CONFIG: cannot load stock exporter config '%s'. Running with internal defaults.", filename);
-        }
-
-        freez(filename);
-    }
-
-    return ret;
-}
-
 int get_system_info(struct rrdhost_system_info *system_info) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
@@ -855,8 +825,6 @@ int main(int argc, char **argv) {
         // terminate optstring
         optstring[string_i] ='\0';
         optstring[(num_opts *2)] ='\0';
-
-        load_exporter_conf(NULL, 0);
 
         int opt;
         while( (opt = getopt(argc, argv, optstring)) != -1 ) {
@@ -1088,8 +1056,6 @@ int main(int argc, char **argv) {
     if(!config_loaded)
         load_netdata_conf(NULL, 0);
 
-    // prerare engine for connectors
-    read_exporting_config();
 
     // ------------------------------------------------------------------------
     // initialize netdata
@@ -1106,7 +1072,6 @@ int main(int argc, char **argv) {
         test_clock_boottime();
 
         // prepare configuration environment variables for the plugins
-
 
         get_netdata_configured_variables();
         set_global_environment();
@@ -1271,6 +1236,10 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+
+    // prerare engine for connectors
+    if (read_exporting_config())
+        info("Engine for connectors activated");
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;

@@ -91,6 +91,7 @@
 #define CONFIG_SECTION_HEALTH   "health"
 #define CONFIG_SECTION_BACKEND  "backend"
 #define CONFIG_SECTION_STREAM   "stream"
+#define CONFIG_SECTION_EXPORTING "connector_global"
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
@@ -141,9 +142,6 @@ extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
 
-extern char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
-extern long long expconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 
 extern int get_connector_instance(struct connector_instance *target_ci);
 

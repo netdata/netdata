@@ -5,6 +5,36 @@
 
 #include "daemon/common.h"
 
+extern char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
+extern long long expconfig_get_number(struct config *root, const char *section, const char *name, long long value);
+extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
+
+extern int is_valid_connector(char *type);
+extern struct _connector_instance  *ci;
+
+#define EXPORTING_CONF                      "exporting.conf"
+
+#define EXPORTER_DESTINATION                "destination"
+#define EXPORTER_DESTINATION_DEFAULT        "localhost"
+
+#define EXPORTER_UPDATE_EVERY               "update every"
+#define EXPORTER_UPDATE_EVERY_DEFAULT       10
+
+#define EXPORTER_BUF_ONFAIL                 "buffer on failures"
+#define EXPORTER_BUF_ONFAIL_DEFAULT         10
+
+#define EXPORTER_TIMEOUT_MS                 "timeout ms"
+#define EXPORTER_TIMEOUT_MS_DEFAULT         10000
+
+#define EXPORTER_SEND_CHART_MATCH           "send charts matching"
+#define EXPORTER_SEND_CHART_MATCH_DEFAULT   "*"
+
+#define EXPORTER_SEND_HOST_MATCH            "send hosts matching"
+#define EXPORTER_SEND_HOST_MATCH_DEFAULT    "localhost *"
+
+#define EXPORTER_SEND_NAMES                 "send names instead of ids"
+#define EXPORTER_SEND_NAMES_DEFAULT         1
+
 struct engine;
 
 struct instance_config {
