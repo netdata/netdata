@@ -649,19 +649,6 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]; then
 	run mkdir -p "${NETDATA_RUN_DIR}" || exit 1
 fi
 
-# --- conf dir ----
-
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d" "ssl"; do
-	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
-		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
-		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
-	fi
-done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
-run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
-run chmod 755 "${NETDATA_USER_CONFIG_DIR}/edit-config"
-
 # --- stock conf dir ----
 
 [ ! -d "${NETDATA_STOCK_CONFIG_DIR}" ] && mkdir -p "${NETDATA_STOCK_CONFIG_DIR}"

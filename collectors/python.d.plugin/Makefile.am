@@ -32,6 +32,10 @@ dist_userpythonconfig_DATA = \
     .keep \
     $(NULL)
 
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(userpythonconfigdir)
+
 pythonconfigdir=$(libconfigdir)/python.d
 dist_pythonconfig_DATA = \
     $(NULL)

@@ -20,6 +20,10 @@ dist_config_SCRIPTS = \
     edit-config \
     $(NULL)
 
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(configdir)
+
 nodist_noinst_DATA = \
     netdata-openrc \
     netdata.logrotate \
