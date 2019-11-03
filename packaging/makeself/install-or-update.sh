@@ -259,5 +259,4 @@ else
         netdata_banner "is installed now!"
     fi
 fi
-run chown "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf"
-run chmod 0664 "/opt/netdata/etc/netdata/netdata.conf"
+run chmod 0644 "/opt/netdata/etc/netdata/netdata.conf"
