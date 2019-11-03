@@ -590,7 +590,7 @@ if [ "${UID}" = "0" ]; then
 	ROOT_USER="root"
 else
 	NETDATA_USER="${USER}"
-	ROOT_USER="${NETDATA_USER}"
+	ROOT_USER="${USER}"
 fi
 NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
