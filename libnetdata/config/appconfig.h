@@ -91,6 +91,9 @@
 #define CONFIG_SECTION_HEALTH   "health"
 #define CONFIG_SECTION_BACKEND  "backend"
 #define CONFIG_SECTION_STREAM   "stream"
+#define CONFIG_SECTION_EXPORTING "connector_global"
+#define EXPORTING_CONF           "exporting.conf"
+
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
@@ -101,6 +104,11 @@ struct config {
     struct section *sections;
     netdata_mutex_t mutex;
     avl_tree_lock index;
+};
+
+struct connector_instance {
+    char    instance_name[CONFIG_MAX_NAME+1];
+    char    connector_name[CONFIG_MAX_NAME+1];
 };
 
 #define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
@@ -135,5 +143,8 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
+
+
+extern int get_connector_instance(struct connector_instance *target_ci);
 
 #endif /* NETDATA_CONFIG_H */

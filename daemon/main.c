@@ -1056,6 +1056,7 @@ int main(int argc, char **argv) {
     if(!config_loaded)
         load_netdata_conf(NULL, 0);
 
+
     // ------------------------------------------------------------------------
     // initialize netdata
     {
@@ -1235,6 +1236,10 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+
+    // prerare engine for connectors
+    if (read_exporting_config())
+        info("Engine for connectors activated");
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
