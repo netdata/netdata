@@ -118,6 +118,7 @@ struct engine {
 void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
+BACKEND_TYPE exporting_select_type(const char *type);
 
 int init_connectors(struct engine *engine);
 

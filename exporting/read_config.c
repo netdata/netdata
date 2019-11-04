@@ -3,6 +3,41 @@
 #include "exporting_engine.h"
 
 /**
+ * Select Type
+ *
+ * Select the connector type based on the user input
+ *
+ * @param type is the string that defines the connector type
+ *
+ * @return It returns the connector id.
+ */
+BACKEND_TYPE exporting_select_type(const char *type) {
+    if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
+        return BACKEND_TYPE_GRAPHITE;
+    }
+    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+        return BACKEND_TYPE_OPENTSDB_USING_TELNET;
+    }
+    else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+        return BACKEND_TYPE_OPENTSDB_USING_HTTP;
+    }
+    else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
+        return BACKEND_TYPE_JSON;
+    }
+    else if (!strcmp(type, "prometheus_remote_write")) {
+        return  BACKEND_TYPE_PROMETEUS;
+    }
+    else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
+        return BACKEND_TYPE_KINESIS;
+    }
+    else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
+        return BACKEND_TYPE_MONGODB;
+    }
+
+    return BACKEND_TYPE_UNKNOWN;
+}
+
+/**
  * Read configuration
  *
  * Based on read configuration an engine data structure is filled with exporting connector instances.
@@ -25,9 +60,10 @@ struct engine *read_exporting_config() {
     if (unlikely(engine))
         return engine;
 
-    // TODO: compose the configuration filename ()
 #if UNIT_TESTING
-    // TODO: filename = "./exporting.conf"
+    char *netdata_configured_user_config_dir = ".";
+    char *netdata_configured_stock_config_dir = ".";
+    char *netdata_configured_hostname = "test_host";
 #endif
 
     {
@@ -48,8 +84,6 @@ struct engine *read_exporting_config() {
 
     };
 
-    // TODO: read and parse the configuration file ()
-
     // Will build a list of instances per connector
     // TODO: change BACKEND to EXPORTING
     ci_list = callocz(sizeof(BACKEND_TYPE), sizeof(struct connector_instance_list *));
@@ -59,7 +93,7 @@ struct engine *read_exporting_config() {
 
         info("Processing connector (%s)", local_ci.instance_name);
         if (exporter_get_boolean(local_ci.instance_name, "enabled", 0)) {
-            backend_type = backend_select_type(local_ci.connector_name);
+            backend_type = exporting_select_type(local_ci.connector_name);
 
             info(" Instance (%s) on connector (%s) is enabled and scheduled for activation",
                  local_ci.instance_name, local_ci.connector_name);
@@ -90,7 +124,7 @@ struct engine *read_exporting_config() {
                                                         EXPORTER_UPDATE_EVERY_DEFAULT);
     }
 
-    for(int i=0; i < sizeof(BACKEND_TYPE); i++) {
+    for(size_t i=0; i < sizeof(BACKEND_TYPE); i++) {
         // For each connector build list
         tmp_ci_list = ci_list[i];
 
@@ -152,6 +186,7 @@ struct engine *read_exporting_config() {
                         tmp_instance->config.send_names_instead_of_ids);
 #endif
 
+#ifndef UNIT_TESTING
                 if (unlikely(!exporting_config_exists) && !engine->config.hostname) {
                         engine->config.hostname = strdupz(
                             config_get(instance_name, "hostname", netdata_configured_hostname));
@@ -159,6 +194,7 @@ struct engine *read_exporting_config() {
                     engine->config.update_every = config_get_number(instance_name, EXPORTER_UPDATE_EVERY,
                                                                     EXPORTER_UPDATE_EVERY_DEFAULT);
                 }
+#endif
 
                 tmp_ci_list1 = tmp_ci_list->next;
                 freez(tmp_ci_list);
@@ -168,28 +204,6 @@ struct engine *read_exporting_config() {
     }
 
     freez(ci_list);
-
-    // temporary configuration stub
-//    struct engine *engine = (struct engine *)calloc(1, sizeof(struct engine));
-//    engine->config.prefix = strdupz("netdata");
-//    engine->config.hostname = strdupz("test-host");
-//    engine->config.update_every = 3;
-//    engine->config.options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
-
-    //engine->connector_root = (struct connector *)calloc(1, sizeof(struct connector));
-    //engine->connector_root->config.type = BACKEND_TYPE_GRAPHITE;
-    //engine->connector_root->engine = engine;
-
-//    engine->connector_root->instance_root = (struct instance *)calloc(1, sizeof(struct instance));
-//    struct instance *instance = engine->connector_root->instance_root;
-//    instance->connector = engine->connector_root;
-//    instance->config.destination = strdupz("localhost");
-//    instance->config.update_every = 1;
-//    instance->config.buffer_on_failures = 10;
-//    instance->config.timeoutms = 10000;
-//    instance->config.charts_pattern = strdupz("*");
-//    instance->config.hosts_pattern = strdupz("localhost *");
-//    instance->config.send_names_instead_of_ids = 1;
 
     return engine;
 }
