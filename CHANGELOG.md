@@ -15,6 +15,7 @@
 - UrlService: allow to skip tls\_verify for http scheme [\#7223](https://github.com/netdata/netdata/pull/7223) ([ilyam8](https://github.com/ilyam8))
 - Fix counter reset detection [\#7220](https://github.com/netdata/netdata/pull/7220) ([mfundul](https://github.com/mfundul))
 - .travis.yml: Increase timeout for docker image builds to 20 minutes [\#7214](https://github.com/netdata/netdata/pull/7214) ([knatsakis](https://github.com/knatsakis))
+- Building a fuzzer against the API \(issue \#7163\) [\#7210](https://github.com/netdata/netdata/pull/7210) ([amoss](https://github.com/amoss))
 - Suggest using /var/run/netdata for the unix socket [\#7206](https://github.com/netdata/netdata/pull/7206) ([CtrlAltDel64](https://github.com/CtrlAltDel64))
 - Fix sizeof inside callocz [\#7187](https://github.com/netdata/netdata/pull/7187) ([thiagoftsm](https://github.com/thiagoftsm))
 - contrib/debian: Fix typo in Description [\#7154](https://github.com/netdata/netdata/pull/7154) ([arkamar](https://github.com/arkamar))
@@ -253,7 +254,6 @@
 - netdata/packaging: put go.d version in one place [\#6557](https://github.com/netdata/netdata/pull/6557) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add alarm status counter api call [\#6554](https://github.com/netdata/netdata/pull/6554) ([alpes214](https://github.com/alpes214))
 - netdata/packaging: Documentation on distribution support matrix and functionality availability [\#6552](https://github.com/netdata/netdata/pull/6552) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- mongodb: ssl connection [\#6546](https://github.com/netdata/netdata/pull/6546) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
@@ -264,8 +264,6 @@
 - Handle disconnected sockets in unbound collector. [\#6561](https://github.com/netdata/netdata/pull/6561) ([Ferroin](https://github.com/Ferroin))
 - netdata/packaging: Notify us when CHANGELOG.md gets too old [\#6556](https://github.com/netdata/netdata/pull/6556) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Move tarball checksum information into lib dir of netdata [\#6555](https://github.com/netdata/netdata/pull/6555) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Add configurable default locations for trusted CA certificates [\#6549](https://github.com/netdata/netdata/pull/6549) ([thiagoftsm](https://github.com/thiagoftsm))
-- smartd\_log: use `del\_dimension` instead of `hide\_dimension` to delete inactive disks [\#6547](https://github.com/netdata/netdata/pull/6547) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.16.0](https://github.com/netdata/netdata/tree/v1.16.0) (2019-07-08)
 
