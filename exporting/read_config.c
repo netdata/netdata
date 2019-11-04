@@ -33,13 +33,13 @@ struct engine *read_exporting_config() {
     {
         char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, EXPORTING_CONF);
 
-        exporting_config_exists = appconfig_load(&netdata_config, filename, 0);
+        exporting_config_exists = appconfig_load(&exporting_config, filename, 0);
         if (!exporting_config_exists) {
             info("CONFIG: cannot load user exporting config '%s'. Will try the stock version.", filename);
             freez(filename);
 
             filename = strdupz_path_subpath(netdata_configured_stock_config_dir, EXPORTING_CONF);
-            exporting_config_exists = appconfig_load(&netdata_config, filename, 0);
+            exporting_config_exists = appconfig_load(&exporting_config, filename, 0);
             if (!exporting_config_exists)
                 info("CONFIG: cannot load stock exporting config '%s'. Running with internal defaults.", filename);
         }
@@ -61,7 +61,7 @@ struct engine *read_exporting_config() {
         if (exporter_get_boolean(local_ci.instance_name, "enabled", 0)) {
             backend_type = backend_select_type(local_ci.connector_name);
 
-            info("Instance (%s) on connector (%s) is enabled and scheduled for activation",
+            info(" Instance (%s) on connector (%s) is enabled and scheduled for activation",
                  local_ci.instance_name, local_ci.connector_name);
 
             tmp_ci_list = (struct connector_instance_list *) callocz(1, sizeof(struct connector_instance_list));
@@ -83,11 +83,10 @@ struct engine *read_exporting_config() {
     // TODO: Check and fill engine fields if actually needed
 
     if (exporting_config_exists) {
-
         engine->config.hostname = strdupz(
-                config_get(CONFIG_SECTION_EXPORTING, "hostname", netdata_configured_hostname));
-        engine->config.prefix = strdupz(config_get(CONFIG_SECTION_EXPORTING, "prefix", "netdata"));
-        engine->config.update_every = config_get_number(CONFIG_SECTION_EXPORTING, EXPORTER_UPDATE_EVERY,
+                exporter_get(CONFIG_SECTION_EXPORTING, "hostname", netdata_configured_hostname));
+        engine->config.prefix = strdupz(exporter_get(CONFIG_SECTION_EXPORTING, "prefix", "netdata"));
+        engine->config.update_every = exporter_get_number(CONFIG_SECTION_EXPORTING, EXPORTER_UPDATE_EVERY,
                                                         EXPORTER_UPDATE_EVERY_DEFAULT);
     }
 
@@ -155,7 +154,7 @@ struct engine *read_exporting_config() {
                         engine->config.hostname = strdupz(
                             config_get(instance_name, "hostname", netdata_configured_hostname));
                     engine->config.prefix = strdupz(config_get(instance_name, "prefix", "netdata"));
-                    engine->config.update_every = config_get_number(instance_name, "update_every",
+                    engine->config.update_every = config_get_number(instance_name, EXPORTER_UPDATE_EVERY,
                                                                     EXPORTER_UPDATE_EVERY_DEFAULT);
                 }
 

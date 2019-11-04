@@ -50,6 +50,17 @@ struct _connector_instance {
     struct _connector_instance *next;   // Next instance
 };
 
+struct config exporting_config = {
+        .sections = NULL,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
+        .index = {
+                .avl_tree = {
+                        .root = NULL,
+                        .compar = appconfig_section_compare
+                },
+                .rwlock = AVL_LOCK_INITIALIZER
+        }
+};
 
 struct _connector_instance  *ci = NULL;
 
@@ -308,6 +319,10 @@ char *expconfig_get(struct config *root, const char *section, const char *name, 
 {
     struct _connector_instance *local_ci;
 
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
+    fprintf(stderr, "Looking section %s -- instance %s\n", section, name);
     local_ci = ci;
     while(local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
@@ -325,6 +340,9 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
 {
     struct _connector_instance *local_ci;
 
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
     local_ci = ci;
     while(local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
@@ -341,6 +359,9 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
 long long  expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
 {
     struct _connector_instance *local_ci;
+
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
     local_ci = ci;
     while(local_ci) {
@@ -570,7 +591,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
         return 0;
     }
 
-    is_exporter_config = (strstr(filename, "exporting.conf") != NULL);
+    is_exporter_config = (strstr(filename, EXPORTING_CONF) != NULL);
 
     while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
         buffer[CONFIG_FILE_LINE_MAX] = '\0';
@@ -593,6 +614,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                 have_backend_config = is_backend_config;
 
             if (is_backend_config) {
+                //root = &exporting_config;
                 if (_backends) {
                     sprintf(buffer, CONFIG_SECTION_BACKEND "/%d", _backends);
                     s = buffer;
@@ -635,6 +657,9 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         if(!cv) {
             cv = appconfig_value_create(co, name, value);
+            if (!strcmp(co->name,"connector_global"))
+                info("Adding EXP GLOBAL [%s]=[%s]", name, value);
+
             if (is_exporter_config || is_backend_config) {
                 if (!strcmp(name,"type")) {
                     if (is_valid_connector(value)) {

@@ -11,8 +11,7 @@ extern int expconfig_get_boolean(struct config *root, const char *section, const
 
 extern int is_valid_connector(char *type);
 extern struct _connector_instance  *ci;
-
-#define EXPORTING_CONF                      "exporting.conf"
+extern struct config exporting_config;
 
 #define EXPORTER_DESTINATION                "destination"
 #define EXPORTER_DESTINATION_DEFAULT        "localhost"

@@ -92,6 +92,8 @@
 #define CONFIG_SECTION_BACKEND  "backend"
 #define CONFIG_SECTION_STREAM   "stream"
 #define CONFIG_SECTION_EXPORTING "connector_global"
+#define EXPORTING_CONF           "exporting.conf"
+
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
