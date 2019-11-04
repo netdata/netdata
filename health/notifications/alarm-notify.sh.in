@@ -1628,7 +1628,7 @@ send_irc() {
 		*) color="#777777" ;;
 		esac
 
-    SNDMESSAGE="${MESSAGE//$'\n'/", "}"
+		SNDMESSAGE="${MESSAGE//$'\n'/", "}"
 		for CHANNEL in ${CHANNELS}; do
 			error=0
 			send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
