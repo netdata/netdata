@@ -109,7 +109,7 @@ struct engine *read_exporting_config() {
                 struct instance *tmp_instance;
                 char   *instance_name;
 
-                info("  Instance %s on %s", tmp_ci_list->local_ci.instance_name,
+                info("Instance %s on %s", tmp_ci_list->local_ci.instance_name,
                         tmp_ci_list->local_ci.connector_name);
 
                 tmp_instance = (struct instance *)calloc(1, sizeof(struct instance));
@@ -145,10 +145,12 @@ struct engine *read_exporting_config() {
                 tmp_instance->config.send_names_instead_of_ids = exporter_get_boolean(
                         instance_name, EXPORTER_SEND_NAMES, EXPORTER_SEND_NAMES_DEFAULT);
 
+#ifdef NETDATA_INTERNAL_CHECKS
                 info("     Dest=[%s], upd=[%d], buffer=[%d] timeout=[%ld] names=[%d]",
                         tmp_instance->config.destination, tmp_instance->config.update_every,
                         tmp_instance->config.buffer_on_failures, tmp_instance->config.timeoutms,
                         tmp_instance->config.send_names_instead_of_ids);
+#endif
 
                 if (unlikely(!exporting_config_exists) && !engine->config.hostname) {
                         engine->config.hostname = strdupz(
