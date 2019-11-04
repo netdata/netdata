@@ -1,7 +1,7 @@
 import { Attributes } from "./transformDataAttributes"
 
-export type ChartLibraryName = "dygraph" | "sparkline" | "peity"
-// | "google" | "d3"
+export type ChartLibraryName = "dygraph" | "sparkline" | "peity" | "google"
+// | "d3"
   | "d3pie" | "easypiechart" | "gauge"
 // | "textonly"
 export interface ChartLibraryConfig {
@@ -135,50 +135,32 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     pixelsPerPoint: () => 3,
     containerClass: () => "netdata-container",
   },
-  // google: {
-  //   initialize: window.NETDATA.googleInitialize,
-  //   create: window.NETDATA.googleChartCreate,
-  //   update: window.NETDATA.googleChartUpdate,
-  //   resize: null,
-  //   setSelection: undefined, // function(state, t) { void(state); return true; },
-  //   clearSelection: undefined, // function(state) { void(state); return true; },
-  //   toolboxPanAndZoom: null,
-  //   initialized: false,
-  //   enabled: true,
-  //   xssRegexIgnore: new RegExp("^/api/v1/data\.result.rows$"),
-  //   format(state) {
-  //     void (state)
-  //     return "datatable"
-  //   },
-  //   options(state) {
-  //     void (state)
-  //     return ""
-  //   },
-  //   legend(state) {
-  //     void (state)
-  //     return null
-  //   },
-  //   autoresize(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   max_updates_to_recreate(state) {
-  //     void (state)
-  //     return 300
-  //   },
-  //   track_colors(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   pixels_per_point(state) {
-  //     void (state)
-  //     return 4
-  //   },
-  //   container_class(state) {
-  //     void (state)
-  //     return "netdata-container"
-  //   },
-  // },
+  google: {
+    // initialize: window.NETDATA.googleInitialize,
+    // create: window.NETDATA.googleChartCreate,
+    // update: window.NETDATA.googleChartUpdate,
+    // resize: null,
+    // setSelection: undefined, // function(state, t) { void(state); return true; },
+    // clearSelection: undefined, // function(state) { void(state); return true; },
+    hasToolboxPanAndZoom: false,
+    // initialized: false,
+    // enabled: true,
+    xssRegexIgnore: new RegExp("^/api/v1/data.result.rows$"),
+    format: "datatable",
+    options: () => "",
+    hasLegend: () => false,
+    // autoresize(state) {
+    //   void (state)
+    //   return false
+    // },
+    // max_updates_to_recreate(state) {
+    //   void (state)
+    //   return 300
+    // },
+    trackColors: false,
+    pixelsPerPoint: () => 4,
+    containerClass: () => "netdata-container",
+  },
   d3pie: {
     // initialize: window.NETDATA.d3pieInitialize,
     // create: window.NETDATA.d3pieChartCreate,

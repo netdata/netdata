@@ -16,6 +16,7 @@ import { GaugeChart } from "./lib-charts/gauge-chart"
 import { SparklineChart } from "./lib-charts/sparkline-chart"
 import { D3pieChart } from "./lib-charts/d3pie-chart"
 import { PeityChart } from "./lib-charts/peity-chart"
+import { GoogleChart } from "./lib-charts/google-chart"
 
 interface Props {
   attributes: Attributes
@@ -201,6 +202,20 @@ export const AbstractChart = ({
         chartElementClassName={chartElementClassName}
         chartElementId={chartElementId}
         orderedColors={orderedColors}
+      />
+    )
+  }
+
+  if (chartLibrary === "google") {
+    return (
+      <GoogleChart
+        attributes={attributes}
+        chartData={chartData as EasyPieChartData}
+        chartDetails={chartDetails}
+        chartElementClassName={chartElementClassName}
+        chartElementId={chartElementId}
+        orderedColors={orderedColors}
+        unitsCurrent={unitsCurrent}
       />
     )
   }
