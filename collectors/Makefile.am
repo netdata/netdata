@@ -35,10 +35,6 @@ install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(usercustompluginsconfigdir)
 	$(INSTALL) -d $(DESTDIR)$(usergoconfigdir)
 
-uninstall-local:
-	-rmdir $(DESTDIR)$(usercustompluginsconfigdir)
-	-rmdir $(DESTDIR)$(usergoconfigdir)
-
 dist_noinst_DATA = \
     README.md \
     $(NULL)
