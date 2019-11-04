@@ -4,10 +4,10 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
-	api \
-	gui \
-	server \
-	$(NULL)
+    api \
+    gui \
+    server \
+    $(NULL)
 
 usersslconfigdir=$(configdir)/ssl
 

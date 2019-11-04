@@ -1,38 +1,39 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
+
 CLEANFILES = \
-	charts.d.plugin \
-	$(NULL)
+    charts.d.plugin \
+    $(NULL)
 
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_libconfig_DATA = \
-	charts.d.conf \
-	$(NULL)
+    charts.d.conf \
+    $(NULL)
 
 dist_plugins_SCRIPTS = \
-	charts.d.dryrun-helper.sh \
-	charts.d.plugin \
-	loopsleepms.sh.inc \
-	$(NULL)
+    charts.d.dryrun-helper.sh \
+    charts.d.plugin \
+    loopsleepms.sh.inc \
+    $(NULL)
 
 dist_noinst_DATA = \
-	charts.d.plugin.in \
-	README.md \
-	$(NULL)
+    charts.d.plugin.in \
+    README.md \
+    $(NULL)
 
 dist_charts_SCRIPTS = \
-	$(NULL)
+    $(NULL)
 
 dist_charts_DATA = \
-	$(NULL)
+    $(NULL)
 
 userchartsconfigdir=$(configdir)/charts.d
 dist_userchartsconfig_DATA = \
-	.keep \
-	$(NULL)
+    .keep \
+    $(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask
 install-exec-local:
@@ -40,7 +41,7 @@ install-exec-local:
 
 chartsconfigdir=$(libconfigdir)/charts.d
 dist_chartsconfig_DATA = \
-	$(NULL)
+    $(NULL)
 
 include ap/Makefile.inc
 include apache/Makefile.inc

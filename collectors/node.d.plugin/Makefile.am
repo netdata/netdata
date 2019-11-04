@@ -9,8 +9,8 @@ include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_libconfig_DATA = \
-	node.d.conf \
-	$(NULL)
+    node.d.conf \
+    $(NULL)
 
 dist_plugins_SCRIPTS = \
     node.d.plugin \
@@ -23,8 +23,8 @@ dist_noinst_DATA = \
 
 usernodeconfigdir=$(configdir)/node.d
 dist_usernodeconfig_DATA = \
-	.keep \
-	$(NULL)
+    .keep \
+    $(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask
 install-exec-local:
@@ -32,7 +32,7 @@ install-exec-local:
 
 nodeconfigdir=$(libconfigdir)/node.d
 dist_nodeconfig_DATA = \
-	$(NULL)
+    $(NULL)
 
 dist_node_DATA = \
     $(NULL)
