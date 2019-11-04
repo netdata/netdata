@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-AUTOMAKE_OPTIONS=foreign subdir-objects 1.11
+AUTOMAKE_OPTIONS = foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
-MAINTAINERCLEANFILES= \
+MAINTAINERCLEANFILES = \
     config.log config.status \
     $(srcdir)/Makefile.in \
     $(srcdir)/config.h.in $(srcdir)/config.h.in~ $(srcdir)/configure \
@@ -15,7 +15,7 @@ MAINTAINERCLEANFILES= \
     $(srcdir)/m4/ltoptions.m4 \
     $(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
-CLEANFILES= \
+CLEANFILES = \
     $(srcdir)/$(distdir).tar.gz
 
 EXTRA_DIST = \
@@ -50,7 +50,7 @@ SUBDIRS = \
     tests \
     $(NULL)
 
-dist_noinst_DATA= \
+dist_noinst_DATA = \
     CHANGELOG.md \
     cppcheck.sh \
     configs.signatures \
@@ -70,7 +70,7 @@ dist_noinst_DATA= \
 
 # until integrated within build
 # should be proper init.d/openrc/systemd usable
-dist_noinst_SCRIPTS= \
+dist_noinst_SCRIPTS = \
     coverity-scan.sh \
     packaging/installer/netdata-updater.sh \
     packaging/installer/netdata-uninstaller.sh \
