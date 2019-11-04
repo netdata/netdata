@@ -10,7 +10,7 @@ SUBDIRS = \
     $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	gui/confluence/README.md \
-	gui/custom/README.md \
-	$(NULL)
+    README.md \
+    gui/confluence/README.md \
+    gui/custom/README.md \
+    $(NULL)
