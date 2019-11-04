@@ -1,4 +1,6 @@
-import { forEachObjIndexed, propOr, pathOr } from "ramda"
+import {
+  forEachObjIndexed, propOr, pathOr, cond, always, T,
+} from "ramda"
 import React, {
   useEffect, useState, useLayoutEffect, useRef,
 } from "react"
@@ -19,6 +21,7 @@ import { fetchChartAction, fetchDataAction } from "../actions"
 import {
   selectChartData, selectChartFetchDataParams, selectChartDetailsRequest,
 } from "../selectors"
+import { ChartData, ChartDetails } from "../chart-types"
 
 import { Chart } from "./chart"
 import "./chart-container.css"
@@ -103,15 +106,22 @@ export const ChartContainer = ({
   const fetchDataParams = useSelector((state: AppStateT) => selectChartFetchDataParams(
     state, { id: chartUuid },
   ))
+  const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
 
   const hoveredX = useSelector(selectGlobalSelection)
 
   // periodical update of newest data
+  // default to 2000ms. When chartDetails has been fetched, use chartDetails.update_every
+  // if chartData has been fetched, use chartData.view_update_every instead
+  // todo add support to "data-update-every" attribute
+  const viewUpdateEvery = cond([
+    [always(!!chartData), () => (chartData as ChartData).view_update_every * 1000],
+    [always(!!chartDetails), () => (chartDetails as ChartDetails).update_every * 1000],
+    [T, always(2000)],
+  ])()
   const [shouldFetch, setShouldFetch] = useFetchNewDataClock({
     areCriteriaMet: !globalPanAndZoom && !hoveredX,
-    preferedIntervalTime: chartDetails
-      ? chartDetails.update_every * 1000
-      : 2000,
+    preferedIntervalTime: viewUpdateEvery,
   })
 
   // corresponds to force_update_at in old dashboard
@@ -140,7 +150,6 @@ export const ChartContainer = ({
   /**
    * fetch data
    */
-  const chartData = useSelector((state: AppStateT) => selectChartData(state, { id: chartUuid }))
   useEffect(() => {
     if (shouldFetch && chartDetails && hasPortalNodeBeenStyled && !shouldHide) {
       // todo can be overriden by main.js
