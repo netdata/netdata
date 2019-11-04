@@ -2,6 +2,12 @@
 
 #include "exporting_engine.h"
 
+#if UNIT_TESTING
+char *netdata_configured_user_config_dir = ".";
+char *netdata_configured_stock_config_dir = ".";
+char *netdata_configured_hostname = "test_host";
+#endif
+
 /**
  * Select Type
  *
@@ -55,12 +61,6 @@ struct engine *read_exporting_config()
 
     if (unlikely(engine))
         return engine;
-
-#if UNIT_TESTING
-    char *netdata_configured_user_config_dir = ".";
-    char *netdata_configured_stock_config_dir = ".";
-    char *netdata_configured_hostname = "test_host";
-#endif
 
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, EXPORTING_CONF);
 
