@@ -17,6 +17,7 @@ import { SparklineChart } from "./lib-charts/sparkline-chart"
 import { D3pieChart } from "./lib-charts/d3pie-chart"
 import { PeityChart } from "./lib-charts/peity-chart"
 import { GoogleChart } from "./lib-charts/google-chart"
+import { TextOnly } from "./lib-charts/text-only"
 
 interface Props {
   attributes: Attributes
@@ -216,6 +217,17 @@ export const AbstractChart = ({
         chartElementId={chartElementId}
         orderedColors={orderedColors}
         unitsCurrent={unitsCurrent}
+      />
+    )
+  }
+
+  if (chartLibrary === "textonly") {
+    return (
+      <TextOnly
+        attributes={attributes}
+        chartData={chartData as EasyPieChartData}
+        chartElementClassName={chartElementClassName}
+        chartElementId={chartElementId}
       />
     )
   }

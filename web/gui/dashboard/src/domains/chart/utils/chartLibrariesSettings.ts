@@ -2,13 +2,12 @@ import { Attributes } from "./transformDataAttributes"
 
 export type ChartLibraryName = "dygraph" | "sparkline" | "peity" | "google"
 // | "d3"
-  | "d3pie" | "easypiechart" | "gauge"
-// | "textonly"
+  | "d3pie" | "easypiechart" | "gauge" | "textonly"
 export interface ChartLibraryConfig {
   aspectRatio?: number
   format: string
   hasLegend: (attributes: Attributes) => boolean
-  hasToolboxPanAndZoom: boolean
+  hasToolboxPanAndZoom?: boolean
   isLogScale?: (attributes: Attributes) => boolean
   options: (attributes: Attributes) => string
   trackColors: boolean
@@ -287,46 +286,28 @@ export const chartLibrariesSettings: ChartLibrariesSettings = {
     aspectRatio: 60,
     containerClass: () => "netdata-container-gauge",
   },
-  // textonly: {
-  //   autoresize(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   container_class(state) {
-  //     void (state)
-  //     return "netdata-container"
-  //   },
-  //   create: window.NETDATA.textOnlyCreate,
-  //   enabled: true,
-  //   format(state) {
-  //     void (state)
-  //     return "array"
-  //   },
-  //   initialized: true,
-  //   initialize(callback) {
-  //     callback()
-  //   },
-  //   legend(state) {
-  //     void (state)
-  //     return null
-  //   },
-  //   max_updates_to_recreate(state) {
-  //     void (state)
-  //     return 5000
-  //   },
-  //   options(state) {
-  //     void (state)
-  //     return "absolute"
-  //   },
-  //   pixels_per_point(state) {
-  //     void (state)
-  //     return 3
-  //   },
-  //   track_colors(state) {
-  //     void (state)
-  //     return false
-  //   },
-  //   update: window.NETDATA.textOnlyUpdate,
-  //   xssRegexIgnore: new RegExp("^/api/v1/data\.result$"),
-  // },
+  textonly: {
+    // autoresize(state) {
+    //   void (state)
+    //   return false
+    // },
+    containerClass: () => "netdata-container",
+    // create: window.NETDATA.textOnlyCreate,
+    // enabled: true,
+    format: "array",
+    // initialized: true,
+    // initialize(callback) {
+    //   callback()
+    // },
+    hasLegend: () => false,
+    // max_updates_to_recreate(state) {
+    //   void (state)
+    //   return 5000
+    // },
+    options: () => "absolute",
+    pixelsPerPoint: () => 3,
+    trackColors: false,
+    // update: window.NETDATA.textOnlyUpdate,
+    xssRegexIgnore: new RegExp("^/api/v1/data.result$"),
+  },
 }

@@ -274,6 +274,10 @@ export interface Attributes {
   d3PieCssprefix?: string,
 
   peityStrokeWidth?: number,
+
+  textOnlyDecimalPlaces?: number,
+  textOnlyPrefix?: string,
+  textOnlySuffix?: string,
 }
 
 export type AttributePropKeys = keyof Attributes
@@ -495,6 +499,10 @@ const getAttributesMap = (): AttributesMap => ({
   d3PieCssprefix: { key: "d3pie-cssprefix" },
 
   peityStrokeWidth: { key: "peity-strokewidth" },
+
+  textOnlyDecimalPlaces: { key: "textonly-decimal-places" },
+  textOnlyPrefix: { key: "textonly-prefix" },
+  textOnlySuffix: { key: "textonly-suffix" },
 })
 
 export const getAttributes = (node: Element): Attributes => mapObjIndexed(
