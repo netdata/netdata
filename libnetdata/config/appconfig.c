@@ -94,25 +94,25 @@ int is_valid_connector(char *type){
 
     if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
             return 1;
-        }
-        else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
-            return 1;
-        }
-        else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
-            return 1;
-        }
-        else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
-            return 1;
-        }
-        else if (!strcmp(type, "prometheus_remote_write")) {
-            return  1;
-        }
-        else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
-            return 1;
-        }
-        else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
-            return 1;
-        }
+    }
+    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+        return 1;
+    }
+    else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+        return 1;
+    }
+    else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
+        return 1;
+    }
+    else if (!strcmp(type, "prometheus_remote_write")) {
+        return  1;
+    }
+    else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
+        return 1;
+    }
+    else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
+        return 1;
+    }
 
     return 0;
 }
