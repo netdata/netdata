@@ -35,16 +35,12 @@ paths:
   /charts:
     get:
       summary: Get a list of all charts available at the server
-      description: >-
-        The charts endpoint returns a summary about all charts stored in the
-        netdata server.
+      description: The charts endpoint returns a summary about all charts stored in the netdata server.
       responses:
         '200':
           description: An array of charts.
           schema:
-            type: array
-            items:
-              $ref: '#/definitions/chart_summary'
+            $ref: '#/definitions/chart_summary'
   /chart:
     get:
       summary: Get info about a specific chart
@@ -69,10 +65,7 @@ paths:
   /alarm_variables:
     get:
       summary: List variables available to configure alarms for a chart
-      description: >-
-        Returns the basic information of a chart and all the variables that can
-        be used in alarm and template health configurations for the particular
-        chart or family.
+      description: Returns the basic information of a chart and all the variables that can be used in alarm and template health configurations for the particular chart or family.
       parameters:
         - name: chart
           in: query
@@ -80,11 +73,10 @@ paths:
           required: true
           type: string
           format: as returned by /charts
+          default: system.cpu
       responses:
         '200':
-          description: >-
-            A javascript object with information about the chart and the
-            available variables.
+          description: A javascript object with information about the chart and the available variables.
           schema:
             $ref: '#/definitions/alarm_variables'
         '400':
@@ -92,15 +84,11 @@ paths:
         '404':
           description: No chart with the given id is found.
         '500':
-          description: >-
-            Internal server error. This usually means the server is out of
-            memory.
+          description: Internal server error. This usually means the server is out of memory.
   /data:
     get:
       summary: Get collected data for a specific chart
-      description: >-
-        The data endpoint returns data stored in the round robin database of a
-        chart.
+      description: The data endpoint returns data stored in the round robin database of a chart.
       parameters:
         - name: chart
           in: query
@@ -112,10 +100,7 @@ paths:
           default: system.cpu
         - name: dimension
           in: query
-          description: >-
-            Zero, one or more dimension ids or names, as returned by the /chart
-            call, separated with comma or pipe. Netdata simple patterns are
-            supported.
+          description: 'Zero, one or more dimension ids or names, as returned by the /chart call, separated with comma or pipe. Netdata simple patterns are supported.'
           required: false
           type: array
           items:
@@ -125,15 +110,7 @@ paths:
           allowEmptyValue: false
         - name: after
           in: query
-          description: >-
-            This parameter can either be an absolute timestamp specifying the
-            starting point of the data to be returned, or a relative number of
-            seconds (negative, relative to parameter: before). Netdata will
-            assume it is a relative number if it is less that 3 years (in
-            seconds). Netdata will adapt this parameter to the boundaries of the
-            round robin database. The default is the beginning of the round
-            robin database (i.e. by default netdata will attempt to return data
-            for the entire database).
+          description: 'This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is the beginning of the round robin database (i.e. by default netdata will attempt to return data for the entire database).'
           required: true
           type: number
           format: integer
@@ -141,25 +118,14 @@ paths:
           default: -600
         - name: before
           in: query
-          description: >-
-            This parameter can either be an absolute timestamp specifying the
-            ending point of the data to be returned, or a relative number of
-            seconds (negative), relative to the last collected timestamp.
-            Netdata will assume it is a relative number if it is less than 3
-            years (in seconds). Netdata will adapt this parameter to the
-            boundaries of the round robin database. The default is zero (i.e.
-            the timestamp of the last value collected).
+          description: 'This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is zero (i.e. the timestamp of the last value collected).'
           required: false
           type: number
           format: integer
           default: 0
         - name: points
           in: query
-          description: >-
-            The number of points to be returned. If not given, or it is <= 0, or
-            it is bigger than the points stored in the round robin database for
-            this chart for the given duration, all the available collected
-            values for the given duration will be returned.
+          description: 'The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration will be returned.'
           required: true
           type: number
           format: integer
@@ -167,13 +133,7 @@ paths:
           default: 20
         - name: group
           in: query
-          description: >-
-            The grouping method. If multiple collected values are to be grouped
-            in order to return fewer points, this parameters defines the method
-            of grouping. methods supported "min", "max", "average", "sum",
-            "incremental-sum". "max" is actually calculated on the absolute
-            value collected (so it works for both positive and negative
-            dimesions to return the most extreme value in either direction).
+          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
           enum:
@@ -188,10 +148,7 @@ paths:
           allowEmptyValue: false
         - name: gtime
           in: query
-          description: >-
-            The grouping number of seconds. This is used in conjunction with
-            group=average to change the units of metrics (ie when the data is
-            per-second, setting gtime=60 will turn them to per-minute).
+          description: 'The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).'
           required: false
           type: number
           format: integer
@@ -256,30 +213,19 @@ paths:
           allowEmptyValue: true
         - name: filename
           in: query
-          description: >-
-            Add Content-Disposition: attachment; filename=<filename> header to
-            the response, that will instruct the browser to save the response
-            with the given filename.
+          description: 'Add Content-Disposition: attachment; filename=<filename> header to the response, that will instruct the browser to save the response with the given filename.'
           required: false
           type: string
           allowEmptyValue: true
         - name: tqx
           in: query
-          description: >-
-            [Google Visualization
-            API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en)
-            formatted parameter.
+          description: '[Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.'
           required: false
           type: string
           allowEmptyValue: true
       responses:
         '200':
-          description: >-
-            The call was successful. The response includes the data in the
-            format requested. Swagger2.0 does not process the discriminator
-            field to show polymorphism. The response will be one of the
-            sub-types of the data-schema according to the chosen format, e.g.
-            json -> data_json.
+          description: 'The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of the data-schema according to the chosen format, e.g. json -> data_json.'
           schema:
             $ref: '#/definitions/data'
         '400':
@@ -287,9 +233,7 @@ paths:
         '404':
           description: No chart with the given id is found.
         '500':
-          description: >-
-            Internal server error. This usually means the server is out of
-            memory.
+          description: Internal server error. This usually means the server is out of memory.
   /badge.svg:
     get:
       summary: Generate a SVG image for a chart (or dimension)
@@ -322,15 +266,7 @@ paths:
           allowEmptyValue: false
         - name: after
           in: query
-          description: >-
-            This parameter can either be an absolute timestamp specifying the
-            starting point of the data to be returned, or a relative number of
-            seconds, to the last collected timestamp. Netdata will assume it is
-            a relative number if it is smaller than the duration of the round
-            robin database for this chart. So, if the round robin database is
-            3600 seconds, any value from -3600 to 3600 will trigger relative
-            arithmetics. Netdata will adapt this parameter to the boundaries of
-            the round robin database.
+          description: 'This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.'
           required: true
           type: number
           format: integer
@@ -338,28 +274,14 @@ paths:
           default: -600
         - name: before
           in: query
-          description: >-
-            This parameter can either be an absolute timestamp specifying the
-            ending point of the data to be returned, or a relative number of
-            seconds, to the last collected timestamp. Netdata will assume it is
-            a relative number if it is smaller than the duration of the round
-            robin database for this chart. So, if the round robin database is
-            3600 seconds, any value from -3600 to 3600 will trigger relative
-            arithmetics. Netdata will adapt this parameter to the boundaries of
-            the round robin database.
+          description: 'This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.'
           required: false
           type: number
           format: integer
           default: 0
         - name: group
           in: query
-          description: >-
-            The grouping method. If multiple collected values are to be grouped
-            in order to return fewer points, this parameters defines the method
-            of grouping. methods are supported "min", "max", "average", "sum",
-            "incremental-sum". "max" is actually calculated on the absolute
-            value collected (so it works for both positive and negative
-            dimesions to return the most extreme value in either direction).
+          description: 'The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported "min", "max", "average", "sum", "incremental-sum". "max" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).'
           required: true
           type: string
           enum:
@@ -414,29 +336,21 @@ paths:
           allowEmptyValue: true
         - name: value_color
           in: query
-          description: >-
-            A color to be used for the background of the label. You can set
-            multiple using a pipe with a condition each, like this:
-            color<value|color>value|color:null The following operators are
-            supported: >, <, >=, <=, =, :null (to check if no value exists).
+          description: 'A color to be used for the background of the label. You can set multiple using a pipe with a condition each, like this: color<value|color>value|color:null The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists).'
           required: false
           type: string
           format: any text
           allowEmptyValue: true
         - name: multiply
           in: query
-          description: >-
-            Multiply the value with this number for rendering it at the image
-            (integer value required).
+          description: Multiply the value with this number for rendering it at the image (integer value required).
           required: false
           type: number
           format: integer
           allowEmptyValue: true
         - name: divide
           in: query
-          description: >-
-            Divide the value with this number for rendering it at the image
-            (integer value required).
+          description: Divide the value with this number for rendering it at the image (integer value required).
           required: false
           type: number
           format: integer
@@ -456,15 +370,11 @@ paths:
         '404':
           description: No chart with the given id is found.
         '500':
-          description: >-
-            Internal server error. This usually means the server is out of
-            memory.
+          description: Internal server error. This usually means the server is out of memory.
   /allmetrics:
     get:
       summary: Get a value of all the metrics maintained by netdata
-      description: >-
-        The allmetrics endpoint returns the latest value of all charts and
-        dimensions stored in the netdata server.
+      description: The allmetrics endpoint returns the latest value of all charts and dimensions stored in the netdata server.
       parameters:
         - name: format
           in: query
@@ -506,10 +416,7 @@ paths:
           default: 'yes'
         - name: names
           in: query
-          description: >-
-            When enabled netdata will report dimension names. When disabled
-            netdata will report dimension IDs. The default is controlled in
-            netdata.conf.
+          description: When enabled netdata will report dimension names. When disabled netdata will report dimension IDs. The default is controlled in netdata.conf.
           required: false
           type: string
           enum:
@@ -518,10 +425,7 @@ paths:
           default: 'yes'
         - name: oldunits
           in: query
-          description: >-
-            When enabled, netdata will show metric names for the default
-            source=average as they appeared before 1.12, by using the legacy
-            unit naming conventions.
+          description: 'When enabled, netdata will show metric names for the default source=average as they appeared before 1.12, by using the legacy unit naming conventions.'
           required: false
           type: string
           enum:
@@ -530,9 +434,7 @@ paths:
           default: 'yes'
         - name: hideunits
           in: query
-          description: >-
-            When enabled, netdata will not include the units in the metric
-            names, for the default source=average.
+          description: 'When enabled, netdata will not include the units in the metric names, for the default source=average.'
           required: false
           type: string
           enum:
@@ -541,9 +443,7 @@ paths:
           default: 'yes'
         - name: server
           in: query
-          description: >-
-            Set a distinct name of the client querying prometheus metrics.
-            Netdata will use the client IP if this is not set.
+          description: Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.
           required: false
           type: string
           format: any text
@@ -555,9 +455,7 @@ paths:
           format: any text
         - name: data
           in: query
-          description: >-
-            Select the prometheus response data source. There is a setting in
-            netdata.conf for the default.
+          description: Select the prometheus response data source. There is a setting in netdata.conf for the default.
           required: false
           type: string
           enum:
@@ -573,11 +471,7 @@ paths:
   /alarms:
     get:
       summary: Get a list of active or raised alarms on the server
-      description: >-
-        The alarms endpoint returns the list of all raised or enabled alarms on
-        the netdata server. Called without any parameters, the raised alarms in
-        state WARNING or CRITICAL are returned. By passing "?all", all the
-        enabled alarms are returned.
+      description: 'The alarms endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing "?all", all the enabled alarms are returned.'
       parameters:
         - name: all
           in: query
@@ -593,18 +487,11 @@ paths:
   /alarm_log:
     get:
       summary: Retrieves the entries of the alarm log
-      description: >-
-        Returns an array of alarm_log entries, with historical information on
-        raised and cleared alarms.
+      description: 'Returns an array of alarm_log entries, with historical information on raised and cleared alarms.'
       parameters:
         - name: after
           in: query
-          description: >-
-            Passing the parameter after=UNIQUEID returns all the events in the
-            alarm log that occurred after UNIQUEID. An automated series of calls
-            would call the interface once without after=, store the last
-            UNIQUEID of the returned set, and give it back to get incrementally
-            the next events.
+          description: 'Passing the parameter after=UNIQUEID returns all the events in the alarm log that occurred after UNIQUEID. An automated series of calls would call the interface once without after=, store the last UNIQUEID of the returned set, and give it back to get incrementally the next events.'
           required: false
           type: integer
       responses:
@@ -617,9 +504,7 @@ paths:
   /alarm_count:
     get:
       summary: Get an overall status of the chart
-      description: >-
-        Checks multiple charts with the same context and counts number of alarms
-        with given status.
+      description: Checks multiple charts with the same context and counts number of alarms with given status.
       parameters:
         - in: query
           name: context
@@ -649,40 +534,21 @@ paths:
           default: RAISED
       responses:
         '200':
-          description: >-
-            An object containing a count of alarms with given status for given
-            contexts.
+          description: An object containing a count of alarms with given status for given contexts.
           schema:
             type: array
             items:
               type: number
         '500':
-          description: >-
-            Internal server error. This usually means the server is out of
-            memory.
+          description: Internal server error. This usually means the server is out of memory.
   /manage/health:
     get:
-      summary: >-
-        Accesses the health management API to control health checks and
-        notifications at runtime.
-      description: >-
-        Available from Netdata v1.12 and above, protected via bearer
-        authorization. Especially useful for maintenance periods, the API allows
-        you to disable health checks completely, silence alarm notifications, or
-        Disable/Silence specific alarms that match selectors on alarm/template
-        name, chart, context, host and family. For the simple disable/silence
-        all scenaria, only the cmd parameter is required. The other parameters
-        are used to define alarm selectors. For more information and examples,
-        refer to the netdata documentation.
+      summary: Accesses the health management API to control health checks and notifications at runtime.
+      description: 'Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenaria, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.'
       parameters:
         - name: cmd
           in: query
-          description: >-
-            DISABLE ALL: No alarm criteria are evaluated, nothing is written in
-            the alarm log. SILENCE ALL: No notifications are sent. RESET: Return
-            to the default state. DISABLE/SILENCE: Set the mode to be used for
-            the alarms matching the criteria of the alarm selectors. LIST: Show
-            active configuration.
+          description: 'DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors. LIST: Show active configuration.'
           required: false
           type: string
           enum:
@@ -694,21 +560,15 @@ paths:
             - LIST
         - name: alarm
           in: query
-          description: >-
-            The expression provided will match both `alarm` and `template`
-            names.
+          description: The expression provided will match both `alarm` and `template` names.
           type: string
         - name: chart
           in: query
-          description: >-
-            Chart ids/names, as shown on the dashboard. These will match the
-            `on` entry of a configured `alarm`.
+          description: 'Chart ids/names, as shown on the dashboard. These will match the `on` entry of a configured `alarm`.'
           type: string
         - name: context
           in: query
-          description: >-
-            Chart context, as shown on the dashboard. These will match the `on`
-            entry of a configured `template`.
+          description: 'Chart context, as shown on the dashboard. These will match the `on` entry of a configured `template`.'
           type: string
         - name: hosts
           in: query
@@ -847,26 +707,18 @@ definitions:
           - freebsd
       history:
         type: number
-        description: >-
-          The duration, in seconds, of the round robin database maintained by
-          netdata.
+        description: 'The duration, in seconds, of the round robin database maintained by netdata.'
       memory_mode:
         type: string
         description: The name of the database memory mode on the server.
       update_every:
         type: number
-        description: >-
-          The default update frequency of the netdata server. All charts have an
-          update frequency equal or bigger than this.
+        description: The default update frequency of the netdata server. All charts have an update frequency equal or bigger than this.
       charts:
         type: object
-        description: >-
-          An object containing all the chart objects available at the netdata
-          server. This is used as an indexed array. The key of each chart object
-          is the id of the chart.
+        description: An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.
         properties:
-          key:
-            $ref: '#/definitions/chart'
+          $ref: '#/definitions/chart'
       charts_count:
         type: number
         description: The number of charts.
@@ -890,39 +742,25 @@ definitions:
         description: The name of the chart.
       type:
         type: string
-        description: >-
-          The type of the chart. Types are not handled by netdata. You can use
-          this field for anything you like.
+        description: The type of the chart. Types are not handled by netdata. You can use this field for anything you like.
       family:
         type: string
-        description: >-
-          The family of the chart. Families are not handled by netdata. You can
-          use this field for anything you like.
+        description: The family of the chart. Families are not handled by netdata. You can use this field for anything you like.
       title:
         type: string
         description: The title of the chart.
       priority:
-        type: string
-        description: >-
-          The relative priority of the chart. NetData does not care about
-          priorities. This is just an indication of importance for the chart
-          viewers to sort charts of higher priority (lower number) closer to the
-          top. Priority sorting should only be used among charts of the same
-          type or family.
+        type: number
+        description: The relative priority of the chart. NetData does not care about priorities. This is just an indication of importance for the chart viewers to sort charts of higher priority (lower number) closer to the top. Priority sorting should only be used among charts of the same type or family.
       enabled:
         type: boolean
-        description: >-
-          True when the chart is enabled. Disabled charts do not currently
-          collect values, but they may have historical values available.
+        description: 'True when the chart is enabled. Disabled charts do not currently collect values, but they may have historical values available.'
       units:
         type: string
         description: The unit of measurement for the values of all dimensions of the chart.
       data_url:
         type: string
-        description: >-
-          The absolute path to get data values for this chart. You are expected
-          to use this path as the base when constructing the URL to fetch data
-          values for this chart.
+        description: The absolute path to get data values for this chart. You are expected to use this path as the base when constructing the URL to fetch data values for this chart.
       chart_type:
         type: string
         description: The chart type.
@@ -932,41 +770,36 @@ definitions:
           - stacked
       duration:
         type: number
-        description: >-
-          The duration, in seconds, of the round robin database maintained by
-          netdata.
+        description: 'The duration, in seconds, of the round robin database maintained by netdata.'
       first_entry:
         type: number
-        description: >-
-          The UNIX timestamp of the first entry (the oldest) in the round robin
-          database.
+        description: The UNIX timestamp of the first entry (the oldest) in the round robin database.
       last_entry:
         type: number
         description: The UNIX timestamp of the latest entry in the round robin database.
       update_every:
         type: number
-        description: >-
-          The update frequency of this chart, in seconds. One value every this
-          amount of time is kept in the round robin database.
+        description: 'The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database.'
       dimensions:
         type: object
-        description: >-
-          An object containing all the chart dimensions available for the chart.
-          This is used as an indexed array. The key of the object the id of the
-          dimension.
-        properties:
-          key:
-            $ref: '#/definitions/dimension'
+        description: 'An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is a dictionary containing the name.'
+        additionalProperties:
+          type: object
+          properties:
+            name:
+              type: string
+              description: The name of the dimension
       chart_variables:
         type: object
         properties:
-          key:
-            $ref: '#/definitions/chart_variables'
+          $ref: '#/definitions/chart_variables'
       green:
         type: number
+        nullable: 'true'
         description: Chart health green threshold.
       red:
         type: number
+        nullable: 'true'
         description: Chart health red threshold.
   alarm_variables:
     type: object
@@ -979,9 +812,7 @@ definitions:
         description: The name of the chart.
       cnart_context:
         type: string
-        description: >-
-          The context of the chart. It is shared across multiple monitored
-          software or hardware instances and used in alarm templates.
+        description: The context of the chart. It is shared across multiple monitored software or hardware instances and used in alarm templates.
       family:
         type: string
         description: The family of the chart.
@@ -991,8 +822,7 @@ definitions:
       chart_variables:
         type: object
         properties:
-          key:
-            $ref: '#/definitions/chart_variables'
+          $ref: '#/definitions/chart_variables'
       family_variables:
         type: object
         properties:
@@ -1020,18 +850,10 @@ definitions:
       varname2:
         type: number
         format: float
-  dimension:
-    type: object
-    properties:
-      name:
-        type: string
-        description: The name of the dimension.
   data:
     type: object
     discriminator: format
-    description: >-
-      Response will contain the appropriate subtype, e.g. data_json depending on
-      the requested format.
+    description: 'Response will contain the appropriate subtype, e.g. data_json depending on the requested format.'
     properties:
       api:
         type: number
@@ -1044,44 +866,28 @@ definitions:
         description: The name of the chart.
       update_every:
         type: number
-        description: >-
-          The update frequency of this chart, in seconds. One value every this
-          amount of time is kept in the round robin database (indepedently of
-          the current view).
+        description: 'The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view).'
       view_update_every:
         type: number
-        description: >-
-          The current view appropriate update frequency of this chart, in
-          seconds. There is no point to request chart refreshes, using the same
-          settings, more frequently than this.
+        description: 'The current view appropriate update frequency of this chart, in seconds. There is no point to request chart refreshes, using the same settings, more frequently than this.'
       first_entry:
         type: number
-        description: >-
-          The UNIX timestamp of the first entry (the oldest) in the round robin
-          database (indepedently of the current view).
+        description: The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view).
       last_entry:
         type: number
-        description: >-
-          The UNIX timestamp of the latest entry in the round robin database
-          (indepedently of the current view).
+        description: The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view).
       after:
         type: number
-        description: >-
-          The UNIX timestamp of the first entry (the oldest) returned in this
-          response.
+        description: The UNIX timestamp of the first entry (the oldest) returned in this response.
       before:
         type: number
         description: The UNIX timestamp of the latest entry returned in this response.
       min:
         type: number
-        description: >-
-          The minimum value returned in the current view. This can be used to
-          size the y-series of the chart.
+        description: The minimum value returned in the current view. This can be used to size the y-series of the chart.
       max:
         type: number
-        description: >-
-          The maximum value returned in the current view. This can be used to
-          size the y-series of the chart.
+        description: The maximum value returned in the current view. This can be used to size the y-series of the chart.
       dimension_names:
         description: The dimension names of the chart as returned in the current view.
         type: array
@@ -1093,9 +899,7 @@ definitions:
         items:
           type: string
       latest_values:
-        description: >-
-          The latest values collected for the chart (indepedently of the current
-          view).
+        description: The latest values collected for the chart (indepedently of the current view).
         type: array
         items:
           type: string
@@ -1116,8 +920,7 @@ definitions:
       chart_variables:
         type: object
         properties:
-          key:
-            $ref: '#/definitions/chart_variables'
+          $ref: '#/definitions/chart_variables'
   data_json:
     description: Data response in json format.
     allOf:
@@ -1132,18 +935,13 @@ definitions:
                 items:
                   type: string
               data:
-                description: >-
-                  The data requested, one element per sample with each element
-                  containing the values of the dimensions described in the
-                  labels value.
+                description: 'The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.'
                 type: array
                 items:
                   type: number
             description: 'The result requested, in the format requested.'
   data_flat:
-    description: >-
-      Data response in csv / tsv / tsv-excel / ssv / ssv-comma / markdown / html
-      formats.
+    description: Data response in csv / tsv / tsv-excel / ssv / ssv-comma / markdown / html formats.
     allOf:
       - $ref: '#/definitions/data'
       - properties:
@@ -1164,18 +962,13 @@ definitions:
       - $ref: '#/definitions/data'
       - properties:
           result:
-            description: >-
-              The first inner array contains strings showing the labels of each
-              column, each subsequent array contains the values for each point
-              in time.
+            description: 'The first inner array contains strings showing the labels of each column, each subsequent array contains the values for each point in time.'
             type: array
             items:
               type: array
               items: {}
   data_datatable:
-    description: >-
-      Data response in datatable / datasource formats (suitable for Google
-      Charts).
+    description: Data response in datatable / datasource formats (suitable for Google Charts).
     allOf:
       - $ref: '#/definitions/data'
       - properties:
@@ -1212,11 +1005,7 @@ definitions:
                       items:
                         properties:
                           v:
-                            description: >-
-                              Each value in the row is represented by an object
-                              named `c` with five v fields: data, null, null, 0,
-                              the value. This format is fixed by the Google
-                              Charts API.
+                            description: 'Each value in the row is represented by an object named `c` with five v fields: data, null, null, 0, the value. This format is fixed by the Google Charts API.'
   alarms:
     type: object
     properties:
@@ -1248,19 +1037,13 @@ definitions:
                 type: string
               active:
                 type: boolean
-                description: >-
-                  Will be false only if the alarm is disabled in the
-                  configuration.
+                description: Will be false only if the alarm is disabled in the configuration.
               disabled:
                 type: boolean
-                description: >-
-                  Whether the health check for this alarm has been disabled via
-                  a health command API DISABLE command.
+                description: Whether the health check for this alarm has been disabled via a health command API DISABLE command.
               silenced:
                 type: boolean
-                description: >-
-                  Whether notifications for this alarm have been silenced via a
-                  health command API SILENCE command.
+                description: Whether notifications for this alarm have been silenced via a health command API SILENCE command.
               exec:
                 type: string
               recipient:
@@ -1425,8 +1208,8 @@ definitions:
       info:
         type: string
       value:
-        type: string
-        format: nullable
+        type: number
+        nullable: 'true'
       old_value:
-        type: string
-        format: nullable
+        type: number
+        nullable: 'true'
