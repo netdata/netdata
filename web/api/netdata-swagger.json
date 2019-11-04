@@ -40,10 +40,7 @@
           "200": {
             "description": "An array of charts.",
             "schema": {
-              "type": "array",
-              "items": {
                 "$ref": "#/definitions/chart_summary"
-              }
             }
           }
         }
@@ -91,7 +88,8 @@
             "description": "The id of the chart as returned by the /charts call.",
             "required": true,
             "type": "string",
-            "format": "as returned by /charts"
+            "format": "as returned by /charts",
+            "default": "system.cpu"
           }
         ],
         "responses": {
@@ -951,9 +949,7 @@
           "type": "object",
           "description": "An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart"
-            }
           }
         },
         "charts_count": {
@@ -998,7 +994,7 @@
           "description": "The title of the chart."
         },
         "priority": {
-          "type": "string",
+          "type": "number",
           "description": "The relative priority of the chart. NetData does not care about priorities. This is just an indication of importance for the chart viewers to sort charts of higher priority (lower number) closer to the top. Priority sorting should only be used among charts of the same type or family."
         },
         "enabled": {
@@ -1040,27 +1036,31 @@
         },
         "dimensions": {
           "type": "object",
-          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. The key of the object the id of the dimension.",
-          "properties": {
-            "key": {
-              "$ref": "#/definitions/dimension"
+          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is a dictionary containing the name.",
+          "additionalProperties" : {
+            "type" : "object",
+            "properties" : {
+              "name" : {
+                "type" : "string",
+                "description" : "The name of the dimension"
+              }
             }
           }
         },
         "chart_variables": {
           "type": "object",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart_variables"
-            }
           }
         },
         "green": {
           "type": "number",
+          "nullable": "true",
           "description": "Chart health green threshold."
         },
         "red": {
           "type": "number",
+          "nullable": "true",
           "description": "Chart health red threshold."
         }
       }
@@ -1091,9 +1091,7 @@
         "chart_variables": {
           "type": "object",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart_variables"
-            }
           }
         },
         "family_variables": {
@@ -1134,15 +1132,6 @@
         "varname2": {
           "type": "number",
           "format": "float"
-        }
-      }
-    },
-    "dimension": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "The name of the dimension."
         }
       }
     },
@@ -1238,9 +1227,7 @@
         "chart_variables": {
           "type": "object",
           "properties": {
-            "key": {
               "$ref": "#/definitions/chart_variables"
-            }
           }
         }
       }
@@ -1678,12 +1665,12 @@
           "type": "string"
         },
         "value": {
-          "type": "string",
-          "format": "nullable"
+          "type": "number",
+          "nullable" : "true"
         },
         "old_value": {
-          "type": "string",
-          "format": "nullable"
+          "type": "number",
+          "nullable" : "true"
         }
       }
     }
