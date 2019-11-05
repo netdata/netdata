@@ -112,6 +112,9 @@ void simple_connector_worker(void *instance_p)
         // ------------------------------------------------------------------------
         // if we are connected, send our buffer to the data collecting server
 
+        uv_mutex_lock(&instance->mutex);
+        uv_cond_wait(&instance->cond_var, &instance->mutex);
+
         if(likely(sock != -1)) {
             size_t len = buffer_strlen(buffer);
             int flags = 0;
@@ -161,5 +164,7 @@ void simple_connector_worker(void *instance_p)
             // increment the counter we check for data loss
             failures++;
         }
+
+        uv_mutex_unlock(&instance->mutex);
     }
 }

@@ -55,6 +55,7 @@ int start_batch_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            uv_mutex_lock(&instance->mutex);
             if (connector->start_batch_formatting) {
                 if (connector->start_batch_formatting(instance) != 0) {
                     error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
@@ -194,6 +195,8 @@ int end_batch_formatting(struct engine *engine)
                     return 1;
                 }
             }
+            uv_mutex_unlock(&instance->mutex);
+            uv_cond_signal(&instance->cond_var);
         }
     }
 
@@ -212,20 +215,20 @@ int end_batch_formatting(struct engine *engine)
 int prepare_buffers(struct engine *engine)
 {
     netdata_thread_disable_cancelability();
-    // rrd_rdlock();
+    rrd_rdlock();
     if (start_batch_formatting(engine) != 0)
         return 1;
 
     RRDHOST *host;
     rrdhost_foreach_read(host)
     {
-        // rrdhost_rdlock(host);
+        rrdhost_rdlock(host);
         if (start_host_formatting(engine) != 0)
             return 1;
         RRDSET *st;
         rrdset_foreach_read(st, host)
         {
-            // rrdset_rdlock(st);
+            rrdset_rdlock(st);
             if (start_chart_formatting(engine) != 0)
                 return 1;
 
@@ -238,17 +241,17 @@ int prepare_buffers(struct engine *engine)
 
             if (end_chart_formatting(engine) != 0)
                 return 1;
-            // rrdset_unlock(st);
+            rrdset_unlock(st);
         }
 
         if (end_host_formatting(engine) != 0)
             return 1;
-        // rrdhost_unlock(host);
+        rrdhost_unlock(host);
     }
 
     if (end_batch_formatting(engine) != 0)
         return 1;
-    // rrd_unlock();
+    rrd_unlock();
     netdata_thread_enable_cancelability();
 
     return 0;
