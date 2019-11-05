@@ -1,6 +1,8 @@
 import React, { Fragment } from "react"
 import classNames from "classnames"
 
+import { colorHex2Rgb } from "utils/color-hex-2-rgb"
+
 import { seconds4human } from "../utils/seconds4human"
 import { Attributes } from "../utils/transformDataAttributes"
 import { ChartData, ChartDetails, DygraphData } from "../chart-types"
@@ -175,7 +177,7 @@ export const ChartLegend = ({
         {chartData.dimension_names.map((dimensionName, i) => {
           // todo dimension could be a separate component
           const color = colors[dimensionName]
-          const rgb = window.NETDATA.colorHex2Rgb(color)
+          const rgb = colorHex2Rgb(color)
 
           const isSelected = selectedDimensions.length === 0
             || selectedDimensions.includes(dimensionName)
