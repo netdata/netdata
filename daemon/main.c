@@ -74,7 +74,9 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_STATSD
 
         // common plugins for all systems
+#ifdef ENABLE_EXPORTING
     {"EXPORTING",            NULL,                    NULL,         1, NULL, NULL, exporting_main},
+#endif
     {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
 
@@ -1237,9 +1239,11 @@ int main(int argc, char **argv) {
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
 
+#ifdef ENABLE_EXPORTING
     // prerare engine for connectors
     if (read_exporting_config())
         info("Engine for connectors activated");
+#endif
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
