@@ -5,6 +5,8 @@
 
 #include "daemon/common.h"
 
+#include <uv.h>
+
 extern char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long expconfig_get_number(struct config *root, const char *section, const char *name, long long value);
 extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
