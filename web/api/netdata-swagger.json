@@ -1,19 +1,10 @@
 {
-  "swagger": "2.0",
+  "openapi": "3.0.0",
   "info": {
     "title": "NetData API",
     "description": "Real-time performance and health monitoring.",
     "version": "1.11.1_rolling"
   },
-  "host": "registry.my-netdata.io",
-  "schemes": [
-    "https",
-    "http"
-  ],
-  "basePath": "/api/v1",
-  "produces": [
-    "application/json"
-  ],
   "paths": {
     "/info": {
       "get": {
@@ -22,8 +13,12 @@
         "responses": {
           "200": {
             "description": "netdata basic information.",
-            "schema": {
-              "$ref": "#/definitions/info"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/info"
+                }
+              }
             }
           },
           "503": {
@@ -39,8 +34,12 @@
         "responses": {
           "200": {
             "description": "An array of charts.",
-            "schema": {
-                "$ref": "#/definitions/chart_summary"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/chart_summary"
+                }
+              }
             }
           }
         }
@@ -56,16 +55,22 @@
             "in": "query",
             "description": "The id of the chart as returned by the /charts call.",
             "required": true,
-            "type": "string",
-            "format": "as returned by /charts",
-            "default": "system.cpu"
+            "schema": {
+              "type": "string",
+              "format": "as returned by /charts",
+              "default": "system.cpu"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "A javascript object with detailed information about the chart.",
-            "schema": {
-              "$ref": "#/definitions/chart"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/chart"
+                }
+              }
             }
           },
           "400": {
@@ -87,16 +92,22 @@
             "in": "query",
             "description": "The id of the chart as returned by the /charts call.",
             "required": true,
-            "type": "string",
-            "format": "as returned by /charts",
-            "default": "system.cpu"
+            "schema": {
+              "type": "string",
+              "format": "as returned by /charts",
+              "default": "system.cpu"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "A javascript object with information about the chart and the available variables.",
-            "schema": {
-              "$ref": "#/definitions/alarm_variables"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/alarm_variables"
+                }
+              }
             }
           },
           "400": {
@@ -121,170 +132,196 @@
             "in": "query",
             "description": "The id of the chart as returned by the /charts call.",
             "required": true,
-            "type": "string",
-            "format": "as returned by /charts",
             "allowEmptyValue": false,
-            "default": "system.cpu"
+            "schema": {
+              "type": "string",
+              "format": "as returned by /charts",
+              "default": "system.cpu"
+            }
           },
           {
             "name": "dimension",
             "in": "query",
             "description": "Zero, one or more dimension ids or names, as returned by the /chart call, separated with comma or pipe. Netdata simple patterns are supported.",
             "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "collectionFormat": "pipes",
-              "format": "as returned by /charts"
-            },
-            "allowEmptyValue": false
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "as returned by /charts"
+              }
+            }
           },
           {
             "name": "after",
             "in": "query",
             "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds (negative, relative to parameter: before). Netdata will assume it is a relative number if it is less that 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is the beginning of the round robin database (i.e. by default netdata will attempt to return data for the entire database).",
             "required": true,
-            "type": "number",
-            "format": "integer",
             "allowEmptyValue": false,
-            "default": -600
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -600
+            }
           },
           {
             "name": "before",
             "in": "query",
             "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds (negative), relative to the last collected timestamp. Netdata will assume it is a relative number if it is less than 3 years (in seconds). Netdata will adapt this parameter to the boundaries of the round robin database. The default is zero (i.e. the timestamp of the last value collected).",
             "required": false,
-            "type": "number",
-            "format": "integer",
-            "default": 0
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 0
+            }
           },
           {
             "name": "points",
             "in": "query",
             "description": "The number of points to be returned. If not given, or it is <= 0, or it is bigger than the points stored in the round robin database for this chart for the given duration, all the available collected values for the given duration will be returned.",
             "required": true,
-            "type": "number",
-            "format": "integer",
             "allowEmptyValue": false,
-            "default": 20
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 20
+            }
           },
           {
             "name": "group",
             "in": "query",
             "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
             "required": true,
-            "type": "string",
-            "enum": [
-              "min",
-              "max",
-              "average",
-              "median",
-              "stddev",
-              "sum",
-              "incremental-sum"
-            ],
-            "default": "average",
-            "allowEmptyValue": false
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "min",
+                "max",
+                "average",
+                "median",
+                "stddev",
+                "sum",
+                "incremental-sum"
+              ],
+              "default": "average"
+            }
           },
           {
             "name": "gtime",
             "in": "query",
             "description": "The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).",
             "required": false,
-            "type": "number",
-            "format": "integer",
             "allowEmptyValue": false,
-            "default": 0
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 0
+            }
           },
           {
             "name": "format",
             "in": "query",
             "description": "The format of the data to be returned.",
             "required": true,
-            "type": "string",
-            "enum": [
-              "json",
-              "jsonp",
-              "csv",
-              "tsv",
-              "tsv-excel",
-              "ssv",
-              "ssvcomma",
-              "datatable",
-              "datasource",
-              "html",
-              "markdown",
-              "array",
-              "csvjsonarray"
-            ],
-            "default": "json",
-            "allowEmptyValue": false
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "jsonp",
+                "csv",
+                "tsv",
+                "tsv-excel",
+                "ssv",
+                "ssvcomma",
+                "datatable",
+                "datasource",
+                "html",
+                "markdown",
+                "array",
+                "csvjsonarray"
+              ],
+              "default": "json"
+            }
           },
           {
             "name": "options",
             "in": "query",
             "description": "Options that affect data generation.",
             "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "nonzero",
-                "flip",
-                "jsonwrap",
-                "min2max",
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "nonzero",
+                  "flip",
+                  "jsonwrap",
+                  "min2max",
+                  "seconds",
+                  "milliseconds",
+                  "abs",
+                  "absolute",
+                  "absolute-sum",
+                  "null2zero",
+                  "objectrows",
+                  "google_json",
+                  "percentage",
+                  "unaligned",
+                  "match-ids",
+                  "match-names",
+                  "showcustomvars"
+                ]
+              },
+              "default": [
                 "seconds",
-                "milliseconds",
-                "abs",
-                "absolute",
-                "absolute-sum",
-                "null2zero",
-                "objectrows",
-                "google_json",
-                "percentage",
-                "unaligned",
-                "match-ids",
-                "match-names",
-                "showcustomvars"
-              ],
-              "collectionFormat": "pipes"
-            },
-            "default": [
-              "seconds",
-              "jsonwrap"
-            ],
-            "allowEmptyValue": false
+                "jsonwrap"
+              ]
+            }
           },
           {
             "name": "callback",
             "in": "query",
             "description": "For JSONP responses, the callback function name.",
             "required": false,
-            "type": "string",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "filename",
             "in": "query",
-            "description": "Add Content-Disposition: attachment; filename=<filename> header to the response, that will instruct the browser to save the response with the given filename.",
+            "description": "Add Content-Disposition: attachment; filename= header to the response, that will instruct the browser to save the response with the given filename.",
             "required": false,
-            "type": "string",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "tqx",
             "in": "query",
             "description": "[Google Visualization API](https://developers.google.com/chart/interactive/docs/dev/implementing_data_source?hl=en) formatted parameter.",
             "required": false,
-            "type": "string",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The call was successful. The response includes the data in the format requested. Swagger2.0 does not process the discriminator field to show polymorphism. The response will be one of the sub-types of the data-schema according to the chosen format, e.g. json -> data_json.",
-            "schema": {
-              "$ref": "#/definitions/data"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/data"
+                }
+              }
             }
           },
           "400": {
@@ -309,156 +346,182 @@
             "in": "query",
             "description": "The id of the chart as returned by the /charts call.",
             "required": true,
-            "type": "string",
-            "format": "as returned by /charts",
             "allowEmptyValue": false,
-            "default": "system.cpu"
+            "schema": {
+              "type": "string",
+              "format": "as returned by /charts",
+              "default": "system.cpu"
+            }
           },
           {
             "name": "alarm",
             "in": "query",
             "description": "The name of an alarm linked to the chart.",
             "required": false,
-            "type": "string",
-            "format": "any text",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
           },
           {
             "name": "dimension",
             "in": "query",
             "description": "Zero, one or more dimension ids, as returned by the /chart call.",
             "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "collectionFormat": "pipes",
-              "format": "as returned by /charts"
-            },
-            "allowEmptyValue": false
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "as returned by /charts"
+              }
+            }
           },
           {
             "name": "after",
             "in": "query",
             "description": "This parameter can either be an absolute timestamp specifying the starting point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
             "required": true,
-            "type": "number",
-            "format": "integer",
             "allowEmptyValue": false,
-            "default": -600
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": -600
+            }
           },
           {
             "name": "before",
             "in": "query",
             "description": "This parameter can either be an absolute timestamp specifying the ending point of the data to be returned, or a relative number of seconds, to the last collected timestamp. Netdata will assume it is a relative number if it is smaller than the duration of the round robin database for this chart. So, if the round robin database is 3600 seconds, any value from -3600 to 3600 will trigger relative arithmetics. Netdata will adapt this parameter to the boundaries of the round robin database.",
             "required": false,
-            "type": "number",
-            "format": "integer",
-            "default": 0
+            "schema": {
+              "type": "number",
+              "format": "integer",
+              "default": 0
+            }
           },
           {
             "name": "group",
             "in": "query",
             "description": "The grouping method. If multiple collected values are to be grouped in order to return fewer points, this parameters defines the method of grouping. methods are supported \"min\", \"max\", \"average\", \"sum\", \"incremental-sum\". \"max\" is actually calculated on the absolute value collected (so it works for both positive and negative dimesions to return the most extreme value in either direction).",
             "required": true,
-            "type": "string",
-            "enum": [
-              "min",
-              "max",
-              "average",
-              "median",
-              "stddev",
-              "sum",
-              "incremental-sum"
-            ],
-            "default": "average",
-            "allowEmptyValue": false
+            "allowEmptyValue": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "min",
+                "max",
+                "average",
+                "median",
+                "stddev",
+                "sum",
+                "incremental-sum"
+              ],
+              "default": "average"
+            }
           },
           {
             "name": "options",
             "in": "query",
             "description": "Options that affect data generation.",
             "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "abs",
-                "absolute",
-                "display-absolute",
-                "absolute-sum",
-                "null2zero",
-                "percentage",
-                "unaligned"
-              ],
-              "collectionFormat": "pipes"
-            },
-            "default": [
-              "absolute"
-            ],
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "abs",
+                  "absolute",
+                  "display-absolute",
+                  "absolute-sum",
+                  "null2zero",
+                  "percentage",
+                  "unaligned"
+                ]
+              },
+              "default": [
+                "absolute"
+              ]
+            }
           },
           {
             "name": "label",
             "in": "query",
             "description": "A text to be used as the label.",
             "required": false,
-            "type": "string",
-            "format": "any text",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
           },
           {
             "name": "units",
             "in": "query",
             "description": "A text to be used as the units.",
             "required": false,
-            "type": "string",
-            "format": "any text",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
           },
           {
             "name": "label_color",
             "in": "query",
             "description": "A color to be used for the background of the label.",
             "required": false,
-            "type": "string",
-            "format": "any text",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
           },
           {
             "name": "value_color",
             "in": "query",
-            "description": "A color to be used for the background of the label. You can set multiple using a pipe with a condition each, like this: color<value|color>value|color:null The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists).",
+            "description": "A color to be used for the background of the label. You can set multiple using a pipe with a condition each, like this: colorvalue|color:null The following operators are supported: >, <, >=, <=, =, :null (to check if no value exists).",
             "required": false,
-            "type": "string",
-            "format": "any text",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
           },
           {
             "name": "multiply",
             "in": "query",
             "description": "Multiply the value with this number for rendering it at the image (integer value required).",
             "required": false,
-            "type": "number",
-            "format": "integer",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
           },
           {
             "name": "divide",
             "in": "query",
             "description": "Divide the value with this number for rendering it at the image (integer value required).",
             "required": false,
-            "type": "number",
-            "format": "integer",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
           },
           {
             "name": "scale",
             "in": "query",
             "description": "Set the scale of the badge (greater or equal to 100).",
             "required": false,
-            "type": "number",
-            "format": "integer",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "number",
+              "format": "integer"
+            }
           }
         ],
         "responses": {
@@ -487,115 +550,135 @@
             "in": "query",
             "description": "The format of the response to be returned.",
             "required": true,
-            "type": "string",
-            "enum": [
-              "shell",
-              "prometheus",
-              "prometheus_all_hosts",
-              "json"
-            ],
-            "default": "shell"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "shell",
+                "prometheus",
+                "prometheus_all_hosts",
+                "json"
+              ],
+              "default": "shell"
+            }
           },
           {
             "name": "help",
             "in": "query",
             "description": "Enable or disable HELP lines in prometheus output.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "yes",
-              "no"
-            ],
-            "default": "no"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "default": "no"
+            }
           },
           {
             "name": "types",
             "in": "query",
             "description": "Enable or disable TYPE lines in prometheus output.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "yes",
-              "no"
-            ],
-            "default": "no"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "default": "no"
+            }
           },
           {
             "name": "timestamps",
             "in": "query",
             "description": "Enable or disable timestamps in prometheus output.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "yes",
-              "no"
-            ],
-            "default": "yes"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "default": "yes"
+            }
           },
           {
             "name": "names",
             "in": "query",
             "description": "When enabled netdata will report dimension names. When disabled netdata will report dimension IDs. The default is controlled in netdata.conf.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "yes",
-              "no"
-            ],
-            "default": "yes"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "default": "yes"
+            }
           },
           {
             "name": "oldunits",
             "in": "query",
             "description": "When enabled, netdata will show metric names for the default source=average as they appeared before 1.12, by using the legacy unit naming conventions.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "yes",
-              "no"
-            ],
-            "default": "yes"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "default": "yes"
+            }
           },
           {
             "name": "hideunits",
             "in": "query",
             "description": "When enabled, netdata will not include the units in the metric names, for the default source=average.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "yes",
-              "no"
-            ],
-            "default": "yes"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "default": "yes"
+            }
           },
           {
             "name": "server",
             "in": "query",
             "description": "Set a distinct name of the client querying prometheus metrics. Netdata will use the client IP if this is not set.",
             "required": false,
-            "type": "string",
-            "format": "any text"
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
           },
           {
             "name": "prefix",
             "in": "query",
             "description": "Prefix all prometheus metrics with this string.",
             "required": false,
-            "type": "string",
-            "format": "any text"
+            "schema": {
+              "type": "string",
+              "format": "any text"
+            }
           },
           {
             "name": "data",
             "in": "query",
             "description": "Select the prometheus response data source. There is a setting in netdata.conf for the default.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "as-collected",
-              "average",
-              "sum"
-            ],
-            "default": "average"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "as-collected",
+                "average",
+                "sum"
+              ],
+              "default": "average"
+            }
           }
         ],
         "responses": {
@@ -618,15 +701,21 @@
             "in": "query",
             "description": "If passed, all enabled alarms are returned.",
             "required": false,
-            "type": "boolean",
-            "allowEmptyValue": true
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "An object containing general info and a linked list of alarms.",
-            "schema": {
-              "$ref": "#/definitions/alarms"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/alarms"
+                }
+              }
             }
           }
         }
@@ -642,16 +731,22 @@
             "in": "query",
             "description": "Passing the parameter after=UNIQUEID returns all the events in the alarm log that occurred after UNIQUEID. An automated series of calls would call the interface once without after=, store the last UNIQUEID of the returned set, and give it back to get incrementally the next events.",
             "required": false,
-            "type": "integer"
+            "schema": {
+              "type": "integer"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "An array of alarm log entries.",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/alarm_log_entry"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/alarm_log_entry"
+                  }
+                }
               }
             }
           }
@@ -669,14 +764,15 @@
             "description": "Specify context which should be checked.",
             "required": false,
             "allowEmptyValue": true,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "collectionFormat": "pipes"
-            },
-            "default": [
-              "system.cpu"
-            ]
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "system.cpu"
+              ]
+            }
           },
           {
             "in": "query",
@@ -684,26 +780,32 @@
             "description": "Specify alarm status to count.",
             "required": false,
             "allowEmptyValue": true,
-            "type": "string",
-            "enum": [
-              "REMOVED",
-              "UNDEFINED",
-              "UNINITIALIZED",
-              "CLEAR",
-              "RAISED",
-              "WARNING",
-              "CRITICAL"
-            ],
-            "default": "RAISED"
+            "schema": {
+              "type": "string",
+              "enum": [
+                "REMOVED",
+                "UNDEFINED",
+                "UNINITIALIZED",
+                "CLEAR",
+                "RAISED",
+                "WARNING",
+                "CRITICAL"
+              ],
+              "default": "RAISED"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "An object containing a count of alarms with given status for given contexts.",
-            "schema": {
-              "type": "array",
-              "items": {
-                "type": "number"
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  }
+                }
               }
             }
           },
@@ -723,45 +825,57 @@
             "in": "query",
             "description": "DISABLE ALL: No alarm criteria are evaluated, nothing is written in the alarm log. SILENCE ALL: No notifications are sent. RESET: Return to the default state. DISABLE/SILENCE: Set the mode to be used for the alarms matching the criteria of the alarm selectors. LIST: Show active configuration.",
             "required": false,
-            "type": "string",
-            "enum": [
-              "DISABLE ALL",
-              "SILENCE ALL",
-              "DISABLE",
-              "SILENCE",
-              "RESET",
-              "LIST"
-            ]
+            "schema": {
+              "type": "string",
+              "enum": [
+                "DISABLE ALL",
+                "SILENCE ALL",
+                "DISABLE",
+                "SILENCE",
+                "RESET",
+                "LIST"
+              ]
+            }
           },
           {
             "name": "alarm",
             "in": "query",
             "description": "The expression provided will match both `alarm` and `template` names.",
-            "type": "string"
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "chart",
             "in": "query",
             "description": "Chart ids/names, as shown on the dashboard. These will match the `on` entry of a configured `alarm`.",
-            "type": "string"
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "context",
             "in": "query",
             "description": "Chart context, as shown on the dashboard. These will match the `on` entry of a configured `template`.",
-            "type": "string"
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "hosts",
             "in": "query",
             "description": "The hostnames that will need to match.",
-            "type": "string"
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "families",
             "in": "query",
             "description": "The alarm families.",
-            "type": "string"
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -775,599 +889,611 @@
       }
     }
   },
-  "definitions": {
-    "info": {
-      "type": "object",
-      "properties": {
-        "version": {
-          "type": "string",
-          "description": "netdata version of the server.",
-          "example": "1.11.1_rolling"
-        },
-        "uid": {
-          "type": "string",
-          "description": "netdata unique id of the server.",
-          "example": "24e9fe3c-f2ac-11e8-bafc-0242ac110002"
-        },
-        "mirrored_hosts": {
-          "type": "array",
-          "description": "List of hosts mirrored of the server (include itself).",
-          "items": {
-            "type": "string"
+  "servers": [
+    {
+      "url": "https://registry.my-netdata.io/api/v1"
+    },
+    {
+      "url": "http://registry.my-netdata.io/api/v1"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "info": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "netdata version of the server.",
+            "example": "1.11.1_rolling"
           },
-          "example": [
-            "host1.example.com",
-            "host2.example.com"
-          ]
-        },
-        "os_name": {
-          "type": "string",
-          "description": "Operating System Name.",
-          "example": "Manjaro Linux"
-        },
-        "os_id": {
-          "type": "string",
-          "description": "Operating System ID.",
-          "example": "manjaro"
-        },
-        "os_id_like": {
-          "type": "string",
-          "description": "Known OS similar to this OS.",
-          "example": "arch"
-        },
-        "os_version": {
-          "type": "string",
-          "description": "Operating System Version.",
-          "example": "18.0.4"
-        },
-        "os_version_id": {
-          "type": "string",
-          "description": "Operating System Version ID.",
-          "example": "unknown"
-        },
-        "os_detection": {
-          "type": "string",
-          "description": "OS parameters detection method.",
-          "example": "Mixed"
-        },
-        "kernel_name": {
-          "type": "string",
-          "description": "Kernel Name.",
-          "example": "Linux"
-        },
-        "kernel_version": {
-          "type": "string",
-          "description": "Kernel Version.",
-          "example": "4.19.32-1-MANJARO"
-        },
-        "architecture": {
-          "type": "string",
-          "description": "Kernel architecture.",
-          "example": "x86_64"
-        },
-        "virtualization": {
-          "type": "string",
-          "description": "Virtualization Type.",
-          "example": "kvm"
-        },
-        "virt_detection": {
-          "type": "string",
-          "description": "Virtualization detection method.",
-          "example": "systemd-detect-virt"
-        },
-        "container": {
-          "type": "string",
-          "description": "Container technology.",
-          "example": "docker"
-        },
-        "container_detection": {
-          "type": "string",
-          "description": "Container technology detection method.",
-          "example": "dockerenv"
-        },
-        "collectors": {
-          "type": "array",
-          "items": {
+          "uid": {
+            "type": "string",
+            "description": "netdata unique id of the server.",
+            "example": "24e9fe3c-f2ac-11e8-bafc-0242ac110002"
+          },
+          "mirrored_hosts": {
+            "type": "array",
+            "description": "List of hosts mirrored of the server (include itself).",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "host1.example.com",
+              "host2.example.com"
+            ]
+          },
+          "os_name": {
+            "type": "string",
+            "description": "Operating System Name.",
+            "example": "Manjaro Linux"
+          },
+          "os_id": {
+            "type": "string",
+            "description": "Operating System ID.",
+            "example": "manjaro"
+          },
+          "os_id_like": {
+            "type": "string",
+            "description": "Known OS similar to this OS.",
+            "example": "arch"
+          },
+          "os_version": {
+            "type": "string",
+            "description": "Operating System Version.",
+            "example": "18.0.4"
+          },
+          "os_version_id": {
+            "type": "string",
+            "description": "Operating System Version ID.",
+            "example": "unknown"
+          },
+          "os_detection": {
+            "type": "string",
+            "description": "OS parameters detection method.",
+            "example": "Mixed"
+          },
+          "kernel_name": {
+            "type": "string",
+            "description": "Kernel Name.",
+            "example": "Linux"
+          },
+          "kernel_version": {
+            "type": "string",
+            "description": "Kernel Version.",
+            "example": "4.19.32-1-MANJARO"
+          },
+          "architecture": {
+            "type": "string",
+            "description": "Kernel architecture.",
+            "example": "x86_64"
+          },
+          "virtualization": {
+            "type": "string",
+            "description": "Virtualization Type.",
+            "example": "kvm"
+          },
+          "virt_detection": {
+            "type": "string",
+            "description": "Virtualization detection method.",
+            "example": "systemd-detect-virt"
+          },
+          "container": {
+            "type": "string",
+            "description": "Container technology.",
+            "example": "docker"
+          },
+          "container_detection": {
+            "type": "string",
+            "description": "Container technology detection method.",
+            "example": "dockerenv"
+          },
+          "collectors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "Array of collector plugins and modules.",
+              "properties": {
+                "plugin": {
+                  "type": "string",
+                  "description": "Collector plugin.",
+                  "example": "python.d.plugin"
+                },
+                "module": {
+                  "type": "string",
+                  "description": "Module of the collector plugin.",
+                  "example": "dockerd"
+                }
+              }
+            }
+          },
+          "alarms": {
             "type": "object",
-            "description": "Array of collector plugins and modules.",
+            "description": "Number of alarms in the server.",
             "properties": {
-              "plugin": {
-                "type": "string",
-                "description": "Collector plugin.",
-                "example": "python.d.plugin"
+              "normal": {
+                "type": "integer",
+                "description": "Number of alarms in normal state."
               },
-              "module": {
-                "type": "string",
-                "description": "Module of the collector plugin.",
-                "example": "dockerd"
+              "warning": {
+                "type": "integer",
+                "description": "Number of alarms in warning state."
+              },
+              "critical": {
+                "type": "integer",
+                "description": "Number of alarms in critical state."
               }
             }
           }
-        },
-        "alarms": {
-          "type": "object",
-          "description": "Number of alarms in the server.",
-          "properties": {
-            "normal": {
-              "type": "integer",
-              "description": "Number of alarms in normal state."
-            },
-            "warning": {
-              "type": "integer",
-              "description": "Number of alarms in warning state."
-            },
-            "critical": {
-              "type": "integer",
-              "description": "Number of alarms in critical state."
+        }
+      },
+      "chart_summary": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "description": "The hostname of the netdata server."
+          },
+          "version": {
+            "type": "string",
+            "description": "netdata version of the server."
+          },
+          "release_channel": {
+            "type": "string",
+            "description": "The release channel of the build on the server.",
+            "example": "nightly"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "The current timezone on the server."
+          },
+          "os": {
+            "type": "string",
+            "description": "The netdata server host operating system.",
+            "enum": [
+              "macos",
+              "linux",
+              "freebsd"
+            ]
+          },
+          "history": {
+            "type": "number",
+            "description": "The duration, in seconds, of the round robin database maintained by netdata."
+          },
+          "memory_mode": {
+            "type": "string",
+            "description": "The name of the database memory mode on the server."
+          },
+          "update_every": {
+            "type": "number",
+            "description": "The default update frequency of the netdata server. All charts have an update frequency equal or bigger than this."
+          },
+          "charts": {
+            "type": "object",
+            "description": "An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/chart"
             }
+          },
+          "charts_count": {
+            "type": "number",
+            "description": "The number of charts."
+          },
+          "dimensions_count": {
+            "type": "number",
+            "description": "The total number of dimensions."
+          },
+          "alarms_count": {
+            "type": "number",
+            "description": "The number of alarms."
+          },
+          "rrd_memory_bytes": {
+            "type": "number",
+            "description": "The size of the round robin database in bytes."
           }
         }
-      }
-    },
-    "chart_summary": {
-      "type": "object",
-      "properties": {
-        "hostname": {
-          "type": "string",
-          "description": "The hostname of the netdata server."
-        },
-        "version": {
-          "type": "string",
-          "description": "netdata version of the server."
-        },
-        "release_channel": {
-          "type": "string",
-          "description": "The release channel of the build on the server.",
-          "example": "nightly"
-        },
-        "timezone": {
-          "type": "string",
-          "description": "The current timezone on the server."
-        },
-        "os": {
-          "type": "string",
-          "description": "The netdata server host operating system.",
-          "enum": [
-            "macos",
-            "linux",
-            "freebsd"
-          ]
-        },
-        "history": {
-          "type": "number",
-          "description": "The duration, in seconds, of the round robin database maintained by netdata."
-        },
-        "memory_mode": {
-          "type": "string",
-          "description": "The name of the database memory mode on the server."
-        },
-        "update_every": {
-          "type": "number",
-          "description": "The default update frequency of the netdata server. All charts have an update frequency equal or bigger than this."
-        },
-        "charts": {
-          "type": "object",
-          "description": "An object containing all the chart objects available at the netdata server. This is used as an indexed array. The key of each chart object is the id of the chart.",
-          "properties": {
-              "$ref": "#/definitions/chart"
-          }
-        },
-        "charts_count": {
-          "type": "number",
-          "description": "The number of charts."
-        },
-        "dimensions_count": {
-          "type": "number",
-          "description": "The total number of dimensions."
-        },
-        "alarms_count": {
-          "type": "number",
-          "description": "The number of alarms."
-        },
-        "rrd_memory_bytes": {
-          "type": "number",
-          "description": "The size of the round robin database in bytes."
-        }
-      }
-    },
-    "chart": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "The unique id of the chart."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the chart."
-        },
-        "type": {
-          "type": "string",
-          "description": "The type of the chart. Types are not handled by netdata. You can use this field for anything you like."
-        },
-        "family": {
-          "type": "string",
-          "description": "The family of the chart. Families are not handled by netdata. You can use this field for anything you like."
-        },
-        "title": {
-          "type": "string",
-          "description": "The title of the chart."
-        },
-        "priority": {
-          "type": "number",
-          "description": "The relative priority of the chart. NetData does not care about priorities. This is just an indication of importance for the chart viewers to sort charts of higher priority (lower number) closer to the top. Priority sorting should only be used among charts of the same type or family."
-        },
-        "enabled": {
-          "type": "boolean",
-          "description": "True when the chart is enabled. Disabled charts do not currently collect values, but they may have historical values available."
-        },
-        "units": {
-          "type": "string",
-          "description": "The unit of measurement for the values of all dimensions of the chart."
-        },
-        "data_url": {
-          "type": "string",
-          "description": "The absolute path to get data values for this chart. You are expected to use this path as the base when constructing the URL to fetch data values for this chart."
-        },
-        "chart_type": {
-          "type": "string",
-          "description": "The chart type.",
-          "enum": [
-            "line",
-            "area",
-            "stacked"
-          ]
-        },
-        "duration": {
-          "type": "number",
-          "description": "The duration, in seconds, of the round robin database maintained by netdata."
-        },
-        "first_entry": {
-          "type": "number",
-          "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database."
-        },
-        "last_entry": {
-          "type": "number",
-          "description": "The UNIX timestamp of the latest entry in the round robin database."
-        },
-        "update_every": {
-          "type": "number",
-          "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database."
-        },
-        "dimensions": {
-          "type": "object",
-          "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is a dictionary containing the name.",
-          "additionalProperties" : {
-            "type" : "object",
-            "properties" : {
-              "name" : {
-                "type" : "string",
-                "description" : "The name of the dimension"
-              }
-            }
-          }
-        },
-        "chart_variables": {
-          "type": "object",
-          "properties": {
-              "$ref": "#/definitions/chart_variables"
-          }
-        },
-        "green": {
-          "type": "number",
-          "nullable": "true",
-          "description": "Chart health green threshold."
-        },
-        "red": {
-          "type": "number",
-          "nullable": "true",
-          "description": "Chart health red threshold."
-        }
-      }
-    },
-    "alarm_variables": {
-      "type": "object",
-      "properties": {
-        "chart": {
-          "type": "string",
-          "description": "The unique id of the chart."
-        },
-        "chart_name": {
-          "type": "string",
-          "description": "The name of the chart."
-        },
-        "cnart_context": {
-          "type": "string",
-          "description": "The context of the chart. It is shared across multiple monitored software or hardware instances and used in alarm templates."
-        },
-        "family": {
-          "type": "string",
-          "description": "The family of the chart."
-        },
-        "host": {
-          "type": "string",
-          "description": "The host containing the chart."
-        },
-        "chart_variables": {
-          "type": "object",
-          "properties": {
-              "$ref": "#/definitions/chart_variables"
-          }
-        },
-        "family_variables": {
-          "type": "object",
-          "properties": {
-            "varname1": {
-              "type": "number",
-              "format": "float"
-            },
-            "varname2": {
-              "type": "number",
-              "format": "float"
-            }
-          }
-        },
-        "host_variables": {
-          "type": "object",
-          "properties": {
-            "varname1": {
-              "type": "number",
-              "format": "float"
-            },
-            "varname2": {
-              "type": "number",
-              "format": "float"
-            }
-          }
-        }
-      }
-    },
-    "chart_variables": {
-      "type": "object",
-      "properties": {
-        "varname1": {
-          "type": "number",
-          "format": "float"
-        },
-        "varname2": {
-          "type": "number",
-          "format": "float"
-        }
-      }
-    },
-    "data": {
-      "type": "object",
-      "discriminator": "format",
-      "description": "Response will contain the appropriate subtype, e.g. data_json depending on the requested format.",
-      "properties": {
-        "api": {
-          "type": "number",
-          "description": "The API version this conforms to, currently 1."
-        },
-        "id": {
-          "type": "string",
-          "description": "The unique id of the chart."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the chart."
-        },
-        "update_every": {
-          "type": "number",
-          "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view)."
-        },
-        "view_update_every": {
-          "type": "number",
-          "description": "The current view appropriate update frequency of this chart, in seconds. There is no point to request chart refreshes, using the same settings, more frequently than this."
-        },
-        "first_entry": {
-          "type": "number",
-          "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view)."
-        },
-        "last_entry": {
-          "type": "number",
-          "description": "The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view)."
-        },
-        "after": {
-          "type": "number",
-          "description": "The UNIX timestamp of the first entry (the oldest) returned in this response."
-        },
-        "before": {
-          "type": "number",
-          "description": "The UNIX timestamp of the latest entry returned in this response."
-        },
-        "min": {
-          "type": "number",
-          "description": "The minimum value returned in the current view. This can be used to size the y-series of the chart."
-        },
-        "max": {
-          "type": "number",
-          "description": "The maximum value returned in the current view. This can be used to size the y-series of the chart."
-        },
-        "dimension_names": {
-          "description": "The dimension names of the chart as returned in the current view.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "dimension_ids": {
-          "description": "The dimension IDs of the chart as returned in the current view.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "latest_values": {
-          "description": "The latest values collected for the chart (indepedently of the current view).",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "view_latest_values": {
-          "description": "The latest values returned with this response.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "dimensions": {
-          "type": "number",
-          "description": "The number of dimensions returned."
-        },
-        "points": {
-          "type": "number",
-          "description": "The number of rows / points returned."
-        },
-        "format": {
-          "type": "string",
-          "description": "The format of the result returned."
-        },
-        "chart_variables": {
-          "type": "object",
-          "properties": {
-              "$ref": "#/definitions/chart_variables"
-          }
-        }
-      }
-    },
-    "data_json": {
-      "description": "Data response in json format.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/data"
-        },
-        {
-          "properties": {
-            "result": {
+      },
+      "chart": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique id of the chart."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the chart."
+          },
+          "type": {
+            "type": "string",
+            "description": "The type of the chart. Types are not handled by netdata. You can use this field for anything you like."
+          },
+          "family": {
+            "type": "string",
+            "description": "The family of the chart. Families are not handled by netdata. You can use this field for anything you like."
+          },
+          "title": {
+            "type": "string",
+            "description": "The title of the chart."
+          },
+          "priority": {
+            "type": "number",
+            "description": "The relative priority of the chart. NetData does not care about priorities. This is just an indication of importance for the chart viewers to sort charts of higher priority (lower number) closer to the top. Priority sorting should only be used among charts of the same type or family."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "True when the chart is enabled. Disabled charts do not currently collect values, but they may have historical values available."
+          },
+          "units": {
+            "type": "string",
+            "description": "The unit of measurement for the values of all dimensions of the chart."
+          },
+          "data_url": {
+            "type": "string",
+            "description": "The absolute path to get data values for this chart. You are expected to use this path as the base when constructing the URL to fetch data values for this chart."
+          },
+          "chart_type": {
+            "type": "string",
+            "description": "The chart type.",
+            "enum": [
+              "line",
+              "area",
+              "stacked"
+            ]
+          },
+          "duration": {
+            "type": "number",
+            "description": "The duration, in seconds, of the round robin database maintained by netdata."
+          },
+          "first_entry": {
+            "type": "number",
+            "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database."
+          },
+          "last_entry": {
+            "type": "number",
+            "description": "The UNIX timestamp of the latest entry in the round robin database."
+          },
+          "update_every": {
+            "type": "number",
+            "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database."
+          },
+          "dimensions": {
+            "type": "object",
+            "description": "An object containing all the chart dimensions available for the chart. This is used as an indexed array. For each pair in the dictionary: the key is the id of the dimension and the value is a dictionary containing the name.",
+            "additionalProperties": {
               "type": "object",
               "properties": {
-                "labels": {
-                  "description": "The dimensions retrieved from the chart.",
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
-                "data": {
-                  "description": "The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.",
-                  "type": "array",
-                  "items": {
-                    "type": "number"
-                  }
+                "name": {
+                  "type": "string",
+                  "description": "The name of the dimension"
                 }
+              }
+            }
+          },
+          "chart_variables": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/chart_variables"
+            }
+          },
+          "green": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chart health green threshold."
+          },
+          "red": {
+            "type": "number",
+            "nullable": true,
+            "description": "Chart health red threshold."
+          }
+        }
+      },
+      "alarm_variables": {
+        "type": "object",
+        "properties": {
+          "chart": {
+            "type": "string",
+            "description": "The unique id of the chart."
+          },
+          "chart_name": {
+            "type": "string",
+            "description": "The name of the chart."
+          },
+          "cnart_context": {
+            "type": "string",
+            "description": "The context of the chart. It is shared across multiple monitored software or hardware instances and used in alarm templates."
+          },
+          "family": {
+            "type": "string",
+            "description": "The family of the chart."
+          },
+          "host": {
+            "type": "string",
+            "description": "The host containing the chart."
+          },
+          "chart_variables": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/chart_variables"
+            }
+          },
+          "family_variables": {
+            "type": "object",
+            "properties": {
+              "varname1": {
+                "type": "number",
+                "format": "float"
               },
-              "description": "The result requested, in the format requested."
+              "varname2": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "host_variables": {
+            "type": "object",
+            "properties": {
+              "varname1": {
+                "type": "number",
+                "format": "float"
+              },
+              "varname2": {
+                "type": "number",
+                "format": "float"
+              }
             }
           }
         }
-      ]
-    },
-    "data_flat": {
-      "description": "Data response in csv / tsv / tsv-excel / ssv / ssv-comma / markdown / html formats.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/data"
+      },
+      "chart_variables": {
+        "type": "object",
+        "properties": {
+          "varname1": {
+            "type": "number",
+            "format": "float"
+          },
+          "varname2": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      },
+      "data": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "format"
         },
-        {
-          "properties": {
-            "result": {
+        "description": "Response will contain the appropriate subtype, e.g. data_json depending on the requested format.",
+        "properties": {
+          "api": {
+            "type": "number",
+            "description": "The API version this conforms to, currently 1."
+          },
+          "id": {
+            "type": "string",
+            "description": "The unique id of the chart."
+          },
+          "name": {
+            "type": "string",
+            "description": "The name of the chart."
+          },
+          "update_every": {
+            "type": "number",
+            "description": "The update frequency of this chart, in seconds. One value every this amount of time is kept in the round robin database (indepedently of the current view)."
+          },
+          "view_update_every": {
+            "type": "number",
+            "description": "The current view appropriate update frequency of this chart, in seconds. There is no point to request chart refreshes, using the same settings, more frequently than this."
+          },
+          "first_entry": {
+            "type": "number",
+            "description": "The UNIX timestamp of the first entry (the oldest) in the round robin database (indepedently of the current view)."
+          },
+          "last_entry": {
+            "type": "number",
+            "description": "The UNIX timestamp of the latest entry in the round robin database (indepedently of the current view)."
+          },
+          "after": {
+            "type": "number",
+            "description": "The UNIX timestamp of the first entry (the oldest) returned in this response."
+          },
+          "before": {
+            "type": "number",
+            "description": "The UNIX timestamp of the latest entry returned in this response."
+          },
+          "min": {
+            "type": "number",
+            "description": "The minimum value returned in the current view. This can be used to size the y-series of the chart."
+          },
+          "max": {
+            "type": "number",
+            "description": "The maximum value returned in the current view. This can be used to size the y-series of the chart."
+          },
+          "dimension_names": {
+            "description": "The dimension names of the chart as returned in the current view.",
+            "type": "array",
+            "items": {
               "type": "string"
             }
-          }
-        }
-      ]
-    },
-    "data_array": {
-      "description": "Data response in array format.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/data"
-        },
-        {
-          "properties": {
-            "result": {
-              "type": "array",
-              "items": {
-                "type": "number"
-              }
+          },
+          "dimension_ids": {
+            "description": "The dimension IDs of the chart as returned in the current view.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "latest_values": {
+            "description": "The latest values collected for the chart (indepedently of the current view).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "view_latest_values": {
+            "description": "The latest values returned with this response.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dimensions": {
+            "type": "number",
+            "description": "The number of dimensions returned."
+          },
+          "points": {
+            "type": "number",
+            "description": "The number of rows / points returned."
+          },
+          "format": {
+            "type": "string",
+            "description": "The format of the result returned."
+          },
+          "chart_variables": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/chart_variables"
             }
           }
         }
-      ]
-    },
-    "data_csvjsonarray": {
-      "description": "Data response in csvjsonarray format.",
-      "allOf": [
-        {
-          "$ref": "#/definitions/data"
-        },
-        {
-          "properties": {
-            "result": {
-              "description": "The first inner array contains strings showing the labels of each column, each subsequent array contains the values for each point in time.",
-              "type": "array",
-              "items": {
-                "type": "array",
-                "items": {}
-              }
-            }
-          }
-        }
-      ]
-    },
-    "data_datatable": {
-      "description": "Data response in datatable / datasource formats (suitable for Google Charts).",
-      "allOf": [
-        {
-          "$ref": "#/definitions/data"
-        },
-        {
-          "properties": {
-            "result": {
-              "type": "object",
-              "properties": {
-                "cols": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "description": "Always empty - for future use."
-                      },
-                      "label": {
-                        "description": "The dimension returned from the chart."
-                      },
-                      "pattern": {
-                        "description": "Always empty - for future use."
-                      },
-                      "type": {
-                        "description": "The type of data in the column / chart-dimension."
-                      },
-                      "p": {
-                        "description": "Contains any annotations for the column."
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "label",
-                      "pattern",
-                      "type"
-                    ]
+      },
+      "data_json": {
+        "description": "Data response in json format.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/data"
+          },
+          {
+            "properties": {
+              "result": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "description": "The dimensions retrieved from the chart.",
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "data": {
+                    "description": "The data requested, one element per sample with each element containing the values of the dimensions described in the labels value.",
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
                   }
                 },
-                "rows": {
+                "description": "The result requested, in the format requested."
+              }
+            }
+          }
+        ]
+      },
+      "data_flat": {
+        "description": "Data response in csv / tsv / tsv-excel / ssv / ssv-comma / markdown / html formats.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/data"
+          },
+          {
+            "properties": {
+              "result": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "data_array": {
+        "description": "Data response in array format.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/data"
+          },
+          {
+            "properties": {
+              "result": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "data_csvjsonarray": {
+        "description": "Data response in csvjsonarray format.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/data"
+          },
+          {
+            "properties": {
+              "result": {
+                "description": "The first inner array contains strings showing the labels of each column, each subsequent array contains the values for each point in time.",
+                "type": "array",
+                "items": {
                   "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "c": {
-                        "type": "array",
-                        "items": {
-                          "properties": {
-                            "v": {
-                              "description": "Each value in the row is represented by an object named `c` with five v fields: data, null, null, 0, the value. This format is fixed by the Google Charts API."
+                  "items": {}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "data_datatable": {
+        "description": "Data response in datatable / datasource formats (suitable for Google Charts).",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/data"
+          },
+          {
+            "properties": {
+              "result": {
+                "type": "object",
+                "properties": {
+                  "cols": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "description": "Always empty - for future use."
+                        },
+                        "label": {
+                          "description": "The dimension returned from the chart."
+                        },
+                        "pattern": {
+                          "description": "Always empty - for future use."
+                        },
+                        "type": {
+                          "description": "The type of data in the column / chart-dimension."
+                        },
+                        "p": {
+                          "description": "Contains any annotations for the column."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label",
+                        "pattern",
+                        "type"
+                      ]
+                    }
+                  },
+                  "rows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "c": {
+                          "type": "array",
+                          "items": {
+                            "properties": {
+                              "v": {
+                                "description": "Each value in the row is represented by an object named `c` with five v fields: data, null, null, 0, the value. This format is fixed by the Google Charts API."
+                              }
                             }
                           }
                         }
@@ -1378,299 +1504,299 @@
               }
             }
           }
-        }
-      ]
-    },
-    "alarms": {
-      "type": "object",
-      "properties": {
-        "hostname": {
-          "type": "string"
-        },
-        "latest_alarm_log_unique_id": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "status": {
-          "type": "boolean"
-        },
-        "now": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "alarms": {
-          "type": "object",
-          "properties": {
-            "chart-name.alarm-name": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "name": {
-                  "type": "string",
-                  "description": "Full alarm name."
-                },
-                "chart": {
-                  "type": "string"
-                },
-                "family": {
-                  "type": "string"
-                },
-                "active": {
-                  "type": "boolean",
-                  "description": "Will be false only if the alarm is disabled in the configuration."
-                },
-                "disabled": {
-                  "type": "boolean",
-                  "description": "Whether the health check for this alarm has been disabled via a health command API DISABLE command."
-                },
-                "silenced": {
-                  "type": "boolean",
-                  "description": "Whether notifications for this alarm have been silenced via a health command API SILENCE command."
-                },
-                "exec": {
-                  "type": "string"
-                },
-                "recipient": {
-                  "type": "string"
-                },
-                "source": {
-                  "type": "string"
-                },
-                "units": {
-                  "type": "string"
-                },
-                "info": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string"
-                },
-                "last_status_change": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "last_updated": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "next_update": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "update_every": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "delay_up_duration": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "delay_down_duration": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "delay_max_duration": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "delay_multiplier": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "delay": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "delay_up_to_timestamp": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "value_string": {
-                  "type": "string"
-                },
-                "no_clear_notification": {
-                  "type": "boolean"
-                },
-                "lookup_dimensions": {
-                  "type": "string"
-                },
-                "db_after": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "db_before": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "lookup_method": {
-                  "type": "string"
-                },
-                "lookup_after": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "lookup_before": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "lookup_options": {
-                  "type": "string"
-                },
-                "calc": {
-                  "type": "string"
-                },
-                "calc_parsed": {
-                  "type": "string"
-                },
-                "warn": {
-                  "type": "string"
-                },
-                "warn_parsed": {
-                  "type": "string"
-                },
-                "crit": {
-                  "type": "string"
-                },
-                "crit_parsed": {
-                  "type": "string"
-                },
-                "warn_repeat_every": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "crit_repeat_every": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "green": {
-                  "type": "string",
-                  "format": "nullable"
-                },
-                "red": {
-                  "type": "string",
-                  "format": "nullable"
-                },
-                "value": {
-                  "type": "number"
+        ]
+      },
+      "alarms": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "latest_alarm_log_unique_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "boolean"
+          },
+          "now": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alarms": {
+            "type": "object",
+            "properties": {
+              "chart-name.alarm-name": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Full alarm name."
+                  },
+                  "chart": {
+                    "type": "string"
+                  },
+                  "family": {
+                    "type": "string"
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "description": "Will be false only if the alarm is disabled in the configuration."
+                  },
+                  "disabled": {
+                    "type": "boolean",
+                    "description": "Whether the health check for this alarm has been disabled via a health command API DISABLE command."
+                  },
+                  "silenced": {
+                    "type": "boolean",
+                    "description": "Whether notifications for this alarm have been silenced via a health command API SILENCE command."
+                  },
+                  "exec": {
+                    "type": "string"
+                  },
+                  "recipient": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "string"
+                  },
+                  "info": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "last_status_change": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "last_updated": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "next_update": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "update_every": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "delay_up_duration": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "delay_down_duration": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "delay_max_duration": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "delay_multiplier": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "delay": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "delay_up_to_timestamp": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "value_string": {
+                    "type": "string"
+                  },
+                  "no_clear_notification": {
+                    "type": "boolean"
+                  },
+                  "lookup_dimensions": {
+                    "type": "string"
+                  },
+                  "db_after": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "db_before": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "lookup_method": {
+                    "type": "string"
+                  },
+                  "lookup_after": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "lookup_before": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "lookup_options": {
+                    "type": "string"
+                  },
+                  "calc": {
+                    "type": "string"
+                  },
+                  "calc_parsed": {
+                    "type": "string"
+                  },
+                  "warn": {
+                    "type": "string"
+                  },
+                  "warn_parsed": {
+                    "type": "string"
+                  },
+                  "crit": {
+                    "type": "string"
+                  },
+                  "crit_parsed": {
+                    "type": "string"
+                  },
+                  "warn_repeat_every": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "crit_repeat_every": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "green": {
+                    "type": "string",
+                    "format": "nullable"
+                  },
+                  "red": {
+                    "type": "string",
+                    "format": "nullable"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
                 }
               }
             }
           }
         }
-      }
-    },
-    "alarm_log_entry": {
-      "type": "object",
-      "properties": {
-        "hostname": {
-          "type": "string"
-        },
-        "unique_id": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "alarm_id": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "alarm_event_id": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "name": {
-          "type": "string"
-        },
-        "chart": {
-          "type": "string"
-        },
-        "family": {
-          "type": "string"
-        },
-        "processed": {
-          "type": "boolean"
-        },
-        "updated": {
-          "type": "boolean"
-        },
-        "exec_run": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "exec_failed": {
-          "type": "boolean"
-        },
-        "exec": {
-          "type": "string"
-        },
-        "recipient": {
-          "type": "string"
-        },
-        "exec_code": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "source": {
-          "type": "string"
-        },
-        "units": {
-          "type": "string"
-        },
-        "when": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "duration": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "non_clear_duration": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "status": {
-          "type": "string"
-        },
-        "old_status": {
-          "type": "string"
-        },
-        "delay": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "delay_up_to_timestamp": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "updated_by_id": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "updates_id": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "value_string": {
-          "type": "string"
-        },
-        "old_value_string": {
-          "type": "string"
-        },
-        "silenced": {
-          "type": "string"
-        },
-        "info": {
-          "type": "string"
-        },
-        "value": {
-          "type": "number",
-          "nullable" : "true"
-        },
-        "old_value": {
-          "type": "number",
-          "nullable" : "true"
+      },
+      "alarm_log_entry": {
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": "string"
+          },
+          "unique_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alarm_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alarm_event_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "chart": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "processed": {
+            "type": "boolean"
+          },
+          "updated": {
+            "type": "boolean"
+          },
+          "exec_run": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "exec_failed": {
+            "type": "boolean"
+          },
+          "exec": {
+            "type": "string"
+          },
+          "recipient": {
+            "type": "string"
+          },
+          "exec_code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "source": {
+            "type": "string"
+          },
+          "units": {
+            "type": "string"
+          },
+          "when": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duration": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "non_clear_duration": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "old_status": {
+            "type": "string"
+          },
+          "delay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "delay_up_to_timestamp": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_by_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updates_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "value_string": {
+            "type": "string"
+          },
+          "old_value_string": {
+            "type": "string"
+          },
+          "silenced": {
+            "type": "string"
+          },
+          "info": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "old_value": {
+            "type": "number",
+            "nullable": true
+          }
         }
       }
     }
