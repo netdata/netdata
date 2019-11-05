@@ -7,6 +7,42 @@ import { Attributes } from "./transformDataAttributes"
 type Converter = (v: number) => number | string
 // only time units are converted into strings, the rest are numbers
 
+// todo - memoization similar to the one as in old dashboard, but probably not needed
+const formattersFixed: any[] = []
+const formattersZeroBased: any[] = []
+const fastNumberFormat = (min: number, max: number) => {
+  const key = max
+  if (min === max) {
+    if (typeof formattersFixed[key] === "undefined") {
+      formattersFixed[key] = new Intl.NumberFormat(undefined, {
+        useGrouping: true,
+        minimumFractionDigits: min,
+        maximumFractionDigits: max,
+      })
+    }
+
+    return formattersFixed[key]
+  } if (min === 0) {
+    if (typeof formattersZeroBased[key] === "undefined") {
+      formattersZeroBased[key] = new Intl.NumberFormat(undefined, {
+        useGrouping: true,
+        minimumFractionDigits: min,
+        maximumFractionDigits: max,
+      })
+    }
+
+    return formattersZeroBased[key]
+  }
+  // (old dashboard comment)
+  // this is never used
+  // it is added just for completeness
+  return new Intl.NumberFormat(undefined, {
+    useGrouping: true,
+    minimumFractionDigits: min,
+    maximumFractionDigits: max,
+  })
+}
+
 const getLegendFormatValue = (
   convertUnits: Converter, intlNumberFormat: Intl.NumberFormat | null, valueDecimalDetail: number,
 ) => (value: number | string | null) => {
@@ -50,7 +86,7 @@ const getLegendFormatValue = (
     }
   }
 
-  return window.NETDATA.fastNumberFormat.get(dmin, dmax).format(value)
+  return fastNumberFormat(dmin, dmax).format(value)
 }
 
 type LegendFormatValue = (value: string | number | null) => string | number
@@ -162,8 +198,7 @@ export const useFormatters = ({
       if (newDecimals < 0) {
         newIntlNumberFormat = null
       } else {
-        // todo refractor fastNumberFormat
-        newIntlNumberFormat = window.NETDATA.fastNumberFormat.get(
+        newIntlNumberFormat = fastNumberFormat(
           newDecimals,
           newDecimals,
         )
