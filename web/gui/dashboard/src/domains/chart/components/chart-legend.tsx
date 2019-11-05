@@ -2,6 +2,7 @@ import React, { Fragment } from "react"
 import classNames from "classnames"
 
 import { colorHex2Rgb } from "utils/color-hex-2-rgb"
+import { useDateTime } from "utils/date-time"
 
 import { seconds4human } from "../utils/seconds4human"
 import { Attributes } from "../utils/transformDataAttributes"
@@ -146,6 +147,8 @@ export const ChartLegend = ({
     setSelectedDimensions(newSelectedDimensions)
   }
 
+  const { localeDateString, localeTimeString } = useDateTime()
+
   return (
     <div className={classNames(
       "netdata-chart-legend",
@@ -158,7 +161,7 @@ export const ChartLegend = ({
       >
         {showUndefined
           ? legendPluginModuleString(false, chartDetails)
-          : window.NETDATA.dateTime.localeDateString(legendDate)}
+          : localeDateString(legendDate)}
       </span>
       <br />
       <span
@@ -167,7 +170,7 @@ export const ChartLegend = ({
       >
         {showUndefined
           ? chartDetails.context.toString()
-          : window.NETDATA.dateTime.localeTimeString(legendDate)}
+          : localeTimeString(legendDate)}
       </span>
       <br />
       <span className="netdata-legend-title-units">{unitsCurrent}</span>
