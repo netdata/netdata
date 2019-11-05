@@ -1293,6 +1293,7 @@ int main(int argc, char **argv) {
 
     signals_unblock();
 
+    commands_init();
     // ------------------------------------------------------------------------
     // Handle signals
 

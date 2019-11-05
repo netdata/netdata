@@ -65,6 +65,7 @@
 #include "daemon.h"
 #include "main.h"
 #include "signals.h"
+#include "commands.h"
 
 // global netdata daemon variables
 extern char *netdata_configured_hostname;
