@@ -90,9 +90,10 @@ struct engine *read_exporting_config()
             info(
                 "Instance (%s) on connector (%s) type=%d is enabled and scheduled for activation",
                 local_ci.instance_name,
-                local_ci.connector_name, backend_type);
+                local_ci.connector_name,
+                backend_type);
 
-            tmp_ci_list = (struct connector_instance_list *) callocz(1, sizeof(struct connector_instance_list));
+            tmp_ci_list = (struct connector_instance_list *)callocz(1, sizeof(struct connector_instance_list));
             memcpy(&tmp_ci_list->local_ci, &local_ci, sizeof(local_ci));
             tmp_ci_list->next = ci_list[backend_type];
             ci_list[backend_type] = tmp_ci_list;
