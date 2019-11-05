@@ -62,21 +62,21 @@ struct config exporting_config = {
     }
 };
 
-struct _connector_instance  *ci = NULL;
+struct _connector_instance  *global_connector_instance = NULL;
 
 int get_connector_instance(struct connector_instance *target_ci)
 {
     static struct _connector_instance *local_ci = NULL;
 
-    if (unlikely(!ci))
+    if (unlikely(!global_connector_instance))
         return 0;
 
     if (target_ci == NULL) {
-        local_ci = ci;
+        local_ci = NULL;
         return 1;
     }
     if (local_ci == NULL)
-        local_ci = ci;
+        local_ci = global_connector_instance;
     else {
         local_ci = local_ci->next;
         if (local_ci == NULL)
@@ -318,8 +318,7 @@ char *expconfig_get(struct config *root, const char *section, const char *name, 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
-    fprintf(stderr, "Looking section %s -- instance %s\n", section, name);
-    local_ci = ci;
+    local_ci = global_connector_instance;
     while (local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
             break;
@@ -345,7 +344,7 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
-    local_ci = ci;
+    local_ci = global_connector_instance;
     while (local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
             break;
@@ -371,7 +370,7 @@ long long expconfig_get_number(struct config *root, const char *section, const c
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
-    local_ci = ci;
+    local_ci = global_connector_instance;
     while (local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
             break;
@@ -628,7 +627,6 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                 have_backend_config = is_backend_config;
 
             if (is_backend_config) {
-                //root = &exporting_config;
                 if (_backends) {
                     sprintf(buffer, CONFIG_SECTION_BACKEND "/%d", _backends);
                     s = buffer;
@@ -671,30 +669,29 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         if (!cv) {
             cv = appconfig_value_create(co, name, value);
-            if (!strcmp(co->name, "connector_global"))
-                info("Adding EXP GLOBAL [%s]=[%s]", name, value);
-
             if (is_exporter_config || is_backend_config) {
                 if (!strcmp(name, "type")) {
                     if (is_valid_connector(value)) {
+                        char connector_name[CONFIG_MAX_NAME + 1];
                         struct section *local_connector;
-                        local_connector = appconfig_section_find(root, value);
+
+                        snprintfz(connector_name, CONFIG_MAX_NAME, CONNECTOR_SECTION_FORMAT, value);
+                        local_connector = appconfig_section_find(root, connector_name);
+
                         if (local_connector == NULL && is_backend_config) {
-                            //info("Auto defining connector %s", value);
-                            // Ok auto define this connector because we need it for backwards compatibility
-                            local_connector = appconfig_section_create(root, value);
+                            // Auto define this connector because we need it for backwards compatibility
+                            local_connector = appconfig_section_create(root, connector_name);
                             appconfig_value_create(local_connector, "enable", "yes");
                             appconfig_value_create(local_connector, "type", value);
                         }
                         if (local_connector) {
-                            //info("Adding instance %s to connector %s", co->name, local_connector->name);
                             struct _connector_instance *local_ci;
 
                             local_ci = callocz(1, sizeof(struct _connector_instance));
                             local_ci->instance = co;
                             local_ci->connector = local_connector;
-                            local_ci->next = ci;
-                            ci = local_ci;
+                            local_ci->next = global_connector_instance;
+                            global_connector_instance = local_ci;
                         }
                     } else {
                         info("Ignoring unknown connector %s specified for version " VERSION, value);
@@ -702,13 +699,19 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                 }
             }
         } else {
-            if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
-                debug(D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
+            if (((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
+                debug(
+                    D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
                 freez(cv->value);
                 cv->value = strdupz(value);
-            }
-            else
-                debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.", line, filename, co->name, cv->name);
+            } else
+                debug(
+                    D_CONFIG,
+                    "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.",
+                    line,
+                    filename,
+                    co->name,
+                    cv->name);
         }
         cv->flags |= CONFIG_VALUE_LOADED;
     }

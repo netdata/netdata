@@ -1238,8 +1238,8 @@ int main(int argc, char **argv) {
     }
 
     // prerare engine for connectors
-    if (read_exporting_config())
-        info("Engine for connectors activated");
+    //if (read_exporting_config())
+    //    info("Engine for connectors activated");
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
