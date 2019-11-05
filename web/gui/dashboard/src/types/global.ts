@@ -2,6 +2,8 @@
 // @ts-ignore isolated-modules
 
 interface Theme {
+  bootstrap_css: string
+  dashboard_css: string
   background: string
   foreground: string
   grid: string
