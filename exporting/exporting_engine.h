@@ -12,7 +12,7 @@ extern long long expconfig_get_number(struct config *root, const char *section, 
 extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 
 extern int is_valid_connector(char *type);
-extern struct _connector_instance *ci;
+extern struct _connector_instance *global_connector_instance;
 extern struct config exporting_config;
 
 #define EXPORTER_DESTINATION                "destination"
