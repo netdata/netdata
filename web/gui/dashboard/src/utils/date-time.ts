@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { useSelector } from "react-redux"
 
-import { selectTimezone } from "../domains/global/selectors"
+import { selectTimezone } from "domains/global/selectors"
 
 const zeropad = (x: number) => {
   if (x > -10 && x < 10) {
@@ -12,13 +12,20 @@ const zeropad = (x: number) => {
 
 export const isSupportingDateTimeFormat = !!(Intl && Intl.DateTimeFormat)
 
+const narrowToDate = (d: Date | number) => (typeof d === "number"
+  ? new Date(d)
+  : d
+)
 // these are the old netdata functions
 // we fallback to these, if the new ones fail
-export const localeDateStringNative = (d: Date) => d.toLocaleDateString()
-export const localeTimeStringNative = (d: Date) => d.toLocaleTimeString()
-export const xAxisTimeStringNative = (d: Date) => `${zeropad(d.getHours())}:${
-  zeropad(d.getMinutes())}:${
-  zeropad(d.getSeconds())}`
+export const localeDateStringNative = (d: Date | number) => narrowToDate(d).toLocaleDateString()
+export const localeTimeStringNative = (d: Date | number) => narrowToDate(d).toLocaleTimeString()
+export const xAxisTimeStringNative = (d: Date | number) => {
+  const date = narrowToDate(d)
+  return `${zeropad(date.getHours())}:${
+    zeropad(date.getMinutes())}:${
+    zeropad(date.getSeconds())}`
+}
 
 
 export const isProperTimezone = (timeZone: string): boolean => {
@@ -54,7 +61,7 @@ export const useDateTime = () => {
     }
     const dateFormat = () => new Intl.DateTimeFormat(navigator.language, dateOptions)
     return isSupportingDateTimeFormat
-      ? (d: Date) => dateFormat().format(d)
+      ? (d: Date | number) => dateFormat().format(d)
       : localeDateStringNative
   }, [timezone, isUsingTimezone])
 
@@ -72,7 +79,7 @@ export const useDateTime = () => {
     }
     const timeFormat = () => new Intl.DateTimeFormat(navigator.language, timeOptions)
     return isSupportingDateTimeFormat
-      ? (d: Date) => timeFormat().format(d)
+      ? (d: Date | number) => timeFormat().format(d)
       : localeTimeStringNative
   }, [timezone, isUsingTimezone])
 
@@ -89,7 +96,7 @@ export const useDateTime = () => {
     }
     const xAxisFormat = () => new Intl.DateTimeFormat(navigator.language, xAxisOptions)
     return isSupportingDateTimeFormat
-      ? (d: Date) => xAxisFormat().format(d)
+      ? (d: Date | number) => xAxisFormat().format(d)
       : xAxisTimeStringNative
   }, [timezone, isUsingTimezone])
 
