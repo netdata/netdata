@@ -58,7 +58,11 @@ int init_graphite_connector(struct connector *connector)
     connector->end_host_formatting = NULL;
     connector->end_batch_formatting = NULL;
 
-    connector->worker = graphite_connector_worker;
+    connector->worker = simple_connector_worker;
+
+    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    connector->config.connector_specific_config = (void *)connector_specific_config;
+    connector_specific_config->default_port = 2003;
 
     return 0;
 }
@@ -78,16 +82,4 @@ int init_graphite_instance(struct instance *instance)
     }
 
     return 0;
-}
-
-/**
- * Grafite connector worker
- *
- * Runs in a separate thread for every instance.
- *
- * @param instance_p an instance data structure.
- */
-void graphite_connector_worker(void *instance_p)
-{
-    (void)instance_p;
 }

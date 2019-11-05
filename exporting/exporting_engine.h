@@ -5,12 +5,14 @@
 
 #include "daemon/common.h"
 
+#include <uv.h>
+
 extern char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long expconfig_get_number(struct config *root, const char *section, const char *name, long long value);
 extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 
 extern int is_valid_connector(char *type);
-extern struct _connector_instance  *ci;
+extern struct _connector_instance *ci;
 extern struct config exporting_config;
 
 #define EXPORTER_DESTINATION                "destination"
@@ -48,8 +50,13 @@ struct instance_config {
     void *connector_specific_config;
 };
 
+struct simple_connector_config {
+    int default_port;
+};
+
 struct connector_config {
     BACKEND_TYPE type;
+    void *connector_specific_config;
 };
 
 struct engine_config {
@@ -59,10 +66,25 @@ struct engine_config {
     BACKEND_OPTIONS options; // TODO: Rename to EXPORTING_OPTIONS
 };
 
+struct stats {
+    collected_number chart_buffered_metrics;
+    collected_number chart_lost_metrics;
+    collected_number chart_sent_metrics;
+    collected_number chart_buffered_bytes;
+    collected_number chart_received_bytes;
+    collected_number chart_sent_bytes;
+    collected_number chart_receptions;
+    collected_number chart_transmission_successes;
+    collected_number chart_transmission_failures;
+    collected_number chart_data_lost_events;
+    collected_number chart_lost_bytes;
+    collected_number chart_reconnects;
+};
+
 struct instance {
     struct instance_config config;
     void *buffer;
-    void *stats;
+    struct stats stats;
 
     uv_thread_t thread;
 
@@ -98,6 +120,7 @@ struct engine {
 void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
+BACKEND_TYPE exporting_select_type(const char *type);
 
 int init_connectors(struct engine *engine);
 
@@ -114,6 +137,8 @@ int metric_formatting(struct engine *engine, RRDDIM *rd);
 int end_chart_formatting(struct engine *engine);
 int end_host_formatting(struct engine *engine);
 int end_batch_formatting(struct engine *engine);
+
+void simple_connector_worker(void *instance_p);
 
 int send_internal_metrics(struct engine *engine);
 

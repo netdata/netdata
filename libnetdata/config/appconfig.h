@@ -82,15 +82,15 @@
 
 #define CONFIG_FILENAME "netdata.conf"
 
-#define CONFIG_SECTION_GLOBAL   "global"
-#define CONFIG_SECTION_WEB      "web"
-#define CONFIG_SECTION_STATSD   "statsd"
-#define CONFIG_SECTION_PLUGINS  "plugins"
-#define CONFIG_SECTION_CLOUD    "cloud"
-#define CONFIG_SECTION_REGISTRY "registry"
-#define CONFIG_SECTION_HEALTH   "health"
-#define CONFIG_SECTION_BACKEND  "backend"
-#define CONFIG_SECTION_STREAM   "stream"
+#define CONFIG_SECTION_GLOBAL    "global"
+#define CONFIG_SECTION_WEB       "web"
+#define CONFIG_SECTION_STATSD    "statsd"
+#define CONFIG_SECTION_PLUGINS   "plugins"
+#define CONFIG_SECTION_CLOUD     "cloud"
+#define CONFIG_SECTION_REGISTRY  "registry"
+#define CONFIG_SECTION_HEALTH    "health"
+#define CONFIG_SECTION_BACKEND   "backend"
+#define CONFIG_SECTION_STREAM    "stream"
 #define CONFIG_SECTION_EXPORTING "connector_global"
 #define EXPORTING_CONF           "exporting.conf"
 
@@ -107,8 +107,8 @@ struct config {
 };
 
 struct connector_instance {
-    char    instance_name[CONFIG_MAX_NAME+1];
-    char    connector_name[CONFIG_MAX_NAME+1];
+    char instance_name[CONFIG_MAX_NAME + 1];
+    char connector_name[CONFIG_MAX_NAME + 1];
 };
 
 #define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
@@ -143,7 +143,6 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
-
 
 extern int get_connector_instance(struct connector_instance *target_ci);
 

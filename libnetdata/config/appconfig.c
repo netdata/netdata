@@ -2,7 +2,7 @@
 
 #include "../libnetdata.h"
 
-int     _backends=0;    // number of backend sections we have
+int _backends = 0; // number of backend sections we have
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
@@ -45,26 +45,27 @@ struct section {
 };
 
 struct _connector_instance {
-    struct section  *connector;        // actual connector
-    struct section  *instance;         // This instance
-    struct _connector_instance *next;   // Next instance
+    struct section *connector;        // actual connector
+    struct section *instance;         // This instance
+    struct _connector_instance *next; // Next instance
 };
 
 struct config exporting_config = {
-        .sections = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-                .avl_tree = {
-                        .root = NULL,
-                        .compar = appconfig_section_compare
-                },
-                .rwlock = AVL_LOCK_INITIALIZER
-        }
+    .sections = NULL,
+    .mutex = NETDATA_MUTEX_INITIALIZER,
+    .index = {
+        .avl_tree = {
+            .root = NULL,
+            .compar = appconfig_section_compare
+        },
+        .rwlock = AVL_LOCK_INITIALIZER
+    }
 };
 
 struct _connector_instance  *ci = NULL;
 
-int get_connector_instance(struct connector_instance *target_ci) {
+int get_connector_instance(struct connector_instance *target_ci)
+{
     static struct _connector_instance *local_ci = NULL;
 
     if (unlikely(!ci))
@@ -88,29 +89,24 @@ int get_connector_instance(struct connector_instance *target_ci) {
     return 1;
 }
 
-int is_valid_connector(char *type){
+int is_valid_connector(char *type)
+{
     if (unlikely(!type))
         return 0;
 
-    if(!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
-            return 1;
-    }
-    else if(!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+    if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         return 1;
-    }
-    else if(!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
         return 1;
-    }
-    else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
+    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
         return 1;
-    }
-    else if (!strcmp(type, "prometheus_remote_write")) {
-        return  1;
-    }
-    else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
+    } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return 1;
-    }
-    else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
+    } else if (!strcmp(type, "prometheus_remote_write")) {
+        return 1;
+    } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
+        return 1;
+    } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
         return 1;
     }
 
@@ -324,16 +320,22 @@ char *expconfig_get(struct config *root, const char *section, const char *name, 
 
     fprintf(stderr, "Looking section %s -- instance %s\n", section, name);
     local_ci = ci;
-    while(local_ci) {
+    while (local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
             break;
         local_ci = local_ci->next;
     }
     if (!local_ci)
         return NULL;
-    return appconfig_get(root, local_ci->instance->name, name,
-            appconfig_get(root, local_ci->connector->name, name,
-                    appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+    return appconfig_get(
+        root,
+        local_ci->instance->name,
+        name,
+        appconfig_get(
+            root,
+            local_ci->connector->name,
+            name,
+            appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
 int expconfig_get_boolean(struct config *root, const char *section, const char *name, int default_value)
@@ -344,19 +346,25 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
         return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
     local_ci = ci;
-    while(local_ci) {
+    while (local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
             break;
         local_ci = local_ci->next;
     }
     if (!local_ci)
         return 0;
-    return appconfig_get_boolean(root, local_ci->instance->name, name,
-            appconfig_get_boolean(root, local_ci->connector->name, name,
-                    appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+    return appconfig_get_boolean(
+        root,
+        local_ci->instance->name,
+        name,
+        appconfig_get_boolean(
+            root,
+            local_ci->connector->name,
+            name,
+            appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
-long long  expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
+long long expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
 {
     struct _connector_instance *local_ci;
 
@@ -364,16 +372,22 @@ long long  expconfig_get_number(struct config *root, const char *section, const 
         return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
     local_ci = ci;
-    while(local_ci) {
+    while (local_ci) {
         if (strcmp(local_ci->instance->name, section) == 0)
             break;
         local_ci = local_ci->next;
     }
     if (!local_ci)
         return 0;
-    return appconfig_get_number(root, local_ci->instance->name, name,
-            appconfig_get_number(root, local_ci->connector->name, name,
-                    appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+    return appconfig_get_number(
+        root,
+        local_ci->instance->name,
+        name,
+        appconfig_get_number(
+            root,
+            local_ci->connector->name,
+            name,
+            appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
 }
 
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
@@ -575,9 +589,9 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 {
     int line = 0;
     struct section *co = NULL;
-    int   is_exporter_config = 0;
-    int   is_backend_config  = 0;
-    int   have_backend_config = 0;
+    int is_exporter_config = 0;
+    int is_backend_config = 0;
+    int have_backend_config = 0;
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
@@ -609,7 +623,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
             s[len - 1] = '\0';
             s++;
 
-            is_backend_config = !(strcmp(s,CONFIG_SECTION_BACKEND));
+            is_backend_config = !(strcmp(s, CONFIG_SECTION_BACKEND));
             if (!have_backend_config)
                 have_backend_config = is_backend_config;
 
@@ -655,13 +669,13 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         struct config_option *cv = appconfig_option_index_find(co, name, 0);
 
-        if(!cv) {
+        if (!cv) {
             cv = appconfig_value_create(co, name, value);
-            if (!strcmp(co->name,"connector_global"))
+            if (!strcmp(co->name, "connector_global"))
                 info("Adding EXP GLOBAL [%s]=[%s]", name, value);
 
             if (is_exporter_config || is_backend_config) {
-                if (!strcmp(name,"type")) {
+                if (!strcmp(name, "type")) {
                     if (is_valid_connector(value)) {
                         struct section *local_connector;
                         local_connector = appconfig_section_find(root, value);
@@ -669,8 +683,8 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                             //info("Auto defining connector %s", value);
                             // Ok auto define this connector because we need it for backwards compatibility
                             local_connector = appconfig_section_create(root, value);
-                            appconfig_value_create(local_connector,"enable","yes");
-                            appconfig_value_create(local_connector,"type",value);
+                            appconfig_value_create(local_connector, "enable", "yes");
+                            appconfig_value_create(local_connector, "type", value);
                         }
                         if (local_connector) {
                             //info("Adding instance %s to connector %s", co->name, local_connector->name);
@@ -682,14 +696,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                             local_ci->next = ci;
                             ci = local_ci;
                         }
-                    }
-                    else  {
+                    } else {
                         info("Ignoring unknown connector %s specified for version " VERSION, value);
                     }
                 }
             }
-        }
-        else {
+        } else {
             if(((cv->flags & CONFIG_VALUE_USED) && overwrite_used) || !(cv->flags & CONFIG_VALUE_USED)) {
                 debug(D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
                 freez(cv->value);
