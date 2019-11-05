@@ -87,6 +87,8 @@ struct instance {
     struct stats stats;
 
     uv_thread_t thread;
+    uv_mutex_t mutex;
+    uv_cond_t cond_var;
 
     struct instance *next;
     struct connector *connector;

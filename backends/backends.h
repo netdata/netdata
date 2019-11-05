@@ -26,7 +26,9 @@ typedef enum backend_types {
     BACKEND_TYPE_MONGODB                    // Send data to MongoDB collection
 } BACKEND_TYPE;
 
+#ifdef ENABLE_EXPORTING
 #include "exporting/exporting_engine.h"
+#endif
 
 typedef int (**backend_response_checker_t)(BUFFER *);
 typedef int (**backend_request_formatter_t)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS);
