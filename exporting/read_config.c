@@ -76,6 +76,9 @@ struct engine *read_exporting_config()
 
     freez(filename);
 
+    if (!exporting_config_exists)
+        memcpy(&exporting_config, &netdata_config, sizeof(netdata_config));
+
     // Will build a list of instances per connector
     // TODO: change BACKEND to EXPORTING
     ci_list = callocz(sizeof(BACKEND_TYPE), sizeof(struct connector_instance_list *));
@@ -83,7 +86,7 @@ struct engine *read_exporting_config()
     while (get_connector_instance(&local_ci)) {
         BACKEND_TYPE backend_type;
 
-        info("Processing connector (%s)", local_ci.instance_name);
+        info("Processing connector instance (%s)", local_ci.instance_name);
         if (exporter_get_boolean(local_ci.instance_name, "enabled", 0)) {
             backend_type = exporting_select_type(local_ci.connector_name);
 

@@ -681,7 +681,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                         if (local_connector == NULL && is_backend_config) {
                             // Auto define this connector because we need it for backwards compatibility
                             local_connector = appconfig_section_create(root, connector_name);
-                            appconfig_value_create(local_connector, "enable", "yes");
+                            appconfig_value_create(local_connector, "enabled", "yes");
                             appconfig_value_create(local_connector, "type", value);
                         }
                         if (local_connector) {
