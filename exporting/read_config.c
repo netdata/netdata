@@ -19,21 +19,20 @@ char *netdata_configured_hostname = "test_host";
  */
 BACKEND_TYPE exporting_select_type(const char *type)
 {
-    if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
+    if (!strcmp(type, "connector_graphite") || !strcmp(type, "connector_graphite:plaintext")) {
         return BACKEND_TYPE_GRAPHITE;
-    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
+    } else if (!strcmp(type, "connector_opentsdb") || !strcmp(type, "connector_opentsdb:telnet")) {
         return BACKEND_TYPE_OPENTSDB_USING_TELNET;
-    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
+    } else if (!strcmp(type, "connector_opentsdb:http") || !strcmp(type, "connector_opentsdb:https")) {
         return BACKEND_TYPE_OPENTSDB_USING_HTTP;
-    } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
+    } else if (!strcmp(type, "connector_json") || !strcmp(type, "connector_json:plaintext")) {
         return BACKEND_TYPE_JSON;
-    } else if (!strcmp(type, "prometheus_remote_write")) {
+    } else if (!strcmp(type, "connector_prometheus_remote_write") || !strcmp(type, "connector_prometheus_remote_write")) {
         return BACKEND_TYPE_PROMETEUS;
-    } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
+    } else if (!strcmp(type, "connector_kinesis") || !strcmp(type, "connector_kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
-    } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
+    } else if (!strcmp(type, "connector_mongodb") || !strcmp(type, "connector_mongodb:plaintext"))
         return BACKEND_TYPE_MONGODB;
-    }
 
     return BACKEND_TYPE_UNKNOWN;
 }
@@ -77,6 +76,9 @@ struct engine *read_exporting_config()
 
     freez(filename);
 
+    if (!exporting_config_exists)
+        memcpy(&exporting_config, &netdata_config, sizeof(netdata_config));
+
     // Will build a list of instances per connector
     // TODO: change BACKEND to EXPORTING
     ci_list = callocz(sizeof(BACKEND_TYPE), sizeof(struct connector_instance_list *));
@@ -84,14 +86,15 @@ struct engine *read_exporting_config()
     while (get_connector_instance(&local_ci)) {
         BACKEND_TYPE backend_type;
 
-        info("Processing connector (%s)", local_ci.instance_name);
+        info("Processing connector instance (%s)", local_ci.instance_name);
         if (exporter_get_boolean(local_ci.instance_name, "enabled", 0)) {
             backend_type = exporting_select_type(local_ci.connector_name);
 
             info(
-                " Instance (%s) on connector (%s) is enabled and scheduled for activation",
+                "Instance (%s) on connector (%s) type=%d is enabled and scheduled for activation",
                 local_ci.instance_name,
-                local_ci.connector_name);
+                local_ci.connector_name,
+                backend_type);
 
             tmp_ci_list = (struct connector_instance_list *)callocz(1, sizeof(struct connector_instance_list));
             memcpy(&tmp_ci_list->local_ci, &local_ci, sizeof(local_ci));

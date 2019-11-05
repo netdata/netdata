@@ -91,8 +91,9 @@
 #define CONFIG_SECTION_HEALTH    "health"
 #define CONFIG_SECTION_BACKEND   "backend"
 #define CONFIG_SECTION_STREAM    "stream"
-#define CONFIG_SECTION_EXPORTING "connector_global"
+#define CONFIG_SECTION_EXPORTING "exporting_global"
 #define EXPORTING_CONF           "exporting.conf"
+#define CONNECTOR_SECTION_FORMAT "connector_%s"
 
 
 // these are used to limit the configuration names and values lengths
