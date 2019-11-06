@@ -248,6 +248,76 @@ static void test_exporting_engine(void **state)
     free(ptr);
 }
 
+static void test_read_exporting_config(void **state)
+{
+    (void)state;
+
+    struct engine *engine = __mock_read_exporting_config();
+
+    assert_ptr_not_equal(engine, NULL);
+    assert_string_equal(engine->config.prefix, "netdata");
+    assert_string_equal(engine->config.hostname, "test-host");
+    assert_int_equal(engine->config.update_every, 3);
+    assert_int_equal(engine->config.options, BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES);
+
+    struct connector *connector = engine->connector_root;
+    assert_ptr_not_equal(connector, NULL);
+    assert_ptr_equal(connector->next, NULL);
+    assert_ptr_equal(connector->engine, engine);
+    assert_int_equal(connector->config.type, BACKEND_TYPE_GRAPHITE);
+
+    struct instance *instance = connector->instance_root;
+    assert_ptr_not_equal(instance, NULL);
+    assert_ptr_equal(instance->next, NULL);
+    assert_ptr_equal(instance->connector, connector);
+    assert_string_equal(instance->config.destination, "localhost");
+    assert_int_equal(instance->config.update_every, 1);
+    assert_int_equal(instance->config.buffer_on_failures, 10);
+    assert_int_equal(instance->config.timeoutms, 10000);
+    assert_string_equal(instance->config.charts_pattern, "*");
+    assert_string_equal(instance->config.hosts_pattern, "localhost *");
+    assert_int_equal(instance->config.send_names_instead_of_ids, 1);
+
+    free(engine->connector_root->instance_root);
+    free(engine->connector_root);
+    free(engine);
+}
+
+static void test_init_connectors(void **state)
+{
+    (void)state;
+
+    struct engine *engine = __mock_read_exporting_config();
+
+    init_connectors_in_tests(engine);
+
+    struct connector *connector = engine->connector_root;
+    assert_ptr_equal(connector->start_batch_formatting, NULL);
+    assert_ptr_equal(connector->start_host_formatting, NULL);
+    assert_ptr_equal(connector->start_chart_formatting, NULL);
+    assert_ptr_equal(connector->metric_formatting, format_dimension_collected_graphite_plaintext);
+    assert_ptr_equal(connector->end_chart_formatting, NULL);
+    assert_ptr_equal(connector->end_host_formatting, NULL);
+    assert_ptr_equal(connector->end_batch_formatting, NULL);
+    assert_ptr_equal(connector->worker, simple_connector_worker);
+
+    struct simple_connector_config *connector_specific_config =
+        (struct simple_connector_config *)connector->config.connector_specific_config;
+    assert_int_equal(connector_specific_config->default_port, 2003);
+
+    BUFFER *buffer = (BUFFER *)connector->instance_root->buffer;
+    assert_ptr_not_equal(buffer, NULL);
+    buffer_sprintf(buffer, "%s", "graphite test");
+    assert_string_equal(buffer_tostring(buffer), "graphite test");
+
+    // expect_value(__wrap_uv_thread_create, thread, instance, sizeof(struct instance));
+    // expect_memory(__wrap_uv_thread_create, instance, instance, sizeof(struct instance));
+
+    free(engine->connector_root->instance_root);
+    free(engine->connector_root);
+    free(engine);
+}
+
 static void test_prepare_buffers(void **state)
 {
     (void)state;
@@ -332,76 +402,6 @@ static void test_prepare_buffers(void **state)
     free(engine);
 }
 
-static void test_read_exporting_config(void **state)
-{
-    (void)state;
-
-    struct engine *engine = __mock_read_exporting_config();
-
-    assert_ptr_not_equal(engine, NULL);
-    assert_string_equal(engine->config.prefix, "netdata");
-    assert_string_equal(engine->config.hostname, "test-host");
-    assert_int_equal(engine->config.update_every, 3);
-    assert_int_equal(engine->config.options, BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES);
-
-    struct connector *connector = engine->connector_root;
-    assert_ptr_not_equal(connector, NULL);
-    assert_ptr_equal(connector->next, NULL);
-    assert_ptr_equal(connector->engine, engine);
-    assert_int_equal(connector->config.type, BACKEND_TYPE_GRAPHITE);
-
-    struct instance *instance = connector->instance_root;
-    assert_ptr_not_equal(instance, NULL);
-    assert_ptr_equal(instance->next, NULL);
-    assert_ptr_equal(instance->connector, connector);
-    assert_string_equal(instance->config.destination, "localhost");
-    assert_int_equal(instance->config.update_every, 1);
-    assert_int_equal(instance->config.buffer_on_failures, 10);
-    assert_int_equal(instance->config.timeoutms, 10000);
-    assert_string_equal(instance->config.charts_pattern, "*");
-    assert_string_equal(instance->config.hosts_pattern, "localhost *");
-    assert_int_equal(instance->config.send_names_instead_of_ids, 1);
-
-    free(engine->connector_root->instance_root);
-    free(engine->connector_root);
-    free(engine);
-}
-
-static void test_init_connectors(void **state)
-{
-    (void)state;
-
-    struct engine *engine = __mock_read_exporting_config();
-
-    init_connectors_in_tests(engine);
-
-    struct connector *connector = engine->connector_root;
-    assert_ptr_equal(connector->start_batch_formatting, NULL);
-    assert_ptr_equal(connector->start_host_formatting, NULL);
-    assert_ptr_equal(connector->start_chart_formatting, NULL);
-    assert_ptr_equal(connector->metric_formatting, format_dimension_collected_graphite_plaintext);
-    assert_ptr_equal(connector->end_chart_formatting, NULL);
-    assert_ptr_equal(connector->end_host_formatting, NULL);
-    assert_ptr_equal(connector->end_batch_formatting, NULL);
-    assert_ptr_equal(connector->worker, simple_connector_worker);
-
-    struct simple_connector_config *connector_specific_config =
-        (struct simple_connector_config *)connector->config.connector_specific_config;
-    assert_int_equal(connector_specific_config->default_port, 2003);
-
-    BUFFER *buffer = (BUFFER *)connector->instance_root->buffer;
-    assert_ptr_not_equal(buffer, NULL);
-    buffer_sprintf(buffer, "%s", "graphite test");
-    assert_string_equal(buffer_tostring(buffer), "graphite test");
-
-    // expect_value(__wrap_uv_thread_create, thread, instance, sizeof(struct instance));
-    // expect_memory(__wrap_uv_thread_create, instance, instance, sizeof(struct instance));
-
-    free(engine->connector_root->instance_root);
-    free(engine->connector_root);
-    free(engine);
-}
-
 static void test_exporting_name_copy(void **state)
 {
     (void)state;
@@ -464,9 +464,9 @@ int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_exporting_engine),
-        cmocka_unit_test(test_prepare_buffers),
         cmocka_unit_test(test_read_exporting_config),
         cmocka_unit_test(test_init_connectors),
+        cmocka_unit_test(test_prepare_buffers),
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test(test_format_dimension_collected_graphite_plaintext),
         cmocka_unit_test(test_init_graphite_instance),
