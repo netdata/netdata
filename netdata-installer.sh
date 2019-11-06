@@ -1051,7 +1051,7 @@ echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/u
 echo >&2
 
 # -----------------------------------------------------------------------------
-progress "Install (but not enable) netdata updater tool"
+progress "Installing (but not enabling) the netdata updater tool"
 cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
