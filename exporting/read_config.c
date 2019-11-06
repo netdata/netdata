@@ -6,6 +6,17 @@
 char *netdata_configured_user_config_dir = ".";
 char *netdata_configured_stock_config_dir = ".";
 char *netdata_configured_hostname = "test_host";
+struct config netdata_config = {
+        .sections = NULL,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
+        .index = {
+                .avl_tree = {
+                        .root = NULL,
+                        .compar = appconfig_section_compare
+                },
+                .rwlock = AVL_LOCK_INITIALIZER
+        }
+};
 #endif
 
 /**
@@ -91,7 +102,7 @@ struct engine *read_exporting_config()
             backend_type = exporting_select_type(local_ci.connector_name);
 
             info(
-                "Instance (%s) on connector (%s) type=%d is enabled and scheduled for activation",
+                "Instance (%s) on connector (%s) type=%u is enabled and scheduled for activation",
                 local_ci.instance_name,
                 local_ci.connector_name,
                 backend_type);

@@ -646,6 +646,7 @@ set(NETDATA_FILES
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${BACKENDS_PLUGIN_FILES}
+        ${EXPORTING_ENGINE_FILES}
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
@@ -926,6 +927,10 @@ if(BUILD_TESTING)
         -Wl,--wrap=send_internal_metrics
         -Wl,--wrap=now_realtime_sec
         -Wl,--wrap=uv_thread_create
+        -Wl,--wrap=uv_mutex_lock
+        -Wl,--wrap=uv_mutex_unlock
+        -Wl,--wrap=uv_cond_signal
+        -Wl,--wrap=uv_cond_wait
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

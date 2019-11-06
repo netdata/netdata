@@ -696,6 +696,10 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=send_internal_metrics \
         -Wl,--wrap=now_realtime_sec \
         -Wl,--wrap=uv_thread_create \
+        -Wl,--wrap=uv_mutex_lock \
+        -Wl,--wrap=uv_mutex_unlock \
+        -Wl,--wrap=uv_cond_signal \
+        -Wl,--wrap=uv_cond_wait \
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)

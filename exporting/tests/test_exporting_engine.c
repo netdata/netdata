@@ -6,7 +6,10 @@
 #include "../exporting_engine.h"
 #include "../graphite/graphite.h"
 
+#include <stdarg.h>
+#include <stddef.h>
 #include <setjmp.h>
+#include <stdint.h>
 #include <cmocka.h>
 
 time_t __wrap_now_realtime_sec(void)
@@ -168,6 +171,27 @@ void __wrap_uv_thread_create(uv_thread_t thread, void (*worker)(void *arg), void
     check_expected_ptr(thread);
     check_expected_ptr(worker);
     check_expected_ptr(arg);
+}
+
+void __wrap_uv_mutex_lock(uv_mutex_t *mutex)
+{
+    (void)mutex;
+}
+
+void __wrap_uv_mutex_unlock(uv_mutex_t *mutex)
+{
+    (void)mutex;
+}
+
+void __wrap_uv_cond_signal(uv_cond_t *cond_var)
+{
+    (void)cond_var;
+}
+
+void __wrap_uv_cond_wait(uv_cond_t *cond_var, uv_mutex_t *mutex)
+{
+    (void)cond_var;
+    (void)mutex;
 }
 
 void init_connectors_in_tests(struct engine *engine)
