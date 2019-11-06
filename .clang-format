@@ -10,13 +10,13 @@
 #
 ---
 AccessModifierOffset: -4
-AlignAfterOpenBracket: AlwaysBreak
+AlignAfterOpenBracket: true
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 #AlignEscapedNewlines: Left # Unknown to clang-format-4.0
 AlignOperands: true
 AlignTrailingComments: true
-AllowAllParametersOfDeclarationOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
 AllowShortBlocksOnASingleLine: false
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
@@ -58,7 +58,7 @@ CommentPragmas: '^ IWYU pragma:'
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 ConstructorInitializerIndentWidth: 4
 ContinuationIndentWidth: 4
-Cpp11BracedListStyle: false
+Cpp11BracedListStyle: true
 DerivePointerAlignment: false
 DisableFormat: false
 ExperimentalAutoDetectBinPacking: false
@@ -116,3 +116,4 @@ Standard: Cpp03
 TabWidth: 4
 UseTab: Never
 ...
+
