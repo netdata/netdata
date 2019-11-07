@@ -32,7 +32,8 @@ So, although Netdata collects metrics every second, it can send to the backend s
     -   **prometheus** is described at [prometheus page](prometheus/) since it pulls data from Netdata.
 
     -   **prometheus remote write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
-        **Elasticsearch**, **Gnocchi**, **Graphite**, **InfluxDB**, **Kafka**, **OpenTSDB**, **PostgreSQL**, **TimescaleDB**, **Splunk**, **VictoriaMetrics**, and a lot of other [storage
+        **Elasticsearch**, **Gnocchi**, **Graphite**, **InfluxDB**, **Kafka**, **OpenTSDB**, **PostgreSQL/TimescaleDB**,
+        **Splunk**, **VictoriaMetrics**, and a lot of other [storage
         providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage))
 
         metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus
