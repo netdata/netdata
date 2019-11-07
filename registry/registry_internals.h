@@ -12,7 +12,7 @@
 
 // ----------------------------------------------------------------------------
 // COMMON structures
-#include <inttypes.h>
+#include <stdint.h>
 struct registry {
     int enabled;
 
