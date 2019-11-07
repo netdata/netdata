@@ -12,28 +12,28 @@
 
 // ----------------------------------------------------------------------------
 // COMMON structures
-
+#include <inttypes.h>
 struct registry {
     int enabled;
 
     // entries counters / statistics
-    unsigned long long persons_count;
-    unsigned long long machines_count;
-    unsigned long long usages_count;
-    unsigned long long urls_count;
-    unsigned long long persons_urls_count;
-    unsigned long long machines_urls_count;
-    unsigned long long log_count;
+    uint64_t persons_count;
+    uint64_t machines_count;
+    uint64_t usages_count;
+    uint64_t urls_count;
+    uint64_t persons_urls_count;
+    uint64_t machines_urls_count;
+    uint64_t log_count;
 
     // memory counters / statistics
-    unsigned long long persons_memory;
-    unsigned long long machines_memory;
-    unsigned long long urls_memory;
-    unsigned long long persons_urls_memory;
-    unsigned long long machines_urls_memory;
+    uint64_t persons_memory;
+    uint64_t machines_memory;
+    uint64_t urls_memory;
+    uint64_t persons_urls_memory;
+    uint64_t machines_urls_memory;
 
     // configuration
-    unsigned long long save_registry_every_entries;
+    uint64_t save_registry_every_entries;
     char *registry_domain;
     char *hostname;
     char *registry_to_announce;
