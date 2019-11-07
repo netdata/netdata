@@ -15,8 +15,8 @@ RRDHOST *__wrap_rrdhost_find_by_hostname(const char *hostname, uint32_t hash)
 
 /* Note: we've got some intricate code inside the global statistics module, might be useful to pull it inside the
          test set instead of mocking it. */
-void __wrap_finished_web_request_statistics(uint64_t dt, uint64_t bytes_received, uint64_t bytes_sent,
-                                            uint64_t content_size, uint64_t compressed_content_size)
+void __wrap_finished_web_request_statistics(
+    uint64_t dt, uint64_t bytes_received, uint64_t bytes_sent, uint64_t content_size, uint64_t compressed_content_size)
 {
 }
 
@@ -75,8 +75,8 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
     va_end(args);
 }
 
-void __wrap_error_int(const char *prefix, const char *file, const char *function, const unsigned long line,
-                      const char *fmt, ...)
+void __wrap_error_int(
+    const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -90,20 +90,20 @@ WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 char *netdata_configured_web_dir = "UNKNOWN FIXME";
 RRDHOST *localhost = NULL;
 
-struct config netdata_config = {.sections = NULL,
-                                .mutex = NETDATA_MUTEX_INITIALIZER,
-                                .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
-                                          .rwlock = AVL_LOCK_INITIALIZER}};
+struct config netdata_config = { .sections = NULL,
+                                 .mutex = NETDATA_MUTEX_INITIALIZER,
+                                 .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
+                                            .rwlock = AVL_LOCK_INITIALIZER } };
 
-const char *http_headers[] = {"Host: 254.254.0.1",
-                              "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_" // No ,
-                              "0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36",
-                              "Connection: keep-alive",
-                              "X-Forwarded-For: 1.254.1.251",
-                              "Cookie: _ga=GA1.1.1227576758.1571113676; _gid=GA1.2.1222321739.1573628979",
-                              "X-Requested-With: XMLHttpRequest",
-                              "Accept-Encoding: gzip, deflate",
-                              "Cache-Control: no-cache, no-store"};
+const char *http_headers[] = { "Host: 254.254.0.1",
+                               "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_" // No ,
+                               "0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36",
+                               "Connection: keep-alive",
+                               "X-Forwarded-For: 1.254.1.251",
+                               "Cookie: _ga=GA1.1.1227576758.1571113676; _gid=GA1.2.1222321739.1573628979",
+                               "X-Requested-With: XMLHttpRequest",
+                               "Accept-Encoding: gzip, deflate",
+                               "Cache-Control: no-cache, no-store" };
 #define MAX_HEADERS (sizeof(http_headers) / (sizeof(const char *)))
 
 static void build_request(struct web_buffer *wb, const char *url, bool use_cr, size_t num_headers)
@@ -160,7 +160,7 @@ static void api_info(void **state)
 int main(void)
 {
     localhost = malloc(sizeof(RRDHOST));
-    const struct CMUnitTest tests[] = {cmocka_unit_test(api_info)};
+    const struct CMUnitTest tests[] = { cmocka_unit_test(api_info) };
     debug_flags = 0xffffffffffff;
 
     free(localhost);
