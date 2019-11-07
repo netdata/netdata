@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Initial CMocka testing against web\_client.c \(issue \#7229\). [\#7264](https://github.com/netdata/netdata/pull/7264) ([amoss](https://github.com/amoss))
+- Remove documentation about kickstart-static64.sh and netdata updater [\#7262](https://github.com/netdata/netdata/pull/7262) ([knatsakis](https://github.com/knatsakis))
 - Upgraded swagger docs from Dolphin tool. [\#7257](https://github.com/netdata/netdata/pull/7257) ([amoss](https://github.com/amoss))
 - Update SYN cookie alarm to be less aggressive. [\#7250](https://github.com/netdata/netdata/pull/7250) ([Ferroin](https://github.com/Ferroin))
 - netdata/docs: netdata installer documentation minor nit [\#7246](https://github.com/netdata/netdata/pull/7246) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
@@ -168,7 +170,6 @@
 - Add clang-format. Update Contribution guidelines. [\#6677](https://github.com/netdata/netdata/pull/6677) ([cosmix](https://github.com/cosmix))
 - changed naming for redirect\_uri param [\#6663](https://github.com/netdata/netdata/pull/6663) ([jacekkolasa](https://github.com/jacekkolasa))
 - Fixes netdata group deletion on linux for uninstall script [\#6645](https://github.com/netdata/netdata/pull/6645) ([mbarper](https://github.com/mbarper))
-- Gearman plugin for Netdata [\#6567](https://github.com/netdata/netdata/pull/6567) ([agronick](https://github.com/agronick))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
@@ -254,8 +255,6 @@
 - Fix crash in malloc [\#6583](https://github.com/netdata/netdata/pull/6583) ([thiagoftsm](https://github.com/thiagoftsm))
 - Build DEB and RPM packages in parallel [\#6579](https://github.com/netdata/netdata/pull/6579) ([knatsakis](https://github.com/knatsakis))
 - Fixed typo 'follwing' -\> 'following' [\#6575](https://github.com/netdata/netdata/pull/6575) ([vvanouytsel](https://github.com/vvanouytsel))
-- netdata/packaging: Bare OS validations [\#6574](https://github.com/netdata/netdata/pull/6574) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- vsphere collector: charts description and alarms [\#6572](https://github.com/netdata/netdata/pull/6572) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
