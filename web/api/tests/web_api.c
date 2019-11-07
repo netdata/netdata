@@ -128,6 +128,7 @@ static void build_request(struct web_buffer *wb, const char *url, bool use_cr, s
 
 static struct web_client *pre_test_setup()
 {
+    localhost = malloc(sizeof(RRDHOST));
     struct web_client *w = (struct web_client *)malloc(sizeof(struct web_client));
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
@@ -144,13 +145,14 @@ static void post_test_cleanup(struct web_client *w)
     buffer_free(w->response.header);
     buffer_free(w->response.header_output);
     free(w);
+    free(localhost);
 }
 
 static void api_info(void **state)
 {
     for (size_t i = 0; i < MAX_HEADERS; i++) {
         struct web_client *w = pre_test_setup();
-        build_request(w->response.data, "/api/v1/info", true, 9001);
+        build_request(w->response.data, "/api/v1/info", true, i);
         web_client_process_request(w);
         assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
         post_test_cleanup(w);
@@ -159,10 +161,8 @@ static void api_info(void **state)
 
 int main(void)
 {
-    localhost = malloc(sizeof(RRDHOST));
     const struct CMUnitTest tests[] = { cmocka_unit_test(api_info) };
     debug_flags = 0xffffffffffff;
 
-    free(localhost);
     return cmocka_run_group_tests_name("web_api", tests, NULL, NULL);
 }
