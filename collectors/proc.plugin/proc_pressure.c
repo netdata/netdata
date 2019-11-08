@@ -174,7 +174,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
             double full10 = strtod(procfile_lineword(ff, 1, 2), NULL);
             double full60 = strtod(procfile_lineword(ff, 1, 4), NULL);
             double full300 = strtod(procfile_lineword(ff, 1, 6), NULL);
-            update_pressure_chart(&resources[i].charts.some, full10, full60, full300);
+            update_pressure_chart(&resources[i].charts.full, full10, full60, full300);
         }
     }
 
