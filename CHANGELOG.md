@@ -254,7 +254,6 @@
 - Install Netdata with Docker  [\#6596](https://github.com/netdata/netdata/pull/6596) ([prhomhyse](https://github.com/prhomhyse))
 - netdata/packaging: Expect .tar.gz version of go.d plugin [\#6590](https://github.com/netdata/netdata/pull/6590) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fix configure.ac allowing deprecated LZ4 library call [\#6589](https://github.com/netdata/netdata/pull/6589) ([mfundul](https://github.com/mfundul))
-- Fix crash in malloc [\#6583](https://github.com/netdata/netdata/pull/6583) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
