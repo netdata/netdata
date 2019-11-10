@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	rocketchat/README.md \
-	rocketchat/Makefile.inc \
-	$(NULL)
+    rocketchat/README.md \
+    rocketchat/Makefile.inc \
+    $(NULL)
 

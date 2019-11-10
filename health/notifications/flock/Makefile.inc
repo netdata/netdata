@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	flock/README.md \
-	flock/Makefile.inc \
-	$(NULL)
+    flock/README.md \
+    flock/Makefile.inc \
+    $(NULL)
 
