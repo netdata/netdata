@@ -846,6 +846,13 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
         // is there anything?
         if(!*s || s == e) break;
 
+        if (e && e[0] == '/' && (e+1) && e[1] == '/') {
+            error("A destiny specified %s does not have the correct format [PROTOCOL:]IP[%INTERFACE][:PORT]"
+                  , s);
+            sock = -1;
+            break;
+        }
+
         char buf[e - s + 1];
         strncpyz(buf, s, e - s);
         if(reconnects_counter) *reconnects_counter += 1;
