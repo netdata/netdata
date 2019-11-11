@@ -19,6 +19,10 @@ dist_userhealthconfig_DATA = \
     .keep \
     $(NULL)
 
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(userhealthconfigdir)
+
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
     health.d/adaptec_raid.conf \
