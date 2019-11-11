@@ -590,7 +590,7 @@ if [ "${UID}" = "0" ]; then
 	ROOT_USER="root"
 else
 	NETDATA_USER="${USER}"
-	ROOT_USER="${NETDATA_USER}"
+	ROOT_USER="${USER}"
 fi
 NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
@@ -648,19 +648,6 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]; then
 	# this is needed if NETDATA_PREFIX is not empty
 	run mkdir -p "${NETDATA_RUN_DIR}" || exit 1
 fi
-
-# --- conf dir ----
-
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d" "ssl"; do
-	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
-		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
-		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
-	fi
-done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
-run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
-run chmod 755 "${NETDATA_USER_CONFIG_DIR}/edit-config"
 
 # --- stock conf dir ----
 
@@ -920,10 +907,7 @@ else
 	run_ok "netdata started!"
 	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 fi
-if [ "${UID}" -eq 0 ]; then
-	run chown "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
-fi
-run chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 
 if [ "$(uname)" = "Linux" ]; then
 	# -------------------------------------------------------------------------
@@ -1086,6 +1070,7 @@ RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
 EOF
+run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 
 echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
 cat <<EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"

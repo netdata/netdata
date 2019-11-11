@@ -27,6 +27,14 @@ SUBDIRS = \
     tc.plugin \
     $(NULL)
 
+usercustompluginsconfigdir=$(configdir)/custom-plugins.d
+usergoconfigdir=$(configdir)/go.d
+
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(usercustompluginsconfigdir)
+	$(INSTALL) -d $(DESTDIR)$(usergoconfigdir)
+
 dist_noinst_DATA = \
     README.md \
     $(NULL)

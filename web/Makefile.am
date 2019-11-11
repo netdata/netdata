@@ -9,6 +9,12 @@ SUBDIRS = \
     server \
     $(NULL)
 
+usersslconfigdir=$(configdir)/ssl
+
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(usersslconfigdir)
+
 dist_noinst_DATA = \
     README.md \
     gui/confluence/README.md \

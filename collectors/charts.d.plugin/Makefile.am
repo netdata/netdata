@@ -34,6 +34,10 @@ dist_userchartsconfig_DATA = \
     .keep \
     $(NULL)
 
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(userchartsconfigdir)
+
 chartsconfigdir=$(libconfigdir)/charts.d
 dist_chartsconfig_DATA = \
     $(NULL)

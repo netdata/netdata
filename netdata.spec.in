@@ -256,7 +256,7 @@ autoreconf -ivf
 rm -rf "${RPM_BUILD_ROOT}"
 %{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
 
-find "${RPM_BUILD_ROOT}" -name .keep -delete
+find "${RPM_BUILD_ROOT}%{_localstatedir}" -name .keep -delete -print
 
 install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 
@@ -290,9 +290,6 @@ install -m 4750 -p slabinfo.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plug
 # ###########################################################
 # Install registry directory
 install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/custom-plugins.d"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/go.d"
-install -m 755 -d "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}/ssl"
 
 # ###########################################################
 # Install netdata service
@@ -423,12 +420,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %files
 %doc README.md
-%defattr(-,root,netdata)
+%{_sysconfdir}/%{name}
+%config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
 
-%dir %{_sysconfdir}/%{name}
+%defattr(-,root,netdata)
 %dir %{_libdir}/%{name}
 
-%config(noreplace) %{_sysconfdir}/%{name}/*.conf
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 
 %{_libdir}/%{name}
@@ -436,7 +433,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %defattr(0755,netdata,netdata,0755)
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
-%{_sysconfdir}/%{name}/edit-config
 
 %defattr(4750,root,netdata,0750)
 
@@ -466,15 +462,6 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_datadir}/%{name}
 
 %defattr(0750,netdata,netdata,0755)
-
-%dir %{_sysconfdir}/%{name}/health.d
-%dir %{_sysconfdir}/%{name}/python.d
-%dir %{_sysconfdir}/%{name}/charts.d
-%dir %{_sysconfdir}/%{name}/custom-plugins.d
-%dir %{_sysconfdir}/%{name}/go.d
-%dir %{_sysconfdir}/%{name}/ssl
-%dir %{_sysconfdir}/%{name}/node.d
-%dir %{_sysconfdir}/%{name}/statsd.d
 %{_libdir}/%{name}/conf.d/
 
 %if %{with systemd}
@@ -515,6 +502,8 @@ Use this plugin to enable metrics collection from cupsd, the daemon running when
 %endif
 
 %changelog
+* Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10
+- Fix /etc/netdata permissions
 * Mon Sep 23 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-9
 - Do not build CUPS plugin subpackage on CentOS 6 and CentOS 7
 * Tue Aug 20 2019 Pavlos Emm. Katsoulakis <paul@netdat.acloud> - 0.0.0-8
