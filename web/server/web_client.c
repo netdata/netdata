@@ -1266,7 +1266,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
                 while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
                     if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                        error("Cannot send HTTP headers to web client.");
+                        error("Cannot send HTTPS headers to web client.");
                         break;
                     }
                 }

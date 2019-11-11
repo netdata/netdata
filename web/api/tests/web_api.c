@@ -8,6 +8,12 @@
 #include <cmocka.h>
 #include <stdbool.h>
 
+/*ssize_t send(int sockfd, const void *buf, size_t len, int flags)
+{
+    printf("Mocking send: %u bytes\n", len);
+    return len;
+}*/
+
 RRDHOST *__wrap_rrdhost_find_by_hostname(const char *hostname, uint32_t hash)
 {
     return NULL;
@@ -157,6 +163,8 @@ static void api_info(void **state)
         build_request(w->response.data, "/api/v1/info", true, i);
         size_t real_len = w->response.data->len;
         for(size_t len=0; len <real_len; len++) {
+            // The web_client code over-writes the reponse each time so we need to rebuild it the same way.
+            build_request(w->response.data, "/api/v1/info", true, i);
             w->response.data->len = len;
             info("Buffer contains: %s [first %u]", w->response.data->buffer, len);
             web_client_process_request(w);
