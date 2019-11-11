@@ -126,6 +126,8 @@ static void build_request(struct web_buffer *wb, const char *url, bool use_cr, s
     buffer_strcat(wb, "\n");
 }
 
+/* Note: this is not a CMocka group_test_setup/teardown pair. This is performed per-test.
+*/
 static struct web_client *pre_test_setup()
 {
     localhost = malloc(sizeof(RRDHOST));
@@ -153,8 +155,17 @@ static void api_info(void **state)
     for (size_t i = 0; i < MAX_HEADERS; i++) {
         struct web_client *w = pre_test_setup();
         build_request(w->response.data, "/api/v1/info", true, i);
+        size_t real_len = w->response.data->len;
+        for(size_t len=0; len <real_len; len++) {
+            w->response.data->len = len;
+            info("Buffer contains: %s [first %u]", w->response.data->buffer, len);
+            web_client_process_request(w);
+            assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
+        }
+        w->response.data->len = real_len;
+        info("Buffer contains: %s [complete]", w->response.data->buffer);
         web_client_process_request(w);
-        assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
+        assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
         post_test_cleanup(w);
     }
 }
