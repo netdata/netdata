@@ -1121,7 +1121,11 @@ void *backends_main(void *ptr) {
                 }
             }
             else {
-                error("BACKEND: failed to update database backend '%s'", destination);
+                if (!strstr(destination,"//")) {
+                    error("BACKEND: failed to update database backend '%s'", destination);
+                } else {
+                    error("BACKEND: failed to connect to destination '%s', please remove '//'.", destination);
+                }
                 chart_transmission_failures++;
 
                 // increment the counter we check for data loss
