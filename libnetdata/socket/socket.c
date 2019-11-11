@@ -846,8 +846,8 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
         // is there anything?
         if(!*s || s == e) break;
 
-        if (e && e[0] == '/' && (e+1) && e[1] == '/') {
-            error("A destiny specified %s does not have the correct format [PROTOCOL:]IP[%INTERFACE][:PORT]"
+        if (e && e[0] == '/' && e[1] == '/') {
+            error("A destination specified %s does not have the correct format [PROTOCOL:]HOST[%INTERFACE][:PORT]"
                   , s);
             sock = -1;
             break;
