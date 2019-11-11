@@ -1822,7 +1822,7 @@ netdataDashboard.context = {
     // web_log
 
     'web_log.response_statuses': {
-        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b> and <b>304</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b>, <code>other</code> are all the other responses.',
+        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>304</b> and <b>401</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b> except <b>401</b>, <code>other</code> are all the other responses.',
         mainheads: [
             function (os, id) {
                 void(os);

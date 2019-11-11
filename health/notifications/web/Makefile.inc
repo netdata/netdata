@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	web/README.md \
-	web/Makefile.inc \
-	$(NULL)
+    web/README.md \
+    web/Makefile.inc \
+    $(NULL)
 

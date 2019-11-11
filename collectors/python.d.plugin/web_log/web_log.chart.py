@@ -867,7 +867,7 @@ class Web:
         :return:
         """
         code_class = code[0]
-        if code_class == '2' or code == '304' or code_class == '1':
+        if code_class == '2' or code == '304' or code_class == '1' or code == '401':
             self.data['successful_requests'] += 1
         elif code_class == '3':
             self.data['redirects'] += 1
