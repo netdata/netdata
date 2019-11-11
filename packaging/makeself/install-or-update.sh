@@ -201,19 +201,6 @@ fi
 
 
 # -----------------------------------------------------------------------------
-
-progress "create user config directories"
-
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "custom-plugins.d" "ssl"
-do
-    if [ ! -d "etc/netdata/${x}" ]
-        then
-        run mkdir -p "etc/netdata/${x}" || exit 1
-    fi
-done
-
-
-# -----------------------------------------------------------------------------
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
@@ -244,20 +231,18 @@ fi
 
 
 # -----------------------------------------------------------------------------
-
 if [ ${STARTIT} -eq 0 ]; then
-    create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
-    netdata_banner "is installed now!"
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+	netdata_banner "is installed now!"
 else
-    progress "starting netdata"
+	progress "starting netdata"
 
-    if ! restart_netdata "/opt/netdata/bin/netdata"; then
-        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
-        netdata_banner "is installed and running now!"
-    else
-        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
-        netdata_banner "is installed now!"
-    fi
+	if ! restart_netdata "${NETDATA_PREFIX}/bin/netdata"; then
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+		netdata_banner "is installed and running now!"
+	else
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+		netdata_banner "is installed now!"
+	fi
 fi
-run chown "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf"
-run chmod 0664 "/opt/netdata/etc/netdata/netdata.conf"
+run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
