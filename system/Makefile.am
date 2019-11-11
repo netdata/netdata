@@ -1,4 +1,3 @@
-#
 # Copyright (C) 2015 Alon Bar-Lev <alon.barlev@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 

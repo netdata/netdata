@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
-
 CLEANFILES = \
     charts.d.plugin \
     $(NULL)
