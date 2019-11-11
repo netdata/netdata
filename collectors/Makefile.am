@@ -25,9 +25,8 @@ SUBDIRS = \
     slabinfo.plugin \
     statsd.plugin \
     tc.plugin \
-   	$(NULL)
-
+    $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)

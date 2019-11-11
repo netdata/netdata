@@ -1,89 +1,89 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-AUTOMAKE_OPTIONS=foreign subdir-objects 1.11
+AUTOMAKE_OPTIONS = foreign subdir-objects 1.11
 ACLOCAL_AMFLAGS = -I build/m4
 
-MAINTAINERCLEANFILES= \
-	config.log config.status \
-	$(srcdir)/Makefile.in \
-	$(srcdir)/config.h.in $(srcdir)/config.h.in~ $(srcdir)/configure \
-	$(srcdir)/install-sh $(srcdir)/ltmain.sh $(srcdir)/missing \
-	$(srcdir)/compile $(srcdir)/depcomp $(srcdir)/aclocal.m4 \
-	$(srcdir)/config.guess $(srcdir)/config.sub \
-	$(srcdir)/m4/ltsugar.m4 $(srcdir)/m4/libtool.m4 \
-	$(srcdir)/m4/ltversion.m4 $(srcdir)/m4/lt~obsolete.m4 \
-	$(srcdir)/m4/ltoptions.m4 \
-	$(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
+MAINTAINERCLEANFILES = \
+    config.log config.status \
+    $(srcdir)/Makefile.in \
+    $(srcdir)/config.h.in $(srcdir)/config.h.in~ $(srcdir)/configure \
+    $(srcdir)/install-sh $(srcdir)/ltmain.sh $(srcdir)/missing \
+    $(srcdir)/compile $(srcdir)/depcomp $(srcdir)/aclocal.m4 \
+    $(srcdir)/config.guess $(srcdir)/config.sub \
+    $(srcdir)/m4/ltsugar.m4 $(srcdir)/m4/libtool.m4 \
+    $(srcdir)/m4/ltversion.m4 $(srcdir)/m4/lt~obsolete.m4 \
+    $(srcdir)/m4/ltoptions.m4 \
+    $(srcdir)/pkcs11-helper.spec $(srcdir)/config-w32-vc.h
 
-CLEANFILES= \
-	$(srcdir)/$(distdir).tar.gz
+CLEANFILES = \
+    $(srcdir)/$(distdir).tar.gz
 
 EXTRA_DIST = \
-	.gitignore \
-	.csslintrc \
-	.eslintignore \
-	.eslintrc \
-	.github/CODEOWNERS \
-	build/m4/jemalloc.m4 \
-	build/m4/ax_c___atomic.m4 \
-	build/m4/ax_check_enable_debug.m4 \
-	build/m4/ax_c_mallinfo.m4 \
-	build/m4/ax_gcc_func_attribute.m4 \
-	build/m4/ax_check_compile_flag.m4 \
-	build/m4/ax_c_statement_expressions.m4 \
-	build/m4/ax_pthread.m4 \
-	build/m4/ax_c_lto.m4 \
-	build/m4/ax_c_mallopt.m4 \
-	build/m4/tcmalloc.m4 \
-	build/m4/ax_c__generic.m4 \
-	README.md \
-	CONTRIBUTORS.md \
-	CODE_OF_CONDUCT.md \
-	LICENSE \
-	REDISTRIBUTED.md \
-	CONTRIBUTING.md \
-	$(NULL)
+    .gitignore \
+    .csslintrc \
+    .eslintignore \
+    .eslintrc \
+    .github/CODEOWNERS \
+    build/m4/jemalloc.m4 \
+    build/m4/ax_c___atomic.m4 \
+    build/m4/ax_check_enable_debug.m4 \
+    build/m4/ax_c_mallinfo.m4 \
+    build/m4/ax_gcc_func_attribute.m4 \
+    build/m4/ax_check_compile_flag.m4 \
+    build/m4/ax_c_statement_expressions.m4 \
+    build/m4/ax_pthread.m4 \
+    build/m4/ax_c_lto.m4 \
+    build/m4/ax_c_mallopt.m4 \
+    build/m4/tcmalloc.m4 \
+    build/m4/ax_c__generic.m4 \
+    README.md \
+    CONTRIBUTORS.md \
+    CODE_OF_CONDUCT.md \
+    LICENSE \
+    REDISTRIBUTED.md \
+    CONTRIBUTING.md \
+    $(NULL)
 
 SUBDIRS = \
-	diagrams \
-	system \
-	tests \
-	$(NULL)
+    diagrams \
+    system \
+    tests \
+    $(NULL)
 
-dist_noinst_DATA= \
-	CHANGELOG.md \
-	cppcheck.sh \
-	configs.signatures \
-	contrib \
-	netdata.cppcheck \
-	netdata.spec \
-	package.json \
-	docs \
-	packaging/version \
-	packaging/go.d.version \
-	packaging/go.d.checksums \
-	packaging/installer/README.md \
-	packaging/installer/UNINSTALL.md \
-	packaging/installer/UPDATE.md \
-	netlify.toml \
-	$(NULL)
+dist_noinst_DATA = \
+    CHANGELOG.md \
+    cppcheck.sh \
+    configs.signatures \
+    contrib \
+    netdata.cppcheck \
+    netdata.spec \
+    package.json \
+    docs \
+    packaging/version \
+    packaging/go.d.version \
+    packaging/go.d.checksums \
+    packaging/installer/README.md \
+    packaging/installer/UNINSTALL.md \
+    packaging/installer/UPDATE.md \
+    netlify.toml \
+    $(NULL)
 
 # until integrated within build
 # should be proper init.d/openrc/systemd usable
-dist_noinst_SCRIPTS= \
-	coverity-scan.sh \
-	packaging/installer/netdata-updater.sh \
-	packaging/installer/netdata-uninstaller.sh \
-	packaging/installer/kickstart.sh \
-	packaging/installer/kickstart-static64.sh \
-	packaging/installer/functions.sh \
-	netdata-installer.sh \
-	docs/generator/buildhtml.sh \
-	docs/generator/buildyaml.sh \
-	docs/generator/checklinks.sh \
-	docs/generator/requirements.txt \
-	docs/generator/runtime.txt \
-	$(NULL)
+dist_noinst_SCRIPTS = \
+    coverity-scan.sh \
+    packaging/installer/netdata-updater.sh \
+    packaging/installer/netdata-uninstaller.sh \
+    packaging/installer/kickstart.sh \
+    packaging/installer/kickstart-static64.sh \
+    packaging/installer/functions.sh \
+    netdata-installer.sh \
+    docs/generator/buildhtml.sh \
+    docs/generator/buildyaml.sh \
+    docs/generator/checklinks.sh \
+    docs/generator/requirements.txt \
+    docs/generator/runtime.txt \
+    $(NULL)
 
 # -----------------------------------------------------------------------------
 # Compile netdata binaries
@@ -98,19 +98,19 @@ SUBDIRS += \
     registry \
     streaming \
     web \
-	$(NULL)
+    $(NULL)
 
 
 AM_CFLAGS = \
-	$(OPTIONAL_MATH_CFLAGS) \
-	$(OPTIONAL_NFACCT_CFLAGS) \
-	$(OPTIONAL_ZLIB_CFLAGS) \
-	$(OPTIONAL_UUID_CFLAGS) \
-	$(OPTIONAL_LIBCAP_LIBS) \
-	$(OPTIONAL_IPMIMONITORING_CFLAGS) \
-	$(OPTIONAL_CUPS_CFLAGS) \
-	$(OPTIONAL_XENSTAT_CFLAGS) \
-	$(NULL)
+    $(OPTIONAL_MATH_CFLAGS) \
+    $(OPTIONAL_NFACCT_CFLAGS) \
+    $(OPTIONAL_ZLIB_CFLAGS) \
+    $(OPTIONAL_UUID_CFLAGS) \
+    $(OPTIONAL_LIBCAP_LIBS) \
+    $(OPTIONAL_IPMIMONITORING_CFLAGS) \
+    $(OPTIONAL_CUPS_CFLAGS) \
+    $(OPTIONAL_XENSTAT_CFLAGS) \
+    $(NULL)
 
 sbin_PROGRAMS =
 dist_cache_DATA = packaging/installer/.keep
@@ -160,20 +160,20 @@ LIBNETDATA_FILES = \
     libnetdata/storage_number/storage_number.h \
     libnetdata/threads/threads.c \
     libnetdata/threads/threads.h \
-	libnetdata/url/url.c \
-	libnetdata/url/url.h \
-	libnetdata/json/json.c \
-	libnetdata/json/json.h \
-	libnetdata/json/jsmn.c \
-	libnetdata/json/jsmn.h \
-	libnetdata/health/health.c \
-	libnetdata/health/health.h \
+    libnetdata/url/url.c \
+    libnetdata/url/url.h \
+    libnetdata/json/json.c \
+    libnetdata/json/json.h \
+    libnetdata/json/jsmn.c \
+    libnetdata/json/jsmn.h \
+    libnetdata/health/health.c \
+    libnetdata/health/health.h \
     libnetdata/string/utf8.h \
     $(NULL)
 
 APPS_PLUGIN_FILES = \
-	collectors/apps.plugin/apps_plugin.c \
-	$(LIBNETDATA_FILES) \
+    collectors/apps.plugin/apps_plugin.c \
+    $(LIBNETDATA_FILES) \
     $(NULL)
 
 CHECKS_PLUGIN_FILES = \
@@ -182,29 +182,29 @@ CHECKS_PLUGIN_FILES = \
     $(NULL)
 
 FREEBSD_PLUGIN_FILES = \
-	collectors/freebsd.plugin/plugin_freebsd.c \
-	collectors/freebsd.plugin/plugin_freebsd.h \
-	collectors/freebsd.plugin/freebsd_sysctl.c \
-	collectors/freebsd.plugin/freebsd_getmntinfo.c \
-	collectors/freebsd.plugin/freebsd_getifaddrs.c \
-	collectors/freebsd.plugin/freebsd_devstat.c \
-	collectors/freebsd.plugin/freebsd_kstat_zfs.c \
-	collectors/freebsd.plugin/freebsd_ipfw.c \
-	collectors/proc.plugin/zfs_common.c \
-	collectors/proc.plugin/zfs_common.h \
+    collectors/freebsd.plugin/plugin_freebsd.c \
+    collectors/freebsd.plugin/plugin_freebsd.h \
+    collectors/freebsd.plugin/freebsd_sysctl.c \
+    collectors/freebsd.plugin/freebsd_getmntinfo.c \
+    collectors/freebsd.plugin/freebsd_getifaddrs.c \
+    collectors/freebsd.plugin/freebsd_devstat.c \
+    collectors/freebsd.plugin/freebsd_kstat_zfs.c \
+    collectors/freebsd.plugin/freebsd_ipfw.c \
+    collectors/proc.plugin/zfs_common.c \
+    collectors/proc.plugin/zfs_common.h \
     $(NULL)
 
 HEALTH_PLUGIN_FILES = \
-	health/health.c \
-	health/health.h \
-	health/health_config.c \
-	health/health_json.c \
-	health/health_log.c \
+    health/health.c \
+    health/health.h \
+    health/health_config.c \
+    health/health_json.c \
+    health/health_log.c \
     $(NULL)
 
 IDLEJITTER_PLUGIN_FILES = \
-	collectors/idlejitter.plugin/plugin_idlejitter.c \
-	collectors/idlejitter.plugin/plugin_idlejitter.h \
+    collectors/idlejitter.plugin/plugin_idlejitter.c \
+    collectors/idlejitter.plugin/plugin_idlejitter.h \
     $(NULL)
 
 CGROUPS_PLUGIN_FILES = \
@@ -228,19 +228,19 @@ FREEIPMI_PLUGIN_FILES = \
     $(NULL)
 
 CUPS_PLUGIN_FILES = \
-	collectors/cups.plugin/cups_plugin.c \
-	$(LIBNETDATA_FILES) \
-	$(NULL)
+    collectors/cups.plugin/cups_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
 
 NFACCT_PLUGIN_FILES = \
-	collectors/nfacct.plugin/plugin_nfacct.c \
+    collectors/nfacct.plugin/plugin_nfacct.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
 SLABINFO_PLUGIN_FILES = \
-	collectors/slabinfo.plugin/slabinfo.c \
-	$(LIBNETDATA_FILES)
-	$(NULL)
+    collectors/slabinfo.plugin/slabinfo.c \
+    $(LIBNETDATA_FILES)
+    $(NULL)
 
 XENSTAT_PLUGIN_FILES = \
     collectors/xenstat.plugin/xenstat_plugin.c \
@@ -253,62 +253,62 @@ PERF_PLUGIN_FILES = \
     $(NULL)
 
 PROC_PLUGIN_FILES = \
-	collectors/proc.plugin/ipc.c \
-	collectors/proc.plugin/plugin_proc.c \
-	collectors/proc.plugin/plugin_proc.h \
-	collectors/proc.plugin/proc_diskstats.c \
-	collectors/proc.plugin/proc_mdstat.c \
-	collectors/proc.plugin/proc_interrupts.c \
-	collectors/proc.plugin/proc_softirqs.c \
-	collectors/proc.plugin/proc_loadavg.c \
-	collectors/proc.plugin/proc_meminfo.c \
-	collectors/proc.plugin/proc_pagetypeinfo.c \
-	collectors/proc.plugin/proc_net_dev.c \
-	collectors/proc.plugin/proc_net_ip_vs_stats.c \
-	collectors/proc.plugin/proc_net_netstat.c \
-	collectors/proc.plugin/proc_net_rpc_nfs.c \
-	collectors/proc.plugin/proc_net_rpc_nfsd.c \
-	collectors/proc.plugin/proc_net_snmp.c \
-	collectors/proc.plugin/proc_net_snmp6.c \
-	collectors/proc.plugin/proc_net_sctp_snmp.c \
-	collectors/proc.plugin/proc_net_sockstat.c \
-	collectors/proc.plugin/proc_net_sockstat6.c \
-	collectors/proc.plugin/proc_net_softnet_stat.c \
-	collectors/proc.plugin/proc_net_stat_conntrack.c \
-	collectors/proc.plugin/proc_net_stat_synproxy.c \
-	collectors/proc.plugin/proc_self_mountinfo.c \
-	collectors/proc.plugin/proc_self_mountinfo.h \
-	collectors/proc.plugin/zfs_common.c \
-	collectors/proc.plugin/zfs_common.h \
-	collectors/proc.plugin/proc_spl_kstat_zfs.c \
-	collectors/proc.plugin/proc_stat.c \
-	collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c \
-	collectors/proc.plugin/proc_vmstat.c \
-	collectors/proc.plugin/proc_uptime.c \
-	collectors/proc.plugin/sys_kernel_mm_ksm.c \
-	collectors/proc.plugin/sys_block_zram.c \
-	collectors/proc.plugin/sys_devices_system_edac_mc.c \
-	collectors/proc.plugin/sys_devices_system_node.c \
-	collectors/proc.plugin/sys_fs_btrfs.c \
-	collectors/proc.plugin/sys_class_power_supply.c \
+    collectors/proc.plugin/ipc.c \
+    collectors/proc.plugin/plugin_proc.c \
+    collectors/proc.plugin/plugin_proc.h \
+    collectors/proc.plugin/proc_diskstats.c \
+    collectors/proc.plugin/proc_mdstat.c \
+    collectors/proc.plugin/proc_interrupts.c \
+    collectors/proc.plugin/proc_softirqs.c \
+    collectors/proc.plugin/proc_loadavg.c \
+    collectors/proc.plugin/proc_meminfo.c \
+    collectors/proc.plugin/proc_pagetypeinfo.c \
+    collectors/proc.plugin/proc_net_dev.c \
+    collectors/proc.plugin/proc_net_ip_vs_stats.c \
+    collectors/proc.plugin/proc_net_netstat.c \
+    collectors/proc.plugin/proc_net_rpc_nfs.c \
+    collectors/proc.plugin/proc_net_rpc_nfsd.c \
+    collectors/proc.plugin/proc_net_snmp.c \
+    collectors/proc.plugin/proc_net_snmp6.c \
+    collectors/proc.plugin/proc_net_sctp_snmp.c \
+    collectors/proc.plugin/proc_net_sockstat.c \
+    collectors/proc.plugin/proc_net_sockstat6.c \
+    collectors/proc.plugin/proc_net_softnet_stat.c \
+    collectors/proc.plugin/proc_net_stat_conntrack.c \
+    collectors/proc.plugin/proc_net_stat_synproxy.c \
+    collectors/proc.plugin/proc_self_mountinfo.c \
+    collectors/proc.plugin/proc_self_mountinfo.h \
+    collectors/proc.plugin/zfs_common.c \
+    collectors/proc.plugin/zfs_common.h \
+    collectors/proc.plugin/proc_spl_kstat_zfs.c \
+    collectors/proc.plugin/proc_stat.c \
+    collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c \
+    collectors/proc.plugin/proc_vmstat.c \
+    collectors/proc.plugin/proc_uptime.c \
+    collectors/proc.plugin/sys_kernel_mm_ksm.c \
+    collectors/proc.plugin/sys_block_zram.c \
+    collectors/proc.plugin/sys_devices_system_edac_mc.c \
+    collectors/proc.plugin/sys_devices_system_node.c \
+    collectors/proc.plugin/sys_fs_btrfs.c \
+    collectors/proc.plugin/sys_class_power_supply.c \
     $(NULL)
 
 TC_PLUGIN_FILES = \
-	collectors/tc.plugin/plugin_tc.c \
-	collectors/tc.plugin/plugin_tc.h \
+    collectors/tc.plugin/plugin_tc.c \
+    collectors/tc.plugin/plugin_tc.h \
     $(NULL)
 
 MACOS_PLUGIN_FILES = \
-	collectors/macos.plugin/plugin_macos.c \
-	collectors/macos.plugin/plugin_macos.h \
-	collectors/macos.plugin/macos_sysctl.c \
-	collectors/macos.plugin/macos_mach_smi.c \
-	collectors/macos.plugin/macos_fw.c \
+    collectors/macos.plugin/plugin_macos.c \
+    collectors/macos.plugin/plugin_macos.h \
+    collectors/macos.plugin/macos_sysctl.c \
+    collectors/macos.plugin/macos_mach_smi.c \
+    collectors/macos.plugin/macos_fw.c \
     $(NULL)
 
 PLUGINSD_PLUGIN_FILES = \
-	collectors/plugins.d/plugins_d.c \
-	collectors/plugins.d/plugins_d.h \
+    collectors/plugins.d/plugins_d.c \
+    collectors/plugins.d/plugins_d.h \
     $(NULL)
 
 RRD_PLUGIN_FILES = \
@@ -407,24 +407,24 @@ STREAMING_PLUGIN_FILES = \
     $(NULL)
 
 REGISTRY_PLUGIN_FILES = \
-	registry/registry.c \
-	registry/registry.h \
-	registry/registry_db.c \
-	registry/registry_init.c \
-	registry/registry_internals.c \
-	registry/registry_internals.h \
-	registry/registry_log.c \
-	registry/registry_machine.c \
-	registry/registry_machine.h \
-	registry/registry_person.c \
-	registry/registry_person.h \
-	registry/registry_url.c \
-	registry/registry_url.h \
+    registry/registry.c \
+    registry/registry.h \
+    registry/registry_db.c \
+    registry/registry_init.c \
+    registry/registry_internals.c \
+    registry/registry_internals.h \
+    registry/registry_log.c \
+    registry/registry_machine.c \
+    registry/registry_machine.h \
+    registry/registry_person.c \
+    registry/registry_person.h \
+    registry/registry_url.c \
+    registry/registry_url.h \
     $(NULL)
 
 STATSD_PLUGIN_FILES = \
-	collectors/statsd.plugin/statsd.c \
-	collectors/statsd.plugin/statsd.h \
+    collectors/statsd.plugin/statsd.c \
+    collectors/statsd.plugin/statsd.h \
     $(NULL)
 
 WEB_PLUGIN_FILES = \
@@ -470,36 +470,36 @@ MONGODB_BACKEND_FILES = \
     $(NULL)
 
 DAEMON_FILES = \
-	daemon/common.c \
-	daemon/common.h \
-	daemon/daemon.c \
-	daemon/daemon.h \
-	daemon/global_statistics.c \
-	daemon/global_statistics.h \
-	daemon/main.c \
-	daemon/main.h \
-	daemon/signals.c \
-	daemon/signals.h \
-	daemon/unit_test.c \
-	daemon/unit_test.h \
+    daemon/common.c \
+    daemon/common.h \
+    daemon/daemon.c \
+    daemon/daemon.h \
+    daemon/global_statistics.c \
+    daemon/global_statistics.h \
+    daemon/main.c \
+    daemon/main.h \
+    daemon/signals.c \
+    daemon/signals.h \
+    daemon/unit_test.c \
+    daemon/unit_test.h \
     $(NULL)
 
 NETDATA_FILES = \
     collectors/all.h \
     $(DAEMON_FILES) \
-	$(LIBNETDATA_FILES) \
-	$(API_PLUGIN_FILES) \
-	$(BACKENDS_PLUGIN_FILES) \
-	$(CHECKS_PLUGIN_FILES) \
-	$(HEALTH_PLUGIN_FILES) \
-	$(IDLEJITTER_PLUGIN_FILES) \
-	$(PLUGINSD_PLUGIN_FILES) \
-	$(REGISTRY_PLUGIN_FILES) \
-	$(RRD_PLUGIN_FILES) \
-	$(STREAMING_PLUGIN_FILES) \
-	$(STATSD_PLUGIN_FILES) \
-	$(WEB_PLUGIN_FILES) \
-	$(NULL)
+    $(LIBNETDATA_FILES) \
+    $(API_PLUGIN_FILES) \
+    $(BACKENDS_PLUGIN_FILES) \
+    $(CHECKS_PLUGIN_FILES) \
+    $(HEALTH_PLUGIN_FILES) \
+    $(IDLEJITTER_PLUGIN_FILES) \
+    $(PLUGINSD_PLUGIN_FILES) \
+    $(REGISTRY_PLUGIN_FILES) \
+    $(RRD_PLUGIN_FILES) \
+    $(STREAMING_PLUGIN_FILES) \
+    $(STATSD_PLUGIN_FILES) \
+    $(WEB_PLUGIN_FILES) \
+    $(NULL)
 
 if FREEBSD
     NETDATA_FILES += \
@@ -524,22 +524,22 @@ if LINUX
 endif
 
 NETDATA_COMMON_LIBS = \
-	$(OPTIONAL_MATH_LIBS) \
-	$(OPTIONAL_ZLIB_LIBS) \
-	$(OPTIONAL_SSL_LIBS) \
-	$(OPTIONAL_UUID_LIBS) \
-	$(OPTIONAL_UV_LIBS) \
-	$(OPTIONAL_LZ4_LIBS) \
-	$(OPTIONAL_JUDY_LIBS) \
-	$(OPTIONAL_SSL_LIBS) \
-	$(OPTIONAL_JSONC_LIBS) \
-	$(NULL)
+    $(OPTIONAL_MATH_LIBS) \
+    $(OPTIONAL_ZLIB_LIBS) \
+    $(OPTIONAL_SSL_LIBS) \
+    $(OPTIONAL_UUID_LIBS) \
+    $(OPTIONAL_UV_LIBS) \
+    $(OPTIONAL_LZ4_LIBS) \
+    $(OPTIONAL_JUDY_LIBS) \
+    $(OPTIONAL_SSL_LIBS) \
+    $(OPTIONAL_JSONC_LIBS) \
+    $(NULL)
 
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
-	$(NETDATA_COMMON_LIBS) \
-	$(NULL)
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
 if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
@@ -550,7 +550,7 @@ if ENABLE_PLUGIN_APPS
     plugins_PROGRAMS += apps.plugin
     apps_plugin_SOURCES = $(APPS_PLUGIN_FILES)
     apps_plugin_LDADD = \
-    	$(NETDATA_COMMON_LIBS) \
+        $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_LIBCAP_LIBS) \
         $(NULL)
 endif
@@ -559,7 +559,7 @@ if ENABLE_PLUGIN_CGROUP_NETWORK
     plugins_PROGRAMS += cgroup-network
     cgroup_network_SOURCES = $(CGROUP_NETWORK_FILES)
     cgroup_network_LDADD = \
-    	$(NETDATA_COMMON_LIBS) \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 
@@ -567,7 +567,7 @@ if ENABLE_PLUGIN_FREEIPMI
     plugins_PROGRAMS += freeipmi.plugin
     freeipmi_plugin_SOURCES = $(FREEIPMI_PLUGIN_FILES)
     freeipmi_plugin_LDADD = \
-    	$(NETDATA_COMMON_LIBS) \
+        $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
         $(NULL)
 endif

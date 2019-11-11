@@ -8,11 +8,11 @@ SUBDIRS = \
     $(NULL)
 
 CLEANFILES = \
-	$(NULL)
+    $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)
 
 userhealthconfigdir=$(configdir)/health.d
 dist_userhealthconfig_DATA = \
