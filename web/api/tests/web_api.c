@@ -162,7 +162,7 @@ static void api_info(void **state)
         struct web_client *w = pre_test_setup();
         build_request(w->response.data, "/api/v1/info", true, i);
         size_t real_len = w->response.data->len;
-        for(size_t len=0; len <real_len; len++) {
+        for (size_t len = 0; len < real_len; len++) {
             // The web_client code over-writes the reponse each time so we need to rebuild it the same way.
             build_request(w->response.data, "/api/v1/info", true, i);
             w->response.data->len = len;
