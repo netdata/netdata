@@ -931,6 +931,7 @@ if(BUILD_TESTING)
         -Wl,--wrap=uv_mutex_unlock
         -Wl,--wrap=uv_cond_signal
         -Wl,--wrap=uv_cond_wait
+        -Wl,--wrap=strdupz
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

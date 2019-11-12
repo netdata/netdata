@@ -12,6 +12,18 @@
 #include <stdint.h>
 #include <cmocka.h>
 
+RRDHOST *localhost;
+netdata_rwlock_t rrd_rwlock;
+
+// Use memomy allocation functions guarded by CMocka in strdupz, mallocz, callocz, and reallocz
+const char *__wrap_strdupz(const char *s)
+{
+    char *duplicate = malloc(sizeof(char) * (strlen(s) + 1));
+    strcpy(duplicate, s);
+
+    return duplicate;
+}
+
 time_t __wrap_now_realtime_sec(void)
 {
     function_called();
@@ -25,7 +37,7 @@ struct engine *__wrap_read_exporting_config()
     return mock_ptr_type(struct engine *);
 }
 
-struct engine *__mock_read_exporting_config()
+static struct engine *__mock_read_exporting_config()
 {
     struct engine *engine = calloc(1, sizeof(struct engine));
     engine->config.prefix = strdupz("netdata");
@@ -138,9 +150,6 @@ int __mock_end_batch_formatting(struct instance *instance)
     return mock_type(int);
 }
 
-RRDHOST *localhost;
-netdata_rwlock_t rrd_rwlock;
-
 void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line)
 {
     (void)host;
@@ -194,7 +203,62 @@ void __wrap_uv_cond_wait(uv_cond_t *cond_var, uv_mutex_t *mutex)
     (void)mutex;
 }
 
-void init_connectors_in_tests(struct engine *engine)
+static int setup_configured_engine(void **state)
+{
+    struct engine *engine = __mock_read_exporting_config();
+
+    engine->after = 1;
+    engine->before = 2;
+
+    *state = engine;
+
+    return 0;
+}
+
+static int teardown_configured_engine(void **state)
+{
+    struct engine *engine = *state;
+
+    struct instance *instance = engine->connector_root->instance_root;
+    free((void *)instance->config.destination);
+    free(instance->config.charts_pattern);
+    free(instance->config.hosts_pattern);
+    free(instance);
+
+    free(engine->connector_root);
+
+    free((void *)engine->config.prefix);
+    free((void *)engine->config.hostname);
+    free(engine);
+
+    return 0;
+}
+
+static int setup_rrdhost()
+{
+    return 0;
+}
+
+static int teardown_rrdhost()
+{
+    return 0;
+}
+
+static int setup_initialized_engine(void **state)
+{
+    (void)state;
+
+    return 0;
+}
+
+static int teardown_initialized_engine(void **state)
+{
+    (void)state;
+
+    return 0;
+}
+
+static void init_connectors_in_tests(struct engine *engine)
 {
     expect_function_call(__wrap_uv_thread_create);
 
@@ -207,12 +271,7 @@ void init_connectors_in_tests(struct engine *engine)
 
 static void test_exporting_engine(void **state)
 {
-    (void)state;
-
-    struct engine *engine = malloc(sizeof(struct engine));
-    memset(engine, 0xDB, sizeof(struct engine));
-    engine->after = 1;
-    engine->before = 2;
+    struct engine *engine = *state;
 
     expect_function_call(__wrap_read_exporting_config);
     will_return(__wrap_read_exporting_config, engine);
@@ -243,16 +302,12 @@ static void test_exporting_engine(void **state)
 
     void *ptr = malloc(sizeof(int));
     assert_ptr_equal(exporting_main(ptr), NULL);
-
-    free(engine);
     free(ptr);
 }
 
 static void test_read_exporting_config(void **state)
 {
-    (void)state;
-
-    struct engine *engine = __mock_read_exporting_config(); // TODO: use real function
+    struct engine *engine = *state; // TODO: use real read_exporting_config() function
 
     assert_ptr_not_equal(engine, NULL);
     assert_string_equal(engine->config.prefix, "netdata");
@@ -277,17 +332,11 @@ static void test_read_exporting_config(void **state)
     assert_string_equal(instance->config.charts_pattern, "*");
     assert_string_equal(instance->config.hosts_pattern, "localhost *");
     assert_int_equal(instance->config.send_names_instead_of_ids, 1);
-
-    free(engine->connector_root->instance_root);
-    free(engine->connector_root);
-    free(engine);
 }
 
 static void test_init_connectors(void **state)
 {
-    (void)state;
-
-    struct engine *engine = __mock_read_exporting_config();
+    struct engine *engine = *state;
 
     init_connectors_in_tests(engine);
 
@@ -301,21 +350,13 @@ static void test_init_connectors(void **state)
     assert_ptr_equal(connector->end_batch_formatting, NULL);
     assert_ptr_equal(connector->worker, simple_connector_worker);
 
-    struct simple_connector_config *connector_specific_config =
-        (struct simple_connector_config *)connector->config.connector_specific_config;
+    struct simple_connector_config *connector_specific_config = connector->config.connector_specific_config;
     assert_int_equal(connector_specific_config->default_port, 2003);
 
-    BUFFER *buffer = (BUFFER *)connector->instance_root->buffer;
+    BUFFER *buffer = connector->instance_root->buffer;
     assert_ptr_not_equal(buffer, NULL);
     buffer_sprintf(buffer, "%s", "graphite test");
     assert_string_equal(buffer_tostring(buffer), "graphite test");
-
-    // expect_value(__wrap_uv_thread_create, thread, instance, sizeof(struct instance));
-    // expect_memory(__wrap_uv_thread_create, instance, instance, sizeof(struct instance));
-
-    free(engine->connector_root->instance_root);
-    free(engine->connector_root);
-    free(engine);
 }
 
 static void test_prepare_buffers(void **state)
@@ -353,9 +394,6 @@ static void test_prepare_buffers(void **state)
     expect_function_call(__mock_start_batch_formatting);
     expect_memory(__mock_start_batch_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_start_batch_formatting, 0);
-
-    // ignore_function_calls(__wrap_now_realtime_sec);
-    // will_return_always(__wrap_now_realtime_sec, 1);
 
     expect_function_call(__mock_start_host_formatting);
     expect_memory(__mock_start_host_formatting, instance, instance, sizeof(struct instance));
@@ -415,25 +453,24 @@ static void test_exporting_name_copy(void **state)
 
 static void test_format_dimension_collected_graphite_plaintext(void **state)
 {
-    (void)state;
+    struct engine *engine = *state;
 
-    struct engine *engine = __mock_read_exporting_config();
     init_connectors_in_tests(engine);
 
     localhost = calloc(1, sizeof(RRDHOST));
-    localhost->tags = strdup("TAG1=VALUE1 TAG2=VALUE2");
+    localhost->tags = strdupz("TAG1=VALUE1 TAG2=VALUE2");
 
     localhost->rrdset_root = calloc(1, sizeof(RRDSET));
     RRDSET *st = localhost->rrdset_root;
     st->rrdhost = localhost;
     strcpy(st->id, "chart_id");
-    st->name = strdup("chart_name");
+    st->name = strdupz("chart_name");
 
     localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     rd->rrdset = st;
-    rd->id = strdup("dimension_id");
-    rd->name = strdup("dimension_name");
+    rd->id = strdupz("dimension_id");
+    rd->name = strdupz("dimension_name");
     rd->last_collected_value = 123000321;
     rd->last_collected_time.tv_sec = 15051;
 
@@ -442,12 +479,15 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
         buffer_tostring(engine->connector_root->instance_root->buffer),
         "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
 
+    free((void *)rd->name);
+    free((void *)rd->id);
     free(rd);
+
+    free((void *)st->name);
     free(st);
+
+    free((void *)localhost->tags);
     free(localhost);
-    free(engine->connector_root->instance_root);
-    free(engine->connector_root);
-    free(engine);
 }
 
 static void test_init_graphite_instance(void **state)
@@ -463,12 +503,13 @@ static void test_init_graphite_instance(void **state)
 int main(void)
 {
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(test_exporting_engine),
-        cmocka_unit_test(test_read_exporting_config),
-        cmocka_unit_test(test_init_connectors),
+        cmocka_unit_test_setup_teardown(test_exporting_engine, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(test_read_exporting_config, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(test_init_connectors, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test(test_prepare_buffers),
         cmocka_unit_test(test_exporting_name_copy),
-        cmocka_unit_test(test_format_dimension_collected_graphite_plaintext),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_collected_graphite_plaintext, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test(test_init_graphite_instance),
     };
 

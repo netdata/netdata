@@ -700,6 +700,7 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=uv_mutex_unlock \
         -Wl,--wrap=uv_cond_signal \
         -Wl,--wrap=uv_cond_wait \
+        -Wl,--wrap=strdupz \
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
