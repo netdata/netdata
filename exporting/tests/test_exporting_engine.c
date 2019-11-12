@@ -236,24 +236,61 @@ static int teardown_configured_engine(void **state)
 
 static int setup_rrdhost()
 {
+    localhost = calloc(1, sizeof(RRDHOST));
+    localhost->tags = strdupz("TAG1=VALUE1 TAG2=VALUE2");
+
+    localhost->rrdset_root = calloc(1, sizeof(RRDSET));
+    RRDSET *st = localhost->rrdset_root;
+    st->rrdhost = localhost;
+    strcpy(st->id, "chart_id");
+    st->name = strdupz("chart_name");
+
+    localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    rd->rrdset = st;
+    rd->id = strdupz("dimension_id");
+    rd->name = strdupz("dimension_name");
+    rd->last_collected_value = 123000321;
+    rd->last_collected_time.tv_sec = 15051;
+    rd->next = NULL;
+
     return 0;
 }
 
 static int teardown_rrdhost()
 {
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    free((void *)rd->name);
+    free((void *)rd->id);
+    free(rd);
+
+    RRDSET *st = localhost->rrdset_root;
+    free((void *)st->name);
+    free(st);
+
+    free((void *)localhost->tags);
+    free(localhost);
+
     return 0;
 }
 
+static void init_connectors_in_tests(struct engine *engine);
 static int setup_initialized_engine(void **state)
 {
-    (void)state;
+    setup_configured_engine(state);
+
+    struct engine *engine = *state;
+    init_connectors_in_tests(engine);
+
+    setup_rrdhost();
 
     return 0;
 }
 
 static int teardown_initialized_engine(void **state)
 {
-    (void)state;
+    teardown_rrdhost();
+    teardown_configured_engine(state);
 
     return 0;
 }
@@ -341,6 +378,7 @@ static void test_init_connectors(void **state)
     init_connectors_in_tests(engine);
 
     struct connector *connector = engine->connector_root;
+    assert_ptr_equal(connector->next, NULL);
     assert_ptr_equal(connector->start_batch_formatting, NULL);
     assert_ptr_equal(connector->start_host_formatting, NULL);
     assert_ptr_equal(connector->start_chart_formatting, NULL);
@@ -353,6 +391,8 @@ static void test_init_connectors(void **state)
     struct simple_connector_config *connector_specific_config = connector->config.connector_specific_config;
     assert_int_equal(connector_specific_config->default_port, 2003);
 
+    assert_ptr_equal(connector->instance_root->next, NULL);
+
     BUFFER *buffer = connector->instance_root->buffer;
     assert_ptr_not_equal(buffer, NULL);
     buffer_sprintf(buffer, "%s", "graphite test");
@@ -361,16 +401,9 @@ static void test_init_connectors(void **state)
 
 static void test_prepare_buffers(void **state)
 {
-    (void)state;
+    struct engine *engine = *state;
 
-    struct engine *engine = malloc(sizeof(struct engine));
-    memset(engine, 0xD1, sizeof(struct engine));
-    engine->after = 1;
-    engine->before = 2;
-
-    engine->connector_root = malloc(sizeof(struct connector));
     struct connector *connector = engine->connector_root;
-    connector->next = NULL;
     connector->start_batch_formatting = __mock_start_batch_formatting;
     connector->start_host_formatting = __mock_start_host_formatting;
     connector->start_chart_formatting = __mock_start_chart_formatting;
@@ -379,17 +412,7 @@ static void test_prepare_buffers(void **state)
     connector->end_host_formatting = __mock_end_host_formatting;
     connector->end_batch_formatting = __mock_end_batch_formatting;
 
-    connector->instance_root = malloc(sizeof(struct instance));
-
-    localhost = calloc(1, sizeof(RRDHOST));
-    localhost->rrdset_root = calloc(1, sizeof(RRDSET));
-    localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
-    RRDDIM *rd = localhost->rrdset_root->dimensions;
-    memset(rd, 0xD2, sizeof(RRDDIM));
-    rd->next = NULL;
-
-    struct instance *instance = connector->instance_root;
-    instance->next = NULL;
+    struct instance *instance = engine->connector_root->instance_root;
 
     expect_function_call(__mock_start_batch_formatting);
     expect_memory(__mock_start_batch_formatting, instance, instance, sizeof(struct instance));
@@ -403,6 +426,7 @@ static void test_prepare_buffers(void **state)
     expect_memory(__mock_start_chart_formatting, instance, instance, sizeof(struct instance));
     will_return(__mock_start_chart_formatting, 0);
 
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
     expect_function_call(__mock_metric_formatting);
     expect_memory(__mock_metric_formatting, instance, instance, sizeof(struct instance));
     expect_memory(__mock_metric_formatting, rd, rd, sizeof(RRDDIM));
@@ -431,13 +455,6 @@ static void test_prepare_buffers(void **state)
     connector->end_host_formatting = NULL;
     connector->end_batch_formatting = NULL;
     assert_int_equal(__real_prepare_buffers(engine), 0);
-
-    free(localhost->rrdset_root->dimensions);
-    free(localhost->rrdset_root);
-    free(localhost);
-    free(engine->connector_root->instance_root);
-    free(engine->connector_root);
-    free(engine);
 }
 
 static void test_exporting_name_copy(void **state)
@@ -455,39 +472,11 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
 {
     struct engine *engine = *state;
 
-    init_connectors_in_tests(engine);
-
-    localhost = calloc(1, sizeof(RRDHOST));
-    localhost->tags = strdupz("TAG1=VALUE1 TAG2=VALUE2");
-
-    localhost->rrdset_root = calloc(1, sizeof(RRDSET));
-    RRDSET *st = localhost->rrdset_root;
-    st->rrdhost = localhost;
-    strcpy(st->id, "chart_id");
-    st->name = strdupz("chart_name");
-
-    localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
     RRDDIM *rd = localhost->rrdset_root->dimensions;
-    rd->rrdset = st;
-    rd->id = strdupz("dimension_id");
-    rd->name = strdupz("dimension_name");
-    rd->last_collected_value = 123000321;
-    rd->last_collected_time.tv_sec = 15051;
-
     assert_int_equal(format_dimension_collected_graphite_plaintext(engine->connector_root->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->connector_root->instance_root->buffer),
         "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
-
-    free((void *)rd->name);
-    free((void *)rd->id);
-    free(rd);
-
-    free((void *)st->name);
-    free(st);
-
-    free((void *)localhost->tags);
-    free(localhost);
 }
 
 static void test_init_graphite_instance(void **state)
@@ -506,10 +495,10 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_exporting_engine, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(test_read_exporting_config, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(test_init_connectors, setup_configured_engine, teardown_configured_engine),
-        cmocka_unit_test(test_prepare_buffers),
+        cmocka_unit_test_setup_teardown(test_prepare_buffers, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test_setup_teardown(
-            test_format_dimension_collected_graphite_plaintext, setup_configured_engine, teardown_configured_engine),
+            test_format_dimension_collected_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_init_graphite_instance),
     };
 
