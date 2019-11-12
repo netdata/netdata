@@ -15,7 +15,7 @@
 RRDHOST *localhost;
 netdata_rwlock_t rrd_rwlock;
 
-// Use memomy allocation functions guarded by CMocka in strdupz, mallocz, callocz, and reallocz
+// Use memomy allocation functions guarded by CMocka in strdupz
 const char *__wrap_strdupz(const char *s)
 {
     char *duplicate = malloc(sizeof(char) * (strlen(s) + 1));
@@ -344,7 +344,8 @@ static void test_exporting_engine(void **state)
 
 static void test_read_exporting_config(void **state)
 {
-    struct engine *engine = *state; // TODO: use real read_exporting_config() function
+    struct engine *engine = __mock_read_exporting_config(); // TODO: use real read_exporting_config() function
+    *state = engine;
 
     assert_ptr_not_equal(engine, NULL);
     assert_string_equal(engine->config.prefix, "netdata");
@@ -369,6 +370,8 @@ static void test_read_exporting_config(void **state)
     assert_string_equal(instance->config.charts_pattern, "*");
     assert_string_equal(instance->config.hosts_pattern, "localhost *");
     assert_int_equal(instance->config.send_names_instead_of_ids, 1);
+
+    teardown_configured_engine(state);
 }
 
 static void test_init_connectors(void **state)
@@ -493,7 +496,7 @@ int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(test_exporting_engine, setup_configured_engine, teardown_configured_engine),
-        cmocka_unit_test_setup_teardown(test_read_exporting_config, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test(test_read_exporting_config),
         cmocka_unit_test_setup_teardown(test_init_connectors, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(test_prepare_buffers, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_exporting_name_copy),
