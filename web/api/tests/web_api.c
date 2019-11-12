@@ -212,9 +212,9 @@ static void api_info(void **state)
     info("Buffer contains: %s [first %u]", tf->instance->response.data->buffer, tf->prefix_len);
     web_client_process_request(tf->instance);
     if (tf->instance->response.data->len == tf->template->response.data->len)
-        assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
-    else
         assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
+    else
+        assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
 }
 
 static int api_info_setup(void **state)
