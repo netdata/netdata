@@ -201,6 +201,7 @@ static void api_next(void **state)
 static void api_info(void **state)
 {
     struct test_family *tf = (struct test_family *)*state;
+    api_next(state);
     printf("Test %u / %u\n", tf->num_headers, tf->prefix_len);
     struct web_client *w = pre_test_setup();
     build_request(w->response.data, "/api/v1/info", true, tf->num_headers);
@@ -211,8 +212,8 @@ static void api_info(void **state)
         assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
     else
         assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
-    post_test_cleanup(w);
-    api_next(state);
+
+    post_test_cleanup(w);   // This will leak when there is a failure. FIXME
 }
 
 static int api_info_setup(void **state)
@@ -221,7 +222,7 @@ static int api_info_setup(void **state)
     struct test_family *tf = (struct test_family *)*state;
     initial_test_state = NULL; // Move rather than copy: force errors early
     tf->num_headers = 0;
-    tf->prefix_len = 0;
+    tf->prefix_len = -1;
     build_request(tf->w->response.data, "/api/v1/info", true, tf->num_headers);
     return 0;
 }
