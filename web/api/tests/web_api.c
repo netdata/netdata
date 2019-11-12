@@ -156,9 +156,19 @@ static void post_test_cleanup(struct web_client *w)
     free(localhost);
 }
 
+struct test_family {
+    size_t num_tests;
+    size_t num_headers;
+    size_t prefix_len;
+    struct web_client *w;
+};
+struct test_family api_info_test_family;    // This is ugly as global but can't satisfy lifetimes otherwise
+
 static void api_info(void **state)
 {
-    for (size_t i = 0; i < MAX_HEADERS; i++) {
+struct test_family *tf = (struct test_family *)*state;
+    printf("Test %u / %u\n", tf->num_headers, tf->prefix_len);
+/*    for (size_t i = 0; i < MAX_HEADERS; i++) {
         struct web_client *w = pre_test_setup();
         build_request(w->response.data, "/api/v1/info", true, i);
         size_t real_len = w->response.data->len;
@@ -175,13 +185,49 @@ static void api_info(void **state)
         web_client_process_request(w);
         assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
         post_test_cleanup(w);
+    }*/
+}
+
+static void api_info_setup(void **state)
+{
+    *state = &api_info_test_family;
+    api_info_test_family.num_headers = 0;
+    api_info_test_family.prefix_len  = 0;
+}
+
+static void api_info_teardown(void **state)
+{
+}
+
+
+static void api_info_launcher()
+{
+struct test_family *tf = &api_info_test_family;
+    tf->w = pre_test_setup();
+    tf->num_tests = 2;
+    for (size_t i = 0; i < MAX_HEADERS; i++) {
+        build_request(tf->w->response.data, "/api/v1/info", true, MAX_HEADERS);
+        tf->num_tests += tf->w->response.data->len;
     }
+    struct CMUnitTest base_tests[3] = { cmocka_unit_test(api_info_setup),
+                                        cmocka_unit_test(api_info),
+                                        cmocka_unit_test(api_info_teardown) };
+    struct CMUnitTest *tests = calloc(tf->num_tests, sizeof(struct CMUnitTest));
+    tests[0] = base_tests[0];
+    for (size_t i = 1; i < tf->num_tests-1; i++)
+        tests[i] = base_tests[1];
+    tests[tf->num_tests-1] = base_tests[2];
+
+    printf("Setup %u tests in %p\n", tf->num_tests, tests);
+    cmocka_run_group_tests_name("web_api", tests, NULL, NULL);
+    free(tests);
+    post_test_cleanup(tf->w);      // localtest will be an issue. FIXME
 }
 
 int main(void)
 {
-    const struct CMUnitTest tests[] = { cmocka_unit_test(api_info) };
     debug_flags = 0xffffffffffff;
+    api_info_launcher();
 
-    return cmocka_run_group_tests_name("web_api", tests, NULL, NULL);
+    return 0;
 }
