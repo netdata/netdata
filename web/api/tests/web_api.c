@@ -145,9 +145,8 @@ static void build_request(struct web_buffer *wb, const char *url, bool use_cr, s
 
 /* Note: this is not a CMocka group_test_setup/teardown pair. This is performed per-test.
 */
-static struct web_client *pre_test_setup()
+static struct web_client *setup_fresh_web_client()
 {
-    localhost = malloc(sizeof(RRDHOST));
     struct web_client *w = (struct web_client *)malloc(sizeof(struct web_client));
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
@@ -158,13 +157,12 @@ static struct web_client *pre_test_setup()
     return w;
 }
 
-static void post_test_cleanup(struct web_client *w)
+static void destroy_web_client(struct web_client *w)
 {
     buffer_free(w->response.data);
     buffer_free(w->response.header);
     buffer_free(w->response.header_output);
     free(w);
-    free(localhost);
 }
 
 // ---------------------------------- Parameterized test-families -----------------------------------------------------
@@ -180,19 +178,26 @@ void *initial_test_state = NULL;
 // -------------------------------- Test family for /api/v1/info ------------------------------------------------------
 
 struct test_family {
-    size_t num_tests;     // Total size of the test-space
-    size_t num_headers;   // Test index
-    size_t prefix_len;    // Test index
-    struct web_client *w; // Template carried across tests
+    size_t num_tests;            // Total size of the test-space
+    size_t num_headers;          // Test index
+    size_t prefix_len;           // Test index
+    struct web_client *template; // Template carried across tests
+    struct web_client *instance; // Copy used in a single test
 };
 
 static void api_next(void **state)
 {
     struct test_family *tf = (struct test_family *)*state;
+    if (tf->instance != NULL)
+        destroy_web_client(tf->instance);
+    if (localhost != NULL)
+        free(localhost);
+    tf->instance = setup_fresh_web_client();
+    localhost = malloc(sizeof(RRDHOST));
     tf->prefix_len++;
-    if (tf->prefix_len > tf->w->response.data->len) {
+    if (tf->prefix_len > tf->template->response.data->len) {
         tf->num_headers++;
-        build_request(tf->w->response.data, "/api/v1/info", true, tf->num_headers);
+        build_request(tf->template->response.data, "/api/v1/info", true, tf->num_headers);
         tf->prefix_len = 0;
     }
 }
@@ -202,17 +207,14 @@ static void api_info(void **state)
     struct test_family *tf = (struct test_family *)*state;
     api_next(state);
     printf("Test %u / %u\n", tf->num_headers, tf->prefix_len);
-    struct web_client *w = pre_test_setup();
-    build_request(w->response.data, "/api/v1/info", true, tf->num_headers);
-    w->response.data->len = tf->prefix_len;
-    info("Buffer contains: %s [first %u]", w->response.data->buffer, tf->prefix_len);
-    web_client_process_request(w);
-    if (w->response.data->len == tf->w->response.data->len)
-        assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
+    build_request(tf->instance->response.data, "/api/v1/info", true, tf->num_headers);
+    tf->instance->response.data->len = tf->prefix_len;
+    info("Buffer contains: %s [first %u]", tf->instance->response.data->buffer, tf->prefix_len);
+    web_client_process_request(tf->instance);
+    if (tf->instance->response.data->len == tf->template->response.data->len)
+        assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
     else
-        assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
-
-    post_test_cleanup(w); // This will leak when there is a failure. FIXME
+        assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
 }
 
 static int api_info_setup(void **state)
@@ -222,7 +224,7 @@ static int api_info_setup(void **state)
     initial_test_state = NULL; // Move rather than copy: force errors early
     tf->num_headers = 0;
     tf->prefix_len = -1;
-    build_request(tf->w->response.data, "/api/v1/info", true, tf->num_headers);
+    build_request(tf->template->response.data, "/api/v1/info", true, tf->num_headers);
     return 0;
 }
 
@@ -235,11 +237,12 @@ static int api_info_launcher()
 {
     struct test_family *tf = malloc(sizeof(struct test_family));
     initial_test_state = tf;
-    tf->w = pre_test_setup();
+    tf->template = setup_fresh_web_client();
+    tf->instance = NULL;
     tf->num_tests = 0;
     for (size_t i = 0; i < MAX_HEADERS; i++) {
-        build_request(tf->w->response.data, "/api/v1/info", true, MAX_HEADERS);
-        tf->num_tests += tf->w->response.data->len;
+        build_request(tf->template->response.data, "/api/v1/info", true, MAX_HEADERS);
+        tf->num_tests += tf->template->response.data->len;
     }
     struct CMUnitTest base_tests[1] = { cmocka_unit_test(api_info) };
     struct CMUnitTest *tests = calloc(tf->num_tests, sizeof(struct CMUnitTest));
@@ -249,7 +252,8 @@ static int api_info_launcher()
     printf("Setup %u tests in %p\n", tf->num_tests, tests);
     int fails = _cmocka_run_group_tests("web_api", tests, tf->num_tests, api_info_setup, api_info_teardown);
     free(tests);
-    post_test_cleanup(tf->w); // localtest will be an issue. FIXME
+    destroy_web_client(tf->template);
+    // localtest will be an issue. FIXME
     free(tf);
     return fails;
 }
