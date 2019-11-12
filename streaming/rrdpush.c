@@ -1079,8 +1079,8 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
 #ifdef ENABLE_HTTPS
-    host->ssl.conn = ssl->conn;
-    host->ssl.flags = ssl->flags;
+    host->stream_ssl.conn = ssl->conn;
+    host->stream_ssl.flags = ssl->flags;
     if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {

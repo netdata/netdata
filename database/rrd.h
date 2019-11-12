@@ -739,6 +739,7 @@ struct rrdhost {
 
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection
+    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
     struct rrdhost *next;
