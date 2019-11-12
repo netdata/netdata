@@ -14,6 +14,7 @@
 - Makefile.am files indentation [\#7252](https://github.com/netdata/netdata/pull/7252) ([knatsakis](https://github.com/knatsakis))
 - Update SYN cookie alarm to be less aggressive. [\#7250](https://github.com/netdata/netdata/pull/7250) ([Ferroin](https://github.com/Ferroin))
 - netdata/docs: netdata installer documentation minor nit [\#7246](https://github.com/netdata/netdata/pull/7246) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
+- Ownership and permissions of /etc/netdata [\#7244](https://github.com/netdata/netdata/pull/7244) ([knatsakis](https://github.com/knatsakis))
 - fix\_irc\_notification: Remove line break from message [\#7243](https://github.com/netdata/netdata/pull/7243) ([thiagoftsm](https://github.com/thiagoftsm))
 - Typo [\#7242](https://github.com/netdata/netdata/pull/7242) ([cherouvim](https://github.com/cherouvim))
 - .travis.yml: Prevent nightly jobs from timing out \(again\) [\#7238](https://github.com/netdata/netdata/pull/7238) ([knatsakis](https://github.com/knatsakis))
@@ -254,7 +255,6 @@
 - Fix typos in: 'README.md' file. [\#6604](https://github.com/netdata/netdata/pull/6604) ([coffeina](https://github.com/coffeina))
 - mysql collector: slave\_status charts per replication channel [\#6597](https://github.com/netdata/netdata/pull/6597) ([ilyam8](https://github.com/ilyam8))
 - Install Netdata with Docker  [\#6596](https://github.com/netdata/netdata/pull/6596) ([prhomhyse](https://github.com/prhomhyse))
-- netdata/packaging: Expect .tar.gz version of go.d plugin [\#6590](https://github.com/netdata/netdata/pull/6590) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
