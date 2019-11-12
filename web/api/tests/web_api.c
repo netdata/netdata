@@ -169,15 +169,15 @@ void *initial_test_state = NULL;
 // -------------------------------- Test family for /api/v1/info ------------------------------------------------------
 
 struct test_family {
-    size_t num_tests;       // Total size of the test-space
-    size_t num_headers;     // Test index
-    size_t prefix_len;      // Test index
-    struct web_client *w;   // Template carried across tests
+    size_t num_tests;     // Total size of the test-space
+    size_t num_headers;   // Test index
+    size_t prefix_len;    // Test index
+    struct web_client *w; // Template carried across tests
 };
 
 static void api_next(void **state)
 {
-struct test_family *tf = (struct test_family *)*state;
+    struct test_family *tf = (struct test_family *)*state;
     tf->prefix_len++;
     if (tf->prefix_len > tf->w->response.data->len) {
         tf->num_headers++;
@@ -186,10 +186,9 @@ struct test_family *tf = (struct test_family *)*state;
     }
 }
 
-
 static void api_info(void **state)
 {
-struct test_family *tf = (struct test_family *)*state;
+    struct test_family *tf = (struct test_family *)*state;
     printf("Test %u / %u\n", tf->num_headers, tf->prefix_len);
     struct web_client *w = pre_test_setup();
     build_request(w->response.data, "/api/v1/info", true, tf->num_headers);
@@ -207,10 +206,10 @@ struct test_family *tf = (struct test_family *)*state;
 static int api_info_setup(void **state)
 {
     *state = initial_test_state;
-struct test_family *tf = (struct test_family *)*state;
-    initial_test_state = NULL;  // Move rather than copy: force errors early
+    struct test_family *tf = (struct test_family *)*state;
+    initial_test_state = NULL; // Move rather than copy: force errors early
     tf->num_headers = 0;
-    tf->prefix_len  = 0;
+    tf->prefix_len = 0;
     build_request(tf->w->response.data, "/api/v1/info", true, tf->num_headers);
     return 0;
 }
@@ -220,10 +219,9 @@ static int api_info_teardown(void **state)
     return 0;
 }
 
-
 static int api_info_launcher()
 {
-struct test_family *tf = malloc(sizeof(struct test_family));
+    struct test_family *tf = malloc(sizeof(struct test_family));
     initial_test_state = tf;
     tf->w = pre_test_setup();
     tf->num_tests = 0;
@@ -239,7 +237,7 @@ struct test_family *tf = malloc(sizeof(struct test_family));
     printf("Setup %u tests in %p\n", tf->num_tests, tests);
     int fails = _cmocka_run_group_tests("web_api", tests, tf->num_tests, api_info_setup, api_info_teardown);
     free(tests);
-    post_test_cleanup(tf->w);      // localtest will be an issue. FIXME
+    post_test_cleanup(tf->w); // localtest will be an issue. FIXME
     free(tf);
     return fails;
 }
