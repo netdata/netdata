@@ -8,11 +8,11 @@
 #include <cmocka.h>
 #include <stdbool.h>
 
-/*ssize_t send(int sockfd, const void *buf, size_t len, int flags)
+ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
     printf("Mocking send: %u bytes\n", len);
     return len;
-}*/
+}
 
 RRDHOST *__wrap_rrdhost_find_by_hostname(const char *hostname, uint32_t hash)
 {
