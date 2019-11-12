@@ -92,8 +92,7 @@ void __wrap_error_int(
     va_end(args);
 }
 
-void __wrap_fatal_int( 
-    const char *file, const char *function, const unsigned long line, const char *fmt, ... )
+void __wrap_fatal_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
@@ -213,7 +212,7 @@ static void api_info(void **state)
     else
         assert_int_equal(w->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
 
-    post_test_cleanup(w);   // This will leak when there is a failure. FIXME
+    post_test_cleanup(w); // This will leak when there is a failure. FIXME
 }
 
 static int api_info_setup(void **state)
