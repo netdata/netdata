@@ -588,28 +588,28 @@ struct test test4 = {
 // test5 - 32 bit overflows
 
 struct feed_values test5_feed[] = {
-        { 0,       0x00000000FFFFFFFFULL / 3 * 0 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
+        { 0,       0x00000000FFFFFFFFULL / 15 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 7 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 14 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 7 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 14 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 7 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 14 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
 };
 
 calculated_number test5_results[] = {
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15,
 };
 
 struct test test5 = {
@@ -628,36 +628,36 @@ struct test test5 = {
 };
 
 // --------------------------------------------------------------------------------------------------------------------
-// test5b - 16 bit overflows
+// test5b - 64 bit overflows
 
 struct feed_values test5b_feed[] = {
-        { 0,       0x000000000000FFFFULL / 3 * 0 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
+        { 0,       0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 7 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 14 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 7 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 14 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 7 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 14 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
 };
 
 calculated_number test5b_results[] = {
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15,
 };
 
 struct test test5b = {
         "test5b",            // name
-        "test 16-bit incremental values overflow",
+        "test 64-bit incremental values overflow",
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
@@ -666,92 +666,6 @@ struct test test5b = {
         9,                  // result entries
         test5b_feed,        // feed
         test5b_results,     // results
-        NULL,               // feed2
-        NULL                // results2
-};
-
-// --------------------------------------------------------------------------------------------------------------------
-// test5c - 8 bit overflows
-
-struct feed_values test5c_feed[] = {
-        { 0,       0x00000000000000FFULL / 3 * 0 },
-        { 1000000, 0x00000000000000FFULL / 3 * 1 },
-        { 1000000, 0x00000000000000FFULL / 3 * 2 },
-        { 1000000, 0x00000000000000FFULL / 3 * 0 },
-        { 1000000, 0x00000000000000FFULL / 3 * 1 },
-        { 1000000, 0x00000000000000FFULL / 3 * 2 },
-        { 1000000, 0x00000000000000FFULL / 3 * 0 },
-        { 1000000, 0x00000000000000FFULL / 3 * 1 },
-        { 1000000, 0x00000000000000FFULL / 3 * 2 },
-        { 1000000, 0x00000000000000FFULL / 3 * 0 },
-};
-
-calculated_number test5c_results[] = {
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-};
-
-struct test test5c = {
-        "test5c",            // name
-        "test 8-bit incremental values overflow",
-        1,                  // update_every
-        1,                  // multiplier
-        1,                  // divisor
-        RRD_ALGORITHM_INCREMENTAL, // algorithm
-        10,                 // feed entries
-        9,                  // result entries
-        test5c_feed,        // feed
-        test5c_results,     // results
-        NULL,               // feed2
-        NULL                // results2
-};
-
-// --------------------------------------------------------------------------------------------------------------------
-// test5d - 64 bit overflows
-
-struct feed_values test5d_feed[] = {
-        { 0,       0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-};
-
-calculated_number test5d_results[] = {
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-};
-
-struct test test5d = {
-        "test5d",            // name
-        "test 64-bit incremental values overflow",
-        1,                  // update_every
-        1,                  // multiplier
-        1,                  // divisor
-        RRD_ALGORITHM_INCREMENTAL, // algorithm
-        10,                 // feed entries
-        9,                  // result entries
-        test5d_feed,        // feed
-        test5d_results,     // results
         NULL,               // feed2
         NULL                // results2
 };
@@ -1415,12 +1329,6 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(run_test(&test5b))
-        return 1;
-
-    if(run_test(&test5c))
-        return 1;
-
-    if(run_test(&test5d))
         return 1;
 
     if(run_test(&test6))

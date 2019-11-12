@@ -74,46 +74,53 @@ void api_listen_sockets_setup(void) {
 // access lists
 
 SIMPLE_PATTERN *web_allow_connections_from = NULL;
+int web_allow_connections_dns;
 
 // WEB_CLIENT_ACL
 SIMPLE_PATTERN *web_allow_dashboard_from = NULL;
+int             web_allow_dashboard_dns;
 SIMPLE_PATTERN *web_allow_registry_from = NULL;
+int             web_allow_registry_dns;
 SIMPLE_PATTERN *web_allow_badges_from = NULL;
+int             web_allow_badges_dns;
 SIMPLE_PATTERN *web_allow_mgmt_from = NULL;
+int             web_allow_mgmt_dns;
 SIMPLE_PATTERN *web_allow_streaming_from = NULL;
+int             web_allow_streaming_dns;
 SIMPLE_PATTERN *web_allow_netdataconf_from = NULL;
+int             web_allow_netdataconf_dns;
 
 void web_client_update_acl_matches(struct web_client *w) {
     w->acl = WEB_CLIENT_ACL_NONE;
 
     if (!web_allow_dashboard_from ||
         connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_dashboard_from, "dashboard"))
+                           web_allow_dashboard_from, "dashboard", web_allow_dashboard_dns))
         w->acl |= WEB_CLIENT_ACL_DASHBOARD;
 
     if (!web_allow_registry_from ||
         connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_registry_from, "registry"))
+                           web_allow_registry_from, "registry", web_allow_registry_dns))
         w->acl |= WEB_CLIENT_ACL_REGISTRY;
 
     if (!web_allow_badges_from ||
         connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_badges_from, "badges"))
+                           web_allow_badges_from, "badges", web_allow_badges_dns))
         w->acl |= WEB_CLIENT_ACL_BADGE;
 
     if (!web_allow_mgmt_from ||
         connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_mgmt_from, "management"))
+                           web_allow_mgmt_from, "management", web_allow_mgmt_dns))
         w->acl |= WEB_CLIENT_ACL_MGMT;
 
     if (!web_allow_streaming_from ||
         connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                           web_allow_streaming_from, "streaming"))
+                           web_allow_streaming_from, "streaming", web_allow_streaming_dns))
         w->acl |= WEB_CLIENT_ACL_STREAMING;
 
     if (!web_allow_netdataconf_from ||
        connection_allowed(w->ifd, w->client_ip, w->client_host, sizeof(w->client_host),
-                          web_allow_netdataconf_from, "netdata.conf"))
+                          web_allow_netdataconf_from, "netdata.conf", web_allow_netdataconf_dns))
         w->acl |= WEB_CLIENT_ACL_NETDATACONF;
 
     w->acl &= w->port_acl;

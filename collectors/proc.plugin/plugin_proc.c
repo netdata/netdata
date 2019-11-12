@@ -85,14 +85,16 @@ static void proc_main_cleanup(void *ptr) {
 void *proc_main(void *ptr) {
     netdata_thread_cleanup_push(proc_main_cleanup, ptr);
 
-    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
+    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", CONFIG_BOOLEAN_YES);
+
+    config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
 
     // check the enabled status for each module
     int i;
     for(i = 0 ; proc_modules[i].name ;i++) {
         struct proc_module *pm = &proc_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:proc", pm->name, 1);
+        pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
         pm->duration = 0ULL;
         pm->rd = NULL;
     }

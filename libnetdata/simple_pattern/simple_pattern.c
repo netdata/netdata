@@ -260,3 +260,74 @@ void simple_pattern_free(SIMPLE_PATTERN *list) {
 
     free_pattern(((struct simple_pattern *)list));
 }
+
+/* Debugging patterns
+
+   This code should be dead - it is useful for debugging but should not be called by production code.
+   Feel free to comment it out, but please leave it in the file.
+*/
+extern void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p)
+{
+    struct simple_pattern *root = (struct simple_pattern *)p;
+    if(root==NULL) {
+        debug(debug_type,"dump_pattern(NULL)");
+        return;
+    }
+    debug(debug_type,"dump_pattern(%p) child=%p next=%p mode=%d match=%s", root, root->child, root->next, root->mode,
+          root->match);
+    if(root->child!=NULL)
+        simple_pattern_dump(debug_type, (SIMPLE_PATTERN*)root->child);
+    if(root->next!=NULL)
+        simple_pattern_dump(debug_type, (SIMPLE_PATTERN*)root->next);
+}
+
+/* Heuristic: decide if the pattern could match a DNS name.
+
+   Although this functionality is used directly by socket.c:connection_allowed() it must be in this file
+   because of the SIMPLE_PATTERN/simple_pattern structure hiding.
+   Based on RFC952 / RFC1123. We need to decide if the pattern may match a DNS name, or not. For the negative
+   cases we need to be sure that it can only match an ipv4 or ipv6 address:
+     * IPv6 addresses contain ':', which are illegal characters in DNS.
+     * IPv4 addresses cannot contain alpha- characters.
+     * DNS TLDs must be alphanumeric to distinguish from IPv4.
+   Some patterns (e.g. "*a*" ) could match multiple cases (i.e. DNS or IPv6).
+   Some patterns will be awkward (e.g. "192.168.*") as they look like they are intended to match IPv4-only
+   but could match DNS (i.e. "192.168.com" is a valid name).
+*/
+static void scan_is_potential_name(struct simple_pattern *p, int *alpha, int *colon, int *wildcards)
+{
+    while (p) {
+        if (p->match) {
+            if(p->mode == SIMPLE_PATTERN_EXACT && !strcmp("localhost", p->match)) {
+                p = p->child;
+                continue;
+            }
+            char const *scan = p->match;
+            while (*scan != 0) {
+                if ((*scan >= 'a' && *scan <= 'z') || (*scan >= 'A' && *scan <= 'Z'))
+                    *alpha = 1;
+                if (*scan == ':')
+                    *colon = 1;
+                scan++;
+            }
+            if (p->mode != SIMPLE_PATTERN_EXACT)
+                *wildcards = 1;
+            p = p->child;
+        }
+    }
+}
+
+extern int simple_pattern_is_potential_name(SIMPLE_PATTERN *p)
+{
+    int alpha=0, colon=0, wildcards=0;
+    struct simple_pattern *root = (struct simple_pattern*)p;
+    while (root != NULL) {
+        if (root->match != NULL) {
+            scan_is_potential_name(root, &alpha, &colon, &wildcards);
+        }
+        if (root->mode != SIMPLE_PATTERN_EXACT)
+            wildcards = 1;
+        root = root->next;
+    }
+    return (alpha || wildcards) && !colon;
+}

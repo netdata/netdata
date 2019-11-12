@@ -728,19 +728,21 @@ safe_sha256sum() {
 	fi
 }
 
-get_crondir() {
-	crondir=
-	[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
-	[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
-
-	echo "${crondir}"
-}
-
-check_crondir_permissions() {
-	if [ -z "${1}" ]; then
+_get_crondir() {
+	if [ -d /etc/cron.daily ]; then
+		echo /etc/cron.daily
+	elif [ -d /etc/periodic/daily ]; then
+		echo /etc/periodic/daily
+	else
 		echo >&2 "Cannot figure out the cron directory to handle netdata-updater.sh activation/deactivation"
 		return 1
-	elif [ "${UID}" -ne "0" ]; then
+	fi
+
+	return 0
+}
+
+_check_crondir_permissions() {
+	if [ "${UID}" -ne "0" ]; then
 		# We cant touch cron if we are not running as root
 		echo >&2 "You need to run the installer as root for auto-updating via cron"
 		return 1
@@ -773,8 +775,8 @@ cleanup_old_netdata_updater() {
 		rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
 	fi
 
-	crondir="$(get_crondir)"
-	check_crondir_permissions "${crondir}" || return 1
+	crondir="$(_get_crondir)" || return 1
+	_check_crondir_permissions "${crondir}" || return 1
 
 	if [ -f "${crondir}/netdata-updater.sh" ]; then
 		echo >&2 "Removing incorrect netdata-updater filename in cron"
@@ -785,8 +787,8 @@ cleanup_old_netdata_updater() {
 }
 
 enable_netdata_updater() {
-	crondir="$(get_crondir)"
-	check_crondir_permissions "${crondir}" || return 1
+	crondir="$(_get_crondir)" || return 1
+	_check_crondir_permissions "${crondir}" || return 1
 
 	echo >&2 "Adding to cron"
 
@@ -803,8 +805,8 @@ enable_netdata_updater() {
 }
 
 disable_netdata_updater() {
-	crondir="$(get_crondir)"
-	check_crondir_permissions "${crondir}" || return 1
+	crondir="$(_get_crondir)" || return 1
+	_check_crondir_permissions "${crondir}" || return 1
 
 	echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
 	echo >&2

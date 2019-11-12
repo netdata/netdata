@@ -1007,13 +1007,16 @@ int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags) {
  *                        of *writable* bytes (i.e. be aware of the strdup used to compact the pollinfo).
  */
 extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list,
-                              const char *patname) {
+                              const char *patname, int allow_dns)
+{
+    debug(D_LISTENER,"checking %s... (allow_dns=%d)", patname, allow_dns);
     if (!access_list)
         return 1;
     if (simple_pattern_matches(access_list, client_ip))
         return 1;
     // If the hostname is unresolved (and needed) then attempt the DNS lookups.
-    if (client_host[0]==0)
+    //if (client_host[0]==0 && simple_pattern_is_potential_name(access_list))
+    if (client_host[0]==0 && allow_dns)
     {
         struct sockaddr_storage sadr;
         socklen_t addrlen = sizeof(sadr);
@@ -1021,8 +1024,8 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
         if (err != 0 ||
             (err = getnameinfo((struct sockaddr *)&sadr, addrlen, client_host, (socklen_t)hostsize,
                               NULL, 0, NI_NAMEREQD)) != 0) {
-            error("Incoming connection on '%s' does not match a numeric pattern, "
-                  "and host could not be resolved (err=%s)", client_ip, gai_strerror(err));
+            error("Incoming %s on '%s' does not match a numeric pattern, and host could not be resolved (err=%s)",
+                  patname, client_ip, gai_strerror(err));
             if (hostsize >= 8)
                 strcpy(client_host,"UNKNOWN");
             return 0;
@@ -1074,9 +1077,8 @@ extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t
 
 // --------------------------------------------------------------------------------------------------------------------
 // accept_socket() - accept a socket and store client IP and port
-
 int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
-                  char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list) {
+                  char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list, int allow_dns) {
     struct sockaddr_storage sadr;
     socklen_t addrlen = sizeof(sadr);
 
@@ -1088,7 +1090,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
-        if(!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+        if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
             strncpy(client_ip, "localhost", ipsize);
             client_ip[ipsize - 1] = '\0';
         }
@@ -1126,7 +1128,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 debug(D_LISTENER, "New UNKNOWN web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 break;
         }
-        if(!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection")) {
+        if (!connection_allowed(nfd, client_ip, client_host, hostsize, access_list, "connection", allow_dns)) {
             errno = 0;
             error("Permission denied for client '%s', port '%s'", client_ip, client_port);
             close(nfd);
@@ -1135,7 +1137,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
         }
     }
 #ifdef HAVE_ACCEPT4
-    else if(errno == ENOSYS)
+    else if (errno == ENOSYS)
         error("netdata has been compiled with the assumption that the system has the accept4() call, but it is not here. Recompile netdata like this: ./configure --disable-accept4 ...");
 #endif
 
@@ -1444,7 +1446,7 @@ static void poll_events_process(POLLJOB *p, POLLINFO *pi, struct pollfd *pf, sho
 
                         debug(D_POLLFD, "POLLFD: LISTENER: calling accept4() slot %zu (fd %d)", i, fd);
                         nfd = accept_socket(fd, SOCK_NONBLOCK, client_ip, INET6_ADDRSTRLEN, client_port, NI_MAXSERV,
-                                            client_host, NI_MAXHOST, p->access_list);
+                                            client_host, NI_MAXHOST, p->access_list, p->allow_dns);
                         if (unlikely(nfd < 0)) {
                             // accept failed
 
@@ -1562,6 +1564,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         , int   (*snd_callback)(POLLINFO * /*pi*/, short int * /*events*/)
         , void  (*tmr_callback)(void * /*timer_data*/)
         , SIMPLE_PATTERN *access_list
+        , int allow_dns
         , void *data
         , time_t tcp_request_timeout_seconds
         , time_t tcp_idle_timeout_seconds
@@ -1592,6 +1595,7 @@ void poll_events(LISTEN_SOCKETS *sockets
             .checks_every = (tcp_idle_timeout_seconds / 3) + 1,
 
             .access_list = access_list,
+            .allow_dns   = allow_dns,
 
             .timer_milliseconds = timer_milliseconds,
             .timer_data = timer_data,

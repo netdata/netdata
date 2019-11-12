@@ -20,12 +20,19 @@ typedef enum web_server_mode {
 } WEB_SERVER_MODE;
 
 extern SIMPLE_PATTERN *web_allow_connections_from;
+extern int             web_allow_connections_dns;
 extern SIMPLE_PATTERN *web_allow_dashboard_from;
+extern int             web_allow_dashboard_dns;
 extern SIMPLE_PATTERN *web_allow_registry_from;
+extern int             web_allow_registry_dns;
 extern SIMPLE_PATTERN *web_allow_badges_from;
+extern int             web_allow_badges_dns;
 extern SIMPLE_PATTERN *web_allow_streaming_from;
+extern int             web_allow_streaming_dns;
 extern SIMPLE_PATTERN *web_allow_netdataconf_from;
+extern int             web_allow_netdataconf_dns;
 extern SIMPLE_PATTERN *web_allow_mgmt_from;
+extern int             web_allow_mgmt_dns;
 
 extern WEB_SERVER_MODE web_server_mode;
 

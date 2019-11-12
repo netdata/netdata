@@ -73,9 +73,9 @@ extern int sock_enlarge_in(int fd);
 extern int sock_enlarge_out(int fd);
 
 extern int connection_allowed(int fd, char *client_ip, char *client_host, size_t hostsize,
-                              SIMPLE_PATTERN *access_list, const char *patname);
+                              SIMPLE_PATTERN *access_list, const char *patname, int allow_dns);
 extern int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *client_port, size_t portsize,
-                         char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list);
+                         char *client_host, size_t hostsize, SIMPLE_PATTERN *access_list, int allow_dns);
 
 #ifndef HAVE_ACCEPT4
 extern int accept4(int sock, struct sockaddr *addr, socklen_t *addrlen, int flags);
@@ -155,6 +155,7 @@ struct poll {
     struct pollinfo *first_free;
 
     SIMPLE_PATTERN *access_list;
+    int allow_dns;
 
     void *(*add_callback)(POLLINFO *pi, short int *events, void *data);
     void  (*del_callback)(POLLINFO *pi);
@@ -193,6 +194,7 @@ extern void poll_events(LISTEN_SOCKETS *sockets
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
         , void  (*tmr_callback)(void *timer_data)
         , SIMPLE_PATTERN *access_list
+        , int allow_dns
         , void *data
         , time_t tcp_request_timeout_seconds
         , time_t tcp_idle_timeout_seconds
