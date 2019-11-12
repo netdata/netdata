@@ -2,9 +2,10 @@
 
 #include "../libnetdata.h"
 
-int _backends = 0; // number of backend sections we have
-
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
+
+extern struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance);
+
 
 // ----------------------------------------------------------------------------
 // definitions
@@ -44,50 +45,54 @@ struct section {
                             // readers are protected using the rwlock in avl_tree_lock
 };
 
-struct _connector_instance {
-    struct section *connector;        // actual connector
-    struct section *instance;         // This instance
-    struct _connector_instance *next; // Next instance
-};
+//struct  {
+//    struct section *connector;        // actual connector
+//    struct section *instance;         // This instance
+//    struct _connector_instance *next; // Next instance
+//};
 
-struct config exporting_config = {
-    .sections = NULL,
-    .mutex = NETDATA_MUTEX_INITIALIZER,
-    .index = {
-        .avl_tree = {
-            .root = NULL,
-            .compar = appconfig_section_compare
-        },
-        .rwlock = AVL_LOCK_INITIALIZER
-    }
-};
+//struct config exporting_config = {
+//    .sections = NULL,
+//    .mutex = NETDATA_MUTEX_INITIALIZER,
+//    .index = {
+//        .avl_tree = {
+//            .root = NULL,
+//            .compar = appconfig_section_compare
+//        },
+//        .rwlock = AVL_LOCK_INITIALIZER
+//    }
+//};
 
-struct _connector_instance  *global_connector_instance = NULL;
 
-int get_connector_instance(struct connector_instance *target_ci)
-{
-    static struct _connector_instance *local_ci = NULL;
+//extern struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance);
 
-    if (unlikely(!global_connector_instance))
-        return 0;
 
-    if (target_ci == NULL) {
-        local_ci = NULL;
-        return 1;
-    }
-    if (local_ci == NULL)
-        local_ci = global_connector_instance;
-    else {
-        local_ci = local_ci->next;
-        if (local_ci == NULL)
-            return 0;
-    }
-
-    strcpy(target_ci->instance_name, local_ci->instance->name);
-    strcpy(target_ci->connector_name, local_ci->connector->name);
-
-    return 1;
-}
+//struct _connector_instance  *global_connector_instance = NULL;
+//
+//int get_connector_instance(struct connector_instance *target_ci)
+//{
+//    static struct _connector_instance *local_ci = NULL;
+//
+//    if (unlikely(!global_connector_instance))
+//        return 0;
+//
+//    if (target_ci == NULL) {
+//        local_ci = NULL;
+//        return 1;
+//    }
+//    if (local_ci == NULL)
+//        local_ci = global_connector_instance;
+//    else {
+//        local_ci = local_ci->next;
+//        if (local_ci == NULL)
+//            return 0;
+//    }
+//
+//    strcpy(target_ci->instance_name, local_ci->instance->name);
+//    strcpy(target_ci->connector_name, local_ci->connector->name);
+//
+//    return 1;
+//}
 
 int is_valid_connector(char *type)
 {
@@ -311,83 +316,6 @@ cleanup:
     return ret;
 }
 
-char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
-{
-    struct _connector_instance *local_ci;
-
-    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
-        return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
-
-    local_ci = global_connector_instance;
-    while (local_ci) {
-        if (strcmp(local_ci->instance->name, section) == 0)
-            break;
-        local_ci = local_ci->next;
-    }
-    if (!local_ci)
-        return NULL;
-    return appconfig_get(
-        root,
-        local_ci->instance->name,
-        name,
-        appconfig_get(
-            root,
-            local_ci->connector->name,
-            name,
-            appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
-}
-
-int expconfig_get_boolean(struct config *root, const char *section, const char *name, int default_value)
-{
-    struct _connector_instance *local_ci;
-
-    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
-        return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
-
-    local_ci = global_connector_instance;
-    while (local_ci) {
-        if (strcmp(local_ci->instance->name, section) == 0)
-            break;
-        local_ci = local_ci->next;
-    }
-    if (!local_ci)
-        return 0;
-    return appconfig_get_boolean(
-        root,
-        local_ci->instance->name,
-        name,
-        appconfig_get_boolean(
-            root,
-            local_ci->connector->name,
-            name,
-            appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
-}
-
-long long expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
-{
-    struct _connector_instance *local_ci;
-
-    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
-        return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
-
-    local_ci = global_connector_instance;
-    while (local_ci) {
-        if (strcmp(local_ci->instance->name, section) == 0)
-            break;
-        local_ci = local_ci->next;
-    }
-    if (!local_ci)
-        return 0;
-    return appconfig_get_number(
-        root,
-        local_ci->instance->name,
-        name,
-        appconfig_get_number(
-            root,
-            local_ci->connector->name,
-            name,
-            appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
-}
 
 char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
@@ -591,6 +519,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
     int is_exporter_config = 0;
     int is_backend_config = 0;
     int have_backend_config = 0;
+    int _backends = 0;              // number of backend sections we have
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
@@ -685,13 +614,17 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                             appconfig_value_create(local_connector, "type", value);
                         }
                         if (local_connector) {
-                            struct _connector_instance *local_ci;
 
-                            local_ci = callocz(1, sizeof(struct _connector_instance));
-                            local_ci->instance = co;
-                            local_ci->connector = local_connector;
-                            local_ci->next = global_connector_instance;
-                            global_connector_instance = local_ci;
+                              add_connector_instance(local_connector, co);
+
+
+//                            struct _connector_instance *local_ci;
+
+//                            local_ci = callocz(1, sizeof(struct _connector_instance));
+//                            local_ci->instance = co;
+//                            local_ci->connector = local_connector;
+//                            local_ci->next = global_connector_instance;
+//                            global_connector_instance = local_ci;
                         }
                     } else {
                         info("Ignoring unknown connector %s specified for version " VERSION, value);

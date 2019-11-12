@@ -12,7 +12,7 @@ extern long long expconfig_get_number(struct config *root, const char *section, 
 extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
 
 extern int is_valid_connector(char *type);
-extern struct _connector_instance *global_connector_instance;
+//extern struct _connector_instance *global_connector_instance;
 extern struct config exporting_config;
 
 #define EXPORTER_DESTINATION                "destination"
@@ -119,6 +119,20 @@ struct engine {
     time_t before;
 };
 
+struct _connector_instance {
+    struct section *connector;        // actual connector
+    struct section *instance;         // This instance
+    char instance_name[CONFIG_MAX_NAME + 1];
+    char connector_name[CONFIG_MAX_NAME + 1];
+    struct _connector_instance *next; // Next instance
+};
+
+struct connector_instance {
+    char instance_name[CONFIG_MAX_NAME + 1];
+    char connector_name[CONFIG_MAX_NAME + 1];
+};
+
+
 void *exporting_main(void *ptr);
 
 struct engine *read_exporting_config();
@@ -143,5 +157,7 @@ int end_batch_formatting(struct engine *engine);
 void simple_connector_worker(void *instance_p);
 
 int send_internal_metrics(struct engine *engine);
+
+//extern struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance);
 
 #endif /* NETDATA_EXPORTING_ENGINE_H */

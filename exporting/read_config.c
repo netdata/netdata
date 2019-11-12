@@ -8,6 +8,140 @@ char *netdata_configured_stock_config_dir = ".";
 char *netdata_configured_hostname = "test_host";
 #endif
 
+struct config exporting_config = {.sections = NULL,
+                                  .mutex = NETDATA_MUTEX_INITIALIZER,
+                                  .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
+                                            .rwlock = AVL_LOCK_INITIALIZER}};
+
+struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance)
+{
+    static struct _connector_instance *global_connector_instance = NULL;
+    struct _connector_instance *local_ci;
+
+    if (unlikely(!connector))
+        return global_connector_instance;
+
+    local_ci = callocz(1, sizeof(struct _connector_instance));
+    local_ci->instance = instance;
+    local_ci->connector = connector;
+    local_ci->next = global_connector_instance;
+    global_connector_instance = local_ci;
+
+    return global_connector_instance;
+}
+
+char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
+{
+    struct _connector_instance *local_ci;
+
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
+    local_ci = add_connector_instance(NULL, NULL);
+    while (local_ci) {
+        if (strcmp(local_ci->instance_name, section) == 0)
+            break;
+        local_ci = local_ci->next;
+    }
+    if (!local_ci)
+        return NULL;
+    return appconfig_get(
+        root,
+        local_ci->instance_name,
+        name,
+        appconfig_get(
+            root, local_ci->connector_name, name, appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+}
+
+int expconfig_get_boolean(struct config *root, const char *section, const char *name, int default_value)
+{
+    struct _connector_instance *local_ci;
+
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
+    local_ci = add_connector_instance(NULL, NULL);
+    while (local_ci) {
+        if (strcmp(local_ci->instance_name, section) == 0)
+            break;
+        local_ci = local_ci->next;
+    }
+    if (!local_ci)
+        return 0;
+    return appconfig_get_boolean(
+        root,
+        local_ci->instance_name,
+        name,
+        appconfig_get_boolean(
+            root,
+            local_ci->connector_name,
+            name,
+            appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+}
+
+long long expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
+{
+    struct _connector_instance *local_ci;
+
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
+    local_ci = add_connector_instance(NULL, NULL);
+    while (local_ci) {
+        if (strcmp(local_ci->instance_name, section) == 0)
+            break;
+        local_ci = local_ci->next;
+    }
+    if (!local_ci)
+        return 0;
+    return appconfig_get_number(
+        root,
+        local_ci->instance_name,
+        name,
+        appconfig_get_number(
+            root,
+            local_ci->connector_name,
+            name,
+            appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+}
+
+/*
+ * Get the next connector instance that we need to activate
+ *
+ * @param @target_ci will be filled with instance name and connector name
+ *
+ * @return  - 1 if more connectors to be fetched, 0 done
+ *
+ */
+
+int get_connector_instance(struct connector_instance *target_ci)
+{
+    static struct _connector_instance *local_ci = NULL;
+    struct _connector_instance *global_connector_instance;
+
+    global_connector_instance = add_connector_instance(NULL, NULL);
+
+    if (unlikely(!global_connector_instance))
+        return 0;
+
+    if (target_ci == NULL) {
+        local_ci = NULL;
+        return 1;
+    }
+    if (local_ci == NULL)
+        local_ci = global_connector_instance;
+    else {
+        local_ci = local_ci->next;
+        if (local_ci == NULL)
+            return 0;
+    }
+
+    strcpy(target_ci->instance_name, local_ci->instance_name);
+    strcpy(target_ci->connector_name, local_ci->connector_name);
+
+    return 1;
+}
+
 /**
  * Select Type
  *
