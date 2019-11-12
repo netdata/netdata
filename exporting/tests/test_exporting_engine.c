@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "../../libnetdata/libnetdata.h"
-#include "../../libnetdata/required_dummies.h"
+#include "libnetdata/libnetdata.h"
+#include "libnetdata/required_dummies.h"
 
-#include "../exporting_engine.h"
-#include "../graphite/graphite.h"
+#include "exporting/exporting_engine.h"
+#include "exporting/graphite/graphite.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -27,17 +27,17 @@ struct engine *__wrap_read_exporting_config()
 
 struct engine *__mock_read_exporting_config()
 {
-    struct engine *engine = (struct engine *)calloc(1, sizeof(struct engine));
+    struct engine *engine = calloc(1, sizeof(struct engine));
     engine->config.prefix = strdupz("netdata");
     engine->config.hostname = strdupz("test-host");
     engine->config.update_every = 3;
     engine->config.options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
 
-    engine->connector_root = (struct connector *)calloc(1, sizeof(struct connector));
+    engine->connector_root = calloc(1, sizeof(struct connector));
     engine->connector_root->config.type = BACKEND_TYPE_GRAPHITE;
     engine->connector_root->engine = engine;
 
-    engine->connector_root->instance_root = (struct instance *)calloc(1, sizeof(struct instance));
+    engine->connector_root->instance_root = calloc(1, sizeof(struct instance));
     struct instance *instance = engine->connector_root->instance_root;
     instance->connector = engine->connector_root;
     instance->config.destination = strdupz("localhost");
@@ -209,7 +209,7 @@ static void test_exporting_engine(void **state)
 {
     (void)state;
 
-    struct engine *engine = (struct engine *)malloc(sizeof(struct engine));
+    struct engine *engine = malloc(sizeof(struct engine));
     memset(engine, 0xDB, sizeof(struct engine));
     engine->after = 1;
     engine->before = 2;
@@ -252,7 +252,7 @@ static void test_read_exporting_config(void **state)
 {
     (void)state;
 
-    struct engine *engine = __mock_read_exporting_config();
+    struct engine *engine = __mock_read_exporting_config(); // TODO: use real function
 
     assert_ptr_not_equal(engine, NULL);
     assert_string_equal(engine->config.prefix, "netdata");
@@ -322,12 +322,12 @@ static void test_prepare_buffers(void **state)
 {
     (void)state;
 
-    struct engine *engine = (struct engine *)malloc(sizeof(struct engine));
+    struct engine *engine = malloc(sizeof(struct engine));
     memset(engine, 0xD1, sizeof(struct engine));
     engine->after = 1;
     engine->before = 2;
 
-    engine->connector_root = (struct connector *)malloc(sizeof(struct connector));
+    engine->connector_root = malloc(sizeof(struct connector));
     struct connector *connector = engine->connector_root;
     connector->next = NULL;
     connector->start_batch_formatting = __mock_start_batch_formatting;
@@ -338,11 +338,11 @@ static void test_prepare_buffers(void **state)
     connector->end_host_formatting = __mock_end_host_formatting;
     connector->end_batch_formatting = __mock_end_batch_formatting;
 
-    connector->instance_root = (struct instance *)malloc(sizeof(struct instance));
+    connector->instance_root = malloc(sizeof(struct instance));
 
-    localhost = (RRDHOST *)calloc(1, sizeof(RRDHOST));
-    localhost->rrdset_root = (RRDSET *)calloc(1, sizeof(RRDSET));
-    localhost->rrdset_root->dimensions = (RRDDIM *)calloc(1, sizeof(RRDDIM));
+    localhost = calloc(1, sizeof(RRDHOST));
+    localhost->rrdset_root = calloc(1, sizeof(RRDSET));
+    localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     memset(rd, 0xD2, sizeof(RRDDIM));
     rd->next = NULL;
@@ -420,16 +420,16 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
     struct engine *engine = __mock_read_exporting_config();
     init_connectors_in_tests(engine);
 
-    localhost = (RRDHOST *)calloc(1, sizeof(RRDHOST));
+    localhost = calloc(1, sizeof(RRDHOST));
     localhost->tags = strdup("TAG1=VALUE1 TAG2=VALUE2");
 
-    localhost->rrdset_root = (RRDSET *)calloc(1, sizeof(RRDSET));
+    localhost->rrdset_root = calloc(1, sizeof(RRDSET));
     RRDSET *st = localhost->rrdset_root;
     st->rrdhost = localhost;
     strcpy(st->id, "chart_id");
     st->name = strdup("chart_name");
 
-    localhost->rrdset_root->dimensions = (RRDDIM *)calloc(1, sizeof(RRDDIM));
+    localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     rd->rrdset = st;
     rd->id = strdup("dimension_id");
