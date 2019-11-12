@@ -166,6 +166,7 @@ struct test_family api_info_test_family;    // This is ugly as global but can't 
 
 static void api_info(void **state)
 {
+    printf("Rx group state %p\n",*state);
 struct test_family *tf = (struct test_family *)*state;
     printf("Test %u / %u\n", tf->num_headers, tf->prefix_len);
 /*    for (size_t i = 0; i < MAX_HEADERS; i++) {
@@ -188,46 +189,48 @@ struct test_family *tf = (struct test_family *)*state;
     }*/
 }
 
-static void api_info_setup(void **state)
+static int api_info_setup(void **state)
 {
     *state = &api_info_test_family;
+    printf("Set group state %p\n",*state);
     api_info_test_family.num_headers = 0;
     api_info_test_family.prefix_len  = 0;
+    return 0;
 }
 
-static void api_info_teardown(void **state)
+static int api_info_teardown(void **state)
 {
+    return 0;
 }
 
 
-static void api_info_launcher()
+static int api_info_launcher()
 {
 struct test_family *tf = &api_info_test_family;
     tf->w = pre_test_setup();
-    tf->num_tests = 2;
+    tf->num_tests = 0;
     for (size_t i = 0; i < MAX_HEADERS; i++) {
         build_request(tf->w->response.data, "/api/v1/info", true, MAX_HEADERS);
         tf->num_tests += tf->w->response.data->len;
     }
-    struct CMUnitTest base_tests[3] = { cmocka_unit_test(api_info_setup),
-                                        cmocka_unit_test(api_info),
-                                        cmocka_unit_test(api_info_teardown) };
+    struct CMUnitTest base_tests[1] = { cmocka_unit_test(api_info) };
     struct CMUnitTest *tests = calloc(tf->num_tests, sizeof(struct CMUnitTest));
-    tests[0] = base_tests[0];
-    for (size_t i = 1; i < tf->num_tests-1; i++)
-        tests[i] = base_tests[1];
-    tests[tf->num_tests-1] = base_tests[2];
+    for (size_t i = 0; i < tf->num_tests; i++)
+        tests[i] = base_tests[0];
 
     printf("Setup %u tests in %p\n", tf->num_tests, tests);
-    cmocka_run_group_tests_name("web_api", tests, NULL, NULL);
+    int fails = _cmocka_run_group_tests("web_api", tests, tf->num_tests, api_info_setup, api_info_teardown);
     free(tests);
     post_test_cleanup(tf->w);      // localtest will be an issue. FIXME
+    return fails;
 }
 
 int main(void)
 {
     debug_flags = 0xffffffffffff;
-    api_info_launcher();
 
-    return 0;
+    int fails = 0;
+    fails += api_info_launcher();
+
+    return fails;
 }
