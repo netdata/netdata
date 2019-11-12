@@ -154,6 +154,7 @@ static struct web_client *setup_fresh_web_client()
     strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
     w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
+    w->acl = 0x1f;          // Everything on
     return w;
 }
 
