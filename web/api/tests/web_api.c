@@ -92,6 +92,18 @@ void __wrap_error_int(
     va_end(args);
 }
 
+void __wrap_fatal_int( 
+    const char *file, const char *function, const unsigned long line, const char *fmt, ... )
+{
+    va_list args;
+    va_start(args, fmt);
+    printf("FATAL: ");
+    vprintf(fmt, args);
+    printf("\n");
+    va_end(args);
+    fail();
+}
+
 WEB_SERVER_MODE web_server_mode = WEB_SERVER_MODE_STATIC_THREADED;
 char *netdata_configured_web_dir = "UNKNOWN FIXME";
 RRDHOST *localhost = NULL;

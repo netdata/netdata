@@ -661,6 +661,7 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=debug_int \
         -Wl,--wrap=error_int \
         -Wl,--wrap=info_int \
+        -Wl,--wrap=fatal_int \
         $(TEST_LDFLAGS) \
         $(NULL)
     web_api_tests_web_api_testdriver_SOURCES = \
