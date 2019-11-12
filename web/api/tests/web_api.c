@@ -36,6 +36,7 @@ char *__wrap_config_get(struct config *root, const char *section, const char *na
 int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
 {
     printf("api requests: %s\n", url);
+    return HTTP_RESP_OK;
 }
 
 int __wrap_rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url)
@@ -148,6 +149,7 @@ static void build_request(struct web_buffer *wb, const char *url, bool use_cr, s
 static struct web_client *setup_fresh_web_client()
 {
     struct web_client *w = (struct web_client *)malloc(sizeof(struct web_client));
+    memset(w, sizeof(struct web_client), 0);
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
     w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
@@ -210,7 +212,7 @@ static void api_info(void **state)
     printf("Test %u / %u\n", tf->num_headers, tf->prefix_len);
     build_request(tf->instance->response.data, "/api/v1/info", true, tf->num_headers);
     tf->instance->response.data->len = tf->prefix_len;
-    info("Buffer contains: %s [first %u]", tf->instance->response.data->buffer, tf->prefix_len);
+    printf("Buffer contains: %s [first %u]", tf->instance->response.data->buffer, tf->prefix_len);
     web_client_process_request(tf->instance);
     if (tf->instance->response.data->len == tf->template->response.data->len)
         assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
