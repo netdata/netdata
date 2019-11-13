@@ -4,9 +4,6 @@
 
 #define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
-extern struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance);
-
-
 // ----------------------------------------------------------------------------
 // definitions
 
@@ -611,21 +608,10 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                             // Auto define this connector because we need it for backwards compatibility
                             local_connector = appconfig_section_create(root, connector_name);
                             appconfig_value_create(local_connector, "enabled", "yes");
-                            appconfig_value_create(local_connector, "type", value);
                         }
-                        if (local_connector) {
+                        if (likely(local_connector))
+                            add_connector_instance(local_connector, co, local_connector->name, co->name);
 
-                              add_connector_instance(local_connector, co);
-
-
-//                            struct _connector_instance *local_ci;
-
-//                            local_ci = callocz(1, sizeof(struct _connector_instance));
-//                            local_ci->instance = co;
-//                            local_ci->connector = local_connector;
-//                            local_ci->next = global_connector_instance;
-//                            global_connector_instance = local_ci;
-                        }
                     } else {
                         info("Ignoring unknown connector %s specified for version " VERSION, value);
                     }

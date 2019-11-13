@@ -145,6 +145,6 @@ extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
 
-
+extern struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance, char *connector_name, char *instance_name);
 
 #endif /* NETDATA_CONFIG_H */
