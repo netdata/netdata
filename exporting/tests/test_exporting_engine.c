@@ -15,6 +15,9 @@
 RRDHOST *localhost;
 netdata_rwlock_t rrd_rwlock;
 
+#define MAX_LOG_LINE 1024
+char log_line[MAX_LOG_LINE + 1];
+
 // Use memomy allocation functions guarded by CMocka in strdupz
 const char *__wrap_strdupz(const char *s)
 {
@@ -28,6 +31,19 @@ time_t __wrap_now_realtime_sec(void)
 {
     function_called();
     return mock_type(time_t);
+}
+
+void __wrap_info_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
+{
+    (void)file;
+    (void)function;
+    (void)line;
+
+    va_list args;
+
+    va_start(args, fmt);
+    vsnprintf(log_line, MAX_LOG_LINE, fmt, args);
+    va_end(args);
 }
 
 struct engine *__real_read_exporting_config();
@@ -482,6 +498,23 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
         "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
 }
 
+static void test_exporting_discard_response(void **state)
+{
+    struct engine *engine = *state;
+
+    BUFFER *response = buffer_create(0);
+    buffer_sprintf(response, "Test response");
+
+    assert_int_equal(exporting_discard_response(response, engine->connector_root->instance_root), 0);
+    assert_string_equal(
+        log_line,
+        "EXPORTING: received 13 bytes from (null) connector instance. Ignoring them. Sample: 'Test response'");
+
+    assert_int_equal(buffer_strlen(response), 0);
+
+    buffer_free(response);
+}
+
 static void test_init_graphite_instance(void **state)
 {
     (void)state;
@@ -502,6 +535,7 @@ int main(void)
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test_setup_teardown(
             test_format_dimension_collected_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(test_exporting_discard_response, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_init_graphite_instance),
     };
 
