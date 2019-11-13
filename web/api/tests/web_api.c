@@ -10,12 +10,17 @@
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
-    printf("Mocking send: %u bytes\n", len);
+    printf("Mocking send: %zu bytes\n", len);
+    (void)sockfd;
+    (void)buf;
+    (void)flags;
     return len;
 }
 
 RRDHOST *__wrap_rrdhost_find_by_hostname(const char *hostname, uint32_t hash)
 {
+    (void)hostname;
+    (void)hash;
     return NULL;
 }
 
@@ -24,46 +29,67 @@ RRDHOST *__wrap_rrdhost_find_by_hostname(const char *hostname, uint32_t hash)
 void __wrap_finished_web_request_statistics(
     uint64_t dt, uint64_t bytes_received, uint64_t bytes_sent, uint64_t content_size, uint64_t compressed_content_size)
 {
+    (void)dt;
+    (void)bytes_received;
+    (void)bytes_sent;
+    (void)content_size;
+    (void)compressed_content_size;
 }
 
 char *__wrap_config_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
     if (!strcmp(section, CONFIG_SECTION_WEB) && !strcmp(name, "web files owner"))
         return "netdata";
+    (void)root;
+    (void)default_value;
     return "UNKNOWN FIX ME";
 }
 
 int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
 {
     printf("api requests: %s\n", url);
+    (void)host;
+    (void)w;
     return HTTP_RESP_OK;
 }
 
 int __wrap_rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url)
 {
+    (void)host;
+    (void)w;
+    (void)url;
     return 0;
 }
 
 RRDHOST *__wrap_rrdhost_find_by_guid(const char *guid, uint32_t hash)
 {
+    (void)guid;
+    (void)hash;
     printf("FIXME: rrdset_find_guid\n");
     return NULL;
 }
 
 RRDSET *__wrap_rrdset_find_byname(RRDHOST *host, const char *name)
 {
+    (void)host;
+    (void)name;
     printf("FIXME: rrdset_find_byname\n");
     return NULL;
 }
 
 RRDSET *__wrap_rrdset_find(RRDHOST *host, const char *id)
 {
+    (void)host;
+    (void)id;
     printf("FIXME: rrdset_find\n");
     return NULL;
 }
 
 void __wrap_debug_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
+    (void)file;
+    (void)function;
+    (void)line;
     va_list args;
     va_start(args, fmt);
     printf("DEBUG: ");
@@ -74,6 +100,9 @@ void __wrap_debug_int(const char *file, const char *function, const unsigned lon
 
 void __wrap_info_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
+    (void)file;
+    (void)function;
+    (void)line;
     va_list args;
     va_start(args, fmt);
     printf("INFO: ");
@@ -85,6 +114,10 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
 void __wrap_error_int(
     const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
+    (void)prefix;
+    (void)file;
+    (void)function;
+    (void)line;
     va_list args;
     va_start(args, fmt);
     printf("ERROR: ");
@@ -95,6 +128,9 @@ void __wrap_error_int(
 
 void __wrap_fatal_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
+    (void)file;
+    (void)function;
+    (void)line;
     va_list args;
     va_start(args, fmt);
     printf("FATAL: ");
@@ -149,7 +185,7 @@ static void build_request(struct web_buffer *wb, const char *url, bool use_cr, s
 static struct web_client *setup_fresh_web_client()
 {
     struct web_client *w = (struct web_client *)malloc(sizeof(struct web_client));
-    memset(w, sizeof(struct web_client), 0);
+    memset(w, 0, sizeof(struct web_client));
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
     w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
@@ -209,10 +245,10 @@ static void api_info(void **state)
 {
     struct test_family *tf = (struct test_family *)*state;
     api_next(state);
-    printf("Test %u / %u\n", tf->num_headers, tf->prefix_len);
+    printf("Test %zu / %zu\n", tf->num_headers, tf->prefix_len);
     build_request(tf->instance->response.data, "/api/v1/info", true, tf->num_headers);
     tf->instance->response.data->len = tf->prefix_len;
-    printf("Buffer contains: %s [first %u]", tf->instance->response.data->buffer, tf->prefix_len);
+    printf("Buffer contains: %s [first %zu]", tf->instance->response.data->buffer, tf->prefix_len);
     web_client_process_request(tf->instance);
     if (tf->instance->response.data->len == tf->template->response.data->len)
         assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
@@ -233,6 +269,7 @@ static int api_info_setup(void **state)
 
 static int api_info_teardown(void **state)
 {
+    (void)state;
     return 0;
 }
 
@@ -252,7 +289,7 @@ static int api_info_launcher()
     for (size_t i = 0; i < tf->num_tests; i++)
         tests[i] = base_tests[0];
 
-    printf("Setup %u tests in %p\n", tf->num_tests, tests);
+    printf("Setup %zu tests in %p\n", tf->num_tests, tests);
     int fails = _cmocka_run_group_tests("web_api", tests, tf->num_tests, api_info_setup, api_info_teardown);
     free(tests);
     destroy_web_client(tf->template);
