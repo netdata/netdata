@@ -921,8 +921,8 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
-                        char* createdataset_string = "createdataset=";
-                        char* stresstest_string = "stresstest=";
+                        //char* createdataset_string = "createdataset="; Unused?
+                        //char* stresstest_string = "stresstest=";  Unused?
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
