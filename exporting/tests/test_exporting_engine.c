@@ -236,6 +236,19 @@ ssize_t __wrap_recv(int sockfd, void *buf, size_t len, int flags)
     return strlen(mock_string);
 }
 
+ssize_t __wrap_send(int sockfd, const void *buf, size_t len, int flags)
+{
+    function_called();
+
+    check_expected(sockfd);
+    check_expected_ptr(buf);
+    check_expected_ptr(buf);
+    check_expected(len);
+    check_expected(flags);
+
+    return strlen(buf);
+}
+
 static int setup_configured_engine(void **state)
 {
     struct engine *engine = __mock_read_exporting_config();
@@ -547,7 +560,7 @@ static void test_simple_connector_receive_response(void **state)
     expect_value(__wrap_recv, sockfd, 1);
     expect_not_value(__wrap_recv, buf, 0);
     expect_value(__wrap_recv, len, 4096);
-    expect_value(__wrap_recv, flags, 64);
+    expect_value(__wrap_recv, flags, MSG_DONTWAIT);
 
     expect_function_call(__wrap_info_int);
 
@@ -559,6 +572,39 @@ static void test_simple_connector_receive_response(void **state)
 
     assert_int_equal(stats->chart_received_bytes, 9);
     assert_int_equal(stats->chart_receptions, 1);
+    assert_int_equal(sock, 1);
+}
+
+static void test_simple_connector_send_buffer(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+    struct stats *stats = &instance->stats;
+    BUFFER *buffer = instance->buffer;
+
+    int sock = 1;
+    int failures = 3;
+
+    __real_prepare_buffers(engine);
+
+    expect_function_call(__wrap_send);
+    expect_value(__wrap_send, sockfd, 1);
+    expect_value(__wrap_send, buf, buffer_tostring(buffer));
+    expect_string(
+        __wrap_send, buf, "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
+    expect_value(__wrap_send, len, 84);
+    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
+
+    simple_connector_send_buffer(&sock, &failures, instance);
+
+    assert_int_equal(failures, 0);
+    assert_int_equal(stats->chart_transmission_successes, 1);
+    assert_int_equal(stats->chart_sent_bytes, 84);
+    assert_int_equal(stats->chart_sent_metrics, 0);
+    assert_int_equal(stats->chart_transmission_failures, 0);
+
+    assert_int_equal(buffer_strlen(buffer), 0);
+
     assert_int_equal(sock, 1);
 }
 
@@ -582,8 +628,12 @@ int main(void)
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test_setup_teardown(
             test_format_dimension_collected_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
-        cmocka_unit_test_setup_teardown(test_exporting_discard_response, setup_initialized_engine, teardown_initialized_engine),
-        cmocka_unit_test_setup_teardown(test_simple_connector_receive_response, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_exporting_discard_response, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_simple_connector_receive_response, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_simple_connector_send_buffer, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_init_graphite_instance),
     };
 

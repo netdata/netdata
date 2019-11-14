@@ -934,6 +934,7 @@ if(BUILD_TESTING)
         -Wl,--wrap=strdupz
         -Wl,--wrap=info_int
         -Wl,--wrap=recv
+        -Wl,--wrap=send
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)
