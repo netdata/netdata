@@ -14,7 +14,7 @@ Welcome! You've arrived at the documentation for Netdata. Use the links below to
 
   </div>
   <div class="nav-getting-started">
-    <a class="nav-button" href="docs/GettingStarted/">Getting started guide</a>
+    <a class="nav-button" href="docs/getting-started/">Getting started guide</a>
     <p>The perfect place for Netdata beginners to start. Learn how to access Netdata's dashboard, start and stop the service, basic configuration, and more.</p>
 
   </div>

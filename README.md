@@ -152,6 +152,40 @@ not just visualize metrics.
 
 ## News
 
+`Oct 18th, 2019` - **[Netdata v1.18.1 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.18.1 contains 17 bug fixes, 5 improvements, and 5 documentation updates.
+
+The patch has several bug fixes, mainly related to FreeBSD and the binary package generation process. 
+
+Netdata can now [send notifications to Google Hangouts Chat](https://docs.netdata.cloud/health/notifications/hangouts/)! 
+
+On certain systems, the `slabinfo` plugin introduced in v1.18.0 added thousands of new metrics. We decided the collector's usefulness to most users didn't justify the increase in resource requirements. This release disables the collector by default.
+
+Finally, we added a chart under **Netdata Monitoring** to present a better view of the RAM used by the [database engine (dbengine)](https://docs.netdata.cloud/database/engine/). The chart doesn't currently take into consideration the RAM used for slave nodes, so we intend to add more related charts in the future.
+
+---
+
+`Oct 10th, 2019` - **[Netdata v1.18.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.18.0 contains 5 new collectors, 16 bug fixes, 27 improvements, and 20 documentation updates.
+
+The **database engine** is now the default method of storing metrics in Netdata. You immediately get more efficient and configurable long-term metrics storage without any work on your part. By saving recent metrics in RAM and "spilling" historical metrics to disk for long-term storage, the database engine is laying the foundation for many more improvements to distributed metrics.
+
+We even have a [tutorial](https://docs.netdata.cloud/docs/tutorials/longer-metrics-storage/) on switching to the database engine and getting the most from it. Or, just read up on [how performant](https://docs.netdata.cloud/database/engine/#evaluation) the database engine really is.
+
+Both our `python.d` and `go.d` plugins now have more **intelligent auto-detection** by periodically dump a list of active modules to disk. When Netdata starts, such as after a reboot, the plugins use this list of known services to re-establish metrics collection much more reliably. No more worrying if the service or application you need to monitor starts up minutes after Netdata.
+
+Two of our new collectors will help those with Hadoop big data infrastructures. The **HDFS and Zookeeper collection modules** come with essential alarms requested by our community and Netdata's auto-detection capabilities to keep the required configuration to an absolute minimum. Read up on the process via our [HDFS and Zookeeper tutorial](https://docs.netdata.cloud/docs/tutorials/monitor-hadoop-cluster/).
+
+Speaking of new collectors—we also added the ability to collect metrics from SLAB cache, Gearman, and vCenter Server Appliances.
+
+Before v1.18, if you wanted to create alarms for each dimension in a single chart, you need to write separate entities for each dimension—not very efficient or user-friendly. New **dimension templates** fix that hassle. Now, a single entity can automatically generate alarms for any number of dimensions in a chart, even those you weren't aware of! Our [tutorial on dimension templates](https://docs.netdata.cloud/docs/tutorials/dimension-templates/) has all the details.
+
+v1.18 brings support for installing Netdata on offline or air-gapped systems. To help users comply with strict security policies, our installation scripts can now install Netdata using previously-downloaded tarball and checksums instead of downloading them at runtime. We have guides for installing offline via `kickstart.sh` or `kickstart-static64.sh` in our [installation documentation](https://docs.netdata.cloud/packaging/installer/#offline-installations). We're excited to bring real-time monitoring to once-inaccessible systems!
+
+---
+
 `Sep 12th, 2019` - **[Netdata v1.17.1 released!](https://github.com/netdata/netdata/releases)**
 
 Release v1.17.1 contains 2 bug fixes, 6 improvements, and 2 documentation updates.
@@ -356,11 +390,11 @@ This is what you should expect from Netdata:
 ### Health Monitoring & Alarms
 
 -   **Sophisticated alerting** - comes with hundreds of alarms, **out of the box**! Supports dynamic thresholds, hysteresis, alarm templates, multiple role-based notification methods.
--   **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [irc](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [prowl](health/notifications/prowl/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [smstools3](health/notifications/smstools3/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/) and [custom notifications](health/notifications/custom/).
+-   **Notifications**: [alerta.io](health/notifications/alerta/), [amazon sns](health/notifications/awssns/), [discordapp.com](health/notifications/discord/), [email](health/notifications/email/), [flock.com](health/notifications/flock/), [hangouts](health/notifications/hangouts/), [irc](health/notifications/irc/), [kavenegar.com](health/notifications/kavenegar/), [messagebird.com](health/notifications/messagebird/), [pagerduty.com](health/notifications/pagerduty/), [prowl](health/notifications/prowl/), [pushbullet.com](health/notifications/pushbullet/), [pushover.net](health/notifications/pushover/), [rocket.chat](health/notifications/rocketchat/), [slack.com](health/notifications/slack/), [smstools3](health/notifications/smstools3/), [syslog](health/notifications/syslog/), [telegram.org](health/notifications/telegram/), [twilio.com](health/notifications/twilio/), [web](health/notifications/web/) and [custom notifications](health/notifications/custom/).
 
 ### Integrations
 
--   **time-series dbs** - can archive its metrics to **Graphite**, **OpenTSDB**, **Prometheus**, **AWS Kinesis**, **MongoDB**, **JSON document DBs**, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected). Netdata also supports **Prometheus remote write API** which allows storing metrics to **Elasticsearch**, **Gnocchi**, **InfluxDB**, **Kafka**, **PostgreSQL/TimescaleDB**, **Splunk**, **VictoriaMetrics** and a lot of other [storage providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
+-   **time-series dbs** - can archive its metrics to **Graphite**, **OpenTSDB**, **Prometheus**, **AWS Kinesis**, **MongoDB**, **JSON document DBs**, in the same or lower resolution (lower: to prevent it from congesting these servers due to the amount of data collected). Netdata also supports **Prometheus remote write API** which allows storing metrics to **Elasticsearch**, **Gnocchi**, **InfluxDB**, **Kafka**, **PostgreSQL/TimescaleDB**, **Splunk**, **VictoriaMetrics**, and a lot of other [storage providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage).
 
 ## Visualization
 

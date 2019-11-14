@@ -9,6 +9,9 @@ umask 002
 # Be nice on production environments
 renice 19 $$ >/dev/null 2>/dev/null
 
+NETDATA_PREFIX="/opt/netdata"
+NETDATA_USER_CONFIG_DIR="${NETDATA_PREFIX}/etc/netdata"
+
 # -----------------------------------------------------------------------------
 if [ -d /opt/netdata/etc/netdata.old ]; then
 	progress "Found old etc/netdata directory, reinstating this"
@@ -21,16 +24,17 @@ if [ -d /opt/netdata/etc/netdata.old ]; then
 fi
 
 STARTIT=1
+AUTOUPDATE=0
+RELEASE_CHANNEL="nightly"
 
-while [ ! -z "${1}" ]
-do
-    if [ "${1}" = "--dont-start-it" ]
-    then
-        STARTIT=0
-    else
-        echo >&2 "Unknown option '${1}'. Ignoring it."
-    fi
-    shift
+while [ "${1}" ]; do
+	case "${1}" in
+		"--dont-start-it") STARTIT=0;;
+		"--auto-update"|"-u") AUTOUPDATE=1;;
+		"--stable-channel") RELEASE_CHANNEL="stable";;
+		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
+	esac
+	shift 1
 done
 
 deleted_stock_configs=0
@@ -80,7 +84,7 @@ fi
 # -----------------------------------------------------------------------------
 progress "Attempt to create user/group netdata/netadata"
 
-NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
+NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
 NETDATA_ADDED_TO_GROUPS=""
 # Default user/group
 NETDATA_USER="root"
@@ -137,6 +141,22 @@ progress "Install netdata at system init"
 install_netdata_service || run_failed "Cannot install netdata init service."
 
 
+set_netdata_updater_channel || run_failed "Cannot set netdata updater tool release channel to '${RELEASE_CHANNEL}'"
+
+
+# -----------------------------------------------------------------------------
+progress "Install (but not enable) netdata updater tool"
+cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
+install_netdata_updater || run_failed "Cannot install netdata updater tool."
+
+progress "Check if we must enable/disable the netdata updater tool"
+if [ "${AUTOUPDATE}" = "1" ]; then
+	enable_netdata_updater || run_failed "Cannot enable netdata updater tool"
+else
+	disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
+fi
+
+
 # -----------------------------------------------------------------------------
 progress "creating quick links"
 
@@ -181,19 +201,6 @@ fi
 
 
 # -----------------------------------------------------------------------------
-
-progress "create user config directories"
-
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "custom-plugins.d" "ssl"
-do
-    if [ ! -d "etc/netdata/${x}" ]
-        then
-        run mkdir -p "etc/netdata/${x}" || exit 1
-    fi
-done
-
-
-# -----------------------------------------------------------------------------
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
@@ -224,20 +231,18 @@ fi
 
 
 # -----------------------------------------------------------------------------
-
 if [ ${STARTIT} -eq 0 ]; then
-    create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
-    netdata_banner "is installed now!"
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+	netdata_banner "is installed now!"
 else
-    progress "starting netdata"
+	progress "starting netdata"
 
-    if ! restart_netdata "/opt/netdata/bin/netdata"; then
-        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
-        netdata_banner "is installed and running now!"
-    else
-        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
-        netdata_banner "is installed now!"
-    fi
+	if ! restart_netdata "${NETDATA_PREFIX}/bin/netdata"; then
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+		netdata_banner "is installed and running now!"
+	else
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+		netdata_banner "is installed now!"
+	fi
 fi
-run chown "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf"
-run chmod 0664 "/opt/netdata/etc/netdata/netdata.conf"
+run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"

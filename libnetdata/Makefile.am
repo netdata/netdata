@@ -24,8 +24,9 @@ SUBDIRS = \
     storage_number \
     threads \
     url \
+    tests \
     $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)

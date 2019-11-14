@@ -10,3 +10,4 @@ dist_pythonconfig_DATA += gearman/gearman.conf
 
 # do not install these files, but include them in the distribution
 dist_noinst_DATA       += gearman/README.md gearman/Makefile.inc
+

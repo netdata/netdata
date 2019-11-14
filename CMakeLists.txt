@@ -302,6 +302,7 @@ set(LIBNETDATA_FILES
         libnetdata/inlined.h
         libnetdata/libnetdata.c
         libnetdata/libnetdata.h
+        libnetdata/required_dummies.h
         libnetdata/locks/locks.c
         libnetdata/locks/locks.h
         libnetdata/log/log.c
@@ -416,6 +417,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/proc_softirqs.c
         collectors/proc.plugin/proc_loadavg.c
         collectors/proc.plugin/proc_meminfo.c
+        collectors/proc.plugin/proc_pagetypeinfo.c
         collectors/proc.plugin/proc_net_dev.c
         collectors/proc.plugin/proc_net_ip_vs_stats.c
         collectors/proc.plugin/proc_net_netstat.c
@@ -878,3 +880,25 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# Unit tests
+
+if(UNIT_TESTING)
+    message(STATUS "Looking for CMocka which is required for unit testing")
+    find_package(CMocka REQUIRED)
+    include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(str2ld_testdriver libnetdata/tests/test_str2ld.c)
+    target_link_libraries(str2ld_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_str2ld COMMAND str2ld_testdriver)
+
+    add_executable(storage_number_testdriver libnetdata/storage_number/tests/test_storage_number.c)
+    target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_storage_number COMMAND storage_number_testdriver)
+
+    set_target_properties(str2ld_testdriver storage_number_testdriver PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests)
+endif()
+endif()

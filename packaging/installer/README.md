@@ -48,7 +48,7 @@ To learn more about the pros and cons of using *nightly* vs. *stable* releases, 
 Verify the integrity of the script with this:
 
 ```bash
-[ "735e9966a4cf0187863e06a5282b34a7" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "0ae8dd3c4c9b976c4342c9fc09d9afae" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 _It should print `OK, VALID` if the script is the one we ship._
@@ -109,7 +109,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "c529e4eb7ce201845cef605d450f8380" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "8ad43ff960bf6f2487233682909f7a87" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -127,7 +127,6 @@ Example using all the above parameters:
 ```sh
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
 ```
-Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 
 If your shell fails to handle the above one liner, do this:
 
@@ -200,13 +199,13 @@ Try our experimental automatic requirements installer (no need to be root). This
 Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/kickstart.sh && bash /tmp/kickstart.sh -i netdata
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
 ```
 
 Install all the required packages for **monitoring everything Netdata can monitor**:
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/kickstart.sh && bash /tmp/kickstart.sh -i netdata-all
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata-all
 ```
 
 If the above do not work for you, please [open a github issue](https://github.com/netdata/netdata/issues/new?title=packages%20installer%20failed&labels=installation%20help&body=The%20experimental%20packages%20installer%20failed.%0A%0AThis%20is%20what%20it%20says:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20screen%20here%0A%0A%60%60%60) with a copy of the message you get on screen. We are trying to make it work everywhere (this is also why the script [reports back](https://github.com/netdata/netdata/issues/2054) success or failure for all its runs).
@@ -333,7 +332,7 @@ This is how to install the latest Netdata version from sources on FreeBSD:
 
 ```sh
 # install required packages
-pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof
+pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof Judy liblz4 libuv json-c
 
 # download Netdata
 git clone https://github.com/netdata/netdata.git --depth=100
@@ -347,15 +346,17 @@ cd netdata
 
 To install Netdata on pfSense, run the following commands (within a shell or under the **Diagnostics/Command** prompt within the pfSense web interface).
 
-Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata and Python are downloaded from the FreeBSD repository.
+Note that the first four packages are downloaded from the pfSense repository for maintaining compatibility with pfSense, Netdata, Judy and Python are downloaded from the FreeBSD repository.
 
 ```sh
 pkg install pkgconf
 pkg install bash
 pkg install e2fsprogs-libuuid
 pkg install libuv
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/Judy-1.0.5_2.txz
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.9.txz
-pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.15.0.txz
+ln -s /usr/local/lib/libjson-c.so /usr/local/lib/libjson-c.so.4
+pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.17.1.txz
 ```
 **Note:** If you receive a ` Not Found` error during the last two commands above, you will either need to manually look in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its URL instead, or you can try manually changing the netdata version in the URL to the latest version.  
 
@@ -594,7 +595,11 @@ By default, Netdata's installation scripts enable automatic updates for both nig
 If you would prefer to manually update your Netdata agent, you can disable automatic updates by using the `--no-updates` option when you install or update Netdata using the [one-line installation script](#one-line-installation).
 
 ```bash
+# kickstart.sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
+
+# kickstart-static64.sh
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update Netdata](UPDATE.md).

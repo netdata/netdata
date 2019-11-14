@@ -301,10 +301,12 @@ jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js, size_t len,
         }
     }
 
-    for (i = parser->toknext - 1; i >= 0; i--) {
-        /* Unmatched opened object or array */
-        if (tokens[i].start != -1 && tokens[i].end == -1) {
-            return JSMN_ERROR_PART;
+    if (tokens) {
+        for (i = parser->toknext - 1; i >= 0; i--) {
+            /* Unmatched opened object or array */
+            if (tokens[i].start != -1 && tokens[i].end == -1) {
+                return JSMN_ERROR_PART;
+            }
         }
     }
 

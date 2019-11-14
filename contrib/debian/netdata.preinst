@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -e
+
+dpkg-maintscript-helper dir_to_symlink \
+	/var/lib/netdata/www/.well-known /usr/share/netdata/www/.well-known 1.18.1~ netdata -- "$@"
+dpkg-maintscript-helper dir_to_symlink \
+	/var/lib/netdata/www/css /usr/share/netdata/www/css 1.18.1~ netdata -- "$@"
+dpkg-maintscript-helper dir_to_symlink \
+	/var/lib/netdata/www/fonts /usr/share/netdata/www/fonts 1.18.1~ netdata -- "$@"
+dpkg-maintscript-helper dir_to_symlink \
+	/var/lib/netdata/www/images /usr/share/netdata/www/images 1.18.1~ netdata -- "$@"
+dpkg-maintscript-helper dir_to_symlink \
+	/var/lib/netdata/www/lib /usr/share/netdata/www/lib 1.18.1~ netdata -- "$@"
+dpkg-maintscript-helper dir_to_symlink \
+	/var/lib/netdata/www/static /usr/share/netdata/www/static 1.18.1~ netdata -- "$@"

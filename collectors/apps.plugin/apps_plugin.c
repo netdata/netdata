@@ -2569,7 +2569,7 @@ static int collect_data_for_all_processes(void) {
 
     size_t new_procbase_size;
 
-    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
+    int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_PROC };
     if (unlikely(sysctl(mib, 3, NULL, &new_procbase_size, NULL, 0))) {
         error("sysctl error: Can't get processes data size");
         return 0;
@@ -3521,7 +3521,7 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     send_BEGIN(type, "uptime_avg", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
-            send_SET(w->name, w->processes?(w->uptime_sum / w->processes):0);
+            send_SET(w->name, w->uptime_sum / w->processes);
     }
     send_END();
 

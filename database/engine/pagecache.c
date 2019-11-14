@@ -209,9 +209,31 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
     pg_cache_release_pages_unsafe(ctx, number);
     uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 }
+
+/*
+ * This function returns the maximum number of pages allowed in the page cache.
+ * The caller must hold the page cache lock.
+ */
+unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
+{
+    /* it's twice the number of producers since we pin 2 pages per producer */
+    return ctx->max_cache_pages + 2 * (unsigned long)ctx->stats.metric_API_producers;
+}
+
+/*
+ * This function returns the low watermark number of pages in the page cache. The page cache should strive to keep the
+ * number of pages below that number.
+ * The caller must hold the page cache lock.
+ */
+unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
+{
+    /* it's twice the number of producers since we pin 2 pages per producer */
+    return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->stats.metric_API_producers;
+}
+
 /*
  * This function will block until it reserves #number populated pages.
- * It will trigger evictions or dirty page flushing if the ctx->max_cache_pages limit is hit.
+ * It will trigger evictions or dirty page flushing if the pg_cache_hard_limit() limit is hit.
  */
 static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
 {
@@ -223,10 +245,10 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
     assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1)
+    if (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1)
         debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
                 number);
-    while (pg_cache->populated_pages + number >= ctx->max_cache_pages + 1) {
+    while (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1) {
 
         if (!pg_cache_try_evict_one_page_unsafe(ctx)) {
             /* failed to evict */
@@ -260,7 +282,7 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 
 /*
  * This function will attempt to reserve #number populated pages.
- * It may trigger evictions if the ctx->cache_pages_low_watermark limit is hit.
+ * It may trigger evictions if the pg_cache_soft_limit() limit is hit.
  * Returns 0 on failure and 1 on success.
  */
 static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
@@ -272,7 +294,7 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
     assert(number < ctx->max_cache_pages);
 
     uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= ctx->cache_pages_low_watermark + 1) {
+    if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
         debug(D_RRDENGINE,
               "==Page cache full. Trying to reserve %u pages.==",
               number);
@@ -280,11 +302,11 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
             if (!pg_cache_try_evict_one_page_unsafe(ctx))
                 break;
             ++count;
-        } while (pg_cache->populated_pages + number >= ctx->cache_pages_low_watermark + 1);
+        } while (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1);
         debug(D_RRDENGINE, "Evicted %u pages.", count);
     }
 
-    if (pg_cache->populated_pages + number < ctx->max_cache_pages + 1) {
+    if (pg_cache->populated_pages + number < pg_cache_hard_limit(ctx) + 1) {
         pg_cache->populated_pages += number;
         ret = 1; /* success */
     }
@@ -1007,14 +1029,14 @@ static void init_replaceQ(struct rrdengine_instance *ctx)
     assert(0 == uv_rwlock_init(&pg_cache->replaceQ.lock));
 }
 
-static void init_commited_page_index(struct rrdengine_instance *ctx)
+static void init_committed_page_index(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
-    pg_cache->commited_page_index.JudyL_array = (Pvoid_t) NULL;
-    assert(0 == uv_rwlock_init(&pg_cache->commited_page_index.lock));
-    pg_cache->commited_page_index.latest_corr_id = 0;
-    pg_cache->commited_page_index.nr_commited_pages = 0;
+    pg_cache->committed_page_index.JudyL_array = (Pvoid_t) NULL;
+    assert(0 == uv_rwlock_init(&pg_cache->committed_page_index.lock));
+    pg_cache->committed_page_index.latest_corr_id = 0;
+    pg_cache->committed_page_index.nr_committed_pages = 0;
 }
 
 void init_page_cache(struct rrdengine_instance *ctx)
@@ -1027,7 +1049,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
 
     init_metrics_index(ctx);
     init_replaceQ(ctx);
-    init_commited_page_index(ctx);
+    init_committed_page_index(ctx);
 }
 
 void free_page_cache(struct rrdengine_instance *ctx)
@@ -1040,9 +1062,9 @@ void free_page_cache(struct rrdengine_instance *ctx)
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
-    /* Free commited page index */
-    ret_Judy = JudyLFreeArray(&pg_cache->commited_page_index.JudyL_array, PJE0);
-    assert(NULL == pg_cache->commited_page_index.JudyL_array);
+    /* Free committed page index */
+    ret_Judy = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
+    assert(NULL == pg_cache->committed_page_index.JudyL_array);
     bytes_freed += ret_Judy;
 
     for (page_index = pg_cache->metrics_index.last_page_index ;

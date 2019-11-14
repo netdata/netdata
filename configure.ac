@@ -748,6 +748,22 @@ fi
 AC_MSG_RESULT([${enable_plugin_xenstat}])
 AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"])
 
+if test "${enable_plugin_xenstat}" == "yes"; then
+    AC_MSG_CHECKING([for xenstat_vbd_error in -lxenstat])
+    AC_TRY_LINK(
+        [ #include <xenstat.h> ],
+        [
+            xenstat_vbd * vbd;
+            int out = xenstat_vbd_error(vbd);
+        ],
+        [
+            have_xenstat_vbd_error=yes
+            AC_DEFINE([HAVE_XENSTAT_VBD_ERROR], [1], [xenstat_vbd_error usability])
+        ],
+        [ have_xenstat_vbd_error=no ]
+    )
+    AC_MSG_RESULT([${have_xenstat_vbd_error}])
+fi
 
 # -----------------------------------------------------------------------------
 # perf.plugin
@@ -1130,6 +1146,31 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 
+# -----------------------------------------------------------------------------
+# Check if cmocka is available - needed for unit testing
+
+AC_ARG_ENABLE(
+     [unit-tests],
+     [AS_HELP_STRING([--disable-unit-tests],
+                     [Disables building and running the unit tests suite])],
+     [],
+     [enable_unit_tests="yes"]
+)
+
+PKG_CHECK_MODULES(
+    [CMOCKA],
+    [cmocka],
+    [have_cmocka="yes"],
+    [AC_MSG_NOTICE([CMocka not found on the system. Unit tests disabled])]
+)
+AM_CONDITIONAL([ENABLE_UNITTESTS], [test "${enable_unit_tests}" = "yes" -a "${have_cmocka}" = "yes" ])
+AC_SUBST([ENABLE_UNITTESTS])
+
+TEST_CFLAGS="${CFLAGS} ${CMOCKA_CFLAGS}"
+TEST_LIBS="${CMOCKA_LIBS}"
+
+AC_SUBST([TEST_CFLAGS])
+AC_SUBST([TEST_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
@@ -1172,6 +1213,7 @@ AC_CONFIG_FILES([
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile
+    libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
@@ -1188,6 +1230,7 @@ AC_CONFIG_FILES([
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile
     libnetdata/storage_number/Makefile
+    libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
     libnetdata/json/Makefile

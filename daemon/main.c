@@ -96,22 +96,69 @@ void web_server_threading_selection(void) {
     }
 }
 
-void web_server_config_options(void) {
-    web_client_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
-    web_client_first_request_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
-    web_client_streaming_rate_t = config_get_number(CONFIG_SECTION_WEB, "accept a streaming request every seconds", web_client_streaming_rate_t);
+int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p)
+{
+    char *value = config_get(section_name,config_name,default_value);
+    if(!strcmp("yes",value))
+        return 1;
+    if(!strcmp("no",value))
+        return 0;
+    if(strcmp("heuristic",value))
+        error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
+              value, section_name, config_name);
+    return simple_pattern_is_potential_name(p);
+}
 
-    respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
+void web_server_config_options(void)
+{
+    web_client_timeout =
+        (int)config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
+    web_client_first_request_timeout =
+        (int)config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
+    web_client_streaming_rate_t =
+        config_get_number(CONFIG_SECTION_WEB, "accept a streaming request every seconds", web_client_streaming_rate_t);
+
+    respect_web_browser_do_not_track_policy =
+        config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
     web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
-    if(!*web_x_frame_options) web_x_frame_options = NULL;
+    if(!*web_x_frame_options)
+        web_x_frame_options = NULL;
 
-    web_allow_connections_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_dashboard_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_badges_from      = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_registry_from    = simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from", "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_mgmt_from        = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_connections_from =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
+                              NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_connections_dns  =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
+    web_allow_dashboard_from   =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
+                              NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_dashboard_dns    =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
+    web_allow_badges_from      =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_badges_dns       =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
+    web_allow_registry_from    =
+        simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow by dns", "heuristic",
+                                                   web_allow_registry_from);
+    web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"),
+                                                       NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic",
+                                                   web_allow_streaming_from);
+    // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
+    web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from",
+                                                       "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
+                                                       " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
+                                                       " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
+                                                       " 172.31.*"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_netdataconf_dns  =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_mgmt_from);
+    web_allow_mgmt_from        =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
+                              NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_mgmt_dns         =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
 
 #ifdef NETDATA_WITH_ZLIB
@@ -146,44 +193,26 @@ void web_server_config_options(void) {
 }
 
 
-int killpid(pid_t pid, int signal)
-{
-    int ret = -1;
+// killpid kills pid with SIGTERM.
+int killpid(pid_t pid) {
+    int ret;
     debug(D_EXIT, "Request to kill pid %d", pid);
 
     errno = 0;
-    if(kill(pid, 0) == -1) {
+    ret = kill(pid, SIGTERM);
+    if (ret == -1) {
         switch(errno) {
             case ESRCH:
-                error("Request to kill pid %d, but it is not running.", pid);
-                break;
+                // We wanted the process to exit so just let the caller handle.
+                return ret;
 
             case EPERM:
-                error("Request to kill pid %d, but I do not have enough permissions.", pid);
+                error("Cannot kill pid %d, but I do not have enough permissions.", pid);
                 break;
 
             default:
-                error("Request to kill pid %d, but I received an error.", pid);
+                error("Cannot kill pid %d, but I received an error.", pid);
                 break;
-        }
-    }
-    else {
-        errno = 0;
-        ret = kill(pid, signal);
-        if(ret == -1) {
-            switch(errno) {
-                case ESRCH:
-                    error("Cannot kill pid %d, but it is not running.", pid);
-                    break;
-
-                case EPERM:
-                    error("Cannot kill pid %d, but I do not have enough permissions.", pid);
-                    break;
-
-                default:
-                    error("Cannot kill pid %d, but I received an error.", pid);
-                    break;
-            }
         }
     }
 
@@ -306,7 +335,13 @@ int help(int exitcode) {
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
             "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
+#ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
+            "  -W stresstest=A,B,C,D,E  Run a DB engine stress test for A seconds,\n"
+            "                           with B writers and C readers, with a ramp up\n"
+            "                           time of D seconds for writers, a page cache\n"
+            "                           size of E MiB, and exit.\n\n"
+#endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
@@ -719,7 +754,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
                 char n[51], v[101];
                 snprintfz(n, 50,"%s",name);
-                snprintfz(v, 101,"%s",value);
+                snprintfz(v, 100,"%s",value);
                 if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
                     info("Unexpected environment variable %s=%s", n, v);
                 }
@@ -886,7 +921,10 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+#ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
+                        char* stresstest_string = "stresstest=";
+#endif
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -905,14 +943,33 @@ int main(int argc, char **argv) {
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
+#ifdef ENABLE_DBENGINE
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
-#ifdef ENABLE_DBENGINE
-                            unsigned history_seconds = (unsigned )strtoull(optarg, NULL, 0);
+                            unsigned history_seconds = strtoul(optarg, NULL, 0);
                             generate_dbengine_dataset(history_seconds);
-#endif
                             return 0;
                         }
+                        else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
+                            char *endptr;
+                            unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
+                            page_cache_mb = 0;
+
+                            optarg += strlen(stresstest_string);
+                            test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
+                            if (',' == *endptr)
+                                dset_charts = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                query_threads = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                ramp_up_seconds = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
+                                                 page_cache_mb);
+                            return 0;
+                        }
+#endif
                         else if(strcmp(optarg, "simple-pattern") == 0) {
                             if(optind + 2 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W simple-pattern 'pattern' 'string'\n\n"

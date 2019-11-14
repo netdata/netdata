@@ -39,7 +39,18 @@ by running `/etc/netdata/edit-config health_alarm_notify.conf`:
      all notification methods except email, require some configuration
      (i.e. API keys, tokens, destination rooms, channels, etc).
 
-2.  **recipients** per **role** per **notification method**
+-  **recipients** per **role** per **notification method**
+
+```sh
+grep sysadmin /etc/netdata/health_alarm_notify.conf
+
+role_recipients_email[sysadmin]="${DEFAULT_RECIPIENT_EMAIL}"
+role_recipients_pushover[sysadmin]="${DEFAULT_RECIPIENT_PUSHOVER}"
+role_recipients_pushbullet[sysadmin]="${DEFAULT_RECIPIENT_PUSHBULLET}"
+role_recipients_telegram[sysadmin]="${DEFAULT_RECIPIENT_TELEGRAM}"
+role_recipients_slack[sysadmin]="${DEFAULT_RECIPIENT_SLACK}"
+...
+```
 
 ## Testing Notifications
 

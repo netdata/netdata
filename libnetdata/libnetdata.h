@@ -65,6 +65,7 @@
 #include <getopt.h>
 #include <grp.h>
 #include <pwd.h>
+#include <limits.h>
 #include <locale.h>
 #include <net/if.h>
 #include <poll.h>

@@ -160,7 +160,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
     RRDCALC *rrdc;
     for (rrdc = host->alarms_with_foreach; rrdc ; rrdc = rrdc->next) {
         if (simple_pattern_matches(rrdc->spdim, rd->id) || simple_pattern_matches(rrdc->spdim, rd->name)) {
-            if (!strcmp(rrdc->chart, st->name)) {
+            if (rrdc->hash_chart == st->hash_name || !strcmp(rrdc->chart, st->name) || !strcmp(rrdc->chart, st->id)) {
                 char *usename = alarm_name_with_dim(rrdc->name, strlen(rrdc->name), rd->name, strlen(rd->name));
                 if (usename) {
                     if(rrdcalc_exists(host, st->name, usename, 0, 0)){
@@ -186,6 +186,7 @@ void rrdcalc_link_to_rrddim(RRDDIM *rd, RRDSET *st, RRDHOST *host) {
 }
 
 RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collected_number multiplier, collected_number divisor, RRD_ALGORITHM algorithm, RRD_MEMORY_MODE memory_mode) {
+    RRDHOST *host = st->rrdhost;
     rrdset_wrlock(st);
 
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
@@ -204,7 +205,6 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         return rd;
     }
 
-    RRDHOST *host = st->rrdhost;
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
 
@@ -217,9 +217,9 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
     if(memory_mode == RRD_MEMORY_MODE_SAVE || memory_mode == RRD_MEMORY_MODE_MAP ||
-       memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+       memory_mode == RRD_MEMORY_MODE_RAM) {
         rd = (RRDDIM *)mymmap(
-                  (memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE)?NULL:fullfilename
+                  (memory_mode == RRD_MEMORY_MODE_RAM) ? NULL : fullfilename
                 , size
                 , ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE)
                 , 1
@@ -240,7 +240,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
             struct timeval now;
             now_realtime_timeval(&now);
 
-            if(memory_mode == RRD_MEMORY_MODE_RAM || memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+            if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(rd, 0, size);
             }
             else {
@@ -292,7 +292,10 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(!rd)) {
         // if we didn't manage to get a mmap'd dimension, just create one
         rd = callocz(1, size);
-        rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
+        if (memory_mode == RRD_MEMORY_MODE_DBENGINE)
+            rd->rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
+        else
+            rd->rrd_memory_mode = (memory_mode == RRD_MEMORY_MODE_NONE) ? RRD_MEMORY_MODE_NONE : RRD_MEMORY_MODE_ALLOC;
     }
 
     rd->memsize = size;
@@ -400,13 +403,28 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
     if(unlikely(rrddim_index_add(st, rd) != rd))
         error("RRDDIM: INTERNAL ERROR: attempt to index duplicate dimension '%s' on chart '%s'", rd->id, st->id);
 
-    if(host->alarms_with_foreach || host->alarms_template_with_foreach) {
-        rrdhost_wrlock(host);
-        rrdcalc_link_to_rrddim(rd, st, host);
+    if (host->alarms_with_foreach || host->alarms_template_with_foreach) {
+        int count = 0;
+        int hostlocked;
+        for (count = 0 ; count < 5 ; count++) {
+            hostlocked = netdata_rwlock_trywrlock(&host->rrdhost_rwlock);
+            if (!hostlocked) {
+                rrdcalc_link_to_rrddim(rd, st, host);
+                rrdhost_unlock(host);
+                break;
+            } else if (hostlocked != EBUSY) {
+                error("Cannot lock host to create an alarm for the dimension.");
+            }
+            usleep(200000);
+        }
 
-        rrdhost_unlock(host);
+        if (count == 5) {
+            error("Failed to create an alarm for dimension %s of chart %s 5 times. Skipping alarm."
+            , rd->name, st->name);
+        }
     }
     rrdset_unlock(st);
+
     return(rd);
 }
 
@@ -445,7 +463,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
         case RRD_MEMORY_MODE_SAVE:
         case RRD_MEMORY_MODE_MAP:
         case RRD_MEMORY_MODE_RAM:
-        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Unmapping dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);
@@ -454,6 +471,7 @@ void rrddim_free(RRDSET *st, RRDDIM *rd)
 
         case RRD_MEMORY_MODE_ALLOC:
         case RRD_MEMORY_MODE_NONE:
+        case RRD_MEMORY_MODE_DBENGINE:
             debug(D_RRD_CALLS, "Removing dimension '%s'.", rd->name);
             freez((void *)rd->id);
             freez(rd->cache_filename);

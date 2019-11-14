@@ -158,6 +158,8 @@ USAGE: ${PROGRAM} [options]
   --disable-go               Disable installation of go.d.plugin.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
+  --disable-https            Explicitly disable TLS support
+  --disable-dbengine         Explicitly disable DB engine support
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
   --disable-plugin-nfacct
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available
@@ -212,6 +214,8 @@ while [ -n "${1}" ]; do
 		"--stable-channel") RELEASE_CHANNEL="stable";;
 		"--enable-plugin-freeipmi")  NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi";;
 		"--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi";;
+		"--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https";;
+		"--disable-dbengine") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-dbengine/} --disable-dbengine";;
 		"--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct";;
 		"--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct";;
 		"--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat";;
@@ -586,7 +590,7 @@ if [ "${UID}" = "0" ]; then
 	ROOT_USER="root"
 else
 	NETDATA_USER="${USER}"
-	ROOT_USER="${NETDATA_USER}"
+	ROOT_USER="${USER}"
 fi
 NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
@@ -644,19 +648,6 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]; then
 	# this is needed if NETDATA_PREFIX is not empty
 	run mkdir -p "${NETDATA_RUN_DIR}" || exit 1
 fi
-
-# --- conf dir ----
-
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d" "ssl"; do
-	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
-		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
-		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
-	fi
-done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
-run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
-run chmod 755 "${NETDATA_USER_CONFIG_DIR}/edit-config"
 
 # --- stock conf dir ----
 
@@ -881,7 +872,20 @@ progress "Install netdata at system init"
 NETDATA_START_CMD="${NETDATA_PREFIX}/usr/sbin/netdata"
 
 if grep -q docker /proc/1/cgroup >/dev/null 2>&1; then
-	echo >&2 "We are running within a docker container, will not be installing netdata service"
+	# If docker runs systemd for some weird reason, let the install proceed
+	is_systemd_running="NO"
+	if command -v pidof >/dev/null 2>&1; then
+		is_systemd_running="$(pidof /usr/sbin/init || pidof systemd || echo "NO")"
+	else
+		is_systemd_running="$( (ps -p 1 | grep -q systemd && echo "1") || echo "NO")"
+	fi
+
+	if [ "${is_systemd_running}" == "1" ]; then
+		echo >&2 "Found systemd within the docker container, running install_netdata_service() method"
+		install_netdata_service || run_failed "Cannot install netdata init service."
+	else
+		echo >&2 "We are running within a docker container, will not be installing netdata service"
+	fi
 	echo >&2
 else
 	install_netdata_service || run_failed "Cannot install netdata init service."
@@ -903,10 +907,7 @@ else
 	run_ok "netdata started!"
 	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 fi
-if [ "${UID}" -eq 0 ]; then
-	run chown "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
-fi
-run chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 
 if [ "$(uname)" = "Linux" ]; then
 	# -------------------------------------------------------------------------
@@ -1037,63 +1038,20 @@ END
 echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-uninstaller.sh${TPUT_RESET}"
 echo >&2
 
-progress "Install netdata updater tool"
+# -----------------------------------------------------------------------------
+progress "Installing (but not enabling) the netdata updater tool"
+cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
+install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
-if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh ]; then
-	echo >&2 "Removing updater from previous location"
-	rm -f "${NETDATA_PREFIX}"/usr/libexec/netdata-updater.sh
-fi
-
-if [ -f "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" ]; then
-	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${INSTALLER_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || exit 1
+progress "Check if we must enable/disable the netdata updater tool"
+if [ "${AUTOUPDATE}" = "1" ]; then
+	enable_netdata_updater || run_failed "Cannot enable netdata updater tool"
 else
-	sed "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" > "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || exit 1
+	disable_netdata_updater || run_failed "Cannot disable netdata updater tool"
 fi
 
-chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh
-echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh${TPUT_RESET}"
-echo >&2
 
-# Figure out the cron directory for the distro
-crondir=
-[ -d "/etc/periodic/daily" ] && crondir="/etc/periodic/daily"
-[ -d "/etc/cron.daily" ] && crondir="/etc/cron.daily"
-
-if [ -z "${crondir}" ]; then
-	echo >&2 "Cannot figure out the cron directory to handle netdata-updater.sh activation/deactivation"
-elif [ "${UID}" -ne "0" ]; then
-	# We cant touch cron if we are not running as root
-	echo >&2 "You need to run the installer as root for auto-updating via cron."
-else
-	progress "Check if we must enable/disable the netdata updater"
-	if [ "${AUTOUPDATE}" = "1" ]; then
-		if [ -f "${crondir}/netdata-updater.sh" ]; then
-			progress "Removing incorrect netdata-updater filename in cron"
-			rm -f "${crondir}/netdata-updater.sh"
-		fi
-
-		echo >&2 "Adding to cron"
-
-		rm -f "${crondir}/netdata-updater"
-		ln -sf "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" "${crondir}/netdata-updater"
-
-		echo >&2 "Auto-updating has been enabled. Updater script linked to: ${TPUT_RED}${TPUT_BOLD}${crondir}/netdata-update${TPUT_RESET}"
-		echo >&2
-		echo >&2 "${TPUT_DIM}${TPUT_BOLD}netdata-updater.sh${TPUT_RESET}${TPUT_DIM} works from cron. It will trigger an email from cron"
-		echo >&2 "only if it fails (it should not print anything when it can update netdata).${TPUT_RESET}"
-	else
-		echo >&2 "You chose *NOT* to enable auto-update, removing any links to the updater from cron (it may have happened if you are reinstalling)"
-		echo >&2
-
-		if [ -f "${crondir}/netdata-updater" ]; then
-			echo >&2 "Removing cron reference: ${crondir}/netdata-updater"
-			rm -f "${crondir}/netdata-updater"
-		else
-			echo >&2 "Did not find any cron entries to remove"
-		fi
-	fi
-fi
-
+# -----------------------------------------------------------------------------
 progress "Wrap up environment set up"
 
 # Save environment variables
@@ -1112,6 +1070,7 @@ RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
 EOF
+run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 
 echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
 cat <<EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"

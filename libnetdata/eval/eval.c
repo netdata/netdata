@@ -176,7 +176,7 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
 
     *error = EVAL_ERROR_UNKNOWN_VARIABLE;
     buffer_sprintf(exp->error_msg, "[ undefined variable '%s' ] ", v->name);
-    return 0;
+    return NAN;
 }
 
 static inline calculated_number eval_value(EVAL_EXPRESSION *exp, EVAL_VALUE *v, int *error) {

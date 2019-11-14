@@ -117,6 +117,14 @@ GLOBAL_STATS = [
     'Connection_errors_peer_address',
     'Connection_errors_select',
     'Connection_errors_tcpwrap',
+    'Com_delete',
+    'Com_insert',
+    'Com_select',
+    'Com_update',
+    'Com_replace'
+]
+
+GALERA_STATS = [
     'wsrep_local_recv_queue',
     'wsrep_local_send_queue',
     'wsrep_received',
@@ -126,11 +134,14 @@ GLOBAL_STATS = [
     'wsrep_local_bf_aborts',
     'wsrep_local_cert_failures',
     'wsrep_flow_control_paused_ns',
-    'Com_delete',
-    'Com_insert',
-    'Com_select',
-    'Com_update',
-    'Com_replace'
+    'wsrep_cluster_weight',
+    'wsrep_cluster_size',
+    'wsrep_cluster_status',
+    'wsrep_local_state',
+    'wsrep_open_transactions',
+    'wsrep_connected',
+    'wsrep_ready',
+    'wsrep_thread_count'
 ]
 
 
@@ -216,7 +227,15 @@ ORDER = [
     'galera_queue',
     'galera_conflicts',
     'galera_flow_control',
-    'userstats_cpu'
+    'galera_cluster_status',
+    'galera_cluster_state',
+    'galera_cluster_size',
+    'galera_cluster_weight',
+    'galera_connected',
+    'galera_ready',
+    'galera_open_transactions',
+    'galera_thread_count',
+    'userstats_cpu',
 ]
 
 CHARTS = {
@@ -594,6 +613,58 @@ CHARTS = {
             ['wsrep_flow_control_paused_ns', 'paused', 'incremental', 1, 1000000],
         ]
     },
+    'galera_cluster_status': {
+        'options': [None, 'Cluster Component Status', 'status', 'galera', 'mysql.galera_cluster_status', 'line'],
+        'lines': [
+            ['wsrep_cluster_status', 'status', 'absolute'],
+        ]
+    },
+    'galera_cluster_state': {
+        'options': [None, 'Cluster Component State', 'state', 'galera', 'mysql.galera_cluster_state', 'line'],
+        'lines': [
+            ['wsrep_local_state', 'state', 'absolute'],
+        ]
+    },
+    'galera_cluster_size': {
+        'options': [None, 'Number of Nodes in the Cluster', 'num', 'galera', 'mysql.galera_cluster_size', 'line'],
+        'lines': [
+            ['wsrep_cluster_size', 'nodes', 'absolute'],
+        ]
+    },
+    'galera_cluster_weight': {
+        'options': [None, 'The Total Weight of the Current Members in the Cluster', 'weight', 'galera',
+                    'mysql.galera_cluster_weight', 'line'],
+        'lines': [
+            ['wsrep_cluster_weight', 'weight', 'absolute'],
+        ]
+    },
+    'galera_connected': {
+        'options': [None, 'Whether the Node is Connected to the Cluster', 'boolean', 'galera',
+                    'mysql.galera_connected', 'line'],
+        'lines': [
+            ['wsrep_connected', 'connected', 'absolute'],
+        ]
+    },
+    'galera_ready': {
+        'options': [None, 'Whether the Node is Ready to Accept Queries', 'boolean', 'galera',
+                    'mysql.galera_ready', 'line'],
+        'lines': [
+            ['wsrep_ready', 'ready', 'absolute'],
+        ]
+    },
+    'galera_open_transactions': {
+        'options': [None, 'Open Transactions', 'num', 'galera', 'mysql.galera_open_transactions', 'line'],
+        'lines': [
+            ['wsrep_open_transactions', 'open transactions', 'absolute'],
+        ]
+    },
+    'galera_thread_count': {
+        'options': [None, 'Total Number of WSRep (applier/rollbacker) Threads', 'num', 'galera',
+                    'mysql.galera_thread_count', 'line'],
+        'lines': [
+            ['wsrep_thread_count', 'threads', 'absolute'],
+        ]
+    },
     'userstats_cpu': {
         'options': [None, 'Users CPU time', 'percentage', 'userstats', 'mysql.userstats_cpu', 'stacked'],
         'lines': []
@@ -663,6 +734,59 @@ def userstats_chart_template(name):
 DEFAULT_REPL_CHANNEL = ''
 
 
+# Write Set REPlication
+# https://galeracluster.com/library/documentation/galera-status-variables.html
+# https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html
+class WSRepDataConverter:
+    unknown_value = -1
+
+    def convert(self, key, value):
+        if key == 'wsrep_connected':
+            return self.convert_connected(value)
+        elif key == 'wsrep_ready':
+            return self.convert_ready(value)
+        elif key == 'wsrep_cluster_status':
+            return self.convert_cluster_status(value)
+        return value
+
+    def convert_connected(self, value):
+        # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_connected
+        if value == 'OFF':
+            return 0
+        if value == 'ON':
+            return 1
+        return self.unknown_value
+
+    def convert_ready(self, value):
+        # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_ready
+        if value == 'OFF':
+            return 0
+        if value == 'ON':
+            return 1
+        return self.unknown_value
+
+    def convert_cluster_status(self, value):
+        # https://www.percona.com/doc/percona-xtradb-cluster/LATEST/wsrep-status-index.html#wsrep_cluster_status
+        # https://github.com/codership/wsrep-API/blob/eab2d5d5a31672c0b7d116ef1629ff18392fd7d0/wsrep_api.h
+        # typedef enum wsrep_view_status {
+        #     WSREP_VIEW_PRIMARY,      //!< primary group configuration (quorum present)
+        #     WSREP_VIEW_NON_PRIMARY,  //!< non-primary group configuration (quorum lost)
+        #     WSREP_VIEW_DISCONNECTED, //!< not connected to group, retrying.
+        #     WSREP_VIEW_MAX
+        # } wsrep_view_status_t;
+        value = value.lower()
+        if value == 'primary':
+            return 0
+        elif value == 'non-primary':
+            return 1
+        elif value == 'disconnected':
+            return 2
+        return self.unknown_value
+
+
+wsrep_converter = WSRepDataConverter()
+
+
 class Service(MySQLService):
     def __init__(self, configuration=None, name=None):
         MySQLService.__init__(self, configuration=configuration, name=name)
@@ -686,12 +810,9 @@ class Service(MySQLService):
         data = dict()
 
         if 'global_status' in raw_data:
-            global_status = dict(raw_data['global_status'][0])
-            for key in GLOBAL_STATS:
-                if key in global_status:
-                    data[key] = global_status[key]
-            if 'Threads_created' in data and 'Connections' in data:
-                data['Thread_cache_misses'] = round(int(data['Threads_created']) / float(data['Connections']) * 10000)
+            global_status = self.get_global_status(raw_data['global_status'])
+            if global_status:
+                data.update(global_status)
 
         if 'slave_status' in raw_data:
             status = self.get_slave_status(raw_data['slave_status'])
@@ -711,6 +832,52 @@ class Service(MySQLService):
                     data[key] = variables[key]
 
         return data or None
+
+    @staticmethod
+    def convert_wsrep(key, value):
+        return wsrep_converter.convert(key, value)
+
+    def get_global_status(self, raw_global_status):
+        # (
+        #     (
+        #         ('Aborted_clients', '18'),
+        #         ('Aborted_connects', '33'),
+        #         ('Access_denied_errors', '80'),
+        #         ('Acl_column_grants', '0'),
+        #         ('Acl_database_grants', '0'),
+        #         ('Acl_function_grants', '0'),
+        #         ('wsrep_ready', 'OFF'),
+        #         ('wsrep_rollbacker_thread_count', '0'),
+        #         ('wsrep_thread_count', '0')
+        #     ),
+        #     (
+        #         ('Variable_name', 253, 60, 64, 64, 0, 0),
+        #         ('Value', 253, 48, 2048, 2048, 0, 0),
+        #     )
+        # )
+        rows = raw_global_status[0]
+        if not rows:
+            return
+
+        global_status = dict(rows)
+        data = dict()
+
+        for key in GLOBAL_STATS:
+            if key not in global_status:
+                continue
+            value = global_status[key]
+            data[key] = value
+
+        for key in GALERA_STATS:
+            if key not in global_status:
+                continue
+            value = global_status[key]
+            value = self.convert_wsrep(key, value)
+            data[key] = value
+
+        if 'Threads_created' in data and 'Connections' in data:
+            data['Thread_cache_misses'] = round(int(data['Threads_created']) / float(data['Connections']) * 10000)
+        return data
 
     def get_slave_status(self, slave_status_data):
         rows, description = slave_status_data[0], slave_status_data[1]
@@ -742,41 +909,39 @@ class Service(MySQLService):
         self.add_new_charts(slave_status_chart_template, name)
 
     def get_userstats(self, raw_data):
-        # raw_data['user_statistics'] contains the following data structure:
-        #   (
-        #       (
-        #           ('netdata', 42L, 0L, 1264L, 3.111252999999968, 2.968510299999994, 110267L, 19741424L, 0L, 0L, 1265L, 0L,
-        #           0L, 0L, 3L, 0L, 1301L, 0L, 0L, 7633L, 0L, 83L, 44L, 0L, 0L),
-        #           ('root', 60L, 0L, 184L, 0.22856499999999966, 0.1601419999999998, 11605L, 1516513L, 0L, 9L, 220L, 0L, 2L, 1L,
-        #           6L, 4L,127L, 0L, 0L, 45L, 0L, 45L, 0L, 0L, 0L)
-        #        ),
-        #    (
-        #        ('User', 253, 9, 128, 128, 0, 0),
-        #        ('Total_connections', 3, 2, 11, 11, 0, 0),
-        #        ('Concurrent_connections', 3, 1, 11, 11, 0, 0),
-        #        ('Connected_time', 3, 4, 11, 11, 0, 0),
-        #        ('Busy_time', 5, 21, 21, 21, 31, 0),
-        #        ('Cpu_time', 5, 18, 21, 21, 31, 0),
-        #        ('Bytes_received', 8, 6, 21, 21, 0, 0),
-        #        ('Bytes_sent', 8, 8, 21, 21, 0, 0),
-        #        ('Binlog_bytes_written', 8, 1, 21, 21, 0, 0),
-        #        ('Rows_read', 8, 1, 21, 21, 0, 0),
-        #        ('Rows_sent', 8, 4, 21, 21, 0, 0),
-        #        ('Rows_deleted', 8, 1, 21, 21, 0, 0),
-        #        ('Rows_inserted', 8, 1, 21, 21, 0, 0),
-        #        ('Rows_updated', 8, 1, 21, 21, 0, 0),
-        #        ('Select_commands', 8, 1, 21, 21, 0, 0),
-        #        ('Update_commands', 8, 1, 21, 21, 0, 0),
-        #        ('Other_commands', 8, 4, 21, 21, 0, 0),
-        #        ('Commit_transactions', 8, 1, 21, 21, 0, 0),
-        #        ('Rollback_transactions', 8, 1, 21, 21, 0, 0),
-        #        ('Denied_connections', 8, 4, 21, 21, 0, 0),
-        #        ('Lost_connections', 8, 1, 21, 21, 0, 0),
-        #        ('Access_denied', 8, 2, 21, 21, 0, 0),
-        #        ('Empty_queries', 8, 2, 21, 21, 0, 0),
-        #        ('Total_ssl_connections', 8, 1, 21, 21, 0, 0),
-        #        ('Max_statement_time_exceeded', 8, 1, 21, 21, 0, 0)),
-        #   )
+        # (
+        #     (
+        #         ('netdata', 1L, 0L, 60L, 0.15842499999999984, 0.15767439999999996, 5206L, 963957L, 0L, 0L,
+        #          61L, 0L, 0L, 0L, 0L, 0L, 62L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
+        #     ),
+        #     (
+        #         ('User', 253, 7, 128, 128, 0, 0),
+        #         ('Total_connections', 3, 2, 11, 11, 0, 0),
+        #         ('Concurrent_connections', 3, 1, 11, 11, 0, 0),
+        #         ('Connected_time', 3, 2, 11, 11, 0, 0),
+        #         ('Busy_time', 5, 20, 21, 21, 31, 0),
+        #         ('Cpu_time', 5, 20, 21, 21, 31, 0),
+        #         ('Bytes_received', 8, 4, 21, 21, 0, 0),
+        #         ('Bytes_sent', 8, 6, 21, 21, 0, 0),
+        #         ('Binlog_bytes_written', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_read', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_sent', 8, 2, 21, 21, 0, 0),
+        #         ('Rows_deleted', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_inserted', 8, 1, 21, 21, 0, 0),
+        #         ('Rows_updated', 8, 1, 21, 21, 0, 0),
+        #         ('Select_commands', 8, 2, 21, 21, 0, 0),
+        #         ('Update_commands', 8, 1, 21, 21, 0, 0),
+        #         ('Other_commands', 8, 2, 21, 21, 0, 0),
+        #         ('Commit_transactions', 8, 1, 21, 21, 0, 0),
+        #         ('Rollback_transactions', 8, 1, 21, 21, 0, 0),
+        #         ('Denied_connections', 8, 1, 21, 21, 0, 0),
+        #         ('Lost_connections', 8, 1, 21, 21, 0, 0),
+        #         ('Access_denied', 8, 1, 21, 21, 0, 0),
+        #         ('Empty_queries', 8, 2, 21, 21, 0, 0),
+        #         ('Total_ssl_connections', 8, 1, 21, 21, 0, 0),
+        #         ('Max_statement_time_exceeded', 8, 1, 21, 21, 0, 0)
+        #     )
+        # )
         data = dict()
         userstats_vars = [e[0] for e in raw_data['user_statistics'][1]]
         for i, _ in enumerate(raw_data['user_statistics'][0]):

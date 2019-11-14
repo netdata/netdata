@@ -516,7 +516,14 @@ netdataDashboard.menu = {
         title: 'HDFS',
         icon: '<i class="fas fa-folder-open"></i>',
         info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
+    },
+    
+    'am2320': {
+        title: 'AM2320 Sensor',
+        icon: '<i class="fas fa-thermometer-half"></i>',
+        info: 'Readings from the external AM2320 Sensor.'
     }
+
 };
 
 
@@ -1260,6 +1267,39 @@ netdataDashboard.context = {
         info: 'A deadlock happens when two or more transactions mutually hold and request for locks, creating a cycle of dependencies. For more information about <a href="https://dev.mysql.com/doc/refman/5.7/en/innodb-deadlocks-handling.html" target="_blank">how to minimize and handle deadlocks</a>.'
     },
 
+    'mysql.galera_cluster_status': {
+        info:
+            '<code>-1</code>: unknown, ' +
+            '<code>0</code>: primary (primary group configuration, quorum present), ' +
+            '<code>1</code>: non-primary (non-primary group configuration, quorum lost), ' +
+            '<code>2</code>: disconnected(not connected to group, retrying).'
+    },
+
+    'mysql.galera_cluster_state': {
+        info:
+            '<code>0</code>: undefined, ' +
+            '<code>1</code>: joining, ' +
+            '<code>2</code>: donor/desynced, ' +
+            '<code>3</code>: joined, ' +
+            '<code>4</code>: synced.'
+    },
+
+    'mysql.galera_cluster_weight': {
+        info: 'The value is counted as a sum of <code>pc.weight</code> of the nodes in the current Primary Component.'
+    },
+
+    'mysql.galera_connected': {
+        info: '<code>0</code> means that the node has not yet connected to any of the cluster components. ' +
+            'This may be due to misconfiguration.'
+    },
+
+    'mysql.open_transactions': {
+        info: 'The number of locally running transactions which have been registered inside the wsrep provider. ' +
+            'This means transactions which have made operations which have caused write set population to happen. ' +
+            'Transactions which are read only are not counted.'
+    },
+
+
     // ------------------------------------------------------------------------
     // POSTGRESQL
 
@@ -1782,7 +1822,7 @@ netdataDashboard.context = {
     // web_log
 
     'web_log.response_statuses': {
-        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b> and <b>304</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b>, <code>other</code> are all the other responses.',
+        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>304</b> and <b>401</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b> except <b>401</b>, <code>other</code> are all the other responses.',
         mainheads: [
             function (os, id) {
                 void(os);

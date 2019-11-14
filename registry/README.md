@@ -122,6 +122,23 @@ Netdata v1.9+ support limiting access to the registry from given IPs, like this:
 
 Keep in mind that connections to Netdata API ports are filtered by `[web].allow connections from`. So, IPs allowed by `[registry].allow from` should also be allowed by `[web].allow connection from`.
 
+The patterns can be matches over IP addresses or FQDN of the host.
+In order to check the FQDN of the connection without opening the Netdata agent to DNS-spoofing, a reverse-dns record
+must be setup for the connecting host. At connection time the reverse-dns of the peer IP address is resolved, and
+a forward DNS resolution is made to validate the IP address against the name-pattern.
+
+Please note that this process can be expensive on a machine that is serving many connections. The behaviour of
+the pattern matching can be controlled with the following setting:
+```
+[registry]
+    allow by dns = heuristic
+```
+
+The settings are:
+* `yes` allows the pattern to match DNS names.
+* `no` disables DNS matching for the patterns (they only match IP addresses).
+* `heuristic` will estimate if the patterns should match FQDNs by the presence or absence of `:`s or alpha-characters.
+
 ### Where is the registry database stored?
 
 `/var/lib/netdata/registry/*.db`

@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	kavenegar/README.md \
-	kavenegar/Makefile.inc \
-	$(NULL)
+    kavenegar/README.md \
+    kavenegar/Makefile.inc \
+    $(NULL)
 

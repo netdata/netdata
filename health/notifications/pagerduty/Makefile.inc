@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	pagerduty/README.md \
-	pagerduty/Makefile.inc \
-	$(NULL)
+    pagerduty/README.md \
+    pagerduty/Makefile.inc \
+    $(NULL)
 

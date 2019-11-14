@@ -31,16 +31,16 @@ printhelp () {
 
 fix () {
 	if [ "$EXECUTE" -eq 0 ] ; then
-		echo "-- SHOULD EXECUTE: $1"
+		echo "   - SHOULD EXECUTE: $1"
 	else
-		dbg "-- EXECUTING: $1"
+		dbg "   - EXECUTING: $1"
 		eval "$1"
 	fi
 }
 
 testURL () {
 	if [ "$TESTURLS" -eq 0 ] ; then return 0 ; fi
-	dbg "-- Testing URL $1"
+	dbg "   - Testing URL $1"
 	curl -sS "$1" > /dev/null
 	if [ $? -gt 0 ] ; then
 		return 1
@@ -54,13 +54,13 @@ testinternal () {
 	ifile=${2}
 	ilnk=${3}
 	header=${ilnk//-/}
-	dbg "-- Searching for \"$header\" in $ifile"
+	dbg "   - Searching for \"$header\" in $ifile"
 	tr -d '[],_.:? `'< "$ifile" | sed 's/-//g' | grep -i "^\\#*$header\$" >/dev/null
 	if [ $? -eq 0 ] ; then
-		dbg "-- $ilnk found in $ifile"
+		dbg "   - $ilnk found in $ifile"
 		return 0
 	else
-		echo "-- ERROR: $ff - $ilnk header not found in file $ifile"
+		echo "   - ERROR: $ff - $ilnk header not found in file $ifile"
 		EXITCODE=1
 		return 1
 	fi
@@ -71,10 +71,10 @@ testf () {
 	tf=$2
 	
 	if [ -f "$tf" ] ; then 
-		dbg "-- $tf exists"
+		dbg "   - $tf exists"
 		return 0
 	else
-		echo "-- ERROR: $sf - $tf does not exist"
+		echo "   - ERROR: $sf - $tf does not exist"
 		EXITCODE=1
 		return 1
 	fi	
@@ -83,16 +83,16 @@ testf () {
 ck_netdata_relative () {
 	f=${1}
 	rlnk=${2}
-	dbg "-- Checking relative link $rlnk"
+	dbg "   - Checking relative link $rlnk"
 	fpath="."
 	fname="$f"
 	# First ensure that the link works in the repo, then try to fix it in htmldocs
 	if [[ $f =~ ^(.*)/([^/]*)$ ]] ; then
 		fpath="${BASH_REMATCH[1]}"
 		fname="${BASH_REMATCH[2]}"
-		dbg "-- Current file is at $fpath"
+		dbg "   - Current file is at $fpath"
 	else
-		dbg "-- Current file is at root directory"
+		dbg "   - Current file is at root directory"
 	fi
 	# Cases to handle:
 	# (#somelink)
@@ -109,11 +109,11 @@ ck_netdata_relative () {
 
 	case "$rlnk" in
 		\#* ) 
-			dbg "-- # (#somelink)"
+			dbg "   - # (#somelink)"
 			testinternal "$f" "$f" "$rlnk"
 			;;
 		*/ ) 
-			dbg "-- # (path/)"
+			dbg "   - # (path/)"
 			TRGT="$fpath/${rlnk}README.md"
 			testf "$f" "$TRGT"
 			if [ $? -eq 0 ] ; then
@@ -121,11 +121,11 @@ ck_netdata_relative () {
 			fi
 			;;
 		*/\#* )
-			dbg "-- # (path/#somelink)"
+			dbg "   - # (path/#somelink)"
 			if [[ $rlnk =~ ^(.*)/#(.*)$ ]] ; then
 				TRGT="$fpath/${BASH_REMATCH[1]}/README.md"
 				LNK="#${BASH_REMATCH[2]}"
-				dbg "-- Look for $LNK in $TRGT"
+				dbg "   - Look for $LNK in $TRGT"
 				testf "$f" "$TRGT"
 				if [ $? -eq 0 ] ; then
 					testinternal "$f" "$TRGT" "$LNK"
@@ -136,21 +136,21 @@ ck_netdata_relative () {
 			fi
 			;;
 		*.md )
-			dbg "-- # (path/filename.md) -> htmldoc (path/filename/)"
+			dbg "   - # (path/filename.md) -> htmldoc (path/filename/)"
 			testf "$f" "$fpath/$rlnk"
 			if [ $? -eq 0 ] ; then
 				if [[ $rlnk =~ ^(.*)/(.*).md$ ]] ; then
 					if [ "${BASH_REMATCH[2]}" = "README" ] ; then
-						s="../${BASH_REMATCH[1]}/"
+						s="${BASH_REMATCH[1]}/"
 					else
-						s="../${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/"
+						s="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/"
 					fi
 					if [ "$fname" != "README.md" ] ; then s="../$s"; fi
 				fi
 			fi
 			;;
 		*.md\#* )
-			dbg "-- # (path/filename.md#somelink) -> htmldoc (path/filename/#somelink)"
+			dbg "   - # (path/filename.md#somelink) -> htmldoc (path/filename/#somelink)"
 			if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
 				TRGT="$fpath/${BASH_REMATCH[1]}"
 				LNK="#${BASH_REMATCH[2]}"
@@ -160,9 +160,9 @@ ck_netdata_relative () {
 					if [ $? -eq 0 ] ; then
 						if [[ $lnk =~ ^(.*)/(.*).md#(.*)$ ]] ; then
 							if [ "${BASH_REMATCH[2]}" = "README" ] ; then
-								s="../${BASH_REMATCH[1]}/#${BASH_REMATCH[3]}"
+								s="${BASH_REMATCH[1]}/#${BASH_REMATCH[3]}"
 							else
-								s="../${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/#${BASH_REMATCH[3]}"
+								s="${BASH_REMATCH[1]}/${BASH_REMATCH[2]}/#${BASH_REMATCH[3]}"
 							fi
 							if [ "$fname" != "README.md" ] ; then s="../$s"; fi
 						fi			
@@ -171,7 +171,7 @@ ck_netdata_relative () {
 			fi
 			;;
 		*\#* )
-			dbg "-- # (path#somelink) -> (path/#somelink)"
+			dbg "   - # (path#somelink) -> (path/#somelink)"
 			if [[ $rlnk =~ ^(.*)#(.*)$ ]] ; then
 				TRGT="$fpath/${BASH_REMATCH[1]}/README.md"
 				LNK="#${BASH_REMATCH[2]}"
@@ -189,7 +189,7 @@ ck_netdata_relative () {
 			;;
 		* )
 			if [ -d "$fpath/$rlnk" ] ; then
-				dbg "-- # (path) -> htmldoc (path/)"
+				dbg "   - # (path) -> htmldoc (path/)"
 				testf "$f" "$fpath/$rlnk/README.md"
 				if [ $? -eq 0 ] ; then
 					s="$rlnk/"
@@ -198,14 +198,14 @@ ck_netdata_relative () {
 			else
 				cd - >/dev/null
 				if [ -f "$fpath/$rlnk" ] ; then
-					dbg "-- # (path/someotherfile) $rlnk"
+					dbg "   - # (path/someotherfile) $rlnk"
 					if [ "$fpath" = "." ] ; then
 						s="https://github.com/netdata/netdata/tree/master/$rlnk"
 					else
 						s="https://github.com/netdata/netdata/tree/master/$fpath/$rlnk"
 					fi
 				else
-					echo "-- ERROR: $f - $rlnk is neither a file or a directory. Giving up!"
+					echo "   - ERROR: $f - $rlnk is neither a file or a directory. Giving up!"
 					EXITCODE=1
 				fi
 				cd $DOCS_DIR >/dev/null
@@ -229,29 +229,29 @@ checklinks () {
 			if [[ $word =~ .*\]\(([^\(\) ]*)\).* ]] ; then
 				lnk=$(echo "${BASH_REMATCH[1]}" | tr -d '<>')
 				if [ -z "$lnk" ] ; then continue ; fi
-				dbg "-$lnk"
+				dbg " $lnk"
 				case "$lnk" in
-					mailto:* ) dbg "-- Mailto link, ignoring" ;;
+					mailto:* ) dbg "   - Mailto link, ignoring" ;;
 					https://github.com/netdata/netdata/wiki* )
-						dbg "-- Wiki Link $lnk"
-						if [ "$CHKWIKI" -eq 1 ] ; then echo "-- WARNING: $f - $lnk points to the wiki. Please replace it manually" ; fi
+						dbg "   - Wiki Link $lnk"
+						if [ "$CHKWIKI" -eq 1 ] ; then echo "   - WARNING: $f - $lnk points to the wiki. Please replace it manually" ; fi
 					;;
 					https://github.com/netdata/netdata/????/master* )
-						echo "-- ERROR: $f - $lnk is an absolute link to a Netdata file. Please convert to relative."
+						echo "   - ERROR: $f - $lnk is an absolute link to a Netdata file. Please convert to relative."
 						EXITCODE=1
 					;;
 					http* ) 
-						dbg "-- External link $lnk"
+						dbg "   - External link $lnk"
 						if [ "$CHKEXTERNAL" -eq 1 ] ; then 
 							testURL "$lnk"
 							if [ $? -eq 1 ] ; then
-								echo "-- ERROR: $f - $lnk is a broken link"
+								echo "   - ERROR: $f - $lnk is a broken link"
 								EXITCODE=1
 							fi
 						fi
 					;;
 					* ) 
-						dbg "-- Relative link $lnk"
+						dbg "   - Relative link $lnk"
 						if [ "$CHKRELATIVE" -eq 1 ] ; then ck_netdata_relative "$f" "$lnk" ; fi 
 					;;
 				esac

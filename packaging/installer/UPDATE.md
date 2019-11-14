@@ -29,10 +29,14 @@ Keep in mind, Netdata may now have new features, or certain old features may now
 
 ### Manual update to get the latest nightly build
 
-The `kickstart.sh` one-liner will do a one-time update to the latest nightly build, if executed as follows:
+The `kickstart.sh` and `kickstart-static64.sh` one-liners will do a one-time update to the latest nightly build, if executed as follows:
 
 ```sh
+# kickstart.sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
+
+# kickstart-static64.sh
+bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --no-updates
 ```
 
 ### Auto-update
@@ -46,7 +50,7 @@ Note that after Jan 2019, the `kickstart.sh` one-liner `bash <(curl -Ss https://
 
 ## You downloaded a binary package
 
-If you installed it from a binary package, the best way is to **obtain a newer copy** from the source you got it in the first place. This includes the static binary installation via `kickstart-base64.sh`, which would need to be executed again.
+If you installed it from a binary package, the best way is to **obtain a newer copy** from the source you got it in the first place.
 
 If a newer version of Netdata is not available from the source you got it, we suggest to uninstall the version you have and follow the [installation](README.md) instructions for installing a fresh version of Netdata.
 

@@ -396,6 +396,7 @@ void *socket_listen_main_static_threaded_worker(void *ptr) {
                         , web_server_snd_callback
                         , web_server_tmr_callback
                         , web_allow_connections_from
+                        , web_allow_connections_dns
                         , NULL
                         , web_client_first_request_timeout
                         , web_client_timeout

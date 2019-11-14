@@ -8,20 +8,25 @@ SUBDIRS = \
     $(NULL)
 
 CLEANFILES = \
-	$(NULL)
+    $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)
 
 userhealthconfigdir=$(configdir)/health.d
 dist_userhealthconfig_DATA = \
     .keep \
     $(NULL)
 
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(userhealthconfigdir)
+
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
     health.d/adaptec_raid.conf \
+    health.d/am2320.conf \
     health.d/apache.conf \
     health.d/apcupsd.conf \
     health.d/backend.conf \
