@@ -995,11 +995,13 @@ int do_proc_stat(int update_every, usec_t dt) {
                 pthread_t thread;
                 cpu_set_t global_cpu_set;
 
-                sched_getaffinity(getpid(), sizeof(cpu_set_t), &global_cpu_set);
-
-                if (unlikely(!CPU_ISSET(core, &global_cpu_set))) {
-                    continue;
+                if (likely(!pthread_getaffinity_np(pthread_self(), sizeof(cpu_set_t), &global_cpu_set))) {
+                    if (unlikely(!CPU_ISSET(core, &global_cpu_set))) {
+                        continue;
+                    }
                 }
+                else
+                    error("Cannot read current process affinity");
 
                 if(unlikely(pthread_create(&thread, NULL, wake_cpu_thread, (void *)&core)))
                     error("Cannot create wake_cpu_thread");
