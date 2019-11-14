@@ -10,7 +10,7 @@
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
-    printf("Mocking send: %zu bytes\n", len);
+    info("Mocking send: %zu bytes\n", len);
     (void)sockfd;
     (void)buf;
     (void)flags;
@@ -95,7 +95,7 @@ void __wrap_debug_int(const char *file, const char *function, const unsigned lon
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "DEBUG: ");
+    sprintf(log_buffer + strlen(log_buffer), "  DEBUG: ");
     vsprintf(log_buffer + strlen(log_buffer), fmt, args);
     sprintf(log_buffer + strlen(log_buffer), "\n");
     va_end(args);
@@ -108,7 +108,7 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "INFO: ");
+    sprintf(log_buffer + strlen(log_buffer), "  INFO: ");
     vsprintf(log_buffer + strlen(log_buffer), fmt, args);
     sprintf(log_buffer + strlen(log_buffer), "\n");
     va_end(args);
@@ -123,7 +123,7 @@ void __wrap_error_int(
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "ERROR: ");
+    sprintf(log_buffer + strlen(log_buffer), "  ERROR: ");
     vsprintf(log_buffer + strlen(log_buffer), fmt, args);
     sprintf(log_buffer + strlen(log_buffer), "\n");
     va_end(args);
@@ -215,7 +215,7 @@ static void destroy_web_client(struct web_client *w)
 // parameters in the shared state passed between tests. To initialise this counter structure we use this global to
 // pass from the launcher (test-builder) to the setup-fixture.
 
-void *initial_test_state = NULL;
+void *shared_test_state = NULL;
 
 // -------------------------------- Test family for /api/v1/info ------------------------------------------------------
 
@@ -225,16 +225,20 @@ struct test_def {
     char   name[80];
     size_t full_len;
     struct web_client *instance; // Used within this single test
-    struct test_def   *next;
+    bool   completed;
+    struct test_def   *next,*prev;
 };
 
 static void api_info(void **state)
 {
-    struct test_def *def = (struct test_def *)*state;
-    *state = def->next;
+    (void)state;
+    struct test_def *def = (struct test_def *)shared_test_state;
+    shared_test_state = def->next;
 
-    /*if (strlen(log_buffer) > 0)
-        puts(log_buffer);*/
+    if (def->prev != NULL && !def->prev->completed && strlen(log_buffer) > 0) {
+        printf("Log of failing case %s:\n", def->prev->name);
+        puts(log_buffer);
+    }
     log_buffer[0] = 0;
     if (localhost != NULL)
         free(localhost);
@@ -250,19 +254,7 @@ static void api_info(void **state)
         assert_int_equal(def->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
     else
         assert_int_equal(def->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
-}
-
-static int api_info_setup(void **state)
-{
-    *state = initial_test_state;
-    initial_test_state = NULL; // Move rather than copy: force errors early
-    return 0;
-}
-
-static int api_info_teardown(void **state)
-{
-    (void)state;
-    return 0;
+    def->completed = true;
 }
 
 static int api_info_launcher()
@@ -270,7 +262,7 @@ static int api_info_launcher()
     size_t num_tests = 0;
     struct web_client *template = setup_fresh_web_client();
     struct test_def *current, *head = NULL;
-    struct test_def **old_next = &head;
+    struct test_def *prev=NULL;
 
     for (size_t i = 0; i < MAX_HEADERS; i++) {
         build_request(template->response.data, "/api/v1/info", true, i);
@@ -278,14 +270,19 @@ static int api_info_launcher()
             if (j == 0 && i > 0)
                 continue; // All zero-length prefixes are identical, skip after first time
             current = malloc(sizeof(struct test_def));
-            *old_next = current;
-            old_next = &current->next;
+            if (prev != NULL)
+                prev->next = current;
+            else
+                head = current;
+            current->prev = prev;
+            prev = current;
 
             current->num_headers = i;
             current->prefix_len = j;
             current->full_len = template->response.data->len;
             current->instance = NULL;
             current->next = NULL;
+            current->completed = false;
             sprintf(current->name, "/api/v1/info@%zu,%zu/%zu", current->num_headers, current->prefix_len, current->full_len);
             num_tests++;
         }
@@ -299,13 +296,13 @@ static int api_info_launcher()
         tests[i].test_func = api_info;
         tests[i].setup_func = NULL;
         tests[i].teardown_func = NULL;
-        tests[i].initial_state = NULL; // Not input to fixture in CMocka, overwritten by fixture result
+        tests[i].initial_state = NULL;
         current = current->next;
     }
 
-    printf("Setup %zu tests in %p\n", num_tests, tests);
-    initial_test_state = head;
-    int fails = _cmocka_run_group_tests("web_api", tests, num_tests, api_info_setup, api_info_teardown);
+    printf("Setup %zu tests in %p\n", num_tests, head);
+    shared_test_state = head;
+    int fails = _cmocka_run_group_tests("web_api", tests, num_tests, NULL, NULL);
     free(tests);
     destroy_web_client(template);
     // localtest will be an issue. FIXME
