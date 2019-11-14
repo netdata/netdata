@@ -67,6 +67,7 @@ extern void netdev_rename_device_add(const char *host_device, const char *contai
 extern void netdev_rename_device_del(const char *host_device);
 
 #include "proc_self_mountinfo.h"
+#include "proc_pressure.h"
 #include "zfs_common.h"
 
 #else // (TARGET_OS == OS_LINUX)
