@@ -724,6 +724,7 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=uv_cond_wait \
         -Wl,--wrap=strdupz \
         -Wl,--wrap=info_int \
+        -Wl,--wrap=recv \
         $(TEST_LDFLAGS) \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)

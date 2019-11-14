@@ -39,6 +39,8 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
     (void)function;
     (void)line;
 
+    function_called();
+
     va_list args;
 
     va_start(args, fmt);
@@ -217,6 +219,21 @@ void __wrap_uv_cond_wait(uv_cond_t *cond_var, uv_mutex_t *mutex)
 {
     (void)cond_var;
     (void)mutex;
+}
+
+ssize_t __wrap_recv(int sockfd, void *buf, size_t len, int flags)
+{
+    function_called();
+
+    check_expected(sockfd);
+    check_expected_ptr(buf);
+    check_expected(len);
+    check_expected(flags);
+
+    char *mock_string = "Test recv";
+    strcpy(buf, mock_string);
+
+    return strlen(mock_string);
 }
 
 static int setup_configured_engine(void **state)
@@ -505,7 +522,10 @@ static void test_exporting_discard_response(void **state)
     BUFFER *response = buffer_create(0);
     buffer_sprintf(response, "Test response");
 
+    expect_function_call(__wrap_info_int);
+
     assert_int_equal(exporting_discard_response(response, engine->connector_root->instance_root), 0);
+
     assert_string_equal(
         log_line,
         "EXPORTING: received 13 bytes from (null) connector instance. Ignoring them. Sample: 'Test response'");
@@ -513,6 +533,33 @@ static void test_exporting_discard_response(void **state)
     assert_int_equal(buffer_strlen(response), 0);
 
     buffer_free(response);
+}
+
+static void test_simple_connector_receive_response(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+    struct stats *stats = &instance->stats;
+
+    int sock = 1;
+
+    expect_function_call(__wrap_recv);
+    expect_value(__wrap_recv, sockfd, 1);
+    expect_not_value(__wrap_recv, buf, 0);
+    expect_value(__wrap_recv, len, 4096);
+    expect_value(__wrap_recv, flags, 64);
+
+    expect_function_call(__wrap_info_int);
+
+    simple_connector_receive_response(&sock, instance);
+
+    assert_string_equal(
+        log_line,
+        "EXPORTING: received 9 bytes from (null) connector instance. Ignoring them. Sample: 'Test recv'");
+
+    assert_int_equal(stats->chart_received_bytes, 9);
+    assert_int_equal(stats->chart_receptions, 1);
+    assert_int_equal(sock, 1);
 }
 
 static void test_init_graphite_instance(void **state)
@@ -536,6 +583,7 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_format_dimension_collected_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(test_exporting_discard_response, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(test_simple_connector_receive_response, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_init_graphite_instance),
     };
 

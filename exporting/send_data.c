@@ -43,7 +43,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
 {
     static BUFFER *response = NULL;
     if (!response)
-        buffer_create(1);
+        response = buffer_create(1);
 
     struct stats *stats = &instance->stats;
 
@@ -70,6 +70,9 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
                 error("EXPORTING: cannot receive data from '%s'.", instance->config.destination);
             }
         }
+#ifdef UNIT_TESTING
+        break;
+#endif
     }
 
     // if we received data, process them
