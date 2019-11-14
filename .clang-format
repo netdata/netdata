@@ -61,7 +61,7 @@ ContinuationIndentWidth: 4
 Cpp11BracedListStyle: true
 DerivePointerAlignment: false
 DisableFormat: false
-ExperimentalAutoDetectBinPacking: false
+ExperimentalAutoDetectBinPacking: true
 #FixNamespaceComments: false # Unknown to clang-format-4.0
 
 #IncludeBlocks: Preserve # Unknown to clang-format-5.0
