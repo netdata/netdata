@@ -222,11 +222,11 @@ void *shared_test_state = NULL;
 struct test_def {
     size_t num_headers; // Index coordinate
     size_t prefix_len;  // Index coordinate
-    char   name[80];
+    char name[80];
     size_t full_len;
     struct web_client *instance; // Used within this single test
-    bool   completed;
-    struct test_def   *next,*prev;
+    bool completed;
+    struct test_def *next, *prev;
 };
 
 static void api_info(void **state)
@@ -263,11 +263,11 @@ static int api_info_launcher()
     size_t num_tests = 0;
     struct web_client *template = setup_fresh_web_client();
     struct test_def *current, *head = NULL;
-    struct test_def *prev=NULL;
+    struct test_def *prev = NULL;
 
     for (size_t i = 0; i < MAX_HEADERS; i++) {
         build_request(template->response.data, "/api/v1/info", true, i);
-        for (size_t j = 0; j<=template->response.data->len; j++) {
+        for (size_t j = 0; j <= template->response.data->len; j++) {
             if (j == 0 && i > 0)
                 continue; // All zero-length prefixes are identical, skip after first time
             current = malloc(sizeof(struct test_def));
@@ -284,15 +284,16 @@ static int api_info_launcher()
             current->instance = NULL;
             current->next = NULL;
             current->completed = false;
-            sprintf(current->name, "/api/v1/info@%zu,%zu/%zu", current->num_headers, current->prefix_len, current->full_len);
+            sprintf(
+                current->name, "/api/v1/info@%zu,%zu/%zu", current->num_headers, current->prefix_len,
+                current->full_len);
             num_tests++;
         }
     }
 
     struct CMUnitTest *tests = calloc(num_tests, sizeof(struct CMUnitTest));
     current = head;
-    for (size_t i = 0; i < num_tests; i++)
-    {
+    for (size_t i = 0; i < num_tests; i++) {
         tests[i].name = current->name;
         tests[i].test_func = api_info;
         tests[i].setup_func = NULL;
@@ -308,7 +309,7 @@ static int api_info_launcher()
     destroy_web_client(template);
     // localtest will be an issue. FIXME
     current = head;
-    while(current!=NULL) {
+    while (current != NULL) {
         struct test_def *c = current;
         current = current->next;
         if (c->instance != NULL) // Clean up resources from tests that failed
