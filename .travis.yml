@@ -16,7 +16,7 @@ before_install:
 # Install dependencies for all, once
 #
 install:
-  - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
+  - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
   - sudo apt install -y --only-upgrade docker-ce
   - sudo pip install git-semver==0.2.4 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
   - docker info
@@ -104,6 +104,10 @@ jobs:
       name: Run shellchecking on BASH
       script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
 
+      # Check if any of the C code deviates from our coding style
+    - name: Check coding style
+      script: .travis/clangformat.sh
+
       # This falls under same stage defined earlier
     - name: Run checksum checks on kickstart files
       script: ./tests/installer/checksums.sh
@@ -120,7 +124,7 @@ jobs:
 
       name: Standard netdata build
       script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
-      env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+      env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
 
     - name: Docker container build process (alpine installation)

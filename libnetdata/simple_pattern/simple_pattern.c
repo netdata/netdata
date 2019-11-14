@@ -273,7 +273,7 @@ extern void simple_pattern_dump(uint64_t debug_type, SIMPLE_PATTERN *p)
         debug(debug_type,"dump_pattern(NULL)");
         return;
     }
-    debug(debug_type,"dump_pattern(%p) child=%p next=%p mode=%d match=%s", root, root->child, root->next, root->mode,
+    debug(debug_type,"dump_pattern(%p) child=%p next=%p mode=%u match=%s", root, root->child, root->next, root->mode,
           root->match);
     if(root->child!=NULL)
         simple_pattern_dump(debug_type, (SIMPLE_PATTERN*)root->child);

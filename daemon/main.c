@@ -921,8 +921,10 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+#ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
+#endif
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
