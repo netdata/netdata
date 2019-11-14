@@ -127,6 +127,7 @@ int metric_formatting(struct engine *engine, RRDDIM *rd)
                     error("EXPORTING: cannot format metric for %s", instance->config.name);
                     return 1;
                 }
+                instance->stats.chart_buffered_metrics++;
             }
         }
     }

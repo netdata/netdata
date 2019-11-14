@@ -464,36 +464,38 @@ static void test_prepare_buffers(void **state)
     struct instance *instance = engine->connector_root->instance_root;
 
     expect_function_call(__mock_start_batch_formatting);
-    expect_memory(__mock_start_batch_formatting, instance, instance, sizeof(struct instance));
+    expect_value(__mock_start_batch_formatting, instance, instance);
     will_return(__mock_start_batch_formatting, 0);
 
     expect_function_call(__mock_start_host_formatting);
-    expect_memory(__mock_start_host_formatting, instance, instance, sizeof(struct instance));
+    expect_value(__mock_start_host_formatting, instance, instance);
     will_return(__mock_start_host_formatting, 0);
 
     expect_function_call(__mock_start_chart_formatting);
-    expect_memory(__mock_start_chart_formatting, instance, instance, sizeof(struct instance));
+    expect_value(__mock_start_chart_formatting, instance, instance);
     will_return(__mock_start_chart_formatting, 0);
 
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     expect_function_call(__mock_metric_formatting);
-    expect_memory(__mock_metric_formatting, instance, instance, sizeof(struct instance));
-    expect_memory(__mock_metric_formatting, rd, rd, sizeof(RRDDIM));
+    expect_value(__mock_metric_formatting, instance, instance);
+    expect_value(__mock_metric_formatting, rd, rd);
     will_return(__mock_metric_formatting, 0);
 
     expect_function_call(__mock_end_chart_formatting);
-    expect_memory(__mock_end_chart_formatting, instance, instance, sizeof(struct instance));
+    expect_value(__mock_end_chart_formatting, instance, instance);
     will_return(__mock_end_chart_formatting, 0);
 
     expect_function_call(__mock_end_host_formatting);
-    expect_memory(__mock_end_host_formatting, instance, instance, sizeof(struct instance));
+    expect_value(__mock_end_host_formatting, instance, instance);
     will_return(__mock_end_host_formatting, 0);
 
     expect_function_call(__mock_end_batch_formatting);
-    expect_memory(__mock_end_batch_formatting, instance, instance, sizeof(struct instance));
+    expect_value(__mock_end_batch_formatting, instance, instance);
     will_return(__mock_end_batch_formatting, 0);
 
     assert_int_equal(__real_prepare_buffers(engine), 0);
+
+    assert_int_equal(instance->stats.chart_buffered_metrics, 1);
 
     // check with NULL functions
     connector->start_batch_formatting = NULL;
@@ -600,7 +602,7 @@ static void test_simple_connector_send_buffer(void **state)
     assert_int_equal(failures, 0);
     assert_int_equal(stats->chart_transmission_successes, 1);
     assert_int_equal(stats->chart_sent_bytes, 84);
-    assert_int_equal(stats->chart_sent_metrics, 0);
+    assert_int_equal(stats->chart_sent_metrics, 1);
     assert_int_equal(stats->chart_transmission_failures, 0);
 
     assert_int_equal(buffer_strlen(buffer), 0);
