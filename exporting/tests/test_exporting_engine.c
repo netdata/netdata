@@ -249,6 +249,28 @@ ssize_t __wrap_send(int sockfd, const void *buf, size_t len, int flags)
     return strlen(buf);
 }
 
+int __wrap_connect_to_one_of(
+    const char *destination,
+    int default_port,
+    struct timeval *timeout,
+    size_t *reconnects_counter,
+    char *connected_to,
+    size_t connected_to_size)
+{
+    (void)timeout;
+
+    function_called();
+
+    check_expected(destination);
+    check_expected_ptr(default_port);
+    // TODO: check_expected_ptr(timeout);
+    check_expected(reconnects_counter);
+    check_expected(connected_to);
+    check_expected(connected_to_size);
+
+    return mock_type(int);
+}
+
 static int setup_configured_engine(void **state)
 {
     struct engine *engine = __mock_read_exporting_config();
@@ -610,6 +632,33 @@ static void test_simple_connector_send_buffer(void **state)
     assert_int_equal(sock, 1);
 }
 
+static void test_simple_connector_worker(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+    BUFFER *buffer = instance->buffer;
+
+    __real_prepare_buffers(engine);
+
+    expect_function_call(__wrap_connect_to_one_of);
+    expect_string(__wrap_connect_to_one_of, destination, "localhost");
+    expect_value(__wrap_connect_to_one_of, default_port, 2003);
+    expect_not_value(__wrap_connect_to_one_of, reconnects_counter, 0);
+    expect_value(__wrap_connect_to_one_of, connected_to, 0);
+    expect_value(__wrap_connect_to_one_of, connected_to_size, 0);
+    will_return(__wrap_connect_to_one_of, 2);
+
+    expect_function_call(__wrap_send);
+    expect_value(__wrap_send, sockfd, 2);
+    expect_value(__wrap_send, buf, buffer_tostring(buffer));
+    expect_string(
+        __wrap_send, buf, "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
+    expect_value(__wrap_send, len, 84);
+    expect_value(__wrap_send, flags, MSG_NOSIGNAL);
+
+    simple_connector_worker(instance);
+}
+
 static void test_init_graphite_instance(void **state)
 {
     (void)state;
@@ -636,6 +685,8 @@ int main(void)
             test_simple_connector_receive_response, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_simple_connector_send_buffer, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_simple_connector_worker, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_init_graphite_instance),
     };
 
