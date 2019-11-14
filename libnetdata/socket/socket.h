@@ -57,11 +57,6 @@ extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
-#if defined(__linux) || defined(__linux__) || defined(linux)
-extern int create_network_link_socket();
-extern int set_socket_diag(int sd, int family, int protocol);
-#endif
-
 #ifdef ENABLE_HTTPS
 extern ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 extern ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
