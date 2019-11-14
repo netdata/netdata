@@ -254,6 +254,7 @@ static void api_info(void **state)
         assert_int_equal(def->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
     else
         assert_int_equal(def->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
+    assert_int_equal(def->instance->mode, WEB_CLIENT_MODE_NORMAL);
     def->completed = true;
 }
 
