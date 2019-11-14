@@ -8,6 +8,8 @@
 #include <cmocka.h>
 #include <stdbool.h>
 
+// ---------------------------------- Mocking accesses from web_client ------------------------------------------------
+
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
     info("Mocking send: %zu bytes\n", len);
@@ -47,9 +49,9 @@ char *__wrap_config_get(struct config *root, const char *section, const char *na
 
 int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
 {
-    printf("api requests: %s\n", url);
-    (void)host;
-    (void)w;
+    check_expected_ptr(host);
+    check_expected_ptr(w);
+    check_expected_ptr(url);
     return HTTP_RESP_OK;
 }
 
@@ -249,7 +251,14 @@ static void api_info(void **state)
     def->instance->response.data->len = def->prefix_len;
 
     info("Buffer contains: %s [first %zu]", def->instance->response.data->buffer, def->prefix_len);
+    if (def->prefix_len == def->full_len) {
+        expect_value(__wrap_web_client_api_request_v1, host, localhost);
+        expect_value(__wrap_web_client_api_request_v1, w, def->instance);
+        expect_string(__wrap_web_client_api_request_v1, url, "info");
+    }
+
     web_client_process_request(def->instance);
+
     if (def->prefix_len == def->full_len)
         assert_int_equal(def->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
     else
