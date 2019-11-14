@@ -85,6 +85,9 @@ RRDSET *__wrap_rrdset_find(RRDHOST *host, const char *id)
     return NULL;
 }
 
+// -------------------------------- Mocking the log - capture per-test ------------------------------------------------
+
+char log_buffer[10240] = { 0 };
 void __wrap_debug_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
     (void)file;
@@ -92,9 +95,9 @@ void __wrap_debug_int(const char *file, const char *function, const unsigned lon
     (void)line;
     va_list args;
     va_start(args, fmt);
-    printf("DEBUG: ");
-    vprintf(fmt, args);
-    printf("\n");
+    sprintf(log_buffer + strlen(log_buffer), "DEBUG: ");
+    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
+    sprintf(log_buffer + strlen(log_buffer), "\n");
     va_end(args);
 }
 
@@ -105,9 +108,9 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
     (void)line;
     va_list args;
     va_start(args, fmt);
-    printf("INFO: ");
-    vprintf(fmt, args);
-    printf("\n");
+    sprintf(log_buffer + strlen(log_buffer), "INFO: ");
+    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
+    sprintf(log_buffer + strlen(log_buffer), "\n");
     va_end(args);
 }
 
@@ -120,9 +123,9 @@ void __wrap_error_int(
     (void)line;
     va_list args;
     va_start(args, fmt);
-    printf("ERROR: ");
-    vprintf(fmt, args);
-    printf("\n");
+    sprintf(log_buffer + strlen(log_buffer), "ERROR: ");
+    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
+    sprintf(log_buffer + strlen(log_buffer), "\n");
     va_end(args);
 }
 
@@ -231,6 +234,9 @@ static void api_next(void **state)
         destroy_web_client(tf->instance);
     if (localhost != NULL)
         free(localhost);
+    /*if (strlen(log_buffer) > 0)
+        puts(log_buffer);*/
+    log_buffer[0] = 0;
     tf->instance = setup_fresh_web_client();
     localhost = malloc(sizeof(RRDHOST));
     tf->prefix_len++;
@@ -245,10 +251,10 @@ static void api_info(void **state)
 {
     struct test_family *tf = (struct test_family *)*state;
     api_next(state);
-    printf("Test %zu / %zu\n", tf->num_headers, tf->prefix_len);
+    printf("Test api_info / %zu / %zu\n", tf->num_headers, tf->prefix_len);
     build_request(tf->instance->response.data, "/api/v1/info", true, tf->num_headers);
     tf->instance->response.data->len = tf->prefix_len;
-    printf("Buffer contains: %s [first %zu]", tf->instance->response.data->buffer, tf->prefix_len);
+    info("Buffer contains: %s [first %zu]", tf->instance->response.data->buffer, tf->prefix_len);
     web_client_process_request(tf->instance);
     if (tf->instance->response.data->len == tf->template->response.data->len)
         assert_int_equal(tf->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, 0);
