@@ -8,23 +8,24 @@
 #include <cmocka.h>
 #include <stdbool.h>
 
-void repr(char *result, int result_size, const char * buf, int size)
+void repr(char *result, int result_size, char const *buf, int size)
 {
     int n;
-    char *end = result+result_size-1;
-    while (size && result_size>0) {
-        if (*buf <= 0x20 || *buf >= 0x80) {
-            n = snprintf(result, result_size, "\\%02X", *buf);
+    char *end = result + result_size - 1;
+    unsigned char const *ubuf = (unsigned char const*)buf;
+    while (size && result_size > 0) {
+        if (*ubuf <= 0x20 || *ubuf >= 0x80) {
+            n = snprintf(result, result_size, "\\%02X", *ubuf);
         } else {
-            *result = *buf;
+            *result = *ubuf;
             n = 1;
         }
         result += n;
         result_size -= n;
-        buf++;
+        ubuf++;
         size--;
     }
-    if (result_size>0)
+    if (result_size > 0)
         *(result++) = 0;
     else
         *end = 0;
@@ -71,9 +72,9 @@ char *__wrap_config_get(struct config *root, const char *section, const char *na
 
 int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
 {
-char url_repr[160];
-    repr(url_repr,sizeof(url_repr),url,strlen(url));
-    printf("web_client_api_request_v1(url=%s)",url);
+    char url_repr[160];
+    repr(url_repr, sizeof(url_repr), url, strlen(url));
+    printf("web_client_api_request_v1(url=\"%s\")\n", url_repr);
     check_expected_ptr(host);
     check_expected_ptr(w);
     check_expected_ptr(url_repr);
@@ -369,6 +370,57 @@ static int api_chart_launcher()
     return 0;
 }
 
+static void legal_query(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    build_request(w->response.data, "/api/v1/info?blah", true, 0);
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "info?blah", 6);
+
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    expect_any(__wrap_web_client_api_request_v1, url_repr);
+    //    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
+
+    web_client_process_request(w);
+
+    assert_string_equal(w->decoded_query_string, "?blah");
+    free(localhost);
+}
+
+static void not_a_query(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    build_request(w->response.data, "/api/v1/info%3fblah%3f", true, 0);
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "info?blah?", 10);
+
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
+
+    web_client_process_request(w);
+
+    assert_string_equal(w->decoded_query_string, "");
+    free(localhost);
+}
+
 static void newline_in_url(void **state)
 {
     (void)state;
@@ -379,7 +431,7 @@ static void newline_in_url(void **state)
 
     char debug[160];
     repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
-    printf("->%s\n",debug);
+    printf("->%s\n", debug);
 
     char expected_url_repr[160];
     repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
@@ -399,7 +451,8 @@ int main(void)
     debug_flags = 0xffffffffffff;
     int fails = 0;
 
-    struct CMUnitTest static_tests[] = { cmocka_unit_test(newline_in_url) };
+    struct CMUnitTest static_tests[] = { cmocka_unit_test(newline_in_url), cmocka_unit_test(legal_query),
+                                         cmocka_unit_test(not_a_query) };
     fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
 
     //fails += api_info_launcher();
