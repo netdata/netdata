@@ -743,9 +743,9 @@ if [ "${UID}" -eq 0 ]; then
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
 	fi
 
-	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/network_viewer.plugin" ]; then
-		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/network_viewer.plugin"
-		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/network_viewer.plugin"
+	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/networkviewer.plugin" ]; then
+		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/networkviewer.plugin"
+		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/networkviewer.plugin"
 	fi
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin" ]; then

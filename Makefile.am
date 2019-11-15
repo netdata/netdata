@@ -253,7 +253,7 @@ PERF_PLUGIN_FILES = \
     $(NULL)
 
 NETWORK_VIEWER_PLUGIN_FILES = \
-    collectors/network_viewer.plugin/network_viewer_plugin.c \
+    collectors/networkviewer.plugin/network_viewer_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -614,7 +614,7 @@ if ENABLE_PLUGIN_PERF
 endif
 
 if ENABLE_PLUGIN_NETWORK_VIEWER
-    plugins_PROGRAMS += network_viewer.plugin
+    plugins_PROGRAMS += networkviewer.plugin
     network_viewer_plugin_SOURCES = $(NETWORK_VIEWER_PLUGIN_FILES)
     network_viewer_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \

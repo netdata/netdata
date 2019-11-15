@@ -279,7 +279,7 @@ install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 
 # ###########################################################
 # Install network_viewer.plugin
-install -m 4750 -p network_viewer.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/network_viewer.plugin"
+install -m 4750 -p network_viewer.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/networkviewer.plugin"
 
 # ###########################################################
 # Install cups.plugin

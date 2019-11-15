@@ -16,6 +16,7 @@ SUBDIRS = \
     freeipmi.plugin \
     idlejitter.plugin \
     macos.plugin \
+    networkviewer.plugin \
     nfacct.plugin \
     xenstat.plugin \
     perf.plugin \
@@ -25,7 +26,6 @@ SUBDIRS = \
     slabinfo.plugin \
     statsd.plugin \
     tc.plugin \
-    network_viewer.plugin \
     $(NULL)
 
 usercustompluginsconfigdir=$(configdir)/custom-plugins.d
