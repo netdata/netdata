@@ -8,6 +8,28 @@
 #include <cmocka.h>
 #include <stdbool.h>
 
+void repr(char *result, int result_size, const char * buf, int size)
+{
+    int n;
+    char *end = result+result_size-1;
+    while (size && result_size>0) {
+        if (*buf <= 0x20 || *buf >= 0x80) {
+            n = snprintf(result, result_size, "\\%02X", *buf);
+        } else {
+            *result = *buf;
+            n = 1;
+        }
+        result += n;
+        result_size -= n;
+        buf++;
+        size--;
+    }
+    if (result_size>0)
+        *(result++) = 0;
+    else
+        *end = 0;
+}
+
 // ---------------------------------- Mocking accesses from web_client ------------------------------------------------
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
@@ -49,9 +71,12 @@ char *__wrap_config_get(struct config *root, const char *section, const char *na
 
 int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url)
 {
+char url_repr[160];
+    repr(url_repr,sizeof(url_repr),url,strlen(url));
+    printf("web_client_api_request_v1(url=%s)",url);
     check_expected_ptr(host);
     check_expected_ptr(w);
-    check_expected_ptr(url);
+    check_expected_ptr(url_repr);
     return HTTP_RESP_OK;
 }
 
@@ -264,6 +289,7 @@ static void api_info(void **state)
     else
         assert_int_equal(def->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
     assert_int_equal(def->instance->mode, WEB_CLIENT_MODE_NORMAL);
+    printf("decoded: %s\n", def->instance->decoded_query_string);
     def->completed = true;
 }
 
@@ -328,12 +354,56 @@ static int api_info_launcher()
     return fails;
 }
 
+struct api_chart_test_def {
+    char name[80];
+    char chart_name[80];
+    size_t full_len;
+    struct web_client *instance; // Used within this single test
+    bool completed;
+    struct test_def *next, *prev;
+};
+
+static int api_chart_launcher()
+{
+    size_t num_tests = 0;
+    return 0;
+}
+
+static void newline_in_url(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    build_request(w->response.data, "/api/v1/inf\no\t?blah", true, 0);
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n",debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
+
+    web_client_process_request(w);
+
+    printf("decoded: %s\n", w->decoded_query_string);
+    free(localhost);
+}
+
 int main(void)
 {
     debug_flags = 0xffffffffffff;
-
     int fails = 0;
-    fails += api_info_launcher();
+
+    struct CMUnitTest static_tests[] = { cmocka_unit_test(newline_in_url) };
+    fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
+
+    //fails += api_info_launcher();
+    //fails += api_chart_launcher();
 
     return fails;
 }
