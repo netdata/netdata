@@ -446,6 +446,87 @@ static void newline_in_url(void **state)
     free(localhost);
 }
 
+// Leading CRLF (RFC2616, comment in 4.1)
+// Absolute URI "GET http://localhost:19999/api/v1/info HTTP/1.1\r\n"    -> Comment in 5.1.2 of RFC2616
+// Any \n or \r in wrong place in request line -> invalid response   (Description in 5.1 of RFC2616)
+// Any ' ' in the URI -> invalid response   (Description in 5.1 of RFC2616)
+// Characters that can't be in paths #;?
+// Percent-encoding with just one digit? www.spaff%2zf.com
+// Pathless queries
+// Pathless fragments
+// Empty, i.e "GET  HTTP/1.1\r\n"
+// Http versions?
+// "GET noslash HTTP/1.1\r\n"
+// "GET / HTTP/1.1\r\n"
+// "GET // HTTP/1.1\r\n"
+// "GET /// HTTP/1.1\r\n"
+// "GET /apb/../api/v1/info" HTTP/1.1\r\n"
+// "GET % HTTP/1.1\r\n"
+// "GET %0 HTTP/1.1\r\n"
+// "GET %00 HTTP/1.1\r\n"
+// "GET %2 HTTP/1.1\r\n"
+// "GET %x HTTP/1.1\r\n"
+
+/*
+        https://github.com/uriparser/uriparser/blob/uriparser-0.9.3/test/FourSuite.cpp
+
+        Not clear why some of these are illegal -> reserved chars?
+
+	ASSERT_TRUE(testBadUri("beepbeep\x07\x07", 8));
+	ASSERT_TRUE(testBadUri("\n", 0));
+	ASSERT_TRUE(testBadUri("::", 0)); // not OK, per Roy Fielding on the W3C uri list on 2004-04-01
+
+	// the following test cases are from a Perl script by David A. Wheeler
+	// at http://www.dwheeler.com/secure-programs/url.pl
+	ASSERT_TRUE(testBadUri("http://www yahoo.com", 10));
+	ASSERT_TRUE(testBadUri("http://www.yahoo.com/hello world/", 26));
+	ASSERT_TRUE(testBadUri("http://www.yahoo.com/yelp.html#\"", 31));
+
+	// the following test cases are from a Haskell program by Graham Klyne
+	// at http://www.ninebynine.org/Software/HaskellUtils/Network/URITest.hs
+	ASSERT_TRUE(testBadUri("[2010:836B:4179::836B:4179]", 0));
+	ASSERT_TRUE(testBadUri(" ", 0));
+	ASSERT_TRUE(testBadUri("%", 1));
+	ASSERT_TRUE(testBadUri("A%Z", 2));
+	ASSERT_TRUE(testBadUri("%ZZ", 1));
+	ASSERT_TRUE(testBadUri("%AZ", 2));
+	ASSERT_TRUE(testBadUri("A C", 1));
+	ASSERT_TRUE(testBadUri("A\\'C", 1)); // r"A\'C"
+	ASSERT_TRUE(testBadUri("A`C", 1));
+	ASSERT_TRUE(testBadUri("A<C", 1));
+	ASSERT_TRUE(testBadUri("A>C", 1));
+	ASSERT_TRUE(testBadUri("A^C", 1));
+	ASSERT_TRUE(testBadUri("A\\\\C", 1)); // r'A\\C'
+	ASSERT_TRUE(testBadUri("A{C", 1));
+	ASSERT_TRUE(testBadUri("A|C", 1));
+	ASSERT_TRUE(testBadUri("A}C", 1));
+	ASSERT_TRUE(testBadUri("A[C", 1));
+	ASSERT_TRUE(testBadUri("A]C", 1));
+	ASSERT_TRUE(testBadUri("A[**]C", 1));
+	ASSERT_TRUE(testBadUri("http://[xyz]/", 8));
+	ASSERT_TRUE(testBadUri("http://]/", 7));
+	ASSERT_TRUE(testBadUri("http://example.org/[2010:836B:4179::836B:4179]", 19));
+	ASSERT_TRUE(testBadUri("http://example.org/abc#[2010:836B:4179::836B:4179]", 23));
+	ASSERT_TRUE(testBadUri("http://example.org/xxx/[qwerty]#a[b]", 23));
+
+	// from a post to the W3C uri list on 2004-02-17
+	// breaks at 22 instead of 17 because everything up to that point is a valid userinfo
+	ASSERT_TRUE(testBadUri("http://w3c.org:80path1/path2", 22));
+
+*/
+
+/*
+    Pulled from nginx logs:
+
+"!\x005\x00\xE9\x00z\x00{\x00W\x00\xA5\x00\xCC\x00Y\x00z\x00{\x00\xA5\x00\xEA\x00\xCC\x00W\x00\xEA\x00Y\x00\xCC\x00\x06\x00\xEB\x00z\x00\x06\x00\xEA\x00\x06\x005\x00Y\x00\xB0\x00\xEA\x00\xCC\x00Y\x005\x00\xEA\x00\xCC\x00\xE9\x00{\x00\xEA\x00V\x00W\x00W\x00Y\x00|\x00W\x00z\x00{\x00\xA5\x005\x00\xEB\x00\xB0\x00\xEA\x005\x00\xCC\x00\xB0\x00z\x00(\x00\xB0\x00Y\x005\x00\xE9\x00\xEB\x00\xE9\x00\x06\x00\xCC\x00|\x005\x00(\x00!\x00(\x00V\x00W\x00!\x00V\x00Y\x00\xCC\x00|\x00!\x00{\x00\xEA\x00\xEA\x00{\x00\x06\x00\xA5\x00\xEA\x00z\x00\xA5\x00\xB0\x00\xB0\x00\xEA\x00|\x00\xB0\x00\x06\x00z\x005\x00!\x00W\x00Y\x00\x06\x00|\x00\xCC\x00!\x00|\x00|\x00|\x00V\x00\xEB\x00V\x00\xCC\x00Y\x00\xE9\x00W\x00\xE9\x00Y\x00!\x00\x06\x00z\x00\xA5\x00\x06\x00z\x00\xE9\x00\xCC\x00z\x00|\x00\xB0\x00!\x00\xEA\x00\xE9\x00\x06\x00\x06\x00!\x00{\x00\xE9\x00\xB0\x00z\x00Y\x00Y\x00\x06\x00(\x00\xCC\x00V\x00(\x00W\x00{\x00z\x00z\x00\xB0\x00\xEB\x00!\x00{\x005\x00Y\x00\xEB\x00(\x00{\x00z\x00V\x005\x00\x06\x00\xE9\x00V\x00(\x00\xEB\x00{\x00!\x00|\x00!\x00\xE9\x00\xEB\x00|\x00(\x00\x06\x00{\x00|\x00\xE9\x00\xE9\x00\xE9\x00V\x00!\x00!\x00\xEB\x00V\x00\xB0\x00\xB0\x00(\x00W\x00\xEB\x00|\x00\x06\x00(\x00(\x00\xA5\x00z\x005\x00W\x00V\x00(\x00\xEA\x00V\x00V\x005\x00!\x00\xE9\x00\xEB\x00{\x00\xCC\x00(\x00\xEA\x00{\x00\xE9\x00Y\x00\x06\x00\xB0\x00Y\x00\xEA\x00(\x00\xCC\x005\x00\xCC\x00!\x00\x06\x00|\x00\xEB\x00V\x00\xE9\x00V\x00V\x00(\x00\xE9\x00\x06\x00\xA5\x00\xE9\x00\xEA\x00!\x00(\x00\xEA\x00W\x00\xA5\x00W\x00|\x00{\x00\xEA\x00\xE9\x00{\x00\xB0\x00!\x00\xB0\x00\xE9\x005\x00\xEB\x00\xA5\x00V\x00\x06\x00\xEA\x00(\x00W\x00z\x00z\x00W\x00Y\x00W\x00\xEB\x00(\x00W\x00\x06\x00\x06\x00Y\x00\xCC\x00W\x00\xE9\x00\xA5\x00z\x00|\x00\xB0\x00\xEB\x00(\x00\xB0\x00\xEA\x00\xB0\x00(\x00Y\x00V\x00z\x00(\x00\xEA\x00\xB0\x00\xA5\x00V\x00\xEA\x00Y\x00|\x00\xB0\x005\x00\xCC\x005\x00\xB0\x00\xE9\x00|\x00V\x00W\x00W\x00\xEB\x00\xCC\x00|\x00W\x00!\x00\xA5\x00\xCC\x00V\x00V\x00{\x005\x00W\x00|\x00\xA5\x00\xEA\x00|\x00Y\x00Y\x00\xEA\x00{\x00!\x00W\x00Y\x00\xEA\x00\x06\x00{\x00|\x00\xB0\x00\xEB\x00\xCC\x00\x06\x00V\x00z\x00(\x00\xCA\x00"
+"GET /\x5C./awmblog/index.html HTTP/1.1"    (5C = '\')
+"GET /awmblog/autotest6/index.html\x22%20and%20\x22x\x22%3D\x22x HTTP/1.1"
+"GET /static/cv/cv.html\x09 HTTP/1.1"
+"Gh0st\xAD\x00\x00\x00\xE0\x00\x00\x00x\x9CKS``\x98\xC3\xC0\xC0\xC0\x06\xC4\x8C@\xBCQ\x96\x81\x81\x09H\x07\xA7\x16\x95e&\xA7*\x04$&g+\x182\x94\xF6\xB000\xAC\xA8rc\x00\x01\x11\xA0\x82\x1F\x5C`&\x83\xC7K7\x86\x19\xE5n\x0C9\x95n\x0C;\x84\x0F3\xAC\xE8sch\xA8^\xCF4'J\x97\xA9\x82\xE30\xC3\x91h]&\x90\xF8\xCE\x97S\xCBA4L?2=\xE1\xC4\x92\x86\x0B@\xF5`\x0CT\x1F\xAE\xAF]"
+"\x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr"
+
+*/
+
 int main(void)
 {
     debug_flags = 0xffffffffffff;
