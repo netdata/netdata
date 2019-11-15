@@ -405,6 +405,10 @@ set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
         )
 
+set(NETWORK_VIEWER_PLUGIN_FILES
+        collectors/network_viewer.plugin/network_viewer_plugin.c
+        )
+
 set(PROC_PLUGIN_FILES
         collectors/proc.plugin/ipc.c
         collectors/proc.plugin/plugin_proc.c

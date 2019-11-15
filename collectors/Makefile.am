@@ -25,6 +25,7 @@ SUBDIRS = \
     slabinfo.plugin \
     statsd.plugin \
     tc.plugin \
+    network_viewer.plugin \
     $(NULL)
 
 usercustompluginsconfigdir=$(configdir)/custom-plugins.d

@@ -788,6 +788,28 @@ fi
 AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
+# -----------------------------------------------------------------------------
+# network_viewer.plugin
+
+AC_CHECK_HEADER(
+    [dlfcn.h],
+    [AC_CHECK_DECL(
+        [dlopen],
+        [have_network_viewer=yes],
+        [have_network_viewer=no],
+        [#include <dlfcn.h>]
+    )],
+    [have_network_viewer=no]
+)
+
+AC_MSG_CHECKING([if perf.plugin should be enabled])
+if test "${build_target}" == "linux" -a "${have_network_viewer}" = "yes"; then
+    enable_network_viewer="yes"
+else
+    enable_network_viewer="no"
+fi
+AC_MSG_RESULT([${enable_network_viewer}])
+AM_CONDITIONAL([ENABLE_NETWORK_VIEWER], [test "${enable_network_viewer}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin

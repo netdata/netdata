@@ -252,6 +252,11 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+NETWORK_VIEWER_PLUGIN_FILES = \
+    collectors/network_viewer.plugin/network_viewer_plugin.c \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
 PROC_PLUGIN_FILES = \
     collectors/proc.plugin/ipc.c \
     collectors/proc.plugin/plugin_proc.c \
@@ -603,6 +608,14 @@ if ENABLE_PLUGIN_PERF
     plugins_PROGRAMS += perf.plugin
     perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
     perf_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_NETWORK_VIEWER
+    plugins_PROGRAMS += network_viewer.plugin
+    network_viewer_plugin_SOURCES = $(NETWORK_VIEWER_PLUGIN_FILES)
+    network_viewer_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
