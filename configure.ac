@@ -362,6 +362,17 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
+# OpenSSL Cryptography and SSL/TLS Toolkit
+
+AC_CHECK_LIB(
+    [dl],
+    [dlopen],
+    [NETWORK_VIEWER_LIBS="-ldl"]
+)
+
+OPTIONAL_NETWORK_VIEWER_LIBS="${NETWORK_VIEWER_LIBS}"
+
+# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
     AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
@@ -791,25 +802,14 @@ AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 # -----------------------------------------------------------------------------
 # network_viewer.plugin
 
-AC_CHECK_HEADER(
-    [dlfcn.h],
-    [AC_CHECK_DECL(
-        [dlopen],
-        [have_network_viewer=yes],
-        [have_network_viewer=no],
-        [#include <dlfcn.h>]
-    )],
-    [have_network_viewer=no]
-)
-
 AC_MSG_CHECKING([if perf.plugin should be enabled])
-if test "${build_target}" == "linux" -a "${have_network_viewer}" = "yes"; then
+if test "${build_target}" == "linux" -a "${NETWORK_VIEWER_LIBS}"; then
     enable_network_viewer="yes"
 else
     enable_network_viewer="no"
 fi
 AC_MSG_RESULT([${enable_network_viewer}])
-AM_CONDITIONAL([ENABLE_NETWORK_VIEWER], [test "${enable_network_viewer}" = "yes"])
+AM_CONDITIONAL([ENABLE_PLUGIN_NETWORK_VIEWER], [test "${enable_network_viewer}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin
@@ -1146,6 +1146,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
+AC_SUBST([OPTIONAL_NETWORK_VIEWER_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])

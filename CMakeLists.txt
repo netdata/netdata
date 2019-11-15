@@ -857,6 +857,20 @@ ENDIF()
 
 
 # -----------------------------------------------------------------------------
+# network_viewer.plugin
+
+IF(ENABLE_PLUGIN_NETWORK_VIEWER)
+    message(STATUS "network_viewer.plugin: enabled")
+    add_executable(network_viewer.plugin config.h ${NETWORK_VIEWER_PLUGIN_FILES})
+    target_link_libraries (network_viewer.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(network_viewer.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(network_viewer.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "network_viewer.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
 # slabinfo.plugin
 
 IF(ENABLE_PLUGIN_SLABINFO)
