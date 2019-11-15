@@ -80,7 +80,7 @@ int rrdpush_init() {
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key || strchr(default_rrdpush_destination,'/'))) {
-        error("STREAM [send]: cannot enable sending thread - information is missing or the string specified(%s) is not according with expected [PROTOCOL:]HOST[%%INTERFACE][:PORT][:SSL].",default_rrdpush_destination );
+        error("STREAM [send]: cannot enable sending thread - an information is missing(destination, api key,enabled) or the string specified(%s) has a slash('/') that is not according the format expected [PROTOCOL:]HOST[%%INTERFACE][:PORT][:SSL].",default_rrdpush_destination );
         default_rrdpush_enabled = 0;
     }
 
