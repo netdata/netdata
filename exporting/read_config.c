@@ -13,7 +13,16 @@ struct config exporting_config = {.sections = NULL,
                                   .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
                                             .rwlock = AVL_LOCK_INITIALIZER}};
 
-struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance, char *connector_name, char *instance_name)
+/*
+ * @Input:
+ *      Connector / instance to add to an internal structure
+ * @Return
+ *      The current head of the linked list of connector_instance
+ *
+ */
+
+struct _connector_instance *
+add_connector_instance(struct section *connector, struct section *instance, char *connector_name, char *instance_name)
 {
     static struct _connector_instance *global_connector_instance = NULL;
     struct _connector_instance *local_ci;
@@ -32,6 +41,20 @@ struct _connector_instance *add_connector_instance(struct section *connector, st
     return global_connector_instance;
 }
 
+
+static struct _connector_instance *find_instance(const char *section)
+{
+    struct _connector_instance *local_ci;
+
+    local_ci = add_connector_instance(NULL, NULL, NULL, NULL);
+    while (local_ci) {
+        if (!strcmp(local_ci->instance_name, section))
+            break;
+        local_ci = local_ci->next;
+    }
+    return local_ci;
+}
+
 char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
     struct _connector_instance *local_ci;
@@ -39,14 +62,11 @@ char *expconfig_get(struct config *root, const char *section, const char *name, 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
-    local_ci = add_connector_instance(NULL, NULL, NULL, NULL);
-    while (local_ci) {
-        if (strcmp(local_ci->instance_name, section) == 0)
-            break;
-        local_ci = local_ci->next;
-    }
+    local_ci = find_instance(section);
+
     if (!local_ci)
         return NULL;
+
     return appconfig_get(
         root,
         local_ci->instance_name,
@@ -62,14 +82,11 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
-    local_ci = add_connector_instance(NULL, NULL, NULL, NULL);
-    while (local_ci) {
-        if (strcmp(local_ci->instance_name, section) == 0)
-            break;
-        local_ci = local_ci->next;
-    }
+    local_ci = find_instance(section);
+
     if (!local_ci)
         return 0;
+
     return appconfig_get_boolean(
         root,
         local_ci->instance_name,
@@ -88,14 +105,11 @@ long long expconfig_get_number(struct config *root, const char *section, const c
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
 
-    local_ci = add_connector_instance(NULL, NULL, NULL, NULL);
-    while (local_ci) {
-        if (strcmp(local_ci->instance_name, section) == 0)
-            break;
-        local_ci = local_ci->next;
-    }
+    local_ci = find_instance(section);
+
     if (!local_ci)
         return 0;
+
     return appconfig_get_number(
         root,
         local_ci->instance_name,

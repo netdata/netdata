@@ -42,55 +42,6 @@ struct section {
                             // readers are protected using the rwlock in avl_tree_lock
 };
 
-//struct  {
-//    struct section *connector;        // actual connector
-//    struct section *instance;         // This instance
-//    struct _connector_instance *next; // Next instance
-//};
-
-//struct config exporting_config = {
-//    .sections = NULL,
-//    .mutex = NETDATA_MUTEX_INITIALIZER,
-//    .index = {
-//        .avl_tree = {
-//            .root = NULL,
-//            .compar = appconfig_section_compare
-//        },
-//        .rwlock = AVL_LOCK_INITIALIZER
-//    }
-//};
-
-
-//extern struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance);
-
-
-//struct _connector_instance  *global_connector_instance = NULL;
-//
-//int get_connector_instance(struct connector_instance *target_ci)
-//{
-//    static struct _connector_instance *local_ci = NULL;
-//
-//    if (unlikely(!global_connector_instance))
-//        return 0;
-//
-//    if (target_ci == NULL) {
-//        local_ci = NULL;
-//        return 1;
-//    }
-//    if (local_ci == NULL)
-//        local_ci = global_connector_instance;
-//    else {
-//        local_ci = local_ci->next;
-//        if (local_ci == NULL)
-//            return 0;
-//    }
-//
-//    strcpy(target_ci->instance_name, local_ci->instance->name);
-//    strcpy(target_ci->connector_name, local_ci->connector->name);
-//
-//    return 1;
-//}
-
 int is_valid_connector(char *type)
 {
     if (unlikely(!type))
