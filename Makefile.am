@@ -700,8 +700,16 @@ if ENABLE_UNITTESTS
         $(NULL)
     libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
-    exporting_tests_exporting_engine_testdriver_SOURCES = \
+    EXPORTING_ENGINE_TEST_FILES = \
         exporting/tests/test_exporting_engine.c \
+        exporting/tests/test_exporting_engine.h \
+        exporting/tests/exporting_fixtures.c \
+        exporting/tests/exporting_doubles.c \
+        exporting/tests/netdata_doubles.c \
+        exporting/tests/system_doubles.c \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_SOURCES = \
+        $(EXPORTING_ENGINE_TEST_FILES) \
         $(EXPORTING_ENGINE_FILES) \
         $(LIBNETDATA_FILES) \
         $(NULL)

@@ -909,8 +909,16 @@ if(BUILD_TESTING)
     target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
 
+    set(EXPORTING_ENGINE_TEST_FILES
+        exporting/tests/test_exporting_engine.c
+        exporting/tests/test_exporting_engine.h
+        exporting/tests/exporting_fixtures.c
+        exporting/tests/exporting_doubles.c
+        exporting/tests/netdata_doubles.c
+        exporting/tests/system_doubles.c
+        )
     set(TEST_NAME exporting_engine)
-    add_executable(${TEST_NAME}_testdriver exporting/tests/test_${TEST_NAME}.c ${EXPORTING_ENGINE_FILES})
+    add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
         ${TEST_NAME}_testdriver
         PRIVATE
