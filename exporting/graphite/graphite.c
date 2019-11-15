@@ -43,7 +43,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
 }
 
 /**
- * Initialize Grafite connector
+ * Initialize Graphite connector
  *
  * @param instance a connector data structure.
  * @return Always returns 0.
@@ -68,7 +68,7 @@ int init_graphite_connector(struct connector *connector)
 }
 
 /**
- * Initialize Grafite connector instance
+ * Initialize Graphite connector instance
  *
  * @param instance an instance data structure.
  * @return Returns 0 on success, 1 on failure.
