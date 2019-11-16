@@ -1285,6 +1285,11 @@ int main(int argc, char **argv) {
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
 
+    // ------------------------------------------------------------------------
+    // Initialize netdata agent command serving from cli and signals
+
+    commands_init();
+
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
 
@@ -1295,7 +1300,6 @@ int main(int argc, char **argv) {
 
     signals_unblock();
 
-    commands_init();
     // ------------------------------------------------------------------------
     // Handle signals
 

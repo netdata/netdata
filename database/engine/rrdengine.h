@@ -177,7 +177,6 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-extern void sanity_check(void);
 extern int init_rrd_files(struct rrdengine_instance *ctx);
 extern void finalize_rrd_files(struct rrdengine_instance *ctx);
 extern void rrdeng_test_quota(struct rrdengine_worker_config* wc);
