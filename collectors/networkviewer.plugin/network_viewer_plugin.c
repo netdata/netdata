@@ -38,22 +38,9 @@ static void network_viewer_exit(int sig) {
     exit(0);
 }
 
-static int print_bpf_output(void *data, int size)
+static int store_bpf(void *data, int size)
 {
-    struct {
-        uint64_t pid;
-        uint32_t saddr;
-        uint32_t daddr;
-        uint16_t dport;
-        uint16_t retransmit;
-        uint32_t sent;
-        uint64_t recv;
-        uint8_t protocol;
-    } *e = data;
-
-    if (e) {
-        //MUST STORE THIS INSIDE AN AVL AND CASE IT IS 256 I DISPATCH TO THE CLOUD
-    }
+    netdata_conn_stats_t *e = data;
 
     //return LIBBPF_PERF_EVENT_CONT;
     return -2;
@@ -151,8 +138,36 @@ comm_load_err:
     return -1;
 }
 
+void *network_viewer_collector(void *ptr) {
+    netdata_perf_loop_multi(pmu_fd, headers, nprocs, &netdata_exit, print_bpf_output);
+
+    return NULL;
+}
+
+void *network_viewer_publisher(void *ptr) {
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    usec_t step = update_every * USEC_PER_SEC;
+    for (;;) {
+        usec_t dt = heartbeat_next(&hb, step);
+
+        if(unlikely(netdata_exit))
+            break;
+    }
+
+    return NULL;
+}
+
 int main(int argc, char **argv) {
     program_name = "network_viewer";
+
+    //Threads used in this plugin
+    struct netdata_static_thread static_threads_network_viewer[] = {
+            {"COLLECTOR",             NULL,                    NULL,         1, NULL, NULL, network_viewer_collector},
+            {"PUBLISHER",             NULL,                    NULL,         1, NULL, NULL, network_viewer_publisher},
+            {NULL,                   NULL,                    NULL,         0, NULL, NULL, NULL}
+    };
+
 
     //parse input here
 
@@ -178,23 +193,18 @@ int main(int argc, char **argv) {
         return 3;
     }
 
-    error_log_syslog = 0;
-
-    //pass netdata_exit to my_perf_loop_multi
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    usec_t step = update_every * USEC_PER_SEC;
-    for (;;) {
-        usec_t dt = heartbeat_next(&hb, step);
-
-        if(unlikely(netdata_exit))
-            break;
+    if (allocate_memory()) {
+        error("[NETWORK VIEWER]: Cannot allocate the necessary vectors")
+        network_viewer_exit(SIGTERM);
     }
 
-    //I HAVE TO CREATE TWO THREADS, ONE TO PROCESS AND OTHER TO SEND THE MESSAGES
-    //ONE UNIQUE WON'T BE ABLE TO DO EVERYTHING
+    error_log_syslog = 0;
+
+    int i;
+    for (i = 0; static_threads_network_viewer[i].name != NULL ; i++) {
+        struct netdata_static_thread *st = &static_threads[i];
+        netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
+    }
 
     network_viewer_exit(SIGTERM);
 }
