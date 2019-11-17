@@ -42,25 +42,74 @@ struct section {
                             // readers are protected using the rwlock in avl_tree_lock
 };
 
-int is_valid_connector(char *type)
+/*
+ * @Input:
+ *      Connector / instance to add to an internal structure
+ * @Return
+ *      The current head of the linked list of connector_instance
+ *
+ */
+
+_CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance)
 {
+    static struct _connector_instance *global_connector_instance = NULL;
+    struct _connector_instance *local_ci;
+
+    if (unlikely(!connector))
+        return global_connector_instance;
+
+    local_ci = callocz(1, sizeof(struct _connector_instance));
+    local_ci->instance = instance;
+    local_ci->connector = connector;
+    strncpy(local_ci->instance_name, instance->name, CONFIG_MAX_NAME);
+    strncpy(local_ci->connector_name, connector->name, CONFIG_MAX_NAME);
+    local_ci->next = global_connector_instance;
+    global_connector_instance = local_ci;
+
+    return global_connector_instance;
+}
+
+int is_valid_connector(char *type, int check_reserved)
+{
+    int rc = 1;
+
     if (unlikely(!type))
         return 0;
 
+    if (!check_reserved) {
+        if (unlikely(is_valid_connector(type,1))) {
+            return 0;
+        }
+        //if (unlikely(*type == ':')
+        //    return 0;
+        char *separator = strrchr(type, ':');
+        if (likely(separator)) {
+            *separator = '\0';
+            rc = separator - type;
+        } else
+            return 0;
+    }
+//    else {
+//        if (unlikely(is_valid_connector(type,1))) {
+//            error("Section %s invalid -- reserved name", type);
+//            return 0;
+//        }
+//    }
+
     if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
-        return 1;
+        return rc;
     } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
-        return 1;
+        return rc;
     } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
-        return 1;
+        return rc;
     } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
-        return 1;
+        return rc;
     } else if (!strcmp(type, "prometheus_remote_write")) {
-        return 1;
+        return rc;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
-        return 1;
+        return rc;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext")) {
-        return 1;
+        return rc;
     }
 
     return 0;
@@ -468,6 +517,10 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
     int is_backend_config = 0;
     int have_backend_config = 0;
     int _backends = 0;              // number of backend sections we have
+    char working_instance[CONFIG_MAX_NAME + 1];
+    char working_connector[CONFIG_MAX_NAME + 1];
+    struct section *working_connector_section = NULL;
+    int global_exporting_section = 0;
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
 
@@ -498,6 +551,28 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
             // new section
             s[len - 1] = '\0';
             s++;
+
+            if (is_exporter_config) {
+                global_exporting_section = !(strcmp(s, CONFIG_SECTION_EXPORTING));
+                if (unlikely(!global_exporting_section)) {
+                    int rc;
+                    rc = is_valid_connector(s, 0);
+                    if (likely(rc)) {
+                        strncpy(working_connector, s, CONFIG_MAX_NAME);
+                        s = s + rc + 1;
+                        if (unlikely(!(*s))) {
+                            _backends++;
+                            sprintf(buffer, "instance_%d", _backends);
+                            s = buffer;
+                        }
+                        strncpy(working_instance, s, CONFIG_MAX_NAME);
+                    } else {
+                        co = NULL;
+                        error("Section (%s) does not specify a valid connector", s);
+                        continue;
+                    }
+                }
+            }
 
             is_backend_config = !(strcmp(s, CONFIG_SECTION_BACKEND));
             if (!have_backend_config)
@@ -546,26 +621,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         if (!cv) {
             cv = appconfig_value_create(co, name, value);
-            if (is_exporter_config || is_backend_config) {
-                if (!strcmp(name, "type")) {
-                    if (is_valid_connector(value)) {
-                        char connector_name[CONFIG_MAX_NAME + 1];
-                        struct section *local_connector;
 
-                        snprintfz(connector_name, CONFIG_MAX_NAME, CONNECTOR_SECTION_FORMAT, value);
-                        local_connector = appconfig_section_find(root, connector_name);
-
-                        if (local_connector == NULL && is_backend_config) {
-                            // Auto define this connector because we need it for backwards compatibility
-                            local_connector = appconfig_section_create(root, connector_name);
-                            appconfig_value_create(local_connector, "enabled", "yes");
-                        }
-                        if (likely(local_connector))
-                            add_connector_instance(local_connector, co, local_connector->name, co->name);
-
-                    } else {
-                        info("Ignoring unknown connector %s specified for version " VERSION, value);
-                    }
+            if (likely(is_exporter_config) && unlikely(!global_exporting_section)) {
+                if (unlikely(!working_connector_section)) {
+                    working_connector_section = appconfig_section_create(root, working_connector);
+                    if (likely(working_connector_section))
+                        add_connector_instance(working_connector_section, co);
                 }
             }
         } else {

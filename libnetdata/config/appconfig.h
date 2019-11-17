@@ -91,10 +91,8 @@
 #define CONFIG_SECTION_HEALTH    "health"
 #define CONFIG_SECTION_BACKEND   "backend"
 #define CONFIG_SECTION_STREAM    "stream"
-#define CONFIG_SECTION_EXPORTING "exporting_global"
+#define CONFIG_SECTION_EXPORTING "exporting:global"
 #define EXPORTING_CONF           "exporting.conf"
-#define CONNECTOR_SECTION_FORMAT "connector_%s"
-
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
@@ -145,6 +143,20 @@ extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
 
-extern struct _connector_instance *add_connector_instance(struct section *connector, struct section *instance, char *connector_name, char *instance_name);
+
+struct connector_instance {
+    char instance_name[CONFIG_MAX_NAME + 1];
+    char connector_name[CONFIG_MAX_NAME + 1];
+};
+
+typedef struct _connector_instance {
+    struct section *connector;        // actual connector
+    struct section *instance;         // This instance
+    char instance_name[CONFIG_MAX_NAME + 1];
+    char connector_name[CONFIG_MAX_NAME + 1];
+    struct _connector_instance *next; // Next instance
+} _CONNECTOR_INSTANCE;
+
+extern _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance);
 
 #endif /* NETDATA_CONFIG_H */

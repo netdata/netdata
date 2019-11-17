@@ -13,40 +13,18 @@ struct config exporting_config = {.sections = NULL,
                                   .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
                                             .rwlock = AVL_LOCK_INITIALIZER}};
 
-/*
- * @Input:
- *      Connector / instance to add to an internal structure
- * @Return
- *      The current head of the linked list of connector_instance
- *
- */
 
-struct _connector_instance *
-add_connector_instance(struct section *connector, struct section *instance, char *connector_name, char *instance_name)
+static _CONNECTOR_INSTANCE *find_instance(const char *section)
 {
-    static struct _connector_instance *global_connector_instance = NULL;
-    struct _connector_instance *local_ci;
+    _CONNECTOR_INSTANCE *local_ci;
 
-    if (unlikely(!connector))
-        return global_connector_instance;
+    local_ci = add_connector_instance(NULL, NULL);  // Get root section
+    if (unlikely(!local_ci))
+        return local_ci;
 
-    local_ci = callocz(1, sizeof(struct _connector_instance));
-    local_ci->instance = instance;
-    local_ci->connector = connector;
-    strncpy(local_ci->instance_name, instance_name, CONFIG_MAX_NAME);
-    strncpy(local_ci->connector_name, connector_name, CONFIG_MAX_NAME);
-    local_ci->next = global_connector_instance;
-    global_connector_instance = local_ci;
+    if (!section)
+        return local_ci;
 
-    return global_connector_instance;
-}
-
-
-static struct _connector_instance *find_instance(const char *section)
-{
-    struct _connector_instance *local_ci;
-
-    local_ci = add_connector_instance(NULL, NULL, NULL, NULL);
     while (local_ci) {
         if (!strcmp(local_ci->instance_name, section))
             break;
@@ -57,7 +35,7 @@ static struct _connector_instance *find_instance(const char *section)
 
 char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
 {
-    struct _connector_instance *local_ci;
+    _CONNECTOR_INSTANCE *local_ci;
 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
@@ -65,7 +43,7 @@ char *expconfig_get(struct config *root, const char *section, const char *name, 
     local_ci = find_instance(section);
 
     if (!local_ci)
-        return NULL;
+        return NULL;    // TODO: Check if it is meaningful to return default_value
 
     return appconfig_get(
         root,
@@ -77,7 +55,7 @@ char *expconfig_get(struct config *root, const char *section, const char *name, 
 
 int expconfig_get_boolean(struct config *root, const char *section, const char *name, int default_value)
 {
-    struct _connector_instance *local_ci;
+    _CONNECTOR_INSTANCE *local_ci;
 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
@@ -85,7 +63,7 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
     local_ci = find_instance(section);
 
     if (!local_ci)
-        return 0;
+        return 0;       // TODO: Check if it is meaningful to return default_value
 
     return appconfig_get_boolean(
         root,
@@ -100,7 +78,7 @@ int expconfig_get_boolean(struct config *root, const char *section, const char *
 
 long long expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
 {
-    struct _connector_instance *local_ci;
+    _CONNECTOR_INSTANCE *local_ci;
 
     if (!strcmp(section, CONFIG_SECTION_EXPORTING))
         return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
@@ -108,7 +86,7 @@ long long expconfig_get_number(struct config *root, const char *section, const c
     local_ci = find_instance(section);
 
     if (!local_ci)
-        return 0;
+        return 0;   // TODO: Check if it is meaningful to return default_value
 
     return appconfig_get_number(
         root,
@@ -132,10 +110,10 @@ long long expconfig_get_number(struct config *root, const char *section, const c
 
 int get_connector_instance(struct connector_instance *target_ci)
 {
-    static struct _connector_instance *local_ci = NULL;
-    struct _connector_instance *global_connector_instance;
+    static _CONNECTOR_INSTANCE *local_ci = NULL;
+    _CONNECTOR_INSTANCE *global_connector_instance;
 
-    global_connector_instance = add_connector_instance(NULL, NULL, NULL, NULL);
+    global_connector_instance = find_instance(NULL);       // Fetch head of instances
 
     if (unlikely(!global_connector_instance))
         return 0;
@@ -169,19 +147,19 @@ int get_connector_instance(struct connector_instance *target_ci)
  */
 BACKEND_TYPE exporting_select_type(const char *type)
 {
-    if (!strcmp(type, "connector_graphite") || !strcmp(type, "connector_graphite:plaintext")) {
+    if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         return BACKEND_TYPE_GRAPHITE;
-    } else if (!strcmp(type, "connector_opentsdb") || !strcmp(type, "connector_opentsdb:telnet")) {
+    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
         return BACKEND_TYPE_OPENTSDB_USING_TELNET;
-    } else if (!strcmp(type, "connector_opentsdb:http") || !strcmp(type, "connector_opentsdb:https")) {
+    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
         return BACKEND_TYPE_OPENTSDB_USING_HTTP;
-    } else if (!strcmp(type, "connector_json") || !strcmp(type, "connector_json:plaintext")) {
+    } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return BACKEND_TYPE_JSON;
-    } else if (!strcmp(type, "connector_prometheus_remote_write") || !strcmp(type, "connector_prometheus_remote_write")) {
+    } else if (!strcmp(type, "prometheus_remote_write") || !strcmp(type, "prometheus_remote_write")) {
         return BACKEND_TYPE_PROMETEUS;
-    } else if (!strcmp(type, "connector_kinesis") || !strcmp(type, "connector_kinesis:plaintext")) {
+    } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
-    } else if (!strcmp(type, "connector_mongodb") || !strcmp(type, "connector_mongodb:plaintext"))
+    } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext"))
         return BACKEND_TYPE_MONGODB;
 
     return BACKEND_TYPE_UNKNOWN;
@@ -226,6 +204,7 @@ struct engine *read_exporting_config()
 
     freez(filename);
 
+    // TODO: remove if we should drop backwards compatibility via the netdata.conf file directly
     if (!exporting_config_exists)
         memcpy(&exporting_config, &netdata_config, sizeof(netdata_config));
 

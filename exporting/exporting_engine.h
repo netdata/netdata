@@ -7,15 +7,10 @@
 
 #include <uv.h>
 
-extern char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
-extern long long expconfig_get_number(struct config *root, const char *section, const char *name, long long value);
-extern int expconfig_get_boolean(struct config *root, const char *section, const char *name, int value);
-
 #define exporter_get(section, name, value) expconfig_get(&exporting_config, section, name, value)
 #define exporter_get_number(section, name, value) expconfig_get_number(&exporting_config, section, name, value)
 #define exporter_get_boolean(section, name, value) expconfig_get_boolean(&exporting_config, section, name, value)
 
-extern int is_valid_connector(char *type);
 extern struct config exporting_config;
 
 #define EXPORTER_DESTINATION                "destination"
@@ -121,20 +116,6 @@ struct engine {
     time_t after;
     time_t before;
 };
-
-struct _connector_instance {
-    struct section *connector;        // actual connector
-    struct section *instance;         // This instance
-    char instance_name[CONFIG_MAX_NAME + 1];
-    char connector_name[CONFIG_MAX_NAME + 1];
-    struct _connector_instance *next; // Next instance
-};
-
-struct connector_instance {
-    char instance_name[CONFIG_MAX_NAME + 1];
-    char connector_name[CONFIG_MAX_NAME + 1];
-};
-
 
 void *exporting_main(void *ptr);
 
