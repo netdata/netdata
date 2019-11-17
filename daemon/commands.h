@@ -3,6 +3,12 @@
 #ifndef NETDATA_COMMANDS_H
 #define NETDATA_COMMANDS_H 1
 
+#ifdef _WIN32
+# define PIPENAME "\\\\?\\pipe\\netdata-cli"
+#else
+# define PIPENAME "/tmp/netdata-ipc"
+#endif
+
 #define MAX_COMMAND_LENGTH 4096
 
 typedef enum cmd {
@@ -20,6 +26,10 @@ typedef enum cmd_status {
     CMD_STATUS_FAILURE,
     CMD_STATUS_BUSY
 } cmd_status_t;
+
+#define CMD_STATUS_SUCCESS_STR "SUCCESS"
+#define CMD_STATUS_FAILURE_STR "FAILURE"
+#define CMD_STATUS_BUSY_STR "BUSY"
 
 typedef enum cmd_type {
     CMD_TYPE_EXCLUSIVE = 0, // No other command can run at the same time

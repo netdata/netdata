@@ -37,6 +37,7 @@ sha256sums.txt
 
 # netdata binaries
 netdata
+netdatacli
 !netdata/
 upload/
 artifacts/

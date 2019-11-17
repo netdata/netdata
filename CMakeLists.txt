@@ -650,6 +650,12 @@ set(NETDATA_FILES
         ${WEB_PLUGIN_FILES}
         )
 
+set(NETDATACLI_FILES
+        daemon/commands.h
+        cli/cli.c
+        cli/cli.h
+        )
+
 include_directories(AFTER .)
 
 add_definitions(
@@ -784,6 +790,15 @@ IF(XENSTAT_LIBRARIES)
 ELSE()
     SET(ENABLE_PLUGIN_XENSTAT False)
 ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# netdatacli
+
+add_executable(netdatacli config.h ${NETDATACLI_FILES})
+target_link_libraries (netdatacli libnetdata ${NETDATA_COMMON_LIBRARIES})
+target_include_directories(netdatacli PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+target_compile_options(netdatacli PUBLIC ${NETDATA_COMMON_CFLAGS})
 
 
 # -----------------------------------------------------------------------------

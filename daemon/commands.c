@@ -7,16 +7,11 @@ static uv_loop_t* loop;
 static uv_async_t async;
 static struct completion completion;
 static uv_pipe_t server_pipe;
-#ifdef _WIN32
-# define PIPENAME "\\\\?\\pipe\\netdata-cli"
-#else
-# define PIPENAME "/tmp/netdata-ipc"
-#endif
 
 char *cmd_status_str[] = {
-        "SUCCESS",
-        "FAILURE",
-        "BUSY"
+        CMD_STATUS_SUCCESS_STR,
+        CMD_STATUS_FAILURE_STR,
+        CMD_STATUS_BUSY_STR
 };
 
 static int command_thread_error;
