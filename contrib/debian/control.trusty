@@ -59,4 +59,4 @@ Package: netdata-plugin-cups
 Architecture: any
 Depends: cups,
          netdata (>= ${source:Version})
-Description: The Common Unix Printing System plugin for metrics collection from cupds
+Description: The Common Unix Printing System plugin for metrics collection from cupsd

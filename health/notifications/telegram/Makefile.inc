@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	telegram/README.md \
-	telegram/Makefile.inc \
-	$(NULL)
+    telegram/README.md \
+    telegram/Makefile.inc \
+    $(NULL)
 

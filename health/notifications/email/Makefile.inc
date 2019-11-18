@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	email/README.md \
-	email/Makefile.inc \
-	$(NULL)
+    email/README.md \
+    email/Makefile.inc \
+    $(NULL)
 

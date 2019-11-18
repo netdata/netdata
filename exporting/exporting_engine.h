@@ -138,6 +138,9 @@ int end_chart_formatting(struct engine *engine);
 int end_host_formatting(struct engine *engine);
 int end_batch_formatting(struct engine *engine);
 
+int exporting_discard_response(BUFFER *buffer, struct instance *instance);
+void simple_connector_receive_response(int *sock, struct instance *instance);
+void simple_connector_send_buffer(int *sock, int *failures, struct instance *instance);
 void simple_connector_worker(void *instance_p);
 
 int send_internal_metrics(struct engine *engine);

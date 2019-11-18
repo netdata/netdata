@@ -10,18 +10,17 @@ try:
     from psycopg2 import extensions
     from psycopg2.extras import DictCursor
     from psycopg2 import OperationalError
+
     PSYCOPG2 = True
 except ImportError:
     PSYCOPG2 = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-
 DEFAULT_PORT = 5432
 DEFAULT_USER = 'postgres'
-DEFAULT_CONNECT_TIMEOUT = 2       # seconds
+DEFAULT_CONNECT_TIMEOUT = 2  # seconds
 DEFAULT_STATEMENT_TIMEOUT = 5000  # ms
-
 
 CONN_PARAM_DSN = 'dsn'
 CONN_PARAM_HOST = 'host'
@@ -36,7 +35,6 @@ CONN_PARAM_SSL_ROOT_CERT = 'sslrootcert'
 CONN_PARAM_SSL_CRL = 'sslcrl'
 CONN_PARAM_SSL_CERT = 'sslcert'
 CONN_PARAM_SSL_KEY = 'sslkey'
-
 
 QUERY_NAME_WAL = 'WAL'
 QUERY_NAME_ARCHIVE = 'ARCHIVE'
@@ -144,7 +142,6 @@ DEFAULT = 'DEFAULT'
 V96 = 'V96'
 V10 = 'V10'
 V11 = 'V11'
-
 
 QUERY_WAL = {
     DEFAULT: """
@@ -904,6 +901,7 @@ class Service(SimpleService):
         if not self.alive and not self.reconnect():
             return None
 
+        self.data = dict()
         try:
             cursor = self.conn.cursor(cursor_factory=DictCursor)
 
@@ -989,7 +987,8 @@ class Service(SimpleService):
                 self.queries[query_factory(QUERY_NAME_WAL, self.server_version)] = METRICS[QUERY_NAME_WAL]
 
             if self.server_version >= 100000:
-                self.queries[query_factory(QUERY_NAME_REPSLOT_FILES, self.server_version)] = METRICS[QUERY_NAME_REPSLOT_FILES]
+                v = METRICS[QUERY_NAME_REPSLOT_FILES]
+                self.queries[query_factory(QUERY_NAME_REPSLOT_FILES, self.server_version)] = v
 
         if self.server_version >= 90400:
             self.queries[query_factory(QUERY_NAME_AUTOVACUUM)] = METRICS[QUERY_NAME_AUTOVACUUM]
@@ -1005,12 +1004,12 @@ class Service(SimpleService):
             ]
             self.definitions['database_size']['lines'].append(dim)
             for chart_name in [name for name in self.order if name.startswith('db_stat')]:
-                    add_database_stat_chart(
-                        order=self.order,
-                        definitions=self.definitions,
-                        name=chart_name,
-                        database_name=database_name,
-                    )
+                add_database_stat_chart(
+                    order=self.order,
+                    definitions=self.definitions,
+                    name=chart_name,
+                    database_name=database_name,
+                )
             add_database_lock_chart(
                 order=self.order,
                 definitions=self.definitions,
@@ -1078,10 +1077,10 @@ def add_database_lock_chart(order, definitions, database_name):
     chart_name = database_name + '_locks'
     order.insert(-1, chart_name)
     definitions[chart_name] = {
-            'options':
+        'options':
             [None, 'Locks on db: ' + database_name, 'locks', 'db ' + database_name, 'postgres.db_locks', 'line'],
-            'lines': create_lines(database_name)
-            }
+        'lines': create_lines(database_name)
+    }
 
 
 def add_database_stat_chart(order, definitions, name, database_name):
@@ -1097,8 +1096,8 @@ def add_database_stat_chart(order, definitions, name, database_name):
     order.insert(0, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-               'options': [name, title + ': ' + database_name,  units, 'db ' + database_name, context,  chart_type],
-               'lines': create_lines(database_name, chart_template['lines'])}
+        'options': [name, title + ': ' + database_name, units, 'db ' + database_name, context, chart_type],
+        'lines': create_lines(database_name, chart_template['lines'])}
 
 
 def add_replication_delta_chart(order, definitions, name, application_name):
@@ -1115,8 +1114,8 @@ def add_replication_delta_chart(order, definitions, name, application_name):
     order.insert(position, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-               'options': [name, title + ': ' + application_name,  units, 'replication delta', context,  chart_type],
-               'lines': create_lines(application_name, chart_template['lines'])}
+        'options': [name, title + ': ' + application_name, units, 'replication delta', context, chart_type],
+        'lines': create_lines(application_name, chart_template['lines'])}
 
 
 def add_replication_slot_chart(order, definitions, name, slot_name):
@@ -1133,5 +1132,5 @@ def add_replication_slot_chart(order, definitions, name, slot_name):
     order.insert(position, chart_name)
     name, title, units, _, context, chart_type = chart_template['options']
     definitions[chart_name] = {
-               'options': [name, title + ': ' + slot_name,  units, 'replication slot files', context,  chart_type],
-               'lines': create_lines(slot_name, chart_template['lines'])}
+        'options': [name, title + ': ' + slot_name, units, 'replication slot files', context, chart_type],
+        'lines': create_lines(slot_name, chart_template['lines'])}

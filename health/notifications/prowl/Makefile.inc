@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	prowl/README.md \
-	prowl/Makefile.inc \
-	$(NULL)
+    prowl/README.md \
+    prowl/Makefile.inc \
+    $(NULL)
 

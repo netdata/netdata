@@ -2,7 +2,7 @@
 
 Netdata supports **internal** and **external** data collection plugins:
 
--   **internal** plugins are written in `C` and run as threads inside the `netdat`a\` daemon.
+-   **internal** plugins are written in `C` and run as threads inside the `netdata` daemon.
 
 -   **external** plugins may be written in any computer language and are spawn as independent long-running processes by the `netdata` daemon.
      They communicate with the `netdata` daemon via `pipes` (`stdout` communication).

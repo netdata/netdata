@@ -646,6 +646,7 @@ set(NETDATA_FILES
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${BACKENDS_PLUGIN_FILES}
+        ${EXPORTING_ENGINE_FILES}
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
@@ -908,8 +909,16 @@ if(BUILD_TESTING)
     target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
 
+    set(EXPORTING_ENGINE_TEST_FILES
+        exporting/tests/test_exporting_engine.c
+        exporting/tests/test_exporting_engine.h
+        exporting/tests/exporting_fixtures.c
+        exporting/tests/exporting_doubles.c
+        exporting/tests/netdata_doubles.c
+        exporting/tests/system_doubles.c
+        )
     set(TEST_NAME exporting_engine)
-    add_executable(${TEST_NAME}_testdriver exporting/tests/test_${TEST_NAME}.c ${EXPORTING_ENGINE_FILES})
+    add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
     target_compile_options(
         ${TEST_NAME}_testdriver
         PRIVATE
@@ -926,6 +935,15 @@ if(BUILD_TESTING)
         -Wl,--wrap=send_internal_metrics
         -Wl,--wrap=now_realtime_sec
         -Wl,--wrap=uv_thread_create
+        -Wl,--wrap=uv_mutex_lock
+        -Wl,--wrap=uv_mutex_unlock
+        -Wl,--wrap=uv_cond_signal
+        -Wl,--wrap=uv_cond_wait
+        -Wl,--wrap=strdupz
+        -Wl,--wrap=info_int
+        -Wl,--wrap=recv
+        -Wl,--wrap=send
+        -Wl,--wrap=connect_to_one_of
     )
     target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)

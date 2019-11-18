@@ -1447,9 +1447,11 @@ void rrdset_done(RRDSET *st) {
                     continue;
                 }
 
-                // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
-                // to reset the calculation (it will give zero as the calculation for this second)
-                if(unlikely(rd->last_collected_value > rd->collected_value)) {
+                // If the new is smaller than the old (an overflow, or reset), set the old equal to the new
+                // to reset the calculation (it will give zero as the calculation for this second).
+                // It is imperative to set the comparison to uint64_t since type collected_number is signed and
+                // produces wrong results as far as incremental counters are concerned.
+                if(unlikely((uint64_t)rd->last_collected_value > (uint64_t)rd->collected_value)) {
                     debug(D_RRD_STATS, "%s.%s: RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
                           , st->name, rd->name
                           , rd->last_collected_value
@@ -1463,17 +1465,29 @@ void rrdset_done(RRDSET *st) {
                     uint64_t max = (uint64_t)rd->collected_value_max;
                     uint64_t cap = 0;
 
-                         if(max > 0x00000000FFFFFFFFULL) cap = 0xFFFFFFFFFFFFFFFFULL;
-                    else if(max > 0x000000000000FFFFULL) cap = 0x00000000FFFFFFFFULL;
-                    else if(max > 0x00000000000000FFULL) cap = 0x000000000000FFFFULL;
-                    else                                 cap = 0x00000000000000FFULL;
+                    // Signed values are handled by exploiting two's complement which will produce positive deltas
+                    if (max > 0x00000000FFFFFFFFULL)
+                        cap = 0xFFFFFFFFFFFFFFFFULL; // handles signed and unsigned 64-bit counters
+                    else
+                        cap = 0x00000000FFFFFFFFULL; // handles signed and unsigned 32-bit counters
 
                     uint64_t delta = cap - last + new;
+                    uint64_t max_acceptable_rate = (cap / 100) * MAX_INCREMENTAL_PERCENT_RATE;
 
-                    rd->calculated_value +=
-                            (calculated_number) delta
-                            * (calculated_number) rd->multiplier
-                            / (calculated_number) rd->divisor;
+                    // If the delta is less than the maximum acceptable rate and the previous value was near the cap
+                    // then this is an overflow. There can be false positives such that a reset is detected as an
+                    // overflow.
+                    // TODO: remember recent history of rates and compare with current rate to reduce this chance.
+                    if (delta < max_acceptable_rate) {
+                        rd->calculated_value +=
+                                (calculated_number) delta
+                                * (calculated_number) rd->multiplier
+                                / (calculated_number) rd->divisor;
+                    } else {
+                        // This is a reset. Any overflow with a rate greater than MAX_INCREMENTAL_PERCENT_RATE will also
+                        // be detected as a reset instead.
+                        rd->calculated_value += (calculated_number)0;
+                    }
                 }
                 else {
                     rd->calculated_value +=
