@@ -645,12 +645,12 @@ if ENABLE_UNITTESTS
         libnetdata/tests/str2ld_testdriver \
         libnetdata/storage_number/tests/storage_number_testdriver \
         web/api/tests/web_api_testdriver \
-        web/api/tests/web_api_valid_urls \
+        web/api/tests/valid_urls_testdriver \
         $(NULL)
 
     TESTS = $(check_PROGRAMS)
 
-    web_api_tests_web_api_valid_urls_LDFLAGS = \
+    web_api_tests_valid_urls_testdriver_LDFLAGS = \
         -Wl,--wrap=rrdhost_find_by_hostname \
         -Wl,--wrap=finished_web_request_statistics \
         -Wl,--wrap=config_get \
@@ -666,12 +666,13 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=mysendfile \
         $(TEST_LDFLAGS) \
         $(NULL)
-    web_api_tests_web_api_valid_urls_SOURCES = \
+    web_api_tests_valid_urls_testdriver_SOURCES = \
         web/api/tests/valid_urls.c \
+        -DUNIT_TESTING \
         web/server/web_client.c \
         $(LIBNETDATA_FILES) \
         $(NULL)
-    web_api_tests_web_api_valid_urls_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+    web_api_tests_valid_urls_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
     web_api_tests_web_api_testdriver_LDFLAGS = \
         -Wl,--wrap=rrdhost_find_by_hostname \

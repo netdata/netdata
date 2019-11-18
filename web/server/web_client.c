@@ -340,6 +340,7 @@ static inline int access_to_file_is_not_permitted(struct web_client *w, const ch
     return HTTP_RESP_FORBIDDEN;
 }
 
+#ifndef UNIT_TESTING
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
@@ -448,11 +449,13 @@ int mysendfile(struct web_client *w, char *filename) {
     w->response.data->date = statbuf.st_mtimespec.tv_sec;
 #else
     w->response.data->date = statbuf.st_mtim.tv_sec;
-#endif /* __APPLE__ */
+#endif 
     buffer_cacheable(w->response.data);
 
     return HTTP_RESP_OK;
 }
+#endif
+
 
 
 #ifdef NETDATA_WITH_ZLIB

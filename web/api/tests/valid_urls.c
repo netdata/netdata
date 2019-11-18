@@ -81,7 +81,7 @@ int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
     return HTTP_RESP_OK;
 }
 
-int mysendfile(struct web_client *w, char *filename)
+int __wrap_mysendfile(struct web_client *w, char *filename)
 {
     printf("mysendfile(filename=\"%s\"\n",filename);
 }
