@@ -292,7 +292,7 @@ int valid_url_launcher()
         tests[i].teardown_func = NULL;
         tests[i].initial_state = NULL;
     }
-    shared_test_state = valid_url_tests;
+    shared_test_state = 0;
     int fails = _cmocka_run_group_tests("valid_urls", tests, num_tests, NULL, NULL);
     free(tests);
     return fails;
