@@ -54,6 +54,7 @@ struct engine *__mock_read_exporting_config();
 int __real_init_connectors(struct engine *engine);
 int __wrap_init_connectors(struct engine *engine);
 
+int __real_mark_scheduled_instances(struct engine *engine);
 int __wrap_mark_scheduled_instances(struct engine *engine);
 
 int __real_prepare_buffers(struct engine *engine);

@@ -26,23 +26,19 @@ void *exporting_main(void *ptr)
         return NULL;
     }
 
-    usec_t step_ut = USEC_PER_SEC;
-    engine->after = now_realtime_sec();
+    usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     while (!netdata_exit) {
         heartbeat_next(&hb, step_ut);
-        engine->before = now_realtime_sec();
+        engine->now = now_realtime_sec();
 
-        if (mark_scheduled_instances(engine) != 0) {
-            error("EXPORTING: cannot mark scheduled exporting connector instanses");
-            return NULL;
-        }
-
-        if (prepare_buffers(engine) != 0) {
-            error("EXPORTING: cannot prepare data to send");
-            return NULL;
+        if (mark_scheduled_instances(engine)) {
+            if (prepare_buffers(engine) != 0) {
+                error("EXPORTING: cannot prepare data to send");
+                return NULL;
+            }
         }
 
         if (notify_workers(engine) != 0) {
@@ -54,8 +50,6 @@ void *exporting_main(void *ptr)
             error("EXPORTING: cannot send metrics for the operation of exporting engine");
             return NULL;
         }
-
-        engine->after = engine->before;
 
 #ifdef UNIT_TESTING
         break;

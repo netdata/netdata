@@ -10,6 +10,9 @@ char log_line[MAX_LOG_LINE + 1];
 
 void init_connectors_in_tests(struct engine *engine)
 {
+    expect_function_call(__wrap_now_realtime_sec);
+    will_return(__wrap_now_realtime_sec, 2);
+
     expect_function_call(__wrap_uv_thread_create);
 
     expect_value(__wrap_uv_thread_create, thread, &engine->connector_root->instance_root->thread);
@@ -17,6 +20,9 @@ void init_connectors_in_tests(struct engine *engine)
     expect_value(__wrap_uv_thread_create, arg, engine->connector_root->instance_root);
 
     assert_int_equal(__real_init_connectors(engine), 0);
+
+    assert_int_equal(engine->now, 2);
+    assert_int_equal(engine->connector_root->instance_root->after, 2);
 }
 
 static void test_exporting_engine(void **state)
@@ -30,13 +36,12 @@ static void test_exporting_engine(void **state)
     expect_memory(__wrap_init_connectors, engine, engine, sizeof(struct engine));
     will_return(__wrap_init_connectors, 0);
 
-    expect_function_calls(__wrap_now_realtime_sec, 2);
-    will_return(__wrap_now_realtime_sec, 1);
+    expect_function_call(__wrap_now_realtime_sec);
     will_return(__wrap_now_realtime_sec, 2);
 
     expect_function_call(__wrap_mark_scheduled_instances);
     expect_memory(__wrap_mark_scheduled_instances, engine, engine, sizeof(struct engine));
-    will_return(__wrap_mark_scheduled_instances, 0);
+    will_return(__wrap_mark_scheduled_instances, 1);
 
     expect_function_call(__wrap_prepare_buffers);
     expect_memory(__wrap_prepare_buffers, engine, engine, sizeof(struct engine));
@@ -52,6 +57,7 @@ static void test_exporting_engine(void **state)
 
     void *ptr = malloc(sizeof(int));
     assert_ptr_equal(exporting_main(ptr), NULL);
+    assert_int_equal(engine->now, 2);
     free(ptr);
 }
 
@@ -115,6 +121,17 @@ static void test_init_connectors(void **state)
     assert_string_equal(buffer_tostring(buffer), "graphite test");
 }
 
+static void test_mark_scheduled_instances(void **state)
+{
+    struct engine *engine = *state;
+
+    assert_int_equal(__real_mark_scheduled_instances(engine), 1);
+
+    struct instance *instance = engine->connector_root->instance_root;
+    assert_int_equal(instance->scheduled, 1);
+    assert_int_equal(instance->before, 2);
+}
+
 static void test_prepare_buffers(void **state)
 {
     struct engine *engine = *state;
@@ -129,6 +146,7 @@ static void test_prepare_buffers(void **state)
     connector->end_batch_formatting = __mock_end_batch_formatting;
 
     struct instance *instance = engine->connector_root->instance_root;
+    __real_mark_scheduled_instances(engine);
 
     expect_function_call(__mock_start_batch_formatting);
     expect_value(__mock_start_batch_formatting, instance, instance);
@@ -173,6 +191,9 @@ static void test_prepare_buffers(void **state)
     connector->end_host_formatting = NULL;
     connector->end_batch_formatting = NULL;
     assert_int_equal(__real_prepare_buffers(engine), 0);
+
+    assert_int_equal(instance->scheduled, 0);
+    assert_int_equal(instance->after, 2);
 }
 
 static void test_exporting_name_copy(void **state)
@@ -236,8 +257,7 @@ static void test_simple_connector_receive_response(void **state)
     simple_connector_receive_response(&sock, instance);
 
     assert_string_equal(
-        log_line,
-        "EXPORTING: received 9 bytes from (null) connector instance. Ignoring them. Sample: 'Test recv'");
+        log_line, "EXPORTING: received 9 bytes from (null) connector instance. Ignoring them. Sample: 'Test recv'");
 
     assert_int_equal(stats->chart_received_bytes, 9);
     assert_int_equal(stats->chart_receptions, 1);
@@ -254,6 +274,7 @@ static void test_simple_connector_send_buffer(void **state)
     int sock = 1;
     int failures = 3;
 
+    __real_mark_scheduled_instances(engine);
     __real_prepare_buffers(engine);
 
     expect_function_call(__wrap_send);
@@ -283,6 +304,7 @@ static void test_simple_connector_worker(void **state)
     struct instance *instance = engine->connector_root->instance_root;
     BUFFER *buffer = instance->buffer;
 
+    __real_mark_scheduled_instances(engine);
     __real_prepare_buffers(engine);
 
     expect_function_call(__wrap_connect_to_one_of);
@@ -317,9 +339,11 @@ static void test_init_graphite_instance(void **state)
 int main(void)
 {
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test_setup_teardown(test_exporting_engine, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(test_exporting_engine, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_read_exporting_config),
         cmocka_unit_test_setup_teardown(test_init_connectors, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_mark_scheduled_instances, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(test_prepare_buffers, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test_setup_teardown(

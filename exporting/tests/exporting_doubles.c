@@ -43,6 +43,7 @@ int __wrap_init_connectors(struct engine *engine)
     return mock_type(int);
 }
 
+int __real_mark_scheduled_instances(struct engine *engine);
 int __wrap_mark_scheduled_instances(struct engine *engine)
 {
     function_called();

@@ -86,6 +86,10 @@ struct instance {
     void *buffer;
     struct stats stats;
 
+    int scheduled;
+    time_t after;
+    time_t before;
+
     uv_thread_t thread;
     uv_mutex_t mutex;
     uv_cond_t cond_var;
@@ -115,8 +119,7 @@ struct connector {
 struct engine {
     struct engine_config config;
     struct connector *connector_root;
-    time_t after;
-    time_t before;
+    time_t now;
 };
 
 void *exporting_main(void *ptr);

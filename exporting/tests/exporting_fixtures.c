@@ -6,9 +6,6 @@ int setup_configured_engine(void **state)
 {
     struct engine *engine = __mock_read_exporting_config();
 
-    engine->after = 1;
-    engine->before = 2;
-
     *state = engine;
 
     return 0;
@@ -36,6 +33,9 @@ int teardown_configured_engine(void **state)
 int setup_rrdhost()
 {
     localhost = calloc(1, sizeof(RRDHOST));
+
+    localhost->rrd_update_every = 1;
+
     localhost->tags = strdupz("TAG1=VALUE1 TAG2=VALUE2");
 
     localhost->rrdset_root = calloc(1, sizeof(RRDSET));

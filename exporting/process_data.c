@@ -36,13 +36,23 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len)
  * which are scheduled for the update.
  *
  * @param engine an engine data structure.
- * @return Returns 0 on success, 1 on failure.
+ * @return Returns 1 if there are instances to process
  */
 int mark_scheduled_instances(struct engine *engine)
 {
-    (void)engine;
+    int instances_were_scheduled = 0;
 
-    return 0;
+    for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
+        for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
+            if (engine->now % instance->config.update_every < localhost->rrd_update_every) {
+                instance->scheduled = 1;
+                instances_were_scheduled = 1;
+                instance->before = engine->now;
+            }
+        }
+    }
+
+    return instances_were_scheduled;
 }
 
 /**
@@ -55,11 +65,13 @@ int start_batch_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            uv_mutex_lock(&instance->mutex);
-            if (connector->start_batch_formatting) {
-                if (connector->start_batch_formatting(instance) != 0) {
-                    error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
-                    return 1;
+            if (instance->scheduled) {
+                uv_mutex_lock(&instance->mutex);
+                if (connector->start_batch_formatting) {
+                    if (connector->start_batch_formatting(instance) != 0) {
+                        error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
+                        return 1;
+                    }
                 }
             }
         }
@@ -78,7 +90,7 @@ int start_host_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (connector->start_host_formatting) {
+            if (instance->scheduled && connector->start_host_formatting) {
                 if (connector->start_host_formatting(instance) != 0) {
                     error("EXPORTING: cannot start host formatting for %s", instance->config.name);
                     return 1;
@@ -100,7 +112,7 @@ int start_chart_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (connector->start_chart_formatting) {
+            if (instance->scheduled && connector->start_chart_formatting) {
                 if (connector->start_chart_formatting(instance) != 0) {
                     error("EXPORTING: cannot start chart formatting for %s", instance->config.name);
                     return 1;
@@ -122,7 +134,7 @@ int metric_formatting(struct engine *engine, RRDDIM *rd)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (connector->metric_formatting) {
+            if (instance->scheduled && connector->metric_formatting) {
                 if (connector->metric_formatting(instance, rd) != 0) {
                     error("EXPORTING: cannot format metric for %s", instance->config.name);
                     return 1;
@@ -145,7 +157,7 @@ int end_chart_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (connector->end_chart_formatting) {
+            if (instance->scheduled && connector->end_chart_formatting) {
                 if (connector->end_chart_formatting(instance) != 0) {
                     error("EXPORTING: cannot end chart formatting for %s", instance->config.name);
                     return 1;
@@ -168,7 +180,7 @@ int end_host_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (connector->end_host_formatting) {
+            if (instance->scheduled && connector->end_host_formatting) {
                 if (connector->end_host_formatting(instance) != 0) {
                     error("EXPORTING: cannot end host formatting for %s", instance->config.name);
                     return 1;
@@ -190,14 +202,19 @@ int end_batch_formatting(struct engine *engine)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (connector->end_batch_formatting) {
-                if (connector->end_batch_formatting(instance) != 0) {
-                    error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
-                    return 1;
+            if (instance->scheduled) {
+                if (connector->end_batch_formatting) {
+                    if (connector->end_batch_formatting(instance) != 0) {
+                        error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
+                        return 1;
+                    }
                 }
+                uv_mutex_unlock(&instance->mutex);
+                uv_cond_signal(&instance->cond_var);
+
+                instance->scheduled = 0;
+                instance->after = instance->before;
             }
-            uv_mutex_unlock(&instance->mutex);
-            uv_cond_signal(&instance->cond_var);
         }
     }
 
