@@ -204,10 +204,6 @@ struct engine *read_exporting_config()
 
     freez(filename);
 
-    // TODO: remove if we should drop backwards compatibility via the netdata.conf file directly
-    if (!exporting_config_exists)
-        memcpy(&exporting_config, &netdata_config, sizeof(netdata_config));
-
     // Will build a list of instances per connector
     // TODO: change BACKEND to EXPORTING
     ci_list = callocz(sizeof(BACKEND_TYPE), sizeof(struct connector_instance_list *));
@@ -220,10 +216,9 @@ struct engine *read_exporting_config()
             backend_type = exporting_select_type(local_ci.connector_name);
 
             info(
-                "Instance (%s) on connector (%s) type=%d is enabled and scheduled for activation",
+                "Instance (%s) on connector (%s) is enabled and scheduled for activation",
                 local_ci.instance_name,
-                local_ci.connector_name,
-                backend_type);
+                local_ci.connector_name);
 
             tmp_ci_list = (struct connector_instance_list *)callocz(1, sizeof(struct connector_instance_list));
             memcpy(&tmp_ci_list->local_ci, &local_ci, sizeof(local_ci));
