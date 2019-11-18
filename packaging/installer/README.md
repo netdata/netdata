@@ -39,9 +39,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 !!! note
     Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
 
-```
+
 To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
-```
 
 <details markdown="1"><summary>Click here for more information and advanced use of the one-line installation script.</summary>
 
