@@ -663,6 +663,7 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=error_int \
         -Wl,--wrap=info_int \
         -Wl,--wrap=fatal_int \
+        -Wl,--wrap=mysendfile \
         $(TEST_LDFLAGS) \
         $(NULL)
     web_api_tests_web_api_valid_urls_SOURCES = \

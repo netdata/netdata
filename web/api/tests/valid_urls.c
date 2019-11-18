@@ -81,6 +81,11 @@ int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
     return HTTP_RESP_OK;
 }
 
+int mysendfile(struct web_client *w, char *filename)
+{
+    printf("mysendfile(filename=\"%s\"\n",filename);
+}
+
 int __wrap_rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url)
 {
     (void)host;
@@ -113,9 +118,8 @@ RRDSET *__wrap_rrdset_find(RRDHOST *host, const char *id)
     return NULL;
 }
 
-// -------------------------------- Mocking the log - capture per-test ------------------------------------------------
+// -------------------------------- Mocking the log - dump straight through --------------------------------------------
 
-char log_buffer[10240] = { 0 };
 void __wrap_debug_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
     (void)file;
@@ -123,9 +127,9 @@ void __wrap_debug_int(const char *file, const char *function, const unsigned lon
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "  DEBUG: ");
-    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
-    sprintf(log_buffer + strlen(log_buffer), "\n");
+    printf("  DEBUG: ");
+    printf(fmt, args);
+    printf("\n");
     va_end(args);
 }
 
@@ -136,9 +140,9 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "  INFO: ");
-    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
-    sprintf(log_buffer + strlen(log_buffer), "\n");
+    printf("  INFO: ");
+    printf(fmt, args);
+    printf("\n");
     va_end(args);
 }
 
@@ -151,9 +155,9 @@ void __wrap_error_int(
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "  ERROR: ");
-    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
-    sprintf(log_buffer + strlen(log_buffer), "\n");
+    printf("  ERROR: ");
+    printf(fmt, args);
+    printf("\n");
     va_end(args);
 }
 
@@ -165,7 +169,7 @@ void __wrap_fatal_int(const char *file, const char *function, const unsigned lon
     va_list args;
     va_start(args, fmt);
     printf("FATAL: ");
-    vprintf(fmt, args);
+    printf(fmt, args);
     printf("\n");
     va_end(args);
     fail();
@@ -213,115 +217,64 @@ static void build_request(struct web_buffer *wb, const char *url, bool use_cr, s
     buffer_strcat(wb, " HTTP/1.1\r\n\r\n");
 }
 
-// ---------------------------------- Parameterized test-families -----------------------------------------------------
-// There is no way to pass a parameter block into the setup fixture, we would have to patch CMocka and maintain it
-// locally. (The void **current_state in _run_group_tests would be set from a parameter). This is unfortunate as a
-// parameteric unit-tester needs to be to pass parameters to the fixtures. We are faking this by calculating the
-// space of tests in the launcher, passing an array of identical unit-tests to CMocka and then counting through the
-// parameters in the shared state passed between tests. To initialise this counter structure we use this global to
-// pass from the launcher (test-builder) to the setup-fixture.
+//////////////////////////// Test cases ///////////////////////////////////////////////////////////////////////////////
 
-struct valid_url_test_def {
-    char name[80];
-    char url_in[1024];
-    char url_out_repr[1024];
-    char query_out[1024];
-};
-
-struct valid_url_test_def valid_url_tests[] = {
-    { "legal_query", "/api/v1/info?blah", "info", "?blah" },
-    { "root_only", "/", "", "" },
-    { "", "", "", "" }
-};
-
-size_t shared_test_state = 0;
-bool test_completed = false;
-
-static void valid_url(void **state)
+static void only_root(void **state)
 {
     (void)state;
-    struct valid_url_test_def *def = &valid_url_tests[shared_test_state];
-    shared_test_state ++;
-
-    if (shared_test_state>0 && !test_completed && strlen(log_buffer) > 0) {
-        printf("Log of failing case %s:\n", (def-1)->name);
-        puts(log_buffer);
-    }
-    test_completed = false;
 
     if (localhost != NULL)
         free(localhost);
     localhost = malloc(sizeof(RRDHOST));
 
     struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, def->url_in, true, 0);
+    buffer_strcat(w->response.data, "GET / HTTP/1.1\r\n\r\n");
 
     char debug[4096];
     repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
-    printf("->%s\n", debug);
+    printf("-> \"%s\"\n", debug);
 
-    char expected_url_repr[4096];
-    repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
+    //char expected_url_repr[4096];
+    //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
 
-    expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    expect_value(__wrap_web_client_api_request_v1, w, w);
-    // expect_any(__wrap_web_client_api_request_v1, url_repr);
-    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);       // FIXME: pre-repr in def?
+    //expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    //expect_value(__wrap_web_client_api_request_v1, w, w);
+    //expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);       // FIXME: pre-repr in def?
 
     web_client_process_request(w);
 
-    assert_string_equal(w->decoded_query_string, def->query_out);
+    //assert_string_equal(w->decoded_query_string, def->query_out);
     free(localhost);
     localhost = NULL;
-    test_completed = true;
-    log_buffer[0] = 0;
-
 }
 
-int valid_url_launcher()
-{
-    size_t num_tests = 0;
-    for(size_t i=0; valid_url_tests[i].name[0]!=0; i++)
-        num_tests++;
-
-    struct CMUnitTest *tests = calloc(num_tests, sizeof(struct CMUnitTest));
-    for (size_t i = 0; i < num_tests; i++) {
-        tests[i].name = valid_url_tests[i].name;
-        tests[i].test_func = valid_url;
-        tests[i].setup_func = NULL;
-        tests[i].teardown_func = NULL;
-        tests[i].initial_state = NULL;
-    }
-    shared_test_state = 0;
-    int fails = _cmocka_run_group_tests("valid_urls", tests, num_tests, NULL, NULL);
-    free(tests);
-    return fails;
-}
-
-static void legal_query(void **state)
+static void valid_url(void **state)
 {
     (void)state;
+
+    if (localhost != NULL)
+        free(localhost);
     localhost = malloc(sizeof(RRDHOST));
 
     struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, "/api/v1/info?blah", true, 0);
+    buffer_strcat(w->response.data, "GET /api/v1/info?blah HTTP/1.1\r\n\r\n");
 
-    char debug[160];
+    char debug[4096];
     repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
-    printf("->%s\n", debug);
+    printf("-> \"%s\"\n", debug);
 
-    char expected_url_repr[160];
-    repr(expected_url_repr, sizeof(expected_url_repr), "info?blah", 6);
+    //char expected_url_repr[4096];
+    //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
 
-    expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    expect_value(__wrap_web_client_api_request_v1, w, w);
-    expect_any(__wrap_web_client_api_request_v1, url_repr);
-    //    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
+    //expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    //expect_value(__wrap_web_client_api_request_v1, w, w);
+    //expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);       // FIXME: pre-repr in def?
 
     web_client_process_request(w);
 
-    assert_string_equal(w->decoded_query_string, "?blah");
+    //assert_string_equal(w->decoded_query_string, def->query_out);
     free(localhost);
+    localhost = NULL;
 }
 
 static void not_a_query(void **state)
@@ -379,12 +332,13 @@ int main(void)
     debug_flags = 0xffffffffffff;
     int fails = 0;
 
-    struct CMUnitTest static_tests[] = { cmocka_unit_test(newline_in_url), cmocka_unit_test(legal_query),
-                                         cmocka_unit_test(not_a_query) };
+    struct CMUnitTest static_tests[] = {
+        cmocka_unit_test(only_root),
+        cmocka_unit_test(valid_url),
+        cmocka_unit_test(newline_in_url),
+        cmocka_unit_test(not_a_query) };
+
     fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
-
-    fails += valid_url_launcher();
-
     return fails;
 }
 
