@@ -645,9 +645,32 @@ if ENABLE_UNITTESTS
         libnetdata/tests/str2ld_testdriver \
         libnetdata/storage_number/tests/storage_number_testdriver \
         web/api/tests/web_api_testdriver \
+        web/api/tests/web_api_valid_urls \
         $(NULL)
 
     TESTS = $(check_PROGRAMS)
+
+    web_api_tests_web_api_valid_urls_LDFLAGS = \
+        -Wl,--wrap=rrdhost_find_by_hostname \
+        -Wl,--wrap=finished_web_request_statistics \
+        -Wl,--wrap=config_get \
+        -Wl,--wrap=web_client_api_request_v1 \
+        -Wl,--wrap=rrdhost_find_by_guid \
+        -Wl,--wrap=rrdset_find_byname \
+        -Wl,--wrap=rrdset_find \
+        -Wl,--wrap=rrdpush_receiver_thread_spawn \
+        -Wl,--wrap=debug_int \
+        -Wl,--wrap=error_int \
+        -Wl,--wrap=info_int \
+        -Wl,--wrap=fatal_int \
+        $(TEST_LDFLAGS) \
+        $(NULL)
+    web_api_tests_web_api_valid_urls_SOURCES = \
+        web/api/tests/valid_urls.c \
+        web/server/web_client.c \
+        $(LIBNETDATA_FILES) \
+        $(NULL)
+    web_api_tests_web_api_valid_urls_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 
     web_api_tests_web_api_testdriver_LDFLAGS = \
         -Wl,--wrap=rrdhost_find_by_hostname \

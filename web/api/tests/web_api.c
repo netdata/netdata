@@ -372,156 +372,6 @@ static int api_chart_launcher()
 }
 
 
-struct valid_url_test_def {
-    char name[80];
-    char url_in[1024];
-    char url_out_repr[1024];
-    char query_out[1024];
-    bool completed;
-};
-
-struct valid_url_test_def valid_url_tests[] = {
-    { "legal_query", "/api/v1/info?blah", "info", "?blah", false },
-    { "root_only", "/", "", "", false },
-    { "", "", "", "", false }
-};
-
-static void valid_url(void **state)
-{
-    (void)state;
-    struct valid_url_test_def *def= (struct valid_url_test_def *)shared_test_state;
-    shared_test_state = def+1;
-
-    if (def != valid_url_tests && !def->completed && strlen(log_buffer) > 0) {
-        printf("Log of failing case %s:\n", (def-1)->name);
-        puts(log_buffer);
-    }
-
-    if (localhost != NULL)
-        free(localhost);
-    localhost = malloc(sizeof(RRDHOST));
-
-    struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, def->url_in, true, 0);
-
-    char debug[4096];
-    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
-    printf("->%s\n", debug);
-
-    char expected_url_repr[4096];
-    repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
-
-    expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    expect_value(__wrap_web_client_api_request_v1, w, w);
-    // expect_any(__wrap_web_client_api_request_v1, url_repr);
-    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);       // FIXME: pre-repr in def?
-
-    web_client_process_request(w);
-
-    assert_string_equal(w->decoded_query_string, def->query_out);
-    free(localhost);
-    localhost = NULL;
-    def->completed = true;
-    log_buffer[0] = 0;
-
-}
-
-int valid_url_launcher()
-{
-    size_t num_tests = 0;
-    for(size_t i=0; valid_url_tests[i].name[0]!=0; i++)
-        num_tests++;
-
-    struct CMUnitTest *tests = calloc(num_tests, sizeof(struct CMUnitTest));
-    for (size_t i = 0; i < num_tests; i++) {
-        tests[i].name = valid_url_tests[i].name;
-        tests[i].test_func = valid_url;
-        tests[i].setup_func = NULL;
-        tests[i].teardown_func = NULL;
-        tests[i].initial_state = NULL;
-    }
-    shared_test_state = valid_url_tests;
-    int fails = _cmocka_run_group_tests("valid_urls", tests, num_tests, NULL, NULL);
-    free(tests);
-    return fails;
-}
-
-static void legal_query(void **state)
-{
-    (void)state;
-    localhost = malloc(sizeof(RRDHOST));
-
-    struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, "/api/v1/info?blah", true, 0);
-
-    char debug[160];
-    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
-    printf("->%s\n", debug);
-
-    char expected_url_repr[160];
-    repr(expected_url_repr, sizeof(expected_url_repr), "info?blah", 6);
-
-    expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    expect_value(__wrap_web_client_api_request_v1, w, w);
-    expect_any(__wrap_web_client_api_request_v1, url_repr);
-    //    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
-
-    web_client_process_request(w);
-
-    assert_string_equal(w->decoded_query_string, "?blah");
-    free(localhost);
-}
-
-static void not_a_query(void **state)
-{
-    (void)state;
-    localhost = malloc(sizeof(RRDHOST));
-
-    struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, "/api/v1/info%3fblah%3f", true, 0);
-
-    char debug[160];
-    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
-    printf("->%s\n", debug);
-
-    char expected_url_repr[160];
-    repr(expected_url_repr, sizeof(expected_url_repr), "info?blah?", 10);
-
-    expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    expect_value(__wrap_web_client_api_request_v1, w, w);
-    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
-
-    web_client_process_request(w);
-
-    assert_string_equal(w->decoded_query_string, "");
-    free(localhost);
-}
-
-static void newline_in_url(void **state)
-{
-    (void)state;
-    localhost = malloc(sizeof(RRDHOST));
-
-    struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, "/api/v1/inf\no\t?blah", true, 0);
-
-    char debug[160];
-    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
-    printf("->%s\n", debug);
-
-    char expected_url_repr[160];
-    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
-
-    expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    expect_value(__wrap_web_client_api_request_v1, w, w);
-    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
-
-    web_client_process_request(w);
-
-    printf("decoded: %s\n", w->decoded_query_string);
-    free(localhost);
-}
-
 // Leading CRLF (RFC2616, comment in 4.1)
 // Absolute URI "GET http://localhost:19999/api/v1/info HTTP/1.1\r\n"    -> Comment in 5.1.2 of RFC2616
 // Any \n or \r in wrong place in request line -> invalid response   (Description in 5.1 of RFC2616)
@@ -609,14 +459,11 @@ int main(void)
     debug_flags = 0xffffffffffff;
     int fails = 0;
 
-    struct CMUnitTest static_tests[] = { cmocka_unit_test(newline_in_url), cmocka_unit_test(legal_query),
-                                         cmocka_unit_test(not_a_query) };
-    fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
+    struct CMUnitTest static_tests[] = { };
+    //fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
 
     //fails += api_info_launcher();
     //fails += api_chart_launcher();
-    printf("Next?\n");
-    fails += valid_url_launcher();
 
     return fails;
 }
