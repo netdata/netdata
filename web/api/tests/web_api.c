@@ -292,6 +292,7 @@ static void api_info(void **state)
     assert_int_equal(def->instance->mode, WEB_CLIENT_MODE_NORMAL);
     printf("decoded: %s\n", def->instance->decoded_query_string);
     def->completed = true;
+    log_buffer[0] = 0;
 }
 
 static int api_info_launcher()
@@ -368,6 +369,81 @@ static int api_chart_launcher()
 {
     size_t num_tests = 0;
     return 0;
+}
+
+
+struct valid_url_test_def {
+    char name[80];
+    char url_in[1024];
+    char url_out_repr[1024];
+    char query_out[1024];
+    bool completed;
+};
+
+struct valid_url_test_def valid_url_tests[] = {
+    { "legal_query", "/api/v1/info?blah", "info", "?blah", false },
+    { "root_only", "/", "", "", false },
+    { "", "", "", "", false }
+};
+
+static void valid_url(void **state)
+{
+    (void)state;
+    struct valid_url_test_def *def= (struct valid_url_test_def *)shared_test_state;
+    shared_test_state = def+1;
+
+    if (def != valid_url_tests && !def->completed && strlen(log_buffer) > 0) {
+        printf("Log of failing case %s:\n", (def-1)->name);
+        puts(log_buffer);
+    }
+
+    if (localhost != NULL)
+        free(localhost);
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    build_request(w->response.data, def->url_in, true, 0);
+
+    char debug[4096];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[4096];
+    repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
+
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    // expect_any(__wrap_web_client_api_request_v1, url_repr);
+    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);       // FIXME: pre-repr in def?
+
+    web_client_process_request(w);
+
+    assert_string_equal(w->decoded_query_string, def->query_out);
+    free(localhost);
+    localhost = NULL;
+    def->completed = true;
+    log_buffer[0] = 0;
+
+}
+
+int valid_url_launcher()
+{
+    size_t num_tests = 0;
+    for(size_t i=0; valid_url_tests[i].name[0]!=0; i++)
+        num_tests++;
+
+    struct CMUnitTest *tests = calloc(num_tests, sizeof(struct CMUnitTest));
+    for (size_t i = 0; i < num_tests; i++) {
+        tests[i].name = valid_url_tests[i].name;
+        tests[i].test_func = valid_url;
+        tests[i].setup_func = NULL;
+        tests[i].teardown_func = NULL;
+        tests[i].initial_state = NULL;
+    }
+    shared_test_state = valid_url_tests;
+    int fails = _cmocka_run_group_tests("valid_urls", tests, num_tests, NULL, NULL);
+    free(tests);
+    return fails;
 }
 
 static void legal_query(void **state)
@@ -466,6 +542,7 @@ static void newline_in_url(void **state)
 // "GET %00 HTTP/1.1\r\n"
 // "GET %2 HTTP/1.1\r\n"
 // "GET %x HTTP/1.1\r\n"
+// "GET &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& x 400+ HTTP/1.1\r\n"   (crash?)
 
 /*
         https://github.com/uriparser/uriparser/blob/uriparser-0.9.3/test/FourSuite.cpp
@@ -538,6 +615,8 @@ int main(void)
 
     //fails += api_info_launcher();
     //fails += api_chart_launcher();
+    printf("Next?\n");
+    fails += valid_url_launcher();
 
     return fails;
 }
