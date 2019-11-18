@@ -239,7 +239,7 @@ NFACCT_PLUGIN_FILES = \
 
 SLABINFO_PLUGIN_FILES = \
     collectors/slabinfo.plugin/slabinfo.c \
-    $(LIBNETDATA_FILES)
+    $(LIBNETDATA_FILES) \
     $(NULL)
 
 XENSTAT_PLUGIN_FILES = \
