@@ -483,15 +483,13 @@ static void sanity_check(void)
     BUILD_BUG_ON(CMD_TOTAL_COMMANDS != sizeof(command_info_array) / sizeof(command_info_array[0]));
 }
 
-/*
- * Returns 0 on success, negative on error
- */
-int commands_init(void)
+void commands_init(void)
 {
     cmd_t i;
     int error;
 
     sanity_check();
+    info("Initializing command server.");
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         uv_mutex_init(&command_lock_array[i]);
     }
@@ -501,7 +499,7 @@ int commands_init(void)
     error = uv_thread_create(&thread, command_thread, NULL);
     if (error) {
         error("uv_thread_create(): %s", uv_strerror(error));
-        return error;
+        goto after_error;
     }
     /* wait for worker thread to initialize */
     wait_for_completion(&completion);
@@ -512,14 +510,15 @@ int commands_init(void)
         if (error) {
             error("uv_thread_create(): %s", uv_strerror(error));
         }
+        goto after_error;
     }
-    return command_thread_error;
+    return;
+
+after_error:
+    error("Failed to initialize command server.");
 }
 
-/*
- * Returns 0 on success, 1 on error
- */
-int commands_exit(void)
+void commands_exit(void)
 {
     cmd_t i;
 
@@ -534,6 +533,4 @@ int commands_exit(void)
     }
     uv_rwlock_destroy(&exclusive_rwlock);
     info("Command server has stopped.");
-
-    return 0;
 }
