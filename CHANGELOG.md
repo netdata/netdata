@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- installer: add missing trailing backslash [\#7326](https://github.com/netdata/netdata/pull/7326) ([oxplot](https://github.com/oxplot))
 - Fine tune various alarm values. [\#7322](https://github.com/netdata/netdata/pull/7322) ([Ferroin](https://github.com/Ferroin))
 - Updating the Travis pipeline \(issue 7189\) [\#7312](https://github.com/netdata/netdata/pull/7312) ([amoss](https://github.com/amoss))
 - Fix missing streaming when slave has SSL activated. [\#7306](https://github.com/netdata/netdata/pull/7306) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -252,7 +253,6 @@
 - netdata: Add cosmix as codeowner, wherever cakrit is [\#6618](https://github.com/netdata/netdata/pull/6618) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - mysql: do not remove `slave\_status` from queries in module [\#6617](https://github.com/netdata/netdata/pull/6617) ([ilyam8](https://github.com/ilyam8))
 - Add alarm variables to the response of chart and data \(\#6054\) [\#6615](https://github.com/netdata/netdata/pull/6615) ([alpes214](https://github.com/alpes214))
-- Better system OS detection for RHEL6 and Mac OS X [\#6612](https://github.com/netdata/netdata/pull/6612) ([dex4er](https://github.com/dex4er))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
