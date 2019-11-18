@@ -279,6 +279,8 @@ AC_CHECK_LIB(
     [uv_fs_scandir_next],
     [UV_LIBS="-luv"]
 )
+test -z "${UV_LIBS}" && \
+    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
 
 
 # -----------------------------------------------------------------------------
@@ -363,9 +365,6 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
 # DB engine and HTTPS
-test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
-    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
-
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 

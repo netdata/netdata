@@ -231,6 +231,7 @@ Once Netdata is compiled, to run it the following packages are required (already
 |:-----:|-----------|
 | `libuuid` | part of `util-linux` for GUIDs management|
 | `zlib`    | gzip compression for the internal Netdata web server|
+| `libuv`   | Multi-platform support library with a focus on asynchronous I/O, version 1 or greater|
 
 *Netdata will fail to start without the above.*
 
@@ -260,7 +261,6 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 
 | package  | description|
 |:-----:|-----------|
-| `libuv`  | Multi-platform support library with a focus on asynchronous I/O, version 1 or greater|
 | `liblz4` | Extremely fast compression algorithm, version r129 or greater|
 | `Judy`   | General purpose dynamic array|
 | `openssl`| Cryptography and SSL/TLS toolkit|
