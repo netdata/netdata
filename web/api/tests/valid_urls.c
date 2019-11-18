@@ -84,6 +84,7 @@ int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 int __wrap_mysendfile(struct web_client *w, char *filename)
 {
     printf("mysendfile(filename=\"%s\"\n",filename);
+    check_expected_ptr(filename);
 }
 
 int __wrap_rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url)
@@ -237,13 +238,40 @@ static void only_root(void **state)
     //char expected_url_repr[4096];
     //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
 
-    //expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    //expect_value(__wrap_web_client_api_request_v1, w, w);
-    //expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);       // FIXME: pre-repr in def?
+    expect_string(__wrap_mysendfile, filename, "/");
 
     web_client_process_request(w);
 
     //assert_string_equal(w->decoded_query_string, def->query_out);
+    destroy_web_client(w);
+    free(localhost);
+    localhost = NULL;
+}
+
+static void two_slashes(void **state)
+{
+    (void)state;
+
+    if (localhost != NULL)
+        free(localhost);
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET // HTTP/1.1\r\n\r\n");
+
+    char debug[4096];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("-> \"%s\"\n", debug);
+
+    //char expected_url_repr[4096];
+    //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
+
+    expect_string(__wrap_mysendfile, filename, "//");
+
+    web_client_process_request(w);
+
+    //assert_string_equal(w->decoded_query_string, def->query_out);
+    destroy_web_client(w);
     free(localhost);
     localhost = NULL;
 }
@@ -266,24 +294,89 @@ static void valid_url(void **state)
     //char expected_url_repr[4096];
     //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
 
-    //expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    //expect_value(__wrap_web_client_api_request_v1, w, w);
-    //expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);       // FIXME: pre-repr in def?
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    expect_string(__wrap_web_client_api_request_v1, url_repr, "info");
 
     web_client_process_request(w);
 
-    //assert_string_equal(w->decoded_query_string, def->query_out);
+    assert_string_equal(w->decoded_query_string, "?blah");
+    destroy_web_client(w);
     free(localhost);
     localhost = NULL;
 }
 
+/* Any number of blank lines before the request should be ignored according to the RFC */
+static void leading_blanks(void **state)
+{
+    (void)state;
+
+    if (localhost != NULL)
+        free(localhost);
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "\r\n\r\nGET /api/v1/info?blah HTTP/1.1\r\n\r\n");
+
+    char debug[4096];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("-> \"%s\"\n", debug);
+
+    //char expected_url_repr[4096];
+    //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
+
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    expect_string(__wrap_web_client_api_request_v1, url_repr, "info");
+
+    web_client_process_request(w);
+
+    assert_string_equal(w->decoded_query_string, "?blah");
+    destroy_web_client(w);
+    free(localhost);
+    localhost = NULL;
+}
+
+static void empty_url(void **state)
+{
+    (void)state;
+
+    if (localhost != NULL)
+        free(localhost);
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET  HTTP/1.1\r\n\r\n");
+
+    char debug[4096];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("-> \"%s\"\n", debug);
+
+    //char expected_url_repr[4096];
+    //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
+
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    expect_string(__wrap_web_client_api_request_v1, url_repr, "info");
+
+    web_client_process_request(w);
+
+    assert_string_equal(w->decoded_query_string, "?blah");
+    destroy_web_client(w);
+    free(localhost);
+    localhost = NULL;
+}
+
+/* If the %-escape is being performed at the correct time then the url should not be treated as a query, but instead
+   as a path "/api/v1/info?blah?" which should despatch into the API with the given values.
+*/
 static void not_a_query(void **state)
 {
     (void)state;
     localhost = malloc(sizeof(RRDHOST));
 
     struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, "/api/v1/info%3fblah%3f", true, 0);
+    buffer_strcat(w->response.data, "GET /api/v1/info%3fblah%3f HTTP/1.1\r\n\r\n");
 
     char debug[160];
     repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
@@ -299,16 +392,17 @@ static void not_a_query(void **state)
     web_client_process_request(w);
 
     assert_string_equal(w->decoded_query_string, "");
+    destroy_web_client(w);
     free(localhost);
 }
 
-static void newline_in_url(void **state)
+static void cr_in_url(void **state)
 {
     (void)state;
     localhost = malloc(sizeof(RRDHOST));
 
     struct web_client *w = setup_fresh_web_client();
-    build_request(w->response.data, "/api/v1/inf\no\t?blah", true, 0);
+    buffer_strcat(w->response.data, "GET /api/v1/inf\ro\t?blah HTTP/1.1\r\n\r\n");
 
     char debug[160];
     repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
@@ -317,15 +411,268 @@ static void newline_in_url(void **state)
     char expected_url_repr[160];
     repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
 
-    expect_value(__wrap_web_client_api_request_v1, host, localhost);
-    expect_value(__wrap_web_client_api_request_v1, w, w);
-    expect_string(__wrap_web_client_api_request_v1, url_repr, expected_url_repr);
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+static void newline_in_url(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET /api/v1/inf\no\t?blah HTTP/1.1\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
 
     web_client_process_request(w);
 
-    printf("decoded: %s\n", w->decoded_query_string);
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
     free(localhost);
 }
+
+static void bad_version(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET /api/v1/info?blah HTTP/1.2\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void pathless_query(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET ?blah HTTP/1.1\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void pathless_fragment(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET #blah HTTP/1.1\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void short_percent(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET % HTTP/1.1\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void short_percent2(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET %0 HTTP/1.1\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void short_percent3(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET %");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void percent_nulls(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET %00%00%00%00%00%00 HTTP/1.1\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void percent_invalid(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET /%x%x%x%x%x%x HTTP/1.1\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void space_in_url(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET / / HTTP/1.1\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void random_sploit1(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    // FIXME: Encoding probably needs to go through printf
+    buffer_strcat(w->response.data, "GET \x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr HTTP/1.1\r\n\r\n");
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+
 
 int main(void)
 {
@@ -334,9 +681,23 @@ int main(void)
 
     struct CMUnitTest static_tests[] = {
         cmocka_unit_test(only_root),
+        cmocka_unit_test(two_slashes),
         cmocka_unit_test(valid_url),
+        cmocka_unit_test(leading_blanks),
+        cmocka_unit_test(empty_url),
         cmocka_unit_test(newline_in_url),
-        cmocka_unit_test(not_a_query) };
+        cmocka_unit_test(not_a_query),
+        cmocka_unit_test(cr_in_url),
+        cmocka_unit_test(pathless_query),
+        cmocka_unit_test(pathless_fragment),
+        cmocka_unit_test(short_percent),
+        cmocka_unit_test(short_percent2),
+        cmocka_unit_test(short_percent3),
+        cmocka_unit_test(percent_nulls),
+        cmocka_unit_test(percent_invalid),
+        cmocka_unit_test(space_in_url),
+        cmocka_unit_test(random_sploit1),
+        cmocka_unit_test(bad_version) };
 
     fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
     return fails;

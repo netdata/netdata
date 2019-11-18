@@ -372,20 +372,9 @@ static int api_chart_launcher()
 }
 
 
-// Leading CRLF (RFC2616, comment in 4.1)
 // Absolute URI "GET http://localhost:19999/api/v1/info HTTP/1.1\r\n"    -> Comment in 5.1.2 of RFC2616
-// Any \n or \r in wrong place in request line -> invalid response   (Description in 5.1 of RFC2616)
 // Any ' ' in the URI -> invalid response   (Description in 5.1 of RFC2616)
 // Characters that can't be in paths #;?
-// Percent-encoding with just one digit? www.spaff%2zf.com
-// Pathless queries
-// Pathless fragments
-// Empty, i.e "GET  HTTP/1.1\r\n"
-// Http versions?
-// "GET noslash HTTP/1.1\r\n"
-// "GET / HTTP/1.1\r\n"
-// "GET // HTTP/1.1\r\n"
-// "GET /// HTTP/1.1\r\n"
 // "GET /apb/../api/v1/info" HTTP/1.1\r\n"
 // "GET % HTTP/1.1\r\n"
 // "GET %0 HTTP/1.1\r\n"
@@ -450,7 +439,7 @@ static int api_chart_launcher()
 "GET /awmblog/autotest6/index.html\x22%20and%20\x22x\x22%3D\x22x HTTP/1.1"
 "GET /static/cv/cv.html\x09 HTTP/1.1"
 "Gh0st\xAD\x00\x00\x00\xE0\x00\x00\x00x\x9CKS``\x98\xC3\xC0\xC0\xC0\x06\xC4\x8C@\xBCQ\x96\x81\x81\x09H\x07\xA7\x16\x95e&\xA7*\x04$&g+\x182\x94\xF6\xB000\xAC\xA8rc\x00\x01\x11\xA0\x82\x1F\x5C`&\x83\xC7K7\x86\x19\xE5n\x0C9\x95n\x0C;\x84\x0F3\xAC\xE8sch\xA8^\xCF4'J\x97\xA9\x82\xE30\xC3\x91h]&\x90\xF8\xCE\x97S\xCBA4L?2=\xE1\xC4\x92\x86\x0B@\xF5`\x0CT\x1F\xAE\xAF]"
-"\x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr"
+\x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr"
 
 */
 
