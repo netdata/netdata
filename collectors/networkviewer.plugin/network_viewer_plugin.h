@@ -38,15 +38,41 @@ typedef struct {
     uint32_t sent;
     uint64_t recv;
     uint8_t protocol;
+}netdata_kern_stats_t;
+
+typedef struct  netdata_conn_stats{
+    uint64_t first;
+    uint64_t ct;
+    uint32_t saddr;
+    uint32_t daddr;
+    uint32_t internal;
+    uint16_t dport;
+    uint16_t retransmit;
+    uint32_t sent;
+    uint64_t recv;
+    uint8_t protocol;
+    uint8_t removeme;
+
+    struct netdata_conn_stats * next;
 }netdata_conn_stats_t;
+
+typedef struct {
+    avl avl;
+
+    avl_tree_lock bytessent;
+    avl_tree_lock destination_port;
+
+    netdata_conn_stats_t *tree;
+} netdata_control_connection_t;
 
 typedef struct netdata_network
 {
-    struct netdata_network *next;
     in_addr_t ipv4addr;
     in_addr_t netmask;
     in_addr_t router;
     int isloopback;
+
+    struct netdata_network *next;
 } netdata_network_t;
 
 
