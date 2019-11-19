@@ -12,7 +12,7 @@ void repr(char *result, int result_size, char const *buf, int size)
 {
     int n;
     char *end = result + result_size - 1;
-    unsigned char const *ubuf = (unsigned char const*)buf;
+    unsigned char const *ubuf = (unsigned char const *)buf;
     while (size && result_size > 0) {
         if (*ubuf <= 0x20 || *ubuf >= 0x80) {
             n = snprintf(result, result_size, "\\%02X", *ubuf);
@@ -380,7 +380,6 @@ static int api_info_launcher()
     }
     return fails;
 }
-
 
 // Any ' ' in the URI -> invalid response   (Description in 5.1 of RFC2616)
 // Characters that can't be in paths #;?

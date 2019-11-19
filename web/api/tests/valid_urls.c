@@ -12,7 +12,7 @@ void repr(char *result, int result_size, char const *buf, int size)
 {
     int n;
     char *end = result + result_size - 1;
-    unsigned char const *ubuf = (unsigned char const*)buf;
+    unsigned char const *ubuf = (unsigned char const *)buf;
     while (size && result_size > 0) {
         if (*ubuf <= 0x20 || *ubuf >= 0x80) {
             n = snprintf(result, result_size, "\\%02X", *ubuf);
@@ -84,7 +84,7 @@ int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 int __wrap_mysendfile(struct web_client *w, char *filename)
 {
     (void)w;
-    printf("mysendfile(filename=\"%s\"\n",filename);
+    printf("mysendfile(filename=\"%s\"\n", filename);
     check_expected_ptr(filename);
     return HTTP_RESP_OK;
 }
@@ -186,7 +186,6 @@ struct config netdata_config = { .sections = NULL,
                                  .mutex = NETDATA_MUTEX_INITIALIZER,
                                  .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                             .rwlock = AVL_LOCK_INITIALIZER } };
-
 
 /* Note: this is not a CMocka group_test_setup/teardown pair. This is performed per-test.
 */
@@ -679,8 +678,10 @@ static void random_sploit1(void **state)
 
     struct web_client *w = setup_fresh_web_client();
     // FIXME: Encoding probably needs to go through printf
-    buffer_need_bytes(w->response.data,55);
-    memcpy(w->response.data->buffer, "GET \x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr HTTP/1.1\r\n\r\n", 54);
+    buffer_need_bytes(w->response.data, 55);
+    memcpy(
+        w->response.data->buffer,
+        "GET \x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr HTTP/1.1\r\n\r\n", 54);
     w->response.data->len = 54;
 
     char debug[160];
@@ -728,9 +729,9 @@ static void many_ands(void **state)
 
     struct web_client *w = setup_fresh_web_client();
     buffer_strcat(w->response.data, "GET foo?");
-    for(size_t i=0; i<600; i++)
-        buffer_strcat(w->response.data,"&");
-    buffer_strcat(w->response.data," HTTP/1.1\r\n\r\n");
+    for (size_t i = 0; i < 600; i++)
+        buffer_strcat(w->response.data, "&");
+    buffer_strcat(w->response.data, " HTTP/1.1\r\n\r\n");
 
     char debug[2048];
     repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
@@ -747,38 +748,24 @@ static void many_ands(void **state)
     free(localhost);
 }
 
-
-
 int main(void)
 {
     debug_flags = 0xffffffffffff;
     int fails = 0;
 
     struct CMUnitTest static_tests[] = {
-        cmocka_unit_test(only_root),
-        cmocka_unit_test(two_slashes),
-        cmocka_unit_test(valid_url),
-        cmocka_unit_test(leading_blanks),
-        cmocka_unit_test(empty_url),
-        cmocka_unit_test(newline_in_url),
-        cmocka_unit_test(not_a_query),
-        cmocka_unit_test(cr_in_url),
-        cmocka_unit_test(pathless_query),
-        cmocka_unit_test(pathless_fragment),
-        cmocka_unit_test(short_percent),
-        cmocka_unit_test(short_percent2),
-        cmocka_unit_test(short_percent3),
-        cmocka_unit_test(percent_nulls),
-        cmocka_unit_test(percent_invalid),
-        cmocka_unit_test(space_in_url),
-        cmocka_unit_test(random_sploit1),
-        cmocka_unit_test(null_in_url),
+        cmocka_unit_test(only_root), cmocka_unit_test(two_slashes), cmocka_unit_test(valid_url),
+        cmocka_unit_test(leading_blanks), cmocka_unit_test(empty_url), cmocka_unit_test(newline_in_url),
+        cmocka_unit_test(not_a_query), cmocka_unit_test(cr_in_url), cmocka_unit_test(pathless_query),
+        cmocka_unit_test(pathless_fragment), cmocka_unit_test(short_percent), cmocka_unit_test(short_percent2),
+        cmocka_unit_test(short_percent3), cmocka_unit_test(percent_nulls), cmocka_unit_test(percent_invalid),
+        cmocka_unit_test(space_in_url), cmocka_unit_test(random_sploit1), cmocka_unit_test(null_in_url),
         cmocka_unit_test(absolute_url),
-//        cmocka_unit_test(many_ands),      CMocka cannot recover after this crash
-        cmocka_unit_test(bad_version) };
+        //        cmocka_unit_test(many_ands),      CMocka cannot recover after this crash
+        cmocka_unit_test(bad_version)
+    };
     (void)many_ands;
 
     fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
     return fails;
 }
-
