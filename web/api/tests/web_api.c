@@ -356,21 +356,6 @@ static int api_info_launcher()
     return fails;
 }
 
-struct api_chart_test_def {
-    char name[80];
-    char chart_name[80];
-    size_t full_len;
-    struct web_client *instance; // Used within this single test
-    bool completed;
-    struct test_def *next, *prev;
-};
-
-static int api_chart_launcher()
-{
-    size_t num_tests = 0;
-    return 0;
-}
-
 
 // Any ' ' in the URI -> invalid response   (Description in 5.1 of RFC2616)
 // Characters that can't be in paths #;?
@@ -428,12 +413,7 @@ int main(void)
 {
     debug_flags = 0xffffffffffff;
     int fails = 0;
-
-    struct CMUnitTest static_tests[] = { };
-    //fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
-
-    //fails += api_info_launcher();
-    //fails += api_chart_launcher();
+    fails += api_info_launcher();
 
     return fails;
 }

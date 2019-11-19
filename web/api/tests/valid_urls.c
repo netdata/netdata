@@ -83,8 +83,10 @@ int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 
 int __wrap_mysendfile(struct web_client *w, char *filename)
 {
+    (void)w;
     printf("mysendfile(filename=\"%s\"\n",filename);
     check_expected_ptr(filename);
+    return HTTP_RESP_OK;
 }
 
 int __wrap_rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url)
@@ -208,14 +210,6 @@ static void destroy_web_client(struct web_client *w)
     buffer_free(w->response.header);
     buffer_free(w->response.header_output);
     free(w);
-}
-
-static void build_request(struct web_buffer *wb, const char *url, bool use_cr, size_t num_headers)
-{
-    buffer_reset(wb);
-    buffer_strcat(wb, "GET ");
-    buffer_strcat(wb, url);
-    buffer_strcat(wb, " HTTP/1.1\r\n\r\n");
 }
 
 //////////////////////////// Test cases ///////////////////////////////////////////////////////////////////////////////
@@ -686,7 +680,7 @@ static void random_sploit1(void **state)
     struct web_client *w = setup_fresh_web_client();
     // FIXME: Encoding probably needs to go through printf
     buffer_need_bytes(w->response.data,55);
-    memcpy(w->response.data->buffer, "GET \x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr HTTP/1.1\r\n\r\n", 55);
+    memcpy(w->response.data->buffer, "GET \x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr HTTP/1.1\r\n\r\n", 54);
     w->response.data->len = 54;
 
     char debug[160];
@@ -782,6 +776,7 @@ int main(void)
         cmocka_unit_test(absolute_url),
 //        cmocka_unit_test(many_ands),      CMocka cannot recover after this crash
         cmocka_unit_test(bad_version) };
+    (void)many_ands;
 
     fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
     return fails;
