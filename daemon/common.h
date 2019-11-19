@@ -27,10 +27,6 @@
 
 #define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
 
-#define exporter_get(section, name, value) expconfig_get(&exporting_config, section, name, value)
-#define exporter_get_number(section, name, value) expconfig_get_number(&exporting_config, section, name, value)
-#define exporter_get_boolean(section, name, value) expconfig_get_boolean(&exporting_config, section, name, value)
-
 // ----------------------------------------------------------------------------
 // netdata include files
 

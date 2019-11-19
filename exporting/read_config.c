@@ -6,18 +6,135 @@
 char *netdata_configured_user_config_dir = ".";
 char *netdata_configured_stock_config_dir = ".";
 char *netdata_configured_hostname = "test_host";
-struct config netdata_config = {
-        .sections = NULL,
-        .mutex = NETDATA_MUTEX_INITIALIZER,
-        .index = {
-                .avl_tree = {
-                        .root = NULL,
-                        .compar = appconfig_section_compare
-                },
-                .rwlock = AVL_LOCK_INITIALIZER
-        }
-};
 #endif
+
+struct config exporting_config = {.sections = NULL,
+                                  .mutex = NETDATA_MUTEX_INITIALIZER,
+                                  .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
+                                            .rwlock = AVL_LOCK_INITIALIZER}};
+
+
+static _CONNECTOR_INSTANCE *find_instance(const char *section)
+{
+    _CONNECTOR_INSTANCE *local_ci;
+
+    local_ci = add_connector_instance(NULL, NULL);  // Get root section
+    if (unlikely(!local_ci))
+        return local_ci;
+
+    if (!section)
+        return local_ci;
+
+    while (local_ci) {
+        if (!strcmp(local_ci->instance_name, section))
+            break;
+        local_ci = local_ci->next;
+    }
+    return local_ci;
+}
+
+char *expconfig_get(struct config *root, const char *section, const char *name, const char *default_value)
+{
+    _CONNECTOR_INSTANCE *local_ci;
+
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
+    local_ci = find_instance(section);
+
+    if (!local_ci)
+        return NULL;    // TODO: Check if it is meaningful to return default_value
+
+    return appconfig_get(
+        root,
+        local_ci->instance_name,
+        name,
+        appconfig_get(
+            root, local_ci->connector_name, name, appconfig_get(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+}
+
+int expconfig_get_boolean(struct config *root, const char *section, const char *name, int default_value)
+{
+    _CONNECTOR_INSTANCE *local_ci;
+
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
+    local_ci = find_instance(section);
+
+    if (!local_ci)
+        return 0;       // TODO: Check if it is meaningful to return default_value
+
+    return appconfig_get_boolean(
+        root,
+        local_ci->instance_name,
+        name,
+        appconfig_get_boolean(
+            root,
+            local_ci->connector_name,
+            name,
+            appconfig_get_boolean(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+}
+
+long long expconfig_get_number(struct config *root, const char *section, const char *name, long long default_value)
+{
+    _CONNECTOR_INSTANCE *local_ci;
+
+    if (!strcmp(section, CONFIG_SECTION_EXPORTING))
+        return appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value);
+
+    local_ci = find_instance(section);
+
+    if (!local_ci)
+        return 0;   // TODO: Check if it is meaningful to return default_value
+
+    return appconfig_get_number(
+        root,
+        local_ci->instance_name,
+        name,
+        appconfig_get_number(
+            root,
+            local_ci->connector_name,
+            name,
+            appconfig_get_number(root, CONFIG_SECTION_EXPORTING, name, default_value)));
+}
+
+/*
+ * Get the next connector instance that we need to activate
+ *
+ * @param @target_ci will be filled with instance name and connector name
+ *
+ * @return  - 1 if more connectors to be fetched, 0 done
+ *
+ */
+
+int get_connector_instance(struct connector_instance *target_ci)
+{
+    static _CONNECTOR_INSTANCE *local_ci = NULL;
+    _CONNECTOR_INSTANCE *global_connector_instance;
+
+    global_connector_instance = find_instance(NULL);       // Fetch head of instances
+
+    if (unlikely(!global_connector_instance))
+        return 0;
+
+    if (target_ci == NULL) {
+        local_ci = NULL;
+        return 1;
+    }
+    if (local_ci == NULL)
+        local_ci = global_connector_instance;
+    else {
+        local_ci = local_ci->next;
+        if (local_ci == NULL)
+            return 0;
+    }
+
+    strcpy(target_ci->instance_name, local_ci->instance_name);
+    strcpy(target_ci->connector_name, local_ci->connector_name);
+
+    return 1;
+}
 
 /**
  * Select Type
@@ -30,19 +147,19 @@ struct config netdata_config = {
  */
 BACKEND_TYPE exporting_select_type(const char *type)
 {
-    if (!strcmp(type, "connector_graphite") || !strcmp(type, "connector_graphite:plaintext")) {
+    if (!strcmp(type, "graphite") || !strcmp(type, "graphite:plaintext")) {
         return BACKEND_TYPE_GRAPHITE;
-    } else if (!strcmp(type, "connector_opentsdb") || !strcmp(type, "connector_opentsdb:telnet")) {
+    } else if (!strcmp(type, "opentsdb") || !strcmp(type, "opentsdb:telnet")) {
         return BACKEND_TYPE_OPENTSDB_USING_TELNET;
-    } else if (!strcmp(type, "connector_opentsdb:http") || !strcmp(type, "connector_opentsdb:https")) {
+    } else if (!strcmp(type, "opentsdb:http") || !strcmp(type, "opentsdb:https")) {
         return BACKEND_TYPE_OPENTSDB_USING_HTTP;
-    } else if (!strcmp(type, "connector_json") || !strcmp(type, "connector_json:plaintext")) {
+    } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return BACKEND_TYPE_JSON;
-    } else if (!strcmp(type, "connector_prometheus_remote_write")) {
+    } else if (!strcmp(type, "prometheus_remote_write") || !strcmp(type, "prometheus_remote_write")) {
         return BACKEND_TYPE_PROMETEUS;
-    } else if (!strcmp(type, "connector_kinesis") || !strcmp(type, "connector_kinesis:plaintext")) {
+    } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
-    } else if (!strcmp(type, "connector_mongodb") || !strcmp(type, "connector_mongodb:plaintext"))
+    } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext"))
         return BACKEND_TYPE_MONGODB;
 
     return BACKEND_TYPE_UNKNOWN;
@@ -87,9 +204,6 @@ struct engine *read_exporting_config()
 
     freez(filename);
 
-    if (!exporting_config_exists)
-        memcpy(&exporting_config, &netdata_config, sizeof(netdata_config));
-
     // Will build a list of instances per connector
     // TODO: change BACKEND to EXPORTING
     ci_list = callocz(sizeof(BACKEND_TYPE), sizeof(struct connector_instance_list *));
@@ -102,10 +216,9 @@ struct engine *read_exporting_config()
             backend_type = exporting_select_type(local_ci.connector_name);
 
             info(
-                "Instance (%s) on connector (%s) type=%u is enabled and scheduled for activation",
+                "Instance (%s) on connector (%s) is enabled and scheduled for activation",
                 local_ci.instance_name,
-                local_ci.connector_name,
-                backend_type);
+                local_ci.connector_name);
 
             tmp_ci_list = (struct connector_instance_list *)callocz(1, sizeof(struct connector_instance_list));
             memcpy(&tmp_ci_list->local_ci, &local_ci, sizeof(local_ci));
