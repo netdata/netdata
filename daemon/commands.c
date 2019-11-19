@@ -341,6 +341,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
 
         to_copy = MIN(buf->len, MAX_COMMAND_LENGTH - 1 - command_string_size);
         strncpyz(command_string + command_string_size, buf->base, to_copy);
+        command_string_size += to_copy;
     }
     if (buf && buf->len) {
         freez(buf->base);
