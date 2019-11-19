@@ -800,9 +800,9 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# network_viewer.plugin
+# networkviewer.plugin
 
-AC_MSG_CHECKING([if network_viewer.plugin should be enabled])
+AC_MSG_CHECKING([if networkviewer.plugin should be enabled])
 if test "${build_target}" == "linux" -a "${NETWORK_VIEWER_LIBS}"; then
     enable_network_viewer="yes"
 else

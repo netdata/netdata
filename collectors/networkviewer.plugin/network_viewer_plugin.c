@@ -19,11 +19,35 @@ static int freq = 0;
 
 //perf variables
 int *pmu_fd = NULL;
-static struct perf_event_mmap_page *headers = NULL;
+static struct perf_event_mmap_page **headers = NULL;
 
 netdata_network_t *nn;
 
 netdata_control_connection_t ncc;
+
+// required by get_system_cpus()
+char *netdata_configured_host_prefix = "";
+
+// callback required by fatal()
+void netdata_cleanup_and_exit(int ret) {
+    exit(ret);
+}
+
+// callback required by eval()
+int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
+    (void)variable;
+    (void)hash;
+    (void)rc;
+    (void)result;
+    return 0;
+};
+
+void send_statistics( const char *action, const char *action_result, const char *action_data) {
+    (void) action;
+    (void) action_result;
+    (void) action_data;
+    return;
+}
 
 void clean_networks() {
     netdata_network_t *move = nn->next;
@@ -96,8 +120,7 @@ int allocate_memory( ) {
         }
     }
 
-    static struct perf_event_mmap_page *headers = NULL;
-    headers = callocz(nprocs, sizeof());
+    headers = callocz(nprocs, sizeof(struct perf_event_mmap_page *));
     if (!headers) {
         return -1;
     }
@@ -202,10 +225,10 @@ void netdata_set_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) 
     ncs->first = e->first;
     ncs->ct = e->ct;
     ncs->saddr = e->saddr;
-    struct in_addr saddr = { .s_addr = e->saddr} ;
+ //   in_addr_t saddr = e->saddr ;
 
     ip = e->daddr;
-    struct in_addr daddr = { .s_addr = ip} ;
+    in_addr_t daddr = ip;
 
     ncs->daddr = ntohl(ip);
     ncs->internal = (netdata_is_inside(daddr, NULL))?1:0;
@@ -252,7 +275,9 @@ static int netdata_store_bpf(void *data, int size)
             }
         }
 
-        avl_insert_lock(&ncc.destination_port, (avl *)e);
+        netdata_conn_stats_t *ret = (netdata_conn_stats_t *)avl_insert_lock(&ncc.destination_port, (avl *)ncs);
+        if(ret == ncs) {
+        }
     } else {
         netdata_update_conn_stats(ncs, e);
     }
@@ -297,7 +322,7 @@ void *network_viewer_collector(void *ptr) {
     avl_init_lock(&(ncc.destination_port), compare_destination_ip);
 
     size_t nprocs = sysconf(_SC_NPROCESSORS_ONLN);
-    netdata_perf_loop_multi(pmu_fd, headers, nprocs, &netdata_exit, netdata_store_bpf);
+    netdata_perf_loop_multi(pmu_fd, headers, nprocs, (int *)&netdata_exit, netdata_store_bpf);
 
     return NULL;
 }
@@ -340,7 +365,9 @@ static void netdata_send_data() {
                     first = move->next;
                 } else {
                     prev->next = move->next;
-                    (void)avl_remove_lock(&ncc.destination_port, (avl *)move);
+                    netdata_conn_stats_t *ret = (netdata_conn_stats_t *)avl_remove_lock(&ncc.destination_port, (avl *)move);
+                    if(ret) {
+                    }
                     freez(move);
                 }
             }
@@ -355,8 +382,8 @@ static void netdata_send_data() {
               ,NETWORK_VIEWER_INGRESS
               ,"Network viewer ingress traffic."
         );
-        printf("DIMENSION local '' absolute 1 1\n", "cpu");
-        printf("DIMENSION web '' absolute 1 1\n", "cpu");
+        printf("DIMENSION local '' absolute 1 1\n");
+        printf("DIMENSION web '' absolute 1 1\n");
     }
 
     printf(
@@ -391,8 +418,8 @@ static void netdata_send_data() {
                 ,"Network viewer egress traffic."
         );
 
-        printf("DIMENSION local '' absolute 1 1\n", "cpu");
-        printf("DIMENSION web '' absolute 1 1\n", "cpu");
+        printf("DIMENSION local '' absolute 1 1\n");
+        printf("DIMENSION web '' absolute 1 1\n");
     }
 
     printf(
@@ -510,7 +537,7 @@ int netdata_get_router(netdata_network_t *lnn) {
 
     struct  nlmsghdr *nlh, nhm;
 
-    int mypid = getpid();
+    uint32_t mypid = getpid();
     nhm.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg));
     nhm.nlmsg_type = RTM_GETROUTE;
     nhm.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
@@ -578,7 +605,9 @@ end_err:
 }
 
 int main(int argc, char **argv) {
-    program_name = "network_viewer";
+    (void)argc;
+    (void)argv;
+    program_name = "networkviewer.plugin";
 
     //Threads used in this plugin
     struct netdata_static_thread static_threads_network_viewer[] = {
@@ -592,10 +621,6 @@ int main(int argc, char **argv) {
     if (freq >= update_every)
         update_every = freq;
 
-    if (network_viewer_load_libraries()) {
-        return 1;
-    }
-
     //We are adjusting the limit, because we are not creating limits
     //to the number of connections we are monitoring.
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
@@ -604,16 +629,20 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    if (network_viewer_load_libraries()) {
+        return 1;
+    }
+
     signal(SIGTERM, network_viewer_exit);
     signal(SIGINT, network_viewer_exit);
 
     if (load_bpf_file("netdata_ebpf_network_viewer.o")) {
-        error("[NETWORK VIEWER]: Cannot load the eBPF program.")
+        error("[NETWORK VIEWER]: Cannot load the eBPF program.");
         return 3;
     }
 
     if (allocate_memory()) {
-        error("[NETWORK VIEWER]: Cannot allocate the necessary vectors")
+        error("[NETWORK VIEWER]: Cannot allocate the necessary vectors");
         network_viewer_exit(SIGTERM);
     }
 
@@ -634,7 +663,7 @@ int main(int argc, char **argv) {
 
     for (i = 0; static_threads_network_viewer[i].name != NULL ; i++) {
         st = &static_threads_network_viewer[i];
-        netdata_thread_join(st->thread, NULL);
+        netdata_thread_join(*st->thread, NULL);
     }
 
     network_viewer_exit(SIGTERM);

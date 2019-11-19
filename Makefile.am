@@ -252,10 +252,11 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-NETWORK_VIEWER_PLUGIN_FILES = \
+NETWORKVIEWER_PLUGIN_FILES = \
     collectors/networkviewer.plugin/network_viewer_plugin.c \
     $(LIBNETDATA_FILES) \
     $(NULL)
+
 
 PROC_PLUGIN_FILES = \
     collectors/proc.plugin/ipc.c \
@@ -569,6 +570,14 @@ if ENABLE_PLUGIN_CGROUP_NETWORK
         $(NULL)
 endif
 
+if ENABLE_PLUGIN_NETWORK_VIEWER
+    plugins_PROGRAMS += networkviewer.plugin
+    networkviewer_plugin_SOURCES = $(NETWORKVIEWER_PLUGIN_FILES)
+    networkviewer_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
+        $(NULL)
+endif
+
 if ENABLE_PLUGIN_FREEIPMI
     plugins_PROGRAMS += freeipmi.plugin
     freeipmi_plugin_SOURCES = $(FREEIPMI_PLUGIN_FILES)
@@ -609,14 +618,6 @@ if ENABLE_PLUGIN_PERF
     plugins_PROGRAMS += perf.plugin
     perf_plugin_SOURCES = $(PERF_PLUGIN_FILES)
     perf_plugin_LDADD = \
-        $(NETDATA_COMMON_LIBS) \
-        $(NULL)
-endif
-
-if ENABLE_PLUGIN_NETWORK_VIEWER
-    plugins_PROGRAMS += networkviewer.plugin
-    network_viewer_plugin_SOURCES = $(NETWORK_VIEWER_PLUGIN_FILES)
-    network_viewer_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
