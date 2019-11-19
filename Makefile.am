@@ -664,11 +664,11 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=info_int \
         -Wl,--wrap=fatal_int \
         -Wl,--wrap=mysendfile \
+        -DUNIT_TESTING \
         $(TEST_LDFLAGS) \
         $(NULL)
     web_api_tests_valid_urls_testdriver_SOURCES = \
         web/api/tests/valid_urls.c \
-        -DUNIT_TESTING \
         web/server/web_client.c \
         $(LIBNETDATA_FILES) \
         $(NULL)
