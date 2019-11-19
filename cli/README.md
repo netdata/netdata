@@ -12,7 +12,7 @@ help
 reload-health
     Reload health configuration.
 save-database
-    Save internal DB to disk for map/save modes.
+    Save internal DB to disk for for memory mode save.
 reopen-logs
     Close and reopen log files.
 shutdown-agent
