@@ -577,6 +577,12 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                             s = buffer;
                         }
                         strncpy(working_instance, s, CONFIG_MAX_NAME);
+                        working_connector_section = NULL;
+                        if (unlikely(appconfig_section_find(root, working_instance))) {
+                            error("Instance (%s) already exists", working_instance);
+                            co = NULL;
+                            continue;
+                        }
                     } else {
                         co = NULL;
                         error("Section (%s) does not specify a valid connector", s);
@@ -632,12 +638,14 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 
         if (!cv) {
             cv = appconfig_value_create(co, name, value);
-
             if (likely(is_exporter_config) && unlikely(!global_exporting_section)) {
                 if (unlikely(!working_connector_section)) {
-                    working_connector_section = appconfig_section_create(root, working_connector);
-                    if (likely(working_connector_section))
+                    working_connector_section = appconfig_section_find(root, working_connector);
+                    if (!working_connector_section)
+                        working_connector_section = appconfig_section_create(root, working_connector);
+                    if (likely(working_connector_section)) {
                         add_connector_instance(working_connector_section, co);
+                    }
                 }
             }
         } else {
