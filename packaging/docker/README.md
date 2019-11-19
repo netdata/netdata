@@ -259,7 +259,7 @@ Once you have contacted the Netdata owners to setup you up on Github and Travis,
 
 -   Preparation
     -   Have Netdata forked on your personal GitHub account
-    -   Get a GitHub token: Go to **GitHub settings** -> **Developer Settings** -> **Personal access tokens**, aed
+    -   Get a GitHub token: Go to **GitHub settings** -> **Developer Settings** -> **Personal access tokens**, and
         generate a new token with full access to `repo_hook`, read-only access to `admin:org`, `public_repo`,
         `repo_deployment`, `repo:status`, and `user:email` settings enabled. This will be your `GITHUB_TOKEN` that is
         described later in the instructions, so keep it somewhere safe.
