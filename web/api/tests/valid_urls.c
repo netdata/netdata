@@ -276,6 +276,36 @@ static void two_slashes(void **state)
     localhost = NULL;
 }
 
+static void absolute_url(void **state)
+{
+    (void)state;
+
+    if (localhost != NULL)
+        free(localhost);
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET http://localhost:19999/api/v1/info HTTP/1.1\r\n\r\n");
+
+    char debug[4096];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("-> \"%s\"\n", debug);
+
+    //char expected_url_repr[4096];
+    //repr(expected_url_repr, sizeof(expected_url_repr), def->url_out_repr, strlen(def->url_out_repr));
+
+    expect_value(__wrap_web_client_api_request_v1, host, localhost);
+    expect_value(__wrap_web_client_api_request_v1, w, w);
+    expect_string(__wrap_web_client_api_request_v1, url_repr, "info");
+
+    web_client_process_request(w);
+
+    assert_string_equal(w->decoded_query_string, "?blah");
+    destroy_web_client(w);
+    free(localhost);
+    localhost = NULL;
+}
+
 static void valid_url(void **state)
 {
     (void)state;
@@ -749,6 +779,7 @@ int main(void)
         cmocka_unit_test(space_in_url),
         cmocka_unit_test(random_sploit1),
         cmocka_unit_test(null_in_url),
+        cmocka_unit_test(absolute_url),
 //        cmocka_unit_test(many_ands),      CMocka cannot recover after this crash
         cmocka_unit_test(bad_version) };
 
