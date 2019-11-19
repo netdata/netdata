@@ -53,10 +53,21 @@ struct section {
 _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance)
 {
     static struct _connector_instance *global_connector_instance = NULL;
-    struct _connector_instance *local_ci;
+    struct _connector_instance *local_ci, *local_ci_tmp;
 
-    if (unlikely(!connector))
-        return global_connector_instance;
+    if (unlikely(!connector)) {
+        if (unlikely(!instance))
+            return global_connector_instance;
+
+        local_ci = global_connector_instance;
+        while (local_ci) {
+            local_ci_tmp = local_ci->next;
+            freez(local_ci);
+            local_ci = local_ci_tmp;
+        }
+        global_connector_instance = NULL;
+        return NULL;
+    }
 
     local_ci = callocz(1, sizeof(struct _connector_instance));
     local_ci->instance = instance;
