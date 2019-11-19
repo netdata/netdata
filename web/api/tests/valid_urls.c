@@ -655,9 +655,60 @@ static void random_sploit1(void **state)
 
     struct web_client *w = setup_fresh_web_client();
     // FIXME: Encoding probably needs to go through printf
-    buffer_strcat(w->response.data, "GET \x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr HTTP/1.1\r\n\r\n");
+    buffer_need_bytes(w->response.data,55);
+    memcpy(w->response.data->buffer, "GET \x03\x00\x00/*\xE0\x00\x00\x00\x00\x00Cookie: mstshash=Administr HTTP/1.1\r\n\r\n", 55);
+    w->response.data->len = 54;
 
     char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+
+static void null_in_url(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET / / HTTP/1.1\r\n\r\n");
+    w->response.data->buffer[5] = 0;
+
+    char debug[160];
+    repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
+    printf("->%s\n", debug);
+
+    char expected_url_repr[160];
+    repr(expected_url_repr, sizeof(expected_url_repr), "inf\no\t", 6);
+
+    web_client_process_request(w);
+
+    assert_int_equal(w->response.code, HTTP_RESP_BAD_REQUEST);
+
+    destroy_web_client(w);
+    free(localhost);
+}
+static void many_ands(void **state)
+{
+    (void)state;
+    localhost = malloc(sizeof(RRDHOST));
+
+    struct web_client *w = setup_fresh_web_client();
+    buffer_strcat(w->response.data, "GET foo?");
+    for(size_t i=0; i<600; i++)
+        buffer_strcat(w->response.data,"&");
+    buffer_strcat(w->response.data," HTTP/1.1\r\n\r\n");
+
+    char debug[2048];
     repr(debug, sizeof(debug), w->response.data->buffer, w->response.data->len);
     printf("->%s\n", debug);
 
@@ -697,6 +748,8 @@ int main(void)
         cmocka_unit_test(percent_invalid),
         cmocka_unit_test(space_in_url),
         cmocka_unit_test(random_sploit1),
+        cmocka_unit_test(null_in_url),
+//        cmocka_unit_test(many_ands),      CMocka cannot recover after this crash
         cmocka_unit_test(bad_version) };
 
     fails += cmocka_run_group_tests_name("static_tests", static_tests, NULL, NULL);
