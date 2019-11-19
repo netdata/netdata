@@ -664,7 +664,7 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=info_int \
         -Wl,--wrap=fatal_int \
         -Wl,--wrap=mysendfile \
-        -DUNIT_TESTING \
+        -DREMOVE_MYSENDFILE \
         $(TEST_LDFLAGS) \
         $(NULL)
     web_api_tests_valid_urls_testdriver_SOURCES = \

@@ -340,7 +340,8 @@ static inline int access_to_file_is_not_permitted(struct web_client *w, const ch
     return HTTP_RESP_FORBIDDEN;
 }
 
-#ifndef UNIT_TESTING
+// Work around a bug in the CMocka library by removing this function during testing.
+#ifndef REMOVE_MYSENDFILE
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
