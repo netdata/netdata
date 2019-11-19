@@ -155,7 +155,7 @@ BACKEND_TYPE exporting_select_type(const char *type)
         return BACKEND_TYPE_OPENTSDB_USING_HTTP;
     } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return BACKEND_TYPE_JSON;
-    } else if (!strcmp(type, "prometheus_remote_write") || !strcmp(type, "prometheus_remote_write")) {
+    } else if (!strcmp(type, "prometheus_remote_write")) {
         return BACKEND_TYPE_PROMETEUS;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
