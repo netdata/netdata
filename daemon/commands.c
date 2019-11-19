@@ -33,17 +33,17 @@ struct command_context {
 static cmd_status_t cmd_help_execute(char *args, char **message);
 static cmd_status_t cmd_reload_health_execute(char *args, char **message);
 static cmd_status_t cmd_save_database_execute(char *args, char **message);
-static cmd_status_t cmd_log_rotate_execute(char *args, char **message);
+static cmd_status_t cmd_reopen_logs_execute(char *args, char **message);
 static cmd_status_t cmd_exit_execute(char *args, char **message);
 static cmd_status_t cmd_fatal_execute(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
-        {"reload health", cmd_reload_health_execute, CMD_TYPE_ORTHOGONAL},   // reload health configuration
-        {"save database", cmd_save_database_execute, CMD_TYPE_ORTHOGONAL},   // save database for map/save modes
-        {"log rotate", cmd_log_rotate_execute, CMD_TYPE_ORTHOGONAL},         // rotate logs
-        {"exit", cmd_exit_execute, CMD_TYPE_EXCLUSIVE},                      // exit cleanly
-        {"fatal", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},                // exit with fatal error
+        {"reload-health", cmd_reload_health_execute, CMD_TYPE_ORTHOGONAL},   // reload health configuration
+        {"save-database", cmd_save_database_execute, CMD_TYPE_ORTHOGONAL},   // save database for memory mode save
+        {"reopen-logs", cmd_reopen_logs_execute, CMD_TYPE_ORTHOGONAL},       // Close and reopen log files
+        {"shutdown-agent", cmd_exit_execute, CMD_TYPE_EXCLUSIVE},            // exit cleanly
+        {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -89,14 +89,19 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
     *message = mallocz(MAX_COMMAND_LENGTH);
     strncpyz(*message,
              "\nThe commands are (arguments are in brackets):\n"
-             "\thelp\n"
-             "\treload health\n"
-             "\tsave database\n"
-             "\tlog rotate\n"
-             "\texit\n"
-             "\tfatal",
+             "help\n"
+             "    Show this help menu.\n"
+             "reload-health\n"
+             "    Reload health configuration.\n"
+             "save-database\n"
+             "    Save internal DB to disk for memory mode save.\n"
+             "reopen-logs\n"
+             "    Close and reopen log files.\n"
+             "shutdown-agent\n"
+             "    Cleanup and exit the netdata agent.\n"
+             "fatal-agent\n"
+             "    Log the state and halt the netdata agent.\n",
              MAX_COMMAND_LENGTH - 1);
-
     return CMD_STATUS_SUCCESS;
 }
 
@@ -127,7 +132,7 @@ static cmd_status_t cmd_save_database_execute(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
-static cmd_status_t cmd_log_rotate_execute(char *args, char **message)
+static cmd_status_t cmd_reopen_logs_execute(char *args, char **message)
 {
     (void)args;
     (void)message;

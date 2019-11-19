@@ -15,7 +15,7 @@ typedef enum cmd {
     CMD_HELP = 0,
     CMD_RELOAD_HEALTH,
     CMD_SAVE_DATABASE,
-    CMD_LOG_ROTATE,
+    CMD_REOPEN_LOGS,
     CMD_EXIT,
     CMD_FATAL,
     CMD_TOTAL_COMMANDS
@@ -32,10 +32,23 @@ typedef enum cmd_status {
 #define CMD_STATUS_BUSY_STR "BUSY"
 
 typedef enum cmd_type {
-    CMD_TYPE_EXCLUSIVE = 0, // No other command can run at the same time
-    CMD_TYPE_ORTHOGONAL,    // Other commands are allowed to run concurrently but calls to this command are serialized
-    CMD_TYPE_IDEMPOTENT,    // Any call to any command is allowed at the same time as its execution
-    CMD_TYPE_HIGH_PRIORITY  // It can be called even when there is an exclusive command running
+    /*
+     * No other command is allowed to run at the same time (except for CMD_TYPE_HIGH_PRIORITY).
+     */
+    CMD_TYPE_EXCLUSIVE = 0,
+    /*
+     * Other commands are allowed to run concurrently (except for CMD_TYPE_EXCLUSIVE) but calls to this command are
+     * serialized.
+     */
+    CMD_TYPE_ORTHOGONAL,
+    /*
+     * Other commands are allowed to run concurrently (except for CMD_TYPE_EXCLUSIVE) as are calls to this command.
+     */
+    CMD_TYPE_CONCURRENT,
+    /*
+     * Those commands are always allowed to run.
+     */
+    CMD_TYPE_HIGH_PRIORITY
 } cmd_type_t;
 
 /**

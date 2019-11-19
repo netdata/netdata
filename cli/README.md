@@ -7,12 +7,18 @@ The commands that a running netdata agent can execute are the following:
 
 ```sh
 The commands are (arguments are in brackets):
-	help
-	reload health
-	save database
-	log rotate
-	exit
-	fatal
+help
+    Show this help menu.
+reload-health
+    Reload health configuration.
+save-database
+    Save internal DB to disk for map/save modes.
+reopen-logs
+    Close and reopen log files.
+shutdown-agent
+    Cleanup and exit the netdata agent.
+fatal-agent
+    Log the state and halt the netdata agent.
 ```
 
 Those commands are the same that can be sent to netdata via [signals](../daemon#command-line-options).
