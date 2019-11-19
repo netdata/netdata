@@ -327,6 +327,31 @@ static int api_info_launcher()
             num_tests++;
         }
     }
+    for (size_t i = 0; i < MAX_HEADERS; i++) {
+        build_request(template->response.data, "/api/v1/info", false, i);
+        for (size_t j = 0; j <= template->response.data->len; j++) {
+            if (j == 0 && i > 0)
+                continue; // All zero-length prefixes are identical, skip after first time
+            current = malloc(sizeof(struct test_def));
+            if (prev != NULL)
+                prev->next = current;
+            else
+                head = current;
+            current->prev = prev;
+            prev = current;
+
+            current->num_headers = i;
+            current->prefix_len = j;
+            current->full_len = template->response.data->len;
+            current->instance = NULL;
+            current->next = NULL;
+            current->completed = false;
+            sprintf(
+                current->name, "/api/v1/info@%zu,%zu/%zu", current->num_headers, current->prefix_len,
+                current->full_len);
+            num_tests++;
+        }
+    }
 
     struct CMUnitTest *tests = calloc(num_tests, sizeof(struct CMUnitTest));
     current = head;
