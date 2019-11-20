@@ -221,6 +221,9 @@ static struct web_client *setup_fresh_web_client()
     struct web_client *w = (struct web_client *)malloc(sizeof(struct web_client));
     memset(w, 0, sizeof(struct web_client));
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    w->response.data->date = 0; // Valgrind uninitialised value
+    w->response.data->expires = 0; // Valgrind uninitialised value
+    w->response.data->options = 0; // Valgrind uninitialised value
     w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
     w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
     strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
@@ -273,7 +276,7 @@ static void api_info(void **state)
     log_buffer[0] = 0;
     if (localhost != NULL)
         free(localhost);
-    localhost = malloc(sizeof(RRDHOST));
+    localhost = calloc(1,sizeof(RRDHOST));
 
     def->instance = setup_fresh_web_client();
     build_request(def->instance->response.data, "/api/v1/info", true, def->num_headers);
