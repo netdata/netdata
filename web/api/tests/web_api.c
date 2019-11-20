@@ -388,13 +388,15 @@ static int api_info_launcher()
     return fails;
 }
 
-// Any ' ' in the URI -> invalid response   (Description in 5.1 of RFC2616)
-// Characters that can't be in paths #;?
-// "GET /apb/../api/v1/info" HTTP/1.1\r\n"
+/* Raw notes for the cases that we did not use in the unit testing suite.
+   Leaving them here instead of deleting them in-case we expand the suite during the
+   work on the URL parser.
 
-/*
+   Any ' ' in the URI -> invalid response   (Description in 5.1 of RFC2616)
+   Characters that can't be in paths #;?
+   "GET /apb/../api/v1/info" HTTP/1.1\r\n"
+
         https://github.com/uriparser/uriparser/blob/uriparser-0.9.3/test/FourSuite.cpp
-
         Not clear why some of these are illegal -> reserved chars?
 
 	ASSERT_TRUE(testBadUri("beepbeep\x07\x07", 8));
