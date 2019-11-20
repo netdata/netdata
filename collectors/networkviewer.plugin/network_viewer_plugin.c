@@ -18,8 +18,8 @@ static int update_every = 1;
 static int freq = 0;
 
 //perf variables
-int *pmu_fd = NULL;
-static struct perf_event_mmap_page **headers = NULL;
+int pmu_fd[NETDATA_MAX_PROCESSOR];
+static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
 
 netdata_network_t *nn;
 
@@ -80,14 +80,6 @@ static void network_viewer_exit(int sig) {
         dlclose(libnetdatanv);
     }
 
-    if (pmu_fd) {
-        freez(pmu_fd);
-    }
-
-    if (headers) {
-        freez(headers);
-    }
-
     if(nn) {
         clean_networks();
     }
@@ -99,17 +91,12 @@ static void network_viewer_exit(int sig) {
     exit(0);
 }
 
-int allocate_memory( ) {
+int map_memory() {
     size_t nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     size_t i;
 
     if (nprocs < NETDATA_MAX_PROCESSOR) {
         nprocs = NETDATA_MAX_PROCESSOR;
-    }
-
-    pmu_fd = callocz(nprocs, sizeof(int));
-    if (!pmu_fd) {
-        return -1;
     }
 
     for (i = 0; i < nprocs; i++) {
@@ -118,11 +105,6 @@ int allocate_memory( ) {
         if (perf_event_mmap(pmu_fd[i]) < 0) {
             return -1;
         }
-    }
-
-    headers = callocz(nprocs, sizeof(struct perf_event_mmap_page *));
-    if (!headers) {
-        return -1;
     }
 
     for (i = 0; i < nprocs; i++) {
@@ -641,7 +623,7 @@ int main(int argc, char **argv) {
         return 3;
     }
 
-    if (allocate_memory()) {
+    if (map_memory()) {
         error("[NETWORK VIEWER]: Cannot allocate the necessary vectors");
         network_viewer_exit(SIGTERM);
     }
