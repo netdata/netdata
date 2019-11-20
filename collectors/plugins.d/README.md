@@ -73,11 +73,11 @@ Example:
 	# python.d = yes
 ```
 
-The setting `enable running new plugins` changes the default behavior for all external plugins.
-So if set to `no`, only the plugins that are explicitly set to `yes` will be run.
+The setting `enable running new plugins` sets the default behavior for all external plugins. It can be 
+overriden for distinct plugins by modifying the appropriate plugin value configuration to either `yes` or `now`.
 
-The setting `check for new plugins every` controls the time the directory `/usr/libexec/netdata/plugins.d`
-will be rescanned for new plugins. So, new plugins can give added anytime.
+The setting `check for new plugins every` sets the interval between scans of the directory `/usr/libexec/netdata/plugins.d`.
+New plugins can be added anytime and netdata will detect them in a timely manner.
 
 For each of the external plugins enabled, another `netdata.conf` section
 is created, in the form of `[plugin:NAME]`, where `NAME` is the name of the external plugin.
