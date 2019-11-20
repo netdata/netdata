@@ -7,8 +7,8 @@ silence any that you're not interested in.
 Netdata creates charts dynamically, and runs an independent thread to constantly evaluate them, which means Netdata
 operates like a health watchdog for your services and applications.
 
-You can even run statistical algorithms against the metrics you've collected to power complex. Your imagination, and the
-needs of your infrastructure, are your only limits.
+You can even run statistical algorithms against the metrics you've collected to power complex lookups. Your imagination,
+and the needs of your infrastructure, are your only limits.
 
 **Take the next steps with health monitoring:**
 
@@ -18,7 +18,7 @@ needs of your infrastructure, are your only limits.
 
 [<FiCode /> Configuration reference](REFERENCE.md)
 
-[<FiBook /> Tutorials](#tutorials) 
+[<FiBook /> Tutorials](#tutorials)
 
 </DocsSteps>
 

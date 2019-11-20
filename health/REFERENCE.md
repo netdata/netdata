@@ -47,6 +47,9 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 -   The `on` and `lookup` lines are **always required**.
 -   Each entity **must** have one of the following lines: `calc`, `warn`, or `crit`.
 -   The `alarm` or `template` line must be the first line of any entity.
+-   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
+    `!` for a negative match. Order is important, too! See our [simple patterns docs](../libnetdata/simple_pattern/) for
+    more examples.
 
 | line                                                | required        | functionality                                                                         |
 | --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
@@ -121,12 +124,8 @@ If you create a template using the `disk.io` context, it will apply an alarm to 
 
 #### Alarm line `os`
 
-The alarm or template will be used only if the operating system of the host matches this list specified in `os`.
-
-The value is a space-separate list of simple patterns. You can use `*` as a wildcard or prefix with `!` for a negative
-match. Order is important, too!
-
-See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
+The alarm or template will be used only if the operating system of the host matches this list specified in `os`. The
+value is a space-separated list.
 
 The following example enables the entity on Linux, FreeBSD, and MacOS, but no other operating systems.
 
@@ -136,12 +135,7 @@ os: linux freebsd macos
 
 #### Alarm line `hosts`
 
-The alarm or template will be used only if the hostname of the host matches this list.
-
-The value is a space-separate list of simple patterns. You can use `*` as a wildcard or prefix with `!` for a negative
-match. Order is important, too!
-
-See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
+The alarm or template will be used only if the hostname of the host matches this space-separated list.
 
 The following example will load on systems with the hostnames `server` and `server2`, and any system with hostnames that
 begin with `database`. It _will not load_ on the host `redis3`, but will load on any _other_ systems with hostnames that
@@ -154,7 +148,7 @@ hosts: server1 server2 database* !redis3 redis*
 #### Alarm line `families`
 
 The `families` line, used only alongside templates, filters which families within the context this alarm should apply
-to.
+to. The value is a space-separated list.
 
 The value is a space-separate list of simple patterns. See our [simple patterns docs](../libnetdata/simple_pattern/) for
 some examples.
@@ -404,8 +398,8 @@ There are two special values you can use:
 -   `nan`, for example `$this != nan` will check if the variable `this` is available. A variable can be `nan` if the
     database lookup failed. All calculations (i.e. addition, multiplication, etc) with a `nan` result in a `nan`.
 
--   `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be infinite if
-    divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
+-   `inf`, for example `$this != inf` will check if `this` is not infinite. A value or variable can be set to infinite
+    if divided by zero. All calculations (i.e. addition, multiplication, etc) with a `inf` result in a `inf`.
 
 ### Special use of the conditional operator
 
