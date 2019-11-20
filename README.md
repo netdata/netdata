@@ -126,7 +126,7 @@ Netdata has a quite different approach to monitoring.
 Netdata is a monitoring agent you install on all your systems. It is:
 
 -   a **metrics collector** - for system and application metrics (including web servers, databases, containers, etc)
--   a **database engine** - recent metrics stored in memory while historical metrics "spilled" to disk for 
+-   a **database engine** - recent metrics stored in memory with historical metrics "spilled" to disk for 
     long-term storage
 -   a **metrics visualizer** - super fast, interactive, modern, optimized for anomaly detection
 -   an **alarms notification engine** - an advanced watchdog for detecting performance and availability issues
@@ -196,7 +196,9 @@ Release v1.18.0 contains 5 new collectors, 16 bug fixes, 27 improvements, and 20
 
 The **database engine** is now the default method of storing metrics in Netdata. You immediately get more efficient and configurable long-term metrics storage without any work on your part. By saving recent metrics in RAM and "spilling" historical metrics to disk for long-term storage, the database engine is laying the foundation for many more improvements to distributed metrics.
 
-We even have a [tutorial](https://docs.netdata.cloud/docs/tutorials/longer-metrics-storage/) on switching to the database engine and getting the most from it. Or, just read up on [how performant](https://docs.netdata.cloud/database/engine/#evaluation) the database engine is.
+We even have a [tutorial](https://docs.netdata.cloud/docs/tutorials/longer-metrics-storage/) on switching to the
+database engine and getting the most from it. Or, just read up on the database engine's [raw
+performance](https://docs.netdata.cloud/database/engine/#evaluation).
 
 Both our `python.d` and `go.d` plugins now have more **intelligent auto-detection** by periodically dump a list of active modules to disk. When Netdata starts, such as after a reboot, the plugins use this list of known services to re-establish metrics collection much more reliably. No more worrying if the service or application you need to monitor starts up minutes after Netdata.
 
@@ -405,11 +407,16 @@ This is what you should expect from Netdata:
 -   **1% CPU utilization of a single core** - It's unbelievably optimized.
 -   **A few MB of RAM** - The low-memory round-robin option uses 25MB RAM, and you can [resize it](database/).
 -   **Minimal disk I/O** - While running, Netdata only writes historical metrics and reads `error` and `access` logs.
--   **Zero configuration** - Netdataa auto-detects everything, and can collect up to 10,000 metrics per server out of the box.
+-   **Zero configuration** - Netdata auto-detects everything, and can collect up to 10,000 metrics per server out of the
+    box.
 -   **Zero maintenance** - You just run it. Netdata does the rest.
--   **Zero dependencies** - Netdata runs a custom web server for its static web files and its web API (though its plugins may require additional libraries, depending on the applications monitored).
--   **Scales to infinity** - You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not centralized by default, so there is no limit.
--   **Several operating modes** - Autonomous host monitoring (the default), headless data collector, forwarding proxy, store and forward proxy, central multi-host monitoring, in all possible configurations. Each node may have different metrics retention policies and run with or without health monitoring.
+-   **Zero dependencies** - Netdata runs a custom web server for its static web files and its web API (though its
+    plugins may require additional libraries, depending on the applications monitored).
+-   **Scales to infinity** - You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not
+    centralized by default, so there is no limit.
+-   **Several operating modes** - Autonomous host monitoring (the default), headless data collector, forwarding proxy,
+    store and forward proxy, central multi-host monitoring, in all possible configurations. Each node may have different
+    metrics retention policies and run with or without health monitoring.
 
 ### Health Monitoring & Alarms
 
