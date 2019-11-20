@@ -162,7 +162,7 @@ services:
       - 443:443
     volumes:
       - /opt/Caddyfile:/etc/Caddyfile
-      - caddy:/root/.caddy
+      - $HOME/.caddy:/root/.caddy
     environment:
       ACME_AGREE: 'true'
   netdata:
