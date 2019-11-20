@@ -74,7 +74,7 @@ int __wrap_web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *
 {
     char url_repr[160];
     repr(url_repr, sizeof(url_repr), url, strlen(url));
-    printf("web_client_api_request_v1(url=\"%s\")\n", url_repr);
+    info("web_client_api_request_v1(url=\"%s\")\n", url_repr);
     check_expected_ptr(host);
     check_expected_ptr(w);
     check_expected_ptr(url_repr);
@@ -125,7 +125,9 @@ void __wrap_debug_int(const char *file, const char *function, const unsigned lon
     va_start(args, fmt);
     size_t cur = strlen(log_buffer);
     snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "  DEBUG: ");
+    cur = strlen(log_buffer);
     vsnprintf(log_buffer + cur, sizeof(log_buffer) - cur, fmt, args);
+    cur = strlen(log_buffer);
     snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "\n");
     va_end(args);
 }
@@ -139,7 +141,9 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
     va_start(args, fmt);
     size_t cur = strlen(log_buffer);
     snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "  INFO: ");
+    cur = strlen(log_buffer);
     vsnprintf(log_buffer + cur, sizeof(log_buffer) - cur, fmt, args);
+    cur = strlen(log_buffer);
     snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "\n");
     va_end(args);
 }
@@ -155,7 +159,9 @@ void __wrap_error_int(
     va_start(args, fmt);
     size_t cur = strlen(log_buffer);
     snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "  ERROR: ");
+    cur = strlen(log_buffer);
     vsnprintf(log_buffer + cur, sizeof(log_buffer) - cur, fmt, args);
+    cur = strlen(log_buffer);
     snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "\n");
     va_end(args);
 }
@@ -286,7 +292,7 @@ static void api_info(void **state)
     if (def->prefix_len == def->full_len) {
         expect_value(__wrap_web_client_api_request_v1, host, localhost);
         expect_value(__wrap_web_client_api_request_v1, w, def->instance);
-        expect_string(__wrap_web_client_api_request_v1, url, "info");
+        expect_string(__wrap_web_client_api_request_v1, url_repr, "info");
     }
 
     web_client_process_request(def->instance);
@@ -296,7 +302,6 @@ static void api_info(void **state)
     else
         assert_int_equal(def->instance->flags & WEB_CLIENT_FLAG_WAIT_RECEIVE, WEB_CLIENT_FLAG_WAIT_RECEIVE);
     assert_int_equal(def->instance->mode, WEB_CLIENT_MODE_NORMAL);
-    printf("decoded: %s\n", def->instance->decoded_query_string);
     def->completed = true;
     log_buffer[0] = 0;
 }
