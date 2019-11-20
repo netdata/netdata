@@ -74,10 +74,10 @@ Example:
 ```
 
 The setting `enable running new plugins` sets the default behavior for all external plugins. It can be 
-overriden for distinct plugins by modifying the appropriate plugin value configuration to either `yes` or `now`.
+overriden for distinct plugins by modifying the appropriate plugin value configuration to either `yes` or `no`.
 
-The setting `check for new plugins every` sets the interval between scans of the directory `/usr/libexec/netdata/plugins.d`.
-New plugins can be added anytime and netdata will detect them in a timely manner.
+The setting `check for new plugins every` sets the interval between scans of the directory
+`/usr/libexec/netdata/plugins.d`. New plugins can be added any time, and Netdata will detect them in a timely manner.
 
 For each of the external plugins enabled, another `netdata.conf` section
 is created, in the form of `[plugin:NAME]`, where `NAME` is the name of the external plugin.
