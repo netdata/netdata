@@ -315,3 +315,5 @@ In Markdown, use the standard image syntax, `![]()`, and place the alt text betw
 #### Images of text
 
 Don't use images of text, code samples, or terminal output. Instead, put that text content in a code block so that all devices can render it clearly and screen readers can parse it.
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fcontributing%2Fstyle-guide&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
