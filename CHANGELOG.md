@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Update plugins.d/README.md [\#7335](https://github.com/netdata/netdata/pull/7335) ([OdysLam](https://github.com/OdysLam))
 - Update README.md [\#7330](https://github.com/netdata/netdata/pull/7330) ([cakrit](https://github.com/cakrit))
 - installer: add missing trailing backslash [\#7326](https://github.com/netdata/netdata/pull/7326) ([oxplot](https://github.com/oxplot))
 - Fine tune various alarm values. [\#7322](https://github.com/netdata/netdata/pull/7322) ([Ferroin](https://github.com/Ferroin))
@@ -250,9 +251,6 @@
 - Fix 'None' in left nav [\#6632](https://github.com/netdata/netdata/pull/6632) ([joelhans](https://github.com/joelhans))
 - Update terms of use for U.S. legal reasons [\#6631](https://github.com/netdata/netdata/pull/6631) ([cakrit](https://github.com/cakrit))
 - Fix a segmentation fault in backends [\#6627](https://github.com/netdata/netdata/pull/6627) ([vlvkobal](https://github.com/vlvkobal))
-- .travis.yml: Remove 'sudo: true' as it is now deprecated [\#6624](https://github.com/netdata/netdata/pull/6624) ([knatsakis](https://github.com/knatsakis))
--  Change "netdata" to "Netdata" in all docs [\#6621](https://github.com/netdata/netdata/pull/6621) ([joelhans](https://github.com/joelhans))
-- netdata: Add cosmix as codeowner, wherever cakrit is [\#6618](https://github.com/netdata/netdata/pull/6618) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
