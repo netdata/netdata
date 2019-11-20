@@ -189,17 +189,28 @@ Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION]
 Here are the options for the `algorithm` setting:
 
 -   `absolute`: The value is drawn as-is (interpolated to second boundary).
--   `incremental`: The value increases over time. The difference from the last value is presented in the chart, the server interpolates the value and calculates a per-second figure
+-   `incremental`: The value increases over time. The difference from the last value is presented in the chart, the
+    server interpolates the value and calculates a per-second figure.
 -   `percentage-of-absolute-row`: The % of this value compared to the total of all dimensions.
 -   `percentage-of-incremental-row`: The % of this value compared to the incremental total of all dimensions.
 
-t/k
+For example, the `system.io` chart has the following default settings:
 
 ```conf
-        # dim reserved_for_root name = reserved for root
-        # dim reserved_for_root algorithm = absolute
-        # dim reserved_for_root multiplier = 1
-        # dim reserved_for_root divisor = 1
+        # dim in name = in
+        # dim in algorithm = incremental
+        # dim in multiplier = 1
+        # dim in divisor = 1
+        # dim out name = out
+        # dim out algorithm = incremental
+        # dim out multiplier = -1
+        # dim out divisor = 1
 ```
+
+These `dim` settings produce two dimensions, `in` and `out`, both of which use the `incremental` algorithm. By
+multiplying the value of `out` by -1, Netdata creates the negative values seen in the following area chart:
+
+![The system.io chart on a MacOS
+laptop](https://user-images.githubusercontent.com/1153921/69286708-2cfb3900-0bb1-11ea-9fcd-dd8fbb2adf11.png)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2Fconfig%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
