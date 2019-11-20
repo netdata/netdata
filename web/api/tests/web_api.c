@@ -265,7 +265,7 @@ struct test_def {
     char name[80];
     size_t full_len;
     struct web_client *instance; // Used within this single test
-    bool completed;
+    bool completed, use_cr;
     struct test_def *next, *prev;
 };
 
@@ -285,10 +285,12 @@ static void api_info(void **state)
     localhost = calloc(1,sizeof(RRDHOST));
 
     def->instance = setup_fresh_web_client();
-    build_request(def->instance->response.data, "/api/v1/info", true, def->num_headers);
+    build_request(def->instance->response.data, "/api/v1/info", def->use_cr, def->num_headers);
     def->instance->response.data->len = def->prefix_len;
 
-    info("Buffer contains: %s [first %zu]", def->instance->response.data->buffer, def->prefix_len);
+    char buffer_repr[1024];
+    repr(buffer_repr, sizeof(buffer_repr), def->instance->response.data->buffer,def->prefix_len);
+    info("Buffer contains: %s [first %zu]", buffer_repr,def->prefix_len);
     if (def->prefix_len == def->full_len) {
         expect_value(__wrap_web_client_api_request_v1, host, localhost);
         expect_value(__wrap_web_client_api_request_v1, w, def->instance);
@@ -331,10 +333,11 @@ static int api_info_launcher()
             current->full_len = template->response.data->len;
             current->instance = NULL;
             current->next = NULL;
+            current->use_cr = true;
             current->completed = false;
             sprintf(
-                current->name, "/api/v1/info@%zu,%zu/%zu", current->num_headers, current->prefix_len,
-                current->full_len);
+                current->name, "/api/v1/info@%zu,%zu/%zu+%d", current->num_headers, current->prefix_len,
+                current->full_len,true);
             num_tests++;
         }
     }
@@ -356,10 +359,11 @@ static int api_info_launcher()
             current->full_len = template->response.data->len;
             current->instance = NULL;
             current->next = NULL;
+            current->use_cr = false;
             current->completed = false;
             sprintf(
-                current->name, "/api/v1/info@%zu,%zu/%zu", current->num_headers, current->prefix_len,
-                current->full_len);
+                current->name, "/api/v1/info@%zu,%zu/%zu+%d", current->num_headers, current->prefix_len,
+                current->full_len,false);
             num_tests++;
         }
     }
