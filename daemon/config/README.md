@@ -172,22 +172,34 @@ that is information about lines that begin with `dim`, which affect a chart's di
 | `name`            | The name of the chart that appears in the top-left corner, after the chart's title. This name can be used when writing [health entities](../../health/README.md#).                                                                                |
 | `title`           | The text that appears above the chart in the Netdata dashboard.                                                                                                                                                                                   |
 
+### Dimension settings
+
 You may notice a number of settings that begin with `dim` beneath the ones defined in the table above. These settings
-define which dimensions appear on the given chart, and the 
+define which dimensions appear on the given chart and how they are calculated.
 
-Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION] = [VALUE]`.
+Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION] = [VALUE]`. The available options are `name`, `algorithm`, `multipler`, and `divisor`.
 
+| Setting      | Function                                                                                                                                                                                                                                                      |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`       | The name of the dimension as it will appear in the legend of the chart. If left empty, or is missing, Netdata will use the `[DIMENSION ID]` instead.                                                                                                          |
+| `algorithm`  | Can be `absolute`, `incremental`, `percentage-of-absolute-row`, or `percentage-of-incremental-row`. If this setting is empty, invalid, or missing, Netdata will use `absolute`. See the list beneath this table for descriptions of what each algorithm does. |
+| `multiplier` | An integer value by which to multiply the collected value. If empty or missing, Netdata will use `1`. Is often used with the value `1024` to convert metabytes to kilobytes, kilobytes to bytes, and so on.                                                   |
+| `divisor`    | An integer value by which to divide the collected value. If empty or missing, Netdata will use `1`. Is often used with the value `1024` to convert bytes to kilobytes, kilobytes to megabytes, and so on.                                                     |
 
+Here are the options for the `algorithm` setting:
 
-```
+-   `absolute`: The value is drawn as-is (interpolated to second boundary).
+-   `incremental`: The value increases over time. The difference from the last value is presented in the chart, the server interpolates the value and calculates a per-second figure
+-   `percentage-of-absolute-row`: The % of this value compared to the total of all dimensions.
+-   `percentage-of-incremental-row`: The % of this value compared to the incremental total of all dimensions.
+
+t/k
+
+```conf
         # dim reserved_for_root name = reserved for root
         # dim reserved_for_root algorithm = absolute
         # dim reserved_for_root multiplier = 1
         # dim reserved_for_root divisor = 1
 ```
-
-### Dimension settings
-
-t/k
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdaemon%2Fconfig%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
