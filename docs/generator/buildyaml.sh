@@ -256,7 +256,7 @@ navpart 3 collectors/slabinfo.plugin
 echo -ne "    - 'docs/Third-Party-Plugins.md'
 "
 
-navpart 1 health README "Alarms and notifications"
+navpart 1 health README "Health monitoring and alerts"
 echo -ne "    - 'health/QUICKSTART.md'
     - 'health/REFERENCE.md'
 "
