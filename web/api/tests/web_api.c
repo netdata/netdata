@@ -123,9 +123,10 @@ void __wrap_debug_int(const char *file, const char *function, const unsigned lon
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "  DEBUG: ");
-    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
-    sprintf(log_buffer + strlen(log_buffer), "\n");
+    size_t cur = strlen(log_buffer);
+    snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "  DEBUG: ");
+    vsnprintf(log_buffer + cur, sizeof(log_buffer) - cur, fmt, args);
+    snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "\n");
     va_end(args);
 }
 
@@ -136,9 +137,10 @@ void __wrap_info_int(const char *file, const char *function, const unsigned long
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "  INFO: ");
-    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
-    sprintf(log_buffer + strlen(log_buffer), "\n");
+    size_t cur = strlen(log_buffer);
+    snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "  INFO: ");
+    vsnprintf(log_buffer + cur, sizeof(log_buffer) - cur, fmt, args);
+    snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "\n");
     va_end(args);
 }
 
@@ -151,9 +153,10 @@ void __wrap_error_int(
     (void)line;
     va_list args;
     va_start(args, fmt);
-    sprintf(log_buffer + strlen(log_buffer), "  ERROR: ");
-    vsprintf(log_buffer + strlen(log_buffer), fmt, args);
-    sprintf(log_buffer + strlen(log_buffer), "\n");
+    size_t cur = strlen(log_buffer);
+    snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "  ERROR: ");
+    vsnprintf(log_buffer + cur, sizeof(log_buffer) - cur, fmt, args);
+    snprintf(log_buffer + cur, sizeof(log_buffer) - cur, "\n");
     va_end(args);
 }
 
@@ -369,7 +372,6 @@ static int api_info_launcher()
     int fails = _cmocka_run_group_tests("web_api", tests, num_tests, NULL, NULL);
     free(tests);
     destroy_web_client(template);
-    // localtest will be an issue. FIXME
     current = head;
     while (current != NULL) {
         struct test_def *c = current;
@@ -378,6 +380,8 @@ static int api_info_launcher()
             destroy_web_client(c->instance);
         free(c);
     }
+    if (localhost!=NULL)
+        free(localhost);
     return fails;
 }
 
