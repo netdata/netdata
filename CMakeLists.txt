@@ -897,6 +897,64 @@ if(BUILD_TESTING)
     target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
 
-    set_target_properties(str2ld_testdriver storage_number_testdriver PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests)
+    set(WEB_API_TEST_FILES
+        web/api/tests/web_api.c
+        web/server/web_client.c
+        )
+    add_executable(web_api_testdriver ${WEB_API_TEST_FILES})
+    target_link_options(
+        web_api_testdriver
+        PRIVATE
+        -Wl,--wrap=rrdhost_find_by_hostname
+        -Wl,--wrap=finished_web_request_statistics
+        -Wl,--wrap=config_get
+        -Wl,--wrap=web_client_api_request_v1
+        -Wl,--wrap=rrdhost_find_by_guid
+        -Wl,--wrap=rrdset_find_byname
+        -Wl,--wrap=rrdset_find
+        -Wl,--wrap=rrdpush_receiver_thread_spawn
+        -Wl,--wrap=debug_int
+        -Wl,--wrap=error_int
+        -Wl,--wrap=info_int
+        -Wl,--wrap=fatal_int
+    )
+    target_link_libraries(web_api_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_web_api COMMAND web_api_testdriver)
+
+    set(VALID_URLS_TEST_FILES
+        web/api/tests/valid_urls.c
+        web/server/web_client.c
+        )
+    add_executable(valid_urls_testdriver ${VALID_URLS_TEST_FILES})
+    target_link_options(
+        valid_urls_testdriver
+        PRIVATE
+        -Wl,--wrap=rrdhost_find_by_hostname
+        -Wl,--wrap=finished_web_request_statistics
+        -Wl,--wrap=config_get
+        -Wl,--wrap=web_client_api_request_v1
+        -Wl,--wrap=rrdhost_find_by_guid
+        -Wl,--wrap=rrdset_find_byname
+        -Wl,--wrap=rrdset_find
+        -Wl,--wrap=rrdpush_receiver_thread_spawn
+        -Wl,--wrap=debug_int
+        -Wl,--wrap=error_int
+        -Wl,--wrap=info_int
+        -Wl,--wrap=fatal_int
+        -Wl,--wrap=mysendfile
+        -DREMOVE_MYSENDFILE
+    )
+    target_link_libraries(valid_urls_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_valid_urls COMMAND valid_urls_testdriver)
+
+    set_target_properties(
+        str2ld_testdriver
+        storage_number_testdriver
+        web_api_testdriver
+        valid_urls_testdriver
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests
+    )
+
+
 endif()
 endif()
