@@ -18,9 +18,9 @@ void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int 
 static int pmu_fd[NETDATA_MAX_PROCESSOR];
 static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
 
-netdata_network_t *nn = NULL;
+netdata_network_t *ip_table = NULL;
 
-netdata_control_connection_t ncc;
+netdata_control_connection_t connection_controller;
 
 /*
  */
@@ -51,7 +51,7 @@ void send_statistics( const char *action, const char *action_result, const char 
 // ----------------------------------------------------------------------
 
 int netdata_is_inside(in_addr_t val, uint32_t *router) {
-    netdata_network_t *lnn = nn;
+    netdata_network_t *lnn = ip_table;
     while (lnn) {
         if (!lnn->isloopback) {
             in_addr_t ip = lnn->ipv4addr;
@@ -83,8 +83,8 @@ static void netdata_publish_data() {
 #define NETWORK_VIEWER_INGRESS "ingress"
 #define NETWORK_VIEWER_EGRESS  "egress"
 
-    if(ncc.tree) {
-        netdata_conn_stats_t *move = ncc.tree;
+    if(connection_controller.tree) {
+        netdata_conn_stats_t *move = connection_controller.tree;
         while (move) {
             in_addr_t arg = move->saddr;
             //COMPARE TIMESTAMP TO DEFINE THE CORRECT COUNTER
@@ -205,24 +205,25 @@ int netdata_store_bpf(void *data, int size)
 
     //   printf("%-17s %-17s %-5u %-17u %-10u %-10u %-10u %-14u\n", saddr, daddr, ntohs(e->dport), e->retransmit, e->sent, e->recv, proto, (e->ct - e->first));
 
-    netdata_conn_stats_t *ncs = (netdata_conn_stats_t *)avl_search_lock(&ncc.destination_port, (avl *)e);
+    netdata_conn_stats_t *ncs = (netdata_conn_stats_t *)avl_search_lock(&connection_controller.destination_port, (avl *)e);
     if (!ncs) {
         ncs = malloc(sizeof(netdata_conn_stats_t));
         if(ncs) {
 
             netdata_set_conn_stats(ncs, e);
-            if(!ncc.tree) {
-                ncc.tree = ncs;
+            if(!connection_controller.tree) {
+                connection_controller.tree = ncs;
             } else {
                 netdata_conn_stats_t *move, *save;
-                for (move = ncc.tree; move ; save = move, move = move->next);
+                for (move = connection_controller.tree; move ; save = move, move = move->next);
                 if(save) {
                     save->next = ncs;
                 }
             }
 
-            netdata_conn_stats_t *ret = (netdata_conn_stats_t *)avl_insert_lock(&ncc.destination_port, (avl *)ncs);
-            if(ret == ncs) {
+            netdata_conn_stats_t *ret = (netdata_conn_stats_t *)avl_insert_lock(&connection_controller.destination_port, (avl *)ncs);
+            if(ret != ncs) {
+                error("[NETWORK VIEWER] Cannot insert the index to the table destination_port");
             }
         }
     } else {
@@ -261,9 +262,9 @@ int compare_destination_ip(void *a, void *b) {
 
 void *network_collector(void *ptr) {
     (void)ptr;
-    ncc.tree = NULL;
+    connection_controller.tree = NULL;
 
-    avl_init_lock(&(ncc.destination_port), compare_destination_ip);
+    avl_init_lock(&connection_controller.destination_port, compare_destination_ip);
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     netdata_perf_loop_multi(pmu_fd, headers, nprocs, (int *)&netdata_exit, netdata_store_bpf);
@@ -272,20 +273,20 @@ void *network_collector(void *ptr) {
 }
 // ----------------------------------------------------------------------
 static void clean_networks() {
-    netdata_network_t *move = nn->next;
+    netdata_network_t *move = ip_table->next;
     while (move) {
         netdata_network_t *next = move->next;
         free(move);
         move = next;
     }
-    free(nn);
+    free(ip_table);
 }
 
 void clean_connections() {
-    netdata_conn_stats_t * move = ncc.tree->next;
+    netdata_conn_stats_t * move = connection_controller.tree->next;
     while (move) {
         netdata_conn_stats_t *next = move->next;
-        netdata_conn_stats_t *ncs = (netdata_conn_stats_t *)avl_remove_lock(&ncc.destination_port, (avl *)move);
+        netdata_conn_stats_t *ncs = (netdata_conn_stats_t *)avl_remove_lock(&connection_controller.destination_port, (avl *)move);
         if (ncs != move) { //REVIEW THIS
             //error("[NETWORK VIEWER] Cannot remove a connection");
         }
@@ -293,7 +294,7 @@ void clean_connections() {
         free(move);
         move = next;
     }
-    free(ncc.tree);
+    free(connection_controller.tree);
 }
 
 static void int_exit(int sig) {
@@ -302,11 +303,11 @@ static void int_exit(int sig) {
         dlclose(libnetdatanv);
     }
 
-    if(ncc.tree) {
+    if(connection_controller.tree) {
         clean_connections();
     }
 
-    if(nn) {
+    if(ip_table) {
         clean_networks();
     }
 
@@ -483,12 +484,12 @@ int main(int argc, char **argv) {
         return 4;
     }
 
-    nn = netdata_list_ips();
-    if(!nn) {
+    ip_table = netdata_list_ips();
+    if(!ip_table) {
         return 5;
     }
 
-    if (netdata_get_router(nn)) {
+    if (netdata_get_router(ip_table)) {
         return 6;
     }
 
