@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Correct versions of FreeNAS that Netdata is available on [\#7355](https://github.com/netdata/netdata/pull/7355) ([knatsakis](https://github.com/knatsakis))
 - Update netdata-security.md [\#7343](https://github.com/netdata/netdata/pull/7343) ([cakrit](https://github.com/cakrit))
 - 7232: Fix Debian dependencies [\#7342](https://github.com/netdata/netdata/pull/7342) ([andyundso](https://github.com/andyundso))
 - Update plugins.d/README.md [\#7335](https://github.com/netdata/netdata/pull/7335) ([OdysLam](https://github.com/OdysLam))
@@ -189,7 +190,6 @@
 - netdata/installer: Add support for offline installs using kickstart or kickstart-static64 [\#6693](https://github.com/netdata/netdata/pull/6693) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add clang-format. Update Contribution guidelines. [\#6677](https://github.com/netdata/netdata/pull/6677) ([cosmix](https://github.com/cosmix))
 - changed naming for redirect\_uri param [\#6663](https://github.com/netdata/netdata/pull/6663) ([jacekkolasa](https://github.com/jacekkolasa))
-- Fixes netdata group deletion on linux for uninstall script [\#6645](https://github.com/netdata/netdata/pull/6645) ([mbarper](https://github.com/mbarper))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
