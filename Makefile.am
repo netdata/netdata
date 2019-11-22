@@ -254,6 +254,7 @@ PERF_PLUGIN_FILES = \
 
 NETWORKVIEWER_PLUGIN_FILES = \
     collectors/networkviewer.plugin/network_viewer_plugin.c \
+    collectors/networkviewer.plugin/network_viewer_plugin.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
