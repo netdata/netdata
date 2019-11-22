@@ -1,17 +1,17 @@
 # Monitor Unbound DNS servers with Netdata
 
-In v1.19 of Netdata, we release a completely refactored collector for servers running the
-[Unbound](https://nlnetlabs.nl/projects/unbound/about/) DNS resolver.
+[Unbound](https://nlnetlabs.nl/projects/unbound/about/) is a "validating, recursive, caching DNS resolver" from NLNet
+Labs. In v1.19 of Netdata, we release a completely refactored collector for collecting real-time metrics from Unbound
+servers and displaying them in Netdata dashboards.
 
-Unbound is a "validating, recursive, caching DNS resolver"[1][] from NLNet Labs. It runs on FreeBSD, OpenBSD, NetBSD,
-MacOS, Linux, and Windows, and supports DNS-over-TLS, which ensures that DNS queries and answers are all encrypted with
-TLS. In theory, that should reduce the risk of eavesdropping or man-in-the-middle attacks when communicating to DNS
-servers.
+Unbound runs on FreeBSD, OpenBSD, NetBSD, MacOS, Linux, and Windows, and supports DNS-over-TLS, which ensures that DNS
+queries and answers are all encrypted with TLS. In theory, that should reduce the risk of eavesdropping or
+man-in-the-middle attacks when communicating to DNS servers.
 
 This tutorial will show you how to collect dozens of essential metrics from your Unbound servers with minimal
 configuration.
 
-## Set up your Unbound installations
+## Set up your Unbound installation
 
 As with all data sources, Netdata can auto-detect Unbound servers if you installed them using the standard installation
 procedure.
@@ -20,9 +20,10 @@ Regardless of whether you're connecting to a local or remote Unbound server, you
 `remote-control` interface via an IP address, FQDN, or Unix socket.
 
 To set up the `remote-control` interface, you can use `unbound-control`. First, run `unbound-control-setup` to generate
-the TLS key files that will encrypt connections to the remote interface.
-
-Finally, add the following to the end of your `unbound.conf` configuration file.
+the TLS key files that will encrypt connections to the remote interface. Then add the following to the end of your
+`unbound.conf` configuration file. See the [Unbound
+documentation](https://nlnetlabs.nl/documentation/unbound/howto-setup/#setup-remote-control) for more details on using
+`unbound-control`, such as how to handle situations when Unbound is run under a unique user.
 
 ```conf
 # enable remote-control
@@ -30,26 +31,55 @@ remote-control:
     control-enable: yes
 ```
 
-See the [Unbound documentation](https://nlnetlabs.nl/documentation/unbound/howto-setup/#setup-remote-control) for more
-details on using `unbound-control`, such as how to handle situations when Unbound is run under a unique user. Be sure to
-read the documentation for your [`unbound.conf` file](https://nlnetlabs.nl/documentation/unbound/unbound.conf/) as well.
+Next, make your `unbound.conf`, `unbound_control.key`, and `unbound_control.pem` files readable by Netdata.
+
+```bash
+sudo setfacl -m user:netdata:r unbound.conf
+sudo setfacl -m user:netdata:r unbound_control.key
+sudo setfacl -m user:netdata:r unbound_control.pem
+```
+
+Finally, ensure that your `unbound.conf` file is indented using spaces, not tabs, as our collector can't parse a
+configuration file with tabs. There are many ways to accomplish this, but here is one option:
+
+```bash
+sed -i $'s/\t/    /g' *.conf
+```
+
+Finally, take note whether you're using Unbound in _cumulative_ or _non-cumulative_ mode. This will become relevant when
+configuring the collector.
 
 ## Configure the Unbound collector module
+
+To use the Go version of the Unbound collector, you need to explicitly enable it. Open your `go.d.conf` configuration
+file.
+
+```bash
+cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
+./edit-config python.d.conf
+```
+
+Find the `unbound` line, uncomment it, and set it to `unbound: yes`.
 
 To configure Netdata's Unbound collector module, navigate to your Netdata configuration directory (typically at
 `/etc/netdata/`) and use `edit-config` to initialize and edit your Unbound configuration file.
 
 ```bash
-cd /etc/netdata/
+cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
 sudo ./edit-config go.d/unbound.conf
 ```
 
 The file contains all the global and job-related parameters. The `name` setting is required, and two Unbound servers
 can't have the same name.
 
-There are a few methods of connecting to an Unbound server, depending on whether the server is local or remote. To see
-all the available options, see the [unbound.conf
-file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.conf).
+The collector supports both cumulative and non-cumulative modes. Visit Unbound's [statistics configuration
+documentation](https://www.nlnetlabs.nl/documentation/unbound/howto-statistics/) for details on enabling cumulative
+mode, if you're interested.
+
+> It is important you know whether your Unbound server is running in cumulative or non-cumulative mode, as a conflict
+> between modes will create incorrect charts.
+
+At this point, you're ready to edit the `unbound.conf` file according to your needs.
 
 ### Auto-detect a local Unbound server
 
@@ -62,35 +92,17 @@ jobs:
 ```
 
 Netdata will attempt to read `unbound.conf` to get the appropriate `address`, `cumulative`, `use_tls`, `tls_cert`, and
-`tls_key` parameters. If that doesn't work, continue to the next section.
+`tls_key` parameters. 
 
-### Manual setup for a local Unbound server
-
-If Netdata can't read your `unbound.conf` file, or it doesn't contain all the necessary configuration options, you will
-need to set up 
-
-For collecting metrics from a local Unbound server, you can try the following:
-
-```yaml
-jobs:
-  - name: local
-    address: 127.0.0.1:8953
-    use_tls: yes
-    tls_skip_verify: yes
-    tls_cert: /etc/unbound/unbound_control.pem
-    tls_key: /etc/unbound/unbound_control.key
-```
-
-Netdata will need read access to both `.pem` and `.key` files.
+Restart Netdata with `service netdata restart`, or the appropriate method for your system. You should see Unbound
+metrics in your Netdata dashboard! But, if that failed, you will need to manually configure `unbound.conf`. See the
+[default `unbound.conf` file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.conf) for details.
 
 ### Manual setup for a remote Unbound server
 
-Collecting metrics from remote Unbound servers requires manual 
-
-If your Unbound server has `statistics-cumulative` set to `yes` in your `unbound.conf` file, you can set the parameter
-`cumulative` to `yes` to change the statistics collection mode.
-
-Here are a few examples:
+Collecting metrics from remote Unbound servers requires manual configuration. There are too many possibilities to cover
+all remote connections here, but the [default `unbound.conf`
+file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.conf) contains a few useful examples:
 
 ```yaml
 jobs:
@@ -105,6 +117,7 @@ jobs:
 
   - name: remote
     address: 203.0.113.10:8953
+    cumulative: yes
     use_tls: yes
     tls_cert: /etc/unbound/unbound_control.pem
     tls_key: /etc/unbound/unbound_control.key
@@ -115,7 +128,7 @@ file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.con
 
 ## Tweak Unbound collector alarms
 
-t/k
+**COMING SOON: Ilya is adding/updating alarms and I will finish this section then.**
 
 ## What's next?
 
@@ -124,4 +137,4 @@ for improvement or refinement based on real-world use cases. Feel free to [file 
 issue](https://github.com/netdata/netdata/issues/new?labels=bug%2C+needs+triage&template=bug_report.md) with your
 thoughts.
 
-[1]: https://nlnetlabs.nl/projects/unbound/about/
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Ftutorials%2Funbound-metrics&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
