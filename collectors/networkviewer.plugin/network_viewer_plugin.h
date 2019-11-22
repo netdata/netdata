@@ -14,6 +14,13 @@
 # include <unistd.h>
 # include <dlfcn.h>
 
+# include <fcntl.h>
+# include <ctype.h>
+# include <netinet/in.h>
+# include <arpa/inet.h>
+# include <string.h>
+# include <net/if.h>
+
 # include <arpa/inet.h>
 # include <sys/socket.h>
 # include <sys/types.h>
@@ -27,6 +34,12 @@
 # include <ifaddrs.h>
 
 # include <sys/sysinfo.h>
+# include <pthread.h>
+
+//From libnetdata.h
+# include "../../libnetdata/threads/threads.h"
+# include "../../libnetdata/locks/locks.h"
+# include "../../libnetdata/avl/avl.h"
 
 typedef struct {
     uint64_t first;
