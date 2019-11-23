@@ -191,34 +191,51 @@ void netdata_update_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *
     ncs->removeme = (e->protocol == 253)?1:0;
 }
 
+netdata_conn_stats_t *store_new_connection_stat(netdata_kern_stats_t *e) {
+    netdata_conn_stats_t *ncs = malloc(sizeof(netdata_conn_stats_t));
+
+    if(ncs) {
+        netdata_set_conn_stats(ncs, e);
+    }
+
+    return ncs;
+}
+
 int netdata_store_bpf(void *data, int size)
 {
     netdata_kern_stats_t *e = data;
-    /*
-    char saddr[32], daddr[32];
 
-    convert_addr(saddr, 32, e->saddr);
-    convert_addr(daddr, 32, e->daddr);
+    if(!e->dport) {
+        return -2;
+    }
 
-    uint8_t proto = e->protocol;
-     */
+    netdata_conn_stats_t *ncs;
+    netdata_conn_stats_t *ret;
+    if (!connection_controller.tree) {
+        ncs = store_new_connection_stat(e);
+        connection_controller.tree = ncs;
 
-    //   printf("%-17s %-17s %-5u %-17u %-10u %-10u %-10u %-14u\n", saddr, daddr, ntohs(e->dport), e->retransmit, e->sent, e->recv, proto, (e->ct - e->first));
+        ret = (netdata_conn_stats_t *)avl_insert_lock(&connection_controller.destination_port, (avl *)ncs);
+        if(ret != ncs) {
+            fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)ret, (size_t)ncs  );
+        }
 
-    netdata_conn_stats_t *ncs = (netdata_conn_stats_t *)avl_search_lock(&connection_controller.destination_port, (avl *)e);
+        return -2;
+    }
+
+    netdata_conn_stats_t searchme;
+    searchme.saddr = e->saddr;
+    searchme.daddr = e->daddr;
+    searchme.dport = e->dport;
+
+    ncs = (netdata_conn_stats_t *)avl_search_lock(&connection_controller.destination_port, (avl *)&searchme);
     if (!ncs) {
-        ncs = malloc(sizeof(netdata_conn_stats_t));
+        ncs = store_new_connection_stat(e);
         if(ncs) {
-
-            netdata_set_conn_stats(ncs, e);
-            if(!connection_controller.tree) {
-                connection_controller.tree = ncs;
-            } else {
-                netdata_conn_stats_t *move, *save;
-                for (move = connection_controller.tree; move ; save = move, move = move->next);
-                if(save) {
-                    save->next = ncs;
-                }
+            netdata_conn_stats_t *move, *save;
+            for (move = connection_controller.tree; move ; save = move, move = move->next);
+            if(save) {
+                save->next = ncs;
             }
 
             netdata_conn_stats_t *ret = (netdata_conn_stats_t *)avl_insert_lock(&connection_controller.destination_port, (avl *)ncs);
@@ -237,27 +254,24 @@ int compare_destination_ip(void *a, void *b) {
     netdata_conn_stats_t *conn1 = (netdata_conn_stats_t *)a;
     netdata_conn_stats_t *conn2 = (netdata_conn_stats_t *)b;
 
-    if(conn1->daddr < conn2->daddr){
-        if(conn1->dport < conn2->dport) {
-            return -1;
-        }
+    int ret = 0;
 
-        if(conn1->dport > conn2->dport) {
-            return 1;
-        }
+    uint32_t ip1 = conn1->daddr;
+    uint32_t ip2 = conn2->daddr;
+
+    if (ip1 < ip2) ret = -1;
+    else if (ip1 > ip2) ret = 1;
+
+    if (!ret) {
+        uint16_t port1 = conn1->dport;
+        uint16_t port2 = conn2->dport;
+
+        if (port1 < port2) ret = -1;
+        else if (port1 > port2) ret = 1;
+
     }
 
-    if(conn1->daddr > conn2->daddr){
-        if(conn1->dport < conn2->dport) {
-            return -1;
-        }
-
-        if(conn1->dport > conn2->dport) {
-            return 1;
-        }
-    }
-
-    return 0;
+    return ret;
 }
 
 void *network_collector(void *ptr) {
