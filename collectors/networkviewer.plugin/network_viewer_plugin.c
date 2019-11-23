@@ -166,10 +166,10 @@ void netdata_set_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) 
     ip = e->daddr;
     in_addr_t daddr = ip;
 
-    ncs->daddr = ntohl(ip);
+    ncs->daddr = ip;
     ncs->internal = (netdata_is_inside(daddr, NULL))?1:0;
 
-    ncs->dport = ntohs(e->dport);
+    ncs->dport = e->dport;
     ncs->retransmit = e->retransmit;
     ncs->sent = e->sent;
     ncs->recv = e->recv;
