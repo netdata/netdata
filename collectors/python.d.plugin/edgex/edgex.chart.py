@@ -8,10 +8,11 @@ import json
 import threading
 
 from collections import namedtuple
+
 try:
-    from queue import Queue
-except ImportError:
     from Queue import Queue
+except ImportError:
+    from queue import Queue
 
 from bases.FrameworkServices.UrlService import UrlService
 
@@ -22,10 +23,6 @@ ORDER = [
     'readings_throughput',
     'devices_number'
 ]
-
-
-#TODO add more services (lines) in the memstats_heap chart
-#TODO add more charts (malloc, liveobjects, frees, etc.)
 
 CHARTS = {
     'events_throughput':{
@@ -78,9 +75,9 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.url_core_data_events = self.configuration.get('url_core_data', 'http://localhost:48080/avi/v1/events/count')
-        self.url_core_data_readings = self.configuration.get('url_core_data', 'http://localhost:48080/avi/v1/readings/count')
-        self.url_core_metadata_devices = self.configuration.get('url_core_metadata', 'http://localhost:48080/avi/v1/readings/count')
+        self.url_core_data_events = self.configuration.get('url_core_data', 'http://localhost:48080') + '/api/v1/event/count'
+        self.url_core_data_readings = self.configuration.get('url_core_data', 'http://localhost:48080') + '/api/v1/reading/count'
+        self.url_core_metadata_devices = self.configuration.get('url_core_metadata', 'http://localhost:48081') + '/api/v1/device'
         # self.url_core_sys_mgmt = self.configuration.get('url_sys_mgmt' 'http://localhost:48090/avi/v1/metrics/edgex-support')
        
         #  - sys_mgmt is not yet certain whether it is neaded since the metrics are collected natively from netdata in the form of container metrics.
@@ -94,12 +91,12 @@ class Service(UrlService):
             METHODS(
                 get_data=self._get_core_throughput_data,
                 url=self.url_core_data_readings,
-                run=self.configuration.get('events/s', True),
+                run=self.configuration.get('events_per_second', True),
             ),
             METHODS(
                 get_data=self._get_core_throughput_data,
                 url=self.url_core_data_events,
-                run=self.configuration.get('readings/s', True)
+                run=self.configuration.get('readings_per_second', True)
             ),
             METHODS(
                 get_data=self._get_device_info,

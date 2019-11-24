@@ -5,9 +5,9 @@
 # IT IS REQUIRED TO REFERENCE ALL FILES RELATIVE TO THE PARENT
 
 # install these files
-dist_python_DATA       += dovecot/dovecot.chart.py
-dist_pythonconfig_DATA += dovecot/dovecot.conf
+dist_python_DATA       += edgex/edgex.chart.py
+dist_pythonconfig_DATA += edgex/edgex.conf
 
 # do not install these files, but include them in the distribution
-dist_noinst_DATA       += dovecot/README.md dovecot/Makefile.inc
+dist_noinst_DATA       += edgex/README.md edgex/Makefile.inc
 

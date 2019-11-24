@@ -9,17 +9,19 @@ Vendor-neutral, open source, loosely-coupled microservices framework providing y
 
 **metrics:**
 
-charts:
-    V1
-- alloc, dimensions: edgex service
-- malloc, dimensions: edgex service
-- liveobjects, dimensions: edgex service
-- Number of devices, dimensions: # of devices   per device service
-    
-- Number of evevents/s, dimensions: events/s
-- Number of readings/s, dimensions: readings/s
-   
-   V1.1
-    Time it takes for a variable to enter core-data since the command that issued it (later)
-    / Number of device services, dimensions; device services #
-    ...
+As of version 0.1:
+
+- Readings/second
+- Events/second
+- Number of registered devices
+
+Metrics from: Edgex-core-data, Edgex-core-metadata
+
+
+Backlog:
+
+- Number of Registered devices
+- alloc, malloc, liveobjects, frees: as returned from each edgex service in real time
+- sys-mgmt metrics, not in real time (e.g every 10s)
+
+
