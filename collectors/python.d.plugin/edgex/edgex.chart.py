@@ -8,8 +8,6 @@ import json
 import threading
 
 from collections import namedtuple
-from socket import gethostbyname, gaierror
-
 try:
     from queue import Queue
 except ImportError:
@@ -21,7 +19,8 @@ METHODS = namedtuple('METHODS', ['get_data', 'url', 'run'])
 
 ORDER = [
     'events_throughput',
-    'readings_throughput'
+    'readings_throughput',
+    'devices_number'
 ]
 
 
@@ -41,6 +40,13 @@ CHARTS = {
                     'line'],
         'lines': [
             ['readings/s', None, 'incremental'],
+        ]
+    },
+    'devices_number':{
+        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'devices number', 'edgex.devices_number', 
+                    'line'],
+        'lines': [
+            ['number_of_devices', None, 'absolute'],
         ]
     }
  } #
@@ -74,27 +80,31 @@ class Service(UrlService):
         self.definitions = CHARTS
         self.url_core_data_events = self.configuration.get('url_core_data', 'http://localhost:48080/avi/v1/events/count')
         self.url_core_data_readings = self.configuration.get('url_core_data', 'http://localhost:48080/avi/v1/readings/count')
-
+        self.url_core_metadata_devices = self.configuration.get('url_core_metadata', 'http://localhost:48080/avi/v1/readings/count')
         # self.url_core_sys_mgmt = self.configuration.get('url_sys_mgmt' 'http://localhost:48090/avi/v1/metrics/edgex-support')
-        #  - sys_mgmt is not yet certain whether it is neaded since the metrics are collected natively from netdata in the form of containers
+       
+        #  - sys_mgmt is not yet certain whether it is neaded since the metrics are collected natively from netdata in the form of container metrics.
         #  - In the Fuji release, there is a distinction between the metrics returned natively from each service and from sys-mgmt
-        #
         #    The metrics returned from each service are raw (alloc, malloc, etc.) while the metrics returned from the sys-mgmt endpoint
         #    are processed (mem.average, cpu.average, etc.) and for this reason the sys-mgmt endpoint has a considerable lag (2-3s per request).
-        #  - 
-        # self.edgex_services = ['edgex-support-notifications', 'edgex-core-data', 'edgex-core-metdata', 'edgex-core-command']
+        #  - Testing is needed to ascertain which endpoints can be used for real-time monitoring while providing useful information.
 
     def check(self):
         self.methods = [
             METHODS(
-                get_data=self._get_data_general,
+                get_data=self._get_core_throughput_data,
                 url=self.url_core_data_readings,
                 run=self.configuration.get('events/s', True),
             ),
             METHODS(
-                get_data=self._get_data_general,
+                get_data=self._get_core_throughput_data,
                 url=self.url_core_data_events,
                 run=self.configuration.get('readings/s', True)
+            ),
+            METHODS(
+                get_data=self._get_device_info,
+                url=self.url_core_metadata_devices,
+                run=self.configuration.get('number_of_devices', True)
             )
          ]
         return UrlService.check(self)
@@ -121,7 +131,7 @@ class Service(UrlService):
         return result or None
 
     @get_survive_any
-    def _get_data_general(self, queue, url):
+    def _get_core_throughput_data(self, queue, url):
             data = {}
             raw = self._get_raw_data(url)
             if not raw:
@@ -133,5 +143,14 @@ class Service(UrlService):
                 data['readings/s'] = raw
             return queue.put(data)
 
+    @get_survive_any
+    def _get_device_info(self, queue, url):
+            data = {}
+            raw = self._get_raw_data(url) #json string
+            if not raw:
+                return queue.put({})
+            parsed = json.loads(raw) #python object
+            data['number_of_devices'] = len(parsed) #int
+            return queue.put(data)
 
 
