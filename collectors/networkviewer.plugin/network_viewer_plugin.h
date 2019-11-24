@@ -54,6 +54,8 @@ typedef struct {
 }netdata_kern_stats_t;
 
 typedef struct  netdata_conn_stats{
+    avl avl;
+
     uint64_t first;
     uint64_t ct;
     uint32_t saddr;
@@ -70,8 +72,6 @@ typedef struct  netdata_conn_stats{
 }netdata_conn_stats_t;
 
 typedef struct {
-    avl avl;
-
     avl_tree_lock bytessent;
     avl_tree_lock destination_port;
 
