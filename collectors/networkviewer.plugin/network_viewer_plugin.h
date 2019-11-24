@@ -48,7 +48,7 @@ typedef struct {
     uint32_t daddr;
     uint16_t dport;
     uint16_t retransmit;
-    uint32_t sent;
+    uint64_t sent;
     uint64_t recv;
     uint8_t protocol;
 }netdata_kern_stats_t;
@@ -63,7 +63,7 @@ typedef struct  netdata_conn_stats{
     uint32_t internal;
     uint16_t dport;
     uint16_t retransmit;
-    uint32_t sent;
+    uint64_t sent;
     uint64_t recv;
     uint8_t protocol;
     uint8_t removeme;
@@ -72,7 +72,6 @@ typedef struct  netdata_conn_stats{
 }netdata_conn_stats_t;
 
 typedef struct {
-    avl_tree_lock bytessent;
     avl_tree_lock destination_port;
 
     netdata_conn_stats_t *tree;

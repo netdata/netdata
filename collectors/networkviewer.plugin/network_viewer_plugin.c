@@ -111,28 +111,24 @@ static void netdata_publish_data() {
         not_initialized++;
     }
 
-    printf(
-            "BEGIN %s.%s\n"
+    printf("BEGIN %s.%s\n"
             , NETWORK_VIEWER_FAMILY
             , NETWORK_VIEWER_INGRESS
     );
 
-    printf(
-            "SET %s = %u\n"
+    printf("SET %s = %u\n"
             , "ingress"
             , ingress
     );
 
     printf("END\n");
 
-    printf(
-            "BEGIN %s.%s\n"
+    printf("BEGIN %s.%s\n"
             , NETWORK_VIEWER_FAMILY
             , NETWORK_VIEWER_EGRESS
     );
 
-    printf(
-            "SET %s = %u\n"
+    printf("SET %s = %u\n"
             , "egress"
             , egress
     );
@@ -140,10 +136,9 @@ static void netdata_publish_data() {
     printf("END\n");
 }
 
-void *network_viewer_publisher(void *ptr)
-{
+void *network_viewer_publisher(void *ptr) {
     (void)ptr;
-    while(1) {
+    while(!netdata_exit) {
         sleep(1);
 
         netdata_publish_data();
@@ -201,8 +196,7 @@ netdata_conn_stats_t *store_new_connection_stat(netdata_kern_stats_t *e) {
     return ncs;
 }
 
-int netdata_store_bpf(void *data, int size)
-{
+int netdata_store_bpf(void *data, int size) {
     netdata_kern_stats_t *e = data;
 
     if(!e->dport) {
@@ -482,15 +476,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if(network_viewer_load_libraries()) {
+    if (network_viewer_load_libraries()) {
         return 2;
     }
 
     signal(SIGINT, int_exit);
     signal(SIGTERM, int_exit);
 
-    if (load_bpf_file("netdata_ebpf_network_viewer.o") )
-    {
+    if (load_bpf_file("netdata_ebpf_network_viewer.o") ) {
         return 3;
     }
 
