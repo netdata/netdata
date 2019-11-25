@@ -76,3 +76,9 @@ void __rrd_check_rdlock(const char *file, const char *function, const unsigned l
     (void)function;
     (void)line;
 }
+
+const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
+{
+    (void)id;
+    return RRD_MEMORY_MODE_NONE_NAME;
+}

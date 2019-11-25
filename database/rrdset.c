@@ -328,6 +328,8 @@ void rrdset_free(RRDSET *st) {
     // ------------------------------------------------------------------------
     // free its children structures
 
+    freez(st->exporting_flags);
+
     while(st->variables)  rrdsetvar_free(st->variables);
     while(st->alarms)     rrdsetcalc_unlink(st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);

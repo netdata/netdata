@@ -67,11 +67,9 @@ int start_batch_formatting(struct engine *engine)
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled) {
                 uv_mutex_lock(&instance->mutex);
-                if (connector->start_batch_formatting) {
-                    if (connector->start_batch_formatting(instance) != 0) {
-                        error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
-                        return 1;
-                    }
+                if (connector->start_batch_formatting && connector->start_batch_formatting(instance) != 0) {
+                    error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
+                    return 1;
                 }
             }
         }
@@ -84,16 +82,21 @@ int start_batch_formatting(struct engine *engine)
  * Start host formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
+ * @param host a data collecting host.
  * @return Returns 0 on success, 1 on failure.
  */
-int start_host_formatting(struct engine *engine)
+int start_host_formatting(struct engine *engine, RRDHOST *host)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (instance->scheduled && connector->start_host_formatting) {
-                if (connector->start_host_formatting(instance) != 0) {
-                    error("EXPORTING: cannot start host formatting for %s", instance->config.name);
-                    return 1;
+            if (instance->scheduled) {
+                if (rrdhost_is_exportable(instance, host)) {
+                    if (connector->start_host_formatting && connector->start_host_formatting(instance, host) != 0) {
+                        error("EXPORTING: cannot start host formatting for %s", instance->config.name);
+                        return 1;
+                    }
+                } else {
+                    instance->skip_host = 1;
                 }
             }
         }
@@ -106,16 +109,21 @@ int start_host_formatting(struct engine *engine)
  * Start chart formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
+ * @param a chart.
  * @return Returns 0 on success, 1 on failure.
  */
-int start_chart_formatting(struct engine *engine)
+int start_chart_formatting(struct engine *engine, RRDSET *st)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (instance->scheduled && connector->start_chart_formatting) {
-                if (connector->start_chart_formatting(instance) != 0) {
-                    error("EXPORTING: cannot start chart formatting for %s", instance->config.name);
-                    return 1;
+            if (instance->scheduled && !instance->skip_host) {
+                if (rrdset_is_exportable(instance, st)) {
+                    if (connector->start_chart_formatting && connector->start_chart_formatting(instance, st) != 0) {
+                        error("EXPORTING: cannot start chart formatting for %s", instance->config.name);
+                        return 1;
+                    }
+                } else {
+                    instance->skip_chart = 1;
                 }
             }
         }
@@ -128,14 +136,15 @@ int start_chart_formatting(struct engine *engine)
  * Format metric for every connector instance's buffer
  *
  * @param engine an engine data structure.
+ * @param rd dimension(metric) in the Netdata database.
  * @return Returns 0 on success, 1 on failure.
  */
 int metric_formatting(struct engine *engine, RRDDIM *rd)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (instance->scheduled && connector->metric_formatting) {
-                if (connector->metric_formatting(instance, rd) != 0) {
+            if (instance->scheduled && !instance->skip_host && !instance->skip_chart) {
+                if (connector->metric_formatting && connector->metric_formatting(instance, rd) != 0) {
                     error("EXPORTING: cannot format metric for %s", instance->config.name);
                     return 1;
                 }
@@ -151,18 +160,20 @@ int metric_formatting(struct engine *engine, RRDDIM *rd)
  * End chart formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
+ * @param a chart.
  * @return Returns 0 on success, 1 on failure.
  */
-int end_chart_formatting(struct engine *engine)
+int end_chart_formatting(struct engine *engine, RRDSET *st)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (instance->scheduled && connector->end_chart_formatting) {
-                if (connector->end_chart_formatting(instance) != 0) {
+            if (instance->scheduled && !instance->skip_host && !instance->skip_chart) {
+                if (connector->end_chart_formatting && connector->end_chart_formatting(instance, st) != 0) {
                     error("EXPORTING: cannot end chart formatting for %s", instance->config.name);
                     return 1;
                 }
             }
+            instance->skip_chart = 0;
         }
     }
 
@@ -174,18 +185,20 @@ int end_chart_formatting(struct engine *engine)
  * End host formatting for every connector instance's buffer
  *
  * @param engine an engine data structure.
+ * @param host a data collecting host.
  * @return Returns 0 on success, 1 on failure.
  */
-int end_host_formatting(struct engine *engine)
+int end_host_formatting(struct engine *engine, RRDHOST *host)
 {
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            if (instance->scheduled && connector->end_host_formatting) {
-                if (connector->end_host_formatting(instance) != 0) {
+            if (instance->scheduled && !instance->skip_host) {
+                if (connector->end_host_formatting && connector->end_host_formatting(instance, host) != 0) {
                     error("EXPORTING: cannot end host formatting for %s", instance->config.name);
                     return 1;
                 }
             }
+            instance->skip_host = 0;
         }
     }
 
@@ -203,11 +216,9 @@ int end_batch_formatting(struct engine *engine)
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled) {
-                if (connector->end_batch_formatting) {
-                    if (connector->end_batch_formatting(instance) != 0) {
-                        error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
-                        return 1;
-                    }
+                if (connector->end_batch_formatting && connector->end_batch_formatting(instance) != 0) {
+                    error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
+                    return 1;
                 }
                 uv_mutex_unlock(&instance->mutex);
                 uv_cond_signal(&instance->cond_var);
@@ -241,13 +252,13 @@ int prepare_buffers(struct engine *engine)
     rrdhost_foreach_read(host)
     {
         rrdhost_rdlock(host);
-        if (start_host_formatting(engine) != 0)
+        if (start_host_formatting(engine, host) != 0)
             return 1;
         RRDSET *st;
         rrdset_foreach_read(st, host)
         {
             rrdset_rdlock(st);
-            if (start_chart_formatting(engine) != 0)
+            if (start_chart_formatting(engine, st) != 0)
                 return 1;
 
             RRDDIM *rd;
@@ -257,12 +268,12 @@ int prepare_buffers(struct engine *engine)
                     return 1;
             }
 
-            if (end_chart_formatting(engine) != 0)
+            if (end_chart_formatting(engine, st) != 0)
                 return 1;
             rrdset_unlock(st);
         }
 
-        if (end_host_formatting(engine) != 0)
+        if (end_host_formatting(engine, host) != 0)
             return 1;
         rrdhost_unlock(host);
     }

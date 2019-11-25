@@ -15,7 +15,6 @@ struct engine *__mock_read_exporting_config()
     engine->config.prefix = strdupz("netdata");
     engine->config.hostname = strdupz("test-host");
     engine->config.update_every = 3;
-    engine->config.options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
 
     engine->connector_root = calloc(1, sizeof(struct connector));
     engine->connector_root->config.type = BACKEND_TYPE_GRAPHITE;
@@ -30,7 +29,7 @@ struct engine *__mock_read_exporting_config()
     instance->config.timeoutms = 10000;
     instance->config.charts_pattern = strdupz("*");
     instance->config.hosts_pattern = strdupz("localhost *");
-    instance->config.send_names_instead_of_ids = 1;
+    instance->config.options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
 
     return engine;
 }
@@ -73,6 +72,22 @@ int __wrap_send_internal_metrics(struct engine *engine)
     return mock_type(int);
 }
 
+int __wrap_rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
+{
+    function_called();
+    check_expected_ptr(instance);
+    check_expected_ptr(host);
+    return mock_type(int);
+}
+
+int __wrap_rrdset_is_exportable(struct instance *instance, RRDSET *st)
+{
+    function_called();
+    check_expected_ptr(instance);
+    check_expected_ptr(st);
+    return mock_type(int);
+}
+
 int __mock_start_batch_formatting(struct instance *instance)
 {
     function_called();
@@ -80,17 +95,19 @@ int __mock_start_batch_formatting(struct instance *instance)
     return mock_type(int);
 }
 
-int __mock_start_host_formatting(struct instance *instance)
+int __mock_start_host_formatting(struct instance *instance, RRDHOST *host)
 {
     function_called();
     check_expected_ptr(instance);
+    check_expected_ptr(host);
     return mock_type(int);
 }
 
-int __mock_start_chart_formatting(struct instance *instance)
+int __mock_start_chart_formatting(struct instance *instance, RRDSET *st)
 {
     function_called();
     check_expected_ptr(instance);
+    check_expected_ptr(st);
     return mock_type(int);
 }
 
@@ -102,17 +119,19 @@ int __mock_metric_formatting(struct instance *instance, RRDDIM *rd)
     return mock_type(int);
 }
 
-int __mock_end_chart_formatting(struct instance *instance)
+int __mock_end_chart_formatting(struct instance *instance, RRDSET *st)
 {
     function_called();
     check_expected_ptr(instance);
+    check_expected_ptr(st);
     return mock_type(int);
 }
 
-int __mock_end_host_formatting(struct instance *instance)
+int __mock_end_host_formatting(struct instance *instance, RRDHOST *host)
 {
     function_called();
     check_expected_ptr(instance);
+    check_expected_ptr(host);
     return mock_type(int);
 }
 

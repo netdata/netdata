@@ -299,17 +299,17 @@ struct engine *read_exporting_config()
                     NULL,
                     SIMPLE_PATTERN_EXACT);
 
-                tmp_instance->config.send_names_instead_of_ids =
-                    exporter_get_boolean(instance_name, EXPORTER_SEND_NAMES, EXPORTER_SEND_NAMES_DEFAULT);
+                if (exporter_get_boolean(instance_name, EXPORTER_SEND_NAMES, EXPORTER_SEND_NAMES_DEFAULT))
+                    tmp_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 info(
-                    "     Dest=[%s], upd=[%d], buffer=[%d] timeout=[%ld] names=[%d]",
+                    "     Dest=[%s], upd=[%d], buffer=[%d] timeout=[%ld] options=[%u]",
                     tmp_instance->config.destination,
                     tmp_instance->config.update_every,
                     tmp_instance->config.buffer_on_failures,
                     tmp_instance->config.timeoutms,
-                    tmp_instance->config.send_names_instead_of_ids);
+                    tmp_instance->config.options);
 #endif
 
 #ifndef UNIT_TESTING

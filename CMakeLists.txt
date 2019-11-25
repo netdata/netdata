@@ -605,6 +605,7 @@ set(EXPORTING_ENGINE_FILES
         exporting/read_config.c
         exporting/init_connectors.c
         exporting/process_data.c
+        exporting/check_filters.c
         exporting/send_data.c
         exporting/send_internal_metrics.c
         )
@@ -930,6 +931,8 @@ if(BUILD_TESTING)
         -Wl,--wrap=read_exporting_config
         -Wl,--wrap=init_connectors
         -Wl,--wrap=mark_scheduled_instances
+        -Wl,--wrap=rrdhost_is_exportable
+        -Wl,--wrap=rrdset_is_exportable
         -Wl,--wrap=prepare_buffers
         -Wl,--wrap=notify_workers
         -Wl,--wrap=send_internal_metrics

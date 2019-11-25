@@ -70,7 +70,7 @@ static void test_read_exporting_config(void **state)
     assert_string_equal(engine->config.prefix, "netdata");
     assert_string_equal(engine->config.hostname, "test-host");
     assert_int_equal(engine->config.update_every, 3);
-    assert_int_equal(engine->config.options, BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES);
+    assert_int_equal(engine->instance_num, 0);
 
     struct connector *connector = engine->connector_root;
     assert_ptr_not_equal(connector, NULL);
@@ -88,7 +88,7 @@ static void test_read_exporting_config(void **state)
     assert_int_equal(instance->config.timeoutms, 10000);
     assert_string_equal(instance->config.charts_pattern, "*");
     assert_string_equal(instance->config.hosts_pattern, "localhost *");
-    assert_int_equal(instance->config.send_names_instead_of_ids, 1);
+    assert_int_equal(instance->config.options, BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES);
 
     teardown_configured_engine(state);
 }
@@ -98,6 +98,8 @@ static void test_init_connectors(void **state)
     struct engine *engine = *state;
 
     init_connectors_in_tests(engine);
+
+    assert_int_equal(engine->instance_num, 1);
 
     struct connector *connector = engine->connector_root;
     assert_ptr_equal(connector->next, NULL);
@@ -113,9 +115,11 @@ static void test_init_connectors(void **state)
     struct simple_connector_config *connector_specific_config = connector->config.connector_specific_config;
     assert_int_equal(connector_specific_config->default_port, 2003);
 
-    assert_ptr_equal(connector->instance_root->next, NULL);
+    struct instance *instance = connector->instance_root;
+    assert_ptr_equal(instance->next, NULL);
+    assert_int_equal(instance->index, 0);
 
-    BUFFER *buffer = connector->instance_root->buffer;
+    BUFFER *buffer = instance->buffer;
     assert_ptr_not_equal(buffer, NULL);
     buffer_sprintf(buffer, "%s", "graphite test");
     assert_string_equal(buffer_tostring(buffer), "graphite test");
@@ -152,12 +156,25 @@ static void test_prepare_buffers(void **state)
     expect_value(__mock_start_batch_formatting, instance, instance);
     will_return(__mock_start_batch_formatting, 0);
 
+    expect_function_call(__wrap_rrdhost_is_exportable);
+    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
+    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
+    will_return(__wrap_rrdhost_is_exportable, 1);
+
     expect_function_call(__mock_start_host_formatting);
     expect_value(__mock_start_host_formatting, instance, instance);
+    expect_value(__mock_start_host_formatting, host, localhost);
     will_return(__mock_start_host_formatting, 0);
+
+    RRDSET *st = localhost->rrdset_root;
+    expect_function_call(__wrap_rrdset_is_exportable);
+    expect_value(__wrap_rrdset_is_exportable, instance, instance);
+    expect_value(__wrap_rrdset_is_exportable, st, st);
+    will_return(__wrap_rrdset_is_exportable, 1);
 
     expect_function_call(__mock_start_chart_formatting);
     expect_value(__mock_start_chart_formatting, instance, instance);
+    expect_value(__mock_start_chart_formatting, st, st);
     will_return(__mock_start_chart_formatting, 0);
 
     RRDDIM *rd = localhost->rrdset_root->dimensions;
@@ -168,10 +185,12 @@ static void test_prepare_buffers(void **state)
 
     expect_function_call(__mock_end_chart_formatting);
     expect_value(__mock_end_chart_formatting, instance, instance);
+    expect_value(__mock_end_chart_formatting, st, st);
     will_return(__mock_end_chart_formatting, 0);
 
     expect_function_call(__mock_end_host_formatting);
     expect_value(__mock_end_host_formatting, instance, instance);
+    expect_value(__mock_end_host_formatting, host, localhost);
     will_return(__mock_end_host_formatting, 0);
 
     expect_function_call(__mock_end_batch_formatting);
@@ -275,6 +294,18 @@ static void test_simple_connector_send_buffer(void **state)
     int failures = 3;
 
     __real_mark_scheduled_instances(engine);
+
+    expect_function_call(__wrap_rrdhost_is_exportable);
+    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
+    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
+    will_return(__wrap_rrdhost_is_exportable, 1);
+
+    RRDSET *st = localhost->rrdset_root;
+    expect_function_call(__wrap_rrdset_is_exportable);
+    expect_value(__wrap_rrdset_is_exportable, instance, instance);
+    expect_value(__wrap_rrdset_is_exportable, st, st);
+    will_return(__wrap_rrdset_is_exportable, 1);
+
     __real_prepare_buffers(engine);
 
     expect_function_call(__wrap_send);
@@ -305,6 +336,18 @@ static void test_simple_connector_worker(void **state)
     BUFFER *buffer = instance->buffer;
 
     __real_mark_scheduled_instances(engine);
+
+    expect_function_call(__wrap_rrdhost_is_exportable);
+    expect_value(__wrap_rrdhost_is_exportable, instance, instance);
+    expect_value(__wrap_rrdhost_is_exportable, host, localhost);
+    will_return(__wrap_rrdhost_is_exportable, 1);
+
+    RRDSET *st = localhost->rrdset_root;
+    expect_function_call(__wrap_rrdset_is_exportable);
+    expect_value(__wrap_rrdset_is_exportable, instance, instance);
+    expect_value(__wrap_rrdset_is_exportable, st, st);
+    will_return(__wrap_rrdset_is_exportable, 1);
+
     __real_prepare_buffers(engine);
 
     expect_function_call(__wrap_connect_to_one_of);

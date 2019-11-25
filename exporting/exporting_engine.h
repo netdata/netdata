@@ -34,17 +34,34 @@ extern struct config exporting_config;
 #define EXPORTER_SEND_NAMES                 "send names instead of ids"
 #define EXPORTER_SEND_NAMES_DEFAULT         1
 
+typedef enum exporting_options {
+    EXPORTING_OPTION_NONE              = 0,
+
+    EXPORTING_SOURCE_DATA_AS_COLLECTED = (1 << 0),
+    EXPORTING_SOURCE_DATA_AVERAGE      = (1 << 1),
+    EXPORTING_SOURCE_DATA_SUM          = (1 << 2),
+
+    EXPORTING_OPTION_SEND_NAMES        = (1 << 16)
+} EXPORTING_OPTIONS;
+
+#define EXPORTING_OPTIONS_SOURCE_BITS                                                                                  \
+    (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM)
+#define EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) (exporting_options & EXPORTING_OPTIONS_SOURCE_BITS)
+
 struct engine;
 
 struct instance_config {
     const char *name;
     const char *destination;
+
     int update_every;
     int buffer_on_failures;
     long timeoutms;
+
+    EXPORTING_OPTIONS options;
     SIMPLE_PATTERN *charts_pattern;
     SIMPLE_PATTERN *hosts_pattern;
-    int send_names_instead_of_ids;
+
     void *connector_specific_config;
 };
 
@@ -61,7 +78,6 @@ struct engine_config {
     const char *prefix;
     const char *hostname;
     int update_every;
-    BACKEND_OPTIONS options; // TODO: Rename to EXPORTING_OPTIONS
 };
 
 struct stats {
@@ -85,6 +101,9 @@ struct instance {
     struct stats stats;
 
     int scheduled;
+    int skip_host;
+    int skip_chart;
+
     time_t after;
     time_t before;
 
@@ -92,6 +111,7 @@ struct instance {
     uv_mutex_t mutex;
     uv_cond_t cond_var;
 
+    size_t index;
     struct instance *next;
     struct connector *connector;
 };
@@ -100,11 +120,11 @@ struct connector {
     struct connector_config config;
 
     int (*start_batch_formatting)(struct instance *instance);
-    int (*start_host_formatting)(struct instance *instance);
-    int (*start_chart_formatting)(struct instance *instance);
+    int (*start_host_formatting)(struct instance *instance, RRDHOST *host);
+    int (*start_chart_formatting)(struct instance *instance, RRDSET *st);
     int (*metric_formatting)(struct instance *instance, RRDDIM *rd);
-    int (*end_chart_formatting)(struct instance *instance);
-    int (*end_host_formatting)(struct instance *instance);
+    int (*end_chart_formatting)(struct instance *instance, RRDSET *st);
+    int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
 
     void (*worker)(void *instance_p);
@@ -116,8 +136,11 @@ struct connector {
 
 struct engine {
     struct engine_config config;
-    struct connector *connector_root;
+
+    size_t instance_num;
     time_t now;
+
+    struct connector *connector_root;
 };
 
 void *exporting_main(void *ptr);
@@ -133,12 +156,15 @@ int notify_workers(struct engine *engine);
 
 size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 
+int rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
+int rrdset_is_exportable(struct instance *instance, RRDSET *st);
+
 int start_batch_formatting(struct engine *engine);
-int start_host_formatting(struct engine *engine);
-int start_chart_formatting(struct engine *engine);
+int start_host_formatting(struct engine *engine, RRDHOST *host);
+int start_chart_formatting(struct engine *engine, RRDSET *st);
 int metric_formatting(struct engine *engine, RRDDIM *rd);
-int end_chart_formatting(struct engine *engine);
-int end_host_formatting(struct engine *engine);
+int end_chart_formatting(struct engine *engine, RRDSET *st);
+int end_host_formatting(struct engine *engine, RRDHOST *host);
 int end_batch_formatting(struct engine *engine);
 
 int exporting_discard_response(BUFFER *buffer, struct instance *instance);
