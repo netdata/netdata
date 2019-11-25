@@ -135,6 +135,7 @@ def available_modules():
         'nginx_log',  # replaced by web_log
         'mdstat',  # rewritten in C
         'sslcheck',  # rewritten in Go, memory leak bug https://github.com/netdata/netdata/issues/5624
+        'unbound',  # rewritten in Go
     )
 
     files = sorted(os.listdir(DIRS.modules))
