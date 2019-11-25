@@ -1,5 +1,11 @@
 # unbound
 
+## Deprecation Notes
+
+This module is deprecated. Please use [new version](https://github.com/netdata/go.d.plugin/tree/master/modules/unbound) instead.
+
+___
+
 Monitoring uses the remote control interface to fetch statistics.
 
 Provides the following charts:
