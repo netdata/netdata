@@ -2407,34 +2407,6 @@ netdataDashboard.context = {
         info: 'The number of currently connect users on the monitored Spigot server.'
     },
 
-    'unbound.queries': {
-        info: 'Shows the number of queries being processed of each type. Note that <code>Recursive</code> queries are also accounted as cache misses.'
-    },
-
-    'unbound.reqlist': {
-        info: 'Shows various stats about Unbound\'s internal request list.'
-    },
-
-    'unbound.recursion': {
-        info: 'Average and median time to complete recursive name resolution.'
-    },
-
-    'unbound.cache': {
-        info: 'The number of items in each of the various caches.'
-    },
-
-    'unbound.threads.queries': {
-        height: 0.2
-    },
-
-    'unbound.threads.reqlist': {
-        height: 0.2
-    },
-
-    'unbound.threads.recursion': {
-        height: 0.2
-    },
-
     'boinc.tasks': {
         info: 'The total number of tasks and the number of active tasks.  Active tasks are those which are either currently being processed, or are partialy processed but suspended.'
     },
