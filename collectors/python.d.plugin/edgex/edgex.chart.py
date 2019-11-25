@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-# Description: PHP-FPM netdata python.d module
-# Author: Pawel Krupa (paulfantom)
-# Author: Ilya Mashchenko (ilyam8)
+# Description: EdgeX Platform netdata python.d module
+# Author: Odysseas Lamtzidis (OdysLam)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import json
@@ -21,29 +20,38 @@ METHODS = namedtuple('METHODS', ['get_data', 'url', 'run'])
 ORDER = [
     'events_throughput',
     'readings_throughput',
+    'events_count',
     'devices_number'
 ]
 
 CHARTS = {
     'events_throughput':{
-        'options': [None, 'Events per second in the EdgeX platform', 'events/s', 'events', 'edgex.events', 
+        'options': [None, 'Events per second in the EdgeX platform', 'events/s', 'throughput','edgex.events',
                     'line'],
         'lines': [
-            ['events/s', None, 'incremental'],
+            ['events', None, 'incremental']
         ]
     },
     'readings_throughput':{
-        'options': [None, 'Readings per second in the EdgeX platform', 'readings/s', 'readings', 'edgex.readings', 
+        'options': [None, 'Readings per second in the EdgeX platform', 'readings/s', 'throughput', 'edgex.readings', 
                     'line'],
         'lines': [
-            ['readings/s', None, 'incremental'],
+            ['readings', None, 'incremental']
+        ]
+    },
+    'events_count':{
+        'options': [None, 'Total number of events and readings in the EdgeX platform', 'events', 'events', 'edgex.events_readings_abs', 
+                    'line'],
+        'lines': [
+            ['readings', None, 'absolute'],
+            ['events', None, 'absolute']
         ]
     },
     'devices_number':{
-        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'devices number', 'edgex.devices_number', 
+        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'registered devices', 'edgex.devices_number', 
                     'line'],
         'lines': [
-            ['number_of_devices', None, 'absolute'],
+            ['registered_devices', None, 'absolute'],
         ]
     }
  } #
@@ -75,9 +83,26 @@ class Service(UrlService):
         UrlService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER
         self.definitions = CHARTS
-        self.url_core_data_events = self.configuration.get('url_core_data', 'http://localhost:48080') + '/api/v1/event/count'
-        self.url_core_data_readings = self.configuration.get('url_core_data', 'http://localhost:48080') + '/api/v1/reading/count'
-        self.url_core_metadata_devices = self.configuration.get('url_core_metadata', 'http://localhost:48081') + '/api/v1/device'
+        self.url = '{protocol}://{host}'.format(
+            protocol=self.configuration.get('protocol', 'http'),
+            host=self.configuration.get('host', 'localhost')
+        )
+        self.edgex_ports = {
+            'core_data': self.configuration.get('port_data', '48080'),
+            'core_metadata': self.configuration.get('port_metadata', '48081')
+        }
+        self.url_core_data_readings = '{url}:{port}/api/v1/reading/count'.format(
+            url = self.url,
+            port = self.edgex_ports['core_data']
+        )
+        self.url_core_data_events = '{url}:{port}/api/v1/event/count'.format(
+            url = self.url,
+            port = self.edgex_ports['core_data']
+        )
+        self.url_core_metadata_devices = '{url}:{port}/api/v1/device'.format(
+            url = self.url,
+            port = self.edgex_ports['core_metadata']
+        )
         # self.url_core_sys_mgmt = self.configuration.get('url_sys_mgmt' 'http://localhost:48090/avi/v1/metrics/edgex-support')
        
         #  - sys_mgmt is not yet certain whether it is neaded since the metrics are collected natively from netdata in the form of container metrics.
@@ -91,17 +116,17 @@ class Service(UrlService):
             METHODS(
                 get_data=self._get_core_throughput_data,
                 url=self.url_core_data_readings,
-                run=self.configuration.get('events_per_second', True),
+                run=self.configuration.get('events_per_second', False),
             ),
             METHODS(
                 get_data=self._get_core_throughput_data,
                 url=self.url_core_data_events,
-                run=self.configuration.get('readings_per_second', True)
+                run=self.configuration.get('readings_per_second', False)
             ),
             METHODS(
                 get_data=self._get_device_info,
                 url=self.url_core_metadata_devices,
-                run=self.configuration.get('number_of_devices', True)
+                run=self.configuration.get('number_of_devices', False)
             )
          ]
         return UrlService.check(self)
@@ -135,9 +160,9 @@ class Service(UrlService):
                 return queue.put({})
             raw = int(raw)
             if 'event' in url: 
-                data['events/s'] = raw
+                data['events'] = raw
             elif 'reading' in url:
-                data['readings/s'] = raw
+                data['readings'] = raw
             return queue.put(data)
 
     @get_survive_any
@@ -147,7 +172,7 @@ class Service(UrlService):
             if not raw:
                 return queue.put({})
             parsed = json.loads(raw) #python object
-            data['number_of_devices'] = len(parsed) #int
+            data['registered_devices'] = len(parsed) #int
             return queue.put(data)
 
 
