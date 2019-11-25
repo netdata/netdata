@@ -4,8 +4,8 @@ You can:
 
 -   create your own dashboards using simple HTML (no javascript is required for
     basic dashboards)
--   utilizing any or all of the available chart libraries, on the same dashboard
--   using data from one or more Netdata servers, on the same dashboard
+-   utilize any or all of the available chart libraries, on the same dashboard
+-   use data from one or more Netdata servers, on the same dashboard
 -   host your dashboard HTML page on any web server, anywhere
 
 You can also add Netdata charts to existing web pages.
