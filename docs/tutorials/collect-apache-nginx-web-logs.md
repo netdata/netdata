@@ -32,7 +32,7 @@ has readable access log file, you can configure the web log plugin to access and
 ## Configure the web log collector
 
 To use the Go version of this plugin, you need to explicitly enable it, and disable the depreciated Python version.
-First, open `python.d.conf` and 
+First, open `python.d.conf`:
 
 ```bash
 cd /etc/netdata/ # Replace with your Netdata configuration directory, if not /etc/netdata/
@@ -123,7 +123,7 @@ web server's access log and begin showing real-time charts!
 The web log collector is capable of parsing custom log formats and presenting them as charts, but we'll leave that topic
 for a separate tutorial.
 
-We do have [extensive documentation](../../collectors/go.d.plugin/modules/weblog/README.md#custom-log-format) on how to
+We do have [extensive documentation](../../collectors/go.d.plugin/modules/weblog/#custom-log-format) on how to
 build custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alarms
@@ -146,8 +146,8 @@ documentation](../../health/README.md).
 ## What's next?
 
 Now that you have web log collection up and running, we recommend you take a look at the documentation for our
-[python.d](python.d.plugin/web_log/README.md) for some ideas of how you can turn these rather "boring" logs into
-powerful real-time tools for keeping your servers happy.
+[python.d](../../collectors/python.d.plugin/web_log/README.md) for some ideas of how you can turn these rather "boring"
+logs into powerful real-time tools for keeping your servers happy.
 
 Don't forget to give GitHub user [Wing924](https://github.com/Wing924) a big 👍 for his hard work in starting up the Go
 refactoring effort.
