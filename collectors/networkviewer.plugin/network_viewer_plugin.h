@@ -67,6 +67,7 @@ typedef struct  netdata_conn_stats{
     uint64_t recv;
     uint8_t protocol;
     uint8_t removeme;
+    time_t remove_time;
 
     struct netdata_conn_stats * next;
 }netdata_conn_stats_t;
@@ -75,14 +76,13 @@ typedef struct {
     avl_tree_lock destination_port;
 
     netdata_conn_stats_t *tree;
+    netdata_conn_stats_t *removeme;
 } netdata_control_connection_t;
 
 typedef struct netdata_network
 {
     in_addr_t ipv4addr;
     in_addr_t netmask;
-    in_addr_t router;
-    int isloopback;
 
     struct netdata_network *next;
 } netdata_network_t;

@@ -65,6 +65,8 @@ slabinfo.plugin
 cgroup-network
 !cgroup-network/
 
+networkviewer.plugin
+
 # protoc generated files
 *.pb.cc
 *.pb.h
