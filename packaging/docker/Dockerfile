@@ -7,6 +7,9 @@ ARG ARCH=amd64
 # This image contains preinstalled dependecies
 FROM netdata/builder:${ARCH} as builder
 
+# One of 'nightly' or 'stable'
+ARG RELEASE_CHANNEL=nightly
+
 ENV JUDY_VER 1.0.5
 
 # Copy source
@@ -16,7 +19,8 @@ WORKDIR /opt/netdata.git
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
-   ./netdata-installer.sh --dont-wait --dont-start-it
+   ./netdata-installer.sh --dont-wait --dont-start-it \
+   $([ "$RELEASE_CHANNEL" = stable ] && echo --stable-channel)
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
