@@ -214,7 +214,6 @@
 - \[libnetdata/thread\] Set thread name from tag [\#6745](https://github.com/netdata/netdata/pull/6745) ([Saruspete](https://github.com/Saruspete))
 - sidebar-info update - DB engine [\#6744](https://github.com/netdata/netdata/pull/6744) ([jacekkolasa](https://github.com/jacekkolasa))
 - pythond respect prev running jobs and refactor [\#6661](https://github.com/netdata/netdata/pull/6661) ([ilyam8](https://github.com/ilyam8))
-- Stop configure.ac from linking against dbengine and https libraries w… [\#6658](https://github.com/netdata/netdata/pull/6658) ([mfundul](https://github.com/mfundul))
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
