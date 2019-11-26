@@ -95,13 +95,11 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 !!! note
     Do not use `sudo` for this installer—it will escalate privileges itself if needed.
 
-```
 To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](README.md#nightly-vs-stable-releases).
 
 If your system does not have `bash` installed, open the `More information and advanced uses of the kickstart-static64.sh script` dropdown for instructions to run the installer without `bash`.
 
 This script installs Netdata at `/opt/netdata`.
-```
 
 <details markdown="1"><summary>Click here for more information and advanced use of this command.</summary>
 
@@ -119,7 +117,7 @@ The `kickstart-static64.sh` script passes all its parameters to `netdata-install
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--local-files`: Used for offline installations. Pass two file paths, one for the tarball and one fir the checksum file, to force kickstart run the process using those files.
+-   `--local-files`: Used for offline installations. Pass two file paths, one for the tarball and one for the checksum file, to force kickstart run the process using those files.
 
 Example using all the above parameters:
 
