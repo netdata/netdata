@@ -23,12 +23,13 @@ struct engine *__mock_read_exporting_config()
     engine->connector_root->instance_root = calloc(1, sizeof(struct instance));
     struct instance *instance = engine->connector_root->instance_root;
     instance->connector = engine->connector_root;
+    instance->config.name = strdupz("instance_name");
     instance->config.destination = strdupz("localhost");
     instance->config.update_every = 1;
     instance->config.buffer_on_failures = 10;
     instance->config.timeoutms = 10000;
-    instance->config.charts_pattern = strdupz("*");
-    instance->config.hosts_pattern = strdupz("localhost *");
+    instance->config.charts_pattern = simple_pattern_create("*", NULL, SIMPLE_PATTERN_EXACT);
+    instance->config.hosts_pattern = simple_pattern_create("*", NULL, SIMPLE_PATTERN_EXACT);
     instance->config.options = BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES;
 
     return engine;

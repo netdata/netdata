@@ -24,7 +24,7 @@ int init_connectors(struct engine *engine)
                 return 1;
         }
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
-            engine->instance_num++;
+            instance->index = engine->instance_num++;
             instance->after = engine->now;
 
             switch (connector->config.type) {

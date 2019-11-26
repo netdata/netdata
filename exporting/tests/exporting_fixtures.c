@@ -17,8 +17,9 @@ int teardown_configured_engine(void **state)
 
     struct instance *instance = engine->connector_root->instance_root;
     free((void *)instance->config.destination);
-    free(instance->config.charts_pattern);
-    free(instance->config.hosts_pattern);
+    free((void *)instance->config.name);
+    simple_pattern_free(instance->config.charts_pattern);
+    simple_pattern_free(instance->config.hosts_pattern);
     free(instance);
 
     free(engine->connector_root);
@@ -43,6 +44,8 @@ int setup_rrdhost()
     st->rrdhost = localhost;
     strcpy(st->id, "chart_id");
     st->name = strdupz("chart_name");
+    st->flags |= RRDSET_FLAG_ENABLED;
+    st->rrd_memory_mode |= RRD_MEMORY_MODE_SAVE;
 
     localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
     RRDDIM *rd = localhost->rrdset_root->dimensions;

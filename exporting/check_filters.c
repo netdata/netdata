@@ -16,7 +16,7 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
 
     RRDHOST_FLAGS *flags = &host->exporting_flags[instance->index];
 
-    if (unlikely(*flags & (RRDHOST_FLAG_BACKEND_SEND | RRDHOST_FLAG_BACKEND_DONT_SEND))) {
+    if (unlikely((*flags & (RRDHOST_FLAG_BACKEND_SEND | RRDHOST_FLAG_BACKEND_DONT_SEND)) == 0)) {
         char *host_name = (host == localhost) ? "localhost" : host->hostname;
 
         if (!instance->config.hosts_pattern || simple_pattern_matches(instance->config.hosts_pattern, host_name)) {

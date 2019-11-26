@@ -86,8 +86,8 @@ static void test_read_exporting_config(void **state)
     assert_int_equal(instance->config.update_every, 1);
     assert_int_equal(instance->config.buffer_on_failures, 10);
     assert_int_equal(instance->config.timeoutms, 10000);
-    assert_string_equal(instance->config.charts_pattern, "*");
-    assert_string_equal(instance->config.hosts_pattern, "localhost *");
+    assert_true(simple_pattern_matches(instance->config.charts_pattern, "any_chart"));
+    assert_true(simple_pattern_matches(instance->config.hosts_pattern, "anyt_host"));
     assert_int_equal(instance->config.options, BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES);
 
     teardown_configured_engine(state);
@@ -134,6 +134,78 @@ static void test_mark_scheduled_instances(void **state)
     struct instance *instance = engine->connector_root->instance_root;
     assert_int_equal(instance->scheduled, 1);
     assert_int_equal(instance->before, 2);
+}
+
+static void test_rrdhost_is_exportable(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    expect_function_call(__wrap_info_int);
+
+    assert_ptr_equal(localhost->exporting_flags, NULL);
+
+    assert_int_equal(__real_rrdhost_is_exportable(instance, localhost), 1);
+
+    assert_string_equal(
+        log_line,
+        "enabled exporting of host 'localhost' for instance 'instance_name'");
+
+    assert_ptr_not_equal(localhost->exporting_flags, NULL);
+    assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_BACKEND_SEND);
+}
+
+static void test_false_rrdhost_is_exportable(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    simple_pattern_free(instance->config.hosts_pattern);
+    instance->config.hosts_pattern = simple_pattern_create("!*", NULL, SIMPLE_PATTERN_EXACT);
+
+    expect_function_call(__wrap_info_int);
+
+    assert_ptr_equal(localhost->exporting_flags, NULL);
+
+    assert_int_equal(__real_rrdhost_is_exportable(instance, localhost), 0);
+
+    assert_string_equal(
+        log_line,
+        "disabled exporting of host 'localhost' for instance 'instance_name'");
+
+    assert_ptr_not_equal(localhost->exporting_flags, NULL);
+    assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_BACKEND_DONT_SEND);
+}
+
+static void test_rrdset_is_exportable(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+    RRDSET *st = localhost->rrdset_root;
+
+    assert_ptr_equal(st->exporting_flags, NULL);
+
+    assert_int_equal(__real_rrdset_is_exportable(instance, st), 1);
+
+    assert_ptr_not_equal(st->exporting_flags, NULL);
+    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_BACKEND_SEND);
+}
+
+static void test_false_rrdset_is_exportable(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+    RRDSET *st = localhost->rrdset_root;
+
+    simple_pattern_free(instance->config.charts_pattern);
+    instance->config.charts_pattern = simple_pattern_create("!*", NULL, SIMPLE_PATTERN_EXACT);
+
+    assert_ptr_equal(st->exporting_flags, NULL);
+
+    assert_int_equal(__real_rrdset_is_exportable(instance, st), 0);
+
+    assert_ptr_not_equal(st->exporting_flags, NULL);
+    assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_BACKEND_IGNORE);
 }
 
 static void test_prepare_buffers(void **state)
@@ -250,7 +322,7 @@ static void test_exporting_discard_response(void **state)
 
     assert_string_equal(
         log_line,
-        "EXPORTING: received 13 bytes from (null) connector instance. Ignoring them. Sample: 'Test response'");
+        "EXPORTING: received 13 bytes from instance_name connector instance. Ignoring them. Sample: 'Test response'");
 
     assert_int_equal(buffer_strlen(response), 0);
 
@@ -276,7 +348,7 @@ static void test_simple_connector_receive_response(void **state)
     simple_connector_receive_response(&sock, instance);
 
     assert_string_equal(
-        log_line, "EXPORTING: received 9 bytes from (null) connector instance. Ignoring them. Sample: 'Test recv'");
+        log_line, "EXPORTING: received 9 bytes from instance_name connector instance. Ignoring them. Sample: 'Test recv'");
 
     assert_int_equal(stats->chart_received_bytes, 9);
     assert_int_equal(stats->chart_receptions, 1);
@@ -387,6 +459,14 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_init_connectors, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
             test_mark_scheduled_instances, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_rrdhost_is_exportable, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_false_rrdhost_is_exportable, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_rrdset_is_exportable, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_false_rrdset_is_exportable, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(test_prepare_buffers, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test_setup_teardown(
