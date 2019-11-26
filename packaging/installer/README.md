@@ -39,9 +39,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 !!! note
     Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
 
-```
+
 To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
-```
 
 <details markdown="1"><summary>Click here for more information and advanced use of the one-line installation script.</summary>
 
@@ -376,7 +375,7 @@ If you experience an issue with `/usr/bin/install` being absent in pfSense 2.3 o
 
 ##### FreeNAS
 
-On FreeNAS-Corral-RELEASE (>=10.0.3), Netdata is pre-installed.
+On FreeNAS-Corral-RELEASE (>=10.0.3 and <11.3), Netdata is pre-installed.
 
 To use Netdata, the service will need to be enabled and started from the FreeNAS **[CLI](https://github.com/freenas/cli)**.
 
