@@ -51,6 +51,8 @@ If you followed the steps above to enable `remote-control` and make your Unbound
 be enough. Restart Netdata with `service netdata restart`, or the appropriate method for your system. You should see
 Unbound metrics in your Netdata dashboard!
 
+![Some charts showing Unbound metrics in real-time](https://user-images.githubusercontent.com/1153921/69659974-93160f00-103c-11ea-88e6-27e9efcf8c0d.png)
+
 If that failed, you will need to manually configure `unbound.conf`. See the next section for details.
 
 ### Manual setup for a local Unbound server
@@ -119,10 +121,6 @@ jobs:
 
 To see all the available options, see the default [unbound.conf
 file](https://github.com/netdata/go.d.plugin/blob/master/config/go.d/unbound.conf).
-
-## Tweak Unbound collector alarms
-
-**COMING SOON: Ilya is adding/updating alarms and I will finish this section then.**
 
 ## What's next?
 

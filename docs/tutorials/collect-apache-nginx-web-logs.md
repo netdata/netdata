@@ -120,11 +120,11 @@ web server's access log and begin showing real-time charts!
 
 ### Custom log formats and fields
 
-The web log collector is capable of parsing custom log formats and presenting them as charts, but we'll leave that topic
-for a separate tutorial.
+The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll
+leave that topic for a separate tutorial.
 
-We do have [extensive documentation](../../collectors/go.d.plugin/modules/weblog/#custom-log-format) on how to
-build custom parsing for Nginx and Apache logs.
+We do have [extensive documentation](../../collectors/go.d.plugin/modules/weblog/#custom-log-format) on how to build
+custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alarms
 
