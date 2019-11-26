@@ -346,14 +346,18 @@ class Service(SimpleService):
         self.poller = NvidiaSMIPoller(poll)
 
     def get_data(self):
-        if not self.poller.is_started():
-            self.poller.start()
+        # if not self.poller.is_started():
+        #     self.poller.start()
+        #
+        # if not self.poller.is_alive():
+        #     self.debug('poller is off')
+        #     return None
+        #
+        # last_data = self.poller.data()
+        # if not last_data:
+        #     return None
 
-        if not self.poller.is_alive():
-            self.debug('poller is off')
-            return None
-
-        last_data = self.poller.data()
+        last_data = self.poller.run_once()
         if not last_data:
             return None
 
