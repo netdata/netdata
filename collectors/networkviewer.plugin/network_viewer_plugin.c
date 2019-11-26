@@ -435,14 +435,14 @@ netdata_network_t *netdata_list_ips(char *ips) {
     netdata_network_t *ret = NULL, *next;
 
     if (!ips) {
-        static const char *ips[] = { "10.0.0.0", "172.16.0.0", "192.168.0.0" };
+        static const char *pips[] = { "10.0.0.0", "172.16.0.0", "192.168.0.0" };
         static const char *masks[] = { "255.0.0.0", "255.240.0.0", "255.255.0.0" };
 
         int i = 0;
         for (i = 0; i < 3 ; i++) {
             netdata_network_t *set = (netdata_network_t *) callocz(1,sizeof(*ret));
             if(set) {
-                in_addr_t ip = inet_addr(ips[i]);
+                in_addr_t ip = inet_addr(pips[i]);
                 set->ipv4addr = ip;
 
                 in_addr_t mask = inet_addr(masks[i]);
