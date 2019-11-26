@@ -5,6 +5,10 @@ addons:
   apt:
     packages: ['moreutils']
 
+env:
+  global:
+    - RELEASE_CHANNEL=nightly
+
 before_install:
   - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
