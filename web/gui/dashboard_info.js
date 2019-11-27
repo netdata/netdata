@@ -487,7 +487,21 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-server"></i>',
         info: undefined
     },
-
+    'edgex': {
+        title: 'EdgeX',
+        icon: '&nbsp<i>X</i>&nbsp',
+        info: 'Metrics related to the EdgeX Foundry Platform. An Open-Source hardware agnostic IoT platform, part of LF Edge ecosystem.'
+    },
+    'dockerd': {
+        title: 'dockerd',
+        icon: '<i class="fab fa-docker"></i>',
+        info: 'Module which monitors docker health metrics'
+    },
+    'consul': {
+        title:'Consul',
+        icon:'<i class="fas fa-circle-notch" data-fa-transform="rotate-90"></i>',
+        info:'Consul metrics about the health of consul registered services.'
+    },
     'perf': {
         title: 'Perf Counters',
         icon: '<i class="fas fa-tachometer-alt"></i>',
