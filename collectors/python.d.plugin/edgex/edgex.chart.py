@@ -2,6 +2,7 @@
 # Description: EdgeX Platform netdata python.d module
 # Author: Odysseas Lamtzidis (OdysLam)
 # SPDX-License-Identifier: GPL-3.0-or-later
+# Module Version: 0.2
 
 import json
 import threading
@@ -63,7 +64,7 @@ CHARTS = {
         ]
     },
     'memory_alloc':{
-        'options': [None, 'Currently allocated number of bytes on the heap of each EdgeX service. It is measured per EdgeX service and provided by the Golang runtime Package.', 'bytes', 'memory metrics', 'edgex.memory_alloc', 
+        'options': [None, 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package.', 'bytes', 'memory metrics', 'edgex.memory_alloc', 
                     'line'],
         'lines': [
             ['core_data_alloc', None, 'absolute'],
@@ -73,7 +74,7 @@ CHARTS = {
         ]
     },
     'memory_malloc':{
-        'options': [None, 'Mallocs is the cumulative count of heap objects allocated. It is measured per EdgeX service and provided by the Golang runtime Package.', 'heap objects', 'memory metrics','edgex.memory_malloc', 
+        'options': [None, 'Mallocs: it is the cumulative count of heap objects allocated. Provided by the Golang runtime Package.', 'heap objects', 'memory metrics','edgex.memory_malloc', 
                     'line'],
         'lines': [
             ['core_data_malloc', None, 'absolute'],
@@ -83,7 +84,7 @@ CHARTS = {
         ]
     },
     'memory_frees':{
-        'options': [None, 'Frees is the cumulative count of heap objects freed. It is measured per EdgeX service and provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_frees', 
+        'options': [None, 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_frees', 
                     'line'],
         'lines': [
             ['core_data_frees', None, 'absolute'],
@@ -93,7 +94,7 @@ CHARTS = {
         ]
     },
     'memory_liveObjects':{
-        'options': [None, 'The number of live objects is (Mallocs - Frees) . It is measured per EdgeX service and provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_liveObjects', 
+        'options': [None, 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_liveObjects', 
                     'line'],
         'lines': [
             ['core_data_live_objects', None, 'absolute'],
