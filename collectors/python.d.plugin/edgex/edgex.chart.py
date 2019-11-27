@@ -34,22 +34,22 @@ update_every = 5
 
 CHARTS = {
     'events_throughput':{
-        'options': [None, 'Events and Readings (readings are a certain type of event) per second in the EdgeX platform', 'events/s', 'events throughput','edgex.events',
-                    'line'],
+        'options': [None, 'Events and Readings (readings are a certain type of event) per second in the EdgeX platform', 'events/s', 
+                    'events throughput','edgex.events', 'line'],
         'lines': [
             ['events', None, 'incremental'],
             ['readings', None, 'incremental']
         ]
     },
     # 'readings_throughput':{
-    #     'options': [None, 'Readings per second in the EdgeX platform', 'readings/s', 'throughput', 'edgex.readings', 
+    #     'options': [None, 'Readings per second in the EdgeX platform', 'readings/s', 'throughput', 'edgex.readings',
     #                 'line'],
     #     'lines': [
     #         ['readings', None, 'incremental']
     #     ]
     # },
     'events_count':{
-        'options': [None, 'Total number of events and readings in the EdgeX platform', 'events', 'events count', 'edgex.events_readings_abs', 
+        'options': [None, 'Total number of events and readings in the EdgeX platform', 'events', 'events count', 'edgex.events_readings_abs',
                     'line'],
         'lines': [
             ['readings', None, 'absolute'],
@@ -57,15 +57,15 @@ CHARTS = {
         ]
     },
     'devices_number':{
-        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'devices count', 'edgex.devices_number', 
+        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'devices count', 'edgex.devices_number',
                     'line'],
         'lines': [
             ['registered_devices', None, 'absolute'],
         ]
     },
     'memory_alloc':{
-        'options': [None, 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package.', 'bytes', 'memory metrics', 'edgex.memory_alloc', 
-                    'line'],
+        'options': [None, 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package.', 
+                    'bytes', 'memory metrics', 'edgex.memory_alloc', 'line'],
         'lines': [
             ['core_data_alloc', None, 'absolute'],
             ['core_metadata_alloc', None, 'absolute'],
@@ -74,8 +74,8 @@ CHARTS = {
         ]
     },
     'memory_malloc':{
-        'options': [None, 'Mallocs: it is the cumulative count of heap objects allocated. Provided by the Golang runtime Package.', 'heap objects', 'memory metrics','edgex.memory_malloc', 
-                    'line'],
+        'options': [None, 'Mallocs: it is the cumulative count of heap objects allocated. Provided by the Golang runtime Package.', 'heap objects',
+                    'memory metrics','edgex.memory_malloc', 'line'],
         'lines': [
             ['core_data_malloc', None, 'absolute'],
             ['core_metadata_malloc', None, 'absolute'],
@@ -84,8 +84,8 @@ CHARTS = {
         ]
     },
     'memory_frees':{
-        'options': [None, 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_frees', 
-                    'line'],
+        'options': [None, 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package.', 'heap objects', 
+                    'memory metrics', 'edgex.memory_frees', 'line'],
         'lines': [
             ['core_data_frees', None, 'absolute'],
             ['core_metadata_frees', None, 'absolute'],
@@ -94,8 +94,8 @@ CHARTS = {
         ]
     },
     'memory_liveObjects':{
-        'options': [None, 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_liveObjects', 
-                    'line'],
+        'options': [None, 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package.', 'heap objects', 
+                    'memory metrics', 'edgex.memory_liveObjects', 'line'],
         'lines': [
             ['core_data_live_objects', None, 'absolute'],
             ['core_metadata_live_objects', None, 'absolute'],
@@ -104,7 +104,6 @@ CHARTS = {
             
         ]
     }
-    
  } #
 # 'memstats_heap': {
 #         'options': ['heap', 'memory: size of heap memory structures', 'KiB', 'memstats',
@@ -246,7 +245,7 @@ class Service(UrlService):
                 return queue.put({})
             raw = int(raw)
             data['readings'] = raw
-            if 'event' in url: 
+            if 'event' in url:
                 data['events'] = raw
             return queue.put(data)
 
@@ -290,19 +289,19 @@ class Service(UrlService):
             data['core_metadata_malloc'] = parsed["Memory"]["Mallocs"]
             # data['core_metadata_sys'] = parsed["Memory"]["Sys"]
             data['core_metadata_frees'] = parsed["Memory"]["Frees"]
-            data['core_metadata_live_objects'] = parsed["Memory"]["LiveObjects"]        
+            data['core_metadata_live_objects'] = parsed["Memory"]["LiveObjects"]
         elif self.edgex_ports['core_command'] in url:
             data['core_command_alloc'] = parsed["Memory"]["Alloc"]
             data['core_command_malloc'] = parsed["Memory"]["Mallocs"]
             # data['core_command_sys'] = parsed["Memory"]["Sys"]
             data['core_command_frees'] = parsed["Memory"]["Frees"]
-            data['core_command_live_objects'] = parsed["Memory"]["LiveObjects"]          
+            data['core_command_live_objects'] = parsed["Memory"]["LiveObjects"]
         elif self.edgex_ports['support_logging'] in url:
             data['support_logging_alloc'] = parsed["Memory"]["Alloc"]
             data['support_logging_malloc'] = parsed["Memory"]["Mallocs"]
             # data['support_logging_sys'] = parsed["Memory"]["Sys"]
             data['support_logging_frees'] = parsed["Memory"]["Frees"]
-            data['support_logging_live_objects'] =  parsed["Memory"]["LiveObjects"]     
+            data['support_logging_live_objects'] =  parsed["Memory"]["LiveObjects"]
         return queue.put(data)
 
 
