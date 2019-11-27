@@ -82,7 +82,7 @@ To modify how the alarm gets triggered, we suggest that you go through the guide
 
 ##### Receive notifications using my preferred method
 
-You only need to configure `health_alarm_notify.conf`. To learn how to do it, read first [alarm notifications](../health/notifications/#netdata-alarm-notifications) and then open the submenu `Supported Notifications` under `Alarm notifications` in the documentation to find the specific page on your prefered notification method. 
+You only need to configure `health_alarm_notify.conf`. To learn how to do it, read first [alarm notifications](../health/notifications/#netdata-alarm-notifications) and then open the submenu `Supported Notifications` under `Alarm notifications` in the documentation to find the specific page on your preferred notification method. 
 
 ### Make security-related customizations
 

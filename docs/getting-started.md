@@ -4,7 +4,7 @@ Thanks for trying Netdata! In this guide, we'll quickly walk you through the fir
 Netdata installed.
 
 Netdata can collect thousands of metrics in real-time without any configuration, but there are some valuable things to
-know to get the most of out Netdata based on your needs.
+know to get the most out of Netdata based on your needs.
 
 > If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details,
 > including our one-liner script, which automatically installs Netdata on almost all Linux distributions.
@@ -144,7 +144,7 @@ Edit your `/etc/netdata/netdata.conf` file and set the following:
 ```
 
 If you want to keep health monitoring enabled, but turn email notifications off, edit your `health_alarm_notify.conf`
-file with `edit-config`, or with your the text editor of your choice:
+file with `edit-config`, or with the text editor of your choice:
 
 ```bash
 sudo /etc/netdata/edit-config health_alarm_notify.conf
