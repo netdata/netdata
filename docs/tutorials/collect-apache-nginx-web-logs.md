@@ -13,7 +13,7 @@ effort comes with a ton of improvements.
 
 You can now use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage, and the whole parser is faster than
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
-200ms, using ~30% of a single core. To learn more about these improvements, see our [v1.19 release post](link).
+200ms, using ~30% of a single core. To learn more about these improvements, see our [v1.19 release post](https://blog.netdata.cloud/posts/release-1.19/).
 
 The [go.d plugin](https://github.com/netdata/go.d.plugin/tree/master/modules/weblog) is currently compatible with
 [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
