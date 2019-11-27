@@ -6,7 +6,7 @@ description: Visit the dashboard and get your feet wet!
 Welcome to the first part of the Netdata guide!
 
 This guide assumes you've already installed Netdata. If you haven't yet, check out our [installation
-instructions](/docs/packaging/installer) for your system. Once you have Netdata installed, you can hop back over here
+instructions](../../packaging/installer) for your system. Once you have Netdata installed, you can hop back over here
 and dig in.
 
 ## What you'll learn in this part
@@ -32,7 +32,7 @@ to `http://localhost:19999/`.
 
 If you installed Netdata on a remote system, navigate to `http://HOST:19999/` after replacing `HOST` with the IP address
 of that system. To connect to a virtual private server (VPS), for example, you might navigate to
-`http://203.0.113.0:19999`. We'll learn more on monitoring remote systems and [multiple systems](/tutorials/part-03/)
+`http://203.0.113.0:19999`. We'll learn more on monitoring remote systems and [multiple systems](step-03.md)
 later on.
 
 > From here on out in this tutorial, we'll refer to the address you use to view your dashboard as `HOST`. Be sure to 
@@ -59,7 +59,7 @@ what it's collecting. If you run Netdata on many different systems using differe
 menus and submenus may look a little different for each one.
 
 To learn more about menus, see our documentation about [navigating the standard
-dashboard](/docs/web/gui/#menus).
+dashboard](../../web/gui/README.md#menus).
 
 ## Read the descriptions accompanying charts
 
@@ -105,7 +105,7 @@ looking at its name or hovering over the chart's date.
 It's important to understand these differences, as Netdata uses charts, dimensions, families, and contexts to create
 health alarms and configure collectors. To read even more about the differences between all these elements of the
 dashboard, and how they affect other parts of Netdata, read our [dashboards
-documentation](/docs/web/#charts-contexts-families).
+documentation](../../web/README.md#charts-contexts-families).
 
 ## Interact with charts
 
@@ -115,7 +115,7 @@ Netdata's charts are fully interactive. You can pan through historical metrics, 
 timeframes for further analysis, resize charts, and more.
 
 Best of all, Whenever you use a chart in this way, Netdata synchronizes all the other charts to match it. This even
-applies across different Netdata agents if you connect them using the [**My nodes** menu](/docs/registry)!
+applies across different Netdata agents if you connect them using the [**My nodes** menu](../../registry/README.md)!
 
 ![Aniamted GIF of chart
 synchronziation](https://user-images.githubusercontent.com/1153921/63464271-c03a9c00-c413-11e9-971d-245238926193.gif)
@@ -150,7 +150,7 @@ Additionally, resize charts by clicking-and-dragging the icon on the bottom-righ
 ![Animated GIF of resizing a chart and resetting it to the default
 height](https://user-images.githubusercontent.com/1153921/65066675-aec4b100-d939-11e9-9b5d-cee7316428f6.gif)
 
-To learn more about other options and chart interactivity, read our [dashboard documentation](/docs/web/).
+To learn more about other options and chart interactivity, read our [dashboard documentation](../../web/README.md).
 
 ## See raised alarms and the alarm log
 
@@ -168,7 +168,7 @@ log](https://user-images.githubusercontent.com/1153921/63468773-85d5fc80-c41d-11
 
 Let's look at one of those raised alarms a little more in-depth. Here is a static screenshot:
 
-![Screenshot of a raised disk_space.\_
+![Screenshot of a raised disk_space
 alarm](https://user-images.githubusercontent.com/1153921/63468853-af8f2380-c41d-11e9-9cec-1b0cac5d5549.png)
 
 The alarm itself is named **disk - /**, and its context is `disk_space._`. Beneath that is an auto-updating badge that
@@ -205,5 +205,7 @@ In this part of the Netdata tutorial, you learned how to:
 
 Next, you'll learn how to monitor multiple nodes through the dashboard.
 
-<Button><Link to="/tutorials/part-03/">Next: Monitor more than one system with Netdata <FaAngleDoubleRight
+[Next: Monitor more than one system with Netdata &rarr;](step-03.md)
+
+<Button><Link to="/tutorials/part-03/"> <FaAngleDoubleRight
 /></Link></Button>
