@@ -466,6 +466,8 @@ jobs:
     # We only publish if a TAG has been set during packaging
     - stage: Publish for release
       _template: &RELEASE_TEMPLATE
+        env:
+          - RELEASE_CHANNEL: stable
         git:
           depth: false
         script:
