@@ -16,24 +16,16 @@ EdgeX is an important enabler for interested parties to freely collaborate on op
 
 ![](https://www.edgexfoundry.org/wp-content/uploads/sites/25/2018/09/EdgeX_PlatformArchitectureDiagram-1024x651.png)
 
-**metrics:**
+**Metrics:**
 
-As of version 0.1:
+As of version 0.2:
 
 - Readings/second
 - Events/second
 - Absolute number of Events/Readings
 - Number of registered devices
+- Memory Metrics for core services (edgex-core-data, edgex-core-metadata, edgex-core-command, edgex-support-logging). These metrics are generated using the Golang [runtime Package](https://golang.org/pkg/runtime/#ReadMemStats).
 
-**Metrics from services:** Edgex-core-data, Edgex-core-metadata
-
-
-**Backlog:**
-
-(as of 25/11/19)
-
-- alloc, malloc, liveobjects, frees: as returned from each edgex service in real time
-- sys-mgmt metrics, not in real time (e.g every 10s)
--  readings/second per device
-
-
+        - Alloc - currently allocated number of bytes on the heap,
+        - Mallocs and Frees - number of allocations, deallocations
+        - Live objects (mallocs - frees)
