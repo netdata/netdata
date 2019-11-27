@@ -501,8 +501,6 @@ struct cgroup {
     RRDSET *st_queued_ops;
     RRDSET *st_merged_ops;
 
-    // pressure charts are inside `struct pressure' due to complexity
-
     // per cgroup chart variables
     char *filename_cpuset_cpus;
     unsigned long long cpuset_cpus;
