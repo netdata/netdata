@@ -139,8 +139,8 @@ class Service(UrlService):
             host=self.configuration.get('host', 'localhost')
         )
         self.edgex_ports = {
-            'support_logging': self.configuration.get('support_logging', '48061'),
-            'sys_mgmt': self.configuration.get('sys_mgmt', '48090'),
+            'support_logging': self.configuration.get('port_logging', '48061'),
+#            'sys_mgmt': self.configuration.get('port_sys_mgmt', '48090'),
             'core_data': self.configuration.get('port_data', '48080'),
             'core_metadata': self.configuration.get('port_metadata', '48081'),
             'core_command': self.configuration.get('port_command', '48082')
@@ -181,7 +181,7 @@ class Service(UrlService):
             METHODS(
                 get_data=self._get_core_throughput_readings,
                 url=self.url_core_data,
-                run=self.configuration.get('readings_per_second', True)
+                run=self.configuration.get('events_per_second', True)
             ),
             METHODS(
                 get_data=self._get_device_info,
