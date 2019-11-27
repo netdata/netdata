@@ -82,3 +82,53 @@ const char *rrd_memory_mode_name(RRD_MEMORY_MODE id)
     (void)id;
     return RRD_MEMORY_MODE_NONE_NAME;
 }
+
+time_t __mock_rrddim_query_oldest_time(RRDDIM *rd)
+{
+    (void)rd;
+
+    function_called();
+    return mock_type(time_t);
+}
+
+time_t __mock_rrddim_query_latest_time(RRDDIM *rd)
+{
+    (void)rd;
+
+    function_called();
+    return mock_type(time_t);
+}
+
+void __mock_rrddim_query_init(RRDDIM *rd, struct rrddim_query_handle *handle, time_t start_time, time_t end_time)
+{
+    (void)rd;
+    (void)handle;
+
+    function_called();
+    check_expected(start_time);
+    check_expected(end_time);
+}
+
+int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle)
+{
+    (void)handle;
+
+    function_called();
+    return mock_type(int);
+}
+
+storage_number __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle, time_t *current_time)
+{
+    (void)handle;
+    (void)current_time;
+
+    function_called();
+    return mock_type(storage_number);
+}
+
+void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle)
+{
+    (void)handle;
+
+    function_called();
+}

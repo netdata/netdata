@@ -208,6 +208,44 @@ static void test_false_rrdset_is_exportable(void **state)
     assert_int_equal(st->exporting_flags[0], RRDSET_FLAG_BACKEND_IGNORE);
 }
 
+static void test_exporting_calculate_value_from_stored_data(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    time_t timestamp;
+
+    instance->after = 3;
+    instance->before = 10;
+
+    expect_function_call(__mock_rrddim_query_oldest_time);
+    will_return(__mock_rrddim_query_oldest_time, 1);
+
+    expect_function_call(__mock_rrddim_query_latest_time);
+    will_return(__mock_rrddim_query_latest_time, 2);
+
+    expect_function_call(__mock_rrddim_query_init);
+    expect_value(__mock_rrddim_query_init, start_time, 1);
+    expect_value(__mock_rrddim_query_init, end_time, 2);
+
+    expect_function_call(__mock_rrddim_query_is_finished);
+    will_return(__mock_rrddim_query_is_finished, 0);
+    expect_function_call(__mock_rrddim_query_next_metric);
+    will_return(__mock_rrddim_query_next_metric, pack_storage_number(27, SN_EXISTS));
+
+    expect_function_call(__mock_rrddim_query_is_finished);
+    will_return(__mock_rrddim_query_is_finished, 0);
+    expect_function_call(__mock_rrddim_query_next_metric);
+    will_return(__mock_rrddim_query_next_metric, pack_storage_number(45, SN_EXISTS));
+
+    expect_function_call(__mock_rrddim_query_is_finished);
+    will_return(__mock_rrddim_query_is_finished, 1);
+
+    expect_function_call(__mock_rrddim_query_finalize);
+
+    assert_int_equal(exporting_calculate_value_from_stored_data(instance, rd, &timestamp), 36);
+}
+
 static void test_prepare_buffers(void **state)
 {
     struct engine *engine = *state;
@@ -467,6 +505,8 @@ int main(void)
             test_rrdset_is_exportable, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_false_rrdset_is_exportable, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_exporting_calculate_value_from_stored_data, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(test_prepare_buffers, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_exporting_name_copy),
         cmocka_unit_test_setup_teardown(

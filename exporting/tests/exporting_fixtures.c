@@ -46,6 +46,7 @@ int setup_rrdhost()
     st->name = strdupz("chart_name");
     st->flags |= RRDSET_FLAG_ENABLED;
     st->rrd_memory_mode |= RRD_MEMORY_MODE_SAVE;
+    st->update_every = 1;
 
     localhost->rrdset_root->dimensions = calloc(1, sizeof(RRDDIM));
     RRDDIM *rd = localhost->rrdset_root->dimensions;
@@ -56,6 +57,14 @@ int setup_rrdhost()
     rd->last_collected_time.tv_sec = 15051;
     rd->next = NULL;
 
+    rd->state = malloc(sizeof(*rd->state));
+    rd->state->query_ops.oldest_time = __mock_rrddim_query_oldest_time;
+    rd->state->query_ops.latest_time = __mock_rrddim_query_latest_time;
+    rd->state->query_ops.init = __mock_rrddim_query_init;
+    rd->state->query_ops.is_finished = __mock_rrddim_query_is_finished;
+    rd->state->query_ops.next_metric = __mock_rrddim_query_next_metric;
+    rd->state->query_ops.finalize = __mock_rrddim_query_finalize;
+
     return 0;
 }
 
@@ -64,6 +73,7 @@ int teardown_rrdhost()
     RRDDIM *rd = localhost->rrdset_root->dimensions;
     free((void *)rd->name);
     free((void *)rd->id);
+    free(rd->state);
     free(rd);
 
     RRDSET *st = localhost->rrdset_root;

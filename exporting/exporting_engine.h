@@ -159,6 +159,12 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len);
 int rrdhost_is_exportable(struct instance *instance, RRDHOST *host);
 int rrdset_is_exportable(struct instance *instance, RRDSET *st);
 
+calculated_number exporting_calculate_value_from_stored_data(
+    struct instance *instance,
+    RRDDIM *rd,
+    time_t *last_timestamp
+);
+
 int start_batch_formatting(struct engine *engine);
 int start_host_formatting(struct engine *engine, RRDHOST *host);
 int start_chart_formatting(struct engine *engine, RRDSET *st);
