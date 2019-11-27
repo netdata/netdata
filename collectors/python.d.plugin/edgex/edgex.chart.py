@@ -34,7 +34,7 @@ update_every = 5
 
 CHARTS = {
     'events_throughput':{
-        'options': [None, 'Events and Readings (readings are a certain type of event) per second in the EdgeX platform', 'events/s', 
+        'options': [None, 'Events and Readings (readings are a certain type of event) per second in the EdgeX platform', 'events/s',
                     'events throughput','edgex.events', 'line'],
         'lines': [
             ['events', None, 'incremental'],
@@ -64,7 +64,7 @@ CHARTS = {
         ]
     },
     'memory_alloc':{
-        'options': [None, 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package.', 
+        'options': [None, 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package.',
                     'bytes', 'memory metrics', 'edgex.memory_alloc', 'line'],
         'lines': [
             ['core_data_alloc', None, 'absolute'],
@@ -84,7 +84,7 @@ CHARTS = {
         ]
     },
     'memory_frees':{
-        'options': [None, 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package.', 'heap objects', 
+        'options': [None, 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package.', 'heap objects',
                     'memory metrics', 'edgex.memory_frees', 'line'],
         'lines': [
             ['core_data_frees', None, 'absolute'],
@@ -94,14 +94,13 @@ CHARTS = {
         ]
     },
     'memory_liveObjects':{
-        'options': [None, 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package.', 'heap objects', 
+        'options': [None, 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package.', 'heap objects',
                     'memory metrics', 'edgex.memory_liveObjects', 'line'],
         'lines': [
             ['core_data_live_objects', None, 'absolute'],
             ['core_metadata_live_objects', None, 'absolute'],
             ['core_command_live_objects', None, 'absolute'],
             ['support_logging_live_objects', None, 'absolute']
-            
         ]
     }
  } #
