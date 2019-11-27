@@ -1,7 +1,4 @@
----
-title: The step-by-step Netdata tutorial
-description: Ten parts and a whole lot of monitoring know-how to share.
----
+# The step-by-step Netdata tutorial
 
 Welcome to Netdata! We're glad you're interested in our health monitoring and performance troubleshooting system.
 
@@ -13,80 +10,82 @@ more about your systems and applications. If you're completely new to Netdata, o
 monitoring/performance troubleshooting systems before, this tutorial is perfect for you.
 
 > If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can
-> also jump straight into code and configurations with the [getting started guide](/docs/getting-started/).
+> also jump straight into code and configurations with the [getting started guide](../getting-started.md).
 
 This tutorial contains instructions for Netdata installed on a Linux system. Many of the instructions will work on other
 supported operating systems, like FreeBSD and MacOS, but it is not guaranteed.
 
-## Before we get started...
+## Before we get started
 
 Let's make sure you have Netdata installed on your system!
 
-> If you already installed Netdata, feel free to skip to [Part 01: Netdata's building blocks](/tutorials/part-01/).
+> If you already installed Netdata, feel free to skip to [Step 1: Netdata's building blocks](step-01.md).
 
 The easiest way to install Netdata on a Linux system is our `kickstart-static64.sh` one-line installer. Run this on your
-system and let it take care of the rest.
+system and let it take care of the rest. This script will install Netdata from source, keep it up to date with nightly
+releases, connects to the Netdata [registry](../../registry/README.md), and sends [_anonymous
+statistics_](../anonymous-statistics.md) about usage.
 
 ```bash
-bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
 Once finished, you'll have Netdata installed, and you'll be set up to get _nightly updates_ to get the latest features,
 improvements, and bugfixes.
 
 If this method doesn't work for you, or you want to use a different process, visit our [installation
-documentation](/docs/packaging/installer/).
+documentation](../../packaging/installer/).
 
 ## Netdata fundamentals
 
-<Button><Link to="/tutorials/part-01/">Part 01: Netdata's building blocks</Link></Button>
+[Part 1: Netdata's building blocks](step-01.md)
 
 In this introductory part, we're talking about the fundamental ideas, philosophies, and UX decisions behind Netdata.
 
-<Button><Link to="/tutorials/part-02/">Part 02: Get to know Netdata's dashboard</Link></Button>
+[Part 2: Get to know Netdata's dashboard](step-02.md)
 
 Visit Netdata's dashboard to explore, manipulate charts, and check out alarms. Get your first taste of visual anomaly
 detection.
 
-<Button><Link to="/tutorials/part-03/">Part 03: Monitor more than one system with Netdata</Link></Button>
+[Part 3: Monitor more than one system with Netdata](step-03.md)
 
 While the dashboard lets you quickly move from one agent to another, Netdata Cloud is our SaaS solution for monitoring
 the health of many systems. We'll cover its features and the benefits of using Netdata Cloud on top of the dashboard.
 
-<Button><Link to="/tutorials/part-04/">Part 04: The basics of configuring Netdata</Link></Button>
+[Part 4: The basics of configuring Netdata](step-04.md)
 
 While Netdata can monitor thousands of metrics in real-time without any configuration, you may _want_ to tweak some
 settings based on your system's resources.
 
-## Intermediate tutorials
+## Intermediate steps
 
-<Button><Link to="/tutorials/part-05/">Part 05: Health monitoring alarms and notifications</Link></Button>
+[Part 5: Health monitoring alarms and notifications](step-05.md)
 
 Learn how to tune, silence, and write custom alarms. Then, enable notifications so you never miss a health status or
 performance anomaly.
 
-<Button><Link to="/tutorials/part-06/">Part 06: Collect metrics from more services and apps</Link></Button>
+[Part 6: Collect metrics from more services and apps](step-06.md)
 
 Learn how to enable/disable collection plugins, configure a collection plugin job, and add more charts to your Netdata
 dashboard.
 
-<Button><Link to="/tutorials/part-07/">Part 07: Netdata's dashboard in depth</Link></Button>
+[Part 7: Netdata's dashboard in depth](step-07.md)
 
 Now that you configured your Netdata monitoring agent to your exact needs, you'll dive back into metrics snapshots,
 updates, and the dashboard's settings.
 
-## Advanced tutorials
+## Advanced steps
 
-<Button><Link to="/tutorials/part-08/">Part 08: Building your first custom dashboard</Link></Button>
+[Part 8: Building your first custom dashboard](step-08.md)
 
 Build a dashboard that shows the metrics that matter to you the most, or allow you to monitor many systems from a single
 HTML file.
 
-<Button><Link to="/tutorials/part-09/">Part 09: Long-term metrics storage</Link></Button>
+[Part 9: Long-term metrics storage](step-09.md)
 
 Netdata isn't just about real-time metrics—learn how to use our new database engine to store historical data and archive
 metrics to a different database.
 
-<Button><Link to="/tutorials/part-10/">Part 10: Set up a proxy</Link></Button>
+[Part 10: Set up a proxy](step-10.md)
 
 Run Netdata behind an Nginx proxy to improve performance and security by enabling TLS/HTTPS.

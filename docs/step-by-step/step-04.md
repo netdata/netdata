@@ -1,16 +1,13 @@
----
-title: The basics of configuring Netdata
-description: While Netdata comes pre-configured for most use cases, it can be tweaked in thousands of ways.
----
+# The basics of configuring Netdata
 
-Welcome to the fourth part of the Netdata tutorial.
+Welcome to the fourth step of the Netdata tutorial.
 
 Since the beginning, we've covered the building blocks of Netdata, dashboard basics, and how you can monitor many
 individual systems using many distributed Netdata agents.
 
 Next up: configuration.
 
-## What you'll learn in this part
+## What you'll learn in this step
 
 We'll talk about Netdata's default configuration, and then you'll learn how to do the following:
 
@@ -40,7 +37,7 @@ In the system represented by the screenshot, the line reads: `config directory =
 `netdata.conf`, and all the other configuration files, can be found at `/etc/netdata`.
 
 > For more details on where your Netdata config directory is, take a look at our [installation
-instructions](/docs/packaging/installer/).
+instructions](../../packaging/installer/).
 
 For the rest of this tutorial, we'll assume you're editing files or running scripts from _within_ your **Netdata
 configuration directory**.
