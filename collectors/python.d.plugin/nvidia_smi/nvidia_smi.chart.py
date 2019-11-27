@@ -358,14 +358,14 @@ class Service(SimpleService):
 
         return self.poller.data()
 
-    def get_data_simple_mode(self):
+    def get_data_normal_mode(self):
         return self.poller.run_once()
 
     def get_data(self):
         if self.loop_mode:
             last_data = self.get_data_loop_mode()
         else:
-            last_data = self.get_data_simple_mode()
+            last_data = self.get_data_normal_mode()
 
         if not last_data:
             return None
