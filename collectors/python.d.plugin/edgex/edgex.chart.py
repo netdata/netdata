@@ -20,27 +20,35 @@ METHODS = namedtuple('METHODS', ['get_data', 'url', 'run'])
 ORDER = [
     'events_throughput',
     'readings_throughput',
-    'events_count',
-    'devices_number'
+    # 'events_count',
+    'devices_number',
+    'memory_alloc',
+    'memory_malloc',
+    'memory_frees',
+    'memory_liveObjects'
 ]
+
+# default module values (can be overridden per job in `config`)
+update_every = 5
 
 CHARTS = {
     'events_throughput':{
-        'options': [None, 'Events per second in the EdgeX platform', 'events/s', 'throughput','edgex.events',
+        'options': [None, 'Events and Readings (readings are a certain type of event) per second in the EdgeX platform', 'events/s', 'events throughput','edgex.events',
                     'line'],
         'lines': [
-            ['events', None, 'incremental']
-        ]
-    },
-    'readings_throughput':{
-        'options': [None, 'Readings per second in the EdgeX platform', 'readings/s', 'throughput', 'edgex.readings', 
-                    'line'],
-        'lines': [
+            ['events', None, 'incremental'],
             ['readings', None, 'incremental']
         ]
     },
+    # 'readings_throughput':{
+    #     'options': [None, 'Readings per second in the EdgeX platform', 'readings/s', 'throughput', 'edgex.readings', 
+    #                 'line'],
+    #     'lines': [
+    #         ['readings', None, 'incremental']
+    #     ]
+    # },
     'events_count':{
-        'options': [None, 'Total number of events and readings in the EdgeX platform', 'events', 'events', 'edgex.events_readings_abs', 
+        'options': [None, 'Total number of events and readings in the EdgeX platform', 'events', 'events count', 'edgex.events_readings_abs', 
                     'line'],
         'lines': [
             ['readings', None, 'absolute'],
@@ -48,12 +56,54 @@ CHARTS = {
         ]
     },
     'devices_number':{
-        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'registered devices', 'edgex.devices_number', 
+        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'devices count', 'edgex.devices_number', 
                     'line'],
         'lines': [
             ['registered_devices', None, 'absolute'],
         ]
+    },
+    'memory_alloc':{
+        'options': [None, 'Currently allocated number of bytes on the heap of each EdgeX service. It is measured per EdgeX service and provided by the Golang runtime Package.', 'bytes', 'memory metrics', 'edgex.memory_alloc', 
+                    'line'],
+        'lines': [
+            ['core_data_alloc', None, 'absolute'],
+            ['core_metadata_alloc', None, 'absolute'],
+            ['core_command_alloc', None, 'absolute'],
+            ['support_logging_alloc', None, 'absolute']
+        ]
+    },
+    'memory_malloc':{
+        'options': [None, 'Mallocs is the cumulative count of heap objects allocated. It is measured per EdgeX service and provided by the Golang runtime Package.', 'heap objects', 'memory metrics','edgex.memory_malloc', 
+                    'line'],
+        'lines': [
+            ['core_data_malloc', None, 'absolute'],
+            ['core_metadata_malloc', None, 'absolute'],
+            ['core_command_malloc', None, 'absolute'],
+            ['support_logging_malloc', None, 'absolute']
+        ]
+    },
+    'memory_frees':{
+        'options': [None, 'Frees is the cumulative count of heap objects freed. It is measured per EdgeX service and provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_frees', 
+                    'line'],
+        'lines': [
+            ['core_data_frees', None, 'absolute'],
+            ['core_metadata_frees', None, 'absolute'],
+            ['core_command_frees', None, 'absolute'],
+            ['support_logging_frees', None, 'absolute']
+        ]
+    },
+    'memory_liveObjects':{
+        'options': [None, 'The number of live objects is (Mallocs - Frees) . It is measured per EdgeX service and provided by the Golang runtime Package.', 'heap objects', 'memory metrics', 'edgex.memory_liveObjects', 
+                    'line'],
+        'lines': [
+            ['core_data_live_objects', None, 'absolute'],
+            ['core_metadata_live_objects', None, 'absolute'],
+            ['core_command_live_objects', None, 'absolute'],
+            ['support_logging_live_objects', None, 'absolute']
+            
+        ]
     }
+    
  } #
 # 'memstats_heap': {
 #         'options': ['heap', 'memory: size of heap memory structures', 'KiB', 'memstats',
@@ -88,46 +138,80 @@ class Service(UrlService):
             host=self.configuration.get('host', 'localhost')
         )
         self.edgex_ports = {
+            'support_logging': self.configuration.get('support_logging', '48061'),
+            'sys_mgmt': self.configuration.get('sys_mgmt', '48090'),
             'core_data': self.configuration.get('port_data', '48080'),
-            'core_metadata': self.configuration.get('port_metadata', '48081')
+            'core_metadata': self.configuration.get('port_metadata', '48081'),
+            'core_command': self.configuration.get('port_command', '48082')
         }
-        self.url_core_data_readings = '{url}:{port}/api/v1/reading/count'.format(
+        self.url_core_data = '{url}:{port}/api/v1/'.format(
             url = self.url,
             port = self.edgex_ports['core_data']
         )
-        self.url_core_data_events = '{url}:{port}/api/v1/event/count'.format(
-            url = self.url,
-            port = self.edgex_ports['core_data']
-        )
-        self.url_core_metadata_devices = '{url}:{port}/api/v1/device'.format(
+        # self.url_core_data_events = '{url}:{port}/api/v1/'.format(
+        #     url = self.url,
+        #     port = self.edgex_ports['core_data']
+        # )
+        self.url_core_metadata = '{url}:{port}/api/v1/'.format(
             url = self.url,
             port = self.edgex_ports['core_metadata']
         )
-        # self.url_core_sys_mgmt = self.configuration.get('url_sys_mgmt' 'http://localhost:48090/avi/v1/metrics/edgex-support')
-       
-        #  - sys_mgmt is not yet certain whether it is neaded since the metrics are collected natively from netdata in the form of container metrics.
-        #  - In the Fuji release, there is a distinction between the metrics returned natively from each service and from sys-mgmt
-        #    The metrics returned from each service are raw (alloc, malloc, etc.) while the metrics returned from the sys-mgmt endpoint
-        #    are processed (mem.average, cpu.average, etc.) and for this reason the sys-mgmt endpoint has a considerable lag (2-3s per request).
-        #  - Testing is needed to ascertain which endpoints can be used for real-time monitoring while providing useful information.
+        self.url_core_command = '{url}:{port}/api/v1/'.format(
+            url = self.url,
+            port = self.edgex_ports['core_command']
+        )
+        # self.url_sys_mgmt = '{url}:{port}/api/v1/'.format(
+        #     url = self.url,
+        #     port = self.edgex_ports['sys_mgmt']
+        # )
+        self.url_support_logging = '{url}:{port}/api/v1/'.format(
+            url = self.url,
+            port = self.edgex_ports['support_logging']
+        )
+
 
     def check(self):
         self.methods = [
             METHODS(
-                get_data=self._get_core_throughput_data,
-                url=self.url_core_data_readings,
-                run=self.configuration.get('events_per_second', False),
+                get_data=self._get_core_throughput_events,
+                url=self.url_core_data,
+                run=self.configuration.get('events_per_second', True),
             ),
             METHODS(
-                get_data=self._get_core_throughput_data,
-                url=self.url_core_data_events,
-                run=self.configuration.get('readings_per_second', False)
+                get_data=self._get_core_throughput_readings,
+                url=self.url_core_data,
+                run=self.configuration.get('readings_per_second', True)
             ),
             METHODS(
                 get_data=self._get_device_info,
-                url=self.url_core_metadata_devices,
-                run=self.configuration.get('number_of_devices', False)
+                url=self.url_core_metadata,
+                run=self.configuration.get('number_of_devices', True)
+            ),
+            METHODS(
+                get_data=self._get_metrics_data,
+                url=self.url_core_metadata,
+                run=self.configuration.get('metrics', True)
+            ),
+            METHODS(
+                get_data=self._get_metrics_data,
+                url=self.url_core_data,
+                run=self.configuration.get('metrics', True)
+            ),
+            METHODS(
+                get_data=self._get_metrics_data,
+                url=self.url_core_command,
+                run=self.configuration.get('metrics', True)
+            ),
+            METHODS(
+                get_data=self._get_metrics_data,
+                url=self.url_support_logging,
+                run=self.configuration.get('metrics', True)
             )
+            # METHODS(
+            #     get_data=self._get_metrics_data
+            #     url=self.url_sys_mgmt,
+            #     run=self.configuration.get('metrics', True)
+            # )
          ]
         return UrlService.check(self)
 
@@ -153,26 +237,77 @@ class Service(UrlService):
         return result or None
 
     @get_survive_any
-    def _get_core_throughput_data(self, queue, url):
+    def _get_core_throughput_readings(self, queue, url):
             data = {}
-            raw = self._get_raw_data(url)
+            readings_count_url = url + 'reading/count'
+            raw = self._get_raw_data(readings_count_url)
             if not raw:
                 return queue.put({})
             raw = int(raw)
+            data['readings'] = raw
             if 'event' in url: 
                 data['events'] = raw
-            elif 'reading' in url:
-                data['readings'] = raw
+            return queue.put(data)
+
+    def _get_core_throughput_events(self, queue, url):
+            data = {}
+            events_count_url = url + 'event/count'
+            raw = self._get_raw_data(events_count_url)
+            if not raw:
+                return queue.put({})
+            raw = int(raw)
+            data['events'] = raw
             return queue.put(data)
 
     @get_survive_any
     def _get_device_info(self, queue, url):
             data = {}
-            raw = self._get_raw_data(url) #json string
+            device_count_url = url + 'device'
+            raw = self._get_raw_data(device_count_url) #json string
             if not raw:
-                return queue.put({})
+                return queue.put({ })
             parsed = json.loads(raw) #python object
             data['registered_devices'] = len(parsed) #int
             return queue.put(data)
 
 
+    def _get_metrics_data(self, queue, url):
+        data = {}
+        metrics_url = url + 'metrics'
+        raw = self._get_raw_data(metrics_url)
+        if not raw:
+            return queue.put({ })
+        parsed = json.loads(raw)
+        if self.edgex_ports['core_data'] in url:
+            data['core_data_alloc'] = parsed["Memory"]["Alloc"]
+            data['core_data_malloc'] = parsed["Memory"]["Mallocs"]
+            # data['core_data_sys'] = parsed["Memory"]["Sys"]
+            data['core_data_frees'] = parsed["Memory"]["Frees"]
+            data['core_data_live_objects'] = parsed["Memory"]["LiveObjects"]
+        elif self.edgex_ports['core_metadata'] in url:
+            data['core_metadata_alloc'] = parsed["Memory"]["Alloc"]
+            data['core_metadata_malloc'] = parsed["Memory"]["Mallocs"]
+            # data['core_metadata_sys'] = parsed["Memory"]["Sys"]
+            data['core_metadata_frees'] = parsed["Memory"]["Frees"]
+            data['core_metadata_live_objects'] = parsed["Memory"]["LiveObjects"]        
+        elif self.edgex_ports['core_command'] in url:
+            data['core_command_alloc'] = parsed["Memory"]["Alloc"]
+            data['core_command_malloc'] = parsed["Memory"]["Mallocs"]
+            # data['core_command_sys'] = parsed["Memory"]["Sys"]
+            data['core_command_frees'] = parsed["Memory"]["Frees"]
+            data['core_command_live_objects'] = parsed["Memory"]["LiveObjects"]          
+        elif self.edgex_ports['support_logging'] in url:
+            data['support_logging_alloc'] = parsed["Memory"]["Alloc"]
+            data['support_logging_malloc'] = parsed["Memory"]["Mallocs"]
+            # data['support_logging_sys'] = parsed["Memory"]["Sys"]
+            data['support_logging_frees'] = parsed["Memory"]["Frees"]
+            data['support_logging_live_objects'] =  parsed["Memory"]["LiveObjects"]     
+        return queue.put(data)
+
+
+        # elif self.edgex_ports['sys_mgmt'] in url:
+        #     core_data_alloc = parsed["Memory"]["Alloc"]
+        #     core_data_malloc = parsed["Memory"]["Mallocs"]
+        #     core_data_sys = parsed["Memory"]["Sys"]
+        #     core_data_frees = parsed["Memory"]["Frees"]
+        #     core_data_live_objects = parsed["Memory"]["LiveObjects"]
