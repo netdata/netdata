@@ -17,17 +17,6 @@ netdataDashboard.menu = {
         info: 'Overview of the key system metrics.'
     },
 
-    'pressure': {
-        title: 'Pressure',
-        icon: '<i class="fas fa-fire"></i>',
-        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
-            'identifies and quantifies the disruptions caused by resource contentions.<br>' +
-            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource.<br>' +
-            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on a given resource simultaneously. ' +
-            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing.<br>' +
-            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
-    },
-
     'services': {
         title: 'systemd Services',
         icon: '<i class="fas fa-cogs"></i>',
@@ -727,6 +716,32 @@ netdataDashboard.context = {
     'system.load': {
         info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
         height: 0.7
+    },
+
+    'system.cpu_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'system.memory_some_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on a given resource simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'system.io_some_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on a given resource simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'system.io': {
