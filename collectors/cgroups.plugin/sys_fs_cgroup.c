@@ -113,8 +113,8 @@ void read_cgroup_plugin_configuration() {
     cgroup_enable_pressure_cpu = config_get_boolean_ondemand("plugin:cgroups", "enable cpu pressure", cgroup_enable_pressure_cpu);
     cgroup_enable_pressure_io_some = config_get_boolean_ondemand("plugin:cgroups", "enable io some pressure", cgroup_enable_pressure_io_some);
     cgroup_enable_pressure_io_full = config_get_boolean_ondemand("plugin:cgroups", "enable io full pressure", cgroup_enable_pressure_io_full);
-    cgroup_enable_pressure_memory_some = config_get_boolean_ondemand("plugin:cgroups", "enable memory pressure", cgroup_enable_pressure_memory_some);
-    cgroup_enable_pressure_memory_full = config_get_boolean_ondemand("plugin:cgroups", "enable memory pressure", cgroup_enable_pressure_memory_full);
+    cgroup_enable_pressure_memory_some = config_get_boolean_ondemand("plugin:cgroups", "enable memory some pressure", cgroup_enable_pressure_memory_some);
+    cgroup_enable_pressure_memory_full = config_get_boolean_ondemand("plugin:cgroups", "enable memory full pressure", cgroup_enable_pressure_memory_full);
 
     cgroup_recheck_zero_blkio_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero blkio every iterations", cgroup_recheck_zero_blkio_every_iterations);
     cgroup_recheck_zero_mem_failcnt_every_iterations = (int)config_get_number("plugin:cgroups", "recheck zero memory failcnt every iterations", cgroup_recheck_zero_mem_failcnt_every_iterations);
