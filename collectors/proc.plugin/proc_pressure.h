@@ -8,7 +8,6 @@
 struct pressure {
     int updated;
     char *filename;
-    const char *family;
 
     struct pressure_chart {
         int enabled;

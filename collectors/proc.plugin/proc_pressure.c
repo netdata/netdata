@@ -10,19 +10,28 @@
 
 
 static struct pressure resources[PRESSURE_NUM_RESOURCES] = {
-        { .family = "cpu",
-          .some = { .id = "cpu", .title = "CPU Pressure" },
+        {
+            .some = { .id = "cpu_pressure", .title = "CPU Pressure" },
         },
+        {
+            .some = { .id = "memory_some_pressure", .title = "Memory Pressure" },
+            .full = { .id = "memory_full_pressure", .title = "Memory Full Pressure" },
+        },
+        {
+            .some = { .id = "io_some_pressure", .title = "I/O Pressure" },
+            .full = { .id = "io_full_pressure", .title = "I/O Full Pressure" },
+        },
+};
 
-        { .family = "memory",
-          .some = { .id = "memory", .title = "Memory Pressure" },
-          .full = { .id = "memory_full", .title = "Memory Full Pressure" },
-        },
-
-        { .family = "io",
-          .some = { .id = "io", .title = "I/O Pressure" },
-          .full = { .id = "io_full", .title = "I/O Full Pressure" },
-        },
+static struct {
+    procfile *pf;
+    const char *name;       // metric file name
+    const char *family;     // webui section name
+    int section_priority;
+} resource_info[PRESSURE_NUM_RESOURCES] = {
+        { .name = "cpu",    .family = "cpu",    .section_priority = NETDATA_CHART_PRIO_SYSTEM_CPU },
+        { .name = "memory", .family = "ram",    .section_priority = NETDATA_CHART_PRIO_SYSTEM_RAM },
+        { .name = "io",     .family = "disk",   .section_priority = NETDATA_CHART_PRIO_SYSTEM_IO },
 };
 
 void update_pressure_chart(struct pressure_chart *chart) {
@@ -38,7 +47,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
     int i;
 
     static usec_t next_pressure_dt = 0;
-    static procfile *pf[PRESSURE_NUM_RESOURCES];
+    static char *base_path = NULL;
 
     update_every = (update_every < MIN_PRESSURE_UPDATE_EVERY) ? MIN_PRESSURE_UPDATE_EVERY : update_every;
 
@@ -49,44 +58,44 @@ int do_proc_pressure(int update_every, usec_t dt) {
         return 0;
     }
 
+    if (unlikely(!base_path)) {
+        base_path = config_get(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, "base path of pressure metrics", "/proc/pressure");
+    }
+
     for (i = 0; i < PRESSURE_NUM_RESOURCES; i++) {
-        procfile *ff = pf[i];
+        procfile *ff = resource_info[i].pf;
         int do_some = resources[i].some.enabled, do_full = resources[i].full.enabled;
 
         if (unlikely(!ff)) {
             char filename[FILENAME_MAX + 1];
             char config_key[CONFIG_MAX_NAME + 1];
-            char *pressure_filename;
 
             snprintfz(filename
                       , FILENAME_MAX
                       , "%s%s/%s"
                       , netdata_configured_host_prefix
-                      , PLUGIN_PROC_MODULE_PRESSURE_NAME
-                      , resources[i].family);
+                      , base_path
+                      , resource_info[i].name);
 
-            snprintfz(config_key, CONFIG_MAX_NAME, "path to %s pressure", resources[i].family);
-            pressure_filename = config_get(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, filename);
-
-            snprintfz(config_key, CONFIG_MAX_NAME, "enable %s some pressure", resources[i].family);
+            snprintfz(config_key, CONFIG_MAX_NAME, "enable %s some pressure", resource_info[i].name);
             do_some = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, CONFIG_BOOLEAN_YES);
             resources[i].some.enabled = do_some;
             if (resources[i].full.id) {
-                snprintfz(config_key, CONFIG_MAX_NAME, "enable %s full pressure", resources[i].family);
+                snprintfz(config_key, CONFIG_MAX_NAME, "enable %s full pressure", resource_info[i].name);
                 do_full = config_get_boolean(CONFIG_SECTION_PLUGIN_PROC_PRESSURE, config_key, CONFIG_BOOLEAN_YES);
                 resources[i].full.enabled = do_full;
             }
 
-            ff = procfile_open(pressure_filename, " =", PROCFILE_FLAG_DEFAULT);
+            ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
             if (unlikely(!ff)) {
-                error("Cannot read pressure information from %s.", pressure_filename);
+                error("Cannot read pressure information from %s.", filename);
                 fail_count++;
                 continue;
             }
         }
 
         ff = procfile_readall(ff);
-        pf[i] = ff;
+        resource_info[i].pf = ff;
         if (unlikely(!ff)) {
             continue;
         }
@@ -103,16 +112,16 @@ int do_proc_pressure(int update_every, usec_t dt) {
             chart = &resources[i].some;
             if (unlikely(!chart->st)) {
                 chart->st = rrdset_create_localhost(
-                        "pressure"
+                        "system"
                         , chart->id
                         , NULL
-                        , resources[i].family
+                        , resource_info[i].family
                         , NULL
                         , chart->title
                         , "percentage"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_PRESSURE_NAME
-                        , NETDATA_CHART_PRIO_SYSTEM_PRESSURE + 2 * i
+                        , resource_info[i].section_priority + 40
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
@@ -133,16 +142,16 @@ int do_proc_pressure(int update_every, usec_t dt) {
             chart = &resources[i].full;
             if (unlikely(!chart->st)) {
                 chart->st = rrdset_create_localhost(
-                        "pressure"
+                        "system"
                         , chart->id
                         , NULL
-                        , resources[i].family
+                        , resource_info[i].family
                         , NULL
                         , chart->title
                         , "percentage"
                         , PLUGIN_PROC_NAME
                         , PLUGIN_PROC_MODULE_PRESSURE_NAME
-                        , NETDATA_CHART_PRIO_SYSTEM_PRESSURE + 2 * i + 1
+                        , resource_info[i].section_priority + 45
                         , update_every
                         , RRDSET_TYPE_LINE
                 );
