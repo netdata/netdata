@@ -147,9 +147,7 @@ static void test_rrdhost_is_exportable(void **state)
 
     assert_int_equal(__real_rrdhost_is_exportable(instance, localhost), 1);
 
-    assert_string_equal(
-        log_line,
-        "enabled exporting of host 'localhost' for instance 'instance_name'");
+    assert_string_equal(log_line, "enabled exporting of host 'localhost' for instance 'instance_name'");
 
     assert_ptr_not_equal(localhost->exporting_flags, NULL);
     assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_BACKEND_SEND);
@@ -169,9 +167,7 @@ static void test_false_rrdhost_is_exportable(void **state)
 
     assert_int_equal(__real_rrdhost_is_exportable(instance, localhost), 0);
 
-    assert_string_equal(
-        log_line,
-        "disabled exporting of host 'localhost' for instance 'instance_name'");
+    assert_string_equal(log_line, "disabled exporting of host 'localhost' for instance 'instance_name'");
 
     assert_ptr_not_equal(localhost->exporting_flags, NULL);
     assert_int_equal(localhost->exporting_flags[0], RRDHOST_FLAG_BACKEND_DONT_SEND);
@@ -386,7 +382,8 @@ static void test_simple_connector_receive_response(void **state)
     simple_connector_receive_response(&sock, instance);
 
     assert_string_equal(
-        log_line, "EXPORTING: received 9 bytes from instance_name connector instance. Ignoring them. Sample: 'Test recv'");
+        log_line,
+        "EXPORTING: received 9 bytes from instance_name connector instance. Ignoring them. Sample: 'Test recv'");
 
     assert_int_equal(stats->chart_received_bytes, 9);
     assert_int_equal(stats->chart_receptions, 1);
