@@ -364,8 +364,7 @@ static void int_exit(int sig) {
 }
 
 
-int network_viewer_load_libraries()
-{
+int network_viewer_load_libraries() {
     char *err = NULL;
     libnetdatanv = dlopen("./libnetdata_network_viewer.so",RTLD_LAZY);
     if (!libnetdatanv) {
