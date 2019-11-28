@@ -152,6 +152,28 @@ not just visualize metrics.
 
 ## News
 
+`Nov 27th, 2019` - **[Netdata v1.19.0 released!](https://github.com/netdata/netdata/releases)**
+
+Release v1.19.0 contains 2 new collectors, 19 bug fixes, 17 improvements, and 19 documentation updates.
+
+We completed a major rewrite of our **web log collector** to dramatically improve its flexibility and performance. The [new collector](https://github.com/netdata/go.d.plugin/pull/141), written entirely in Go, can parse and chart logs from Nginx and Apache servers, and combines numerous improvements. Netdata now supports the LTSV log format, creates charts for TLS and cipher usage, and is amazingly fast. In a test using SSD storage, the collector parsed the logs for 200,000 requests in about 200ms, using 30% of a single core.
+
+This Go-based collector also has powerful custom log parsing capabilities, which means we're one step closer to a generic application log parser for Netdata. We're continuing to work on this parser to support more application log formatting in the future.
+
+We have a new tutorial on [enabling the Go web log collector](https://docs.netdata.cloud/docs/tutorials/collect-apache-nginx-web-logs/) and using it with Nginx and/or Apache access logs with minimal configuration. Thanks to [Wing924](https://github.com/Wing924) for starting the Go rewrite!
+
+We introduced more **cmocka unit testing** to Netdata. In this release, we're testing how Netdata's internal web server processes HTTP requests—the first step to improve the quality of code throughout, reduce bugs, and make refactoring easier. We wanted to validate the web server's behavior but needed to build a layer of parametric testing on top of the CMocka test runner. Read all about our process of testing and selecting cmocka on our blog post: [Building an agile team's 'safety harness' with cmocka and FOSS](https://blog.netdata.cloud/agile-team-cmocka-foss/).
+
+Netdata's **Unbound collector** was also [completely rewritten in Go](https://github.com/netdata/go.d.plugin/pull/287) to improve how it collects and displays metrics. This new version can get dozens of metrics, including details on queries, cache, uptime, and even show per-thread metrics. See our [tutorial](https://docs.netdata.cloud/docs/tutorials/collect-unbound-metrics/) on enabling the new collector via Netdata's amazing auto-detection feature.
+
+We [fixed an error](https://github.com/netdata/netdata/pull/7220) where **invalid spikes** appeared on certain charts by improving the incremental counter reset/wraparound detection algorithm.
+
+Netdata can now send [**health alarm notifications to IRC channels**](https://docs.netdata.cloud/health/notifications/irc/) thanks to [Strykar](https://github.com/Strykar)!
+
+And, Netdata can now monitor [**AM2320 sensors**](https://docs.netdata.cloud/collectors/python.d.plugin/am2320/), thanks to hard work from [Tom Buck](https://github.com/tommybuck).
+
+---
+
 `Oct 18th, 2019` - **[Netdata v1.18.1 released!](https://github.com/netdata/netdata/releases)**
 
 Release v1.18.1 contains 17 bug fixes, 5 improvements, and 5 documentation updates.
