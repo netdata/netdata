@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import xml.etree.ElementTree as ET
-
 from collections import namedtuple
 
 from bases.FrameworkServices.UrlService import UrlService
-
 
 MonitType = namedtuple('MonitType', ('index', 'name'))
 
@@ -122,7 +120,7 @@ CHARTS = {
 
 
 class BaseMonitService(object):
-    def __init__(self, typ, name,  status, monitor):
+    def __init__(self, typ, name, status, monitor):
         self.type = typ
         self.name = name
         self.status = status
@@ -153,7 +151,7 @@ class BaseMonitService(object):
 
 
 class ProcessMonitService(BaseMonitService):
-    def __init__(self, typ, name,  status, monitor):
+    def __init__(self, typ, name, status, monitor):
         super(ProcessMonitService, self).__init__(typ, name, status, monitor)
         self.uptime = None
         self.threads = None
@@ -192,7 +190,7 @@ class ProcessMonitService(BaseMonitService):
 
 
 class HostMonitService(BaseMonitService):
-    def __init__(self, typ, name,  status, monitor):
+    def __init__(self, typ, name, status, monitor):
         super(HostMonitService, self).__init__(typ, name, status, monitor)
         self.latency = None
 
@@ -210,7 +208,7 @@ class HostMonitService(BaseMonitService):
 
     def data(self):
         base_data = super(HostMonitService, self).data()
-        latency = float(self.latency) * 1000000 if self.latency  else None
+        latency = float(self.latency) * 1000000 if self.latency else None
         data = {self.latency_key(): latency}
         data.update(base_data)
 
