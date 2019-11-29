@@ -125,6 +125,17 @@ static void test_init_connectors(void **state)
     assert_string_equal(buffer_tostring(buffer), "graphite test");
 }
 
+static void test_init_graphite_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+
+    assert_int_equal(init_graphite_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_stored_graphite_plaintext);
+}
+
 static void test_mark_scheduled_instances(void **state)
 {
     struct engine *engine = *state;
@@ -239,7 +250,7 @@ static void test_exporting_calculate_value_from_stored_data(void **state)
 
     expect_function_call(__mock_rrddim_query_finalize);
 
-    assert_int_equal(exporting_calculate_value_from_stored_data(instance, rd, &timestamp), 36);
+    assert_int_equal(__real_exporting_calculate_value_from_stored_data(instance, rd, &timestamp), 36);
 }
 
 static void test_prepare_buffers(void **state)
@@ -339,6 +350,20 @@ static void test_format_dimension_collected_graphite_plaintext(void **state)
     assert_string_equal(
         buffer_tostring(engine->connector_root->instance_root->buffer),
         "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 123000321 15051\n");
+}
+
+static void test_format_dimension_stored_graphite_plaintext(void **state)
+{
+    struct engine *engine = *state;
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    assert_int_equal(format_dimension_stored_graphite_plaintext(engine->connector_root->instance_root, rd), 0);
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 690565856.0000000 15052\n");
 }
 
 static void test_exporting_discard_response(void **state)
@@ -474,22 +499,14 @@ static void test_simple_connector_worker(void **state)
     simple_connector_worker(instance);
 }
 
-static void test_init_graphite_instance(void **state)
-{
-    (void)state;
-
-    // receive responce
-    // reconnect if it's needed
-    // send data
-    // process failures
-}
-
 int main(void)
 {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(test_exporting_engine, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test(test_read_exporting_config),
         cmocka_unit_test_setup_teardown(test_init_connectors, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_init_graphite_instance, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
             test_mark_scheduled_instances, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
@@ -507,6 +524,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_format_dimension_collected_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
+            test_format_dimension_stored_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
             test_exporting_discard_response, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_simple_connector_receive_response, setup_initialized_engine, teardown_initialized_engine),
@@ -514,7 +533,6 @@ int main(void)
             test_simple_connector_send_buffer, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_simple_connector_worker, setup_initialized_engine, teardown_initialized_engine),
-        cmocka_unit_test(test_init_graphite_instance),
     };
 
     return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL);

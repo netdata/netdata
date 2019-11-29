@@ -750,6 +750,7 @@ if ENABLE_UNITTESTS
         -Wl,--wrap=mark_scheduled_instances \
         -Wl,--wrap=rrdhost_is_exportable \
         -Wl,--wrap=rrdset_is_exportable \
+        -Wl,--wrap=exporting_calculate_value_from_stored_data \
         -Wl,--wrap=prepare_buffers \
         -Wl,--wrap=notify_workers \
         -Wl,--wrap=send_internal_metrics \

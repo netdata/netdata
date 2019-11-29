@@ -70,7 +70,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
     time_t last_t;
     calculated_number value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
-    if(!isnan(value))
+    if(isnan(value))
         return 0;
 
     buffer_sprintf(

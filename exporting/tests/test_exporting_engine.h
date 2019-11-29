@@ -63,6 +63,15 @@ int __wrap_init_connectors(struct engine *engine);
 int __real_mark_scheduled_instances(struct engine *engine);
 int __wrap_mark_scheduled_instances(struct engine *engine);
 
+calculated_number __real_exporting_calculate_value_from_stored_data(
+    struct instance *instance,
+    RRDDIM *rd,
+    time_t *last_timestamp);
+calculated_number __wrap_exporting_calculate_value_from_stored_data(
+    struct instance *instance,
+    RRDDIM *rd,
+    time_t *last_timestamp);
+
 int __real_prepare_buffers(struct engine *engine);
 int __wrap_prepare_buffers(struct engine *engine);
 
