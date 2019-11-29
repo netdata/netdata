@@ -159,6 +159,12 @@ class ProcessMonitService(BaseMonitService):
         self.threads = None
         self.children = None
 
+    def __eq__(self, other):
+        return super(ProcessMonitService, self).__eq__(other)
+
+    def __ne__(self, other):
+        return super(ProcessMonitService, self).__ne__(other)
+
     def uptime_key(self):
         return 'process_uptime_{0}'.format(self.name)
 
@@ -186,6 +192,12 @@ class HostMonitService(BaseMonitService):
     def __init__(self, typ, name,  status, monitor):
         super(HostMonitService, self).__init__(typ, name, status, monitor)
         self.latency = None
+
+    def __eq__(self, other):
+        return super(HostMonitService, self).__eq__(other)
+
+    def __ne__(self, other):
+        return super(HostMonitService, self).__ne__(other)
 
     def latency_key(self):
         return 'host_latency_{0}'.format(self.name)
