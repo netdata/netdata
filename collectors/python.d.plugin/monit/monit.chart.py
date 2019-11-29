@@ -165,6 +165,9 @@ class ProcessMonitService(BaseMonitService):
     def __ne__(self, other):
         return super(ProcessMonitService, self).__ne__(other)
 
+    def __hash__(self):
+        return super(ProcessMonitService, self).__hash__()
+
     def uptime_key(self):
         return 'process_uptime_{0}'.format(self.name)
 
@@ -198,6 +201,9 @@ class HostMonitService(BaseMonitService):
 
     def __ne__(self, other):
         return super(HostMonitService, self).__ne__(other)
+
+    def __hash__(self):
+        return super(HostMonitService, self).__hash__()
 
     def latency_key(self):
         return 'host_latency_{0}'.format(self.name)
