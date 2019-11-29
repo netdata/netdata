@@ -119,7 +119,12 @@ int init_graphite_instance(struct instance *instance)
     instance->start_batch_formatting = NULL;
     instance->start_host_formatting = NULL;
     instance->start_chart_formatting = NULL;
-    instance->metric_formatting = format_dimension_collected_graphite_plaintext;
+
+    if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
+        instance->metric_formatting = format_dimension_collected_graphite_plaintext;
+    else
+        instance->metric_formatting = format_dimension_stored_graphite_plaintext;
+
     instance->end_chart_formatting = NULL;
     instance->end_host_formatting = NULL;
     instance->end_batch_formatting = NULL;

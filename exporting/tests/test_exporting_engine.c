@@ -88,7 +88,7 @@ static void test_read_exporting_config(void **state)
     assert_int_equal(instance->config.timeoutms, 10000);
     assert_true(simple_pattern_matches(instance->config.charts_pattern, "any_chart"));
     assert_true(simple_pattern_matches(instance->config.hosts_pattern, "anyt_host"));
-    assert_int_equal(instance->config.options, BACKEND_SOURCE_DATA_AVERAGE | BACKEND_OPTION_SEND_NAMES);
+    assert_int_equal(instance->config.options, EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES);
 
     teardown_configured_engine(state);
 }
