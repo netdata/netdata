@@ -721,16 +721,15 @@ netdataDashboard.context = {
     'system.cpu_pressure': {
         info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
-            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource. ' +
-            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on CPU. ' +
             'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'system.memory_some_pressure': {
         info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
-            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource. ' +
-            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on a given resource simultaneously. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on memory. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on memory simultaneously. ' +
             'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
             'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
@@ -738,8 +737,8 @@ netdataDashboard.context = {
     'system.io_some_pressure': {
         info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
             'identifies and quantifies the disruptions caused by resource contentions. ' +
-            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on a given resource. ' +
-            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on a given resource simultaneously. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on I/O. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on I/O simultaneously. ' +
             'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
             'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
