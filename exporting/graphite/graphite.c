@@ -99,14 +99,6 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
  */
 int init_graphite_connector(struct connector *connector)
 {
-    connector->start_batch_formatting = NULL;
-    connector->start_host_formatting = NULL;
-    connector->start_chart_formatting = NULL;
-    connector->metric_formatting = format_dimension_collected_graphite_plaintext;
-    connector->end_chart_formatting = NULL;
-    connector->end_host_formatting = NULL;
-    connector->end_batch_formatting = NULL;
-
     connector->worker = simple_connector_worker;
 
     struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
@@ -124,6 +116,14 @@ int init_graphite_connector(struct connector *connector)
  */
 int init_graphite_instance(struct instance *instance)
 {
+    instance->start_batch_formatting = NULL;
+    instance->start_host_formatting = NULL;
+    instance->start_chart_formatting = NULL;
+    instance->metric_formatting = format_dimension_collected_graphite_plaintext;
+    instance->end_chart_formatting = NULL;
+    instance->end_host_formatting = NULL;
+    instance->end_batch_formatting = NULL;
+
     instance->buffer = (void *)buffer_create(0);
     if (!instance->buffer) {
         error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);

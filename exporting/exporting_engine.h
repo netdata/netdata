@@ -111,14 +111,6 @@ struct instance {
     uv_mutex_t mutex;
     uv_cond_t cond_var;
 
-    size_t index;
-    struct instance *next;
-    struct connector *connector;
-};
-
-struct connector {
-    struct connector_config config;
-
     int (*start_batch_formatting)(struct instance *instance);
     int (*start_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*start_chart_formatting)(struct instance *instance, RRDSET *st);
@@ -126,6 +118,14 @@ struct connector {
     int (*end_chart_formatting)(struct instance *instance, RRDSET *st);
     int (*end_host_formatting)(struct instance *instance, RRDHOST *host);
     int (*end_batch_formatting)(struct instance *instance);
+
+    size_t index;
+    struct instance *next;
+    struct connector *connector;
+};
+
+struct connector {
+    struct connector_config config;
 
     void (*worker)(void *instance_p);
 

@@ -170,7 +170,7 @@ int start_batch_formatting(struct engine *engine)
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled) {
                 uv_mutex_lock(&instance->mutex);
-                if (connector->start_batch_formatting && connector->start_batch_formatting(instance) != 0) {
+                if (instance->start_batch_formatting && instance->start_batch_formatting(instance) != 0) {
                     error("EXPORTING: cannot start batch formatting for %s", instance->config.name);
                     return 1;
                 }
@@ -194,7 +194,7 @@ int start_host_formatting(struct engine *engine, RRDHOST *host)
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled) {
                 if (rrdhost_is_exportable(instance, host)) {
-                    if (connector->start_host_formatting && connector->start_host_formatting(instance, host) != 0) {
+                    if (instance->start_host_formatting && instance->start_host_formatting(instance, host) != 0) {
                         error("EXPORTING: cannot start host formatting for %s", instance->config.name);
                         return 1;
                     }
@@ -221,7 +221,7 @@ int start_chart_formatting(struct engine *engine, RRDSET *st)
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled && !instance->skip_host) {
                 if (rrdset_is_exportable(instance, st)) {
-                    if (connector->start_chart_formatting && connector->start_chart_formatting(instance, st) != 0) {
+                    if (instance->start_chart_formatting && instance->start_chart_formatting(instance, st) != 0) {
                         error("EXPORTING: cannot start chart formatting for %s", instance->config.name);
                         return 1;
                     }
@@ -247,7 +247,7 @@ int metric_formatting(struct engine *engine, RRDDIM *rd)
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled && !instance->skip_host && !instance->skip_chart) {
-                if (connector->metric_formatting && connector->metric_formatting(instance, rd) != 0) {
+                if (instance->metric_formatting && instance->metric_formatting(instance, rd) != 0) {
                     error("EXPORTING: cannot format metric for %s", instance->config.name);
                     return 1;
                 }
@@ -271,7 +271,7 @@ int end_chart_formatting(struct engine *engine, RRDSET *st)
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled && !instance->skip_host && !instance->skip_chart) {
-                if (connector->end_chart_formatting && connector->end_chart_formatting(instance, st) != 0) {
+                if (instance->end_chart_formatting && instance->end_chart_formatting(instance, st) != 0) {
                     error("EXPORTING: cannot end chart formatting for %s", instance->config.name);
                     return 1;
                 }
@@ -295,7 +295,7 @@ int end_host_formatting(struct engine *engine, RRDHOST *host)
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled && !instance->skip_host) {
-                if (connector->end_host_formatting && connector->end_host_formatting(instance, host) != 0) {
+                if (instance->end_host_formatting && instance->end_host_formatting(instance, host) != 0) {
                     error("EXPORTING: cannot end host formatting for %s", instance->config.name);
                     return 1;
                 }
@@ -318,7 +318,7 @@ int end_batch_formatting(struct engine *engine)
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         for (struct instance *instance = connector->instance_root; instance; instance = instance->next) {
             if (instance->scheduled) {
-                if (connector->end_batch_formatting && connector->end_batch_formatting(instance) != 0) {
+                if (instance->end_batch_formatting && instance->end_batch_formatting(instance) != 0) {
                     error("EXPORTING: cannot end batch formatting for %s", instance->config.name);
                     return 1;
                 }
