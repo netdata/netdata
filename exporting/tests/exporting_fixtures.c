@@ -100,7 +100,10 @@ int setup_initialized_engine(void **state)
 
 int teardown_initialized_engine(void **state)
 {
+    struct engine *engine = *state;
+
     teardown_rrdhost();
+    buffer_free(engine->connector_root->instance_root->buffer);
     teardown_configured_engine(state);
 
     return 0;
