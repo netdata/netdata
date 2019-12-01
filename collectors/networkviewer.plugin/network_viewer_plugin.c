@@ -27,9 +27,12 @@ static char *user_config_dir = NULL;
 static char *stock_config_dir = NULL;
 static char *plugin_dir = NULL;
 
-//used if and only if there is not any connection
+//used ,if and only if, there is not any connection
 static netdata_port_stats_t *fake1 = NULL;
 static netdata_port_stats_t *fake2 = NULL;
+
+//protocols used with this collector
+static char *protocols[] = { "tcp", "udp" };
 
 // required by get_system_cpus()
 char *netdata_configured_host_prefix = "";
@@ -77,7 +80,6 @@ static inline int is_ip_inside_table(in_addr_t src, in_addr_t dst) {
 }
 
 void netdata_set_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
-    static char *protocols[] = { "tcp", "udp" };
     char port[8];
     struct servent *sname;
 
@@ -99,10 +101,6 @@ void netdata_set_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
         snprintf(port, 8, "%d", ntohs(p->port) );
         p->dimension = strdup(port);
     }
-    p->createdim = 1;
-
-    p->last = time(NULL);
-
     p->next = NULL ;
 }
 
@@ -116,11 +114,6 @@ static void write_report(netdata_port_stats_t *ptr) {
     uint64_t ibytes;
     uint64_t ebytes;
     uint32_t econn;
-
-    if (ptr->createdim) {
-        printf("DIMENSION %s '' absolute 1 1\n", ptr->dimension);
-        ptr->createdim = 0;
-    }
 
     if ( ptr->protocol == 6 ) { //TCP
         chart1 = NETWORK_VIEWER_CHART1;
@@ -169,7 +162,7 @@ static void write_report(netdata_port_stats_t *ptr) {
                 , NETWORK_VIEWER_FAMILY
                 , chart4);
 
-        printf( "SET %s = %d\n"
+        printf( "SET %s = %u\n"
                 , dim
                 , econn);
 
@@ -189,6 +182,47 @@ static void fill_fake_vector(netdata_kern_stats_t *ptr, uint8_t proto) {
     ptr->protocol = proto;
     ptr->removeme = 0;
 }
+
+static void netdata_create_chart(char *family, char *name, char *msg, char *axis, int proto) {
+    char port[8];
+    char *dimname;
+    printf("CHART %s.%s '' '%s' '%s' 'network' '' line 1000 1 ''\n"
+            , family
+            , name
+            , msg
+            , axis);
+
+    netdata_port_list_t *move = port_list;
+    struct servent *sname;
+    while (move) {
+        char *proto_name = (!proto)?protocols[0]:protocols[1];
+        sname = getservbyport(move->port, proto_name);
+        if (!sname) {
+            snprintf(port, 8, "%d", ntohs(move->port) );
+            dimname = port;
+        } else {
+            dimname = sname->s_name;
+        }
+        printf("DIMENSION %s '' absolute 1 1\n", dimname);
+
+        move = move->next;
+    }
+}
+
+static void netdata_create_charts() {
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART1, "Network Viewer TCP bytes received from request to specific port.", "kilobits/s", 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART2, "Network viewer TCP request length to specific port.", "kilobits/s", 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART3, "Network viewer UDP bytes received from request to specific port.", "kilobits/s", 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART4, "Network viewer UDP request length to specific port.", "kilobits/s", 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART6, "Network viewer TCP active connections per port.", "active connections", 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections", 1);
+}
+
 
 static void netdata_publish_data() {
     static int not_initialized = 0;
@@ -259,12 +293,18 @@ static void netdata_publish_data() {
 
 void *network_viewer_publisher(void *ptr) {
     (void)ptr;
-    while(!netdata_exit) {
-        sleep(1);
+    netdata_create_charts();
 
+    usec_t step = 1* USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+    while(!netdata_exit) {
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
         netdata_publish_data();
 
         fflush(stdout);
+ //       sleep(1);
     }
 
     return NULL;
@@ -652,7 +692,7 @@ int network_viewer_load_libraries() {
     build_complete_path(lpath, 4096, "libnetdata_network_viewer.so");
     libnetdatanv = dlopen(lpath ,RTLD_LAZY);
     if (!libnetdatanv) {
-        error("[NETWORK VIEWER] Cannot load ./libnetdata_network_viewer.so: %s", err);
+        error("[NETWORK VIEWER] Cannot load ./libnetdata_network_viewer.so.");
         return -1;
     } else {
         load_bpf_file = dlsym(libnetdatanv, "load_bpf_file");

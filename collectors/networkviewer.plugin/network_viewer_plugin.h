@@ -40,6 +40,7 @@
 # include "../../libnetdata/threads/threads.h"
 # include "../../libnetdata/locks/locks.h"
 # include "../../libnetdata/avl/avl.h"
+# include "../../libnetdata/clocks/clocks.h"
 
 typedef struct {
     uint64_t first;
@@ -87,8 +88,6 @@ typedef struct  netdata_port_stats {
     uint32_t etot;
 
     char *dimension;
-    uint8_t createdim;
-    time_t last;
 
     struct netdata_port_stats *next;
 
