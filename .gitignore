@@ -82,6 +82,7 @@ cov-int/
 netdata-coverity-analysis.tgz
 .coverity-scan.conf
 
+.history/
 .cproject/
 .idea/
 .vscode/
