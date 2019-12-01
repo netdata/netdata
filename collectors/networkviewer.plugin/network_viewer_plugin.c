@@ -96,24 +96,10 @@ static void netdata_publish_data() {
                 ,NETWORK_VIEWER_CHART4
                 ,"Network viewer UDP request length to specific port.");
 
-        /*
-        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
-              ,NETWORK_VIEWER_FAMILY
-              ,NETWORK_VIEWER_CHART5
-              ,"Network viewer TCP ingoing connections.");
-              */
-
         printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
                 ,NETWORK_VIEWER_FAMILY
                 ,NETWORK_VIEWER_CHART6
                 ,"Network viewer TCP active connections per port.");
-
-        /*
-        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
-              ,NETWORK_VIEWER_FAMILY
-              ,NETWORK_VIEWER_CHART7
-              ,"Network viewer UDP ingoing connections.");
-              */
 
         printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
                 ,NETWORK_VIEWER_FAMILY
@@ -146,7 +132,6 @@ static void netdata_publish_data() {
             } else {  //UDP
                 chart1 = NETWORK_VIEWER_CHART3;
                 chart2 = NETWORK_VIEWER_CHART4;
-                //chart3 = NETWORK_VIEWER_CHART7;
                 chart4 = NETWORK_VIEWER_CHART8;
             }
 
@@ -263,7 +248,7 @@ void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e)
         if(ncs) {
             netdata_conn_stats_t *ret = (netdata_conn_stats_t *)avl_insert_lock(&p->destination_port, (avl *)ncs);
             if(ret != ncs) {
-                fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)ncs, (size_t)ret );
+                error("[NETWORK VIEWER] Cannot insert a new connection to index.");
                 free(ncs);
             } else {
                 connection_controller.last_connection->next = ncs;
@@ -280,7 +265,7 @@ void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e)
     if(e->removeme) {
         ret = (netdata_conn_stats_t *)avl_remove_lock(&p->destination_port, (avl *)ncs);
         if (ret != ncs) {
-            error("[NETWORK VIEWER] Cannot remove a connection");
+            error("[NETWORK VIEWER] Cannot remove a connection from index.");
         }
 
         p->etot -= 1;
@@ -406,7 +391,7 @@ int netdata_store_bpf(void *data, int size) {
 
         rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
         if(rp != pp) {
-            fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)pp, (size_t)rp  );
+            error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
         }
 
         ncs = store_new_connection_stat(e);
@@ -416,7 +401,7 @@ int netdata_store_bpf(void *data, int size) {
             connection_controller.tree = ncs;
             ret = (netdata_conn_stats_t *)avl_insert_lock(&pp->destination_port, (avl *)ncs);
             if(ret != ncs) {
-                fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)ncs, (size_t)ret  );
+                error("[NETWORK VIEWER] Cannot insert a new connection inside index.");
             } else {
                 pp->etot += 1;
             }
@@ -436,7 +421,7 @@ int netdata_store_bpf(void *data, int size) {
 
             rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
             if(rp != pp) {
-                fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)pp, (size_t)rp  );
+                error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
             }
 
             ncs = store_new_connection_stat(e);
@@ -446,7 +431,7 @@ int netdata_store_bpf(void *data, int size) {
                 connection_controller.last_connection = ncs;
                 ret = (netdata_conn_stats_t *)avl_insert_lock(&pp->destination_port, (avl *)ncs);
                 if(ret != ncs) {
-                    fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)ncs, (size_t)ret );
+                    error("[NETWORK VIEWER] Cannot insert a new connection inside index.");
                 } else {
                     pp->etot += 1;
                 }
@@ -652,12 +637,14 @@ static int map_memory() {
         pmu_fd[i] = test_bpf_perf_event(i);
 
         if (perf_event_mmap(pmu_fd[i]) < 0) {
+            error("[NETWORK VIEWER] Cannot map memory used to transfer data.");
             return -1;
         }
     }
 
     for ( i = 0 ; i < nprocs ; i++ ) {
         if (perf_event_mmap_header(pmu_fd[i], &headers[i]) < 0) {
+            error("[NETWORK VIEWER] Cannot map header used to transfer data.");
             return -1;
         }
     }
@@ -698,7 +685,7 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
 
                 netdata_port_list_t *r = (netdata_port_list_t *)avl_insert_lock(&connection_controller.port_list, (avl *)set);
                 if (r != set ) {
-                    fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)set, (size_t)r  );
+                    error("[NETWORK VIEWER] Cannot insert port inside list.");
                 }
 
                 if(!ret) {
@@ -730,7 +717,7 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
 
                     netdata_port_list_t *r = (netdata_port_list_t *)avl_insert_lock(&connection_controller.port_list, (avl *)set);
                     if (r != set ) {
-                        fprintf(stdout,"Cannot insert addr %lu %lu\n", (size_t)set, (size_t)r  );
+                        error("[NETWORK VIEWER] Cannot insert port inside list.");
                     }
 
                     if(!ret) {
@@ -920,6 +907,7 @@ int main(int argc, char **argv) {
     parse_config();
 
     if (load_bpf_file("netdata_ebpf_network_viewer.o") ) {
+        error("[NETWORK VIEWER] Cannot load eBPF program.");
         return 3;
     }
 
@@ -930,6 +918,7 @@ int main(int argc, char **argv) {
     if(!outgoing_table) {
         outgoing_table = netdata_list_ips(NULL, 1);
         if(!outgoing_table) {
+            error("[NETWORK VIEWER] Cannot load outgoing network range to monitor.");
             return 5;
         }
     }
@@ -937,6 +926,7 @@ int main(int argc, char **argv) {
     if(!ingoing_table) {
         ingoing_table = netdata_list_ips(NULL, 0);
         if(!ingoing_table) {
+            error("[NETWORK VIEWER] Cannot load ingoing network range to monitor.");
             return 6;
         }
     }
@@ -944,6 +934,7 @@ int main(int argc, char **argv) {
     if(!port_list) {
         port_list = netdata_list_ports(NULL);
         if(!port_list) {
+            error("[NETWORK VIEWER] Cannot load network ports to monitor.");
             return 7;
         }
     }
