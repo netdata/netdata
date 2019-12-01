@@ -225,42 +225,6 @@ static void netdata_create_charts() {
 
 
 static void netdata_publish_data() {
-    static int not_initialized = 0;
-
-    if(!not_initialized) {
-        printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
-                ,NETWORK_VIEWER_FAMILY
-                ,NETWORK_VIEWER_CHART1
-                ,"Network Viewer TCP bytes received from request to specific port");
-
-        printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
-                ,NETWORK_VIEWER_FAMILY
-                ,NETWORK_VIEWER_CHART2
-                ,"Network viewer TCP request length to specific port.");
-
-        printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
-                ,NETWORK_VIEWER_FAMILY
-                ,NETWORK_VIEWER_CHART3
-                ,"Network viewer UDP bytes received from request to specific port");
-
-        printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
-                ,NETWORK_VIEWER_FAMILY
-                ,NETWORK_VIEWER_CHART4
-                ,"Network viewer UDP request length to specific port.");
-
-        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
-                ,NETWORK_VIEWER_FAMILY
-                ,NETWORK_VIEWER_CHART6
-                ,"Network viewer TCP active connections per port.");
-
-        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
-                ,NETWORK_VIEWER_FAMILY
-                ,NETWORK_VIEWER_CHART8
-                ,"Network viewer UDP active connections per port.");
-
-        not_initialized++;
-    }
-
     if(connection_controller.ports) {
         netdata_port_stats_t *move = connection_controller.ports;
         while (move) {
@@ -288,7 +252,6 @@ static void netdata_publish_data() {
         }
         write_report(fake2);
     }
-
 }
 
 void *network_viewer_publisher(void *ptr) {
