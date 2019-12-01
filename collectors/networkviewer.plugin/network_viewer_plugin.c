@@ -150,7 +150,7 @@ static void netdata_publish_data() {
                         , NETWORK_VIEWER_FAMILY
                         , chart1);
 
-                printf( "SET %s = %d\n"
+                printf( "SET %s = %lu\n"
                         , dim
                         , ibytes);
 
@@ -161,7 +161,7 @@ static void netdata_publish_data() {
                         , NETWORK_VIEWER_FAMILY
                         , chart2);
 
-                printf( "SET %s = %d\n"
+                printf( "SET %s = %lu\n"
                         , dim
                         , ebytes);
 
