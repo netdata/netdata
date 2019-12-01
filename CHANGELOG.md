@@ -1,5 +1,16 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.19.0...HEAD)
+
+**Merged pull requests:**
+
+- smartd\_log: change ATTR5 chart algorithm to absolute [\#7384](https://github.com/netdata/netdata/pull/7384) ([ilyam8](https://github.com/ilyam8))
+- Do not crash when logging UTF-8 data in Python 2 [\#7376](https://github.com/netdata/netdata/pull/7376) ([vzDevelopment](https://github.com/vzDevelopment))
+- nvidia-smi: not loop mode [\#7372](https://github.com/netdata/netdata/pull/7372) ([ilyam8](https://github.com/ilyam8))
+- Tutorials to support v1.19 release [\#7359](https://github.com/netdata/netdata/pull/7359) ([joelhans](https://github.com/joelhans))
+
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.18.1...v1.19.0)
@@ -191,7 +202,6 @@
 - netdata/packaging: Split CUPS plugin to separate package \(RPM\) [\#6700](https://github.com/netdata/netdata/pull/6700) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/installer: Add support for offline installs using kickstart or kickstart-static64 [\#6693](https://github.com/netdata/netdata/pull/6693) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add clang-format. Update Contribution guidelines. [\#6677](https://github.com/netdata/netdata/pull/6677) ([cosmix](https://github.com/cosmix))
-- changed naming for redirect\_uri param [\#6663](https://github.com/netdata/netdata/pull/6663) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
@@ -213,7 +223,6 @@
 - update cache hashes for js and css [\#6756](https://github.com/netdata/netdata/pull/6756) ([jacekkolasa](https://github.com/jacekkolasa))
 - \[libnetdata/thread\] Set thread name from tag [\#6745](https://github.com/netdata/netdata/pull/6745) ([Saruspete](https://github.com/Saruspete))
 - sidebar-info update - DB engine [\#6744](https://github.com/netdata/netdata/pull/6744) ([jacekkolasa](https://github.com/jacekkolasa))
-- pythond respect prev running jobs and refactor [\#6661](https://github.com/netdata/netdata/pull/6661) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
@@ -243,9 +252,6 @@
 - .travis.yml: Improve template and commit\_message predicates readability [\#6673](https://github.com/netdata/netdata/pull/6673) ([knatsakis](https://github.com/knatsakis))
 - .travis.yml: Build docker images in parallel [\#6672](https://github.com/netdata/netdata/pull/6672) ([knatsakis](https://github.com/knatsakis))
 - add CHANGELOG.md to .remarkignore [\#6671](https://github.com/netdata/netdata/pull/6671) ([prhomhyse](https://github.com/prhomhyse))
-- netdata/packaging: separately identify dependency resolution for HTTPS and DB engine [\#6670](https://github.com/netdata/netdata/pull/6670) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Bugfix 931843 1 [\#6667](https://github.com/netdata/netdata/pull/6667) ([sunflowerbofh](https://github.com/sunflowerbofh))
-- Fix Markdown Lint warnings [\#6664](https://github.com/netdata/netdata/pull/6664) ([prhomhyse](https://github.com/prhomhyse))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
