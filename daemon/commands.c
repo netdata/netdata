@@ -8,10 +8,10 @@ static uv_async_t async;
 static struct completion completion;
 static uv_pipe_t server_pipe;
 
-char *cmd_status_str[] = {
-        CMD_STATUS_SUCCESS_STR,
-        CMD_STATUS_FAILURE_STR,
-        CMD_STATUS_BUSY_STR
+char cmd_prefix_by_status[] = {
+        CMD_PREFIX_INFO,
+        CMD_PREFIX_ERROR,
+        CMD_PREFIX_ERROR
 };
 
 static int command_thread_error;
@@ -229,6 +229,11 @@ static void pipe_write_cb(uv_write_t* req, int status)
     info("Command Clients = %u\n", clients);
 }
 
+static inline void add_char_to_command_reply(char *reply_string, unsigned *reply_string_size, char character)
+{
+    reply_string[(*reply_string_size)++] = character;
+}
+
 static inline void add_string_to_command_reply(char *reply_string, unsigned *reply_string_size, char *str)
 {
     unsigned len;
@@ -242,19 +247,24 @@ static void send_command_reply(uv_stream_t *client, cmd_status_t status, char *m
 {
     int ret;
     char reply_string[MAX_COMMAND_LENGTH] = {'\0', };
+    char exit_status_string[MAX_EXIT_STATUS_LENGTH + 1] = {'\0', };
     unsigned reply_string_size = 0;
     uv_buf_t write_buf;
     uv_write_t write_req;
 
-    add_string_to_command_reply(reply_string, &reply_string_size, cmd_status_str[status]);
+    snprintfz(exit_status_string, MAX_EXIT_STATUS_LENGTH, "%u", status);
+    add_char_to_command_reply(reply_string, &reply_string_size, CMD_PREFIX_EXIT_CODE);
+    add_string_to_command_reply(reply_string, &reply_string_size, exit_status_string);
+    add_char_to_command_reply(reply_string, &reply_string_size, '\0');
+
     if (message) {
-        add_string_to_command_reply(reply_string, &reply_string_size, ": ");
+        add_char_to_command_reply(reply_string, &reply_string_size, cmd_prefix_by_status[status]);
         add_string_to_command_reply(reply_string, &reply_string_size, message);
     }
 
     write_req.data = client;
     write_buf.base = reply_string;
-    write_buf.len = strlen((char *)write_buf.base);
+    write_buf.len = reply_string_size;
     ret = uv_write(&write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
         error("uv_write(): %s", uv_strerror(ret));
@@ -301,9 +311,10 @@ static void parse_commands(uv_stream_t *client)
 
     status = CMD_STATUS_FAILURE;
 
+    /* Skip white-space characters */
+    for (pos = command_string ; isspace(*pos) && ('\0' != *pos) ; ++pos) {;}
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
-        pos = strstr(command_string, command_info_array[i].cmd_str);
-        if (pos) {
+        if (!strncmp(pos, command_info_array[i].cmd_str, strlen(command_info_array[i].cmd_str))) {
             cmd_ctx = mallocz(sizeof(*cmd_ctx));
             cmd_ctx->work.data = cmd_ctx;
             cmd_ctx->client = client;
@@ -339,7 +350,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     } else if (nread) {
         size_t to_copy;
 
-        to_copy = MIN(buf->len, MAX_COMMAND_LENGTH - 1 - command_string_size);
+        to_copy = MIN(nread, MAX_COMMAND_LENGTH - 1 - command_string_size);
         strncpyz(command_string + command_string_size, buf->base, to_copy);
         command_string_size += to_copy;
     }

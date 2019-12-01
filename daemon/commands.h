@@ -10,6 +10,7 @@
 #endif
 
 #define MAX_COMMAND_LENGTH 4096
+#define MAX_EXIT_STATUS_LENGTH 23 /* Can't ever be bigger than "X-18446744073709551616" */
 
 typedef enum cmd {
     CMD_HELP = 0,
@@ -27,9 +28,9 @@ typedef enum cmd_status {
     CMD_STATUS_BUSY
 } cmd_status_t;
 
-#define CMD_STATUS_SUCCESS_STR "SUCCESS"
-#define CMD_STATUS_FAILURE_STR "FAILURE"
-#define CMD_STATUS_BUSY_STR "BUSY"
+#define CMD_PREFIX_INFO 'O'         /* Following string should go to cli stdout */
+#define CMD_PREFIX_ERROR 'E'        /* Following string should go to cli stderr */
+#define CMD_PREFIX_EXIT_CODE 'X'    /* Following string is cli integer exit code */
 
 typedef enum cmd_type {
     /*

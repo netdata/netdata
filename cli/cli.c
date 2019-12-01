@@ -4,11 +4,16 @@
 #include "../libnetdata/required_dummies.h"
 
 static uv_pipe_t client_pipe;
-uv_write_t write_req;
-uv_shutdown_t shutdown_req;
+static uv_write_t write_req;
+static uv_shutdown_t shutdown_req;
 
 static char command_string[MAX_COMMAND_LENGTH];
 static unsigned command_string_size;
+
+static char response_string[MAX_COMMAND_LENGTH];
+static unsigned response_string_size;
+
+static int exit_status;
 
 struct command_context {
     uv_work_t work;
@@ -19,13 +24,51 @@ struct command_context {
     cmd_status_t status;
 };
 
+static void parse_command_reply(void)
+{
+    FILE *stream = NULL;
+    char *pos;
+    int syntax_error = 0;
+
+    for (pos = response_string ;
+         pos < response_string + response_string_size  && !syntax_error ;
+         ++pos) {
+        /* Skip white-space characters */
+        for ( ; isspace(*pos) && ('\0' != *pos); ++pos) {;}
+
+        if ('\0' == *pos)
+            continue;
+
+        switch (*pos) {
+        case CMD_PREFIX_EXIT_CODE:
+            exit_status = atoi(++pos);
+            break;
+        case CMD_PREFIX_INFO:
+            stream = stdout;
+            break;
+        case CMD_PREFIX_ERROR:
+            stream = stderr;
+            break;
+        default:
+            syntax_error = 1;
+            fprintf(stderr, "Syntax error, failed to parse command response.\n");
+            break;
+        }
+        if (stream) {
+            fprintf(stream, "%s\n", ++pos);
+            pos += strlen(pos);
+            stream = NULL;
+        }
+    }
+}
+
 static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
     if (0 == nread) {
         fprintf(stderr, "%s: Zero bytes read by command pipe.\n", __func__);
     } else if (UV_EOF == nread) {
 //      fprintf(stderr, "EOF found in command pipe.\n");
-        fprintf(stdout, "%s\n", command_string);
+        parse_command_reply();
     } else if (nread < 0) {
         fprintf(stderr, "%s: %s\n", __func__, uv_strerror(nread));
     }
@@ -35,9 +78,10 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     } else if (nread) {
         size_t to_copy;
 
-        to_copy = MIN(buf->len, MAX_COMMAND_LENGTH - 1 - command_string_size);
-        strncpyz(command_string + command_string_size, buf->base, to_copy);
-        command_string_size += to_copy;
+        to_copy = MIN(nread, MAX_COMMAND_LENGTH - 1 - response_string_size);
+        memcpy(response_string + response_string_size, buf->base, to_copy);
+        response_string_size += to_copy;
+        response_string[response_string_size] = '\0';
     }
     if (buf && buf->len) {
         free(buf->base);
@@ -59,9 +103,9 @@ static void shutdown_cb(uv_shutdown_t* req, int status)
     (void)req;
     (void)status;
 
-    /* Reset buffer to receive reply */
-    command_string_size = 0;
-    command_string[0] = '\0';
+    /* receive reply */
+    response_string_size = 0;
+    response_string[0] = '\0';
 
     ret = uv_read_start((uv_stream_t *)&client_pipe, alloc_cb, pipe_read_cb);
     if (ret) {
@@ -97,11 +141,11 @@ static void connect_cb(uv_connect_t* req, int status)
     if (status) {
         fprintf(stderr, "uv_pipe_connect(): %s\n", uv_strerror(status));
         fprintf(stderr, "Make sure the netdata service is running.\n");
-        exit(1);
+        exit(-1);
     }
-    command_string_size = 0;
-    command_string[0] = '\0';
-    s = fgets(command_string, MAX_COMMAND_LENGTH, stdin);
+    if (0 == command_string_size) {
+        s = fgets(command_string, MAX_COMMAND_LENGTH, stdin);
+    }
     (void)s; /* We don't need input to communicate with the server */
     command_string_size = strlen(command_string);
 
@@ -117,24 +161,41 @@ static void connect_cb(uv_connect_t* req, int status)
 
 int main(int argc, char **argv)
 {
-    int ret;
+    int ret, i;
     static uv_loop_t* loop;
     uv_connect_t req;
 
-    (void)argc;
-    (void)argv;
+    exit_status = -1; /* default status for when there is no command response from server */
+
     loop = uv_default_loop();
 
     ret = uv_pipe_init(loop, &client_pipe, 1);
     if (ret) {
         fprintf(stderr, "uv_pipe_init(): %s\n", uv_strerror(ret));
-        return 1;
+        return exit_status;
     }
+
+    command_string_size = 0;
+    command_string[0] = '\0';
+    for (i = 1 ; i < argc ; ++i) {
+        size_t to_copy;
+
+        to_copy = MIN(strlen(argv[i]), MAX_COMMAND_LENGTH - 1 - command_string_size);
+        strncpyz(command_string + command_string_size, argv[i], to_copy);
+        command_string_size += to_copy;
+
+        if (command_string_size < MAX_COMMAND_LENGTH - 1) {
+            command_string[command_string_size++] = ' ';
+        } else {
+            break;
+        }
+    }
+
     uv_pipe_connect(&req, &client_pipe, PIPENAME, connect_cb);
 
     uv_run(loop, UV_RUN_DEFAULT);
 
     uv_close((uv_handle_t *)&client_pipe, NULL);
 
-    return 0;
+    return exit_status;
 }
