@@ -74,86 +74,128 @@ static inline int is_ip_inside_table(in_addr_t src, in_addr_t dst) {
 // ----------------------------------------------------------------------
 static void netdata_publish_data() {
     static int not_initialized = 0;
-    uint32_t egress = 0;
-    uint32_t ingress = 0;
-    uint32_t closed = 0;
 
-#define NETWORK_VIEWER_FAMILY  "network_viewer"
-#define NETWORK_VIEWER_CHART  "connections"
-#define NETWORK_VIEWER_INGRESS "ingress"
-#define NETWORK_VIEWER_EGRESS  "egress"
-#define NETWORK_VIEWER_CLOSED  "closed"
-
-    if(connection_controller.tree) {
-        netdata_conn_stats_t *move = connection_controller.tree;
-        while (move) {
-            in_addr_t arg = move->saddr;
-            //COMPARE TIMESTAMP TO DEFINE THE CORRECT COUNTER
-            //USE clock_gettime WITH CLOCK_MONOTONIC
-            if (netdata_is_inside(arg) ) {
-                egress++;
-            } else {
-                ingress++;
-            }
-
-            if (move->removeme) {
-                clean_index(move);
-                closed++;
-            }
-
-            move = move->next;
-        }
-    }
-
-    // ------------------------------------------------------------------------
     if(!not_initialized) {
         printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
                 ,NETWORK_VIEWER_FAMILY
-                ,NETWORK_VIEWER_CHART
-                ,"Network viewer total connections."
-        );
-        printf("DIMENSION %s '' absolute 1 1\n", NETWORK_VIEWER_INGRESS);
-        printf("DIMENSION %s '' absolute 1 1\n", NETWORK_VIEWER_EGRESS);
-        printf("DIMENSION %s '' absolute 1 1\n", NETWORK_VIEWER_CLOSED);
+                ,NETWORK_VIEWER_CHART1
+                ,"Network Viewer TCP bytes received from request to specific port");
+
+        printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
+                ,NETWORK_VIEWER_FAMILY
+                ,NETWORK_VIEWER_CHART2
+                ,"Network viewer TCP request length to specific port.");
+
+        printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
+                ,NETWORK_VIEWER_FAMILY
+                ,NETWORK_VIEWER_CHART3
+                ,"Network viewer UDP bytes received from request to specific port");
+
+        printf("CHART %s.%s '' '%s' 'kilobits/s' 'network' '' line 1000 1 ''\n"
+                ,NETWORK_VIEWER_FAMILY
+                ,NETWORK_VIEWER_CHART4
+                ,"Network viewer UDP request length to specific port.");
+
+        /*
+        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
+              ,NETWORK_VIEWER_FAMILY
+              ,NETWORK_VIEWER_CHART5
+              ,"Network viewer TCP ingoing connections.");
+              */
+
+        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
+                ,NETWORK_VIEWER_FAMILY
+                ,NETWORK_VIEWER_CHART6
+                ,"Network viewer TCP active connections per port.");
+
+        /*
+        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
+              ,NETWORK_VIEWER_FAMILY
+              ,NETWORK_VIEWER_CHART7
+              ,"Network viewer UDP ingoing connections.");
+              */
+
+        printf("CHART %s.%s '' '%s' 'active connections' 'network' '' line 1000 1 ''\n"
+                ,NETWORK_VIEWER_FAMILY
+                ,NETWORK_VIEWER_CHART8
+                ,"Network viewer UDP active connections per port.");
 
         not_initialized++;
     }
 
-    printf("BEGIN %s.%s\n"
-            , NETWORK_VIEWER_FAMILY
-            , NETWORK_VIEWER_INGRESS
-    );
+    if(connection_controller.ports) {
+        char *chart1;
+        char *chart2;
+        char *chart4;
+        char *dim;
+        uint64_t ibytes;
+        uint64_t ebytes;
+        uint32_t econn;
 
-    printf("SET %s = %u\n"
-            , NETWORK_VIEWER_INGRESS
-            , ingress
-    );
+        netdata_port_stats_t *move = connection_controller.ports;
+        while (move) {
+            if (move->createdim) {
+                printf("DIMENSION %s '' absolute 1 1\n", move->dimension);
+                move->createdim = 0;
+            }
 
-    printf("END\n");
+            if ( move->protocol == 6 ) { //TCP
+                chart1 = NETWORK_VIEWER_CHART1;
+                chart2 = NETWORK_VIEWER_CHART2;
+                chart4 = NETWORK_VIEWER_CHART6;
+            } else {  //UDP
+                chart1 = NETWORK_VIEWER_CHART3;
+                chart2 = NETWORK_VIEWER_CHART4;
+                //chart3 = NETWORK_VIEWER_CHART7;
+                chart4 = NETWORK_VIEWER_CHART8;
+            }
 
-    printf("BEGIN %s.%s\n"
-            , NETWORK_VIEWER_FAMILY
-            , NETWORK_VIEWER_EGRESS
-    );
+            dim = move->dimension;
+            if(dim) {
+                ibytes = move->inow - move->iprev;
+                move->iprev = move->inow;
 
-    printf("SET %s = %u\n"
-            , NETWORK_VIEWER_EGRESS
-            , egress
-    );
+                ebytes = move->enow - move->eprev;
+                move->eprev = move->enow;
 
-    printf("END\n");
+                econn = move->etot;
 
-    printf("BEGIN %s.%s\n"
-            , NETWORK_VIEWER_FAMILY
-            , NETWORK_VIEWER_CLOSED
-    );
+                //---------------------------------
+                printf( "BEGIN %s.%s\n"
+                        , NETWORK_VIEWER_FAMILY
+                        , chart1);
 
-    printf("SET %s = %u\n"
-            , NETWORK_VIEWER_CLOSED
-            , closed
-    );
+                printf( "SET %s = %d\n"
+                        , dim
+                        , ibytes);
 
-    printf("END\n");
+                printf("END\n");
+
+                //---------------------------------
+                printf( "BEGIN %s.%s\n"
+                        , NETWORK_VIEWER_FAMILY
+                        , chart2);
+
+                printf( "SET %s = %d\n"
+                        , dim
+                        , ebytes);
+
+                printf("END\n");
+
+                //---------------------------------
+                printf( "BEGIN %s.%s\n"
+                        , NETWORK_VIEWER_FAMILY
+                        , chart4);
+
+                printf( "SET %s = %d\n"
+                        , dim
+                        , econn);
+
+                printf("END\n");
+            }
+            move = move->next;
+        }
+    }
 }
 
 void *network_viewer_publisher(void *ptr) {
