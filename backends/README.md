@@ -1,43 +1,43 @@
 # Metrics long term archiving
 
-Netdata supports backends for archiving the metrics, or providing long term dashboards, using Grafana or other tools,
-like this:
+Netdata supports long-term archiving and graphing of historical data, by introducing a feature called "Backends". **Note that the speed of the Backend does not not affect Netdata in any way.**
+
+###It works like this:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20649711/29f182ba-b4ce-11e6-97c8-ab2c0ab59833.png)
 
-Since Netdata collects thousands of metrics per server per second, which would easily congest any backend server when
-several Netdata servers are sending data to it, Netdata allows sending metrics at a lower frequency, by resampling them.
+Netdata serves thousands of metrics per second, per server. A throughput that could easily congest any backend server, especially taking into consideration that possibly several Netdata instances send simultaneously data to it. To amend for this, **Netdata supports resampling**.
 
-So, although Netdata collects metrics every second, it can send to the backend servers averages or sums every X seconds
-(though, it can send them per second if you need it to).
+Resampling can come in many forms, from a simple *downsample* to sending the *average* or *sum* of an X interval. It's really up to you!
+
 
 ## features
 
-1.  Supported backends
+1.  Supported Backends:
 
-    -   **graphite** (`plaintext interface`, used by **Graphite**, **InfluxDB**, **KairosDB**, **Blueflood**,
-        **ElasticSearch** via logstash tcp input and the graphite codec, etc)
+    -   **Graphite** (`plaintext interface`), used by **Graphite**, **InfluxDB**, **KairosDB**, **Blueflood**,
+        **ElasticSearch**, etc.
 
         metrics are sent to the backend server as `prefix.hostname.chart.dimension`. `prefix` is configured below,
-        `hostname` is the hostname of the machine (can also be configured).
+        while `hostname` is the hostname of the machine (can also be configured).
 
-    -   **opentsdb** (`telnet or HTTP interfaces`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc)
+    -   **Opentsdb** (`telnet or HTTP interfaces`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc. )
 
         metrics are sent to opentsdb as `prefix.chart.dimension` with tag `host=hostname`.
 
-    -   **json** document DBs
+    -   **JSON** document DBs
 
-        metrics are sent to a document db, `JSON` formatted.
+        metrics are sent to a Document Database, formatted in `JSON`.
 
-    -   **prometheus** is described at [prometheus page](prometheus/) since it pulls data from Netdata.
+    -   **Prometheus** is described at [prometheus page](prometheus/), since *technically* it scrapes data from Netdata.
 
-    -   **prometheus remote write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
+    -   **Prometheus Remote Write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
         **Elasticsearch**, **Gnocchi**, **Graphite**, **InfluxDB**, **Kafka**, **OpenTSDB**, **PostgreSQL/TimescaleDB**,
-        **Splunk**, **VictoriaMetrics**, and a lot of other [storage
+        **Splunk**, **VictoriaMetrics**, and others. [storage
         providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage))
 
         metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus
-        protocol](prometheus/). Notes on using the remote write backend are [here](prometheus/remote_write/).
+        protocol](prometheus/). Some comments on using the remote write backend can be found [here](prometheus/remote_write/).
 
     -   **AWS Kinesis Data Streams**
 
@@ -47,11 +47,11 @@ So, although Netdata collects metrics every second, it can send to the backend s
 
         metrics are sent to the database in `JSON` format.
 
-2.  Only one backend may be active at a time.
+2.  Currently, only one Backend can be active at a time. (Except for Prometheus who scrapes the data from Netdata API).
 
-3.  Netdata can filter metrics (at the chart level), to send only a subset of the collected metrics.
+3.  Netdata supports the filtering of charts, so that the user can specify which metrics will be sent to the backend.
 
-4.  Netdata supports three modes of operation for all backends:
+4.  Netdata currently supports **three modes** of operation for all backends:
 
     -   `as-collected` sends to backends the metrics as they are collected, in the units they are collected. So,
         counters are sent as counters and gauges are sent as gauges, much like all data collectors do. For example, to
@@ -74,14 +74,11 @@ So, although Netdata collects metrics every second, it can send to the backend s
     If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with
     Netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot
     simpler. Furthermore, if you use `average`, the charts shown in the back-end will match exactly what you see in
-    Netdata, which is not necessarily true for the other modes of operation.
-
-5.  This code is smart enough, not to slow down Netdata, independently of the speed of the backend server.
+    Netdata. *It is not necessarily true for the other modes of operation.*
 
 ## configuration
 
-In `/etc/netdata/netdata.conf` you should have something like this (if not download the latest version of `netdata.conf`
-from your Netdata):
+Using the command `/etc/netdata/edit-config netdata.conf`, you should be seeing something like this:
 
 ```conf
 [backend]
@@ -130,11 +127,11 @@ from your Netdata):
    destination = [ffff:...:0001]:2003 10.11.12.1:2003
 ```
 
-   When multiple servers are defined, Netdata will try the next one when the first one fails. This allows you to
-   load-balance different servers: give your backend servers in different order on each Netdata.
+   When multiple servers are defined, Netdata will try the next one when the first one fails. **This allows you to
+   load-balance different servers**: In each Netdata instance, specify the Backend servers in a different order.
 
-   Netdata also ships [`nc-backend.sh`](nc-backend.sh), a script that can be used as a fallback backend to save the
-   metrics to disk and push them to the time-series database when it becomes available again. It can also be used to
+   Netdata also ships [`nc-backend.sh`](nc-backend.sh), a script that can be **used as a fallback backend** to save the
+   metrics to disk and push them to the time-series database when it becomes available again**. It can also be used to
    monitor / trace / debug the metrics Netdata generates.
 
    For kinesis backend `destination` should be set to an AWS region (for example, `us-east-1`).
@@ -186,21 +183,16 @@ from your Netdata):
 
 ## monitoring operation
 
-Netdata provides 5 charts:
+Netdata provides 4 charts:
 
 1.  **Buffered metrics**, the number of metrics Netdata added to the buffer for dispatching them to the
     backend server.
 
 2.  **Buffered data size**, the amount of data (in KB) Netdata added the buffer.
 
-3.  ~~**Backend latency**, the time the backend server needed to process the data Netdata sent. If there was a
-    re-connection involved, this includes the connection time.~~ (this chart has been removed, because it only measures
-    the time Netdata needs to give the data to the O/S - since the backend servers do not ack the reception, Netdata
-    does not have any means to measure this properly).
+3.  **Backend operations**, the number of operations performed by Netdata.
 
-4.  **Backend operations**, the number of operations performed by Netdata.
-
-5.  **Backend thread CPU usage**, the CPU resources consumed by the Netdata thread, that is responsible for sending the
+4.  **Backend thread CPU usage**, the CPU resources consumed by the Netdata thread which is responsible for sending the
     metrics to the backend server.
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20463536/eb196084-af3d-11e6-8ee5-ddbd3b4d8449.png)
