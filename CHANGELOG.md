@@ -250,8 +250,6 @@
 - netdata/packaging: \[ci skip\] Correlate configure command [\#6678](https://github.com/netdata/netdata/pull/6678) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: Add auto-generation of packages for nightly [\#6675](https://github.com/netdata/netdata/pull/6675) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - .travis.yml: Improve template and commit\_message predicates readability [\#6673](https://github.com/netdata/netdata/pull/6673) ([knatsakis](https://github.com/knatsakis))
-- .travis.yml: Build docker images in parallel [\#6672](https://github.com/netdata/netdata/pull/6672) ([knatsakis](https://github.com/knatsakis))
-- add CHANGELOG.md to .remarkignore [\#6671](https://github.com/netdata/netdata/pull/6671) ([prhomhyse](https://github.com/prhomhyse))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
