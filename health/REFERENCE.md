@@ -53,7 +53,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 
 | line                                                | required        | functionality                                                                         |
 | --------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
-| [`alarm`/`template`](#alarm-line-alarm-or-template) | no              | Name of the alarm/template.                                                           |
+| [`alarm`/`template`](#alarm-line-alarm-or-template) | yes             | Name of the alarm/template.                                                           |
 | [`on`](#alarm-line-on)                              | yes             | The chart this alarm should attach to.                                                |
 | [`os`](#alarm-line-os)                              | no              | Which operating systems to run this chart.                                            |
 | [`hosts`](#alarm-line-hosts)                        | no              | Which hostnames will run this alarm.                                                  |
@@ -160,8 +160,6 @@ families: sda sdb
 ```
 
 #### Alarm line `lookup`
-
-This line 
 
 This line makes a database lookup to find a value. This result of this lookup is available as `$this`.
 
@@ -381,7 +379,7 @@ These operators are supported `+`, `-`, `*`, `/`, `<`, `<=`, `<>`, `!=`, `>`, `>
 Boolean operators result in either `1` (true) or `0` (false).
 
 The conditional evaluation operator `?` is supported too. Using this operator IF-THEN-ELSE conditional statements can be
-specified. The format is: `(condition) ? (true expression) :(false expression)`. So, Netdata will first evaluate the
+specified. The format is: `(condition) ? (true expression) : (false expression)`. So, Netdata will first evaluate the
 `condition` and based on the result will either evaluate `true expression` or `false expression`.
 
 Example: `($this > 0) ? ($avail * 2) : ($used / 2)`.
@@ -454,7 +452,7 @@ unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-
 
 </details>
 
--   **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of $this for
+-   **chart local variables**. All the dimensions of the chart are exposed as local variables. The value of `$this` for
     the other configured alarms of the chart also appears, under the name of each configured alarm.
 
      Charts also define a few special variables:
