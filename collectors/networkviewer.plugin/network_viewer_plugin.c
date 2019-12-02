@@ -8,6 +8,36 @@
 
 #include "network_viewer_plugin.h"
 
+// callback required by eval()
+int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
+    (void)variable;
+    (void)hash;
+    (void)rc;
+    (void)result;
+    return 0;
+};
+
+void send_statistics( const char *action, const char *action_result, const char *action_data) {
+    (void) action;
+    (void) action_result;
+    (void) action_data;
+    return;
+}
+
+// callbacks required by popen()
+void signals_block(void) {};
+void signals_unblock(void) {};
+void signals_reset(void) {};
+
+// required by get_system_cpus()
+char *netdata_configured_host_prefix = "";
+
+// callback required by fatal()
+void netdata_cleanup_and_exit(int ret) {
+    exit(ret);
+}
+// ----------------------------------------------------------------------
+
 void *libnetdatanv = NULL;
 int (*load_bpf_file)(char *) = NULL;
 int (*test_bpf_perf_event)(int);
@@ -34,29 +64,7 @@ static netdata_port_stats_t *fake2 = NULL;
 //protocols used with this collector
 static char *protocols[] = { "tcp", "udp" };
 
-// required by get_system_cpus()
-char *netdata_configured_host_prefix = "";
-
-// callback required by fatal()
-void netdata_cleanup_and_exit(int ret) {
-    exit(ret);
-}
-
-// callback required by eval()
-int health_variable_lookup(const char *variable, uint32_t hash, struct rrdcalc *rc, calculated_number *result) {
-    (void)variable;
-    (void)hash;
-    (void)rc;
-    (void)result;
-    return 0;
-};
-
-void send_statistics( const char *action, const char *action_result, const char *action_data) {
-    (void) action;
-    (void) action_result;
-    (void) action_data;
-    return;
-}
+static int update_every = 1;
 
 // ----------------------------------------------------------------------
 
@@ -102,6 +110,8 @@ void netdata_set_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
         p->dimension = strdup(port);
     }
     p->next = NULL ;
+
+    fprintf(stderr,"KILLME SET PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
 }
 
 
@@ -127,46 +137,63 @@ static void write_report(netdata_port_stats_t *ptr) {
 
     dim = ptr->dimension;
     if(dim) {
+        fprintf(stderr,"KILLME 1 PROTOCOL WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
         ibytes = ptr->inow - ptr->iprev;
         ptr->iprev = ptr->inow;
 
         ebytes = ptr->enow - ptr->eprev;
         ptr->eprev = ptr->enow;
 
+        fprintf(stderr,"KILLME PROTOCOL WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
+
         econn = ptr->etot;
 
+        fprintf(stderr,"KILLME PROTOCOL WRITE REPORT %s %u (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ibytes, ebytes);
         //--------------------------------------
         printf( "BEGIN %s.%s\n"
                 , NETWORK_VIEWER_FAMILY
                 , chart1);
 
-        printf( "SET %s = %lu\n"
+        fprintf(stderr,"KILLME PROTOCOL BEGIN %s.%s\n", NETWORK_VIEWER_FAMILY, chart1);
+
+        printf( "SET %s = %lld\n"
                 , dim
-                , ibytes);
+                , (long long)ibytes);
+        fprintf(stderr,"KILLME PROTOCOL SET %s = %lld\n", dim,(long long)ibytes );
 
         printf("END\n");
+        fprintf(stderr,"KILLME PROTOCOL END\n");
 
         //--------------------------------------
         printf( "BEGIN %s.%s\n"
                 , NETWORK_VIEWER_FAMILY
                 , chart2);
 
-        printf( "SET %s = %lu\n"
+        fprintf(stderr,"KILLME PROTOCOL BEGIN %s.%s\n", NETWORK_VIEWER_FAMILY, chart2);
+
+        printf( "SET %s = %lld\n"
                 , dim
-                , ebytes);
+                ,(long long) ebytes);
+        fprintf(stderr,"KILLME PROTOCOL SET %s = %lld\n", dim,(long long)ebytes );
 
         printf("END\n");
+        fprintf(stderr,"KILLME PROTOCOL END\n");
 
         //--------------------------------------
         printf( "BEGIN %s.%s\n"
                 , NETWORK_VIEWER_FAMILY
                 , chart4);
 
-        printf( "SET %s = %u\n"
+        fprintf(stderr,"KILLME PROTOCOL BEGIN %s.%s\n", NETWORK_VIEWER_FAMILY, chart4);
+
+        printf( "SET %s = %lld\n"
                 , dim
-                , econn);
+                ,(long long) econn);
+
+        fprintf(stderr,"KILLME PROTOCOL SET %s = %lld\n", dim,(long long)econn );
 
         printf("END\n");
+        fprintf(stderr,"KILLME PROTOCOL END\n");
     }
 }
 
@@ -183,14 +210,15 @@ static void fill_fake_vector(netdata_kern_stats_t *ptr, uint8_t proto) {
     ptr->removeme = 0;
 }
 
-static void netdata_create_chart(char *family, char *name, char *msg, char *axis, int proto) {
+static void netdata_create_chart(char *family, char *name, char *msg, char *axis, char *group, int proto) {
     char port[8];
     char *dimname;
-    printf("CHART %s.%s '' '%s' '%s' 'network' '' line 1000 1 ''\n"
+    printf("CHART %s.%s '' '%s' '%s' '%s' '' line 1000 1 ''\n"
             , family
             , name
             , msg
-            , axis);
+            , axis
+            , group);
 
     netdata_port_list_t *move = port_list;
     struct servent *sname;
@@ -210,17 +238,17 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
 }
 
 static void netdata_create_charts() {
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART1, "Network Viewer TCP bytes received from request to specific port.", "kilobits/s", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART1, "Network Viewer TCP bytes received from request to specific port.", "bytes/s", "TCP", 0);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART2, "Network viewer TCP request length to specific port.", "kilobits/s", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART2, "Network viewer TCP request length to specific port.", "bytes/s", "TCP", 0);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART3, "Network viewer UDP bytes received from request to specific port.", "kilobits/s", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART3, "Network viewer UDP bytes received from request to specific port.", "bytes/s","UDP", 1);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART4, "Network viewer UDP request length to specific port.", "kilobits/s", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART4, "Network viewer UDP request length to specific port.", "bytes/s","UDP", 1);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART6, "Network viewer TCP active connections per port.", "active connections", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART6, "Network viewer TCP active connections per port.", "active connections", "TCP", 0);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections","UDP", 1);
 }
 
 
@@ -235,7 +263,7 @@ static void netdata_publish_data() {
     } else {
         netdata_kern_stats_t e;
         if(!fake1) {
-            fake1 = calloc(1, sizeof(netdata_port_stats_t));
+            fake1 = callocz(1, sizeof(netdata_port_stats_t));
             if(fake1) {
                 fill_fake_vector(&e, 6);
                 netdata_set_port_stats(fake1, &e);
@@ -244,7 +272,7 @@ static void netdata_publish_data() {
         write_report(fake1);
 
         if(!fake2) {
-            fake2 = calloc(1, sizeof(netdata_port_stats_t));
+            fake2 = callocz(1, sizeof(netdata_port_stats_t));
             if(fake2) {
                 fill_fake_vector(&e, 17);
                 netdata_set_port_stats(fake2, &e);
@@ -258,16 +286,15 @@ void *network_viewer_publisher(void *ptr) {
     (void)ptr;
     netdata_create_charts();
 
-    usec_t step = 1* USEC_PER_SEC;
+    usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!netdata_exit) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
-        netdata_publish_data();
 
+        netdata_publish_data();
         fflush(stdout);
- //       sleep(1);
     }
 
     return NULL;
@@ -304,7 +331,7 @@ void netdata_update_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *
 }
 
 netdata_conn_stats_t *store_new_connection_stat(netdata_kern_stats_t *e) {
-    netdata_conn_stats_t *ncs = calloc(1, sizeof(netdata_conn_stats_t));
+    netdata_conn_stats_t *ncs = callocz(1, sizeof(netdata_conn_stats_t));
 
     if(ncs) {
         netdata_set_conn_stats(ncs, e);
@@ -314,8 +341,10 @@ netdata_conn_stats_t *store_new_connection_stat(netdata_kern_stats_t *e) {
 }
 
 void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
+    fprintf(stderr,"KILLME 1 UPDATE PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
     p->inow += e->recv;
     p->enow += e->sent;
+    fprintf(stderr,"KILLME 2 UPDATE PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
 
     netdata_conn_stats_t *ret;
     netdata_conn_stats_t search = { .daddr = e->daddr, .saddr = e->saddr, .dport = e->dport };
@@ -391,7 +420,7 @@ static int compare_destination_ip(void *a, void *b) {
 }
 
 netdata_port_stats_t *store_new_port_stat(netdata_kern_stats_t *e) {
-    netdata_port_stats_t *p = calloc(1, sizeof(netdata_port_stats_t));
+    netdata_port_stats_t *p = callocz(1, sizeof(netdata_port_stats_t));
 
     if(p) {
         netdata_set_port_stats(p, e);
@@ -455,7 +484,6 @@ int netdata_store_bpf(void *data, int size) {
         }
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
-
 
     netdata_port_stats_t search_proto = { .port = e->dport, .protocol = e->protocol };
 
@@ -968,12 +996,25 @@ void parse_config() {
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
-    //program_name = "networkviewer.plugin";
+
+    //set name
+    program_name = "networkviewer.plugin";
+
+    //disable syslog
+    error_log_syslog = 0;
+
+    // set errors flood protection to 100 logs per hour
+    error_log_errors_per_period = 100;
+    error_log_throttle_period = 3600;
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         error("[NETWORK VIEWER] setrlimit(RLIMIT_MEMLOCK)");
         return 1;
+    }
+
+    if (argc) {
+        update_every = strtol(argv[1], NULL, 10);
     }
 
     parse_config();
