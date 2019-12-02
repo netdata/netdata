@@ -13,6 +13,9 @@
 
 extern struct config exporting_config;
 
+#define EXPORTER_DATA_SOURCE                 "data source"
+#define EXPORTER_DATA_SOURCE_DEFAULT         "average"
+
 #define EXPORTER_DESTINATION                "destination"
 #define EXPORTER_DESTINATION_DEFAULT        "localhost"
 
@@ -32,7 +35,7 @@ extern struct config exporting_config;
 #define EXPORTER_SEND_HOST_MATCH_DEFAULT    "localhost *"
 
 #define EXPORTER_SEND_NAMES                 "send names instead of ids"
-#define EXPORTER_SEND_NAMES_DEFAULT         1
+#define EXPORTER_SEND_NAMES_DEFAULT         CONFIG_BOOLEAN_YES
 
 typedef enum exporting_options {
     EXPORTING_OPTION_NONE              = 0,

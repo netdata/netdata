@@ -165,6 +165,26 @@ BACKEND_TYPE exporting_select_type(const char *type)
     return BACKEND_TYPE_UNKNOWN;
 }
 
+EXPORTING_OPTIONS exporting_parse_data_source(const char *data_source, EXPORTING_OPTIONS exporting_options) {
+    if(!strcmp(data_source, "raw") || !strcmp(data_source, "as collected") || !strcmp(data_source, "as-collected") || !strcmp(data_source, "as_collected") || !strcmp(data_source, "ascollected")) {
+        exporting_options |= EXPORTING_SOURCE_DATA_AS_COLLECTED;
+        exporting_options &= ~(EXPORTING_OPTIONS_SOURCE_BITS ^ EXPORTING_SOURCE_DATA_AS_COLLECTED);
+    }
+    else if(!strcmp(data_source, "average")) {
+        exporting_options |= EXPORTING_SOURCE_DATA_AVERAGE;
+        exporting_options &= ~(EXPORTING_OPTIONS_SOURCE_BITS ^ EXPORTING_SOURCE_DATA_AVERAGE);
+    }
+    else if(!strcmp(data_source, "sum") || !strcmp(data_source, "volume")) {
+        exporting_options |= EXPORTING_SOURCE_DATA_SUM;
+        exporting_options &= ~(EXPORTING_OPTIONS_SOURCE_BITS ^ EXPORTING_SOURCE_DATA_SUM);
+    }
+    else {
+        error("EXPORTING: invalid data data_source method '%s'.", data_source);
+    }
+
+    return exporting_options;
+}
+
 /**
  * Read configuration
  *
@@ -299,8 +319,15 @@ struct engine *read_exporting_config()
                     NULL,
                     SIMPLE_PATTERN_EXACT);
 
+                char *data_source =
+                    exporter_get(instance_name, EXPORTER_DATA_SOURCE, EXPORTER_DATA_SOURCE_DEFAULT);
+
+                tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
+
                 if (exporter_get_boolean(instance_name, EXPORTER_SEND_NAMES, EXPORTER_SEND_NAMES_DEFAULT))
                     tmp_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
+                else
+                    tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_NAMES;
 
 #ifdef NETDATA_INTERNAL_CHECKS
                 info(
