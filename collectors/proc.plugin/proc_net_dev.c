@@ -8,9 +8,9 @@
 // As defined in https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net
 const char *operstate_names[] = { "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up" };
 
-static inline get_operstate(char *operstate)
+static inline int get_operstate(char *operstate)
 {
-    for (long unsigned int i = 0; i < sizeof(operstate_names); i++) {
+    for (int i = 0; i < (int) (sizeof(operstate_names) / sizeof(char *)); i++) {
         if (!strcmp(operstate, operstate_names[i])) {
             return i;
         }
