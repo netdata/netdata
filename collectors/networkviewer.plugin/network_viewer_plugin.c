@@ -137,18 +137,18 @@ static void write_report(netdata_port_stats_t *ptr) {
 
     dim = ptr->dimension;
     if(dim) {
-        fprintf(stderr,"KILLME 1 PROTOCOL WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
+        fprintf(stderr,"KILLME WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
         ibytes = ptr->inow - ptr->iprev;
         ptr->iprev = ptr->inow;
 
         ebytes = ptr->enow - ptr->eprev;
         ptr->eprev = ptr->enow;
 
-        fprintf(stderr,"KILLME PROTOCOL WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
+        fprintf(stderr,"KILLME WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
 
         econn = ptr->etot;
 
-        fprintf(stderr,"KILLME PROTOCOL WRITE REPORT %s %u (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ibytes, ebytes);
+        fprintf(stderr,"KILLME WRITE REPORT %s %u (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ibytes, ebytes);
         //--------------------------------------
         printf( "BEGIN %s.%s\n"
                 , NETWORK_VIEWER_FAMILY
@@ -210,6 +210,19 @@ static void fill_fake_vector(netdata_kern_stats_t *ptr, uint8_t proto) {
     ptr->removeme = 0;
 }
 
+parse_text_input_t *overwrite_dimension(uint16_t search) {
+    parse_text_input_t *move = connection_controller.pti;
+
+    while(move) {
+        if (move->port == search) {
+            return move;
+        }
+        move = move->next;
+    }
+
+    return NULL;
+}
+
 static void netdata_create_chart(char *family, char *name, char *msg, char *axis, char *group, int proto) {
     char port[8];
     char *dimname;
@@ -220,18 +233,31 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
             , axis
             , group);
 
+    fprintf(stderr, "KILLME CHART %s.%s '' '%s' '%s' '%s' '' line 1000 1 ''\n"
+            , family
+            , name
+            , msg
+            , axis
+            , group);
+
     netdata_port_list_t *move = port_list;
     struct servent *sname;
     while (move) {
-        char *proto_name = (!proto)?protocols[0]:protocols[1];
-        sname = getservbyport(move->port, proto_name);
-        if (!sname) {
-            snprintf(port, 8, "%d", ntohs(move->port) );
-            dimname = port;
+        parse_text_input_t *p = overwrite_dimension(move->port);
+        if(!p) {
+            char *proto_name = (!proto)?protocols[0]:protocols[1];
+            sname = getservbyport(move->port, proto_name);
+            if (!sname) {
+                snprintf(port, 8, "%d", ntohs(move->port) );
+                dimname = port;
+            } else {
+                dimname = sname->s_name;
+            }
         } else {
-            dimname = sname->s_name;
+            dimname = p->value;
         }
         printf("DIMENSION %s '' absolute 1 1\n", dimname);
+        fprintf(stderr,"KILLME DIMENSION %s '' absolute 1 1\n", dimname);
 
         move = move->next;
     }
@@ -665,6 +691,17 @@ static void int_exit(int sig) {
         free(fake2);
     }
 
+    if (connection_controller.pti) {
+        parse_text_input_t *r = connection_controller.pti;
+        while (r) {
+            free(r->value);
+            parse_text_input_t *save = r->next;
+
+            free(r);
+            r = save;
+        }
+    }
+
     exit(0);
 }
 
@@ -933,13 +970,12 @@ static int read_config_file(const char *path) {
 
     char *s;
     char buffer[1024];
-
     while((s = fgets(buffer,  1024, fp))) {
         s = trim(buffer);
-        if(!s || *s == '#') continue;
+        if (!s || *s == '#') continue;
 
         char *key = s;
-        while(*s && *s != '=') s++;
+        while (*s && *s != '=') s++;
 
         if (!*s) {
             //print an error
@@ -953,12 +989,29 @@ static int read_config_file(const char *path) {
         key = trim_all(key);
         value = trim_all(value);
 
-        if (!strcasecmp(key,"outgoing")) {
-            outgoing_table = netdata_list_ips(value,1);
-        } else if (!strcasecmp(key,"destination_ports")) {
+        if (!strcasecmp(key, "outgoing")) {
+            outgoing_table = netdata_list_ips(value, 1);
+        } else if (!strcasecmp(key, "destination_ports")) {
             port_list = netdata_list_ports(value);
-        } else  if (!strcasecmp(key,"ingoing")) {
+        } else if (!strcasecmp(key, "ingoing")) {
             ingoing_table = netdata_list_ips(value, 0);
+        } else if (isdigit(key[0])) {
+            parse_text_input_t *pti = callocz(1, sizeof(pti));
+            if (pti) {
+                pti->port = htons((uint16_t) strtol(key, NULL, 10));
+                pti->value = strdup(value);
+            }
+
+            if (!connection_controller.pti) {
+                connection_controller.pti = pti;
+            } else {
+                parse_text_input_t *r;
+                parse_text_input_t *save;
+                for (r = connection_controller.pti; r; save = r, r = r->next);
+                if (save) {
+                    save->next = pti;
+                }
+            }
         }
     }
 
@@ -970,6 +1023,8 @@ void parse_config() {
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
+
+    connection_controller.pti = NULL;
 
     memset(&connection_controller,0,sizeof(connection_controller));
     avl_init_lock(&connection_controller.port_list, compare_port_value);
@@ -1014,7 +1069,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc) {
-        update_every = strtol(argv[1], NULL, 10);
+        update_every = (int)strtol(argv[1], NULL, 10);
     }
 
     parse_config();

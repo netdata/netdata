@@ -55,6 +55,13 @@ typedef struct {
     uint8_t removeme;
 }netdata_kern_stats_t;
 
+typedef struct parse_text_input{
+    char *value;
+    uint16_t port;
+
+    struct parse_text_input *next;
+}parse_text_input_t;
+
 typedef struct  netdata_conn_stats{
     avl avl;
 
@@ -111,6 +118,7 @@ typedef struct netdata_control_connection{
 
     netdata_port_stats_t *ports;
     netdata_port_stats_t *last_port;
+    parse_text_input_t *pti;
 } netdata_control_connection_t;
 
 typedef struct netdata_network {
