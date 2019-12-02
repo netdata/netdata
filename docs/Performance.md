@@ -121,19 +121,32 @@ Edit `/etc/netdata/netdata.conf`, find the `[plugins]` section:
 
 In detail:
 
-| plugin|description|
-|:----:|:----------|
-| `proc`|the internal plugin used to monitor the system. Normally, you don't want to disable this. You can disable individual functions of it at the next section.|
-| `tc`|monitoring network interfaces QoS (tc classes)|
-| `idlejitter`|internal plugin (written in C) that attempts show if the systems starved for CPU. Disabling it will eliminate a thread.|
-| `cgroups`|monitoring linux containers. Most probably you are not going to need it. This will also eliminate another thread.|
-| `checks`|a debugging plugin, which is disabled by default.|
-| `apps`|a plugin that monitors system processes. It is very complex and heavy (consumes twice the CPU resources of the Netdata daemon), so if you don't need to monitor the process tree, you can disable it.|
-| `charts.d`|BASH plugins (squid, nginx, mysql, etc). This is a heavy plugin, that consumes twice the CPU resources of the Netdata daemon.|
-| `node.d`|node.js plugin, currently used for SNMP data collection and monitoring named (the name server).|
-| `python.d`|has many modules and can use over 20MB of memory.|
+|plugin|lang|O/S|runs as|modular|description|
+|:----:|:--:|:-:|:-----:|:-----:|:----------|
+|[apps.plugin](apps.plugin/)|`C`|linux, freebsd|external|-|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.** It consumes twice the CPU resources compared to the Netdata daemon.** |
+|[cgroups.plugin](cgroups.plugin/)|`C`|linux|internal|-|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems|
+|[charts.d.plugin](charts.d.plugin/)|`BASH` v4+|any|external|yes|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
+|[checks.plugin](checks.plugin/)|`C`|any|internal|-|a debugging plugin (by default it is disabled)|
+|[cups.plugin](cups.plugin/)|`C`|any|external|-|monitors **CUPS**|
+|[diskspace.plugin](diskspace.plugin/)|`C`|linux|internal|-|collects disk space usage metrics on Linux mount points|
+|[fping.plugin](fping.plugin/)|`C`|any|external|-|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.|
+|[ioping.plugin](ioping.plugin/)|`C`|any|external|-|measures disk read/write latency.|
+|[freebsd.plugin](freebsd.plugin/)|`C`|freebsd|internal|yes|collects resource usage and performance data on FreeBSD systems|
+|[freeipmi.plugin](freeipmi.plugin/)|`C`|linux, freebsd|external|-|collects metrics from enterprise hardware sensors, on Linux and FreeBSD servers.|
+|[idlejitter.plugin](idlejitter.plugin/)|`C`|any|internal|-|measures CPU latency and jitter on all operating systems|
+|[macos.plugin](macos.plugin/)|`C`|macos|internal|yes|collects resource usage and performance data on MacOS systems|
+|[nfacct.plugin](nfacct.plugin/)|`C`|linux|external|-|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`|
+|[xenstat.plugin](xenstat.plugin/)|`C`|linux|external|-|collects XenServer and XCP-ng metrics using `libxenstat`|
+|[perf.plugin](perf.plugin/)|`C`|linux|external|-|collects CPU performance metrics using performance monitoring units (PMU).|
+|[node.d.plugin](node.d.plugin/)|`node.js`|any|external|yes|a **plugin orchestrator** for data collection modules written in `node.js`.|
+|[plugins.d](plugins.d/)|`C`|any|internal|-|implements the **external plugins** API and serves external plugins|
+|[proc.plugin](proc.plugin/)|`C`|linux|internal|yes|collects resource usage and performance data on Linux systems|
+|[python.d.plugin](python.d.plugin/)|`python` v2+|any|external|yes|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported). **It consumes over 20MB of Memory**.|
+|[slabinfo.plugin](slabinfo.plugin/)|`C`|linux|external|-|collects kernel SLAB details on Linux systems|
+|[statsd.plugin](statsd.plugin/)|`C`|any|internal|-|implements a high performance **statsd** server for Netdata|
+|[tc.plugin](tc.plugin/)|`C`|linux|internal|-|collects traffic QoS metrics (`tc`) of Linux network interfaces|
 
-For most IoT devices, you can disable all plugins except `proc`. For `proc` there is another section that controls which functions of it you need. Check the next section.
+For most IoT devices, you can disable all plugins except `proc`. You can further drill down on the distinct metrics that you want from `proc` by altering the `proc` configuration variables that are found inside `netdata.conf`. 
 
 ---
 
