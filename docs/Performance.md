@@ -123,7 +123,7 @@ In detail:
 
 |plugin|lang|O/S|runs as|modular|description|
 |:----:|:--:|:-:|:-----:|:-----:|:----------|
-|[apps.plugin](apps.plugin/)|`C`|linux, freebsd|external|-|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.** It consumes twice the CPU resources compared to the Netdata daemon.** |
+|[apps.plugin](apps.plugin/)|`C`|linux, freebsd|external|-|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**. *It consumes twice the CPU resources compared to the Netdata daemon.* |
 |[cgroups.plugin](cgroups.plugin/)|`C`|linux|internal|-|collects resource usage of **Containers**, libvirt **VMs** and **systemd services**, on Linux systems|
 |[charts.d.plugin](charts.d.plugin/)|`BASH` v4+|any|external|yes|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
 |[checks.plugin](checks.plugin/)|`C`|any|internal|-|a debugging plugin (by default it is disabled)|

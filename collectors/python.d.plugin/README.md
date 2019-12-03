@@ -2,7 +2,7 @@
 
 `python.d.plugin` is a Netdata external plugin. It is an **orchestrator** for data collection modules written in `python`.
 
-1.  It runs as an independent process `ps fax` shows it
+1.  It runs as an independent process, `ps fax` shows it
 2.  It is started and stopped automatically by Netdata
 3.  It communicates with Netdata via a unidirectional pipe (sending data to the `netdata` daemon)
 4.  Supports any number of data collection **modules**
@@ -13,7 +13,13 @@
 
 Every module should be compatible with python2 and python3.
 All third party libraries should be installed system-wide or in `python_modules` directory.
-Module configurations are written in YAML and **pyYAML is required**.
+
+**Netdata uses the default Python system installation**, thus for *most* systems (e.g Ubuntu) Python2 will be used.
+
+To install Python modules (libraries), it is advised to use the Python Package Manager (**pip**), please refer [here](https://pip.pypa.io/en/stable/installing/) for instalation instructions.
+
+Module configurations are written in YAML, **pyYAML is required**. For example, to install it with pip, simply execute
+`pip install pyaml`.
 
 Every configuration file must have one of two formats:
 
@@ -75,6 +81,21 @@ Writing new python module is simple. You just need to remember to include 5 majo
 If you plan to submit the module in a PR, make sure and go through the [PR checklist for new modules](#pull-request-checklist-for-python-plugins) beforehand to make sure you have updated all the files you need to. 
 
 For a quick start, you can look at the [example plugin](example/example.chart.py).
+
+### How to test a new module
+
+Testing a new python plugin is fairly simple, the example assumes that Netdata executables are installed in `/usr/libexec/netdata` and the configuration files at `/etc/netdata`.
+
+1. Create a local folder with all the necessery files, for easy access:
+    - `<module_name>.chart.py`: The collector's script
+    - `<module_name>.conf`: The collector's configuration file
+2. Edit the `python.d` configuration file using the command: `/etc/netdata/edit-config python.d` and add enable the plugin by adding the following line: `<module_name>: yes`.
+3. Place `<module_name>.chart.py` inside the directory `/usr/libexec/netdata/python.d/` and `<module_name>.conf` inside `/etc/netdata/python.d/`.
+4. Restart Netdata.
+5. *Optionally*, you can edit `web/gui/dashboard_info.js` to add your own icon for the collector. Find the icon you like at the FontAwesome website, **verify that it belongs to version 5.0.1 or prior** and use the `class` name that is listed in the website. 
+6. *Optionally*, you can create alarms for your new shining collector
+
+The module *should* start automatically. If it doesn't, debug the module using the method mentioned above.
 
 ### Global variables `ORDER` and `CHART`
 
