@@ -154,7 +154,9 @@ Find the `SEND_EMAIL="YES"` line and change it to `SEND_EMAIL="NO"`.
 
 **What's next?**:
 
--   Write your own health alarm using the [examples](../health/README.md#examples).
+-   Follow the [health quickstart](../health/QUICKSTART.md) to locate and edit existing health entities, and then create
+    your own.
+-   See all the alarm options via the [health configuration reference](../health/REFERENCE.md).
 -   Add a new notification method, like [Slack](../health/notifications/slack/).
 
 ## Change how long Netdata stores metrics
