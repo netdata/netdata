@@ -134,12 +134,46 @@ static void test_init_connectors(void **state)
 static void test_init_graphite_instance(void **state)
 {
     struct engine *engine = *state;
-    struct instance *instance = engine->connector_root->instance_root;
+    struct connector *connector = engine->connector_root;
+    struct instance *instance = connector->instance_root;
+
+    init_graphite_connector(connector);
+    assert_int_equal(
+        ((struct simple_connector_config *)(connector->config.connector_specific_config))->default_port, 2003);
+    freez(connector->config.connector_specific_config);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+    assert_int_equal(init_graphite_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_graphite_plaintext);
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
 
     instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
-
     assert_int_equal(init_graphite_instance(instance), 0);
     assert_ptr_equal(instance->metric_formatting, format_dimension_stored_graphite_plaintext);
+}
+
+static void test_init_json_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct connector *connector = engine->connector_root;
+    struct instance *instance = connector->instance_root;
+
+    init_json_connector(connector);
+    assert_int_equal(
+        ((struct simple_connector_config *)(connector->config.connector_specific_config))->default_port, 5448);
+    freez(connector->config.connector_specific_config);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+    assert_int_equal(init_json_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_json_plaintext);
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+    assert_int_equal(init_json_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_stored_json_plaintext);
+
 }
 
 static void test_mark_scheduled_instances(void **state)
@@ -513,6 +547,8 @@ int main(void)
         cmocka_unit_test_setup_teardown(test_init_connectors, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
             test_init_graphite_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_init_json_instance, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
             test_mark_scheduled_instances, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
