@@ -718,6 +718,31 @@ netdataDashboard.context = {
         height: 0.7
     },
 
+    'system.cpu_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on CPU. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'system.memory_some_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on memory. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on memory simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'system.io_some_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on I/O. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on I/O simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
     'system.io': {
         info: function (os) {
             var s = 'Total Disk I/O, for all physical disks. You can get detailed information about each disk at the <a href="#menu_disk">Disks</a> section and per application Disk usage at the <a href="#menu_apps">Applications Monitoring</a> section.';

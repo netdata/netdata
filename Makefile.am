@@ -263,6 +263,8 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/proc_loadavg.c \
     collectors/proc.plugin/proc_meminfo.c \
     collectors/proc.plugin/proc_pagetypeinfo.c \
+    collectors/proc.plugin/proc_pressure.c \
+    collectors/proc.plugin/proc_pressure.h \
     collectors/proc.plugin/proc_net_dev.c \
     collectors/proc.plugin/proc_net_ip_vs_stats.c \
     collectors/proc.plugin/proc_net_netstat.c \

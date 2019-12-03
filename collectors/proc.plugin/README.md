@@ -18,6 +18,7 @@
 -   `/proc/interrupts` (total and per core hardware interrupts)
 -   `/proc/softirqs` (total and per core software interrupts)
 -   `/proc/loadavg` (system load and total processes running)
+-   `/proc/pressure/{cpu,memory,io}` (pressure stall information)
 -   `/proc/sys/kernel/random/entropy_avail` (random numbers pool availability - used in cryptography)
 -   `/sys/class/power_supply` (power supply properties)
 -   `ipc` (IPC semaphores and message queues)
