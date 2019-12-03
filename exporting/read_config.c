@@ -2,12 +2,6 @@
 
 #include "exporting_engine.h"
 
-#if UNIT_TESTING
-char *netdata_configured_user_config_dir = ".";
-char *netdata_configured_stock_config_dir = ".";
-char *netdata_configured_hostname = "test_host";
-#endif
-
 struct config exporting_config = {.sections = NULL,
                                   .mutex = NETDATA_MUTEX_INITIALIZER,
                                   .index = {.avl_tree = {.root = NULL, .compar = appconfig_section_compare},
@@ -339,7 +333,6 @@ struct engine *read_exporting_config()
                     tmp_instance->config.options);
 #endif
 
-#ifndef UNIT_TESTING
                 if (unlikely(!exporting_config_exists) && !engine->config.hostname) {
                     engine->config.hostname =
                         strdupz(config_get(instance_name, "hostname", netdata_configured_hostname));
@@ -347,7 +340,6 @@ struct engine *read_exporting_config()
                     engine->config.update_every =
                         config_get_number(instance_name, EXPORTER_UPDATE_EVERY, EXPORTER_UPDATE_EVERY_DEFAULT);
                 }
-#endif
 
                 tmp_ci_list1 = tmp_ci_list->next;
                 freez(tmp_ci_list);

@@ -6,6 +6,12 @@
 RRDHOST *localhost;
 netdata_rwlock_t rrd_rwlock;
 
+// global variables needed by read_exporting_config()
+struct config netdata_config;
+char *netdata_configured_user_config_dir = ".";
+char *netdata_configured_stock_config_dir = ".";
+char *netdata_configured_hostname = "test_host";
+
 char log_line[MAX_LOG_LINE + 1];
 
 void init_connectors_in_tests(struct engine *engine)
