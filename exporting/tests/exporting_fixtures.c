@@ -57,7 +57,7 @@ int setup_rrdhost()
     rd->last_collected_time.tv_sec = 15051;
     rd->next = NULL;
 
-    rd->state = malloc(sizeof(*rd->state));
+    rd->state = calloc(1, sizeof(*rd->state));
     rd->state->query_ops.oldest_time = __mock_rrddim_query_oldest_time;
     rd->state->query_ops.latest_time = __mock_rrddim_query_latest_time;
     rd->state->query_ops.init = __mock_rrddim_query_init;
