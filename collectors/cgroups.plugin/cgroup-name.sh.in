@@ -96,11 +96,14 @@ function k8s_get_name() {
 			cut -d' ' -f1
 			)"
 		elif ps -C kubelet >/dev/null 2>&1 && command -v kubectl >/dev/null 2>&1; then
-			if kubectl get pod --all-namespaces >/dev/null 2>&1; then
-				NAME="$(kubectl get pod --all-namespaces --output='json' | \
+			if [[ -z ${KUBE_CONFIG+x} ]]; then
+				KUBE_CONFIG="/etc/kubernetes/admin.conf"
+			fi
+			if kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces >/dev/null 2>&1; then
+				NAME="$(kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces --output='json' | \
 				jq -r '.items[] | select(.metadata.uid == "'$id'") | .metadata.name')"
 			else
-				warning "kubectl cannot get pod list, check for configuration file in $HOME/.kube/config"
+				warning "kubectl cannot get pod list, check for configuration file in $KUBE_CONFIG, or set this path to env \$KUBE_CONFIG"
 			fi
 		fi
 	else
