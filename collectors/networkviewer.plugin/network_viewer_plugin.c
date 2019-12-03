@@ -57,10 +57,6 @@ static char *user_config_dir = NULL;
 static char *stock_config_dir = NULL;
 static char *plugin_dir = NULL;
 
-//used ,if and only if, there is not any connection
-static netdata_port_stats_t *fake1 = NULL;
-static netdata_port_stats_t *fake2 = NULL;
-
 //protocols used with this collector
 static char *protocols[] = { "tcp", "udp" };
 
@@ -87,22 +83,15 @@ static inline int is_ip_inside_table(in_addr_t src, in_addr_t dst) {
     return (is_ip_inside_this_range(src, outgoing_table) &&  is_ip_inside_this_range(dst, ingoing_table));
 }
 
-void netdata_set_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
+void netdata_set_port_stats(netdata_port_stats_t *p, uint16_t dport, uint8_t protocol) {
     char port[8];
     struct servent *sname;
 
-    p->port = e->dport;
-    p->protocol = e->protocol;
+    p->port = dport;
+    p->protocol = protocol;
 
-    p->iprev = 0;
-    p->inow = e->recv;
-    p->etot = 1;
-    p->eprev = 0;
-    p->enow = e->sent;
-
-    char *proto = ( p->protocol == 6 )?protocols[0]:protocols[1];
-    sname = getservbyport(e->dport,proto);
-
+    char *proto = ( protocol == 6 )?protocols[0]:protocols[1];
+    sname = getservbyport(dport,proto);
     if (sname) {
         p->dimension = strdup(sname->s_name);
     } else {
@@ -111,11 +100,12 @@ void netdata_set_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
     }
     p->next = NULL ;
 
-    fprintf(stderr,"KILLME SET PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
+ //   fprintf(stderr,"KILLME SET PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
 }
 
 
 // ----------------------------------------------------------------------
+/*
 static void write_report(netdata_port_stats_t *ptr) {
     char *chart1;
     char *chart2;
@@ -196,36 +186,9 @@ static void write_report(netdata_port_stats_t *ptr) {
         fprintf(stderr,"KILLME PROTOCOL END\n");
     }
 }
+ */
 
-static void fill_fake_vector(netdata_kern_stats_t *ptr, uint8_t proto) {
-    ptr->first = 0;
-    ptr->ct = 0;
-    ptr->saddr = 0;
-    ptr->daddr = 0;
-    ptr->dport = port_list[0].port;
-    ptr->retransmit = 0;
-    ptr->sent = 0;
-    ptr->recv = 0;
-    ptr->protocol = proto;
-    ptr->removeme = 0;
-}
-
-parse_text_input_t *overwrite_dimension(uint16_t search) {
-    parse_text_input_t *move = connection_controller.pti;
-
-    while(move) {
-        if (move->port == search) {
-            return move;
-        }
-        move = move->next;
-    }
-
-    return NULL;
-}
-
-static void netdata_create_chart(char *family, char *name, char *msg, char *axis, char *group, int proto) {
-    char port[8];
-    char *dimname;
+static void netdata_create_chart(char *family, char *name, char *msg, char *axis, char *group, uint8_t protocol) {
     printf("CHART %s.%s '' '%s' '%s' '%s' '' line 1000 1 ''\n"
             , family
             , name
@@ -241,23 +204,14 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
             , group);
 
     netdata_port_list_t *move = port_list;
-    struct servent *sname;
     while (move) {
-        parse_text_input_t *p = overwrite_dimension(move->port);
-        if(!p) {
-            char *proto_name = (!proto)?protocols[0]:protocols[1];
-            sname = getservbyport(move->port, proto_name);
-            if (!sname) {
-                snprintf(port, 8, "%d", ntohs(move->port) );
-                dimname = port;
-            } else {
-                dimname = sname->s_name;
-            }
-        } else {
-            dimname = p->value;
+
+        netdata_port_stats_t search_proto = { .port = move->port, .protocol = protocol };
+        netdata_port_stats_t *rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)&search_proto);
+        if(rp) {
+            printf("DIMENSION %s '' absolute 1 1\n", rp->dimension);
+            //fprintf(stderr,"KILLME DIMENSION %s '' absolute 1 1\n", dimname);
         }
-        printf("DIMENSION %s '' absolute 1 1\n", dimname);
-        fprintf(stderr,"KILLME DIMENSION %s '' absolute 1 1\n", dimname);
 
         move = move->next;
     }
@@ -277,35 +231,105 @@ static void netdata_create_charts() {
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections","UDP", 1);
 }
 
+static void write_connection(char *name, uint32_t *bytes, char **dimension) {
+    printf( "BEGIN %s.%s\n"
+            , NETWORK_VIEWER_FAMILY
+            , name);
+
+    uint16_t i = 0;
+    netdata_port_list_t *move = port_list;
+    while (move) {
+        printf("SET %s = %lld\n", dimension[i], (long long) bytes[i]);
+        i++;
+        move = move->next;
+    }
+
+    printf("END\n");
+}
+
+static void write_traffic(char *name, uint64_t *bytes, char **dimension) {
+    printf( "BEGIN %s.%s\n"
+            , NETWORK_VIEWER_FAMILY
+            , name);
+
+    uint16_t i = 0;
+    netdata_port_list_t *move = port_list;
+    while (move) {
+        printf("SET %s = %lld\n", dimension[i], (long long) bytes[i]);
+        i++;
+
+        move = move->next;
+    }
+
+    printf("END\n");
+}
 
 static void netdata_publish_data() {
-    if(connection_controller.ports) {
-        netdata_port_stats_t *move = connection_controller.ports;
-        while (move) {
-            write_report(move);
+    uint32_t econn_udp[NETDATA_MAX_DIMENSION];
+    uint64_t ibytes_udp[NETDATA_MAX_DIMENSION];
+    uint64_t ebytes_udp[NETDATA_MAX_DIMENSION];
+    uint32_t econn_tcp[NETDATA_MAX_DIMENSION];
+    uint64_t ibytes_tcp[NETDATA_MAX_DIMENSION];
+    uint64_t ebytes_tcp[NETDATA_MAX_DIMENSION];
+    static char *dimensions[NETDATA_MAX_DIMENSION];
+    static int initialize = 0;
 
-            move = move->next;
-        }
-    } else {
-        netdata_kern_stats_t e;
-        if(!fake1) {
-            fake1 = callocz(1, sizeof(netdata_port_stats_t));
-            if(fake1) {
-                fill_fake_vector(&e, 6);
-                netdata_set_port_stats(fake1, &e);
-            }
-        }
-        write_report(fake1);
-
-        if(!fake2) {
-            fake2 = callocz(1, sizeof(netdata_port_stats_t));
-            if(fake2) {
-                fill_fake_vector(&e, 17);
-                netdata_set_port_stats(fake2, &e);
-            }
-        }
-        write_report(fake2);
+    if (!initialize) {
+        initialize++;
     }
+
+    //fill content
+    uint16_t tcp = 0;
+    uint16_t udp = 0;
+    netdata_port_stats_t *move = connection_controller.ports;
+
+    uint64_t *ibytes;
+    uint64_t *ebytes;
+    uint32_t *econn;
+    while (move) {
+        if (move->protocol == 6) {//tcp
+            if(!initialize) {
+                dimensions[tcp] = move->dimension;
+            }
+            ibytes = &ibytes_tcp[tcp];
+            ebytes = &ebytes_tcp[tcp];
+            econn = &econn_tcp[tcp];
+            tcp++;
+        } else {
+            ibytes = &ibytes_udp[udp];
+            ebytes = &ebytes_udp[udp];
+            econn = &econn_udp[udp];
+            udp++;
+        }
+
+        if(move->inow != move->iprev) {
+            *ibytes = move->inow - move->iprev;
+            move->iprev = move->inow;
+
+            *ebytes = move->enow - move->eprev;
+            move->eprev = move->enow;
+        } else {
+            *ibytes = 0;
+            *ebytes = 0;
+        }
+
+        *econn = move->etot;
+
+        move = move->next;
+    }
+
+    if(!initialize) {
+        initialize++;
+    }
+
+    write_traffic(NETWORK_VIEWER_CHART1, ibytes_tcp, dimensions);
+    write_traffic(NETWORK_VIEWER_CHART3, ibytes_udp, dimensions);
+
+    write_traffic(NETWORK_VIEWER_CHART2, ebytes_tcp, dimensions);
+    write_traffic(NETWORK_VIEWER_CHART4, ebytes_udp, dimensions);
+
+    write_connection(NETWORK_VIEWER_CHART6, econn_tcp, dimensions);
+    write_connection(NETWORK_VIEWER_CHART8, econn_udp, dimensions);
 }
 
 void *network_viewer_publisher(void *ptr) {
@@ -445,11 +469,11 @@ static int compare_destination_ip(void *a, void *b) {
     return ret;
 }
 
-netdata_port_stats_t *store_new_port_stat(netdata_kern_stats_t *e) {
+netdata_port_stats_t *store_new_port_stat(uint16_t dport, uint8_t protocol) {
     netdata_port_stats_t *p = callocz(1, sizeof(netdata_port_stats_t));
 
     if(p) {
-        netdata_set_port_stats(p, e);
+        netdata_set_port_stats(p, dport, protocol);
         avl_init_lock(&p->destination_port, compare_destination_ip);
     }
 
@@ -481,8 +505,7 @@ int netdata_store_bpf(void *data, int size) {
     if(inside < 0) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
-
-    netdata_port_stats_t *pp;
+    /*
     netdata_port_stats_t *rp;
     netdata_conn_stats_t *ncs;
     netdata_conn_stats_t *ret;
@@ -510,11 +533,13 @@ int netdata_store_bpf(void *data, int size) {
         }
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
+     */
 
     netdata_port_stats_t search_proto = { .port = e->dport, .protocol = e->protocol };
-
-    pp = (netdata_port_stats_t *)avl_search_lock(&connection_controller.port_stat, (avl *)&search_proto);
+    netdata_port_stats_t *pp = (netdata_port_stats_t *)avl_search_lock(&connection_controller.port_stat, (avl *)&search_proto);
     if (!pp) {
+        return -2;
+        /*
         pp = store_new_port_stat(e);
         if(pp) {
             connection_controller.last_port->next = pp;
@@ -538,6 +563,7 @@ int netdata_store_bpf(void *data, int size) {
                 }
             }
         }
+         */
     } else {
         netdata_update_port_stats(pp, e);
     }
@@ -570,8 +596,6 @@ static int compare_port(void *a, void *b) {
 
 void *network_collector(void *ptr) {
     (void)ptr;
-
-    avl_init_lock(&(connection_controller.port_stat), compare_port);
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
     int netdata_exit = 0;
@@ -660,7 +684,6 @@ void clean_list_ports() {
 }
 
 static void int_exit(int sig) {
-    (void)sig;
     if(libnetdatanv) {
         dlclose(libnetdatanv);
     }
@@ -681,16 +704,6 @@ static void int_exit(int sig) {
         clean_list_ports();
     }
 
-    if(fake1) {
-        free(fake1->dimension);
-        free(fake1);
-    }
-
-    if(fake2) {
-        free(fake2->dimension);
-        free(fake2);
-    }
-
     if (connection_controller.pti) {
         parse_text_input_t *r = connection_controller.pti;
         while (r) {
@@ -702,7 +715,7 @@ static void int_exit(int sig) {
         }
     }
 
-    exit(0);
+    exit(sig);
 }
 
 static void build_complete_path(char *out, size_t length, char *filename) {
@@ -808,19 +821,59 @@ static int compare_port_value(void *a, void *b) {
     return 0;
 }
 
+static int port_stat_link_list(uint16_t port) {
+    netdata_port_stats_t *pp;
+    netdata_port_stats_t *rp;
+    pp = store_new_port_stat(port, 6); //tcp
+    if(pp) {
+        rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
+        if (rp != pp) {
+            error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
+            return -1;
+        }
+
+        if (!connection_controller.ports) {
+            connection_controller.ports = pp;
+            connection_controller.last_port = pp;
+        } else {
+            connection_controller.last_port->next = pp;
+            connection_controller.last_port = pp;
+        }
+
+        pp = store_new_port_stat(port, 17); //udp
+        if(pp) {
+            rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
+            if (rp != pp) {
+                error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
+                return -1;
+            }
+            connection_controller.last_port->next = pp;
+            connection_controller.last_port = pp;
+        } else {
+            return -1;
+        }
+    } else {
+        return -1;
+    }
+
+    return 0;
+}
+
 netdata_port_list_t *netdata_list_ports(char *ports) {
     netdata_port_list_t *ret = NULL, *next;
     netdata_port_list_t *set;
+
     uint16_t port;
 
+    uint16_t i;
     if (!ports) {
-        int i = 0;
         for (i = 0; i < 50; i++) {
             uint16_t def[] = {  20, 21, 25, 37, 43, 53, 80, 88, 110, 118,
                                 123, 135, 137, 138, 139, 143, 156, 194, 389, 443,
                                 445, 464, 465, 513, 520, 530, 546, 547, 563, 631,
                                 636, 691, 749, 901, 989, 990, 993, 995, 1381, 1433,
                                 1434, 1512, 1525, 3128, 3389, 3306, 5432, 6000, 8080, 19999 } ;
+
             set = (netdata_port_list_t *) callocz(1,sizeof(netdata_port_list_t));
             if(set) {
                 port = htons(def[i]);
@@ -831,6 +884,10 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                     error("[NETWORK VIEWER] Cannot insert port inside list.");
                 }
 
+                if ( port_stat_link_list(port) ) {
+                    return NULL;
+                }
+
                 if(!ret) {
                     ret =  set;
                 } else {
@@ -839,7 +896,10 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
 
                 next = set;
             }
+
         }
+
+        i = 50;
     } else {
         while (*ports) {
             char *vport = ports;
@@ -861,6 +921,11 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                     netdata_port_list_t *r = (netdata_port_list_t *)avl_insert_lock(&connection_controller.port_list, (avl *)set);
                     if (r != set ) {
                         error("[NETWORK VIEWER] Cannot insert port inside list.");
+                        return NULL;
+                    }
+
+                    if ( port_stat_link_list(port) ) {
+                        return NULL;
                     }
 
                     if(!ret) {
@@ -1019,32 +1084,60 @@ static int read_config_file(const char *path) {
     return 0;
 }
 
+static void update_dimensions() {
+    if (connection_controller.pti) {
+        parse_text_input_t *r = connection_controller.pti;
+        while (r) {
+            //UPDATE TCP
+            netdata_port_stats_t search_proto = { .port = r->port, .protocol = 6 };
+            netdata_port_stats_t *rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)&search_proto);
+            if(rp) {
+                free(rp->dimension);
+                rp->dimension = strdup(r->value);
+            }
+
+            //UPDATE UDP
+            search_proto.protocol = 17;
+            rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)&search_proto);
+            if(rp) {
+                free(rp->dimension);
+                rp->dimension = strdup(r->value);
+            }
+
+            r = r->next;
+        }
+    }
+}
+
 void parse_config() {
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
 
-    connection_controller.pti = NULL;
-
     memset(&connection_controller,0,sizeof(connection_controller));
     avl_init_lock(&connection_controller.port_list, compare_port_value);
+    avl_init_lock(&(connection_controller.port_stat), compare_port);
 
     if (!user_config_dir && !stock_config_dir) {
         return;
     }
 
-    int read_stock = 0;
+    int read_file = 0;
     if (user_config_dir) {
-        read_stock =  read_config_file(user_config_dir);
+        read_file =  read_config_file(user_config_dir);
     }
 
-    if (read_stock && stock_config_dir) {
-        //PUT INFO HERE
-        read_stock =  read_config_file(stock_config_dir);
+    if (read_file && stock_config_dir) {
+        info("[NETWORK VIEWER] Cannot read configuration file network_viewer.conf");
+        read_file =  read_config_file(stock_config_dir);
     }
 
-    if (read_stock) {
-        //REPORT ERROR FOR ALL HERE
+    if (read_file) {
+        info("[NETWORK VIEWER] Cannot read stock file network_viewer.conf, collector will start with default.");
+    } else {
+        if(port_list) {
+            update_dimensions();
+        }
     }
 }
 
@@ -1075,7 +1168,7 @@ int main(int argc, char **argv) {
     parse_config();
 
     if (network_viewer_load_libraries()) {
-        return 2;
+        int_exit(2);
     }
 
     signal(SIGINT, int_exit);
@@ -1083,18 +1176,18 @@ int main(int argc, char **argv) {
 
     if(network_viewer_load_ebpf()) {
         error("[NETWORK VIEWER] Cannot load eBPF program.");
-        return 3;
+        int_exit(3);
     }
 
     if (map_memory()) {
-        return 4;
+        int_exit(4);
     }
 
     if(!outgoing_table) {
         outgoing_table = netdata_list_ips(NULL, 1);
         if(!outgoing_table) {
             error("[NETWORK VIEWER] Cannot load outgoing network range to monitor.");
-            return 5;
+            int_exit(5);
         }
     }
 
@@ -1102,7 +1195,7 @@ int main(int argc, char **argv) {
         ingoing_table = netdata_list_ips(NULL, 0);
         if(!ingoing_table) {
             error("[NETWORK VIEWER] Cannot load ingoing network range to monitor.");
-            return 6;
+            int_exit(6);
         }
     }
 
@@ -1110,7 +1203,7 @@ int main(int argc, char **argv) {
         port_list = netdata_list_ports(NULL);
         if(!port_list) {
             error("[NETWORK VIEWER] Cannot load network ports to monitor.");
-            return 7;
+            int_exit(7);
         }
     }
 
@@ -1124,14 +1217,14 @@ int main(int argc, char **argv) {
     for ( i = 0; i < end ; i++ ) {
         if ( ( pthread_create(&thread[i], &attr, (!i)?network_viewer_publisher:network_collector, NULL) ) ) {
             error("[NETWORK VIEWER] Cannot create the necessaries threads.");
-            return 8;
+            int_exit(8);
         }
     }
 
     for ( i = 0; i < end ; i++ ) {
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[NETWORK VIEWER] Cannot join the necessaries threads.");
-            return 9;
+            int_exit(9);
         }
     }
 

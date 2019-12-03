@@ -131,6 +131,8 @@ typedef struct netdata_network {
 
 # define NETDATA_MAX_PROCESSOR 128
 
+# define NETDATA_MAX_DIMENSION 50
+
 # define NETWORK_VIEWER_FAMILY "network_viewer"
 # define NETWORK_VIEWER_CHART1 "TCP_transf_inbound"
 # define NETWORK_VIEWER_CHART2 "TCP_transf_outbound"
