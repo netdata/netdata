@@ -80,7 +80,7 @@ static inline char *strip_quotes(char *str) {
 #endif // BACKENDS_INTERNALS
 
 #include "backends/prometheus/backend_prometheus.h"
-// #include "backends/graphite/graphite.h"
+#include "backends/graphite/graphite.h"
 #include "backends/json/json.h"
 #include "backends/opentsdb/opentsdb.h"
 

@@ -408,14 +408,12 @@ void backend_set_graphite_variables(int *default_port,
                                     backend_request_formatter_t brf)
 {
     *default_port = 2003;
-    (void)brc;
-    (void)brf;
-    // *brc = process_graphite_response;
+    *brc = process_graphite_response;
 
-    // if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-    //     *brf = format_dimension_collected_graphite_plaintext;
-    // else
-    //     *brf = format_dimension_stored_graphite_plaintext;
+    if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
+        *brf = backends_format_dimension_collected_graphite_plaintext;
+    else
+        *brf = backends_format_dimension_stored_graphite_plaintext;
 }
 
 /**

@@ -74,6 +74,7 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_STATSD
 
         // common plugins for all systems
+    {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
 #ifdef ENABLE_EXPORTING
     {"EXPORTING",            NULL,                    NULL,         1, NULL, NULL, exporting_main},
 #endif
