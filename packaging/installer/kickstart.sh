@@ -293,7 +293,7 @@ INTERACTIVE=1
 PACKAGES_INSTALLER_OPTIONS="netdata"
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="--auto-update"
-RELEASE_CHANNEL="nightly"
+RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 while [ -n "${1}" ]; do
 	if [ "${1}" = "all" ]; then
 		PACKAGES_INSTALLER_OPTIONS="netdata-all"
@@ -308,6 +308,10 @@ while [ -n "${1}" ]; do
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
 		NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --stable-channel"
+		shift 1
+	elif [ "${1}" = "--nightly-channel" ]; then
+		RELEASE_CHANNEL="stable"
+		NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --nightly-channel"
 		shift 1
 	elif [ "${1}" = "--local-files" ]; then
 		shift 1

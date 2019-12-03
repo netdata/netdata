@@ -8,6 +8,7 @@
 #  --non-interactive        do not wait for input
 #  --dont-start-it          do not start netdata after install
 #  --stable-channel         Use the stable release channel, rather than the nightly to fetch sources
+#  --nightly-channel        Use the nightly release channel, rather than the stable to fetch sources
 #  --local-files Use a manually provided tarball for the installation
 #
 # ---------------------------------------------------------------------------------------------------------------------
@@ -185,7 +186,7 @@ fi
 opts=
 NETDATA_INSTALLER_OPTIONS=""
 NETDATA_UPDATES="--auto-update"
-RELEASE_CHANNEL="nightly"
+RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 while [ -n "${1}" ]; do
 	if [ "${1}" = "--dont-wait" ] || [ "${1}" = "--non-interactive" ] || [ "${1}" = "--accept" ]; then
 		opts="${opts} --accept"
@@ -198,6 +199,10 @@ while [ -n "${1}" ]; do
 		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
+		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
+		shift 1
+	elif [ "${1}" = "--nightly-channel" ]; then
+		RELEASE_CHANNEL="nightly"
 		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
 		shift 1
 	elif [ "${1}" = "--local-files" ]; then

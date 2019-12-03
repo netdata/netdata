@@ -155,6 +155,8 @@ USAGE: ${PROGRAM} [options]
   --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
   --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
                              This results in less frequent updates.
+  --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
+                             This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
@@ -202,7 +204,7 @@ AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
-RELEASE_CHANNEL="nightly"
+RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
 while [ -n "${1}" ]; do
 	case "${1}" in
@@ -212,6 +214,7 @@ while [ -n "${1}" ]; do
 		"--dont-wait") DONOTWAIT=1;;
 		"--auto-update"|"-u") AUTOUPDATE=1;;
 		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--nightly-channel") RELEASE_CHANNEL="nightly";;
 		"--enable-plugin-freeipmi")  NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi";;
 		"--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi";;
 		"--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https";;

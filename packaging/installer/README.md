@@ -65,6 +65,7 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 -   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
+-   `--nightly-channel`: Automatically update on every new nightly build.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--local-files`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
 
