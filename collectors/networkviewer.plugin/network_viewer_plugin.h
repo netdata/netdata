@@ -105,6 +105,7 @@ typedef struct netdata_port_list {
     avl avl;
 
     uint16_t port;
+    char *dimension;
 
     struct netdata_port_list *next;
 }netdata_port_list_t;

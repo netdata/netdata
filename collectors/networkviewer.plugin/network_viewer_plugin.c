@@ -105,90 +105,7 @@ void netdata_set_port_stats(netdata_port_stats_t *p, uint16_t dport, uint8_t pro
 
 
 // ----------------------------------------------------------------------
-/*
-static void write_report(netdata_port_stats_t *ptr) {
-    char *chart1;
-    char *chart2;
-    char *chart4;
-    char *dim;
-    uint64_t ibytes;
-    uint64_t ebytes;
-    uint32_t econn;
-
-    if ( ptr->protocol == 6 ) { //TCP
-        chart1 = NETWORK_VIEWER_CHART1;
-        chart2 = NETWORK_VIEWER_CHART2;
-        chart4 = NETWORK_VIEWER_CHART6;
-    } else {  //UDP(17)
-        chart1 = NETWORK_VIEWER_CHART3;
-        chart2 = NETWORK_VIEWER_CHART4;
-        chart4 = NETWORK_VIEWER_CHART8;
-    }
-
-    dim = ptr->dimension;
-    if(dim) {
-        fprintf(stderr,"KILLME WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
-        ibytes = ptr->inow - ptr->iprev;
-        ptr->iprev = ptr->inow;
-
-        ebytes = ptr->enow - ptr->eprev;
-        ptr->eprev = ptr->enow;
-
-        fprintf(stderr,"KILLME WRITE REPORT %s %u (%lu, %lu) (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ptr->inow, ptr->iprev, ptr->enow, ptr->eprev);
-
-        econn = ptr->etot;
-
-        fprintf(stderr,"KILLME WRITE REPORT %s %u (%lu, %lu)\n", ptr->dimension, ntohs(ptr->port), ibytes, ebytes);
-        //--------------------------------------
-        printf( "BEGIN %s.%s\n"
-                , NETWORK_VIEWER_FAMILY
-                , chart1);
-
-        fprintf(stderr,"KILLME PROTOCOL BEGIN %s.%s\n", NETWORK_VIEWER_FAMILY, chart1);
-
-        printf( "SET %s = %lld\n"
-                , dim
-                , (long long)ibytes);
-        fprintf(stderr,"KILLME PROTOCOL SET %s = %lld\n", dim,(long long)ibytes );
-
-        printf("END\n");
-        fprintf(stderr,"KILLME PROTOCOL END\n");
-
-        //--------------------------------------
-        printf( "BEGIN %s.%s\n"
-                , NETWORK_VIEWER_FAMILY
-                , chart2);
-
-        fprintf(stderr,"KILLME PROTOCOL BEGIN %s.%s\n", NETWORK_VIEWER_FAMILY, chart2);
-
-        printf( "SET %s = %lld\n"
-                , dim
-                ,(long long) ebytes);
-        fprintf(stderr,"KILLME PROTOCOL SET %s = %lld\n", dim,(long long)ebytes );
-
-        printf("END\n");
-        fprintf(stderr,"KILLME PROTOCOL END\n");
-
-        //--------------------------------------
-        printf( "BEGIN %s.%s\n"
-                , NETWORK_VIEWER_FAMILY
-                , chart4);
-
-        fprintf(stderr,"KILLME PROTOCOL BEGIN %s.%s\n", NETWORK_VIEWER_FAMILY, chart4);
-
-        printf( "SET %s = %lld\n"
-                , dim
-                ,(long long) econn);
-
-        fprintf(stderr,"KILLME PROTOCOL SET %s = %lld\n", dim,(long long)econn );
-
-        printf("END\n");
-        fprintf(stderr,"KILLME PROTOCOL END\n");
-    }
-}
- */
-
-static void netdata_create_chart(char *family, char *name, char *msg, char *axis, char *group, uint8_t protocol) {
+static void netdata_create_chart(char *family, char *name, char *msg, char *axis, char *group) {
     printf("CHART %s.%s '' '%s' '%s' '%s' '' line 1000 1 ''\n"
             , family
             , name
@@ -196,42 +113,39 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
             , axis
             , group);
 
+    /*
     fprintf(stderr, "KILLME CHART %s.%s '' '%s' '%s' '%s' '' line 1000 1 ''\n"
             , family
             , name
             , msg
             , axis
             , group);
+            */
 
     netdata_port_list_t *move = port_list;
     while (move) {
-
-        netdata_port_stats_t search_proto = { .port = move->port, .protocol = protocol };
-        netdata_port_stats_t *rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)&search_proto);
-        if(rp) {
-            printf("DIMENSION %s '' absolute 1 1\n", rp->dimension);
-            //fprintf(stderr,"KILLME DIMENSION %s '' absolute 1 1\n", dimname);
-        }
+        printf("DIMENSION %s '' absolute 1 1\n", move->dimension);
+       // fprintf(stderr,"KILLME DIMENSION %s '' absolute 1 1\n", move->dimension);
 
         move = move->next;
     }
 }
 
 static void netdata_create_charts() {
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART1, "Network Viewer TCP bytes received from request to specific port.", "bytes/s", "TCP", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART1, "Network Viewer TCP bytes received from request to specific port.", "bytes/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART2, "Network viewer TCP request length to specific port.", "bytes/s", "TCP", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART2, "Network viewer TCP request length to specific port.", "bytes/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART3, "Network viewer UDP bytes received from request to specific port.", "bytes/s","UDP", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART3, "Network viewer UDP bytes received from request to specific port.", "bytes/s","UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART4, "Network viewer UDP request length to specific port.", "bytes/s","UDP", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART4, "Network viewer UDP request length to specific port.", "bytes/s","UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART6, "Network viewer TCP active connections per port.", "active connections", "TCP", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART6, "Network viewer TCP active connections per port.", "active connections", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections","UDP", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections","UDP");
 }
 
-static void write_connection(char *name, uint32_t *bytes, char **dimension) {
+static void write_connection(char *name, uint32_t *bytes) {
     printf( "BEGIN %s.%s\n"
             , NETWORK_VIEWER_FAMILY
             , name);
@@ -239,7 +153,8 @@ static void write_connection(char *name, uint32_t *bytes, char **dimension) {
     uint16_t i = 0;
     netdata_port_list_t *move = port_list;
     while (move) {
-        printf("SET %s = %lld\n", dimension[i], (long long) bytes[i]);
+        printf("SET %s = %lld\n", move->dimension, (long long) bytes[i]);
+        //fprintf(stderr,"KILLME WRITE CONNECTION %s = %lld \n\n", move->dimension, (long long) bytes[i]);
         i++;
         move = move->next;
     }
@@ -247,7 +162,7 @@ static void write_connection(char *name, uint32_t *bytes, char **dimension) {
     printf("END\n");
 }
 
-static void write_traffic(char *name, uint64_t *bytes, char **dimension) {
+static void write_traffic(char *name, uint64_t *bytes) {
     printf( "BEGIN %s.%s\n"
             , NETWORK_VIEWER_FAMILY
             , name);
@@ -255,11 +170,13 @@ static void write_traffic(char *name, uint64_t *bytes, char **dimension) {
     uint16_t i = 0;
     netdata_port_list_t *move = port_list;
     while (move) {
-        printf("SET %s = %lld\n", dimension[i], (long long) bytes[i]);
+        printf("SET %s = %lld\n", move->dimension, (long long) bytes[i]);
+   //     fprintf(stderr,"KILLME WRITE TRAFFIC %s = %lld \n\n", move->dimension, (long long) bytes[i]);
         i++;
 
         move = move->next;
     }
+ //   fprintf(stderr,"KILLME WRITE TRAFFIC %u \n\n", i);
 
     printf("END\n");
 }
@@ -271,12 +188,6 @@ static void netdata_publish_data() {
     uint32_t econn_tcp[NETDATA_MAX_DIMENSION];
     uint64_t ibytes_tcp[NETDATA_MAX_DIMENSION];
     uint64_t ebytes_tcp[NETDATA_MAX_DIMENSION];
-    static char *dimensions[NETDATA_MAX_DIMENSION];
-    static int initialize = 0;
-
-    if (!initialize) {
-        initialize++;
-    }
 
     //fill content
     uint16_t tcp = 0;
@@ -288,9 +199,6 @@ static void netdata_publish_data() {
     uint32_t *econn;
     while (move) {
         if (move->protocol == 6) {//tcp
-            if(!initialize) {
-                dimensions[tcp] = move->dimension;
-            }
             ibytes = &ibytes_tcp[tcp];
             ebytes = &ebytes_tcp[tcp];
             econn = &econn_tcp[tcp];
@@ -308,28 +216,28 @@ static void netdata_publish_data() {
 
             *ebytes = move->enow - move->eprev;
             move->eprev = move->enow;
+
+            *econn = move->etot;
         } else {
             *ibytes = 0;
             *ebytes = 0;
-        }
 
-        *econn = move->etot;
+            *econn = move->etot;
+        }
+        //fprintf(stderr,"KILLME PUBLISH DATA %lu %lu %u \n\n", *ibytes, *ebytes, *econn);
 
         move = move->next;
     }
+    //fprintf(stderr,"KILLME DATA %u %u \n\n", tcp, udp);
 
-    if(!initialize) {
-        initialize++;
-    }
+    write_traffic(NETWORK_VIEWER_CHART1, ibytes_tcp);
+    write_traffic(NETWORK_VIEWER_CHART3, ibytes_udp);
 
-    write_traffic(NETWORK_VIEWER_CHART1, ibytes_tcp, dimensions);
-    write_traffic(NETWORK_VIEWER_CHART3, ibytes_udp, dimensions);
+    write_traffic(NETWORK_VIEWER_CHART2, ebytes_tcp);
+    write_traffic(NETWORK_VIEWER_CHART4, ebytes_udp);
 
-    write_traffic(NETWORK_VIEWER_CHART2, ebytes_tcp, dimensions);
-    write_traffic(NETWORK_VIEWER_CHART4, ebytes_udp, dimensions);
-
-    write_connection(NETWORK_VIEWER_CHART6, econn_tcp, dimensions);
-    write_connection(NETWORK_VIEWER_CHART8, econn_udp, dimensions);
+    write_connection(NETWORK_VIEWER_CHART6, econn_tcp);
+    write_connection(NETWORK_VIEWER_CHART8, econn_udp);
 }
 
 void *network_viewer_publisher(void *ptr) {
@@ -391,10 +299,10 @@ netdata_conn_stats_t *store_new_connection_stat(netdata_kern_stats_t *e) {
 }
 
 void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e) {
-    fprintf(stderr,"KILLME 1 UPDATE PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
+ //   fprintf(stderr,"KILLME 1 UPDATE PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
     p->inow += e->recv;
     p->enow += e->sent;
-    fprintf(stderr,"KILLME 2 UPDATE PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
+ //   fprintf(stderr,"KILLME 2 UPDATE PORT %s %u (%lu, %lu) (%lu, %lu)\n", p->dimension, ntohs(e->dport), p->inow, p->iprev, p->enow, p->eprev);
 
     netdata_conn_stats_t *ret;
     netdata_conn_stats_t search = { .daddr = e->daddr, .saddr = e->saddr, .dport = e->dport };
@@ -402,10 +310,19 @@ void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e)
     if (!ncs) {
         ncs = store_new_connection_stat(e);
         if(ncs) {
-            netdata_conn_stats_t *ret = (netdata_conn_stats_t *)avl_insert_lock(&p->destination_port, (avl *)ncs);
+            if (!connection_controller.tree) {
+                connection_controller.last_connection = ncs;
+                ncs->prev = NULL;
+                connection_controller.tree = ncs;
+            } else {
+                connection_controller.last_connection->next = ncs;
+                ncs->prev = connection_controller.last_connection;
+                connection_controller.last_connection = ncs;
+            }
+
+            ret = (netdata_conn_stats_t *)avl_insert_lock(&p->destination_port, (avl *)ncs);
             if(ret != ncs) {
                 error("[NETWORK VIEWER] Cannot insert a new connection to index.");
-                free(ncs);
             } else {
                 connection_controller.last_connection->next = ncs;
                 ncs->prev = connection_controller.last_connection;
@@ -418,7 +335,7 @@ void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e)
         netdata_update_conn_stats(ncs, e);
     }
 
-    if(e->removeme) {
+    if(ncs && e->removeme) {
         ret = (netdata_conn_stats_t *)avl_remove_lock(&p->destination_port, (avl *)ncs);
         if (ret != ncs) {
             error("[NETWORK VIEWER] Cannot remove a connection from index.");
@@ -431,7 +348,9 @@ void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e)
             ncs->prev = NULL;
         } else {
             ret = ncs->prev;
-            ret->next  = ncs->next;
+            if(ret) {
+                ret->next  = ncs->next;
+            }
         }
 
         free(ncs);
@@ -492,7 +411,6 @@ int netdata_store_bpf(void *data, int size) {
     (void)size;
 
     netdata_kern_stats_t *e = data;
-
     if(!e->dport) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
@@ -505,6 +423,7 @@ int netdata_store_bpf(void *data, int size) {
     if(inside < 0) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
+
     /*
     netdata_port_stats_t *rp;
     netdata_conn_stats_t *ncs;
@@ -565,7 +484,7 @@ int netdata_store_bpf(void *data, int size) {
         }
          */
     } else {
-        netdata_update_port_stats(pp, e);
+       netdata_update_port_stats(pp, e);
     }
 
     return -2; //LIBBPF_PERF_EVENT_CONT;
@@ -821,7 +740,7 @@ static int compare_port_value(void *a, void *b) {
     return 0;
 }
 
-static int port_stat_link_list(uint16_t port) {
+static int port_stat_link_list(netdata_port_list_t *pl,uint16_t port) {
     netdata_port_stats_t *pp;
     netdata_port_stats_t *rp;
     pp = store_new_port_stat(port, 6); //tcp
@@ -832,6 +751,7 @@ static int port_stat_link_list(uint16_t port) {
             return -1;
         }
 
+        pl->dimension = pp->dimension;
         if (!connection_controller.ports) {
             connection_controller.ports = pp;
             connection_controller.last_port = pp;
@@ -884,7 +804,7 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                     error("[NETWORK VIEWER] Cannot insert port inside list.");
                 }
 
-                if ( port_stat_link_list(port) ) {
+                if ( port_stat_link_list(r, port) ) {
                     return NULL;
                 }
 
@@ -924,7 +844,7 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                         return NULL;
                     }
 
-                    if ( port_stat_link_list(port) ) {
+                    if ( port_stat_link_list(set, port) ) {
                         return NULL;
                     }
 
@@ -1094,6 +1014,13 @@ static void update_dimensions() {
             if(rp) {
                 free(rp->dimension);
                 rp->dimension = strdup(r->value);
+
+                netdata_port_list_t lnpl;
+                lnpl.port = r->port;
+                netdata_port_list_t *r = (netdata_port_list_t *)avl_search_lock(&connection_controller.port_list, (avl *)&lnpl);
+                if (r) {
+                    r->dimension = rp->dimension;
+                }
             }
 
             //UPDATE UDP
