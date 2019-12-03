@@ -220,7 +220,7 @@ struct engine *read_exporting_config()
 
     // Will build a list of instances per connector
     // TODO: change BACKEND to EXPORTING
-    ci_list = callocz(sizeof(BACKEND_TYPE), sizeof(struct connector_instance_list *));
+    ci_list = callocz(BACKEND_TYPE_NUM, sizeof(struct connector_instance_list *));
 
     while (get_connector_instance(&local_ci)) {
         BACKEND_TYPE backend_type;
@@ -260,12 +260,13 @@ struct engine *read_exporting_config()
             exporter_get_number(CONFIG_SECTION_EXPORTING, EXPORTER_UPDATE_EVERY, EXPORTER_UPDATE_EVERY_DEFAULT);
     }
 
-    for (size_t i = 0; i < sizeof(BACKEND_TYPE); i++) {
+    for (size_t i = 0; i < BACKEND_TYPE_NUM; i++) {
         // For each connector build list
         tmp_ci_list = ci_list[i];
 
         // If we have a list of instances for this connector then build it
         if (tmp_ci_list) {
+        info("EXPORTING: type = %lu, list = %p", i, tmp_ci_list);
             struct connector *tmp_connector;
 
             tmp_connector = (struct connector *)calloc(1, sizeof(struct connector));

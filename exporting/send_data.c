@@ -2,6 +2,7 @@
 
 #include "exporting_engine.h"
 #include "graphite/graphite.h"
+#include "json/json.h"
 
 /**
  * Discard response

@@ -1227,6 +1227,7 @@ AC_CONFIG_FILES([
     diagrams/Makefile
     exporting/Makefile
     exporting/graphite/Makefile
+    exporting/json/Makefile
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile

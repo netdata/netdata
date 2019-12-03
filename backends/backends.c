@@ -269,9 +269,9 @@ void backend_set_kinesis_variables(int *default_port,
 #if HAVE_KINESIS
     *brc = process_json_response;
     if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_json_plaintext;
+        *brf = backends_format_dimension_collected_json_plaintext;
     else
-        *brf = format_dimension_stored_json_plaintext;
+        *brf = backends_format_dimension_stored_json_plaintext;
 #endif
 }
 
@@ -321,9 +321,9 @@ void backend_set_mongodb_variables(int *default_port,
 #if HAVE_MONGOC
     *brc = process_json_response;
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_json_plaintext;
+        *brf = backends_format_dimension_collected_json_plaintext;
     else
-        *brf = format_dimension_stored_json_plaintext;
+        *brf = backends_format_dimension_stored_json_plaintext;
 #endif
 }
 
@@ -344,9 +344,9 @@ void backend_set_json_variables(int *default_port,
     *brc = process_json_response;
 
     if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_json_plaintext;
+        *brf = backends_format_dimension_collected_json_plaintext;
     else
-        *brf = format_dimension_stored_json_plaintext;
+        *brf = backends_format_dimension_stored_json_plaintext;
 }
 
 /**
@@ -622,6 +622,9 @@ void *backends_main(void *ptr) {
             break;
         }
         case BACKEND_TYPE_UNKNOWN: {
+            break;
+        }
+        default: {
             break;
         }
     }

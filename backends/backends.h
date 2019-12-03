@@ -23,7 +23,8 @@ typedef enum backend_types {
     BACKEND_TYPE_JSON,                      // Stores the data using JSON.
     BACKEND_TYPE_PROMETEUS,                 // The user selected to use Prometheus backend
     BACKEND_TYPE_KINESIS,                   // Send message to AWS Kinesis
-    BACKEND_TYPE_MONGODB                    // Send data to MongoDB collection
+    BACKEND_TYPE_MONGODB,                   // Send data to MongoDB collection
+    BACKEND_TYPE_NUM                        // Number of backend types
 } BACKEND_TYPE;
 
 #ifdef ENABLE_EXPORTING

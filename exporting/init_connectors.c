@@ -2,6 +2,7 @@
 
 #include "exporting_engine.h"
 #include "graphite/graphite.h"
+#include "json/json.h"
 
 /**
  * Initialize connectors
@@ -19,6 +20,10 @@ int init_connectors(struct engine *engine)
                 if (init_graphite_connector(connector) != 0)
                     return 1;
                 break;
+            case BACKEND_TYPE_JSON:
+                if (init_json_connector(connector) != 0)
+                    return 1;
+                break;
             default:
                 error("EXPORTING: unknown exporting connector type");
                 return 1;
@@ -30,6 +35,10 @@ int init_connectors(struct engine *engine)
             switch (connector->config.type) {
                 case BACKEND_TYPE_GRAPHITE:
                     if (init_graphite_instance(instance) != 0)
+                        return 1;
+                    break;
+                case BACKEND_TYPE_JSON:
+                    if (init_json_instance(instance) != 0)
                         return 1;
                     break;
                 default:

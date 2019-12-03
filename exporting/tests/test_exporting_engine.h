@@ -7,6 +7,7 @@
 
 #include "exporting/exporting_engine.h"
 #include "exporting/graphite/graphite.h"
+#include "exporting/json/json.h"
 
 #include <stdarg.h>
 #include <stddef.h>

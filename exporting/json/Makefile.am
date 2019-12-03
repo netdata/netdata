@@ -2,13 +2,3 @@
 
 AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
-
-SUBDIRS = \
-    tests \
-    graphite \
-    json \
-    $(NULL)
-
-dist_noinst_DATA = \
-    README.md \
-    $(NULL)

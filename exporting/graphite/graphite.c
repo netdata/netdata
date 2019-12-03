@@ -3,7 +3,7 @@
 #include "graphite.h"
 
 /**
- * Format dimension using collected data for graphine connector
+ * Format dimension using collected data for Graphite connector
  *
  * @param instance an instance data structure.
  * @param rd a dimension.
@@ -43,7 +43,7 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
 }
 
 /**
- * Format dimension using a calculated value from stored data for graphine connector
+ * Format dimension using a calculated value from stored data for Graphite connector
  *
  * @param instance an instance data structure.
  * @param rd a dimension.
@@ -85,8 +85,6 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
             , value
             , (unsigned long long) last_t
     );
-
-    return 0;
 
     return 0;
 }
