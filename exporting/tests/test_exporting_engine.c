@@ -406,6 +406,37 @@ static void test_format_dimension_stored_graphite_plaintext(void **state)
         "netdata.test-host.chart_name.dimension_name;TAG1=VALUE1 TAG2=VALUE2 690565856.0000000 15052\n");
 }
 
+static void test_format_dimension_collected_json_plaintext(void **state)
+{
+    struct engine *engine = *state;
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    assert_int_equal(format_dimension_collected_json_plaintext(engine->connector_root->instance_root, rd), 0);
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\"," \
+        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\"," \
+        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\"," \
+        "\"name\":\"dimension_name\",\"value\":123000321,\"timestamp\": 15051}\n");
+}
+
+static void test_format_dimension_stored_json_plaintext(void **state)
+{
+    struct engine *engine = *state;
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    assert_int_equal(format_dimension_stored_json_plaintext(engine->connector_root->instance_root, rd), 0);
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\"," \
+        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\"," \
+        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\"," \
+        "\"name\":\"dimension_name\",\"value\":690565856.0000000,\"timestamp\": 15052}\n");
+}
+
 static void test_exporting_discard_response(void **state)
 {
     struct engine *engine = *state;
@@ -567,6 +598,10 @@ int main(void)
             test_format_dimension_collected_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_format_dimension_stored_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_collected_json_plaintext, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_stored_json_plaintext, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_exporting_discard_response, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
