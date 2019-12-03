@@ -404,65 +404,10 @@ int netdata_store_bpf(void *data, int size) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
 
-    /*
-    netdata_port_stats_t *rp;
-    netdata_conn_stats_t *ncs;
-    netdata_conn_stats_t *ret;
-    if (!connection_controller.ports) {
-        pp = store_new_port_stat(e);
-        connection_controller.ports = pp;
-        connection_controller.last_port = pp;
-
-        rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
-        if(rp != pp) {
-            error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
-        }
-
-        ncs = store_new_connection_stat(e);
-        if(ncs) {
-            connection_controller.last_connection = ncs;
-            ncs->prev = NULL;
-            connection_controller.tree = ncs;
-            ret = (netdata_conn_stats_t *)avl_insert_lock(&pp->destination_port, (avl *)ncs);
-            if(ret != ncs) {
-                error("[NETWORK VIEWER] Cannot insert a new connection inside index.");
-            } else {
-                pp->etot += 1;
-            }
-        }
-        return -2;//LIBBPF_PERF_EVENT_CONT;
-    }
-     */
-
     netdata_port_stats_t search_proto = { .port = e->dport, .protocol = e->protocol };
     netdata_port_stats_t *pp = (netdata_port_stats_t *)avl_search_lock(&connection_controller.port_stat, (avl *)&search_proto);
     if (!pp) {
         return -2;
-        /*
-        pp = store_new_port_stat(e);
-        if(pp) {
-            connection_controller.last_port->next = pp;
-            connection_controller.last_port = pp;
-
-            rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
-            if(rp != pp) {
-                error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
-            }
-
-            ncs = store_new_connection_stat(e);
-            if(ncs) {
-                connection_controller.last_connection->next = ncs;
-                ncs->prev = connection_controller.last_connection;
-                connection_controller.last_connection = ncs;
-                ret = (netdata_conn_stats_t *)avl_insert_lock(&pp->destination_port, (avl *)ncs);
-                if(ret != ncs) {
-                    error("[NETWORK VIEWER] Cannot insert a new connection inside index.");
-                } else {
-                    pp->etot += 1;
-                }
-            }
-        }
-         */
     } else {
        netdata_update_port_stats(pp, e);
     }
@@ -632,7 +577,7 @@ int network_viewer_load_libraries() {
     build_complete_path(lpath, 4096, "libnetdata_network_viewer.so");
     libnetdatanv = dlopen(lpath ,RTLD_LAZY);
     if (!libnetdatanv) {
-        error("[NETWORK VIEWER] Cannot load ./libnetdata_network_viewer.so.");
+        error("[NETWORK VIEWER] Cannot load %s.", lpath);
         return -1;
     } else {
         load_bpf_file = dlsym(libnetdatanv, "load_bpf_file");
