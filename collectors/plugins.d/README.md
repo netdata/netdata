@@ -20,8 +20,15 @@ from external processes, thus allowing Netdata to use **external plugins**.
 |[python.d.plugin](../python.d.plugin/)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
 |[slabinfo.plugin](../slabinfo.plugin/)|`C`|linux|collects kernel internal cache objects (SLAB) metrics.|
 
-Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native Netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator).
-Each of these modular plugins has each own methods for defining modules. Please check the examples and their documentation.
+### Plugin Orchestrators
+
+Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included.
+
+ Writing modules for these plugins is easier than accessing the native Netdata API directly. **You will find numerous Modules already available** for each orchestrator under the directory of the particular plugin (e.g. under python.d.plugin for the python orchestrator).
+
+Each of these modular plugins has each own methods for defining modules. *Please refer to the documentation and the source code of already available modules.*
+
+For a list of the available Modules, please refer [here](/docs/Add-more-charts-to-netdata.md).
 
 ## Motivation
 
