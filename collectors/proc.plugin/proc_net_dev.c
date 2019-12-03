@@ -726,9 +726,9 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 if (unlikely(d->duplex_last_collected_usec >= (usec_t)dt_to_refresh_duplex)) {
                     if (unlikely(!d->chart_var_duplex)) {
-                        d->chart_var_duplex = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "duplex_state");
+                        d->chart_var_duplex = rrdsetvar_custom_chart_variable_create(d->st_bandwidth, "duplex");
                         if (!d->chart_var_duplex) {
-                            error("Cannot create interface %s chart variable 'duplex_state'. Will not update the duplex status anymore.", d->name);
+                            error("Cannot create interface %s chart variable 'duplex'. Will not update the duplex status anymore.", d->name);
                             freez(d->filename_duplex);
                             d->filename_duplex = NULL;
                         }
