@@ -150,7 +150,10 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'packaging/DISTRIBUTIONS.md'
     - 'packaging/installer/UNINSTALL.md'
 - 'docs/getting-started.md'
-- 'docs/step-by-step/step-00.md'
+"
+navpart 1 docs/step-by-step "" "Step-by-step tutorial" 1
+# navpart 1 health README "Alarms and notifications"
+echo -ne "
 - Running Netdata:
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'
