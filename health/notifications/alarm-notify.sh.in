@@ -1704,13 +1704,13 @@ send_matrix() {
         {
             "msgtype": "m.notice",
             "format": "org.matrix.custom.html",
-            "formatted_body": "<font color=\"$color\">${host} ${status_message}, \`${chart}\` (${family}), <b>${alarm}</b></font>",
-            "body": "${host} ${status_message}, \`${chart}\` (${family}), *${alarm}*"
+			"formatted_body": "<font color=\"$color\">${host} (${goto_url}) ${status_message}, \`${chart}\` (${family}), <b>${alarm}</b></font>",
+			"body": "${host} (${goto_url}) ${status_message}, \`${chart}\` (${family}), *${alarm}*"
         }
 EOF
 		)"
 
-		httpcode=$(docurl -X POST --data-urlencode "payload=${payload}" "${webhook}")
+		httpcode=$(docurl -X POST --data "${payload}" "${webhook}")
 		if [ "${httpcode}" == "200" ]; then
 			info "sent matrix notification for: ${host} ${chart}.${name} is ${status} to '${room}'"
 			sent=$((sent + 1))
