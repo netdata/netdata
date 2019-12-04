@@ -29,8 +29,7 @@ _Users should_ **back up** _their `./dbengine` folders if they consider this dat
 
 ## Configuration
 
-There is one DB engine instance per Netdata host/node. That is, there is one `./dbengine` folder per node, and all
-charts of `dbengine` memory mode in such a host share the same storage space and DB engine instance memory state. You
+There is one DB engine instance per Netdata host/node. That is, there is one `./dbengine` folder per node (Netdata machine). All charts that are saved with memory mode `dbengine` share the same storage space and DB engine instance memory state. You
 can select the memory mode for localhost by editing netdata.conf and setting:
 
 ```conf
@@ -41,10 +40,10 @@ can select the memory mode for localhost by editing netdata.conf and setting:
 For setting the memory mode for the rest of the nodes you should look at
 [streaming](../../streaming/).
 
-The `history` configuration option is meaningless for `memory mode = dbengine` and is ignored for any metrics being
+The `history` configuration option is meaningless for `memory mode = dbengine` and is *ignored* for any metrics being
 stored in the DB engine.
 
-All DB engine instances, for localhost and all other streaming recipient nodes inherit their configuration from
+**All DB engine instances**, for localhost and all other streaming recipient nodes inherit their configuration from
 `netdata.conf`:
 
 ```conf
@@ -54,14 +53,22 @@ All DB engine instances, for localhost and all other streaming recipient nodes i
 ```
 
 The above values are the default and minimum values for Page Cache size and DB engine disk space quota. Both numbers are
-in **MiB**. All DB engine instances will allocate the configured resources separately.
+in **MiB**. **Each DB engine instance will allocate it's own page cache size and disk space**, thus for N instances, DBengine will need N * Resources.
 
 The `page cache size` option determines the amount of RAM in **MiB** that is dedicated to caching Netdata metric values
-themselves as far as queries are concerned. The total page cache size will be greater since data collection itself will
+themselves, as far as queries are concerned. The total page cache size will be greater since data collection itself will
 consume additional memory as is described in the [Memory requirements](#memory-requirements) section.
 
 The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing Netdata
 metric values and all related metadata describing them.
+
+### DBengine storage capacity in Metrics
+
+Based on our testing, these default settings will retain about a day's worth of metrics when Netdata collects roughly 4,000 metrics every second. If you increase either page cache size or dbengine disk space, Netdata will retain even more historical metrics.
+
+**This number is per DB engine instance.**
+
+You can read more about increasing the DB engine's retention in this [tutorial](/docs/tutorials/longer-metrics-storage.md).
 
 ## Operation
 
@@ -101,14 +108,34 @@ and streaming recipient nodes):
 
 An important observation is that RAM usage depends on both the `page cache size` and the `dbengine disk space` options.
 
+### Example:
+
+Let's say we have 1 Netdata Master Node with 10 slaves. I want to save the data for 1 week without downsampling, and afterwards I will downsample to 1 sample per 5 minutes.
+
+For the archiving I will be using the Backends functionality, so we wont't elaborate any further here.
+
+For the one week's worth of data, I will have 10 DB engine instances for the *Slaves* and 1 for the *Master*.
+
+Each Slave saves 2000 metrics/s, and Master Node only 1000/s.
+
+Thus, taking into account that for 4000 metrics/s the default settings will save 1 day, with 2000 metrics/s I will save for 2 days.
+
+Final Disk Space = (256 * 10 slaves * 7 days ) / 2 + (256 * 7 * 1 Master) / 4 MiB
+
+Final RAM usage = (10 slaves + 1 Master)* (32 * 1.049 * 10^6) Page cache size + (2000 dimensions * 10 slaves * 4096 * 2 ) + (#pages-on-disk * 4096 * 0.03) + (1000 dimensions * 1 Master * 4096 * 2 ) + (#pages-on-disk * 4096 * 0.03) bytes
+
+
+
 ## File descriptor requirements
 
 The Database Engine may keep a **significant** amount of files open per instance (e.g. per streaming slave or master
 server). When configuring your system you should make sure there are at least 50 file descriptors available per
 `dbengine` instance.
 
-Netdata allocates 25% of the available file descriptors to its Database Engine instances. This means that only 25% of
-the file descriptors that are available to the Netdata service are accessible by dbengine instances. You should take
+*Netdata allocates 25% of the available file descriptors to its Database Engine instances.* This means that only 25% of
+the file descriptors that are available to the Netdata service are accessible by dbengine instances. 
+
+You should take
 that into account when configuring your service or system-wide file descriptor limits. You can roughly estimate that the
 Netdata service needs 2048 file descriptors for every 10 streaming slave hosts when streaming is configured to use
 `memory mode = dbengine`.
