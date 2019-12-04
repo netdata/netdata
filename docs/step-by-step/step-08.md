@@ -1,15 +1,13 @@
----
-title: Build your first custom dashboard
-description: Learn how to flourish any web page with Netdata's real-time charts, configure them, and style them.
----
+# Step 8. Build your first custom dashboard
 
-In previous parts of the tutorial, you have learned how several sections of the Netdata dashboard worked. 
+In previous steps of the tutorial, you have learned how several sections of the Netdata dashboard worked. 
 
-This part will show you how to set up a custom dashboard to fit your unique needs. If nothing else, Netdata is really, really flexible. 🤸
+This step will show you how to set up a custom dashboard to fit your unique needs. If nothing else, Netdata is really,
+really flexible. 🤸
 
-## What you'll learn in this part
+## What you'll learn in this step
 
-In this part of the Netdata guide, you'll learn:
+In this step of the Netdata guide, you'll learn:
 
 -   [Why you might want a custom dashboard](#why-should-i-create-a-custom-dashboard)
 -   [How to create and prepare your `custom-dashboard.html` file](#create-and-prepare-your-custom-dashboardhtml-file)
@@ -23,21 +21,27 @@ Let's get on with it!
 
 Because it's cool!
 
-But there are way more reasons than that. Many users create custom dashboards to aggregate real-time data from multiple Netdata servers in one place.
+But there are way more reasons than that. Many users create custom dashboards to aggregate real-time data from multiple
+Netdata servers in one place.
 
-Others want to create a more streamlined experience to see specific metrics without clicking through the standard dashboard. For example, those working on application performance monitoring for their company's custom app might only need a select number of charts most of the time.
+Others want to create a more streamlined experience to see specific metrics without clicking through the standard
+dashboard. For example, those working on application performance monitoring for their company's custom app might only
+need a select number of charts most of the time.
 
-By creating a custom dashboard and hosting it with a web server, you can create a public status page for your service. At least your users will have something to look at while they're waiting for the 503 errors to clear up!
+By creating a custom dashboard and hosting it with a web server, you can create a public status page for your service.
+At least your users will have something to look at while they're waiting for the 503 errors to clear up!
 
 Or, you can add Netdata charts to existing web pages.
 
-Netdata's custom dashboarding capability is meant to be as flexible as your ideas. So, we hope you can take these fundamental ideas and turn them into something amazing.
+Netdata's custom dashboarding capability is meant to be as flexible as your ideas. So, we hope you can take these
+fundamental ideas and turn them into something amazing.
 
 ## Create and prepare your `custom-dashboard.html` file
 
 By default, Netdata stores its web server files at `/usr/share/netdata/web`.
 
-To create your custom dashboard, create/edit a file at `/usr/share/netdata/web/custom-dashboard.html` and copy in the following:
+To create your custom dashboard, create/edit a file at `/usr/share/netdata/web/custom-dashboard.html` and copy in the
+following:
 
 ```html
 <!DOCTYPE html>
@@ -71,7 +75,9 @@ To create your custom dashboard, create/edit a file at `/usr/share/netdata/web/c
 
 Try visiting `http://HOST:19999/custom-dashbord.html` in your browser.
 
-If you get a blank page with this text&mdash;`Access to file is not permitted: /usr/share/netdata/web/custom-dashboard.html`&mdash;it means that you need to change the dashboard file's permissions. Try the below command and reload:
+If you get a blank page with this text&mdash;`Access to file is not permitted:
+/usr/share/netdata/web/custom-dashboard.html`&mdash;it means that you need to change the dashboard file's permissions.
+Try the below command and reload:
 
 ```bash
 sudo chown netdata:netdata /usr/share/netdata/web/custom-dashboard.html
@@ -81,14 +87,16 @@ You should see a blank page with the title: **Your custom dashboard**!
 
 ## Add `dashboard.js` to your custom dashboard file
 
-You need to include the `dashboard.js` file of a Netdata server to add Netdata charts. Add the following to the `<head>` of your custom dashboard page and change `HOST` according to your setup.
+You need to include the `dashboard.js` file of a Netdata server to add Netdata charts. Add the following to the `<head>`
+of your custom dashboard page and change `HOST` according to your setup.
 
 ```html
   <!-- Add dashboard.js here! -->
   <script type="text/javascript" src="http://HOST:19999/dashboard.js"></script>
 ```
 
-When you add `dashboard.js` to any web page, it loads several JavaScript and CSS files to create and style charts. It also scans the page for elements that define charts, builds them, and refreshes with new metrics.
+When you add `dashboard.js` to any web page, it loads several JavaScript and CSS files to create and style charts. It
+also scans the page for elements that define charts, builds them, and refreshes with new metrics.
 
 > If you enabled SSL on your Netdata dashboard, you will need to use `https://` to grab the `dashboard.js` file.
 
@@ -135,7 +143,7 @@ charts on a single page.
 ### The chart unique ID (required)
 
 You need to specify the unique ID of a chart to show it on your custom dashboard. If you forgot how to find the unique
-ID, head back over to [part 2](/tutorials/part-02/#understand-charts-dimensions-families-and-contexts) for a
+ID, head back over to [step 2](step-02.md#understand-charts-dimensions-families-and-contexts) for a
 re-introduction.
 
 You can then put this unique ID into a `<div>` element with the `data-netdata` attribute. Put this in the `<body>` of
@@ -172,7 +180,8 @@ Reload the page, and you should see a real-time `system.cpu` chart!
       <div data-netdata="users.cpu"></div>
 ```
 
-![Custom dashboard with four charts added](https://user-images.githubusercontent.com/1153921/67526566-e675f580-f669-11e9-8ff5-d1f21a84fb2b.png)
+![Custom dashboard with four charts
+added](https://user-images.githubusercontent.com/1153921/67526566-e675f580-f669-11e9-8ff5-d1f21a84fb2b.png)
 
 ### Set chart duration
 
@@ -200,9 +209,11 @@ custom dashboard to display the _last 5 minutes_ (`5m * 60s = 300s`) of data.
 
 ### Set chart size
 
-You can set the size of any chart using the `data-height=""` and `data-width=""` attributes. These attributes can be anything CSS accepts for width and height (e.g. percentages, pixels, em/rem, calc, and so on).
+You can set the size of any chart using the `data-height=""` and `data-width=""` attributes. These attributes can be
+anything CSS accepts for width and height (e.g. percentages, pixels, em/rem, calc, and so on).
 
-Let's make the charts a little taller and allow them to fit side-by-side for a more compact view. Add `data-height="200px"` and `data-width="50%"` to each chart.
+Let's make the charts a little taller and allow them to fit side-by-side for a more compact view. Add
+`data-height="200px"` and `data-width="50%"` to each chart.
 
 ```html
       <div data-netdata="system.cpu"
@@ -225,11 +236,13 @@ Let's make the charts a little taller and allow them to fit side-by-side for a m
 
 Now we're getting somewhere!
 
-![A custom dashboard with four charts side-by-side](https://user-images.githubusercontent.com/1153921/67526620-ff7ea680-f669-11e9-92d3-575665fc3a8e.png)
+![A custom dashboard with four charts
+side-by-side](https://user-images.githubusercontent.com/1153921/67526620-ff7ea680-f669-11e9-92d3-575665fc3a8e.png)
 
 ## Final touches
 
-While we already have a perfectly workable dashboard as-is, let's add some final touches to make it a little more pleasant on the eyes.
+While we already have a perfectly workable dashboard as-is, let's add some final touches to make it a little more
+pleasant on the eyes.
 
 First, add some extra CSS to create some vertical whitespace between the top and bottom row of charts.
 
@@ -279,7 +292,8 @@ Prefer a dark theme? Add this to your `<head>` _above_ where you added `dashboar
 
 Refresh the dashboard to give your eyes a break from all that blue light!
 
-![A finished custom dashboard](https://user-images.githubusercontent.com/1153921/67531221-a23d2200-f676-11e9-91fe-c2cf1c426bf9.png)
+![A finished custom
+dashboard](https://user-images.githubusercontent.com/1153921/67531221-a23d2200-f676-11e9-91fe-c2cf1c426bf9.png)
 
 ## The final `custom-dashboard.html`
 
@@ -365,7 +379,8 @@ In case you got lost along the way, here's the final version of the `custom-dash
 
 ## What's next?
 
-In this guide, you learned the fundamentals of building a custom Netdata dashboard. You should now be able to add more charts to your `custom-dashboard.html`, change the charts that are already there, and size them according to your needs.
+In this guide, you learned the fundamentals of building a custom Netdata dashboard. You should now be able to add more
+charts to your `custom-dashboard.html`, change the charts that are already there, and size them according to your needs.
 
 Of course, the custom dashboarding features covered here are just the beginning. Be sure to read up on our [custom
 dashboard documentation](https://docs.netdata.cloud/web/gui/custom/) for details on how you can use other chart
@@ -373,4 +388,4 @@ libraries, pull metrics from multiple Netdata agents, and choose which dimension
 
 Next, you'll learn how to store long-term historical metrics in Netdata!
 
-<Button><Link to="/tutorials/part-09/">Next: Long-term metrics storage <FaAngleDoubleRight /></Link></Button>
+[Next: Long-term metrics storage &rarr;](step-09.md)

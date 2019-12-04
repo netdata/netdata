@@ -1,7 +1,4 @@
----
-title: Monitor more than one system with Netdata
-description: Netdata Cloud is our solution to bridging the gap between two or two thousand distributed agents.
----
+# Step 3. Monitor more than one system with Netdata
 
 The Netdata agent is _distributed_ by design. That means each agent operates independently from any other, collecting
 and creating charts only for the system you installed it on. We made this decision a long time ago to [improve security
@@ -23,9 +20,9 @@ Even if you don't have multiple systems right now, keep reading—you'll learn h
 Netdata demo servers. That way, you'll be able to experience one of Netdata's best features now, so that you're ready to
 implement it once you inevitably get another system you want to monitor.
 
-## What you'll learn in this part
+## What you'll learn in this step
 
-In this part of the Netdata guide, we'll talk about why you should use Netdata Cloud, and then you'll learn:
+In this step of the Netdata guide, we'll talk about why you should use Netdata Cloud, and then you'll learn:
 
 -   [Why you should use Netdata Cloud](#why-use-netdata-cloud)
 -   [Add nodes to your Netdata Cloud account](#add-nodes-to-your-netdata-cloud-account)
@@ -155,7 +152,9 @@ Play around until you find the right settings for you and your infrastructure.
 
 If you want to clean up your Nodes View a bit, you can remove them from your Netdata Cloud account.
 
-Click on the node in question, and then scroll to the bottom of the Node overiew sidebar. You'll see a URL under the **Node URLs** heading. Hover over the URL and click on the garbage bin icon. Click **Confirm** on the modal window. Then, click the **Forget** button that appears in the sidebar, and hit **Confirm** once again.
+Click on the node in question, and then scroll to the bottom of the Node overiew sidebar. You'll see a URL under the
+**Node URLs** heading. Hover over the URL and click on the garbage bin icon. Click **Confirm** on the modal window.
+Then, click the **Forget** button that appears in the sidebar, and hit **Confirm** once again.
 
 ![Removing a node from Nodes View](https://user-images.githubusercontent.com/1153921/68406518-357a5b00-013f-11ea-85b0-3dc797eb9ff8.gif)
 
@@ -165,4 +164,4 @@ Now that you know how to add multiple nodes to your Netdata Cloud agent and navi
 more about how you can configure Netdata to your liking. From there, you'll be able to customize your Netdata experience
 to your exact infrastructure and the information you need.
 
-[ext: The basics of configuring Netdata &rarr;](step-04.md)
+[Next: The basics of configuring Netdata &rarr;](step-04.md)

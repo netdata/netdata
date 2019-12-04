@@ -1,17 +1,16 @@
----
-title: Get to know Netdata's dashboard
-description: Visit the dashboard and get your feet wet!
----
+# Step 2. Get to know Netdata's dashboard
 
-Welcome to the first part of the Netdata guide!
+Welcome to Netdata proper! Now that you understand how Netdata works, how it's built, and why we built it, you can start
+working with the dashboard directly.
 
-This guide assumes you've already installed Netdata. If you haven't yet, check out our [installation
-instructions](../../packaging/installer) for your system. Once you have Netdata installed, you can hop back over here
-and dig in.
+This step-by-step guide assumes you've already installed Netdata on a system of yours. If you haven't yet, hop back over
+to ["step 0"](step-00.md#before-we-get-started) for information about our one-line installer script. Or, view the
+[installation docs](../../packaging/installer) to learn more. Once you have Netdata installed, you can hop back over
+here and dig in.
 
-## What you'll learn in this part
+## What you'll learn in this step
 
-In this part of the Netdata guide, you'll learn how to:
+In this step of the Netdata guide, you'll learn how to:
 
 -   [Visit and explore the dashboard](#visit-and-explore-the-dashboard)
 -   [Explore available charts using menus](#explore-available-charts-using-menus)
@@ -195,7 +194,7 @@ system.
 
 ## What's next?
 
-In this part of the Netdata tutorial, you learned how to:
+In this step of the Netdata tutorial, you learned how to:
 
 -   Visit the dashboard
 -   Explore available charts (using the right-side menu)
@@ -206,6 +205,3 @@ In this part of the Netdata tutorial, you learned how to:
 Next, you'll learn how to monitor multiple nodes through the dashboard.
 
 [Next: Monitor more than one system with Netdata &rarr;](step-03.md)
-
-<Button><Link to="/tutorials/part-03/"> <FaAngleDoubleRight
-/></Link></Button>

@@ -1,22 +1,28 @@
 # Netdata Documentation
 
-**Netdata is real-time health monitoring and performance troubleshooting for systems and applications.** It helps you instantly diagnose slowdowns and anomalies in your infrastructure with thousands of metrics, interactive visualizations, and insightful health alarms.
+**Netdata is real-time health monitoring and performance troubleshooting for systems and applications.** It helps you
+instantly diagnose slowdowns and anomalies in your infrastructure with thousands of metrics, interactive visualizations,
+and insightful health alarms.
 
 ## Navigating the Netdata documentation
 
-Welcome! You've arrived at the documentation for Netdata. Use the links below to find answers to the most common questions about Netdata, such as how to install it, getting started guides, basic configuration, and adding more charts. Or, explore all of Netdata's documentation using the table of contents to your left.
+Welcome! You've arrived at the documentation for Netdata. Use the links below to find answers to the most common
+questions about Netdata, such as how to install it, getting started guides, basic configuration, and adding more charts.
+Or, explore all of Netdata's documentation using the table of contents to your left.
 
 <div class="homepage-nav">
 
   <div class="nav-install">
-    <a class="nav-button" href="packaging/installer/#one-line-installation">One-line installation</a>
-    <p>Use our completely automated one-line installation process to get Netdata on all Linux distributions. Or, find detailed instructions for binary packages, Kubernetes, macOS, and more.</p>
-
+    <a class="nav-button" href="packaging/installer/#one-line-installation">One-line automated installation</a>
+    <p>Use our completely automated one-line installation script to install Netdata on Linux systems. Or, find detailed instructions for binary packages, Kubernetes, Docker, macOS, and more.</p>
+  </div>
+  <div class="nav-install">
+    <a class="nav-button" href="docs/step-by-step/step-00/">Step-by-step tutorial</a>
+    <p>Take a guided tour through each of Netdata's core features—perfect for beginners. Follow detailed instructions to monitor your systems and apps, and start your journey into performance troubleshooting.</p>
   </div>
   <div class="nav-getting-started">
     <a class="nav-button" href="docs/getting-started/">Getting started guide</a>
-    <p>The perfect place for Netdata beginners to start. Learn how to access Netdata's dashboard, start and stop the service, basic configuration, and more.</p>
-
+    <p>Have some monitoring and system administration experience? Dive right into configuring Netdata, accessing the dashboard, working with the daemon, and changing how Netdata stores metrics.</p>
   </div>
   <div class="nav-configuration">
     <a class="nav-button" href="docs/configuration-guide/">Configuration guide</a>

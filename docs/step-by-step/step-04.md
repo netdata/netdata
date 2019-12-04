@@ -1,4 +1,4 @@
-# The basics of configuring Netdata
+# Step 4. The basics of configuring Netdata
 
 Welcome to the fourth step of the Netdata tutorial.
 
@@ -37,7 +37,7 @@ In the system represented by the screenshot, the line reads: `config directory =
 `netdata.conf`, and all the other configuration files, can be found at `/etc/netdata`.
 
 > For more details on where your Netdata config directory is, take a look at our [installation
-instructions](../../packaging/installer/).
+> instructions](../../packaging/installer/).
 
 For the rest of this tutorial, we'll assume you're editing files or running scripts from _within_ your **Netdata
 configuration directory**.
@@ -88,7 +88,8 @@ First, you'll add a fake option to show you how Netdata loads its configuration 
     test = 1
 ```
 
-Restart Netdata with `service restart netdata` or the [appropriate alternative](/docs/getting-started/#start-stop-and-restart-netdata) for your system.
+Restart Netdata with `service restart netdata` or the [appropriate
+alternative](/docs/getting-started/#start-stop-and-restart-netdata) for your system.
 
 Now, open up your browser and navigate to `http://HOST:19999/netdata.conf`. You'll see that Netdata has recognized
 that our fake option isn't valid and added a notice that Netdata will ignore it.
@@ -122,11 +123,11 @@ Netdata has dozens upon dozens of options you can change. To see them all, read 
 At this point, you should be comfortable with getting to your Netdata directory, opening and editing `netdata.conf`, and
 seeing your changes reflected in the dashboard.
 
-Netdata has many more configuration files that you might want to change, but we'll cover those in the following parts of
+Netdata has many more configuration files that you might want to change, but we'll cover those in the following steps of
 this tutorial.
 
-In the next part, we're going to cover one of Netdata's core functions: monitoring the health of your systems via alarms
+In the next step, we're going to cover one of Netdata's core functions: monitoring the health of your systems via alarms
 and notifications. You'll learn how to disable alarms, create new ones, and push notifications to the system of your
 choosing.
 
-<Button><Link to="/tutorials/part-05/">Next: Health monitoring alarms and notifications <FaAngleDoubleRight /></Link></Button>
+[Next: Health monitoring alarms and notifications &rarr;](step-05.md)

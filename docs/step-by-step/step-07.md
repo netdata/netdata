@@ -1,16 +1,13 @@
----
-title: Netdata's dashboard in depth
-description: The dashboard is more than charts and visual anomaly detection—let's get advanced.
----
+# Step 7. Netdata's dashboard in depth
 
-Welcome to the seventh part of the Netdata guide!
+Welcome to the seventh step of the Netdata guide!
 
-This part of the guide aims to get you more familiar with the features of the dashboard not previously mentioned in
-[part 2](/tutorials/part-02/).
+This step of the guide aims to get you more familiar with the features of the dashboard not previously mentioned in
+[step 2](step-02.md).
 
-## What you'll learn in this part
+## What you'll learn in this step
 
-In this part of the Netdata guide, you'll learn how to:
+In this step of the Netdata guide, you'll learn how to:
 
 -   [Change the dashboard's settings](#change-the-dashboards-settings)
 -   [Check if there's an update to Netdata](#check-if-theres-an-update-to-netdata)
@@ -100,7 +97,7 @@ restore your real-time dashboard for your machine.
 
 ## What's next?
 
-In this part of the Netdata tutorial, you learned how to:
+In this step of the Netdata tutorial, you learned how to:
 
 -   Change the dashboard's settings
 -   Check if there's an update to Netdata
@@ -108,4 +105,4 @@ In this part of the Netdata tutorial, you learned how to:
 
 Next, you'll learn how to build your first custom dashboard!
 
-<Button><Link to="/tutorials/part-08/">Next: Build your first custom dashboard <FaAngleDoubleRight /></Link></Button>
+[Next: Build your first custom dashboard &rarr;](step-08.md)

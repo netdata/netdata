@@ -1,7 +1,4 @@
----
-title: Long-term metrics storage
-description: Store days or months of historical metrics with Netdata's database and archiving options.
----
+# Step 9. Long-term metrics storage
 
 By default, Netdata stores metrics in a [database engine](/docs/database/engine/), which stores recent metrics in your
 system's RAM while "spilling" historical metrics to disk. It helps you store a much larger dataset than the amount of
@@ -20,13 +17,13 @@ To store _even more_ metrics, you have two options. First, you can tweak the dat
 or disk it uses. Second, you can archive metrics to a separate database backend. We'll use MongoDB and Prometheus as
 examples.
 
-## What you'll learn in this part
+## What you'll learn in this step
 
-In this part of the Netdata guide, you'll learn how to:
+In this step of the Netdata guide, you'll learn how to:
 
 -   [Tweak the database engine's settings](#tweak-the-database-engines-settings)
 -   [Use the MongoDB backend](#use-the-mongodb-backend)
--   [Use the Prometheus backend](#use-the-prometheus-backend)
+-   [Use the Prometheus backend](#use-the-prometheus-remote-write-backend)
 
 Let's get started!
 
@@ -154,10 +151,10 @@ You can check out the following great resources on how to use Netdata and Promet
 
 ## What's next?
 
-You're getting close to the end! In this part, you learned how to make the most of the database engine, or archive
+You're getting close to the end! In this step, you learned how to make the most of the database engine, or archive
 metrics to MongoDB for long-term storage.
 
-In the last part of this step-by-step tutorial, we'll put our sysadmin hat on and use Nginx to proxy traffic to and from
+In the last step of this step-by-step tutorial, we'll put our sysadmin hat on and use Nginx to proxy traffic to and from
 our Netdata dashboard.
 
-<Button><Link to="/tutorials/part-10/">Next: Set up a proxy <FaAngleDoubleRight /></Link></Button>
+[Next: Set up a proxy &rarr;](step-10.md)
