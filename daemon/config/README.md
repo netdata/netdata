@@ -169,7 +169,7 @@ that is information about lines that begin with `dim`, which affect a chart's di
 | `units`           | Text for the label of the vertical axis of the chart. This means all dimensions should have the same unit of measurement.                                                                                                                                       |
 | `context`         | Change the default [context](../../web/README.md#contexts) of the chart. Changing this setting will affect what metrics and metrics the chart displays, and which alarms are attached to it.                                                                    |
 | `priority`        | Define where the chart should appear on the Netdata dashboard. Lower values equal higher priority, so a priority of `1` will place the chart highest, while a priority of `9999999` would place the chart at the bottom of the Netdata dashboard.               |
-| `name`            | The name of the chart that appears in the top-left corner, after the chart's title. You can also use this name when writing [health entities](../../health/README.md#).                                                                                         |
+| `name`            | The name of the chart that appears in the top-left corner, after the chart's title. You can also use this name when writing [health entities](../../health/REFERENCE.md#health-entity-reference).                                                               |
 | `title`           | The text that appears above the chart in the Netdata dashboard.                                                                                                                                                                                                 |
 
 ### Dimension settings
@@ -183,8 +183,8 @@ Each dimension setting has the following structure: `dim [DIMENSION ID] [OPTION]
 | :----------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `name`       | The name of the dimension as it will appear in the legend of the chart. If left empty, or is missing, Netdata will use the `[DIMENSION ID]` instead.                                                                                                          |
 | `algorithm`  | Can be `absolute`, `incremental`, `percentage-of-absolute-row`, or `percentage-of-incremental-row`. If this setting is empty, invalid, or missing, Netdata will use `absolute`. See the list beneath this table for descriptions of what each algorithm does. |
-| `multiplier` | An integer value by which to multiply the collected value. If empty or missing, Netdata will use `1`. This setting is often used with the value `1024` to convert metabytes to kilobytes, kilobytes to bytes, and so on.                                                   |
-| `divisor`    | An integer value by which to divide the collected value. If empty or missing, Netdata will use `1`. This setting is often used with the value `1024` to convert bytes to kilobytes, kilobytes to megabytes, and so on.                                                     |
+| `multiplier` | An integer value by which to multiply the collected value. If empty or missing, Netdata will use `1`. This setting is often used with the value `1024` to convert metabytes to kilobytes, kilobytes to bytes, and so on.                                      |
+| `divisor`    | An integer value by which to divide the collected value. If empty or missing, Netdata will use `1`. This setting is often used with the value `1024` to convert bytes to kilobytes, kilobytes to megabytes, and so on.                                        |
 
 Here are the options for the `algorithm` setting:
 
