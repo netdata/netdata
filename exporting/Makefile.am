@@ -7,6 +7,7 @@ SUBDIRS = \
     tests \
     graphite \
     json \
+    opentsdb \
     $(NULL)
 
 dist_noinst_DATA = \

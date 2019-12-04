@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "exporting_engine.h"
-#include "graphite/graphite.h"
-#include "json/json.h"
 
 /**
  * Discard response

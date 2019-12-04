@@ -606,6 +606,8 @@ set(EXPORTING_ENGINE_FILES
         exporting/graphite/graphite.h
         exporting/json/json.c
         exporting/json/json.h
+        exporting/opentsdb/opentsdb.c
+        exporting/opentsdb/opentsdb.h
         exporting/read_config.c
         exporting/init_connectors.c
         exporting/process_data.c

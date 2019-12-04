@@ -3,6 +3,7 @@
 #include "exporting_engine.h"
 #include "graphite/graphite.h"
 #include "json/json.h"
+#include "opentsdb/opentsdb.h"
 
 /**
  * Initialize connectors
@@ -24,6 +25,14 @@ int init_connectors(struct engine *engine)
                 if (init_json_connector(connector) != 0)
                     return 1;
                 break;
+            case BACKEND_TYPE_OPENTSDB_USING_TELNET:
+                if (init_opentsdb_connector(connector) != 0)
+                    return 1;
+                break;
+            case BACKEND_TYPE_OPENTSDB_USING_HTTP:
+                if (init_opentsdb_connector(connector) != 0)
+                    return 1;
+                break;
             default:
                 error("EXPORTING: unknown exporting connector type");
                 return 1;
@@ -39,6 +48,14 @@ int init_connectors(struct engine *engine)
                     break;
                 case BACKEND_TYPE_JSON:
                     if (init_json_instance(instance) != 0)
+                        return 1;
+                    break;
+                case BACKEND_TYPE_OPENTSDB_USING_TELNET:
+                    if (init_opentsdb_telnet_instance(instance) != 0)
+                        return 1;
+                    break;
+                case BACKEND_TYPE_OPENTSDB_USING_HTTP:
+                    if (init_opentsdb_http_instance(instance) != 0)
                         return 1;
                     break;
                 default:

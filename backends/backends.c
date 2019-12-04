@@ -366,9 +366,9 @@ void backend_set_opentsdb_http_variables(int *default_port,
     *brc = process_opentsdb_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_opentsdb_http;
+        *brf = backends_format_dimension_collected_opentsdb_http;
     else
-        *brf = format_dimension_stored_opentsdb_http;
+        *brf = backends_format_dimension_stored_opentsdb_http;
 
 }
 
@@ -389,9 +389,9 @@ void backend_set_opentsdb_telnet_variables(int *default_port,
     *brc = process_opentsdb_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_opentsdb_telnet;
+        *brf = backends_format_dimension_collected_opentsdb_telnet;
     else
-        *brf = format_dimension_stored_opentsdb_telnet;
+        *brf = backends_format_dimension_stored_opentsdb_telnet;
 }
 
 /**

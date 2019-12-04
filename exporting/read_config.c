@@ -266,7 +266,6 @@ struct engine *read_exporting_config()
 
         // If we have a list of instances for this connector then build it
         if (tmp_ci_list) {
-        info("EXPORTING: type = %lu, list = %p", i, tmp_ci_list);
             struct connector *tmp_connector;
 
             tmp_connector = (struct connector *)calloc(1, sizeof(struct connector));
