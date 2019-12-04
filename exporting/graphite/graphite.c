@@ -74,17 +74,16 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         return 0;
 
     buffer_sprintf(
-            instance->buffer
-            , "%s.%s.%s.%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n"
-            , engine->config.prefix
-            , engine->config.hostname
-            , chart_name
-            , dimension_name
-            , (host->tags)?";":""
-            , (host->tags)?host->tags:""
-            , value
-            , (unsigned long long) last_t
-    );
+        instance->buffer,
+        "%s.%s.%s.%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
+        engine->config.prefix,
+        engine->config.hostname,
+        chart_name,
+        dimension_name,
+        (host->tags) ? ";" : "",
+        (host->tags) ? host->tags : "",
+        value,
+        (unsigned long long)last_t);
 
     return 0;
 }
