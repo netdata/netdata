@@ -100,6 +100,7 @@ function k8s_get_name() {
 				KUBE_CONFIG="/etc/kubernetes/admin.conf"
 			fi
 			if kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces >/dev/null 2>&1; then
+				#shellcheck disable=SC2086
 				NAME="$(kubectl --kubeconfig=$KUBE_CONFIG get pod --all-namespaces --output='json' | \
 				jq -r '.items[] | select(.metadata.uid == "'$id'") | .metadata.name')"
 			else
