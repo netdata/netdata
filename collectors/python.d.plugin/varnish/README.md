@@ -2,6 +2,14 @@
 
 Module uses the `varnishstat` command to provide varnish cache statistics.
 
+## Requirements
+
+User `netdata` should be added to the  `varnish` group.
+```bash
+sudo groupadd varnish #create varnish group
+sudo usermod -aG varnish netdata #add user
+```
+
 It produces:
 
 1.  **Connections Statistics** in connections/s

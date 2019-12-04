@@ -5,6 +5,12 @@ Module monitor docker health metrics.
 **Requirement:**
 
 -   `docker` package, required version 3.2.0+
+- `netdata` user should be added to the group `docker` so it can access the socket. Read more at the [docker docks](https://docs.docker.com/install/linux/linux-postinstall/).
+```bash
+sudo groupadd docker #create docker group
+sudo usermod -aG docker netdata #add user
+```
+
 
 Following charts are drawn:
 
