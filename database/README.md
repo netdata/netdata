@@ -39,7 +39,7 @@ Currently Netdata supports 6 memory modes:
 5.  `alloc`, like `ram` but it uses `calloc()` and does not support [KSM](#ksm). This mode is the fallback for all
     others except `none`.
 
-6.  `dbengine`, (the default) data are in database files. The [Database Engine](engine/) works like a traditional
+6.  `dbengine`, (**the default**) data are in database files. The [Database Engine](engine/) works like a traditional
     database. There is some amount of RAM dedicated to data caching and indexing and the rest of the data reside
     compressed on disk. The number of history entries is not fixed in this case, but depends on the configured disk
     space and the effective compression ratio of the data stored. This is the **only mode** that supports changing the
