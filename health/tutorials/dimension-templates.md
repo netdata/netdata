@@ -4,19 +4,19 @@ Your ability to monitor the health of your systems and applications relies on yo
 the best set of alarms for your particular needs.
 
 In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of writing [alarm
-entities](../../health/README.md#entities-in-the-health-files) for charts with many dimensions.
+entities](../REFERENCE.md#health-entity-reference) for charts with many dimensions.
 
 Dimension templates can condense many individual entities into one—no more copy-pasting one entity and changing the
 `alarm`/`template` and `lookup` lines for each dimension you'd like to monitor.
 
 They are, however, an advanced health monitoring feature. For more basic instructions on creating your first alarm,
-check out our [health monitoring documentation](../../health/), which also includes
-[examples](../../health/README.md#examples).
+check out our [health monitoring documentation](../README.md), which also includes
+[examples](../REFERENCE.md#example-alarms).
 
 ## The fundamentals of `foreach`
 
 Our dimension templates update creates a new `foreach` parameter to the existing [`lookup`
-line](../../health/README.md#alarm-line-lookup). This is where the magic happens.
+line](../REFERENCE.md#alarm-line-lookup). This is where the magic happens.
 
 You use the `foreach` parameter to specify which dimensions you want to monitor with this single alarm. You can separate
 them with a comma (`,`) or a pipe (`|`). You can also use a [Netdata simple pattern](../../libnetdata/simple_pattern/README.md)
@@ -113,7 +113,7 @@ documentation](../../libnetdata/simple_pattern/README.md).
 
 ## Using `foreach` with alarm templates
 
-Dimension templates also work with [alarm templates](../../health/README.md#entities-in-the-health-files). Alarm
+Dimension templates also work with [alarm templates](../REFERENCE.md#alarm-line-alarm-or-template). Alarm
 templates help you create alarms for all the charts with a given context—for example, all the cores of your system's
 CPU.
 
