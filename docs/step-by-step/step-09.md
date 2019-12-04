@@ -1,6 +1,6 @@
 # Step 9. Long-term metrics storage
 
-By default, Netdata stores metrics in a [database engine](/docs/database/engine/), which stores recent metrics in your
+By default, Netdata stores metrics in a [database engine](../../database/engine/), which stores recent metrics in your
 system's RAM while "spilling" historical metrics to disk. It helps you store a much larger dataset than the amount of
 RAM your system has.
 
@@ -49,8 +49,8 @@ values themselves.
 The `dbengine disk space` option determines the amount of disk space, in MiB, that Netdata dedicates to storing Netdata
 metric values and all related metadata describing them.
 
-You can uncomment and change either of these values according to the resources you want the database engine
-to use. However, it's recommended you read up on [](/docs/database/engine/#memory-requirements) to ensure you don't
+You can uncomment and change either of these values according to the resources you want the database engine to use.
+However, it's recommended you read up on [](../../database/engine/README.md#memory-requirements) to ensure you don't
 overwhelm your system. Out of memory errors are no fun!
 
 ```conf
@@ -60,12 +60,13 @@ overwhelm your system. Out of memory errors are no fun!
     dbengine disk space = 512
 ```
 
-After you've made your changes, [restart](/docs/getting-started/#starting-and-stopping-netdata) the `netdata` service.
+After you've made your changes, [restart](../getting-started.md#start-stop-and-restart-netdata) the `netdata` service.
 
 To confirm the database engine is working, go to your Netdata dashboard and click on the **Netdata Monitoring** menu on
 the right-hand side. You can find `dbengine` metrics after `queries`.
 
-![Image of the database engine reflected in the Netdata Dashboard](https://user-images.githubusercontent.com/12263278/64781383-9c71fe00-d55a-11e9-962b-efd5558efbae.png)
+![Image of the database engine reflected in the Netdata
+Dashboard](https://user-images.githubusercontent.com/12263278/64781383-9c71fe00-d55a-11e9-962b-efd5558efbae.png)
 
 ## Use the MongoDB backend
 
@@ -113,7 +114,7 @@ database = your_database_name
 collection = your_collection_name
 ```
 
-[Restart](/docs/getting-started/#starting-and-stopping-netdata) Netdata.
+[Restart](../getting-started.md#start-stop-and-restart-netdata) Netdata.
 
 You can confirm MongoDB is saving your metrics using
 [mongotop](https://docs.mongodb.com/manual/reference/program/mongotop/#bin.mongotop). Run the following command:
@@ -141,13 +142,13 @@ In the `[backend]` section of `netdata.conf`, enable and add configuration for t
     remote write URL path = /receive
 ```
 
-[Restart](/docs/getting-started/#starting-and-stopping-netdata) Netdata. It will now be
-archiving historical metrics to your Prometheus backend!
+[Restart](../getting-started.md#start-stop-and-restart-netdata) Netdata. It will now be archiving historical metrics to
+your Prometheus backend!
 
 You can check out the following great resources on how to use Netdata and Prometheus:
 
--   [Using Netdata with Prometheus](/docs/backends/prometheus/)
--   [Netdata, Prometheus, Grafana stack](/docs/backends/walkthrough/)
+-   [Using Netdata with Prometheus](../../backends/prometheus/)
+-   [Netdata, Prometheus, Grafana stack](../../backends/WALKTHROUGH.md)
 
 ## What's next?
 

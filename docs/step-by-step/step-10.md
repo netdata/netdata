@@ -195,9 +195,9 @@ You're a real sysadmin now!
 
 If you want to configure your Nginx proxy further, check out the following:
 
--   [Running Netdata behind Nginx](https://docs.netdata.cloud/docs/running-behind-nginx/)
--   [High-performance Netdata](https://docs.netdata.cloud/docs/high-performance-netdata/)
--   [Enabling TLS on Netdata's dashboard](https://docs.netdata.cloud/web/server/#enabling-tls-support)
+-   [Running Netdata behind Nginx](../Running-behind-nginx.md)
+-   [High-performance Netdata](../high-performance-netdata.md)
+-   [Enabling TLS on Netdata's dashboard](../../web/server/README.md#enabling-tls-support)
 
 And... you're _almost_ done with the Netdata tutorial.
 
