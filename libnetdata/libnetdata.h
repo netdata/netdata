@@ -84,6 +84,7 @@
 #include <uuid/uuid.h>
 #include <spawn.h>
 #include <uv.h>
+#include <assert.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>

@@ -7,7 +7,6 @@
 #define _GNU_SOURCE
 #endif
 #include <fcntl.h>
-#include <assert.h>
 #include <lz4.h>
 #include <Judy.h>
 #include <openssl/sha.h>
