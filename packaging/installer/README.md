@@ -4,8 +4,17 @@ Netdata is a **monitoring agent**. It is designed to be installed and run on all
 
 The best way to install Netdata is directly from source. Our **automatic installer** will install any required system packages and compile Netdata directly on your systems.
 
-!!! warning
-    You can find Netdata packages distributed by third parties. In many cases, these packages are either too old or broken. So, the suggested ways to install Netdata are the ones in this page.
+## Anonymous usage data collection
+
+From Netdata v1.12 and above, anonymous usage information **is collected by default** and sent to Google Analytics. To read more about the information collected and **how to opt-out**, check the [anonymous statistics page](../../docs/anonymous-statistics.md)..
+
+*The usage statistics are **vital** for us, so we can proactively act on improvements and prioritize new features & updates. We thank you for **actively** contributing to Netdata Development*.
+
+## System Package Managers
+
+The binaries that are distributed by the systems package managers (such as apt) or other 3rd parties are old and **deprecated**. Please refer to the [binary package instructions](#Binary-Packages) on how to add our latest repositories.
+
+## Contents
 
 1.  [Automatic one line installation](#one-line-installation), easy installation from source, **this is the default**
 2.  [Install pre-built static binary on any 64bit Linux](#linux-64bit-pre-built-static-binary)
@@ -20,7 +29,7 @@ The best way to install Netdata is directly from source. Our **automatic install
 
 See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
 
-Note: From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read more about the information collected and how to opt-out, check the [anonymous statistics page](../../docs/anonymous-statistics.md).
+
 
 ---
 
@@ -292,13 +301,13 @@ cd netdata
 
 -   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
 
--   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
+-   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`.
 
 Once the installer completes, the file `/etc/netdata/netdata.conf` will be created (if you changed the installation directory, the configuration will appear in that directory too).
 
-You can edit this file to set options. One common option to tweak is `history`, which controls the size of the memory database Netdata will use. By default is `3600` seconds (an hour of data at the charts) which makes Netdata use about 10-15MB of RAM (depending on the number of charts detected on your system). Check **\[[Memory Requirements]]**.
+You can edit this file to set options. One common option to tweak is `history`, which controls the size of the memory database Netdata will use. By default is `3600` seconds (an hour of data at the charts) which makes Netdata use about 10-15MB of RAM (depending on the number of charts detected on your system). Please visit the [database article](/database/README.md) for more information.
 
-To apply the changes you made, you have to restart Netdata.
+**To apply the changes you made, you have to restart Netdata.**
 
 ---
 
@@ -308,18 +317,20 @@ To apply the changes you made, you have to restart Netdata.
 
 We provide our own flavour of binary packages for the most common operating systems that comply with .RPM and .DEB packaging formats.
 
-We have currently released packages following the .RPM format with version [1.16.0](https://github.com/netdata/netdata/releases/tag/v1.16.0).
-We have planned to release packages following the .DEB format with version [1.17.0](https://github.com/netdata/netdata/releases/tag/v1.17.0).
-Early adopters may experiment with our .DEB formatted packages using our nightly releases. Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io).
+Early adopters may experiment with our .DEB formatted packages using our nightly releases.
 
-Netdata is committed to support installation of our solution to all operating systems. This is a constant battle for Netdata, as we strive to automate and make things easier for our users. For the operating system support matrix, please visit our [distributions](../../packaging/DISTRIBUTIONS.md) support page.
+Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io).
+
+**Please Note** that you must add the proper Package Cloud repositories to the system Package sources **before** attempting to install Netdata (e.g `apt-get install netdata`).
 
 We provide two separate repositories, one for our stable releases and one for our nightly releases.
 
 1.  Stable releases: Our stable production releases are hosted in [netdata/netdata](https://packagecloud.io/netdata/netdata) repository of package cloud
 2.  Nightly releases: Our latest releases are hosted in [netdata/netdata-edge](https://packagecloud.io/netdata/netdata-edge) repository of package cloud
 
-Visit the repository pages and follow the quick set-up instructions to get started.
+Netdata is **committed** to support installation of our solution to **all operating systems**. This is a constant battle for Netdata, as we strive to automate and make things easier for our users.
+
+For the operating system support matrix, please visit our [distributions](../../packaging/DISTRIBUTIONS.md) support page.
 
 ---
 
@@ -359,19 +370,19 @@ pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/python36-3.6.9.txz
 ln -s /usr/local/lib/libjson-c.so /usr/local/lib/libjson-c.so.4
 pkg add http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/netdata-1.17.1.txz
 ```
-**Note:** If you receive a ` Not Found` error during the last two commands above, you will either need to manually look in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its URL instead, or you can try manually changing the netdata version in the URL to the latest version.  
+**Note:** If you receive a ` Not Found` error during the last two commands above, you will either need to manually look in the [repo folder](http://pkg.freebsd.org/FreeBSD:11:amd64/latest/All/) for the latest available package and use its URL instead, or you can try manually changing the netdata version in the URL to the latest version.
 
 You must edit `/usr/local/etc/netdata/netdata.conf` and change `bind to = 127.0.0.1` to `bind to = 0.0.0.0`.
 
-To start Netdata manually, run `service netdata onestart`  
+To start Netdata manually, run `service netdata onestart`
 
 Visit the Netdata dashboard to confirm it's working: `http://<pfsenseIP>:19999`
 
-To start Netdata automatically every boot, add `service netdata onestart` as a Shellcmd entry within the pfSense web interface under **Services/Shellcmd**. You'll need to install the Shellcmd package beforehand under **System/Package Manager/Available Packages**. The Shellcmd Type should be set to `Shellcmd`.  
+To start Netdata automatically every boot, add `service netdata onestart` as a Shellcmd entry within the pfSense web interface under **Services/Shellcmd**. You'll need to install the Shellcmd package beforehand under **System/Package Manager/Available Packages**. The Shellcmd Type should be set to `Shellcmd`.
 ![](https://i.imgur.com/wcKiPe1.png)
 Alternatively more information can be found in <https://doc.pfsense.org/index.php/Installing_FreeBSD_Packages>, for achieving the same via the command line and scripts.
 
-If you experience an issue with `/usr/bin/install` being absent in pfSense 2.3 or earlier, update pfSense or use a workaround from <https://redmine.pfsense.org/issues/6643>  
+If you experience an issue with `/usr/bin/install` being absent in pfSense 2.3 or earlier, update pfSense or use a workaround from <https://redmine.pfsense.org/issues/6643>
 
 **Note:** In pfSense, the Netdata configuration files are located under `/usr/local/etc/netdata`
 
@@ -544,11 +555,11 @@ curl -s https://api.github.com/repos/netdata/netdata/releases/latest | grep "bro
 # Netdata dependency handling script
 curl -s https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh | wget -qi -
 
-# go.d plugin 
+# go.d plugin
 # For binaries for OS types and architectures not listed on [go.d releases](https://github.com/netdata/go.d.plugin/releases/latest), kindly open a github issue and we will do our best to serve your request
 export OS=$(uname -s | tr '[:upper:]' '[:lower:]') ARCH=$(uname -m | sed -e 's/i386/386/g' -e 's/i686/386/g' -e 's/x86_64/amd64/g' -e 's/aarch64/arm64/g' -e 's/armv64/arm64/g' -e 's/armv6l/arm/g' -e 's/armv7l/arm/g' -e 's/armv5tel/arm/g') && curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*${OS}-${ARCH}.tar.gz" | cut -d '"' -f 4 | wget -qi -
 
-# go.d configuration 
+# go.d configuration
 curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
 ```
 
@@ -570,7 +581,7 @@ your defined policy allows (if any).
 
 Now you can run either the `kickstart.sh` or `kickstart-static64.sh` scripts
 using the `--local-files` option. This option requires you to specify
-the location and names of the files you just downloaded. 
+the location and names of the files you just downloaded.
 
 !!! note When using `--local-files`, the `kickstart.sh` or
     `kickstart-static64.sh` scripts won't download any Netdata assets from the

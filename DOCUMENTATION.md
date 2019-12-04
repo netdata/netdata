@@ -9,7 +9,7 @@ Welcome! You've arrived at the documentation for Netdata. Use the links below to
 <div class="homepage-nav">
 
   <div class="nav-install">
-    <a class="nav-button" href="packaging/installer/#one-line-installation">One-line installation</a>
+    <a class="nav-button" href="packaging/installer/">Installation guide</a>
     <p>Use our completely automated one-line installation process to get Netdata on all Linux distributions. Or, find detailed instructions for binary packages, Kubernetes, macOS, and more.</p>
 
   </div>
