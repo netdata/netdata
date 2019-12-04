@@ -49,12 +49,11 @@ inbound = 0.0.0.0/0
 
 ### Destination Ports
 
-Netdata could monitor all the 65536 port values allowed, but this could slow down the charts, because the number of 
-dimensions would be very high, to avoid this problem we created the limit of 50 destination ports to monitor, you can
-define the ports to be monitored with the following option
+Netdata is capable to monitor all the 65536 ports, but this will slow down the chart rendering, to avoid this problem 
+Netdata selected 50 most common ports as default ports to monitor.
 
 ```
-destination_ports = 20,21,22,25,43,53,80,88,110,118,123,135, 137 138 139 143, 156, 194, 389, 443, 445, 464, 465, 513, 520, 530, 546, 547, 563, 631, 636, 691, 749, 901, 989, 990, 993, 995, 1381, 1433 1434 1512 1525 3128 3389 3306 5432 6000 8080 19999
+destination_ports = 20,21,22,23, 25,43,53,80,88,110,118,123,135, 137 138 139 143, 156, 194, 389, 443, 445, 464, 465, 513, 520, 530, 546, 547, 563, 631, 636, 691, 749, 901, 989, 990, 993, 995, 1381, 1433 1434 1512 1525 3389 3306 5432 6000 8080 19999
 ```
 
 we also allow different separators (either space or comma) for the destination ports.
