@@ -3,6 +3,55 @@
 #include "graphite.h"
 
 /**
+ * Initialize Graphite connector
+ *
+ * @param instance a connector data structure.
+ * @return Always returns 0.
+ */
+int init_graphite_connector(struct connector *connector)
+{
+    connector->worker = simple_connector_worker;
+
+    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
+    connector->config.connector_specific_config = (void *)connector_specific_config;
+    connector_specific_config->default_port = 2003;
+
+    return 0;
+}
+
+/**
+ * Initialize Graphite connector instance
+ *
+ * @param instance an instance data structure.
+ * @return Returns 0 on success, 1 on failure.
+ */
+int init_graphite_instance(struct instance *instance)
+{
+    instance->start_batch_formatting = NULL;
+    instance->start_host_formatting = NULL;
+    instance->start_chart_formatting = NULL;
+
+    if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
+        instance->metric_formatting = format_dimension_collected_graphite_plaintext;
+    else
+        instance->metric_formatting = format_dimension_stored_graphite_plaintext;
+
+    instance->end_chart_formatting = NULL;
+    instance->end_host_formatting = NULL;
+    instance->end_batch_formatting = NULL;
+
+    instance->buffer = (void *)buffer_create(0);
+    if (!instance->buffer) {
+        error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);
+        return 1;
+    }
+    uv_mutex_init(&instance->mutex);
+    uv_cond_init(&instance->cond_var);
+
+    return 0;
+}
+
+/**
  * Format dimension using collected data for Graphite connector
  *
  * @param instance an instance data structure.
@@ -84,55 +133,6 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         (host->tags) ? host->tags : "",
         value,
         (unsigned long long)last_t);
-
-    return 0;
-}
-
-/**
- * Initialize Graphite connector
- *
- * @param instance a connector data structure.
- * @return Always returns 0.
- */
-int init_graphite_connector(struct connector *connector)
-{
-    connector->worker = simple_connector_worker;
-
-    struct simple_connector_config *connector_specific_config = mallocz(sizeof(struct simple_connector_config));
-    connector->config.connector_specific_config = (void *)connector_specific_config;
-    connector_specific_config->default_port = 2003;
-
-    return 0;
-}
-
-/**
- * Initialize Graphite connector instance
- *
- * @param instance an instance data structure.
- * @return Returns 0 on success, 1 on failure.
- */
-int init_graphite_instance(struct instance *instance)
-{
-    instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = NULL;
-    instance->start_chart_formatting = NULL;
-
-    if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
-        instance->metric_formatting = format_dimension_collected_graphite_plaintext;
-    else
-        instance->metric_formatting = format_dimension_stored_graphite_plaintext;
-
-    instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = NULL;
-    instance->end_batch_formatting = NULL;
-
-    instance->buffer = (void *)buffer_create(0);
-    if (!instance->buffer) {
-        error("EXPORTING: cannot create buffer for graphite exporting connector instance %s", instance->config.name);
-        return 1;
-    }
-    uv_mutex_init(&instance->mutex);
-    uv_cond_init(&instance->cond_var);
 
     return 0;
 }
