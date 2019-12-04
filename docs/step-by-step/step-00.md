@@ -38,54 +38,54 @@ documentation](../../packaging/installer/).
 
 ## Netdata fundamentals
 
-[Part 1: Netdata's building blocks](step-01.md)
+[Step 1. Netdata's building blocks](step-01.md)
 
-In this introductory part, we're talking about the fundamental ideas, philosophies, and UX decisions behind Netdata.
+In this introductory step, we're talking about the fundamental ideas, philosophies, and UX decisions behind Netdata.
 
-[Part 2: Get to know Netdata's dashboard](step-02.md)
+[Step 2. Get to know Netdata's dashboard](step-02.md)
 
 Visit Netdata's dashboard to explore, manipulate charts, and check out alarms. Get your first taste of visual anomaly
 detection.
 
-[Part 3: Monitor more than one system with Netdata](step-03.md)
+[Step 3. Monitor more than one system with Netdata](step-03.md)
 
 While the dashboard lets you quickly move from one agent to another, Netdata Cloud is our SaaS solution for monitoring
 the health of many systems. We'll cover its features and the benefits of using Netdata Cloud on top of the dashboard.
 
-[Part 4: The basics of configuring Netdata](step-04.md)
+[Step 4. The basics of configuring Netdata](step-04.md)
 
 While Netdata can monitor thousands of metrics in real-time without any configuration, you may _want_ to tweak some
 settings based on your system's resources.
 
 ## Intermediate steps
 
-[Part 5: Health monitoring alarms and notifications](step-05.md)
+[Step 5. Health monitoring alarms and notifications](step-05.md)
 
 Learn how to tune, silence, and write custom alarms. Then, enable notifications so you never miss a health status or
 performance anomaly.
 
-[Part 6: Collect metrics from more services and apps](step-06.md)
+[Step 6. Collect metrics from more services and apps](step-06.md)
 
 Learn how to enable/disable collection plugins, configure a collection plugin job, and add more charts to your Netdata
 dashboard.
 
-[Part 7: Netdata's dashboard in depth](step-07.md)
+[Step 7. Netdata's dashboard in depth](step-07.md)
 
 Now that you configured your Netdata monitoring agent to your exact needs, you'll dive back into metrics snapshots,
 updates, and the dashboard's settings.
 
 ## Advanced steps
 
-[Part 8: Building your first custom dashboard](step-08.md)
+[Step 8. Building your first custom dashboard](step-08.md)
 
 Build a dashboard that shows the metrics that matter to you the most, or allow you to monitor many systems from a single
 HTML file.
 
-[Part 9: Long-term metrics storage](step-09.md)
+[Step 9. Long-term metrics storage](step-09.md)
 
 Netdata isn't just about real-time metrics—learn how to use our new database engine to store historical data and archive
 metrics to a different database.
 
-[Part 10: Set up a proxy](step-10.md)
+[Step 10. Set up a proxy](step-10.md)
 
 Run Netdata behind an Nginx proxy to improve performance and security by enabling TLS/HTTPS.

@@ -1,7 +1,4 @@
----
-title: Collect metrics from more services and apps
-description: Set up your apps and services to have their metrics auto-collected by Netdata's intelligent plugin system.
----
+# Step 6. Collect metrics from more services and apps
 
 When Netdata _starts_, it auto-detects dozens of **data sources**, such as database servers, web servers, and more.
 
@@ -15,7 +12,7 @@ correctly.
 Check out the [available data collection modulues](/docs/Add-more-charts-to-netdata/#available-data-collection-modules)
 to find the module for the source you want to monitor.
 
-## What you'll learn in this part
+## What you'll learn in this step
 
 We'll begin with an overview on Netdata's plugin architecture, and then dive into the following:
 
@@ -53,7 +50,7 @@ enable or disable them.
 One reason you might want to _disable_ plugins is to improve Netdata's performance on low-resource systems, like
 ephemeral nodes or edge devices.
 
-You can enable or disable plugins in the [plugin] section of `netdata.conf`. This section features a list of all the
+You can enable or disable plugins in the `[plugin]` section of `netdata.conf`. This section features a list of all the
 plugins with a boolean setting (`yes` or `no`) to enable or disable them. Be sure to uncomment the line by removing the
 hash (`#`)!
 
@@ -101,7 +98,9 @@ location /stub_status {
 }
 ```
 
-Restart Netdata using `service netdata restart` or the [correct alternative](/docs/getting-started/#start-stop-and-restart-netdata) for your system, and Netdata will auto-detect metrics from the Nginx web server!
+Restart Netdata using `service netdata restart` or the [correct
+alternative](/docs/getting-started/#start-stop-and-restart-netdata) for your system, and Netdata will auto-detect
+metrics from the Nginx web server!
 
 While not necessary for most auto-detection and collection purposes, you can also configure the Nginx collection module
 itself by editing its configuration file:
@@ -118,4 +117,4 @@ restart Netdata.
 Now that you've learned the fundamentals behind configuring data sources for auto-detection, it's time to move back to
 the dashboard to learn more about some of its more advanced features.
 
-<Button><Link to="/tutorials/part-07/">Next: Netdata's dashboard in depth <FaAngleDoubleRight /></Link></Button>
+[Next: Netdata's dashboard in depth &rarr;](step-07.md)

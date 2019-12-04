@@ -1,9 +1,6 @@
----
-title: Health monitoring alarms and notifications
-description: Tweak Netdata's purpose-built alarms and get notified in the way that works best for you.
----
+# Step 5. Health monitoring alarms and notifications
 
-In the fifth part of the Netdata tutorial, we're introducing you to one of our core features: **health monitoring**.
+In the fifth step of the Netdata tutorial, we're introducing you to one of our core features: **health monitoring**.
 
 To accurately monitor the health of your systems and applications, you need to know _immediately_ when there's something
 strange going on. Netdata's alarm and notification systems are essential to keeping you informed. 
@@ -15,12 +12,12 @@ need to edit them.
 That said, it's essential to learn how alarms and notifications work in Netdata so you can quickly configure them.
 Luckily, Netdata's alarm and notification system are incredibly adaptable to your needs.
 
-## What you'll learn in this part
+## What you'll learn in this step
 
 We'll talk about Netdata's default configuration, and then you'll learn how to do the following:
 
 -   [Tune Netdata's pre-configured alarms](#tune-netdatas-pre-configured-alarms)
--   [Write your first health entity](#writer-your-first-health-entity)
+-   [Write your first health entity](#write-your-first-health-entity)
 -   [Enable Netdata's notification systems](#enable-netdatas-notification-systems)
 
 ## Tune Netdata's pre-configured alarms
@@ -36,7 +33,7 @@ entity](https://user-images.githubusercontent.com/1153921/67034648-ebb4cc80-f0cc
 
 Look at the `source` row in the table. This means the `system.cpu` chart sources its health alarms from
 `4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. To tune these alarms, you'll need to edit the alarm file at
-`health.d/cpu.conf`. Go to your [Netdata directory](/tutorial/part-03/#find-your-netdata-conf-file) and use the
+`health.d/cpu.conf`. Go to your [Netdata directory](step-04.md#find-your-netdataconf-file) and use the
 `edit-config` script.
 
 ```bash
@@ -274,7 +271,8 @@ You should see output similar to this:
 # OK
 ```
 
-... and you should get three separate emails, one for each test alarm, in your inbox! (Be sure to check your spam folder.)
+... and you should get three separate emails, one for each test alarm, in your inbox! (Be sure to check your spam
+folder.)
 
 ## Enable Slack notifications
 
@@ -328,7 +326,7 @@ following documentation:
 
 ## What's next?
 
-In this part, you learned the fundamentals of Netdata's health monitoring tools: alarms and notifications. You should be
+In this step, you learned the fundamentals of Netdata's health monitoring tools: alarms and notifications. You should be
 able to tune default alarms, silence them, and understand some of the basics of writing health entities. And,
 if you so chose, you'll now have both email and Slack notifications enabled.
 
@@ -337,4 +335,4 @@ You're coming along quick!
 Next up, we're going to cover how Netdata collects its metrics, and how you can get Netdata to collect real-time metrics
 from hundreds of services with almost no configuration on your part. Onward!
 
-<Button><Link to="/tutorials/part-06/">Next: Collect metrics from more services and apps <FaAngleDoubleRight /></Link></Button>
+[Next: Collect metrics from more services and apps &rarr;](step-06.md)
