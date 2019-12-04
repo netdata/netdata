@@ -173,7 +173,51 @@ static void test_init_json_instance(void **state)
     instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
     assert_int_equal(init_json_instance(instance), 0);
     assert_ptr_equal(instance->metric_formatting, format_dimension_stored_json_plaintext);
+}
 
+static void test_init_opentsdb_connector(void **state)
+{
+    struct engine *engine = *state;
+    struct connector *connector = engine->connector_root;
+
+    init_opentsdb_connector(connector);
+    assert_int_equal(
+        ((struct simple_connector_config *)(connector->config.connector_specific_config))->default_port, 4242);
+    freez(connector->config.connector_specific_config);
+}
+
+static void test_init_opentsdb_telnet_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct connector *connector = engine->connector_root;
+    struct instance *instance = connector->instance_root;
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+    assert_int_equal(init_opentsdb_telnet_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_opentsdb_telnet);
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+    assert_int_equal(init_opentsdb_telnet_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_stored_opentsdb_telnet);
+}
+
+static void test_init_opentsdb_http_instance(void **state)
+{
+    struct engine *engine = *state;
+    struct connector *connector = engine->connector_root;
+    struct instance *instance = connector->instance_root;
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_OPTION_SEND_NAMES;
+    assert_int_equal(init_opentsdb_http_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_collected_opentsdb_http);
+    assert_ptr_not_equal(instance->buffer, NULL);
+    buffer_free(instance->buffer);
+
+    instance->config.options = EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_OPTION_SEND_NAMES;
+    assert_int_equal(init_opentsdb_http_instance(instance), 0);
+    assert_ptr_equal(instance->metric_formatting, format_dimension_stored_opentsdb_http);
 }
 
 static void test_mark_scheduled_instances(void **state)
@@ -414,9 +458,9 @@ static void test_format_dimension_collected_json_plaintext(void **state)
     assert_int_equal(format_dimension_collected_json_plaintext(engine->connector_root->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->connector_root->instance_root->buffer),
-        "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\"," \
-        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\"," \
-        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\"," \
+        "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\","
+        "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\","
+        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\","
         "\"name\":\"dimension_name\",\"value\":123000321,\"timestamp\": 15051}\n");
 }
 
@@ -431,10 +475,74 @@ static void test_format_dimension_stored_json_plaintext(void **state)
     assert_int_equal(format_dimension_stored_json_plaintext(engine->connector_root->instance_root, rd), 0);
     assert_string_equal(
         buffer_tostring(engine->connector_root->instance_root->buffer),
-        "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\"," \
+        "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\","
         "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\"," \
-        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\"," \
+        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\","
         "\"name\":\"dimension_name\",\"value\":690565856.0000000,\"timestamp\": 15052}\n");
+}
+
+static void test_format_dimension_collected_opentsdb_telnet(void **state)
+{
+    struct engine *engine = *state;
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    assert_int_equal(format_dimension_collected_opentsdb_telnet(engine->connector_root->instance_root, rd), 0);
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "put netdata.chart_name.dimension_name 15051 123000321 host=test-host TAG1=VALUE1 TAG2=VALUE2\n");
+}
+
+static void test_format_dimension_stored_opentsdb_telnet(void **state)
+{
+    struct engine *engine = *state;
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    assert_int_equal(format_dimension_stored_opentsdb_telnet(engine->connector_root->instance_root, rd), 0);
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "put netdata.chart_name.dimension_name 15052 690565856.0000000 host=test-host TAG1=VALUE1 TAG2=VALUE2\n");
+}
+
+static void test_format_dimension_collected_opentsdb_http(void **state)
+{
+    struct engine *engine = *state;
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    assert_int_equal(format_dimension_collected_opentsdb_http(engine->connector_root->instance_root, rd), 0);
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "POST /api/put HTTP/1.1\r\n"
+        "Host: test-host\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: 153\r\n\r\n"
+        "{  \"metric\": \"netdata.chart_name.dimension_name\",  "
+        "\"timestamp\": 15051,  "
+        "\"value\": 123000321,  "
+        "\"tags\": {    \"host\": \"test-host TAG1=VALUE1 TAG2=VALUE2\"  }}");
+}
+
+static void test_format_dimension_stored_opentsdb_http(void **state)
+{
+    struct engine *engine = *state;
+
+    expect_function_call(__wrap_exporting_calculate_value_from_stored_data);
+    will_return(__wrap_exporting_calculate_value_from_stored_data, pack_storage_number(27, SN_EXISTS));
+
+    RRDDIM *rd = localhost->rrdset_root->dimensions;
+    assert_int_equal(format_dimension_stored_opentsdb_http(engine->connector_root->instance_root, rd), 0);
+    assert_string_equal(
+        buffer_tostring(engine->connector_root->instance_root->buffer),
+        "POST /api/put HTTP/1.1\r\n"
+        "Host: test-host\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: 161\r\n\r\n"
+        "{  \"metric\": \"netdata.chart_name.dimension_name\",  "
+        "\"timestamp\": 15052,  "
+        "\"value\": 690565856.0000000,  "
+        "\"tags\": {    \"host\": \"test-host TAG1=VALUE1 TAG2=VALUE2\"  }}");
 }
 
 static void test_exporting_discard_response(void **state)
@@ -581,6 +689,12 @@ int main(void)
         cmocka_unit_test_setup_teardown(
             test_init_json_instance, setup_configured_engine, teardown_configured_engine),
         cmocka_unit_test_setup_teardown(
+            test_init_opentsdb_connector, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_init_opentsdb_telnet_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
+            test_init_opentsdb_http_instance, setup_configured_engine, teardown_configured_engine),
+        cmocka_unit_test_setup_teardown(
             test_mark_scheduled_instances, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_rrdhost_is_exportable, setup_initialized_engine, teardown_initialized_engine),
@@ -602,6 +716,14 @@ int main(void)
             test_format_dimension_collected_json_plaintext, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_format_dimension_stored_json_plaintext, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_collected_opentsdb_telnet, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_stored_opentsdb_telnet, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_collected_opentsdb_http, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_dimension_stored_opentsdb_http, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
             test_exporting_discard_response, setup_initialized_engine, teardown_initialized_engine),
         cmocka_unit_test_setup_teardown(
