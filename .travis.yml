@@ -178,10 +178,6 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on CentOS 7"
 
-    - name: Build/install for CentOS 6 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
-      after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 6"
-
     - name: Build/install for CentOS 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 7"
@@ -205,10 +201,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.04"
 
       # Centos runs
-    - name: Run netdata lifecycle on CentOS 6 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:6" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 6"
-
     - name: Run netdata lifecycle on CentOS 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
@@ -435,15 +427,7 @@ jobs:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
-      name: "Build & Publish RPM package for Enterprise Linux 6"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) RPM( Enterprise Linux)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Enterprise Linux 7"
+      name: "Build & Publish RPM package for Enterprise Linux 7"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
       env:
