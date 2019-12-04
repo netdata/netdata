@@ -204,8 +204,8 @@ stress -m 1 --vm-bytes 8G --vm-keep
 ```
 
 Netdata is capable of understanding much more complicated entities. To better understand how they work, read the [health
-documentation](../../health/README.md), look at some [examples](../../health/README.md#examples), and open the files
-containing the default entities on your system.
+documentation](../../health/README.md), look at some [examples](../../health/REFERENCE.md#example-alarms), and open the
+files containing the default entities on your system.
 
 Now that you can write a basic health entity, let's make sure you know when they get triggered by enabling email and
 Slack notifications.
