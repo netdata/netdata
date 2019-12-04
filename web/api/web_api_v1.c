@@ -765,6 +765,21 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     (void)url;
     if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
 
+    /* Temporary test-vector for #7408
+       Leave the code commented out to support easy testing until #7410 is complete (and then delete it).
+
+    netdata_rwlock_rdlock(&localhost->labels_rwlock);
+    struct label *l = localhost->labels;
+    while (l != NULL) {
+        error("Label: \"%s\" -> \"%s\"", l->key, l->value);
+        l = l->next;
+    }
+
+    netdata_rwlock_rdlock(&localhost->labels_rwlock);
+    */
+
+
+
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;

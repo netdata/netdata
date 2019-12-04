@@ -148,6 +148,12 @@ typedef enum rrddim_flags {
 #define rrddim_flag_clear(rd, flag) (rd)->flags &= ~(flag)
 #endif
 
+struct label {
+    char *key, *value;
+    struct label *next;
+};
+
+struct label *create_label(char *key, char *value);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -723,6 +729,11 @@ struct rrdhost {
     // locks
 
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
+
+    // ------------------------------------------------------------------------
+    // Support for host-level labels
+    struct label *labels;
+    netdata_rwlock_t labels_rwlock;         // lock for the label list
 
     // ------------------------------------------------------------------------
     // indexes
