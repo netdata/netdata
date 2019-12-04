@@ -443,6 +443,9 @@ Which in turn, results in the following behavior:
      the first time it goes above 95, but will remain a critical alert goes below 85 (at which
      point it will return to being a warning).
 
+The above is graphically illustrated in the image bellow. Let's assume that the alert's metric, for some unknown reason, oscilates arround 85. *With hysteresis taken into account, the alarm will be activated only once.*
+![](hysteresis.png)
+
 ---
 
 ### Variables
