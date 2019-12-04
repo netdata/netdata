@@ -7,14 +7,12 @@
 #define _GNU_SOURCE
 #endif
 #include <fcntl.h>
-#include <aio.h>
-#include <uv.h>
 #include <assert.h>
 #include <lz4.h>
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include <stdint.h>
+#include "../../daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"

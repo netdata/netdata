@@ -83,6 +83,7 @@
 #include <unistd.h>
 #include <uuid/uuid.h>
 #include <spawn.h>
+#include <uv.h>
 
 #ifdef HAVE_NETINET_IN_H
 #include <netinet/in.h>
