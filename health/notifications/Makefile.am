@@ -45,3 +45,4 @@ include telegram/Makefile.inc
 include twilio/Makefile.inc
 include web/Makefile.inc
 include custom/Makefile.inc
+include matrix/Makefile.inc
