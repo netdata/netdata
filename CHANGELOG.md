@@ -12,7 +12,9 @@
 - Fix typo and markup in packaging/installer README [\#7368](https://github.com/netdata/netdata/pull/7368) ([nabijaczleweli](https://github.com/nabijaczleweli))
 - Tutorials to support v1.19 release [\#7359](https://github.com/netdata/netdata/pull/7359) ([joelhans](https://github.com/joelhans))
 - Update python.d README  [\#7357](https://github.com/netdata/netdata/pull/7357) ([OdysLam](https://github.com/OdysLam))
+- Documentation on per-chart configuration options [\#7345](https://github.com/netdata/netdata/pull/7345) ([joelhans](https://github.com/joelhans))
 - Fixing errors in plugins.d/README.md [\#7340](https://github.com/netdata/netdata/pull/7340) ([joelhans](https://github.com/joelhans))
+- Health: Proposed restructuring of health documentation [\#7329](https://github.com/netdata/netdata/pull/7329) ([joelhans](https://github.com/joelhans))
 - proc.plugin: add pressure stall information [\#7209](https://github.com/netdata/netdata/pull/7209) ([hexchain](https://github.com/hexchain))
 - Fixing linter errors in packaging/docker/README [\#7199](https://github.com/netdata/netdata/pull/7199) ([joelhans](https://github.com/joelhans))
 
@@ -249,7 +251,6 @@
 - netdata/installer: fix static64 installer always overwriting configuration [\#6710](https://github.com/netdata/netdata/pull/6710) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - exact path to netdata.conf in .gitignore [\#6709](https://github.com/netdata/netdata/pull/6709) ([sunflowerbofh](https://github.com/sunflowerbofh))
 - Tabulatin on health/health.c [\#6691](https://github.com/netdata/netdata/pull/6691) ([thiagoftsm](https://github.com/thiagoftsm))
-- netdata/packaging: Align libdir in all configure commands [\#6682](https://github.com/netdata/netdata/pull/6682) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
