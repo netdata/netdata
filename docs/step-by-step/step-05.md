@@ -66,7 +66,7 @@ the `warn` and `crit` lines to the values of your choosing. For example:
     crit: $this > (($status == $CRITICAL) ? (75) : (95))
 ```
 
-You _can_ [restart Netdata](/docs/getting-started/#start-stop-and-restart-netdata) to enable your tune, but you can also
+You _can_ [restart Netdata](../getting-started.md#start-stop-and-restart-netdata) to enable your tune, but you can also
 send a signal to Netdata to reload _only_ the health monitoring component.
 
 ```bash
@@ -74,7 +74,7 @@ killall -USR2 netdata
 ```
 
 You can also tune any other aspect of the default alarms. To better understand how each line in a health entity works,
-read our [health documentation](/docs/health/).
+read our [health documentation](../../health/).
 
 ### Silence an individual alarm
 
@@ -204,8 +204,8 @@ stress -m 1 --vm-bytes 8G --vm-keep
 ```
 
 Netdata is capable of understanding much more complicated entities. To better understand how they work, read the [health
-documentation](), look at some [examples](/docs/health/#examples), and open the files containing the default entities on
-your system.
+documentation](../../health/README.md), look at some [examples](../../health/README.md#examples), and open the files
+containing the default entities on your system.
 
 Now that you can write a basic health entity, let's make sure you know when they get triggered by enabling email and
 Slack notifications.
@@ -216,7 +216,7 @@ Health alarms, while great on their own, are pretty useless without some way of 
 That's why Netdata comes with a notification system that supports more than a dozen services, such as email, Slack,
 Discord, PagerDuty, Twilio, Amazon SNS, and much more.
 
-To see all the supported systems, visit our [notifications documentation](/docs/health/notifications/).
+To see all the supported systems, visit our [notifications documentation](../../health/notifications/).
 
 ### Email notifications
 
@@ -320,9 +320,9 @@ applications.
 To further configure your email or Slack notification setup, or to enable other notification systems, check out the
 following documentation:
 
--   [Email notifications](/docs/health/notifications/email/)
--   [Slack notifications](/docs/health/notifications/slack/)
--   [Netdata's notification system](/docs/health/notifications/)
+-   [Email notifications](../../health/notifications/email/)
+-   [Slack notifications](../../health/notifications/slack/)
+-   [Netdata's notification system](../../health/notifications/)
 
 ## What's next?
 

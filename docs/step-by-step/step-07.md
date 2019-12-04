@@ -43,7 +43,7 @@ Some settings are applied immediately, and others are only reflected after you r
 
 ## Check if there's an update to Netdata
 
-Netdata upon installation with [the one-liner](/docs/packaging/installer/#one-line-installation) comes with the
+Netdata upon installation with [the one-liner](../../packaging/installer/README.md#one-line-installation) comes with the
 auto-update option enabled by default.
 
 You can always check if there is an update available right from the **Update** area of your Netdata dashboard.
@@ -54,8 +54,8 @@ modal](https://user-images.githubusercontent.com/12263278/64876743-be957a00-d647
 If an update is available, you'll see a modal similar to the one above.
 
 Netdata automatically updates itself, but if you choose to update it manually, there are [several well-documented
-methods](/docs/packaging/installer/UPDATE/) to achieve that. However, it is best practice for you to first go over the
-[changelog](https://docs.netdata.cloud/changelog/).
+methods](../../packaging/installer/UPDATE.md) to achieve that. However, it is best practice for you to first go over the
+[changelog](../../CHANGELOG.md).
 
 ## Export and import a snapshot
 

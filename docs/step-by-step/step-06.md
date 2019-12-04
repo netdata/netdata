@@ -3,13 +3,13 @@
 When Netdata _starts_, it auto-detects dozens of **data sources**, such as database servers, web servers, and more.
 
 To auto-detect and collect metrics from a source you just installed, you need to [restart
-Netdata](/docs/getting-started/#start-stop-and-restart-netdata).
+Netdata](../getting-started.md#start-stop-and-restart-netdata).
 
 However, auto-detection only works if you installed the source using its standard installation
 procedure. If Netdata isn't collecting metrics after a restart, your source probably isn't configured
 correctly.
 
-Check out the [available data collection modulues](/docs/Add-more-charts-to-netdata/#available-data-collection-modules)
+Check out the [available data collection modulues](../Add-more-charts-to-netdata.md#available-data-collection-modules)
 to find the module for the source you want to monitor.
 
 ## What you'll learn in this step
@@ -38,9 +38,9 @@ collection modules written in the language of the orchestrator. They communicate
 Orchestrators also simplify the plugin development process and minimize the number of threads and processes running.
 
 To develop a collector module, you'll choose an orchestrator based on your preferred programming language. Netdata
-provides plugin orchestrators for [Bash](/docs/collectors/charts.d.plugin/) (`charts.d`),
-[Python](/docs/collectors/python.d.plugin/) (`python.d`), [Go](/docs/collectors/go.d.plugin/) (`go.d`), and
-[Node.js](/docs/collectors/node.d.plugin/) (`node.d`).
+provides plugin orchestrators for [Bash](../../collectors/charts.d.plugin/) (`charts.d`),
+[Python](../../collectors/python.d.plugin/) (`python.d`), [Go](../../collectors/go.d.plugin/) (`go.d`), and
+[Node.js](../../collectors/node.d.plugin/) (`node.d`).
 
 ## Enable and disable plugins
 
@@ -99,7 +99,7 @@ location /stub_status {
 ```
 
 Restart Netdata using `service netdata restart` or the [correct
-alternative](/docs/getting-started/#start-stop-and-restart-netdata) for your system, and Netdata will auto-detect
+alternative](../getting-started.md#start-stop-and-restart-netdata) for your system, and Netdata will auto-detect
 metrics from the Nginx web server!
 
 While not necessary for most auto-detection and collection purposes, you can also configure the Nginx collection module

@@ -89,7 +89,7 @@ First, you'll add a fake option to show you how Netdata loads its configuration 
 ```
 
 Restart Netdata with `service restart netdata` or the [appropriate
-alternative](/docs/getting-started/#start-stop-and-restart-netdata) for your system.
+alternative](../getting-started.md#start-stop-and-restart-netdata) for your system.
 
 Now, open up your browser and navigate to `http://HOST:19999/netdata.conf`. You'll see that Netdata has recognized
 that our fake option isn't valid and added a notice that Netdata will ignore it.
@@ -116,7 +116,7 @@ Once you're done, restart Netdata and refresh the dashboard. Say hello to your r
 ![Animated GIF of editing the hostname option in
 netdata.conf](https://user-images.githubusercontent.com/1153921/65470784-86e5b980-de21-11e9-87bf-fabec7989738.gif)
 
-Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon configuration](/docs/daemon/config/).
+Netdata has dozens upon dozens of options you can change. To see them all, read our [daemon configuration](../../daemon/config/).
 
 ## What's next?
 
