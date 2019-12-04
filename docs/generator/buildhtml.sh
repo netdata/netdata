@@ -22,7 +22,8 @@ git clone https://github.com/netdata/go.d.plugin.git ${GO_D_DIR}
 # Copy all Netdata .md files to docs/generator/src. Exclude htmldoc itself and also the directory node_modules generatord by Netlify
 echo "Copying files"
 rm -rf ${SRC_DIR}
-find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print | cpio -pd ${SRC_DIR}
+mkdir ${SRC_DIR}
+find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -exec cp -prv --parents '{}' ./${SRC_DIR}/ ';'
 
 # Copy Netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/

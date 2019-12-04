@@ -522,6 +522,12 @@ netdataDashboard.menu = {
         title: 'AM2320 Sensor',
         icon: '<i class="fas fa-thermometer-half"></i>',
         info: 'Readings from the external AM2320 Sensor.'
+    },
+
+    'scaleio': {
+        title: 'ScaleIO',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Performance and health statistics for various ScaleIO components. Data collected via VxFlex OS Gateway REST API.'
     }
 
 };
