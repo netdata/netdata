@@ -707,6 +707,23 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+struct label *create_label(char *key, char *value)
+{
+    size_t key_len = strlen(key), value_len = strlen(value);
+    size_t n = key_len + 1 + value_len + 1 + sizeof(struct label);
+    struct label *result = callocz(n,1);
+    if (result != NULL) {
+        char *c = (char *)result;
+        c += sizeof(struct label);
+        strcpy(c, key);
+        result->key = c;
+        c += key_len + 1;
+        strcpy(c, value);
+        result->value = c;
+    }
+    return result;
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - delete host files
 
