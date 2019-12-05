@@ -164,7 +164,6 @@ struct label {
 };
 
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
-struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
