@@ -60,6 +60,8 @@ ARG NETDATA_UID=201
 ARG NETDATA_GID=201
 ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
+# If set to 1, will disable anonymous stats collection and reporting
+ENV DO_NOT_TRACK 0
 RUN \
     # provide judy installation to base image
     apk add make alpine-sdk shadow && \
