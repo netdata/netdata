@@ -707,6 +707,21 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+struct label *load_auto_labels()
+{
+    return NULL;
+}
+
+struct label *load_config_labels()
+{
+    return NULL;
+}
+
+struct label *load_kubernetes_labels()
+{
+    return NULL;
+}
+
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
 {
     size_t key_len = strlen(key), value_len = strlen(value);
