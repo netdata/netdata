@@ -741,7 +741,7 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
 {
     size_t key_len = strlen(key), value_len = strlen(value);
     size_t n = sizeof(struct label) + key_len + 1 + value_len + 1;
-    struct label *result = callocz(n,1);
+    struct label *result = callocz(1,n);
     if (result != NULL) {
         char *c = (char *)result;
         c += sizeof(struct label);
@@ -798,7 +798,7 @@ void reload_host_labels()
 {
     struct label *from_auto = load_auto_labels();
     struct label *from_k8s = load_kubernetes_labels();
-    struct label *from_config = load_auto_labels();
+    struct label *from_config = load_config_labels();
 
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
     new_labels = merge_label_lists(new_labels, from_config);
