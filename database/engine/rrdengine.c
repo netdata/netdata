@@ -8,7 +8,7 @@ rrdeng_stats_t global_fs_errors = 0;
 rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
 rrdeng_stats_t global_flushing_errors = 0;
 
-void sanity_check(void)
+static void sanity_check(void)
 {
     /* Magic numbers must fit in the super-blocks */
     BUILD_BUG_ON(strlen(RRDENG_DF_MAGIC) > RRDENG_MAGIC_SZ);
@@ -845,6 +845,7 @@ void rrdengine_main(void)
     int ret;
     struct rrdengine_instance *ctx;
 
+    sanity_check();
     ret = rrdeng_init(&ctx, "/tmp", RRDENG_MIN_PAGE_CACHE_SIZE_MB, RRDENG_MIN_DISK_SPACE_MB);
     if (ret) {
         exit(ret);

@@ -264,6 +264,8 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/proc_loadavg.c \
     collectors/proc.plugin/proc_meminfo.c \
     collectors/proc.plugin/proc_pagetypeinfo.c \
+    collectors/proc.plugin/proc_pressure.c \
+    collectors/proc.plugin/proc_pressure.h \
     collectors/proc.plugin/proc_net_dev.c \
     collectors/proc.plugin/proc_net_ip_vs_stats.c \
     collectors/proc.plugin/proc_net_netstat.c \
@@ -498,6 +500,8 @@ DAEMON_FILES = \
     daemon/main.h \
     daemon/signals.c \
     daemon/signals.h \
+    daemon/commands.c \
+    daemon/commands.h \
     daemon/unit_test.c \
     daemon/unit_test.h \
     $(NULL)
@@ -559,6 +563,13 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JSONC_LIBS) \
     $(NULL)
 
+NETDATACLI_FILES = \
+    daemon/commands.h \
+    $(LIBNETDATA_FILES) \
+    cli/cli.c \
+    cli/cli.h \
+    $(NULL)
+
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
@@ -568,6 +579,17 @@ if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
     netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
+endif
+
+sbin_PROGRAMS += netdatacli
+netdatacli_SOURCES = $(NETDATACLI_FILES)
+netdatacli_LDADD = \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+if ENABLE_CXX_LINKER
+    netdatacli_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
+else
+    netdatacli_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 endif
 
 if ENABLE_PLUGIN_APPS

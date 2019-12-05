@@ -82,3 +82,19 @@ def read_last_line(f):
                 break
         result = opened.readline()
     return result.decode()
+
+
+def unicode_str(arg):
+    """Return the argument as a unicode string.
+
+    The `unicode` function has been removed from Python3 and `str` takes its
+    place. This function is a helper which will try using Python 2's `unicode`
+    and if it doesn't exist, assume we're using Python 3 and use `str`.
+
+    :param arg:
+    :return: <str>
+    """
+    try:
+        return unicode(arg)
+    except NameError:
+        return str(arg)

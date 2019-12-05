@@ -439,6 +439,8 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
         collectors/proc.plugin/proc_vmstat.c
         collectors/proc.plugin/proc_uptime.c
+        collectors/proc.plugin/proc_pressure.c
+        collectors/proc.plugin/proc_pressure.h
         collectors/proc.plugin/sys_kernel_mm_ksm.c
         collectors/proc.plugin/sys_block_zram.c
         collectors/proc.plugin/sys_devices_system_edac_mc.c
@@ -644,6 +646,8 @@ set(DAEMON_FILES
         daemon/main.h
         daemon/signals.c
         daemon/signals.h
+        daemon/commands.c
+        daemon/commands.h
         daemon/unit_test.c
         daemon/unit_test.h
         )
@@ -663,6 +667,12 @@ set(NETDATA_FILES
         ${STATSD_PLUGIN_FILES}
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
+        )
+
+set(NETDATACLI_FILES
+        daemon/commands.h
+        cli/cli.c
+        cli/cli.h
         )
 
 include_directories(AFTER .)
@@ -799,6 +809,15 @@ IF(XENSTAT_LIBRARIES)
 ELSE()
     SET(ENABLE_PLUGIN_XENSTAT False)
 ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# netdatacli
+
+add_executable(netdatacli config.h ${NETDATACLI_FILES})
+target_link_libraries (netdatacli libnetdata ${NETDATA_COMMON_LIBRARIES})
+target_include_directories(netdatacli PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+target_compile_options(netdatacli PUBLIC ${NETDATA_COMMON_CFLAGS})
 
 
 # -----------------------------------------------------------------------------

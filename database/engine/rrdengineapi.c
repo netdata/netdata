@@ -745,8 +745,6 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     int error;
     uint32_t max_open_files;
 
-    sanity_check();
-
     max_open_files = rlimit_nofile.rlim_cur / 4;
 
     /* reserve RRDENG_FD_BUDGET_PER_INSTANCE file descriptors for this instance */
