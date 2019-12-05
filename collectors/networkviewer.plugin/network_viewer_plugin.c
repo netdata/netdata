@@ -772,7 +772,6 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                 for ( ; i <= end ; i++) {
                     set = (netdata_port_list_t *) callocz(1,sizeof(netdata_port_list_t));
                     if(set) {
-                        fprintf(stderr, "KILLME %s %u\n", vport ,i);
                         if (!dash) {
                             port = htons((uint16_t)strtol(vport,NULL,10));
                         } else {
