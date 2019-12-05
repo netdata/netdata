@@ -710,7 +710,7 @@ void rrdhost_save_charts(RRDHOST *host) {
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
 {
     size_t key_len = strlen(key), value_len = strlen(value);
-    size_t n = key_len + 1 + value_len + 1 + sizeof(struct label);
+    size_t n = sizeof(struct label) + key_len + 1 + value_len + 1;
     struct label *result = callocz(n,1);
     if (result != NULL) {
         char *c = (char *)result;
