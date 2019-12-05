@@ -7,14 +7,11 @@
 #define _GNU_SOURCE
 #endif
 #include <fcntl.h>
-#include <aio.h>
-#include <uv.h>
-#include <assert.h>
 #include <lz4.h>
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include <stdint.h>
+#include "../../daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -177,7 +174,6 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-extern void sanity_check(void);
 extern int init_rrd_files(struct rrdengine_instance *ctx);
 extern void finalize_rrd_files(struct rrdengine_instance *ctx);
 extern void rrdeng_test_quota(struct rrdengine_worker_config* wc);
