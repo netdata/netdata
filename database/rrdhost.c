@@ -709,31 +709,31 @@ void rrdhost_save_charts(RRDHOST *host) {
 
 struct label *load_auto_labels()
 {
-    // TESTING ONLY DELETE AFTER REVIEW
+    /* TESTING ONLY DELETE AFTER REVIEW
     struct label *l = add_label_to_list(NULL, "_os_name", "Linux for the win", LABEL_SOURCE_AUTO);
     l = add_label_to_list(l, "_os_version", "All the versions", LABEL_SOURCE_AUTO);
     l = add_label_to_list(l, "_kernel_version", "The absolute latest", LABEL_SOURCE_AUTO);
-    return l;
+    return l; */
     return NULL;
 }
 
 struct label *load_config_labels()
 {
-    // TESTING ONLY DELETE AFTER REVIEW
+    /* TESTING ONLY DELETE AFTER REVIEW
     struct label *l = add_label_to_list(NULL, "_os_name", "Darwin overwrites everything", LABEL_SOURCE_NETDATA_CONF);
     l = add_label_to_list(l, "alpha", "Alpha value from config", LABEL_SOURCE_NETDATA_CONF);
     l = add_label_to_list(l, "somethingUnique", "Unique value from config", LABEL_SOURCE_NETDATA_CONF);
-    return l;
+    return l; */
     return NULL;
 }
 
 struct label *load_kubernetes_labels()
 {
-    // TESTING ONLY DELETE AFTER REVIEW
+    /* TESTING ONLY DELETE AFTER REVIEW
     struct label *l = add_label_to_list(NULL, "alpha", "Alpha value from k8s", LABEL_SOURCE_KUBERNETES);
     l = add_label_to_list(l, "beta", "Beta value from k8s", LABEL_SOURCE_KUBERNETES);
     l = add_label_to_list(l, "_os_version", "os version from k8s", LABEL_SOURCE_KUBERNETES);
-    return l;
+    return l; */
     return NULL;
 }
 
