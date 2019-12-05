@@ -158,6 +158,7 @@ typedef enum label_source {
 
 struct label {
     char *key, *value;
+    uint32_t key_hash;
     LABEL_SOURCE label_source;
     struct label *next;
 };

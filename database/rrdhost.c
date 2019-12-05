@@ -721,6 +721,7 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
         strcpy(c, value);
         result->value = c;
         result->label_source = label_source;
+        result->key_hash = simple_hash(result->key);
     }
     return result;
 }
