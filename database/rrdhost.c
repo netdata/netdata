@@ -707,10 +707,25 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+struct label *load_auto_labels()
+{
+    return NULL;
+}
+
+struct label *load_config_labels()
+{
+    return NULL;
+}
+
+struct label *load_kubernetes_labels()
+{
+    return NULL;
+}
+
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
 {
     size_t key_len = strlen(key), value_len = strlen(value);
-    size_t n = key_len + 1 + value_len + 1 + sizeof(struct label);
+    size_t n = sizeof(struct label) + key_len + 1 + value_len + 1;
     struct label *result = callocz(n,1);
     if (result != NULL) {
         char *c = (char *)result;
@@ -721,6 +736,7 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
         strcpy(c, value);
         result->value = c;
         result->label_source = label_source;
+        result->key_hash = simple_hash(result->key);
     }
     return result;
 }
