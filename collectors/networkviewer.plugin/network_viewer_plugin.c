@@ -711,8 +711,10 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
     uint16_t port;
 
     uint16_t i;
+    uint16_t end;
     if (!ports) {
-        for (i = 0; i < 50; i++) {
+        end = 50;
+        for (i = 0; i < end; i++) {
             uint16_t def[] = {  20, 21, 22, 25, 37, 43, 53, 80, 88, 110,
                                 118, 123, 135, 137, 138, 139, 143, 156, 194, 389,
                                 443, 445, 464, 465, 513, 520, 530, 546, 547, 563,
@@ -756,28 +758,46 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
             vport = trim_all(vport);
 
             if(vport) {
-                set = (netdata_port_list_t *) callocz(1,sizeof(netdata_port_list_t));
-                if(set) {
-                    port = htons((uint16_t)strtol(vport,NULL,10));
-                    set->port = port;
+                char *dash = strchr(vport,'-');
+                if(!dash) {
+                    i = 0;
+                    end = 0;
+                } else {
+                    *dash = 0x00;
+                    i = (uint16_t) strtol(vport,NULL, 10);
+                    dash++;
+                    end = (uint16_t) strtol(dash,NULL, 10);
+                }
 
-                    netdata_port_list_t *r = (netdata_port_list_t *)avl_insert_lock(&connection_controller.port_list, (avl *)set);
-                    if (r != set ) {
-                        error("[NETWORK VIEWER] Cannot insert port inside list.");
-                        return NULL;
+                for ( ; i <= end ; i++) {
+                    set = (netdata_port_list_t *) callocz(1,sizeof(netdata_port_list_t));
+                    if(set) {
+                        fprintf(stderr, "KILLME %s %u\n", vport ,i);
+                        if (!dash) {
+                            port = htons((uint16_t)strtol(vport,NULL,10));
+                        } else {
+                            port = htons(i);
+                        }
+                        set->port = port;
+
+                        netdata_port_list_t *r = (netdata_port_list_t *)avl_insert_lock(&connection_controller.port_list, (avl *)set);
+                        if (r != set ) {
+                            error("[NETWORK VIEWER] Cannot insert port inside list.");
+                            return NULL;
+                        }
+
+                        if ( port_stat_link_list(set, port) ) {
+                            return NULL;
+                        }
+
+                        if(!ret) {
+                            ret =  set;
+                        } else {
+                            next->next = set;
+                        }
+
+                        next = set;
                     }
-
-                    if ( port_stat_link_list(set, port) ) {
-                        return NULL;
-                    }
-
-                    if(!ret) {
-                        ret =  set;
-                    } else {
-                        next->next = set;
-                    }
-
-                    next = set;
                 }
             }
         }
