@@ -1,8 +1,5 @@
 // Source: https://github.com/codacy/codacy-remark-lint/raw/master/.remarkrc.js
 
-const fs = require("fs");
-const path = require("path");
-
 exports.settings = {
   gfm: true,
   commonmark: true,
@@ -18,13 +15,6 @@ exports.settings = {
   listItemIndent: 'tab',
   incrementListMarker: true
 };
-
-const personalDictionaryPath = path.join(__dirname, ".dictionary");
-const personalDictionary = fs.existsSync(personalDictionaryPath)
-  ? {
-      personal: fs.readFileSync(personalDictionaryPath, "utf8")
-    }
-  : {};
 
 const remarkPresetLintMarkdownStyleGuide = {
   plugins: require("remark-preset-lint-markdown-style-guide").plugins.filter(

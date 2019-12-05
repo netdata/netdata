@@ -1818,7 +1818,7 @@ function renderPage(menus, data) {
 
     if (!isMemoryModeDbEngine) {
         sidebar += '<br />&nbsp;<br />Get more history by ' +
-          '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <strong>history</strong></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>'
+          '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <strong>history</strong></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>';
     }
 
     sidebar += '<br/>&nbsp;<br/><strong>netdata</strong><br/>' + data.version.toString() + '</small></li>';
@@ -4956,7 +4956,8 @@ function handleSignInMessage(e) {
 
     netdataRegistryCallback(registryAgents);
     if (e.data.redirectURI && !window.location.href.includes(e.data.redirectURI)) {
-        window.location.replace(e.data.redirectURI);
+        // lgtm false-positive - redirectURI does not come from user input, but from iframe callback
+        window.location.replace(e.data.redirectURI); // lgtm[js/client-side-unvalidated-url-redirection]
     }
 }
 
@@ -5183,5 +5184,5 @@ if (document.readyState === "complete") {
         if (document.readyState === "complete") {
             initializeApp();
         }
-    })
+    });
 }
