@@ -148,12 +148,21 @@ typedef enum rrddim_flags {
 #define rrddim_flag_clear(rd, flag) (rd)->flags &= ~(flag)
 #endif
 
+typedef enum label_source {
+    LABEL_SOURCE_AUTO             = 0,
+    LABEL_SOURCE_NETDATA_CONF     = (1 << 0),
+    LABEL_SOURCE_DOCKER           = (1 << 1),
+    LABEL_SOURCE_ENVIRONMENT      = (1 << 2),
+    LABEL_SOURCE_KUBERNETES       = (1 << 3)
+} LABEL_SOURCE;
+
 struct label {
     char *key, *value;
+    LABEL_SOURCE label_source;
     struct label *next;
 };
 
-struct label *create_label(char *key, char *value);
+struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric

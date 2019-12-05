@@ -707,7 +707,7 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
-struct label *create_label(char *key, char *value)
+struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
 {
     size_t key_len = strlen(key), value_len = strlen(value);
     size_t n = key_len + 1 + value_len + 1 + sizeof(struct label);
@@ -720,6 +720,7 @@ struct label *create_label(char *key, char *value)
         c += key_len + 1;
         strcpy(c, value);
         result->value = c;
+        result->label_source = label_source;
     }
     return result;
 }
