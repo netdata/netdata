@@ -8,7 +8,21 @@ The default behavior of this plugin is to monitor all connections from the priva
 
 ## Only Linux for while
 
-This plugin for while works only on Linux, but we are monitoring the development of eBPF on other Operate Systems.
+This plugin for while works only on Linux, but we are monitoring the development of eBPF on other Operate Systems. For 
+Linux there is also a limitation, the collector won't work for kernel verson smaller than `4.11.0` .
+
+## Kprobe and tracing file system
+
+For this collector works it will be necessary your kernel to be compiled with support to `k[ret]probe`, case this was not
+done, the collector won't be able to monitor the traffic of data.
+
+Another requirement for this collector works is the necessity to have mounted both `debugfs` and `tracingfs`, case they
+are not mount by default, add the following lines to your `/etc/fstab`:
+
+```
+debugfs    /sys/kernel/debug   debugfs   defaults         0   0
+tracefs    /sys/kernel/tracing tracefs    defaults     0   0
+```
 
 ## Charts
 
