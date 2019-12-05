@@ -353,7 +353,7 @@ This is how it works:
 |Function|Description|Documentation|
 |:------:|:----------|:-----------:|
 |**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[`collectors`](collectors/#data-collection-plugins)|
-|**Store**|Metrics are stored between the RAM & the disk in an extremely efficient DBengine, using a custom made floating point number for minimal footprint.|[`database`](database/#database)|
+|**Store**|Metrics are stored between the RAM and the disk in an extremely efficient DBengine, using a custom made floating point number for minimal footprint.|[`database`](database/#database)|
 |**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)|
 |**Stream**|An lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.|[`streaming`](streaming/#streaming-and-replication)|
 |**Archive**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)|
