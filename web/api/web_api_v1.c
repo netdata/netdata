@@ -771,7 +771,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     netdata_rwlock_rdlock(&localhost->labels_rwlock);
     struct label *l = localhost->labels;
     while (l != NULL) {
-        error("Label: \"%s\" -> \"%s\"", l->key, l->value);
+        error("Label [source id=%u]: \"%s\" -> \"%s\"", l->label_source, l->key, l->value);
         l = l->next;
     }
 
