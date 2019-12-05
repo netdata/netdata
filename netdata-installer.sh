@@ -289,6 +289,16 @@ cat <<BANNER3
 
 BANNER3
 
+if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
+  cat <<BANNER4
+
+  ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
+  Anonymous usage stats will be collected and sent to Google Analytics.
+  To opt-out, pass --disable-telemetry option to the installer.
+
+BANNER4
+fi
+
 have_autotools=
 if [ "$(type autoreconf 2>/dev/null)" ]; then
 	autoconf_maj_min() {
