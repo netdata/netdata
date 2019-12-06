@@ -1267,19 +1267,8 @@ int main(int argc, char **argv) {
 
     error_log_limit_reset();
 
-    // ------------------------------------------------------------------------
-    // load the host-level labels
-    /*
-       Temporary test-vector for #7408.
-       Leave the code commented out to support easy testing until #7410 is complete (and then delete it).
-
-    netdata_rwlock_wrlock(&localhost->labels_rwlock);
-    struct label *l = create_label("HostLabel1","Höst Låbel",LABEL_SOURCE_AUTO);
-    l->next = create_label("Label2","xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",LABEL_SOURCE_ENVIRONMENT);
-    localhost->labels = l;
-    netdata_rwlock_unlock(&localhost->labels_rwlock);
-    */
-
+    // Load host labels
+    reload_host_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads
