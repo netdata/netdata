@@ -747,9 +747,22 @@ struct label *load_auto_labels()
 
 struct label *load_config_labels()
 {
-    struct label *ret = NULL;
-//add_label_to_list
-    return ret;
+    struct label *l = NULL;
+    struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
+    if(co) {
+        config_section_wrlock(co);
+        struct config_option *cv;
+        for(cv = co->values; cv ; cv = cv->next) {
+            if(is_valid_label_key(cv->name)) {
+                l = add_label_to_list(l, cv->name, cv->value, LABEL_SOURCE_NETDATA_CONF);
+            } else {
+                error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s).", cv->name);
+            }
+        }
+        config_section_unlock(co);
+    }
+
+    return l;
 }
 
 struct label *load_kubernetes_labels()

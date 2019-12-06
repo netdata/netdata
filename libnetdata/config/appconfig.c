@@ -12,36 +12,6 @@
 #define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
 
-struct config_option {
-    avl avl;                // the index entry of this entry - this has to be first!
-
-    uint8_t flags;
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-    char *value;
-
-    struct config_option *next; // config->mutex protects just this
-};
-
-struct section {
-    avl avl;                // the index entry of this section - this has to be first!
-
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-
-    struct section *next;    // gloabl config_mutex protects just this
-
-    struct config_option *values;
-    avl_tree_lock values_index;
-
-    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
-                            // readers are protected using the rwlock in avl_tree_lock
-};
-
 
 // ----------------------------------------------------------------------------
 // locking
@@ -54,11 +24,11 @@ static inline void appconfig_unlock(struct config *root) {
     netdata_mutex_unlock(&root->mutex);
 }
 
-static inline void config_section_wrlock(struct section *co) {
+inline void config_section_wrlock(struct section *co) {
     netdata_mutex_lock(&co->mutex);
 }
 
-static inline void config_section_unlock(struct section *co) {
+inline void config_section_unlock(struct section *co) {
     netdata_mutex_unlock(&co->mutex);
 }
 
@@ -695,4 +665,9 @@ int config_parse_duration(const char* string, int* result) {
     fallback:
     *result = 0;
     return 0;
+}
+
+struct section *appconfig_get_section(struct config *root, const char *name)
+{
+    return appconfig_section_find(root, name);
 }
