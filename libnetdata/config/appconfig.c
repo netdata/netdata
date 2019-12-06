@@ -520,6 +520,103 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
     return 1;
 }
 
+int appconfig_reload_section(struct config *root, char *filename, const char *section_name)
+{
+    int line = 0;
+    struct section *co;
+    uint32_t hash = simple_hash(section_name);
+
+    char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
+
+    if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
+
+    FILE *fp = fopen(filename, "r");
+    if(!fp) {
+        error("CONFIG: Cannot open the file %s to reload the section %s", filename, section_name);
+        return 0;
+    }
+
+    int rewrite = 0;
+    while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
+        buffer[CONFIG_FILE_LINE_MAX] = '\0';
+        line++;
+
+        s = trim(buffer);
+        if(!s || *s == '#') {
+            debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
+            continue;
+        }
+
+        int len = (int) strlen(s);
+        if(*s == '[' && s[len - 1] == ']') {
+            if(rewrite) {
+                break;
+            }
+            // new section
+            s[len - 1] = '\0';
+            s++;
+
+            co = appconfig_section_find(root, s);
+            if(!co) continue;
+
+            if(co->hash != hash || strcmp(section_name,co->name))
+                continue;
+
+            rewrite++;
+            continue;
+        }
+
+        if(!co) {
+            // line outside a section
+            error("CONFIG: ignoring line %d ('%s') of file '%s', it is outside all sections.", line, s, filename);
+            continue;
+        }
+
+        if(!rewrite)
+            continue;
+
+        char *name = s;
+        char *value = strchr(s, '=');
+        if(!value) {
+            error("CONFIG: ignoring line %d ('%s') of file '%s', there is no = in it.", line, s, filename);
+            continue;
+        }
+        *value = '\0';
+        value++;
+
+        name = trim(name);
+        value = trim(value);
+
+        if(!name || *name == '#') {
+            error("CONFIG: ignoring line %d of file '%s', name is empty.", line, filename);
+            continue;
+        }
+
+        if(!value) value = "";
+
+        struct config_option *cv = appconfig_option_index_find(co, name, 0);
+
+        if(!cv) cv = appconfig_value_create(co, name, value);
+        else {
+            if(!(cv->flags & CONFIG_VALUE_USED)) {
+                config_section_wrlock(co);
+                debug(D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
+                freez(cv->value);
+                cv->value = strdupz(value);
+                config_section_unlock(co);
+            }
+            else
+                debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.", line, filename, co->name, cv->name);
+        }
+
+        cv->flags |= CONFIG_VALUE_LOADED;
+    }
+
+    fclose(fp);
+
+    return 1;
+}
+
 void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
 {
     int i, pri;
@@ -564,6 +661,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                || !strcmp(co->name, CONFIG_SECTION_HEALTH)
                || !strcmp(co->name, CONFIG_SECTION_BACKEND)
                || !strcmp(co->name, CONFIG_SECTION_STREAM)
+               || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
                     )
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;

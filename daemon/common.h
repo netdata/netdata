@@ -9,6 +9,7 @@
 // shortcuts for the default netdata configuration
 
 #define config_load(filename, overwrite_used) appconfig_load(&netdata_config, filename, overwrite_used)
+#define config_reload_section(filename, section) appconfig_reload_section(&netdata_config, filename, section)
 #define config_get(section, name, default_value) appconfig_get(&netdata_config, section, name, default_value)
 #define config_get_number(section, name, value) appconfig_get_number(&netdata_config, section, name, value)
 #define config_get_float(section, name, value) appconfig_get_float(&netdata_config, section, name, value)
