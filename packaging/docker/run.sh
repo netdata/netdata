@@ -7,7 +7,7 @@
 # Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 set -e
 
-if [ "$DO_NOT_TRACK" = 1 ]; then
+if [ -n "${DO_NOT_TRACK+x}" ]; then
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
 
