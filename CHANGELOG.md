@@ -6,7 +6,10 @@
 
 **Merged pull requests:**
 
+- address lgtm alerts [\#7441](https://github.com/netdata/netdata/pull/7441) ([jacekkolasa](https://github.com/jacekkolasa))
+- Docs: Change build process to allow apostrophes in headers [\#7431](https://github.com/netdata/netdata/pull/7431) ([joelhans](https://github.com/joelhans))
 - .travis.yml: Remove CentOS 6 package building and lifecycle tests [\#7425](https://github.com/netdata/netdata/pull/7425) ([knatsakis](https://github.com/knatsakis))
+- Add docs generator directories to .gitignore [\#7421](https://github.com/netdata/netdata/pull/7421) ([joelhans](https://github.com/joelhans))
 - Docs: Fixes to new health documentation structure [\#7419](https://github.com/netdata/netdata/pull/7419) ([joelhans](https://github.com/joelhans))
 - installer: include go.d.plugin version v0.12.0 [\#7418](https://github.com/netdata/netdata/pull/7418) ([ilyam8](https://github.com/ilyam8))
 - Attempt to fix broken docs builds [\#7409](https://github.com/netdata/netdata/pull/7409) ([joelhans](https://github.com/joelhans))
@@ -211,7 +214,6 @@
 - Common pattern for web and alarms together with two bug fixes [\#6783](https://github.com/netdata/netdata/pull/6783) ([thiagoftsm](https://github.com/thiagoftsm))
 - Changes to launching the python.d plugin aggregator. [\#6781](https://github.com/netdata/netdata/pull/6781) ([amoss](https://github.com/amoss))
 - vcsa collector: charts descritpion and alarms [\#6772](https://github.com/netdata/netdata/pull/6772) ([ilyam8](https://github.com/ilyam8))
-- netdata/packaging: Introduce separate CUPS package for debian distributions [\#6724](https://github.com/netdata/netdata/pull/6724) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
@@ -246,11 +248,6 @@
 - netdata/packaging: Add python3-lxc dependency [\#6753](https://github.com/netdata/netdata/pull/6753) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - make coverity-scan.sh usable by hand [\#6747](https://github.com/netdata/netdata/pull/6747) ([ktsaou](https://github.com/ktsaou))
 - netdata/packaging: fix coverity problem in travis \(2 issues\) [\#6743](https://github.com/netdata/netdata/pull/6743) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Add command-line option descriptions for apps.plugin [\#6738](https://github.com/netdata/netdata/pull/6738) ([vlvkobal](https://github.com/vlvkobal))
-- netdata/packaging: Add purging logic for package cloud repositories [\#6732](https://github.com/netdata/netdata/pull/6732) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Fix corrupted transaction payload handling [\#6731](https://github.com/netdata/netdata/pull/6731) ([mfundul](https://github.com/mfundul))
-- Netdata-installer warning removed [\#6715](https://github.com/netdata/netdata/pull/6715) ([thiagoftsm](https://github.com/thiagoftsm))
-- Remove of unecessary NULL web server [\#6714](https://github.com/netdata/netdata/pull/6714) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
