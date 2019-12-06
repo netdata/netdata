@@ -781,7 +781,9 @@ struct label *load_kubernetes_labels()
                 while (*eos && *eos != '\n') eos++;
                 if (*eos == '\n') *eos = '\0';
                 if (strlen(value)>1) {
-                    l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                    if (is_valid_label_key(name)){
+                        l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                    }
                 } else {
                     info("%s returned: '%s'", label_script, name);
                 }
