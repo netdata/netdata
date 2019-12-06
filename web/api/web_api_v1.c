@@ -767,16 +767,15 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
 
     /* Temporary test-vector for #7408
        Leave the code commented out to support easy testing until #7410 is complete (and then delete it).
-
     netdata_rwlock_rdlock(&localhost->labels_rwlock);
     struct label *l = localhost->labels;
     while (l != NULL) {
         error("Label [source id=%u]: \"%s\" -> \"%s\"", l->label_source, l->key, l->value);
         l = l->next;
     }
-
     netdata_rwlock_unlock(&localhost->labels_rwlock);
     */
+
 
 
 
