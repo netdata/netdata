@@ -139,9 +139,6 @@ void health_reload_host(RRDHOST *host) {
             t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
     }
 
-    //Reload the section "host labels" from netdata.conf, because it can be new labels that will indicate alarms.
-    config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
-
     rrdhost_rdlock(host);
     // reset all thresholds to all charts
     RRDSET *st;
