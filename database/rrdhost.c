@@ -880,17 +880,6 @@ void reload_host_labels()
     localhost->labels = new_labels;
     netdata_rwlock_unlock(&localhost->labels_rwlock);
 
-/*  This should not be done without holding the reader lock.
-    The clitool will output this information when you reload.
-    DELETE THIS COMMENT?
-
-    struct label *l=localhost->labels;
-    while (l != NULL) {
-        info("Label [source=%s]: \"%s\" -> \"%s\"", translate_label_source(l->label_source), l->key, l->value);
-        l = l->next;
-    }
-*/
-
     while (old_labels != NULL)
     {
         struct label *current = old_labels;
