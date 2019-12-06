@@ -36,26 +36,27 @@ We recommend you spend some time reading the descriptions for each setting to un
 Pay particular attention to the following settings, as they have dramatic impacts on the performance and appearance of
 your Netdata dashboard:
 
--   When to refresh the charts? -   How to handle hidden charts? -   Which chart refresh policy to use? -   Which theme
-to use? -   Do you need help?
+-   When to refresh the charts? 
+-   How to handle hidden charts? 
+-   Which chart refresh policy to use? 
+-   Which theme to use? 
+-   Do you need help?
 
 Some settings are applied immediately, and others are only reflected after you refresh the page.
 
 ## Check if there's an update to Netdata
 
-Netdata upon installation with [the one-liner](../../packaging/installer/README.md#one-line-installation) comes with the
-auto-update option enabled by default.
-
-You can always check if there is an update available right from the **Update** area of your Netdata dashboard.
+You can always check if there is an update available from the **Update** area of your Netdata dashboard.
 
 ![Animated GIF of opening the update
 modal](https://user-images.githubusercontent.com/12263278/64876743-be957a00-d647-11e9-83dd-2f0a8df572cb.gif)
 
 If an update is available, you'll see a modal similar to the one above.
 
-Netdata automatically updates itself, but if you choose to update it manually, there are [several well-documented
-methods](../../packaging/installer/UPDATE.md) to achieve that. However, it is best practice for you to first go over the
-[changelog](../../CHANGELOG.md).
+When you use the [automatic one-line installer script](../../packaging/installer/README.md#one-line-installation),
+Netdata will automatically attempt to update every day. If you choose to update it manually, there are [several
+well-documented methods](../../packaging/installer/UPDATE.md) to achieve that. However, it is best practice for you to
+first go over the [changelog](../../CHANGELOG.md).
 
 ## Export and import a snapshot
 
@@ -63,8 +64,7 @@ Netdata can export and import snapshots of the contents of your dashboard at a g
 a snapshot created by any other Netdata agent.
 
 Snapshot files include all the information of the dashboard, including the URL of the origin server, its unique ID, and
-chart data queries for the visible timeframe, to align, pan, and zoom the charts as needed. Snapshots are not in
-real-time.
+chart data queries for the visible timeframe. While snapshots are not in real-time, and thus won't update with new metrics, you can still pan, zoom, and highlight charts as you see fit.
 
 Snapshots can be incredibly useful for diagnosing anomalies after they've already happened. Let's say Netdata triggered
 an alarm while you were sleeping. In the morning, you can look up the exact moment the alarm was raised, export a

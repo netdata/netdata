@@ -22,12 +22,10 @@ Let's get started!
 
 ## Visit and explore the dashboard
 
-Netdata's dashboard is where you interact with your system's metrics. Time to open it up and start exploring.
+Netdata's dashboard is where you interact with your system's metrics. Time to open it up and start exploring. Open up
+your browser of choice.
 
-Open up your browser of choice. 
-
-If you installed Netdata on the same system you're using to open your browser, navigate
-to `http://localhost:19999/`. 
+If you installed Netdata on the same system you're using to open your browser, navigate to `http://localhost:19999/`. 
 
 If you installed Netdata on a remote system, navigate to `http://HOST:19999/` after replacing `HOST` with the IP address
 of that system. To connect to a virtual private server (VPS), for example, you might navigate to
@@ -70,13 +68,13 @@ For example, here's the description that accompanies the **swap** chart.
 description](https://user-images.githubusercontent.com/1153921/63452078-477b1600-c3fa-11e9-836b-2fc90fba8b4b.png)
 
 If you're new to health monitoring and performance troubleshooting, we recommend you spend some time reading these
-descriptions and learning more at pages we've linked to.
+descriptions and learning more at the pages linked above.
 
 ## Understand charts, dimensions, families, and contexts
 
-A **chart** is an interactive visualization of one or more collected/calculated metrics. You can see the name of a chart
-by looking at the top-left corner of a chart and finding the parenthesized text. On a Linux system, one of the first
-charts on the dashboard will be the system CPU chart, with the unique ID of `system.cpu`:
+A **chart** is an interactive visualization of one or more collected/calculated metrics. You can see the name (also
+known as its unique ID) of a chart by looking at the top-left corner of a chart and finding the parenthesized text. On a
+Linux system, one of the first charts on the dashboard will be the system CPU chart, with the name `system.cpu`:
 
 ![Screenshot of the system CPU chart in the Netdata
 dashboard](https://user-images.githubusercontent.com/1153921/67443082-43b16e80-f5b8-11e9-8d33-d6ee052c6678.png)
@@ -90,15 +88,14 @@ and more.
 dashboard](https://user-images.githubusercontent.com/1153921/62721031-2bba4d80-b9c0-11e9-9dca-32403617ce72.png)
 
 A **family** is _one_ instance of a monitored hardware or software resource that needs to be monitored and displayed
-separately from similar instances. Netdata is likely monitoring more than one disk/partition on your system. If so, it
-creates a different family for each disk or partition. For example, if your system has multiple partitions, Netdata
-might create different families for `/`, `/boot`, `/home`, and so on.
+separately from similar instances. For example, if your system has multiple partitions, Netdata will create different
+families for `/`, `/boot`, `/home`, and so on. Same goes for entire disks, network devices, and more.
 
 ![A number of families created for disk partitions](https://user-images.githubusercontent.com/1153921/67896952-a788e980-fb1a-11e9-880b-2dfb3945c8d6.png)
 
-A **context** groups several charts based on the types of metrics being collected and displayed. For example, the Disk
-section often has many contexts: `disk.io`, `disk.ops`, `disk.backlog`, `disk.util`, and so on. Netdata uses this
-context to create individual charts and then groups them by family. You can always see the context of any chart by
+A **context** groups several charts based on the types of metrics being collected and displayed. For example, the
+**Disk** section often has many contexts: `disk.io`, `disk.ops`, `disk.backlog`, `disk.util`, and so on. Netdata uses
+this context to create individual charts and then groups them by family. You can always see the context of any chart by
 looking at its name or hovering over the chart's date.
 
 It's important to understand these differences, as Netdata uses charts, dimensions, families, and contexts to create
@@ -199,9 +196,9 @@ In this step of the Netdata tutorial, you learned how to:
 -   Visit the dashboard
 -   Explore available charts (using the right-side menu)
 -   Read the descriptions accompanying charts
--   Pan, zoom, select, reset, and resize charts
+-   Interact with charts
 -   See raised alarms and the alarm log
 
 Next, you'll learn how to monitor multiple nodes through the dashboard.
 
-[Next: Monitor more than one system with Netdata &rarr;](step-03.md)
+[Next: Monitor more than one system with Netdata →](step-03.md)

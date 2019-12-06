@@ -18,7 +18,7 @@ We'll begin with an overview on Netdata's plugin architecture, and then dive int
 
 -   [Netdata's plugin architecture](#netdatas-plugin-architecture)
 -   [Enable and disable plugins](#enable-and-disable-plugins)
--   [Enable the Nginx module as an example](#example-enabling-the-nginx-module)
+-   [Enable the Nginx module as an example](#example-enable-the-nginx-module)
 
 ## Netdata's plugin architecture
 
@@ -27,19 +27,11 @@ Many Netdata users never have to configure plugins or worry about which plugin o
 But, if you want to configure plugins or write a collector module for your custom source, it's important to understand
 the underlying plugin architecture.
 
-By default, Netdata collects a lot of metrics every second. It uses **internal** plugins to collect system metrics,
-**external** plugins to collect non-system metrics, and **orchestrator** plugins to support data collection modules,
-such as the Nginx example mentioned earlier.
+By default, Netdata collects a lot of metrics every second using a lot of plugins. **Internal** plugins collect system
+metrics, **external** plugins collect non-system metrics, and **orchestrator** plugins support data collection modules.
 
-Plugin orchestrators are external plugins that do not collect any data by themselves. Instead, they support data
-collection modules written in the language of the orchestrator. They communicate with the netdata daemon via pipes
-(stdout communication).
-
-Orchestrators also simplify the plugin development process and minimize the number of threads and processes running.
-
-To develop a collector module, you'll choose an orchestrator based on your preferred programming language. Netdata
-provides plugin orchestrators for [Bash](../../collectors/charts.d.plugin/) (`charts.d`),
-[Python](../../collectors/python.d.plugin/) (`python.d`), [Go](../../collectors/go.d.plugin/) (`go.d`), and
+These modules are primarily written in [Go](../../collectors/go.d.plugin/) (`go.d`) and
+[Python](../../collectors/python.d.plugin/), although some use [Bash](../../collectors/charts.d.plugin/) (`charts.d`) or
 [Node.js](../../collectors/node.d.plugin/) (`node.d`).
 
 ## Enable and disable plugins
@@ -58,7 +50,7 @@ Enabled:
 
 ```conf
 [plugins]
-  node.d = no
+  # node.d = yes
 ```
 
 Disabled:
@@ -70,7 +62,7 @@ Disabled:
 
 When you explicitly disable a plugin this way, it won't auto-collect metrics using its modules.
 
-## Example: Enabling the Nginx module
+## Example: Enable the Nginx module
 
 To help explain how the auto-dectection process works, let's use an Nginx web server as an example. 
 
@@ -78,8 +70,7 @@ Even if you don't have Nginx installed on your system, we recommend you read thr
 apply the process to other data sources, such as Apache, Redis, Memcached, and more.
 
 The Nginx module, which helps Netdata collect metrics from a running Nginx web server, is part of the `python.d.plugin`
-external plugin _orchestrator_. We'll cover what external plugins and orchestrators are in the next section on
-[Netdata's plugin architecture](#netdatas-plugin-architecture).
+external plugin _orchestrator_.
 
 In order for Netdata to auto-detect an Nginx web server, you need to enable `ngx_http_stub_status_module` and pass the
 `stub_status` directive in the `location` block of your Nginx configuration file.
@@ -90,23 +81,25 @@ You can confirm if the module is already enabled or not by using following comma
 nginx -V 2>&1 | grep -o with-http_stub_status_module
 ```
 
-And your Nginx configuration file should have a `location` block similar to the following:
+If this command returns nothing, you'll need to [enable this module](https://www.nginx.com/blog/monitoring-nginx/).
+
+Next, edit your `/etc/nginx/sites-enabled/default` file to include a `location` block with the following:
 
 ```conf
-location /stub_status {
-    stub_status;
-}
+    location /stub_status {
+        stub_status;
+    }
 ```
 
 Restart Netdata using `service netdata restart` or the [correct
 alternative](../getting-started.md#start-stop-and-restart-netdata) for your system, and Netdata will auto-detect
-metrics from the Nginx web server!
+metrics from your Nginx web server!
 
 While not necessary for most auto-detection and collection purposes, you can also configure the Nginx collection module
 itself by editing its configuration file:
 
 ```sh
-/etc/netdata/edit-config python.d/nginx.conf
+./edit-config python.d/nginx.conf
 ```
 
 After configuring any source, or changing the configration files for their respective modules, always

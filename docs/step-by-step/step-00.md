@@ -3,17 +3,18 @@
 Welcome to Netdata! We're glad you're interested in our health monitoring and performance troubleshooting system.
 
 Because Netdata is entirely open-source software, you can use it free of charge, whether you want to monitor one or ten
-thousand systems! Our code is hosted on [GitHub](https://github.com/netdata/netdata).
+thousand systems! All our code is hosted on [GitHub](https://github.com/netdata/netdata).
 
-This tutorial is designed to help you understand what Netdata is, what it's capable of, and how it'll help you learn
-more about your systems and applications. If you're completely new to Netdata, or have never tried health
-monitoring/performance troubleshooting systems before, this tutorial is perfect for you.
+This tutorial is designed to help you understand what Netdata is, what it's capable of, and how it'll help you make
+faster and more informed decisions about the health and performance of your systems and applications. If you're
+completely new to Netdata, or have never tried health monitoring/performance troubleshooting systems before, this
+tutorial is perfect for you.
 
-> If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can
-> also jump straight into code and configurations with the [getting started guide](../getting-started.md).
+If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can jump
+straight into code and configurations with our [getting started guide](../getting-started.md).
 
-This tutorial contains instructions for Netdata installed on a Linux system. Many of the instructions will work on other
-supported operating systems, like FreeBSD and MacOS, but it is not guaranteed.
+> This tutorial contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
+> other supported operating systems, like FreeBSD and MacOS, but we can't make any guarantees.
 
 ## Before we get started
 
@@ -21,10 +22,12 @@ Let's make sure you have Netdata installed on your system!
 
 > If you already installed Netdata, feel free to skip to [Step 1: Netdata's building blocks](step-01.md).
 
-The easiest way to install Netdata on a Linux system is our `kickstart-static64.sh` one-line installer. Run this on your
-system and let it take care of the rest. This script will install Netdata from source, keep it up to date with nightly
-releases, connects to the Netdata [registry](../../registry/README.md), and sends [_anonymous
-statistics_](../anonymous-statistics.md) about usage.
+The easiest way to install Netdata on a Linux system is our `kickstart.sh` one-line installer. Run this on your system
+and let it take care of the rest. 
+
+This script will install Netdata from source, keep it up to date with nightly releases, connects to the Netdata
+[registry](../../registry/README.md), and sends [_anonymous statistics_](../anonymous-statistics.md) about how you use
+Netdata. We use this information to better understand how we can improve the Netdata experience for all our users.
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
@@ -34,13 +37,13 @@ Once finished, you'll have Netdata installed, and you'll be set up to get _night
 improvements, and bugfixes.
 
 If this method doesn't work for you, or you want to use a different process, visit our [installation
-documentation](../../packaging/installer/).
+documentation](../../packaging/installer/README.md) for details.
 
 ## Netdata fundamentals
 
 [Step 1. Netdata's building blocks](step-01.md)
 
-In this introductory step, we're talking about the fundamental ideas, philosophies, and UX decisions behind Netdata.
+In this introductory step, we'll talk about the fundamental ideas, philosophies, and UX decisions behind Netdata.
 
 [Step 2. Get to know Netdata's dashboard](step-02.md)
 
@@ -61,13 +64,13 @@ settings based on your system's resources.
 
 [Step 5. Health monitoring alarms and notifications](step-05.md)
 
-Learn how to tune, silence, and write custom alarms. Then, enable notifications so you never miss a health status or
-performance anomaly.
+Learn how to tune, silence, and write custom alarms. Then enable notifications so you never miss a change in health
+status or performance anomaly.
 
 [Step 6. Collect metrics from more services and apps](step-06.md)
 
-Learn how to enable/disable collection plugins, configure a collection plugin job, and add more charts to your Netdata
-dashboard.
+Learn how to enable/disable collection plugins and configure a collection plugin job to add more charts to your Netdata
+dashboard and begin monitoring more apps and services, like MySQL, Nginx, MongoDB, and hundreds more.
 
 [Step 7. Netdata's dashboard in depth](step-07.md)
 
@@ -78,14 +81,14 @@ updates, and the dashboard's settings.
 
 [Step 8. Building your first custom dashboard](step-08.md)
 
-Build a dashboard that shows the metrics that matter to you the most, or allow you to monitor many systems from a single
-HTML file.
+Using simple HTML, CSS, and JavaScript, we'll build a custom dashboard that displays essential information in any format
+you choose. You can even monitor many systems from a single HTML file.
 
 [Step 9. Long-term metrics storage](step-09.md)
 
-Netdata isn't just about real-time metrics—learn how to use our new database engine to store historical data and archive
-metrics to a different database.
+Want to store lots of real-time metrics from Netdata? Tweak our custom database to your heart's content. Want to take
+your Netdata metrics elsewhere? We're happy to help you archive data to Prometheus, MongoDB, TimescaleDB, and others.
 
 [Step 10. Set up a proxy](step-10.md)
 
-Run Netdata behind an Nginx proxy to improve performance and security by enabling TLS/HTTPS.
+Run Netdata behind an Nginx proxy to improve performance, and enable TLS/HTTPS for better security.

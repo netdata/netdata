@@ -25,7 +25,7 @@ The location of that directory and `netdata.conf` depends on your operating syst
 Netdata.
 
 The most reliable method of finding your Netdata config directory is loading your `netdata.conf` on your browser. Open a
-tab and navigate to `http://HOST:19999/netdata.conf`. Your browser will load up a text document that looks like this:
+tab and navigate to `http://HOST:19999/netdata.conf`. Your browser will load a text document that looks like this:
 
 ![A netdata.conf file opened in the
 browser](https://user-images.githubusercontent.com/1153921/68346763-344f1c80-00b2-11ea-9d1d-0ccac74d5558.png)
@@ -49,18 +49,19 @@ Netdata configuration files using a text editor. Or, if the configuration file d
 an example file to your Netdata config directory and then allow you to edit it before saving it.
 
 > `edit-config` will use the `EDITOR` environment variable on your system to edit the file. On many systems, that is
-> defaulted to `vim` or `nano`. We highly recommend `nano` for beginning users. To change this variable for the current
-> session (it will when you reboot), export a new value: `export EDITOR=nano`.
+> defaulted to `vim` or `nano`. We highly recommend `nano` for beginners. To change this variable for the current
+> session (it will revert to the default when you reboot), export a new value: `export EDITOR=nano`. Or, [make the
+> change permanent](https://stackoverflow.com/questions/13046624/how-to-permanently-export-a-variable-in-linux).
 
 Let's give it a shot. Navigate to your Netdata config directory. To use `edit-config` on `netdata.conf`, you need to
 have permissions to edit the file. On Linux/MacOS systems, you can usually use `sudo` to elevate your permissions.
 
 ```bash
-cd /etc/netdata    # Replace this path with your Netdata config directory
-./edit-config netdata.conf    # Or `sudo ./edit-config netdata.conf`
+cd /etc/netdata # Replace this path with your Netdata config directory as found in the steps above
+sudo ./edit-config netdata.conf
 ```
 
-You should now see `netdata.conf` your editor! Let's walk through how the file is structured so you understand 
+You should now see `netdata.conf` your editor! Let's walk through how the file is structured.
 
 ## The structure of `netdata.conf`
 
@@ -69,19 +70,19 @@ There are two main parts of the file to note: **sections** and **options**.
 The `netdata.conf` file is broken up into various **sections**, such as `[global]`, `[web]`, and `[registry]`. Each
 section contains the configuration options for some core component of Netdata.
 
-Each section also contains many **options**. Options have a name and a value. For example, for the option `config
-directory = /etc/netdata`, `config directory` is the name, and `/etc/netdata` is the value.
+Each section also contains many **options**. Options have a name and a value. With the option `config directory =
+/etc/netdata`, `config directory` is the name, and `/etc/netdata` is the value.
 
-Most lines are **commented**, in that they start with a hash symbol (`#`) and thus are ignored by Netdata when it loads
-the configuration file. Netdata will add a comment to any settings it doesn't recognize or isn't using. To _enable_ any
-setting, you need to **uncomment** it by removing that hash.
+Most lines are **commented**, in that they start with a hash symbol (`#`), and the value is set to a sane default. To
+tell Netdata that you'd like to change any option from its default value, you must **uncomment** it by removing that
+hash.
 
 ### Edit your `netdata.conf` file
 
 Let's try editing the options in `netdata.conf` to see how the process works.
 
-First, you'll add a fake option to show you how Netdata loads its configuration files. Add a `test` option under the
-`[global]` section and give it the value of `1`.
+First, add a fake option to show you how Netdata loads its configuration files. Add a `test` option under the `[global]`
+section and give it the value of `1`.
 
 ```conf
 [global]

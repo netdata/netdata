@@ -9,8 +9,7 @@ Netdata comes with hundreds of pre-configured alarms that don't require configur
 community of system adminstrators to cover the most important parts of production systems, so, in many cases, you won't
 need to edit them.
 
-That said, it's essential to learn how alarms and notifications work in Netdata so you can quickly configure them.
-Luckily, Netdata's alarm and notification system are incredibly adaptable to your needs.
+Luckily, Netdata's alarm and notification system are incredibly adaptable to your infrastructure's unique needs.
 
 ## What you'll learn in this step
 
@@ -33,11 +32,10 @@ entity](https://user-images.githubusercontent.com/1153921/67034648-ebb4cc80-f0cc
 
 Look at the `source` row in the table. This means the `system.cpu` chart sources its health alarms from
 `4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. To tune these alarms, you'll need to edit the alarm file at
-`health.d/cpu.conf`. Go to your [Netdata directory](step-04.md#find-your-netdataconf-file) and use the
+`health.d/cpu.conf`. Go to your [Netdata config directory](step-04.md#find-your-netdataconf-file) and use the
 `edit-config` script.
 
 ```bash
-cd /etc/netdata    # Replace this path with your Netdata directory
 sudo ./edit-config health.d/cpu.conf
 ```
 
@@ -63,7 +61,7 @@ the `warn` and `crit` lines to the values of your choosing. For example:
 
 ```yaml
     warn: $this > (($status >= $WARNING)  ? (60) : (75))
-    crit: $this > (($status == $CRITICAL) ? (75) : (95))
+    crit: $this > (($status == $CRITICAL) ? (75) : (85))
 ```
 
 You _can_ [restart Netdata](../getting-started.md#start-stop-and-restart-netdata) to enable your tune, but you can also
@@ -111,7 +109,7 @@ bother you with notifications.
 The best way to understand how health entities work is building your own and experimenting with the options. To start,
 let's build a health entity that triggers an alarm when system RAM usage goes above 80%.
 
-The first line in a health entity will be `alarm:`. This is how you name your entity—you can give it any name you
+The first line in a health entity will be `alarm:`. This is how you name your entity. You can give it any name you
 choose, but the only symbols allowed are `.` and `_`. Let's call the alarm `ram_usage`.
 
 ```yaml
@@ -119,10 +117,10 @@ choose, but the only symbols allowed are `.` and `_`. Let's call the alarm `ram_
 ```
 
 > You'll see some funky indentation in the lines coming up. Don't worry about it too much! Indentation is not important
-> to how Netdata processes entities, and it will make sense when we're done.
+> to how Netdata processes entities, and it will make sense when you're done.
 
-Next, we need to specify which chart this entity listens via the `on:` line. We're declaring that we want this alarm to
-check metrics in the `system.ram` chart.
+Next, you need to specify which chart this entity listens via the `on:` line. You're declaring that you want this alarm
+to check metrics on the `system.ram` chart.
 
 ```yaml
     on: system.ram
@@ -139,46 +137,45 @@ Let's take a moment to break this line down.
 
 -   `average`: Calculate the average of all the metrics collected.
 -   `-1m`: Use metrics from 1 minute ago until now to calculate that average.
--   `percentage`: Clarify that we're calculating a percentage of RAM usage.
+-   `percentage`: Clarify that you want to calculate a percentage of RAM usage.
 -   `of used`: Specify which dimension (`used`) on the `system.ram` chart you want to monitor with this entity.
 
-In other words, we're talking 1 minute's worth of metrics from the `used` dimension on the `system.ram` chart,
+In other words, you're taking 1 minute's worth of metrics from the `used` dimension on the `system.ram` chart,
 calculating their average, and returning it as a percentage.
 
-We can move on to the `units` line, which lets Netdata know that we're working with a percentage and not an absolute
+You can move on to the `units` line, which lets Netdata know that we're working with a percentage and not an absolute
 unit.
 
 ```yaml
  units: %
 ```
 
-Next, we have the `every` line, which tells Netdata how often to perform the calculation you've specified in the
-`lookup` line. For certain alarms, you might want to use a shorter duration, which you can specify using values like
-'10s`.
+Next, the `every` line tells Netdata how often to perform the calculation you specified in the `lookup` line. For
+certain alarms, you might want to use a shorter duration, which you can specify using values like `10s`.
 
 ```yaml
  every: 1m
 ```
 
 We'll put the next two lines—`warn` and `crit`—together. In these lines, you declare at which percentage you want to
-trigger a warning or critical alarm. Notice the variable `$this`, which carries the average RAM usage calculated by the
-`lookup` line. As you can see, we're setting off a warning if that average goes above 80%, and a critical alert if it's
-above 90%.
+trigger a warning or critical alarm. Notice the variable `$this`, which is the value calculated by the `lookup` line.
+These lines will trigger a warning if that average RAM useag average goes above 80%, and a critical alert if it's above
+90%.
 
 ```yaml
   warn: $this > 80
   crit: $this > 90
 ```
 
-We'll finish off with the `info` line. This line creates a description of the alarm that will then appear in any
-[notification](#enable-netdatas-notification-systems) you set up. It doesn't change the behavior, and it's optional, but
-it's useful to have, so you or your colleagues know what you created. Think of it as documentation for a health entity!
+Finish off with the `info` line, which creates a description of the alarm that will then appear in any
+[notification](#enable-netdatas-notification-systems) you set up. This line is optional, but it has value—think of it as
+documentation for a health entity!
 
 ```yaml
   info: The percentage of RAM being used by the system.
 ```
 
-Here's what the entity looks like in full (note the alignment of the colons—that's why we indent!):
+Here's what the entity looks like in full. Now you can see why we indented the lines, too.
 
 ```yaml
  alarm: ram_usage
@@ -191,13 +188,13 @@ lookup: average -1m percentage of used
   info: The percentage of RAM being used by the system.
 ```
 
-And what the active warning alert looks like on the Netdata dashboard.
+What about what it looks like on the Netdata dashboard?
 
 ![An active alert for the ram_usage alarm](https://user-images.githubusercontent.com/1153921/67056219-f89ee380-f0ff-11e9-8842-7dc210dd2908.png)
 
 If you'd like to try this alarm on your system, you can install a small program called
-[stress](http://manpages.ubuntu.com/manpages/disco/en/man1/stress.1.html) to create load on your system. Use the command
-below, and change the `8G` value to a number that's appropriate for your system.
+[stress](http://manpages.ubuntu.com/manpages/disco/en/man1/stress.1.html) to create a synthetic load. Use the command
+below, and change the `8G` value to a number that's appropriate for the amount of RAM on your system.
 
 ```bash
 stress -m 1 --vm-bytes 8G --vm-keep
@@ -207,9 +204,6 @@ Netdata is capable of understanding much more complicated entities. To better un
 documentation](../../health/README.md), look at some [examples](../../health/REFERENCE.md#example-alarms), and open the
 files containing the default entities on your system.
 
-Now that you can write a basic health entity, let's make sure you know when they get triggered by enabling email and
-Slack notifications.
-
 ## Enable Netdata's notification systems
 
 Health alarms, while great on their own, are pretty useless without some way of you knowing they've been triggered.
@@ -218,11 +212,13 @@ Discord, PagerDuty, Twilio, Amazon SNS, and much more.
 
 To see all the supported systems, visit our [notifications documentation](../../health/notifications/).
 
+We'll cover email and Slack notifications here, but with this knowledge you should be able to enable any other type of
+notifications instead of or in addition to these.
+
 ### Email notifications
 
-Enabling email notifications is a great place to start. To use email notifications, you should have `sendmail` or an
-equivalent installed on your system. Linux systems use `sendmail` or similar programs to, unsurprisingly, send emails to
-any inbox. 
+To use email notifications, you need `sendmail` or an equivalent installed on your system. Linux systems use `sendmail`
+or similar programs to, unsurprisingly, send emails to any inbox.
 
 > Learn more about `sendmail` via its [documentation](http://www.postfix.org/sendmail.1.html).
 
@@ -238,7 +234,7 @@ Look for the following lines:
 # if a role recipient is not configured, an email will be send to:
 DEFAULT_RECIPIENT_EMAIL="root"
 # to receive only critical alarms, set it to "root|critical"
-`"
+```
 
 Change the value of `DEFAULT_RECIPIENT_EMAIL` to the email address at which you'd like to receive notifications.
 
@@ -246,9 +242,9 @@ Change the value of `DEFAULT_RECIPIENT_EMAIL` to the email address at which you'
 # if a role recipient is not configured, an email will be sent to:
 DEFAULT_RECIPIENT_EMAIL="me@example.com"
 # to receive only critical alarms, set it to "root|critical"
-`"
+```
 
-Now try testing email notifications by first becoming the Netdata user and force send a test alarm:
+Test email notifications system by first becoming the Netdata user and then asking Netdata to send a test alarm:
 
 ```bash
 sudo su -s /bin/bash netdata
@@ -296,7 +292,7 @@ Look for the `SLACK_WEBHOOK_URL="  "` line and add the incoming webhook URL you 
 
 ```conf
 SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXXXXXX/XXXXXXXXX/XXXXXXXXXXXX"
-`"
+```
 
 A few lines down, edit the `DEFAULT_RECIPIENT_SLACK` line to contain a single hash `#` character. This instructs Netdata
 to send a notification to the channel you configured with the incoming webhook.
@@ -327,8 +323,8 @@ following documentation:
 ## What's next?
 
 In this step, you learned the fundamentals of Netdata's health monitoring tools: alarms and notifications. You should be
-able to tune default alarms, silence them, and understand some of the basics of writing health entities. And,
-if you so chose, you'll now have both email and Slack notifications enabled.
+able to tune default alarms, silence them, and understand some of the basics of writing health entities. And, if you so
+chose, you'll now have both email and Slack notifications enabled.
 
 You're coming along quick!
 

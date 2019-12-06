@@ -8,21 +8,22 @@ You might be thinking, "So, now I have to remember all these IP addresses, and t
 manually, to move from one system to another? Maybe I should just make a bunch of bookmarks. What's a few more tabs
 on top of the hundred I have already? 🤬"
 
-And we get it. That's why we built [Netdata Cloud](../netdata-cloud/README.md), which connects many distributed agents
+We get it. That's why we built [Netdata Cloud](../netdata-cloud/README.md), which connects many distributed agents
 together for a seamless experience when monitoring multiple systems.
 
 All without remembering IPs or making a bunch of bookmarks.
 
-> We'll cover _streaming_, which allows you to send metrics from one system to another, in [step 9](step-09.md) of this
-> tutorial.
+> If you're interested in streaming the metrics from one Netdata agent to another, that's unfortunately not part of this
+> tutorial. You'll want to reference our [streaming documentation](../../streaming/README.md) when you're finished with
+> these steps.
 
-Even if you don't have multiple systems right now, keep reading—you'll learn how to test out these features with
-Netdata demo servers. That way, you'll be able to experience one of Netdata's best features now, so that you're ready to
-implement it once you inevitably get another system you want to monitor.
+Even if you don't have multiple systems right now, keep reading. The instructions to follow will show you how to test
+out these features with Netdata demo servers. That way, you'll be able to experience one of Netdata's defining features
+right away.
 
 ## What you'll learn in this step
 
-In this step of the Netdata guide, we'll talk about why you should use Netdata Cloud, and then you'll learn:
+In this step of the Netdata guid, we'll talk about the following:
 
 -   [Why you should use Netdata Cloud](#why-use-netdata-cloud)
 -   [Add nodes to your Netdata Cloud account](#add-nodes-to-your-netdata-cloud-account)
@@ -41,7 +42,7 @@ Netdata Cloud gives you a better way to observe and take action on slowdowns, an
 applications. It connects all your Netdata agents through your _web browser_, allowing you to move between different
 nodes quickly and use the Nodes View to see a handful or hundreds of Netdata-monitored nodes on a single screen.
 
-So, if you're keeping tabs on multiple systems with Netdata, Netdata Cloud gives you all the benefits of a centralized
+If you're keeping tabs on multiple systems with Netdata, Netdata Cloud gives you all the benefits of a centralized
 monitoring solution while distributing the workload to each agent.
 
 That makes Netdata Cloud both comprehensive and lightweight. The best of both worlds!
