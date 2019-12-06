@@ -401,6 +401,33 @@ RRDHOST *rrdhost_find_or_create(
                 , system_info
                 , 0
         );
+
+        static int is_master_label_updated = 0;
+        if (!is_master_label_updated) {
+            struct label *prev_label = NULL;
+            struct label *label = localhost->labels;
+
+            uint32_t is_master_hash = simple_hash("_is_master");
+
+            netdata_rwlock_wrlock(&localhost->labels_rwlock);
+            while (label) {
+                if (label->key_hash == is_master_hash && !strcmp(label->key, "_is_master")) {
+                    struct label *new_label = create_label("_is_master", "true", LABEL_SOURCE_AUTO);
+
+                    if (prev_label)
+                        prev_label->next = new_label;
+                    new_label->next = label->next;
+                    freez(label);
+
+                    is_master_label_updated = 1;
+                    break;
+                }
+                prev_label = label;
+                label = label->next;
+            }
+            netdata_rwlock_unlock(&localhost->labels_rwlock);
+
+        }
     }
     else {
         host->health_enabled = health_enabled;
@@ -742,7 +769,33 @@ struct label *load_auto_labels()
     l = add_label_to_list(l, "_os_version", "All the versions", LABEL_SOURCE_AUTO);
     l = add_label_to_list(l, "_kernel_version", "The absolute latest", LABEL_SOURCE_AUTO);
     return l; */
-    return NULL;
+
+    struct label *label_list = NULL;
+
+    if (localhost->system_info->os_name)
+        label_list = add_label_to_list(label_list, "_os_name", localhost->system_info->os_name, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->os_version)
+        label_list = add_label_to_list(label_list, "_os_version", localhost->system_info->os_version, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->kernel_version)
+        label_list = add_label_to_list(label_list, "_kernel_version", localhost->system_info->kernel_version, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->architecture)
+        label_list = add_label_to_list(label_list, "_architecture", localhost->system_info->architecture, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->virtualization)
+        label_list = add_label_to_list(label_list, "_virtualization", localhost->system_info->virtualization, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->virt_detection)
+        label_list = add_label_to_list(label_list, "_container", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
+
+    label_list = add_label_to_list(label_list, "_is_master", localhost->next ? "true" : "false", LABEL_SOURCE_AUTO);
+
+    if (localhost->rrdpush_send_destination)
+        label_list = add_label_to_list(label_list, "_streams_to", localhost->rrdpush_send_destination, LABEL_SOURCE_AUTO);
+
+    return label_list;
 }
 
 struct label *load_config_labels()
