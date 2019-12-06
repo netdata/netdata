@@ -708,8 +708,8 @@ void rrdhost_save_charts(RRDHOST *host) {
 }
 
 static int is_valid_label_key(char *key) {
-    while(key) {
-        if(!isdigit(*key) || !isalpha(*key) || *key != '.' || *key != '_' || *key != '-')
+    while(*key) {
+        if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
             return 0;
 
         key++;
