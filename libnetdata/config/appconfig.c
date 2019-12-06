@@ -503,6 +503,10 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
             continue;
         }
 
+        if(section_name && overwrite_used && section_hash != co->hash && strcmp(section_name, co->name)) {
+            continue;
+        }
+
         char *name = s;
         char *value = strchr(s, '=');
         if(!value) {
