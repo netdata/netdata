@@ -31,6 +31,7 @@ openssl rsa -in private.pem -outform PEM -pubout -out public.pem
 
 #TARGET_URL="https://$URL_BASE"
 KEY=$(cat public.pem | tr '\n' '!' | sed -e 's/!/\\n/g')
+[ ! -z "$ROOMS" ] && ROOMS=\"$(echo $ROOMS | sed s'/,/", "/g')\"
 cat >tmp.txt <<EMBED_JSON
 {
     "agent": {
@@ -38,7 +39,7 @@ cat >tmp.txt <<EMBED_JSON
         "hostname": "$HOSTNAME"
     },
     "token": "$TOKEN",
-    "rooms" : [ "a man", "a plan", "a canal" ],
+    "rooms" : [ $ROOMS ],
     "public_key" : "$KEY"
 }
 EMBED_JSON
