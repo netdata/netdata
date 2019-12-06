@@ -707,7 +707,7 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
-static int is_valid_label(char *key) {
+static int is_valid_label_key(char *key) {
     while(key) {
         if(!isdigit(*key) || !isalpha(*key) || *key != '.' || *key != '_' || *key != '-')
             return 0;
