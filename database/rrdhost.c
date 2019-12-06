@@ -708,6 +708,14 @@ void rrdhost_save_charts(RRDHOST *host) {
 }
 
 static int is_valid_label_key(char *key) {
+    //Prometheus exporter
+    if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
+        return 0;
+
+    //Internal dimension
+    if (*key == '_')
+        return 0;
+
     while(*key) {
         if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
             return 0;
@@ -754,7 +762,7 @@ struct label *load_config_labels()
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
             char *name = cv->name;
-            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods")) {
+            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
                 l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
             } else {
                 error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s) or values."
