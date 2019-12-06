@@ -753,10 +753,12 @@ struct label *load_config_labels()
         config_section_wrlock(co);
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
-            if(is_valid_label_key(cv->name)) {
-                l = add_label_to_list(l, cv->name, cv->value, LABEL_SOURCE_NETDATA_CONF);
+            char *name = cv->name;
+            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods")) {
+                l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
             } else {
-                error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s).", cv->name);
+                error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s) or values."
+                       , name);
             }
         }
         config_section_unlock(co);
