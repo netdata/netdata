@@ -164,6 +164,7 @@ struct label {
 };
 
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
+extern int is_valid_label(char *key);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric

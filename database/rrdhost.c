@@ -712,8 +712,9 @@ int is_valid_label(char *key) {
         if(!isascii(*key) || !isdigit(*key) || !isalpha(*key) || *key != '.' || *key != '_' || *key != '-')
             return 0;
 
-        key++
+        key++;
     }
+
     return 1;
 }
 
