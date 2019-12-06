@@ -763,9 +763,9 @@ struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_S
     return lab;
 }
 
-int list_contains(struct label *head, struct label *check)
+int label_list_contains(struct label *head, struct label *check)
 {
-    while (head!=NULL)
+    while (head != NULL)
     {
         if (head->key_hash == check->key_hash && !strcmp(head->key, check->key))
             return 1;
@@ -784,7 +784,7 @@ struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
     {
         struct label *current = lo_pri;
         lo_pri = lo_pri->next;
-        if (!list_contains(result, current)) {
+        if (!label_list_contains(result, current)) {
             current->next = result;
             result = current;
         }
