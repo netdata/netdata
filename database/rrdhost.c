@@ -707,6 +707,18 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+char *translate_label_source(LABEL_SOURCE l) {
+    switch (l) {
+        case LABEL_SOURCE_AUTO: return "AUTO";
+            break;
+        case LABEL_SOURCE_NETDATA_CONF: return "NETDATA.CONF";
+        case LABEL_SOURCE_DOCKER : return "DOCKER";
+        case LABEL_SOURCE_ENVIRONMENT  : return "ENVIRONMENT";
+        case LABEL_SOURCE_KUBERNETES : return "KUBERNETES";
+        default: return "";
+    }
+}
+
 struct label *load_auto_labels()
 {
     /* TESTING ONLY DELETE AFTER REVIEW
@@ -734,7 +746,45 @@ struct label *load_kubernetes_labels()
     l = add_label_to_list(l, "beta", "Beta value from k8s", LABEL_SOURCE_KUBERNETES);
     l = add_label_to_list(l, "_os_version", "os version from k8s", LABEL_SOURCE_KUBERNETES);
     return l; */
-    return NULL;
+
+    struct label *l=NULL;
+    char *label_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2));
+    sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
+    if (unlikely(access(label_script, R_OK) != 0)) {
+        error("Kubernetes pod label fetching script %s not found.",label_script);
+        freez(label_script);
+    } else {
+        pid_t command_pid;
+
+        info("Attempting to fetch external labels via %s", label_script);
+
+        FILE *fp = mypopen(label_script, &command_pid);
+        if(fp) {
+            int MAX_LINE_SIZE=300;
+            char buffer[MAX_LINE_SIZE + 1];
+            while (fgets(buffer, MAX_LINE_SIZE, fp) != NULL) {
+                char *name=buffer;
+                char *value=buffer;
+                while (*value && *value != ':') value++;
+                if (*value == ':') {
+                    *value = '\0';
+                    value++;
+                }
+                char *eos=value;
+                while (*eos && *eos != '\n') eos++;
+                if (*eos == '\n') *eos = '\0';
+                if (strlen(value)>1) {
+                    l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                } else {
+                    info("%s returned: '%s'", label_script, name);
+                }
+            };
+            mypclose(fp, command_pid);
+        }
+        freez(label_script);
+    }
+
+    return l;
 }
 
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
@@ -808,12 +858,19 @@ void reload_host_labels()
     localhost->labels = new_labels;
     netdata_rwlock_unlock(&localhost->labels_rwlock);
 
+    struct label *l=localhost->labels;
+    while (l != NULL) {
+        info("Label [source=%s]: \"%s\" -> \"%s\"", translate_label_source(l->label_source), l->key, l->value);
+        l = l->next;
+    }
     while (old_labels != NULL)
     {
         struct label *current = old_labels;
         old_labels = old_labels->next;
         freez(current);
     }
+
+
 }
 
 // ----------------------------------------------------------------------------

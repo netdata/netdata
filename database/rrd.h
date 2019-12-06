@@ -150,10 +150,10 @@ typedef enum rrddim_flags {
 
 typedef enum label_source {
     LABEL_SOURCE_AUTO             = 0,
-    LABEL_SOURCE_NETDATA_CONF     = (1 << 0),
-    LABEL_SOURCE_DOCKER           = (1 << 1),
-    LABEL_SOURCE_ENVIRONMENT      = (1 << 2),
-    LABEL_SOURCE_KUBERNETES       = (1 << 3)
+    LABEL_SOURCE_NETDATA_CONF     = 1,
+    LABEL_SOURCE_DOCKER           = 2,
+    LABEL_SOURCE_ENVIRONMENT      = 3,
+    LABEL_SOURCE_KUBERNETES       = 4
 } LABEL_SOURCE;
 
 struct label {
@@ -163,6 +163,7 @@ struct label {
     struct label *next;
 };
 
+char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
 void reload_host_labels();
