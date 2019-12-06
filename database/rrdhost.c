@@ -707,6 +707,16 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+int is_valid_label(char *key) {
+    while(key) {
+        if(!isascii(*key) || !isdigit(*key) || !isalpha(*key) || *key != '.' || *key != '_' || *key != '-')
+            return 0;
+
+        key++
+    }
+    return 1;
+}
+
 struct label *load_auto_labels()
 {
     return NULL;
@@ -714,7 +724,9 @@ struct label *load_auto_labels()
 
 struct label *load_config_labels()
 {
-    return NULL;
+    struct label *ret = NULL;
+//add_label_to_list
+    return ret;
 }
 
 struct label *load_kubernetes_labels()
