@@ -707,14 +707,31 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+static int is_valid_label_key(char *key) {
+    while(*key) {
+        if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
+            return 0;
+
+        key++;
+    }
+
+    return 1;
+}
+
 char *translate_label_source(LABEL_SOURCE l) {
     switch (l) {
-        case LABEL_SOURCE_AUTO: return "AUTO";
-        case LABEL_SOURCE_NETDATA_CONF: return "NETDATA.CONF";
-        case LABEL_SOURCE_DOCKER : return "DOCKER";
-        case LABEL_SOURCE_ENVIRONMENT  : return "ENVIRONMENT";
-        case LABEL_SOURCE_KUBERNETES : return "KUBERNETES";
-        default: return "Invalid label source";
+        case LABEL_SOURCE_AUTO:
+            return "AUTO";
+        case LABEL_SOURCE_NETDATA_CONF:
+            return "NETDATA.CONF";
+        case LABEL_SOURCE_DOCKER :
+            return "DOCKER";
+        case LABEL_SOURCE_ENVIRONMENT  :
+            return "ENVIRONMENT";
+        case LABEL_SOURCE_KUBERNETES :
+            return "KUBERNETES";
+        default:
+            return "Invalid label source";
     }
 }
 
@@ -730,12 +747,9 @@ struct label *load_auto_labels()
 
 struct label *load_config_labels()
 {
-    /* TESTING ONLY DELETE AFTER REVIEW
-    struct label *l = add_label_to_list(NULL, "_os_name", "Darwin overwrites everything", LABEL_SOURCE_NETDATA_CONF);
-    l = add_label_to_list(l, "alpha", "Alpha value from config", LABEL_SOURCE_NETDATA_CONF);
-    l = add_label_to_list(l, "somethingUnique", "Unique value from config", LABEL_SOURCE_NETDATA_CONF);
-    return l; */
-    return NULL;
+    struct label *ret = NULL;
+//add_label_to_list
+    return ret;
 }
 
 struct label *load_kubernetes_labels()

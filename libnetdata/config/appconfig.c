@@ -436,7 +436,7 @@ int appconfig_get_duration(struct config *root, const char *section, const char 
 // ----------------------------------------------------------------------------
 // config load/save
 
-int appconfig_load(struct config *root, char *filename, int overwrite_used)
+int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name)
 {
     int line = 0;
     struct section *co = NULL;
@@ -451,6 +451,11 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
     if(!fp) {
         // info("CONFIG: cannot open file '%s'. Using internal defaults.", filename);
         return 0;
+    }
+
+    uint32_t section_hash = 0;
+    if(section_name) {
+        section_hash = simple_hash(section_name);
     }
 
     while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
@@ -472,12 +477,33 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
             co = appconfig_section_find(root, s);
             if(!co) co = appconfig_section_create(root, s);
 
+            if(co && section_name && overwrite_used && section_hash == co->hash && !strcmp(section_name, co->name)) {
+                config_section_wrlock(co);
+                struct config_option *cv2 = co->values;
+                while (cv2) {
+                    struct config_option *save = cv2->next;
+                    struct config_option *found = appconfig_option_index_del(co, cv2);
+                    if(found != cv2)
+                        error("INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
+                               cv2->name, co->name);
+
+                    free(cv2);
+                    cv2 = save;
+                }
+                co->values = NULL;
+                config_section_unlock(co);
+            }
+
             continue;
         }
 
         if(!co) {
             // line outside a section
             error("CONFIG: ignoring line %d ('%s') of file '%s', it is outside all sections.", line, s, filename);
+            continue;
+        }
+
+        if(section_name && overwrite_used && section_hash != co->hash && strcmp(section_name, co->name)) {
             continue;
         }
 
@@ -564,6 +590,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                || !strcmp(co->name, CONFIG_SECTION_HEALTH)
                || !strcmp(co->name, CONFIG_SECTION_BACKEND)
                || !strcmp(co->name, CONFIG_SECTION_STREAM)
+               || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
                     )
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;

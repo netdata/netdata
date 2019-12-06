@@ -91,6 +91,7 @@
 #define CONFIG_SECTION_HEALTH   "health"
 #define CONFIG_SECTION_BACKEND  "backend"
 #define CONFIG_SECTION_STREAM   "stream"
+#define CONFIG_SECTION_HOST_LABEL   "host labels"
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
@@ -112,7 +113,7 @@ struct config {
 #define CONFIG_BOOLEAN_AUTO 2       // enabled if it has useful info when enabled
 #endif
 
-extern int appconfig_load(struct config *root, char *filename, int overwrite_used);
+extern int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
 
 extern char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
