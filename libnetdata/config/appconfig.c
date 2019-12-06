@@ -523,7 +523,7 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
 int appconfig_reload_section(struct config *root, char *filename, const char *section_name)
 {
     int line = 0;
-    struct section *co;
+    struct section *co = NULL;
     uint32_t hash = simple_hash(section_name);
 
     char buffer[CONFIG_FILE_LINE_MAX + 1], *s;
@@ -598,15 +598,11 @@ int appconfig_reload_section(struct config *root, char *filename, const char *se
 
         if(!cv) cv = appconfig_value_create(co, name, value);
         else {
-            if(!(cv->flags & CONFIG_VALUE_USED)) {
-                config_section_wrlock(co);
-                debug(D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
-                freez(cv->value);
-                cv->value = strdupz(value);
-                config_section_unlock(co);
-            }
-            else
-                debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', '%s/%s' is already present and used.", line, filename, co->name, cv->name);
+            config_section_wrlock(co);
+            debug(D_CONFIG, "CONFIG: line %d of file '%s', overwriting '%s/%s'.", line, filename, co->name, cv->name);
+            freez(cv->value);
+            cv->value = strdupz(value);
+            config_section_unlock(co);
         }
 
         cv->flags |= CONFIG_VALUE_LOADED;
