@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
+#include "../daemon/mqtt.h"
 
 // ----------------------------------------------------------------------------
 // health alarm log load/save
@@ -69,6 +70,113 @@ inline void health_log_rotate(RRDHOST *host) {
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
+
+    char  mqtt_message[8192];
+
+    sprintf(mqtt_message,"%c\t%s"
+        "\t%08x\t%08x\t%08x\t%08x\t%08x"
+        "\t%08x\t%08x\t%08x"
+        "\t%08x\t%08x\t%08x"
+        "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
+        "\t%d\t%d\t%d\t%d"
+        "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
+        "\t%016lx"
+        "\n"
+        , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
+        , host->hostname
+
+        , ae->unique_id
+        , ae->alarm_id
+        , ae->alarm_event_id
+        , ae->updated_by_id
+        , ae->updates_id
+
+        , (uint32_t)ae->when
+        , (uint32_t)ae->duration
+        , (uint32_t)ae->non_clear_duration
+        , (uint32_t)ae->flags
+        , (uint32_t)ae->exec_run_timestamp
+        , (uint32_t)ae->delay_up_to_timestamp
+
+        , (ae->name)?ae->name:""
+        , (ae->chart)?ae->chart:""
+        , (ae->family)?ae->family:""
+        , (ae->exec)?ae->exec:""
+        , (ae->recipient)?ae->recipient:""
+        , (ae->source)?ae->source:""
+        , (ae->units)?ae->units:""
+        , (ae->info)?ae->info:""
+
+        , ae->exec_code
+        , ae->new_status
+        , ae->old_status
+        , ae->delay
+
+        , ae->new_value
+        , ae->old_value
+        , (uint64_t)ae->last_repeat);
+
+
+    sprintf(mqtt_message,"%c|%s"
+                     "|%08x|%08x|%08x|%08x|%08x"
+                     "|%08x|%08x|%08x"
+                     "|%08x|%08x|%08x"
+                     "|%s|%s|%s|%s|%s|%s|%s|%s"
+                     "|%d|%d|%d|%d"
+                     "|" CALCULATED_NUMBER_FORMAT_AUTO "|" CALCULATED_NUMBER_FORMAT_AUTO
+                     "|%016lx"
+                     "\n"
+        , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
+        , host->hostname
+
+        , ae->unique_id
+        , ae->alarm_id
+        , ae->alarm_event_id
+        , ae->updated_by_id
+        , ae->updates_id
+
+        , (uint32_t)ae->when
+        , (uint32_t)ae->duration
+        , (uint32_t)ae->non_clear_duration
+        , (uint32_t)ae->flags
+        , (uint32_t)ae->exec_run_timestamp
+        , (uint32_t)ae->delay_up_to_timestamp
+
+        , (ae->name)?ae->name:""
+        , (ae->chart)?ae->chart:""
+        , (ae->family)?ae->family:""
+        , (ae->exec)?ae->exec:""
+        , (ae->recipient)?ae->recipient:""
+        , (ae->source)?ae->source:""
+        , (ae->units)?ae->units:""
+        , (ae->info)?ae->info:""
+
+        , ae->exec_code
+        , ae->new_status
+        , ae->old_status
+        , ae->delay
+
+        , ae->new_value
+        , ae->old_value
+        , (uint64_t)ae->last_repeat);
+
+    //info("%s", mqtt_message);
+
+#ifdef ENABLE_HTTPS
+    int rc;
+
+    rc = mqtt_send("netdata/alarm", mqtt_message);
+    if (rc != MOSQ_ERR_SUCCESS)
+        info("MQTT failed with %d",rc);
+#else
+    int rc;
+
+    rc = mqtt_send("netdata/alarm", mqtt_message);
+
+    if (rc != MOSQ_ERR_SUCCESS)
+        info("MQTT failed with %d",rc);
+
+#endif
 
     if(likely(host->health_log_fp)) {
         if(unlikely(fprintf(host->health_log_fp

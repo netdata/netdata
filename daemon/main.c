@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <stdbool.h>
 #include "common.h"
+#include "mqtt.h"
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
@@ -29,6 +31,7 @@ void netdata_cleanup_and_exit(int ret) {
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
+    //mqtt_shutdown();
     rrdhost_cleanup_all();
 
     if(!ret) {
@@ -72,6 +75,8 @@ struct netdata_static_thread static_threads[] = {
 
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
+
+    NETDATA_MQTT_HOOK
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
@@ -772,6 +777,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
 void send_statistics( const char *action, const char *action_result, const char *action_data) {
     static char *as_script;
+
     if (netdata_anonymous_statistics_enabled == -1) {
         char *optout_file = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) +strlen(".opt-out-from-anonymous-statistics") + 2));
         sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
@@ -1261,6 +1267,7 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
+    //mqtt_init();
     rrd_init(netdata_configured_hostname, system_info);
     // ------------------------------------------------------------------------
     // enable log flood protection

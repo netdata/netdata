@@ -632,7 +632,7 @@ set(DAEMON_FILES
         daemon/commands.h
         daemon/unit_test.c
         daemon/unit_test.h
-        )
+        daemon/mqtt.c daemon/mqtt.h)
 
 set(NETDATA_FILES
         collectors/all.h

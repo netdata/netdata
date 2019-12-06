@@ -58,6 +58,9 @@
 // all data collection plugins
 #include "collectors/all.h"
 
+// Include mqtt stuff
+//#include "mqtt.h"
+
 // netdata unit tests
 #include "unit_test.h"
 
