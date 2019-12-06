@@ -29,7 +29,7 @@ echo "HOSTNAME: $HOSTNAME"
 openssl genrsa -out private.pem 2048
 openssl rsa -in private.pem -outform PEM -pubout -out public.pem
 
-TARGET_URL="https://$URL_BASE"
+#TARGET_URL="https://$URL_BASE"
 KEY=$(cat public.pem | tr '\n' '!' | sed -e 's/!/\\n/g')
 cat >tmp.txt <<EMBED_JSON
 {
@@ -37,10 +37,11 @@ cat >tmp.txt <<EMBED_JSON
         "id": "$ID",
         "hostname": "$HOSTNAME"
     },
-    "token": "0543be24-c3b7-408d-9514-997e96c74a28",
+    "token": "$TOKEN",
     "rooms" : [ "a man", "a plan", "a canal" ],
-    "key" : "$KEY"
+    "public_key" : "$KEY"
 }
 EMBED_JSON
 
-curl --trace-ascii - -X PUT --data-binary tmp.txt @public.pem $TARGET_URL
+#curl --trace-ascii - -X PUT -d "@tmp.txt" @public.pem $TARGET_URL
+curl --trace-ascii - -X PUT -d "@tmp.txt" @public.pem $URL_BASE
