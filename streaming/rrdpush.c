@@ -57,12 +57,12 @@ char *netdata_ssl_ca_file = NULL;
 static void load_stream_conf() {
     errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
-    if(!appconfig_load(&stream_config, filename, 0)) {
+    if(!appconfig_load(&stream_config, filename, 0, NULL)) {
         info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
-        if(!appconfig_load(&stream_config, filename, 0))
+        if(!appconfig_load(&stream_config, filename, 0, NULL))
             info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
