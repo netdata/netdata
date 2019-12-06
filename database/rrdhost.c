@@ -710,12 +710,11 @@ void rrdhost_save_charts(RRDHOST *host) {
 char *translate_label_source(LABEL_SOURCE l) {
     switch (l) {
         case LABEL_SOURCE_AUTO: return "AUTO";
-            break;
         case LABEL_SOURCE_NETDATA_CONF: return "NETDATA.CONF";
         case LABEL_SOURCE_DOCKER : return "DOCKER";
         case LABEL_SOURCE_ENVIRONMENT  : return "ENVIRONMENT";
         case LABEL_SOURCE_KUBERNETES : return "KUBERNETES";
-        default: return "";
+        default: return "Invalid label source";
     }
 }
 
@@ -741,12 +740,6 @@ struct label *load_config_labels()
 
 struct label *load_kubernetes_labels()
 {
-    /* TESTING ONLY DELETE AFTER REVIEW
-    struct label *l = add_label_to_list(NULL, "alpha", "Alpha value from k8s", LABEL_SOURCE_KUBERNETES);
-    l = add_label_to_list(l, "beta", "Beta value from k8s", LABEL_SOURCE_KUBERNETES);
-    l = add_label_to_list(l, "_os_version", "os version from k8s", LABEL_SOURCE_KUBERNETES);
-    return l; */
-
     struct label *l=NULL;
     char *label_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2));
     sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
@@ -858,19 +851,23 @@ void reload_host_labels()
     localhost->labels = new_labels;
     netdata_rwlock_unlock(&localhost->labels_rwlock);
 
+/*  This should not be done without holding the reader lock.
+    The clitool will output this information when you reload.
+    DELETE THIS COMMENT?
+
     struct label *l=localhost->labels;
     while (l != NULL) {
         info("Label [source=%s]: \"%s\" -> \"%s\"", translate_label_source(l->label_source), l->key, l->value);
         l = l->next;
     }
+*/
+
     while (old_labels != NULL)
     {
         struct label *current = old_labels;
         old_labels = old_labels->next;
         freez(current);
     }
-
-
 }
 
 // ----------------------------------------------------------------------------
