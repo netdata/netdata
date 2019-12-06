@@ -718,8 +718,30 @@ static int is_valid_label(char *key) {
     return 1;
 }
 
+char *translate_label_source(LABEL_SOURCE l) {
+    switch (l) {
+        case LABEL_SOURCE_AUTO:
+            return "AUTO";
+        case LABEL_SOURCE_NETDATA_CONF:
+            return "NETDATA.CONF";
+        case LABEL_SOURCE_DOCKER :
+            return "DOCKER";
+        case LABEL_SOURCE_ENVIRONMENT  :
+            return "ENVIRONMENT";
+        case LABEL_SOURCE_KUBERNETES :
+            return "KUBERNETES";
+        default:
+            return "Invalid label source";
+    }
+}
+
 struct label *load_auto_labels()
 {
+    /* TESTING ONLY DELETE AFTER REVIEW
+    struct label *l = add_label_to_list(NULL, "_os_name", "Linux for the win", LABEL_SOURCE_AUTO);
+    l = add_label_to_list(l, "_os_version", "All the versions", LABEL_SOURCE_AUTO);
+    l = add_label_to_list(l, "_kernel_version", "The absolute latest", LABEL_SOURCE_AUTO);
+    return l; */
     return NULL;
 }
 
@@ -732,14 +754,51 @@ struct label *load_config_labels()
 
 struct label *load_kubernetes_labels()
 {
-    return NULL;
+    struct label *l=NULL;
+    char *label_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2));
+    sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
+    if (unlikely(access(label_script, R_OK) != 0)) {
+        error("Kubernetes pod label fetching script %s not found.",label_script);
+        freez(label_script);
+    } else {
+        pid_t command_pid;
+
+        info("Attempting to fetch external labels via %s", label_script);
+
+        FILE *fp = mypopen(label_script, &command_pid);
+        if(fp) {
+            int MAX_LINE_SIZE=300;
+            char buffer[MAX_LINE_SIZE + 1];
+            while (fgets(buffer, MAX_LINE_SIZE, fp) != NULL) {
+                char *name=buffer;
+                char *value=buffer;
+                while (*value && *value != ':') value++;
+                if (*value == ':') {
+                    *value = '\0';
+                    value++;
+                }
+                char *eos=value;
+                while (*eos && *eos != '\n') eos++;
+                if (*eos == '\n') *eos = '\0';
+                if (strlen(value)>1) {
+                    l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                } else {
+                    info("%s returned: '%s'", label_script, name);
+                }
+            };
+            mypclose(fp, command_pid);
+        }
+        freez(label_script);
+    }
+
+    return l;
 }
 
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
 {
     size_t key_len = strlen(key), value_len = strlen(value);
     size_t n = sizeof(struct label) + key_len + 1 + value_len + 1;
-    struct label *result = callocz(n,1);
+    struct label *result = callocz(1,n);
     if (result != NULL) {
         char *c = (char *)result;
         c += sizeof(struct label);
@@ -752,6 +811,77 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
         result->key_hash = simple_hash(result->key);
     }
     return result;
+}
+
+struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
+{
+    struct label *lab = create_label(key, value, label_source);
+    lab->next = l;
+    return lab;
+}
+
+int label_list_contains(struct label *head, struct label *check)
+{
+    while (head != NULL)
+    {
+        if (head->key_hash == check->key_hash && !strcmp(head->key, check->key))
+            return 1;
+        head = head->next;
+    }
+    return 0;
+}
+
+/* Create a list with entries from both lists.
+   If any entry in the low priority list is masked by an entry in the high priorty list then delete it.
+*/
+struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
+{
+    struct label *result = hi_pri;
+    while (lo_pri != NULL)
+    {
+        struct label *current = lo_pri;
+        lo_pri = lo_pri->next;
+        if (!label_list_contains(result, current)) {
+            current->next = result;
+            result = current;
+        }
+        else
+            freez(current);
+    }
+    return result;
+}
+
+void reload_host_labels()
+{
+    struct label *from_auto = load_auto_labels();
+    struct label *from_k8s = load_kubernetes_labels();
+    struct label *from_config = load_config_labels();
+
+    struct label *new_labels = merge_label_lists(from_auto, from_k8s);
+    new_labels = merge_label_lists(new_labels, from_config);
+
+    netdata_rwlock_wrlock(&localhost->labels_rwlock);
+    struct label *old_labels = localhost->labels;
+    localhost->labels = new_labels;
+    netdata_rwlock_unlock(&localhost->labels_rwlock);
+
+/*  This should not be done without holding the reader lock.
+    The clitool will output this information when you reload.
+    DELETE THIS COMMENT?
+
+    struct label *l=localhost->labels;
+    while (l != NULL) {
+        info("Label [source=%s]: \"%s\" -> \"%s\"", translate_label_source(l->label_source), l->key, l->value);
+        l = l->next;
+    }
+*/
+
+    while (old_labels != NULL)
+    {
+        struct label *current = old_labels;
+        old_labels = old_labels->next;
+        freez(current);
+    }
 }
 
 // ----------------------------------------------------------------------------

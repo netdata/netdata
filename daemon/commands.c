@@ -37,6 +37,7 @@ static cmd_status_t cmd_save_database_execute(char *args, char **message);
 static cmd_status_t cmd_reopen_logs_execute(char *args, char **message);
 static cmd_status_t cmd_exit_execute(char *args, char **message);
 static cmd_status_t cmd_fatal_execute(char *args, char **message);
+static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -45,6 +46,7 @@ static command_info_t command_info_array[] = {
         {"reopen-logs", cmd_reopen_logs_execute, CMD_TYPE_ORTHOGONAL},       // Close and reopen log files
         {"shutdown-agent", cmd_exit_execute, CMD_TYPE_EXCLUSIVE},            // exit cleanly
         {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
+        {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -94,6 +96,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Show this help menu.\n"
              "reload-health\n"
              "    Reload health configuration.\n"
+             "reload-labels\n"
+             "    Reload all labels.\n"
              "save-database\n"
              "    Save internal DB to disk for memory mode save.\n"
              "reopen-logs\n"
@@ -166,6 +170,23 @@ static cmd_status_t cmd_fatal_execute(char *args, char **message)
 
     fatal("COMMAND: netdata now exits.");
 
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
+{
+    (void)args;
+    (void)message;
+    info("COMMAND: reloading host labels.");
+    reload_host_labels();
+    struct label *l=localhost->labels;
+    BUFFER *wb = buffer_create(10);
+    while (l != NULL) {
+        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, l->value);
+        l = l->next;
+    }
+    (*message)=strdupz(buffer_tostring(wb));
+    buffer_free(wb);
     return CMD_STATUS_SUCCESS;
 }
 
