@@ -716,7 +716,6 @@ static int is_valid_label_key(char *key) {
     if (*key == '_')
         return 0;
 
-    key++;
     while(*key) {
         if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
             return 0;
