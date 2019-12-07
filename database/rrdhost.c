@@ -712,12 +712,7 @@ static int is_valid_label_key(char *key) {
     if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
         return 0;
 
-    //Netdata internal
-    if (*key == '_')
-        return 0;
-
-    key++;
-    //Prometheus internal
+    //Netdata and Prometheus  internal
     if (*key == '_')
         return 0;
 
