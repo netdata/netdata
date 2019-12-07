@@ -59,6 +59,11 @@ struct rrdcalctemplate {
     uint32_t crit_repeat_every; // interval between repeating critical notifications
 
     // ------------------------------------------------------------------------
+    // Labels settings
+    char *labels;                   // the label read from an alarm file
+    SIMPLE_PATTERN *splabels;       // the simple pattern of labels
+
+    // ------------------------------------------------------------------------
     // expressions related to the alarm
 
     EVAL_EXPRESSION *calculation;

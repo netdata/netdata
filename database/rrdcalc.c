@@ -559,6 +559,8 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->units);
     freez(rc->info);
     simple_pattern_free(rc->spdim);
+    freez(rc->labels);
+    simple_pattern_free(rc->splabels);
     freez(rc);
 }
 

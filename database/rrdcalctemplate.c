@@ -56,7 +56,9 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->info);
     freez(rt->dimensions);
     freez(rt->foreachdim);
+    freez(rt->labels);
     simple_pattern_free(rt->spdim);
+    simple_pattern_free(rt->splabels);
     freez(rt);
 }
 
