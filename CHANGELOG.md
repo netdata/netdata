@@ -26,6 +26,7 @@
 - Implement netdata command server and cli tool [\#7325](https://github.com/netdata/netdata/pull/7325) ([mfundul](https://github.com/mfundul))
 - proc.plugin: add pressure stall information [\#7209](https://github.com/netdata/netdata/pull/7209) ([hexchain](https://github.com/hexchain))
 - Fixing linter errors in packaging/docker/README [\#7199](https://github.com/netdata/netdata/pull/7199) ([joelhans](https://github.com/joelhans))
+- Add HP Smart Storage Array python plugin [\#7181](https://github.com/netdata/netdata/pull/7181) ([gnoddep](https://github.com/gnoddep))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
@@ -233,8 +234,6 @@
 - \(Documentation\) fix pfsense instructions and links [\#6768](https://github.com/netdata/netdata/pull/6768) ([Fohdeesha](https://github.com/Fohdeesha))
 - netdata/packaging: Trigger stable package generation upon release process [\#6766](https://github.com/netdata/netdata/pull/6766) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - update cache hashes for js and css [\#6756](https://github.com/netdata/netdata/pull/6756) ([jacekkolasa](https://github.com/jacekkolasa))
-- \[libnetdata/thread\] Set thread name from tag [\#6745](https://github.com/netdata/netdata/pull/6745) ([Saruspete](https://github.com/Saruspete))
-- sidebar-info update - DB engine [\#6744](https://github.com/netdata/netdata/pull/6744) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
@@ -247,7 +246,6 @@
 - Increase minimum release for changelog [\#6758](https://github.com/netdata/netdata/pull/6758) ([cakrit](https://github.com/cakrit))
 - netdata/packaging: Add python3-lxc dependency [\#6753](https://github.com/netdata/netdata/pull/6753) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - make coverity-scan.sh usable by hand [\#6747](https://github.com/netdata/netdata/pull/6747) ([ktsaou](https://github.com/ktsaou))
-- netdata/packaging: fix coverity problem in travis \(2 issues\) [\#6743](https://github.com/netdata/netdata/pull/6743) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.16.1](https://github.com/netdata/netdata/tree/v1.16.1) (2019-07-31)
 
