@@ -21,26 +21,24 @@ Let's get on with it!
 
 Because it's cool!
 
-But there are way more reasons than that. Many users create custom dashboards to aggregate real-time data from multiple
-Netdata servers in one place.
+But there are way more reasons than that, most of which will prove more valuable to you.
 
-Others want to create a more streamlined experience to see specific metrics without clicking through the standard
-dashboard. For example, those working on application performance monitoring for their company's custom app might only
-need a select number of charts most of the time.
+You could use custom dashboards to aggregate real-time data from multiple Netdata agents in one place. Or, you could put
+all the charts with metrics collected from your custom application via `statsd` and perform application performance
+monitoring from a single dashboard. You could even use a custom dashboard and a standalone web server to create an
+enriched public status page for your service, and give your users something fun to look at while they're waiting for the
+503 errors to clear up!
 
-By creating a custom dashboard and hosting it with a web server, you can create a public status page for your service.
-At least your users will have something to look at while they're waiting for the 503 errors to clear up!
-
-Or, you can add Netdata charts to existing web pages.
-
-Netdata's custom dashboarding capability is meant to be as flexible as your ideas. So, we hope you can take these
+Netdata's custom dashboarding capability is meant to be as flexible as your ideas. We hope you can take these
 fundamental ideas and turn them into something amazing.
 
 ## Create and prepare your `custom-dashboard.html` file
 
-By default, Netdata stores its web server files at `/usr/share/netdata/web`.
+By default, Netdata stores its web server files at `/usr/share/netdata/web`. As with finding the location of your
+`netdata.conf` file, you can double-check this location by loading up `http://HOST:19999/netdata.conf` in your browser
+and finding the value of the `web files directory` option.
 
-To create your custom dashboard, create/edit a file at `/usr/share/netdata/web/custom-dashboard.html` and copy in the
+To create your custom dashboard, create a file at `/usr/share/netdata/web/custom-dashboard.html` and copy in the
 following:
 
 ```html
@@ -75,19 +73,18 @@ following:
 
 Try visiting `http://HOST:19999/custom-dashbord.html` in your browser.
 
-If you get a blank page with this text&mdash;`Access to file is not permitted:
-/usr/share/netdata/web/custom-dashboard.html`&mdash;it means that you need to change the dashboard file's permissions.
-Try the below command and reload:
+If you get a blank page with this text: `Access to file is not permitted: /usr/share/netdata/web/custom-dashboard.html`.
+You can fix this error by changing the dashboard file's permissions to make it owned by the `netdata` user.
 
 ```bash
 sudo chown netdata:netdata /usr/share/netdata/web/custom-dashboard.html
 ```
 
-You should see a blank page with the title: **Your custom dashboard**!
+Reload your browser, and you should see a blank page with the title: **Your custom dashboard**!
 
 ## Add `dashboard.js` to your custom dashboard file
 
-You need to include the `dashboard.js` file of a Netdata server to add Netdata charts. Add the following to the `<head>`
+You need to include the `dashboard.js` file of a Netdata agent to add Netdata charts. Add the following to the `<head>`
 of your custom dashboard page and change `HOST` according to your setup.
 
 ```html
@@ -98,7 +95,7 @@ of your custom dashboard page and change `HOST` according to your setup.
 When you add `dashboard.js` to any web page, it loads several JavaScript and CSS files to create and style charts. It
 also scans the page for elements that define charts, builds them, and refreshes with new metrics.
 
-> If you enabled SSL on your Netdata dashboard, you will need to use `https://` to grab the `dashboard.js` file.
+> If you enabled SSL on your Netdata dashboard already, you'll need to use `https://` to grab the `dashboard.js` file.
 
 ## Add some basic styling
 
@@ -241,8 +238,8 @@ side-by-side](https://user-images.githubusercontent.com/1153921/67526620-ff7ea68
 
 ## Final touches
 
-While we already have a perfectly workable dashboard as-is, let's add some final touches to make it a little more
-pleasant on the eyes.
+While we already have a perfectly workable dashboard, let's add some final touches to make it a little more pleasant on
+the eyes.
 
 First, add some extra CSS to create some vertical whitespace between the top and bottom row of charts.
 
@@ -383,8 +380,8 @@ In this guide, you learned the fundamentals of building a custom Netdata dashboa
 charts to your `custom-dashboard.html`, change the charts that are already there, and size them according to your needs.
 
 Of course, the custom dashboarding features covered here are just the beginning. Be sure to read up on our [custom
-dashboard documentation](https://docs.netdata.cloud/web/gui/custom/) for details on how you can use other chart
-libraries, pull metrics from multiple Netdata agents, and choose which dimensions a given chart shows.
+dashboard documentation](../../web/gui/custom/) for details on how you can use other chart libraries, pull metrics from
+multiple Netdata agents, and choose which dimensions a given chart shows.
 
 Next, you'll learn how to store long-term historical metrics in Netdata!
 
