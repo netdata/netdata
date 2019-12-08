@@ -57,6 +57,13 @@ static char *user_config_dir = NULL;
 static char *stock_config_dir = NULL;
 static char *plugin_dir = NULL;
 
+uint32_t *econn_udp = NULL;
+uint64_t *ibytes_udp = NULL;
+uint64_t *ebytes_udp = NULL;
+uint32_t *econn_tcp = NULL;
+uint64_t *ibytes_tcp = NULL;
+uint64_t *ebytes_tcp = NULL;
+
 //protocols used with this collector
 static char *protocols[] = { "tcp", "udp" };
 
@@ -167,13 +174,6 @@ static void write_traffic(char *name, uint64_t *bytes) {
 }
 
 static void netdata_publish_data() {
-    uint32_t econn_udp[NETDATA_MAX_DIMENSION];
-    uint64_t ibytes_udp[NETDATA_MAX_DIMENSION];
-    uint64_t ebytes_udp[NETDATA_MAX_DIMENSION];
-    uint32_t econn_tcp[NETDATA_MAX_DIMENSION];
-    uint64_t ibytes_tcp[NETDATA_MAX_DIMENSION];
-    uint64_t ebytes_tcp[NETDATA_MAX_DIMENSION];
-
     //fill content
     uint16_t tcp = 0;
     uint16_t udp = 0;
@@ -559,6 +559,30 @@ static void int_exit(int sig) {
         }
     }
 
+    if (econn_udp) {
+        freez(econn_udp);
+    }
+
+    if (ibytes_udp) {
+        freez(ibytes_udp);
+    }
+
+    if (ebytes_udp) {
+        freez(econn_udp);
+    }
+
+    if (econn_tcp) {
+        freez(econn_tcp);
+    }
+
+    if (ibytes_tcp) {
+        freez(ibytes_tcp);
+    }
+
+    if (ebytes_tcp) {
+        freez(ebytes_tcp);
+    }
+
     exit(sig);
 }
 
@@ -743,9 +767,10 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
 
                 next = set;
             }
-
         }
+        connection_controller.maxports = end;
     } else {
+        uint16_t counter =0;
         while (*ports) {
             char *vport = ports;
             while (*ports && *ports != ',' && *ports != ' ') ports++;
@@ -770,6 +795,7 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                 }
 
                 for ( ; i <= end ; i++) {
+                    counter++;
                     set = (netdata_port_list_t *) callocz(1,sizeof(netdata_port_list_t));
                     if(set) {
                         if (!dash) {
@@ -800,6 +826,7 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                 }
             }
         }
+        connection_controller.maxports = counter;
     }
 
     return ret;
@@ -977,6 +1004,41 @@ static void update_dimensions() {
     }
 }
 
+int allocate_publish_vectors() {
+    size_t length = (size_t)connection_controller.maxports;
+    econn_udp = (uint32_t *)callocz(length, sizeof(uint32_t));
+    if(!econn_udp) {
+        return -1;
+    }
+
+    ibytes_udp = (uint64_t *)callocz(length, sizeof(uint64_t));
+    if(!econn_udp) {
+        return -1;
+    }
+
+    ebytes_udp = (uint64_t *)callocz(length, sizeof(uint64_t));
+    if(!econn_udp) {
+        return -1;
+    }
+
+    econn_tcp = (uint32_t *)callocz(length, sizeof(uint32_t));
+    if(!econn_tcp) {
+        return -1;
+    }
+
+    ibytes_tcp = (uint64_t *)callocz(length, sizeof(uint64_t));
+    if(!econn_udp) {
+        return -1;
+    }
+
+    ebytes_tcp = (uint64_t *)callocz(length, sizeof(uint64_t));
+    if(!econn_udp) {
+        return -1;
+    }
+
+    return 0;
+}
+
 void parse_config() {
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
@@ -1006,6 +1068,14 @@ void parse_config() {
         if(port_list) {
             update_dimensions();
         }
+    }
+
+    if(!connection_controller.maxports) {
+        int_exit(0);
+    }
+
+    if(allocate_publish_vectors()) {
+        int_exit(8);
     }
 }
 

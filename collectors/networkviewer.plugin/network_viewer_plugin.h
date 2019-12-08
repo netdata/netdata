@@ -119,6 +119,7 @@ typedef struct netdata_control_connection{
 
     netdata_port_stats_t *ports;
     netdata_port_stats_t *last_port;
+    uint16_t maxports;
     parse_text_input_t *pti;
 } netdata_control_connection_t;
 
