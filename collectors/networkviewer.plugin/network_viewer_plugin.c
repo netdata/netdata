@@ -1005,6 +1005,10 @@ static void update_dimensions() {
 }
 
 int allocate_publish_vectors() {
+    if(ebytes_tcp) {
+        return 0;
+    }
+
     size_t length = (size_t)connection_controller.maxports;
     econn_udp = (uint32_t *)callocz(length, sizeof(uint32_t));
     if(!econn_udp) {
@@ -1012,12 +1016,12 @@ int allocate_publish_vectors() {
     }
 
     ibytes_udp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!econn_udp) {
+    if(!ibytes_udp) {
         return -1;
     }
 
     ebytes_udp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!econn_udp) {
+    if(!ebytes_udp) {
         return -1;
     }
 
@@ -1027,12 +1031,12 @@ int allocate_publish_vectors() {
     }
 
     ibytes_tcp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!econn_udp) {
+    if(!ibytes_udp) {
         return -1;
     }
 
     ebytes_tcp = (uint64_t *)callocz(length, sizeof(uint64_t));
-    if(!econn_udp) {
+    if(!ebytes_udp) {
         return -1;
     }
 
