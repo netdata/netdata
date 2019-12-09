@@ -757,7 +757,7 @@ struct label *load_config_labels()
 {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
     if(!status) {
-        char *filename = filename = CONFIG_DIR "/" CONFIG_FILENAME;
+        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
         error("LABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
     }
 
