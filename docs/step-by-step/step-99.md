@@ -5,8 +5,8 @@ Congratulations. 🎉
 You've completed the step-by-step Netdata tutorial. That means you're well on your way to becoming an expert in using
 our toolkit for health monitoring and performance troubleshooting.
 
-But, perhaps more importantly, also an expert on the _fundamental skills behind health monitoring and performance
-troubleshooting_, which you can take with you to any job or project.
+But, perhaps more importantly, also that much closer to being an expert in the _fundamental skills behind health
+monitoring and performance troubleshooting_, which you can take with you to any job or project.
 
 And that is the entire point of this tutorial, and Netdata's [documentation](https://docs.netdata.cloud) as a whole—give
 you every resource possible to help you build faster, more resilient systems, services, and applications.
@@ -31,8 +31,8 @@ Seems like a lot, right? Well, we hope it felt manageable and, yes, even _fun_.
 Now that you're at the end of our step-by-step Netdata tutorial, the next steps are entirely up to you. In fact, you're
 just at the beginning of your journey into health monitoring and performance troubleshooting.
 
-This site exists to put every Netdata resource in front of you as easily and coherently as we possibly can. Click
-around, search, and find new mountains to climb.
+Our documentation exists to put every Netdata resource in front of you as easily and coherently as we possibly can.
+Click around, search, and find new mountains to climb.
 
 If that feels like too much possibility to you, why not one of these options:
 

@@ -32,14 +32,14 @@ A proxy is a middleman between the internet and a service you're running on your
 large enters your system through the proxy, which then routes it to the service.
 
 A proxy is often used to enable encrypted HTTPS connections with your browser, but they're also useful for load
-balancing, performance, and password-protection for your services.
+balancing, performance, and password-protection.
 
 We'll use [Nginx](https://nginx.org/en/) for this step of the tutorial, but you can also use
-[Caddy](https://caddyserver.com/) as a proxy if you prefer.
+[Caddy](https://caddyserver.com/) as a simple proxy if you prefer.
 
 ## Required before you start
 
-You need three things to run a proxy:
+You need three things to run a proxy using Nginx:
 
 -   Nginx and Certbot installed on your system
 -   A fully qualified domain name
@@ -47,11 +47,18 @@ You need three things to run a proxy:
 
 ### Nginx and Certbot
 
-This step of the tutorial assumes you can install Nginx on your system. Because the installation process varies wildly
-based on your operating system, we can't possibly cover all options here. 
+This step of the tutorial assumes you can install Nginx on your system. Here are the easiest methods to do so on Debian,
+Ubuntu, Fedora, and CentOS systems.
+
+```bash
+sudo apt-get install nginx  # Debian/Ubuntu
+sudo dnf install nginx      # Fedora
+sudo yum install nginx      # CentOS
+```
 
 Check out [Nginx's installation
-instructions](https://docs.nginx.com/nginx/admin-guide/installing-nginx/installing-nginx-open-source/) for details.
+instructions](https://docs.nginx.com/nginx/admin-guide/installing-nginx/installing-nginx-open-source/) for details on
+other Linux distributions.
 
 Certbot is a tool to help you create and renew certiciate+key pairs for your domain. Visit their
 [instructions](https://certbot.eff.org/instructions) to get a detailed installation process for your operating system.
@@ -75,7 +82,7 @@ entries for your domain.
 To create a subdomain for Netdata, use your registrar's DNS settings to create an A record for a `netdata` subdomain.
 Point the A record to the IP address of your system.
 
-With this configuration, you'll be able to access your dashboard at `http://netdata.example.com`.
+Once finished with the steps below, you'll be able to access your dashboard at `http://netdata.example.com`.
 
 ## Connect Netdata to Nginx
 

@@ -21,7 +21,6 @@ In this step of the Netdata guide, you'll learn how to:
 -   [Tweak the database engine's settings](#tweak-the-database-engines-settings)
 -   [Archive metrics to a backend](#archive-metrics-to-a-backend)
     -   [Use the MongoDB backend](#archive-metrics-via-the-mongodb-backend)
-    -   [Use the Prometheus backend](#archive-metrics-via-the-prometheus-remote-write-backend)
 
 Let's get started!
 
@@ -91,7 +90,7 @@ methods, MongoDB and Prometheus remote write, to get you started.
 
 ### Archive metrics via the MongoDB backend
 
-Let's begin with installing MongoDB its dependencies.
+Begin by installing MongoDB its dependencies via the correct package manager for your system.
 
 ```bash
 sudo apt-get install mongodb  # Debian/Ubuntu
@@ -100,16 +99,21 @@ sudo yum install mongodb      # CentOS
 ```
 
 Next, install the one essential dependency: v1.7.0 or higher of
-[libmongoc](http://mongoc.org/libmongoc/current/installing.html). 
+[libmongoc](http://mongoc.org/libmongoc/current/installing.html).
 
 ```bash
-sudo apt-get install libmongoc-1.0-0  # Debian/Ubuntu
-sudo dnf install mongo-c-driver       # Fedora
-sudo yum install mongo-c-driver       # CentOS
+sudo apt-get install libmongoc-1.0-0 libmongoc-dev    # Debian/Ubuntu
+sudo dnf install mongo-c-driver mongo-c-driver-devel  # Fedora
+sudo yum install mongo-c-driver mongo-c-driver-devel  # CentOS
 ```
 
-Let's create a new database and connection to 
-**FINISH THIS**
+Next, create a new MongoDB database and collection to store all these archived metrics. Use the `mongo` command to start
+the MongoDB shell, and then execute the following command:
+
+```mongodb
+use netdata
+db.createCollection("netdata_metrics")
+```
 
 Next, Netdata needs to be reinstalled in order to detect that the required libraries to make this backend connection
 exist. Since you most likely installed Netdata using the one-line installer script, all you have to do is run that
@@ -119,7 +123,7 @@ script again. Don't worry—any configuration changes you made along the way wil
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-To enable archiving to the MongoDB backend, set the options in the `backend` section of `netdata.conf` to the following:
+Now, from your Netdata config directory, edit your `netdata.conf` file and set these options in the `[backend]` section:
 
 ```conf
 [backend]
@@ -127,61 +131,37 @@ To enable archiving to the MongoDB backend, set the options in the `backend` sec
     type = mongodb
 ```
 
-In your Netdata config directory, configure the [MongoDB
-URI](https://docs.mongodb.com/manual/reference/connection-string/), database name, and collection name by running:
+You now need to initialize and edit a `mongodb.conf` file to tell Netdata where to find the database you just created.
 
 ```sh
 ./edit-config mongodb.conf
 ```
 
-You will proceed to fill up the MongoDB connection details:
+Add the following values to the file:
 
 ```yaml
+# MongoDB backend configuration
+#
+# All options in this file are mandatory
+
 # URI
-uri = mongodb://<hostname>
+uri = mongodb://localhost
 
 # database name
-database = your_database_name
+database = netdata
 
 # collection name
-collection = your_collection_name
+collection = netdata_metrics
 ```
 
-[Restart](../getting-started.md#start-stop-and-restart-netdata) Netdata.
+[Restart](../getting-started.md#start-stop-and-restart-netdata) Netdata to enable the MongoDB backend. Click on the
+**Netdata Montioring** menu and check out the **backend** sub-menu. You should start seeing these charts fill up with
+data about your MongoDB backend!
 
-You can confirm MongoDB is saving your metrics using
-[mongotop](https://docs.mongodb.com/manual/reference/program/mongotop/#bin.mongotop). Run the following command:
+![image](https://user-images.githubusercontent.com/1153921/70443852-25171200-1a56-11ea-8be3-494544b1c295.png)
 
-```sh
-mongotop --uri "mongodb://<hostname>/your_database_name"
-```
-
-### Archive metrics via the Prometheus remote write backend
-
-If you don't want to use the MongoDB backend, you can try the Prometheus remote write API.
-
-To use this option with [storage
-providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage),
-[protobuf](https://developers.google.com/protocol-buffers/) and [snappy](https://github.com/google/snappy), install the
-libraries first. Next, Netdata should be re-installed from the source. The installer will detect that the required
-libraries and utilities are now available.
-
-In the `[backend]` section of `netdata.conf`, enable and add configuration for the remote write API:
-
-```conf
-[backend]
-    enabled = yes
-    type = prometheus_remote_write
-    remote write URL path = /receive
-```
-
-[Restart](../getting-started.md#start-stop-and-restart-netdata) Netdata. It will now be archiving historical metrics to
-your Prometheus backend!
-
-You can check out the following great resources on how to use Netdata and Prometheus:
-
--   [Using Netdata with Prometheus](../../backends/prometheus/)
--   [Netdata, Prometheus, Grafana stack](../../backends/WALKTHROUGH.md)
+If you'd like to try connecting Netdata to another backend, such as Prometheus or OpenTSDB, read our [backends
+documentation](../../backends/README.md).
 
 ## What's next?
 
