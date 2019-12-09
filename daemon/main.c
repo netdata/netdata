@@ -31,7 +31,6 @@ void netdata_cleanup_and_exit(int ret) {
 
     // cleanup/save the database and exit
     info("EXIT: cleaning up the database...");
-    //mqtt_shutdown();
     rrdhost_cleanup_all();
 
     if(!ret) {
@@ -1267,7 +1266,6 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
-    //mqtt_init();
     rrd_init(netdata_configured_hostname, system_info);
     // ------------------------------------------------------------------------
     // enable log flood protection

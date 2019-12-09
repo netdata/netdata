@@ -4,6 +4,7 @@
 #define NETDATA_HEALTH_H 1
 
 #include "../daemon/common.h"
+#include "../daemon/mqtt.h"
 
 #define NETDATA_PLUGIN_HOOK_HEALTH \
     { \

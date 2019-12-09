@@ -106,6 +106,7 @@ AM_CFLAGS = \
     $(OPTIONAL_NFACCT_CFLAGS) \
     $(OPTIONAL_ZLIB_CFLAGS) \
     $(OPTIONAL_UUID_CFLAGS) \
+	$(OPTIONAL_MQTT_CFLAGS) \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_IPMIMONITORING_CFLAGS) \
     $(OPTIONAL_CUPS_CFLAGS) \
@@ -480,6 +481,8 @@ DAEMON_FILES = \
     daemon/global_statistics.h \
     daemon/main.c \
     daemon/main.h \
+	daemon/mqtt.c \
+	daemon/mqtt.h \
     daemon/signals.c \
     daemon/signals.h \
     daemon/commands.c \
@@ -532,6 +535,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_ZLIB_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_UUID_LIBS) \
+    $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
     $(OPTIONAL_JUDY_LIBS) \
