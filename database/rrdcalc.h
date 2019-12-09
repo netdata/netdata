@@ -163,6 +163,7 @@ extern void dimension_remove_pipe_comma(char *str);
 extern char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen);
 
 extern void rrdcalc_labels_unlink();
+extern void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {

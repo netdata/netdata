@@ -605,6 +605,42 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     rrdcalc_free(rc);
 }
 
+void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+
+    RRDCALC *rc, *clean = NULL;
+    for (rc = host->alarms; rc; rc = rc->next) {
+        if (clean) {
+            error("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+                  clean->name,
+                  host->hostname,
+                  clean->labels);
+            rrdcalc_unlink_and_free(host, clean);
+            clean = NULL;
+        }
+
+        struct label *move = host->labels;
+        if(rc->labels) {
+            while(move) {
+                if (simple_pattern_matches(rc->splabels, move->key)) {
+                    break;
+                }
+                move = move->next;
+            }
+
+            if(!move) {
+                clean = rc;
+            }
+        }
+    }
+
+    if (clean) {
+        rrdcalc_unlink_and_free(host, clean);
+    }
+
+    netdata_rwlock_unlock(&host->labels_rwlock);
+}
+
 void rrdcalc_labels_unlink() {
     rrd_rdlock();
 
@@ -615,39 +651,9 @@ void rrdcalc_labels_unlink() {
 
         if (host->labels) {
             rrdhost_wrlock(host);
-            netdata_rwlock_rdlock(&host->labels_rwlock);
 
-            RRDCALC *rc, *clean = NULL;
-            for (rc = host->alarms; rc; rc = rc->next) {
-                if (clean) {
-                    error("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
-                          clean->name,
-                          host->hostname,
-                          clean->labels);
-                    rrdcalc_unlink_and_free(host, clean);
-                    clean = NULL;
-                }
+            rrdcalc_labels_unlink_alarm_from_host(host);
 
-                struct label *move = host->labels;
-                if(rc->labels) {
-                    while(move) {
-                        if (simple_pattern_matches(rc->splabels, move->key)) {
-                            break;
-                        }
-                        move = move->next;
-                    }
-
-                    if(!move) {
-                        clean = rc;
-                    }
-                }
-            }
-
-            if (clean) {
-                rrdcalc_unlink_and_free(host, clean);
-            }
-
-            netdata_rwlock_unlock(&host->labels_rwlock);
             rrdhost_unlock(host);
         }
     }

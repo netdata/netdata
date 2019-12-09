@@ -152,6 +152,9 @@ void health_reload_host(RRDHOST *host) {
     rrdhost_wrlock(host);
     health_readdir(host, user_path, stock_path, NULL);
 
+    //Discard alarms with labels that do not apply to host
+    rrdcalc_labels_unlink_alarm_from_host(host);
+
     // link the loaded alarms to their charts
     RRDDIM *rd;
     rrdset_foreach_write(st, host) {
@@ -167,8 +170,6 @@ void health_reload_host(RRDHOST *host) {
     }
 
     rrdhost_unlock(host);
-
-    rrdcalc_labels_unlink();
 }
 
 /**
