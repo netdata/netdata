@@ -757,7 +757,7 @@ struct label *load_config_labels()
 {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
     if(!status) {
-        char *filename = filename = CONFIG_DIR "/" CONFIG_FILENAME;
+        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
         error("LABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
     }
 
@@ -810,7 +810,9 @@ struct label *load_kubernetes_labels()
                 while (*eos && *eos != '\n') eos++;
                 if (*eos == '\n') *eos = '\0';
                 if (strlen(value)>1) {
-                    l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                    if (is_valid_label_key(name)){
+                        l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                    }
                 } else {
                     info("%s returned: '%s'", label_script, name);
                 }
