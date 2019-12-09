@@ -5,7 +5,7 @@
 
 // ----------------------------------------------------------------------------
 
-int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
+static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
     errno = 0;
     struct label *move = host->labels;
     if(move && rt->labels) {
