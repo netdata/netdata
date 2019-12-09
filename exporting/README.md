@@ -1,6 +1,6 @@
 # Exporting metrics to external databases (experimental)
 
-The exporting engine is an update for the former [Backends](backends/). It's still work in progress. It has a modular structure and supports metric exporting to multiple exporting connector instances at the same time. You can have different update intervals and filters configured for every exporting connector instance. Configuration is almost similar to [backends](backends/#configuration). The only difference is that type of a connector should be specified in a section name before a colon and a name after the colon. At the moment only four types of connectors are supported: `graphite`, `json`, `opentsdb`, `opentsdb:http`.
+The exporting engine is an update for the former [Backends](../backends/). It's still work in progress. It has a modular structure and supports metric exporting to multiple exporting connector instances at the same time. You can have different update intervals and filters configured for every exporting connector instance. Configuration is almost similar to [backends](../backends/#configuration). The only difference is that type of a connector should be specified in a section name before a colon and a name after the colon. At the moment only four types of connectors are supported: `graphite`, `json`, `opentsdb`, `opentsdb:http`.
 
 An example configuration:
 ```conf
