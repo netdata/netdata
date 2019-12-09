@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Fix dbengine dirty page flushing warning [\#7469](https://github.com/netdata/netdata/pull/7469) ([mfundul](https://github.com/mfundul))
+- rabbitmq: fix handle\_disabled\_disk\_monitoring [\#7464](https://github.com/netdata/netdata/pull/7464) ([ilyam8](https://github.com/ilyam8))
 - address lgtm alerts [\#7441](https://github.com/netdata/netdata/pull/7441) ([jacekkolasa](https://github.com/jacekkolasa))
 - Docs: Change build process to allow apostrophes in headers [\#7431](https://github.com/netdata/netdata/pull/7431) ([joelhans](https://github.com/joelhans))
 - Indicate we no longer build packages for CentOS 6 [\#7430](https://github.com/netdata/netdata/pull/7430) ([ncmans](https://github.com/ncmans))

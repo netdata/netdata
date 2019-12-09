@@ -429,8 +429,8 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
         uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
     }
     pg_cache_put(ctx, descr);
-
-    rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
+    if (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED)
+        rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
 destroy:
     freez(descr);
     pg_cache_update_metric_times(page_index);
