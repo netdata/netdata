@@ -764,12 +764,6 @@ char *translate_label_source(LABEL_SOURCE l) {
 
 struct label *load_auto_labels()
 {
-    /* TESTING ONLY DELETE AFTER REVIEW
-    struct label *l = add_label_to_list(NULL, "_os_name", "Linux for the win", LABEL_SOURCE_AUTO);
-    l = add_label_to_list(l, "_os_version", "All the versions", LABEL_SOURCE_AUTO);
-    l = add_label_to_list(l, "_kernel_version", "The absolute latest", LABEL_SOURCE_AUTO);
-    return l; */
-
     struct label *label_list = NULL;
 
     if (localhost->system_info->os_name)
