@@ -755,6 +755,12 @@ struct label *load_auto_labels()
 
 struct label *load_config_labels()
 {
+    int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
+    if(!status) {
+        char *filename = filename = CONFIG_DIR "/" CONFIG_FILENAME;
+        error("LABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
+    }
+
     struct label *l = NULL;
     struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
     if(co) {
