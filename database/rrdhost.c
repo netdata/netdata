@@ -708,6 +708,14 @@ void rrdhost_save_charts(RRDHOST *host) {
 }
 
 static int is_valid_label_key(char *key) {
+    //Prometheus exporter
+    if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
+        return 0;
+
+    //Netdata and Prometheus  internal
+    if (*key == '_')
+        return 0;
+
     while(*key) {
         if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
             return 0;
@@ -747,9 +755,30 @@ struct label *load_auto_labels()
 
 struct label *load_config_labels()
 {
-    struct label *ret = NULL;
-//add_label_to_list
-    return ret;
+    int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
+    if(!status) {
+        char *filename = filename = CONFIG_DIR "/" CONFIG_FILENAME;
+        error("LABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
+    }
+
+    struct label *l = NULL;
+    struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
+    if(co) {
+        config_section_wrlock(co);
+        struct config_option *cv;
+        for(cv = co->values; cv ; cv = cv->next) {
+            char *name = cv->name;
+            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
+                l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
+            } else {
+                error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s) or values."
+                       , name);
+            }
+        }
+        config_section_unlock(co);
+    }
+
+    return l;
 }
 
 struct label *load_kubernetes_labels()
@@ -866,17 +895,6 @@ void reload_host_labels()
     struct label *old_labels = localhost->labels;
     localhost->labels = new_labels;
     netdata_rwlock_unlock(&localhost->labels_rwlock);
-
-/*  This should not be done without holding the reader lock.
-    The clitool will output this information when you reload.
-    DELETE THIS COMMENT?
-
-    struct label *l=localhost->labels;
-    while (l != NULL) {
-        info("Label [source=%s]: \"%s\" -> \"%s\"", translate_label_source(l->label_source), l->key, l->value);
-        l = l->next;
-    }
-*/
 
     while (old_labels != NULL)
     {

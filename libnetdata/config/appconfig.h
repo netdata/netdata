@@ -98,6 +98,36 @@
 #define CONFIG_MAX_NAME 1024
 #define CONFIG_MAX_VALUE 2048
 
+struct config_option {
+    avl avl;                // the index entry of this entry - this has to be first!
+
+    uint8_t flags;
+    uint32_t hash;          // a simple hash to speed up searching
+    // we first compare hashes, and only if the hashes are equal we do string comparisons
+
+    char *name;
+    char *value;
+
+    struct config_option *next; // config->mutex protects just this
+};
+
+struct section {
+    avl avl;                // the index entry of this section - this has to be first!
+
+    uint32_t hash;          // a simple hash to speed up searching
+    // we first compare hashes, and only if the hashes are equal we do string comparisons
+
+    char *name;
+
+    struct section *next;    // gloabl config_mutex protects just this
+
+    struct config_option *values;
+    avl_tree_lock values_index;
+
+    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
+    // readers are protected using the rwlock in avl_tree_lock
+};
+
 struct config {
     struct section *sections;
     netdata_mutex_t mutex;
@@ -114,6 +144,8 @@ struct config {
 #endif
 
 extern int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
+extern void config_section_wrlock(struct section *co);
+extern void config_section_unlock(struct section *co);
 
 extern char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
@@ -136,5 +168,7 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
+
+extern struct section *appconfig_get_section(struct config *root, const char *name);
 
 #endif /* NETDATA_CONFIG_H */
