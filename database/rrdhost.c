@@ -767,27 +767,34 @@ struct label *load_auto_labels()
     struct label *label_list = NULL;
 
     if (localhost->system_info->os_name)
-        label_list = add_label_to_list(label_list, "_os_name", localhost->system_info->os_name, LABEL_SOURCE_AUTO);
+        label_list =
+            add_label_to_list(label_list, "_os_name", localhost->system_info->os_name, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->os_version)
-        label_list = add_label_to_list(label_list, "_os_version", localhost->system_info->os_version, LABEL_SOURCE_AUTO);
+        label_list =
+            add_label_to_list(label_list, "_os_version", localhost->system_info->os_version, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->kernel_version)
-        label_list = add_label_to_list(label_list, "_kernel_version", localhost->system_info->kernel_version, LABEL_SOURCE_AUTO);
+        label_list =
+            add_label_to_list(label_list, "_kernel_version", localhost->system_info->kernel_version, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->architecture)
-        label_list = add_label_to_list(label_list, "_architecture", localhost->system_info->architecture, LABEL_SOURCE_AUTO);
+        label_list =
+            add_label_to_list(label_list, "_architecture", localhost->system_info->architecture, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->virtualization)
-        label_list = add_label_to_list(label_list, "_virtualization", localhost->system_info->virtualization, LABEL_SOURCE_AUTO);
+        label_list =
+            add_label_to_list(label_list, "_virtualization", localhost->system_info->virtualization, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->virt_detection)
-        label_list = add_label_to_list(label_list, "_container", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
+        label_list =
+            add_label_to_list(label_list, "_container", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
 
     label_list = add_label_to_list(label_list, "_is_master", localhost->next ? "true" : "false", LABEL_SOURCE_AUTO);
 
     if (localhost->rrdpush_send_destination)
-        label_list = add_label_to_list(label_list, "_streams_to", localhost->rrdpush_send_destination, LABEL_SOURCE_AUTO);
+        label_list =
+            add_label_to_list(label_list, "_streams_to", localhost->rrdpush_send_destination, LABEL_SOURCE_AUTO);
 
     return label_list;
 }
