@@ -4,9 +4,6 @@ Netdata is a **monitoring agent**. It is designed to be installed and run on all
 
 The best way to install Netdata is directly from source. Our **automatic installer** will install any required system packages and compile Netdata directly on your systems.
 
-!!! warning
-    You can find Netdata packages distributed by third parties. In many cases, these packages are either too old or broken. So, the suggested ways to install Netdata are the ones in this page.
-
 1.  [Automatic one line installation](#one-line-installation), easy installation from source, **this is the default**
 2.  [Install pre-built static binary on any 64bit Linux](#linux-64bit-pre-built-static-binary)
 3.  [Run Netdata in a docker container](#run-netdata-in-a-docker-container)
@@ -20,7 +17,15 @@ The best way to install Netdata is directly from source. Our **automatic install
 
 See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
 
-Note: From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read more about the information collected and how to opt-out, check the [anonymous statistics page](../../docs/anonymous-statistics.md).
+> ❗ Starting with v1.12, Netdata collects usage information and sends it anonymously to Google Analytics. We use this
+> telemetry for quality assurance and usage statistics. By keeping it enabled, you help make Netdata better. To opt-out
+> and disable telemetry, when using any installer script or installing directly via `netdata-installer.sh`, append the
+> command with the `--disable-telemetry` option. See our [anonymous statistics page](../../docs/anonymous-statistics.md)
+> for more details and other opt-out methods.
+
+> Some third parties, such as the packaging teams at various Linux distributions, distribute old, broken, or altered
+> packages. We recommend you install Netdata using one of the above methods to guarantee you get the latest and
+> checksum-verified packages.
 
 ---
 
@@ -30,25 +35,83 @@ Note: From Netdata v1.12 and above, anonymous usage information is collected by 
 
 This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](#freebsd) and the [MacOS](#macos) sections for more information.
 
-To install Netdata from source, and keep it up to date with our **nightly releases** automatically, run the following:
+To install Netdata from source, automatically keep it up to date with **nightly releases**, and **enable telemetry**,
+run the following:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-!!! note
-    Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
+<div class="installer-notes" markdown="1">
+
+### Notes on the one-line installer script
+
+**Privileges and `sudo`** Do not use <code>sudo</code> with the above script. The script will ask to escalate privileges
+itself if needed.
+
+**Disable telemetry**: We use anonymous statistics for quality assurance and usage statistics. These anonymous
+statistics help us make Netdata better! By analyzing this data, we can better understand which features to develop
+further or identify issues with specific distributions or environments.
+
+To opt-out and disable telemetry, pass the <code>--disable-telemetry</code> option to the kickstart command above: `bash
+<(curl -Ss https://my-netdata.io/kickstart.sh) --disable-telemetry`.
+
+**Nightly, stable, and automatic updates**: By default, Netdata's installation scripts will give you automatic, nightly
+updates, as that is our recommended configuration. However, you might opt for more predictability on a production
+machine. See our section on [nightly vs. stable releases](#nightly-vs-stable-releases) for more. You can use the
+`--stable-channel` option to move away from nightly and to stable updates: `bash <(curl -Ss
+https://my-netdata.io/kickstart.sh) --stable-channel`.
+
+To disable automatic updates of any kind, use the `--no-updates` option.
+
+**Other options and script integrity**: 
+
+<details markdown="1"><summary>Click here for more information and advanced use of the one-line installation script.</summary>
+
+The `kickstart.sh` script:
+
+-   Detects the Linux distro and **installs the required system packages** for building Netdata. Unless you added the
+    `--dont-wait` option, it will ask for your permission first.
+-   Downloads the latest Netdata source code to `/usr/src/netdata.git`.
+-   Installs Netdata by running `./netdata-installer.sh` from the source tree, including any options you might have
+    added.
+-   Installs `netdata-updater.sh` to `cron.daily` to enable automatic updates, unless you added the `--no-updates`
+    option.
+-   Prints a message about whether the insallation succeeded for failed for QA purposes.
+
+The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, so you can add more parameters to
+customize your installation. Here are a few important parameters:
+
+-   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
+-   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
+-   `--stable-channel`: Automatically update only on the release of new major
+    [versions](https://github.com/netdata/netdata/releases).
+-   `--no-updates`: Prevent automatic updates of any kind.
+-   `--disable-telemetry`: Opt-out of sending telemetry to Netdata for quality assurance and usage statistics as
+    described on our [anonymous statistics page](../../docs/anonymous-statistics.md).
+-   `--local-files`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the
+    go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files. This
+    option conflicts with the `--stable-channel` option. If you set this _and_ `--stable-channel`, Netdata will use the
+    local files.
+
+Verify the integrity of the script with the following command. The result should print `OK, VALID` when verified.
+
+```bash
+[ "0ae8dd3c4c9b976c4342c9fc09d9afae" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+```
+
+</details>
+
+</div>
 
 
-To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
+
 
 <details markdown="1"><summary>Click here for more information and advanced use of the one-line installation script.</summary>
 
 Verify the integrity of the script with this:
 
-```bash
-[ "0ae8dd3c4c9b976c4342c9fc09d9afae" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
-```
+
 
 _It should print `OK, VALID` if the script is the one we ship._
 
@@ -66,6 +129,7 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
+-   `--disable-telemetry`: 
 -   `--local-files`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
 
 Example using all the above parameters:

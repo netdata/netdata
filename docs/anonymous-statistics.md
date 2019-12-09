@@ -10,9 +10,10 @@ The statistics calculated from this information will be used for:
 Information is sent to Netdata via two different channels:
 
 -   Google Tag Manager is used when an agent's dashboard is accessed.
--   The script `anonymous-statistics.sh` is executed by the Netdata daemon, when Netdata starts, stops cleanly, or fails.
+-   The script `anonymous-statistics.sh` is executed by the Netdata daemon, when Netdata starts, stops cleanly, or
+    fails.
 
-Both methods are controlled via the same [opt-out mechanism](#opt-out)
+Both methods are controlled via the same [opt-out mechanism](#opt-out).
 
 ## Google tag manager
 
@@ -55,12 +56,21 @@ Furthermore, the FATAL event sends the Netdata process & thread name, along with
 
 To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins directory`, which is usually `/usr/libexec/netdata/plugins.d`. 
 
-## Opt-Out
+## Opt-out
+
+There are three ways of opting-out from anonymous statistics:
+
+-   Create a file called `.opt-out-from-anonymous-statistics`.
+-   Pass the option `--disable-telemetry` to any of the installer scripts.
+-   Set the 
+
+
 
 To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). The effect of creating the file is the following:
 
 -   The daemon will never execute the anonymous statistics script
 -   The anonymous statistics script will exit immediately if called via any other way (e.g. shell)
--   The Google Tag Manager Javascript snippet will remain in the page, but the linked tag will not be fired. The effect is that no data will ever be sent to GA. 
+-   The Google Tag Manager Javascript snippet will remain in the page, but the linked tag will not be fired. The effect
+    is that no data will ever be sent to GA. 
 
 You can also disable telemetry by passing the option `--disable-telemetry` to any of the installers.

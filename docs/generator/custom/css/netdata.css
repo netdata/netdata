@@ -94,3 +94,63 @@
 .md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
     font-weight: 700;
 }
+
+/* Installation page */
+
+.installer-notes {
+    margin-top: 1.4rem;
+    margin-bottom: 2rem;
+    background: rgba(36, 31, 50, 0.073208);
+    border-radius: 3px;
+    padding: 1rem 1.4rem;
+    border: 1px solid rgba(135, 135, 135, 0.276715);
+    box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.0880955), 0px 2px 7px rgba(0, 0, 0, 0.103721);
+}
+
+.installer-notes h3 {
+    margin-top: 0;
+}
+
+.installer-notes .notes-full {
+    grid-column: span 4;
+}
+
+.installer-notes div {
+    grid-column: span 2;
+}
+
+.installer-notes h4 {
+    font-size: 0.8rem;
+}
+
+.installer-notes p {
+    font-size: 0.7rem;
+    color: #35414A;
+}
+
+.md-typeset .installer-notes p > code {
+    background: white;
+}
+
+.md-typeset .installer-notes details {
+    background: white;
+    border-left: none;
+    margin-bottom: 0;
+    padding: 0 1.2rem;
+}
+
+.md-typeset .installer-notes details > summary {
+    background: #35414A;
+    color: white;
+    font-weight: 400;
+    margin: 0 -1.2rem;
+    padding-left: 1.2rem;
+}
+
+.md-typeset .installer-notes details > summary:before {
+    content: '';
+}
+
+.md-typeset .installer-notes details > summary:after {
+    color: white;
+}
