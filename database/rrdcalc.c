@@ -615,7 +615,7 @@ void rrdcalc_labels_unlink() {
 
         if (host->labels) {
             rrdhost_wrlock(host);
-            netdata_rwlock_wrlock(&host->labels_rwlock);
+            netdata_rwlock_rdlock(&host->labels_rwlock);
 
             RRDCALC *rc, *clean = NULL;
             for (rc = host->alarms; rc; rc = rc->next) {

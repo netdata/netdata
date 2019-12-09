@@ -9,7 +9,7 @@ static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
     errno = 0;
     struct label *move = host->labels;
     if(move && rt->labels) {
-        netdata_rwlock_wrlock(&host->labels_rwlock);
+        netdata_rwlock_rdlock(&host->labels_rwlock);
         while(move) {
             if (simple_pattern_matches(rt->splabels, move->key)) {
                 break;

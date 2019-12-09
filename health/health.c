@@ -167,6 +167,8 @@ void health_reload_host(RRDHOST *host) {
     }
 
     rrdhost_unlock(host);
+
+    rrdcalc_labels_unlink();
 }
 
 /**
