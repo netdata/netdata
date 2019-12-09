@@ -84,9 +84,6 @@ if str(os.environ["BUILD_STRING"]).count("debian/jessie") == 1:
     print("5.1 We are building for Jessie, adjusting control file")
     common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
     common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.jessie', 'contrib/debian/control'])
-if str(os.environ["BUILD_STRING"]).count("ubuntu/trusty") == 1:
-    common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
-    common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.trusty', 'contrib/debian/control'])
 if str(os.environ["BUILD_STRING"]).count("ubuntu/xenial") == 1:
     common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
     common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.xenial', 'contrib/debian/control'])
