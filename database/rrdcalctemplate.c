@@ -9,18 +9,19 @@ static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
     errno = 0;
     struct label *move = host->labels;
     if(move && rt->labels) {
-        netdata_rwlock_wrlock(&localhost->labels_rwlock);
+        netdata_rwlock_wrlock(&host->labels_rwlock);
         while(move) {
             if (simple_pattern_matches(rt->splabels, move->key)) {
                 break;
             }
             move = move->next;
         }
-        netdata_rwlock_unlock(&localhost->labels_rwlock);
+        netdata_rwlock_unlock(&host->labels_rwlock);
 
         if(!move) {
-            error("Health template '%s' cannot be applied, because this host does not have the label(s) '%s'",
+            error("Health template '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                    rt->name,
+                   host->hostname,
                    rt->labels
             );
             return 0;
