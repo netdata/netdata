@@ -160,23 +160,29 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
         , ae->old_value
         , (uint64_t)ae->last_repeat);
 
-    //info("%s", mqtt_message);
 
-#ifdef ENABLE_HTTPS
-    int rc;
+    // Sample MQTT send ; to be changed
+    {
+        int rc;
+        static int mqtt_error = 0;
 
-    rc = mqtt_send("netdata/alarm", mqtt_message);
-    if (rc != MOSQ_ERR_SUCCESS)
-        info("MQTT failed with %d",rc);
-#else
-    int rc;
+        rc = mqtt_send(NULL, "alarm", mqtt_message);
 
-    rc = mqtt_send("netdata/alarm", mqtt_message);
+        if (rc != MOSQ_ERR_SUCCESS) {
+            errno = 0;
+            if (!mqtt_error) {
+                mqtt_error = 1;
+                error("MQTT send failed with %d - (%s)",rc, mosquitto_strerror(rc));
+            }
+        }
+        else {
+            if (mqtt_error) {
+                mqtt_error = 0;
+                error("MQTT send OK");
+            }
+        }
 
-    if (rc != MOSQ_ERR_SUCCESS)
-        info("MQTT failed with %d",rc);
-
-#endif
+    }
 
     if(likely(host->health_log_fp)) {
         if(unlikely(fprintf(host->health_log_fp
