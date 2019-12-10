@@ -113,15 +113,15 @@ void *mqtt_main(void *ptr) {
         rc = mosquitto_loop(mosq, NETDATA_MQTT_LOOP_TIMEOUT * 1000, 1);
 
         if (unlikely(rc !=MOSQ_ERR_SUCCESS )) {
+            errno = 0;
+            error("Loop error code %d (%s)", rc, mosquitto_strerror(rc));
             rc = mosquitto_reconnect(mosq);
             if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
                 error("Reconnect loop error code %d (%s) host=%s, port=%d", rc, mosquitto_strerror(rc),
                     mqtt_broker_hostname, mqtt_broker_port);
-
-                // TBD: Using delay
-                sleep_usec(USEC_PER_SEC * 10);
-            } else
-                error("Loop error code %d (%s)", rc, mosquitto_strerror(rc));
+            }
+            // TBD: Using delay
+            sleep_usec(USEC_PER_SEC * 10);
             continue;
         }
 
@@ -230,6 +230,7 @@ int mqtt_send(char *base_topic, char *sub_topic, char *message)
 //TODO: placeholder for password check if we need it
 //int password_callback(char *buf, int size, int rwflag, void *userdata)
 //{
+//    strcpy(buf,"1234678");
 //    return 8;
 //}
 
@@ -259,6 +260,7 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc, int flags, c
     info("Connection to cloud failed");
     // TODO: Keep the connection "alive" for now. The library will reconnect.
     //mqtt_connection_initialized = 0;
+    sleep_usec(USEC_PER_SEC * 5);
 }
 
 
@@ -360,7 +362,7 @@ int mqtt_init(MQTT_INIT_ACTION action)
 
     rc = mosquitto_reconnect_delay_set(mosq, NETDATA_MQTT_RECONNECT_DELAY, NETDATA_MQTT_MAX_RECONNECT_DELAY, 1);
 
-    //mosquitto_tls_set(mosq, "/etc/netdata/mqtt/ca.crt", NULL, "/etc/netdata/mqtt/server.crt", "/etc/netdata/mqtt/server.key", NULL);
+    mosquitto_tls_set(mosq, "/etc/netdata/mqtt/ca.crt", NULL, "/etc/netdata/mqtt/server.crt", "/etc/netdata/mqtt/server.key", NULL);
 
     rc = mosquitto_connect_async(mosq, mqtt_broker_hostname, mqtt_broker_port, NETDATA_MQTT_PING_INTERVAL);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
