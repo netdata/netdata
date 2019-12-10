@@ -18,9 +18,6 @@ All third party libraries should be installed system-wide or in `python_modules`
 
 To install Python modules (libraries), it is advised to use the Python Package Manager (**pip**), please refer [here](https://pip.pypa.io/en/stable/installing/) for instalation instructions.
 
-Module configurations are written in YAML, **pyYAML is required**. For example, to install it with pip, simply execute
-`pip install pyaml`.
-
 Every configuration file must have one of two formats:
 
 -   Configuration for only one job:
