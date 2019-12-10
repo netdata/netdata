@@ -67,7 +67,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                    , custom_dashboard_info_js_filename
     );
 
-    buffer_strcat(wb, "\n\t\"labels\": {\n");
+    buffer_strcat(wb, ",\n\t\"labels\": {\n");
     host_labels2json(host, wb, 2);
     buffer_strcat(wb, "\t}");
 
