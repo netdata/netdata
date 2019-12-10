@@ -761,12 +761,24 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
-inline void hostlabels2json(RRDHOST *host, BUFFER *wb) {
+inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
+    char tabs[11];
+
+    if (indentation > 10)
+        indentation = 10;
+
+    tabs[0] = '\0';
+    while (indentation) {
+        strcat(tabs, "\t");
+        indentation--;
+    }
+
     int count = 0;
     netdata_rwlock_rdlock(&host->labels_rwlock);;
     for (struct label *label = host->labels; label; label = label->next) {
         if(count > 0) buffer_strcat(wb, ",\n");
-        buffer_sprintf(wb, "\t\t\"%s\": \"%s\"", label->key, label->value);
+        buffer_strcat(wb, tabs);
+        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, label->value);
         count++;
     }
     buffer_strcat(wb, "\n");
@@ -807,7 +819,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", (host->system_info->container_detection) ? host->system_info->container_detection : "");
 
     buffer_strcat(wb, "\t\"labels\": {\n");
-    hostlabels2json(host, wb);
+    host_labels2json(host, wb, 2);
     buffer_strcat(wb, "\t},\n");
 
     buffer_strcat(wb, "\t\"collectors\": [");

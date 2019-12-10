@@ -68,7 +68,7 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
     );
 
     buffer_strcat(wb, "\n\t\"labels\": {\n");
-    hostlabels2json(host, wb);
+    host_labels2json(host, wb, 2);
     buffer_strcat(wb, "\t}");
 
     buffer_strcat(wb, ",\n\t\"charts\": {");

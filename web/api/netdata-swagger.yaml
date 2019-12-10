@@ -979,6 +979,14 @@ components:
               name:
                 type: string
                 description: The name of the dimension
+        labels:
+          type: object
+          description: List of host labels.
+          properties:
+            app:
+              type: string
+              description: Host label.
+              example: netdata
         chart_variables:
           type: object
           additionalProperties:
