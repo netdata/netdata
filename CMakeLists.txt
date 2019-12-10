@@ -600,6 +600,11 @@ set(BACKENDS_PLUGIN_FILES
         backends/prometheus/backend_prometheus.h
         )
 
+set(CLAIM_PLUGIN_FILES
+        claim/claim.c
+        claim/claim.h
+        )
+
 set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis.c
         backends/aws_kinesis/aws_kinesis.h
@@ -648,6 +653,7 @@ set(NETDATA_FILES
         ${STATSD_PLUGIN_FILES}
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
+        ${CLAIM_PLUGIN_FILES}
         )
 
 set(NETDATACLI_FILES

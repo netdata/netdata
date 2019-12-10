@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# -----------------------------------------------------------------------------
+# defaults to allow running this script by hand
+
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim"
+TOKEN="unknown"
+URL_BASE="unknown"
+ID="unknown"
+ROOMS=""
+HOSTNAME=$(hostname)
+
+for arg in "$@"
+do
+	case $arg in
+		-token=*) TOKEN=${arg:7} ;;
+		-url=*) URL_BASE=${arg:5} ;;
+		-id=*) ID=${arg:4} ;;
+		-rooms=*) ROOMS=${arg:7} ;;
+		-hostname=*) HOSTNAME=${arg:10} ;;
+		*)  echo "Unknown arg ${arg}"
+		    exit -1 ;;
+	esac
+	shift 1
+done
+
+echo "Token: $TOKEN"
+echo "Url: $URL_BASE"
+echo "Id: $ID"
+echo "ROOMS: $ROOMS"
+echo "HOSTNAME: $HOSTNAME"
+
+if [ -z "${curl}" ]; then
+	curl="$(command -v curl 2>/dev/null)"
+fi
+if [ -z "${curl}" ]; then
+	error "Cannot find curl command in the system path."
+fi
+
+# create the claiming directory for this user
+[ ! -d "${CLAIMING_DIR}" ] && mkdir -p "${CLAIMING_DIR}" && chmod 0640 "${CLAIMING_DIR}"
+
+openssl genrsa -out "${CLAIMING_DIR}/private.pem" 2048
+openssl rsa -in "${CLAIMING_DIR}/private.pem" -outform PEM -pubout -out "${CLAIMING_DIR}/public.pem"
+
+#TARGET_URL="https://$URL_BASE"
+KEY=$(cat public.pem | tr '\n' '!' | sed -e 's/!/\\n/g')
+[ ! -z "$ROOMS" ] && ROOMS=\"$(echo "$ROOMS" | sed s'/,/", "/g')\"
+
+#curl --trace-ascii - -X PUT -d "@-" $TARGET_URL <<EMBED_JSON
+curl --trace-ascii - -X PUT -d "@-" $URL_BASE <<EMBED_JSON
+{
+    "agent": {
+        "id": "$ID",
+        "hostname": "$HOSTNAME"
+    },
+    "token": "$TOKEN",
+    "rooms" : [ $ROOMS ],
+    "public_key" : "$KEY"
+}
+EMBED_JSON

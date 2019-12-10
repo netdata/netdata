@@ -98,6 +98,7 @@ SUBDIRS += \
     registry \
     streaming \
     web \
+    claim \
     $(NULL)
 
 
@@ -453,6 +454,11 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
+CLAIM_PLUGIN_FILES = \
+    claim/claim.c \
+    claim/claim.h \
+    $(NULL)
+
 KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis.c \
     backends/aws_kinesis/aws_kinesis.h \
@@ -503,6 +509,7 @@ NETDATA_FILES = \
     $(STREAMING_PLUGIN_FILES) \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
+    $(CLAIM_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
