@@ -2703,5 +2703,29 @@ netdataDashboard.context = {
             '<code>2</code>: follower, ' +
             '<code>3</code>: observer, ' +
             '<code>4</code>: standalone.'
-            }
+            },
+    // ------------------------------------------------------------------------
+    // EdgeX Foundryu
+    'edgex.events_readings_incr':{
+        info:'Events and Readings (readings are a certain type of event) per second in the EdgeX platform. API eesource: <code>http://localhost:48080/api/v1/event/count</code> and <code>http://localhost:48080/api/v1/reading/count</code>'
+    },
+    'edgex.events_readings_abs':{
+        info: 'Total number of Events and Readings (readings are a certain type of event) in the EdgeX platform. API eesource: <code>http://localhost:48080/api/v1/event/count</code> and <code>http://localhost:48080/api/v1/reading/count</code>'
+    },
+    'edgex.devices_number':{
+        info: 'Number of registered devices in the EdgeX platform. API resources: <code>http://localhost:48081/api/v1/device</code> '
+    },
+    'edgex.memory_alloc':{
+        info: 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
+    },
+    'edgex.memory_malloc':{
+        info: 'Mallocs: it is the cumulative count of heap objects allocated. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
+    },
+    'edgex.memory_frees':{
+        info: 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
+    },
+    'edgex.memory_liveObjects':{
+        info: 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
+    }
+    
 };

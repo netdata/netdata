@@ -1,22 +1,17 @@
 
 # EdgeX 
 
-## EdgeX is an Open Source IoT Platform, hosted by the Linux Foundation 
+EdgeX is an Open Source IoT Platform, hosted by the Linux Foundation.
 
 
-**As mentioned in their site:**
-
-EdgeX FoundryTM is a vendor-neutral open source project hosted by The Linux Foundation building a common open framework for IoT edge computing.  At the heart of the project is an interoperability framework hosted within a full hardware- and OS-agnostic reference software platform to enable an ecosystem of plug-and-play components that unifies the marketplace and accelerates the deployment of IoT solutions.
-
-EdgeX is an important enabler for interested parties to freely collaborate on open and interoperable IoT solutions built using existing connectivity standards combined with their own proprietary innovations.
-
-
-
-**Website:** [EdgeX Foundry](https://www.edgexfoundry.org/)
 
 ![](https://www.edgexfoundry.org/wp-content/uploads/sites/25/2018/09/EdgeX_PlatformArchitectureDiagram-1024x651.png)
 
-**Metrics:**
+## Requirements
+
+EdgeX foundry should be installed on the system. Please see the [Quickstart Guide](https://docs.edgexfoundry.org/Ch-QuickStart.html).
+
+## Charts
 
 As of version 0.2:
 
@@ -29,3 +24,36 @@ As of version 0.2:
         - Alloc - currently allocated number of bytes on the heap,
         - Mallocs and Frees - number of allocations, deallocations
         - Live objects (mallocs - frees)
+
+## Configuration
+
+The plugin is pre-configured to look at localhost for the services, as Netdata *should* be installed on the device it monitors.
+
+**Default configuration:** 
+```
+# host:              localhost
+# protocol:          http
+# port_data:         48080
+# port_metadata:     48081
+# port_command:      48082
+# port_logging:      48060
+# events_per_second: true
+# number_of_devices: true
+# metrics:           true
+
+
+# events_per_second: # true or false. Enable (or not) the event_count and reading_count aggregation.
+# number_of_devices: # true or false. Enable (or not) the aggregation of the  number of edgex devices.
+# metrics: # true or false. Enable (or not) the aggregation of memory related metrics.
+```
+
+
+## Troubleshooting
+
+Ensure that the services are up and running and they listen to the default ports. If you have EdgeX-related problems, please do look into the docs and join the community to interact with EdgeX developers.
+
+**Docs:** [Edgex docs](https://docs.edgexfoundry.org/Ch-QuickStart.html)
+
+**Github**: [EdgeX Github](https://github.com/edgexfoundry)
+
+**EdgeX community:** [Slack Channel](https://slack.edgexfoundry.org/)

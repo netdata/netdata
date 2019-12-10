@@ -20,8 +20,7 @@ METHODS = namedtuple('METHODS', ['get_data', 'url', 'run'])
 
 ORDER = [
     'events_throughput',
-    'readings_throughput',
-    # 'events_count',
+    'events_count',
     'devices_number',
     'memory_alloc',
     'memory_malloc',
@@ -34,22 +33,15 @@ update_every = 5
 
 CHARTS = {
     'events_throughput':{
-        'options': [None, 'Events and Readings (readings are a certain type of event) per second in the EdgeX platform', 'events/s',
-                    'events throughput','edgex.events', 'line'],
+        'options': [None, 'Events Throughput', 'events/s',
+                    'events throughput','edgex.events_readings_incr', 'line'],
         'lines': [
             ['events', None, 'incremental'],
             ['readings', None, 'incremental']
         ]
     },
-    # 'readings_throughput':{
-    #     'options': [None, 'Readings per second in the EdgeX platform', 'readings/s', 'throughput', 'edgex.readings',
-    #                 'line'],
-    #     'lines': [
-    #         ['readings', None, 'incremental']
-    #     ]
-    # },
     'events_count':{
-        'options': [None, 'Total number of events and readings in the EdgeX platform', 'events', 'events count', 'edgex.events_readings_abs',
+        'options': [None, 'Absolute Count', 'events', 'events count', 'edgex.events_readings_abs',
                     'line'],
         'lines': [
             ['readings', None, 'absolute'],
@@ -57,64 +49,53 @@ CHARTS = {
         ]
     },
     'devices_number':{
-        'options': [None, 'Number of registered devices in the EdgeX platform', 'devices', 'devices count', 'edgex.devices_number',
+        'options': [None, 'devices count', 'devices', 'devices count', 'edgex.devices_number',
                     'line'],
         'lines': [
             ['registered_devices', None, 'absolute'],
         ]
     },
     'memory_alloc':{
-        'options': [None, 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package.',
+        'options': [None, 'Alloc',
                     'bytes', 'memory metrics', 'edgex.memory_alloc', 'line'],
         'lines': [
-            ['core_data_alloc', None, 'absolute'],
-            ['core_metadata_alloc', None, 'absolute'],
-            ['core_command_alloc', None, 'absolute'],
-            ['support_logging_alloc', None, 'absolute']
+            ['core_data_alloc', 'core_data', 'absolute'],
+            ['core_metadata_alloc', 'core_metadata', 'absolute'],
+            ['core_command_alloc', 'core_command', 'absolute'],
+            ['support_logging_alloc', 'support_logging', 'absolute']
         ]
     },
     'memory_malloc':{
-        'options': [None, 'Mallocs: it is the cumulative count of heap objects allocated. Provided by the Golang runtime Package.', 'heap objects',
+        'options': [None, 'Mallocs', 'heap objects',
                     'memory metrics','edgex.memory_malloc', 'line'],
         'lines': [
-            ['core_data_malloc', None, 'absolute'],
-            ['core_metadata_malloc', None, 'absolute'],
-            ['core_command_malloc', None, 'absolute'],
-            ['support_logging_malloc', None, 'absolute']
+            ['core_data_malloc', 'core_data', 'absolute'],
+            ['core_metadata_malloc', 'core_metadata', 'absolute'],
+            ['core_command_malloc', 'core_command', 'absolute'],
+            ['support_logging_malloc', 'support_logging', 'absolute']
         ]
     },
     'memory_frees':{
-        'options': [None, 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package.', 'heap objects',
+        'options': [None, 'Frees', 'heap objects',
                     'memory metrics', 'edgex.memory_frees', 'line'],
         'lines': [
-            ['core_data_frees', None, 'absolute'],
-            ['core_metadata_frees', None, 'absolute'],
-            ['core_command_frees', None, 'absolute'],
-            ['support_logging_frees', None, 'absolute']
+            ['core_data_frees', 'core_data', 'absolute'],
+            ['core_metadata_frees', 'core_metadata', 'absolute'],
+            ['core_command_frees', 'core_command', 'absolute'],
+            ['support_logging_frees', 'support_logging', 'absolute']
         ]
     },
     'memory_liveObjects':{
-        'options': [None, 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package.', 'heap objects',
+        'options': [None, 'LiveObjects', 'heap objects',
                     'memory metrics', 'edgex.memory_liveObjects', 'line'],
         'lines': [
-            ['core_data_live_objects', None, 'absolute'],
-            ['core_metadata_live_objects', None, 'absolute'],
-            ['core_command_live_objects', None, 'absolute'],
-            ['support_logging_live_objects', None, 'absolute']
+            ['core_data_live_objects', 'core_data', 'absolute'],
+            ['core_metadata_live_objects', 'core_metadata', 'absolute'],
+            ['core_command_live_objects', 'core_command', 'absolute'],
+            ['support_logging_live_objects', 'support_logging', 'absolute']
         ]
     }
- } #
-# 'memstats_heap': {
-#         'options': ['heap', 'memory: size of heap memory structures', 'KiB', 'memstats',
-#                     'expvar.memstats.heap', 'line'],
-#         'lines': [
-#             ['core-data-alloc', 'alloc', 'absolute', 1, 1024],
-#             ['core-metdata_alloc', 'alloc', 'absolute', 1, 1024],
-#             ['core-command_alloc', 'alloc', 'absolute', 1, 1024],
-#             ['core-sys_mgmt', 'alloc', 'absolute', 1, 1024],
-#         ]
-#     }
-# }
+ }
 
 def get_survive_any(method):
     def w(*args):
@@ -147,10 +128,6 @@ class Service(UrlService):
             url = self.url,
             port = self.edgex_ports['core_data']
         )
-        # self.url_core_data_events = '{url}:{port}/api/v1/'.format(
-        #     url = self.url,
-        #     port = self.edgex_ports['core_data']
-        # )
         self.url_core_metadata = '{url}:{port}/api/v1/'.format(
             url = self.url,
             port = self.edgex_ports['core_metadata']
@@ -159,10 +136,6 @@ class Service(UrlService):
             url = self.url,
             port = self.edgex_ports['core_command']
         )
-        # self.url_sys_mgmt = '{url}:{port}/api/v1/'.format(
-        #     url = self.url,
-        #     port = self.edgex_ports['sys_mgmt']
-        # )
         self.url_support_logging = '{url}:{port}/api/v1/'.format(
             url = self.url,
             port = self.edgex_ports['support_logging']
@@ -206,11 +179,6 @@ class Service(UrlService):
                 url=self.url_support_logging,
                 run=self.configuration.get('metrics', True)
             )
-            # METHODS(
-            #     get_data=self._get_metrics_data
-            #     url=self.url_sys_mgmt,
-            #     run=self.configuration.get('metrics', True)
-            # )
          ]
         return UrlService.check(self)
 
@@ -280,33 +248,20 @@ class Service(UrlService):
         if self.edgex_ports['core_data'] in url:
             data['core_data_alloc'] = parsed["Memory"]["Alloc"]
             data['core_data_malloc'] = parsed["Memory"]["Mallocs"]
-            # data['core_data_sys'] = parsed["Memory"]["Sys"]
             data['core_data_frees'] = parsed["Memory"]["Frees"]
             data['core_data_live_objects'] = parsed["Memory"]["LiveObjects"]
         elif self.edgex_ports['core_metadata'] in url:
             data['core_metadata_alloc'] = parsed["Memory"]["Alloc"]
             data['core_metadata_malloc'] = parsed["Memory"]["Mallocs"]
-            # data['core_metadata_sys'] = parsed["Memory"]["Sys"]
             data['core_metadata_frees'] = parsed["Memory"]["Frees"]
             data['core_metadata_live_objects'] = parsed["Memory"]["LiveObjects"]
         elif self.edgex_ports['core_command'] in url:
             data['core_command_alloc'] = parsed["Memory"]["Alloc"]
             data['core_command_malloc'] = parsed["Memory"]["Mallocs"]
-            # data['core_command_sys'] = parsed["Memory"]["Sys"]
             data['core_command_frees'] = parsed["Memory"]["Frees"]
-            data['core_command_live_objects'] = parsed["Memory"]["LiveObjects"]
         elif self.edgex_ports['support_logging'] in url:
             data['support_logging_alloc'] = parsed["Memory"]["Alloc"]
             data['support_logging_malloc'] = parsed["Memory"]["Mallocs"]
-            # data['support_logging_sys'] = parsed["Memory"]["Sys"]
             data['support_logging_frees'] = parsed["Memory"]["Frees"]
             data['support_logging_live_objects'] =  parsed["Memory"]["LiveObjects"]
         return queue.put(data)
-
-
-        # elif self.edgex_ports['sys_mgmt'] in url:
-        #     core_data_alloc = parsed["Memory"]["Alloc"]
-        #     core_data_malloc = parsed["Memory"]["Mallocs"]
-        #     core_data_sys = parsed["Memory"]["Sys"]
-        #     core_data_frees = parsed["Memory"]["Frees"]
-        #     core_data_live_objects = parsed["Memory"]["LiveObjects"]
