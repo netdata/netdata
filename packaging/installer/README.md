@@ -19,9 +19,9 @@ See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR N
 
 > ❗ Starting with v1.12, Netdata collects usage information and sends it anonymously to Google Analytics. We use this
 > telemetry for quality assurance and usage statistics. By keeping it enabled, you help make Netdata better. To opt-out
-> and disable telemetry, when using any installer script or installing directly via `netdata-installer.sh`, append the
-> command with the `--disable-telemetry` option. See our [anonymous statistics page](../../docs/anonymous-statistics.md)
-> for more details and other opt-out methods.
+> when using any installer script or installing directly via `netdata-installer.sh`, append the command with the
+> `--disable-telemetry` option. See our [anonymous statistics page](../../docs/anonymous-statistics.md) for more details
+> and other opt-out methods.
 
 > Some third parties, such as the packaging teams at various Linux distributions, distribute old, broken, or altered
 > packages. We recommend you install Netdata using one of the above methods to guarantee you get the latest and
@@ -35,8 +35,8 @@ See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR N
 
 This method is **fully automatic on all Linux distributions**. FreeBSD and MacOS systems need some preparations before installing Netdata for the first time. Check the [FreeBSD](#freebsd) and the [MacOS](#macos) sections for more information.
 
-To install Netdata from source, automatically keep it up to date with **nightly releases**, and **enable telemetry**,
-run the following:
+To install Netdata from source, automatically keep it up to date with **nightly releases**, and **enable anonymous
+statistics**, run the following:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
@@ -49,9 +49,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 **Privileges and `sudo`:** Do not use <code>sudo</code> with the above script. The script will ask to escalate
 privileges itself if needed.
 
-**Disable telemetry**: We use anonymous statistics for quality assurance and usage statistics. These anonymous
-statistics help us make Netdata better! By analyzing this data, we can better understand which features to develop
-further or identify issues with specific distributions or environments.
+**Disable anonymous statistics**: We use [anonymous statistics](../../docs/anonymous-statistics.md) for quality
+assurance and usage statistics. These anonymous statistics help us make Netdata better! By analyzing this data, we can
+better understand which features to develop further or identify issues with specific distributions or environments.
 
 To opt-out and disable telemetry, pass the <code>--disable-telemetry</code> option to the kickstart command above: `bash
 <(curl -Ss https://my-netdata.io/kickstart.sh) --disable-telemetry`.
@@ -128,9 +128,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 **Privileges and `sudo`:** Do not use <code>sudo</code> with the above script. The script will ask to escalate
 privileges itself if needed.
 
-**Disable telemetry**: We use anonymous statistics for quality assurance and usage statistics. These anonymous
-statistics help us make Netdata better! By analyzing this data, we can better understand which features to develop
-further or identify issues with specific distributions or environments.
+**Disable telemetry**: We use [anonymous statistics](../../docs/anonymous-statistics.md) for quality assurance and usage
+statistics. These anonymous statistics help us make Netdata better! By analyzing this data, we can better understand
+which features to develop further or identify issues with specific distributions or environments.
 
 To opt-out and disable telemetry, pass the <code>--disable-telemetry</code> option to the kickstart command above: `bash
 <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --disable-telemetry`.
@@ -207,8 +207,6 @@ To install the latest git version of Netdata, please follow these 2 steps:
 2.  [Install Netdata](#install-netdata)
 
     Download and install Netdata. You can also update it the same way.
-
----
 
 ### Prepare your system
 
@@ -323,19 +321,52 @@ cd netdata
 ./netdata-installer.sh
 ```
 
--   If you don't want to run it straight-away, add `--dont-start-it` option.
+<div class="installer-notes" markdown="1">
 
--   You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
+### Notes on the `netdata-installer.sh` script
 
--   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
+**Disable telemetry**: We use [anonymous statistics](../../docs/anonymous-statistics.md) for quality assurance and usage
+statistics. These anonymous statistics help us make Netdata better! By analyzing this data, we can better understand
+which features to develop further or identify issues with specific distributions or environments.
 
--   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
+To opt-out and disable telemetry, pass the <code>--disable-telemetry</code> option to the installer: `./netdata-installer.sh --disable-telemetry`.
 
-Once the installer completes, the file `/etc/netdata/netdata.conf` will be created (if you changed the installation directory, the configuration will appear in that directory too).
+**Nightly, stable, and automatic updates**: By default, Netdata's installation scripts will give you automatic, nightly
+updates, as that is our recommended configuration. However, you might opt for more predictability on a production
+machine. See our section on [nightly vs. stable releases](#nightly-vs-stable-releases) for more. You can use the
+`--stable-channel` option to move away from nightly and to stable updates: `./netdata-installer.sh --stable-channel`.
 
-You can edit this file to set options. One common option to tweak is `history`, which controls the size of the memory database Netdata will use. By default is `3600` seconds (an hour of data at the charts) which makes Netdata use about 10-15MB of RAM (depending on the number of charts detected on your system). Check **\[[Memory Requirements]]**.
+To disable automatic updates of any kind, use the `--no-updates` option.
 
-To apply the changes you made, you have to restart Netdata.
+**Other options**: 
+
+<details markdown="1"><summary>Click here for more information about running `netdata-installer.sh` manually.</summary>
+
+The `netdata-installer.sh` script has many parameters to help you customize your installation:
+
+-   `--install`: Change the installation directory from the default `/etc/netdata`. For example, `--install /opt` will
+    install Netdata in `/opt/netdata`.
+-   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
+-   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
+-   `--stable-channel`: Automatically update only on the release of new major
+    [versions](https://github.com/netdata/netdata/releases).
+-   `--no-updates`: Prevent automatic updates of any kind.
+-   `--disable-telemetry`: Opt-out of sending telemetry to Netdata for quality assurance and usage statistics as
+    described on our [anonymous statistics page](../../docs/anonymous-statistics.md).
+-   `--local-files`: Used for [offline installations](#offline-installations). Pass four file paths: the Netdata
+    tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
+    process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
+    `--stable-channel`, Netdata will use the local files.
+
+If your server does not have access to the internet and you have manually put the installation directory on your server,
+you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting
+to download and install `go.d.plugin`. 
+
+</details>
+
+</div>
+
+Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
 
 ---
 
@@ -526,26 +557,6 @@ Additionally, as of 2018/06/24, the Netdata installer doesn't recognize DSM as a
 [ -x /etc/rc.netdata ] && /etc/rc.netdata start
 ```
 
-## Nightly vs. stable releases
-
-The Netdata team maintains two releases of the Netdata agent: **nightly** and **stable**. By default, Netdata's installation scripts will give you **automatic, nightly** updates, as that is our recommended configuration.
-
-**Nightly**: We create nightly builds every 24 hours. They contain fully-tested code that fixes bugs or security flaws, or introduces new features to Netdata. Every nightly release is a candidate for then becoming a stable release—when we're ready, we simply change the release tags on GitHub. That means nightly releases are stable and proven to function correctly in the vast majority of Netdata use cases. That's why nightly is the *best choice for most Netdata users*.
-
-**Stable**: We create stable releases whenever we believe the code has reached a major milestone. Most often, stable releases correlate with the introduction of new, significant features. Stable releases might be a better choice for those who run Netdata in *mission-critical production systems*, as updates will come more infrequently, and only after the community helps fix any bugs that might have been introduced in previous releases.
-
-**Pros of using nightly releases:**
-
--   Get the latest features and bugfixes as soon as they're available
--   Receive security-related fixes immediately
--   Use stable, fully-tested code that's always improving
--   Leverage the same Netdata experience our community is using
-
-**Pros of using stable releases:**
-
--   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata installation
--   Retain more control over the Netdata version you use
-
 ## Offline installations
 
 You can install Netdata on systems without internet access, but you need to take
@@ -566,7 +577,8 @@ page](https://github.com/netdata/netdata/releases/latest) and [latest go.d
 plugin release page](https://github.com/netdata/go.d.plugin/releases) to
 download the required files manually.
 
-#### kickstart.sh
+### kickstart.sh
+
 ```bash
 cd /tmp
 
@@ -589,7 +601,8 @@ export OS=$(uname -s | tr '[:upper:]' '[:lower:]') ARCH=$(uname -m | sed -e 's/i
 curl -s https://api.github.com/repos/netdata/go.d.plugin/releases/latest | grep "browser_download_url.*config.tar.gz" | cut -d '"' -f 4 | wget -qi -
 ```
 
-#### kickstart-static64.sh
+### kickstart-static64.sh
+
 ```bash
 cd /tmp
 
@@ -626,6 +639,26 @@ bash kickstart-static64.sh --local-files /tmp/netdata-version-number-here.gz.run
 Now that you're finished with your offline installation, you can move on to our
 [getting started guide](../../docs/getting-started.md)!
 
+## Nightly vs. stable releases
+
+The Netdata team maintains two releases of the Netdata agent: **nightly** and **stable**. By default, Netdata's installation scripts will give you **automatic, nightly** updates, as that is our recommended configuration.
+
+**Nightly**: We create nightly builds every 24 hours. They contain fully-tested code that fixes bugs or security flaws, or introduces new features to Netdata. Every nightly release is a candidate for then becoming a stable release—when we're ready, we simply change the release tags on GitHub. That means nightly releases are stable and proven to function correctly in the vast majority of Netdata use cases. That's why nightly is the *best choice for most Netdata users*.
+
+**Stable**: We create stable releases whenever we believe the code has reached a major milestone. Most often, stable releases correlate with the introduction of new, significant features. Stable releases might be a better choice for those who run Netdata in *mission-critical production systems*, as updates will come more infrequently, and only after the community helps fix any bugs that might have been introduced in previous releases.
+
+**Pros of using nightly releases:**
+
+-   Get the latest features and bugfixes as soon as they're available
+-   Receive security-related fixes immediately
+-   Use stable, fully-tested code that's always improving
+-   Leverage the same Netdata experience our community is using
+
+**Pros of using stable releases:**
+
+-   Protect yourself from the rare instance when major bugs slip through our testing and negatively affect a Netdata installation
+-   Retain more control over the Netdata version you use
+
 ## Automatic updates
 
 By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
@@ -641,5 +674,23 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update Netdata](UPDATE.md).
+
+## Opt-out from anonymous statistics
+
+The best method to opt-out from anonymous statistics depends on your installation method and whether you already have
+Netdata installed or not. To change an existing installation, use the first option. For new installations, either 
+
+**Create a file called `.opt-out-from-anonymous-statistics`.** This empty file, stored in your Netdata configuration
+directory (usually `etc/netdata`), immediately stops the statistics script from running, and works with any type of
+installation, including manual, offline, and macOS installations. Create the file by running `touch
+.opt-out-from-anonymous-statistics` from your Netdata configuration directory.
+
+**Pass the option `--disable-telemetry` to any of the installer scripts on this page.** You can append this option
+during the initial installation or a manual update.
+
+**Set your `DO_NOT_TRACK` environmental variable to `1`.** You can set this variable with the following command: `export
+DO_NOT_TRACK=1`. This variable must be present _during installation_ to make the necessary changes. Visit the [project's
+homepage](https://consoledonottrack.com/) for more details on the purpose and implementation of this environmental
+variable.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

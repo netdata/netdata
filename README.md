@@ -74,11 +74,12 @@ When you install multiple Netdata, they are integrated into **one distributed ap
 
 *in the last 24 hours:*<br/> [![New Users Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![New Machines Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry) [![Sessions Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v42)](https://registry.my-netdata.io/#menu_netdata_submenu_registry)
 
-## Quick Start
+## Quickstart
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-To install Netdata from source on any Linux system (physical, virtual, container, IoT, edge) and keep it up to date with our **nightly releases** automatically, run the following:
+To install Netdata from source on any Linux system (physical, virtual, container, IoT, edge), automatically keep it up
+to date with **nightly releases**, and **enable anonymous statistics**, run the following:
 
 ```bash
 # make sure you run `bash` for your shell
@@ -88,16 +89,23 @@ bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](packaging/installer/README.md#nightly-vs-stable-releases).
-
 The above command will:
 
 -   Install any required packages on your system (it will ask you to confirm before doing so)
 -   Compile it, install it, and start it.
 
-More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
+More installation methods and additional options can be found at the [installation
+page](packaging/installer/README.md#installation).
 
-To try Netdata in a docker container, run this:
+> To learn more about the pros and cons of using _nightly_ vs. _stable_ releases, see our [notice about the two
+> options](packaging/installer/README.md#nightly-vs-stable-releases).
+
+> ❗ Starting with v1.12, Netdata collects usage information and sends it anonymously to Google Analytics. We use this
+> telemetry for quality assurance and usage statistics. By keeping it enabled, you help make Netdata better! To opt-out,
+> append the `--disable-telemetry` option: `bash <(curl -Ss https://my-netdata.io/kickstart.sh) --disable-telemetry`.
+> See our [anonymous statistics page](docs/anonymous-statistics.md) for more details.
+
+To try Netdata in a Docker container, run this:
 
 ```sh
 docker run -d --name=netdata \
@@ -112,11 +120,9 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running Netdata in docker, check the [docker installation page](packaging/docker/).
+For more information about running Netdata with Docker, check the [Docker installation page](packaging/docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
-
-From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read more about the information collected and how to opt-out, check the [anonymous statistics page](docs/anonymous-statistics.md).
 
 ## Why Netdata
 

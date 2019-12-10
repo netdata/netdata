@@ -198,26 +198,39 @@ If sending this information to the central Netdata registry violates your securi
 
 ### Opt out of anonymous statistics
 
-Starting with v1.12 Netdata also collects [anonymous statistics](anonymous-statistics.md) on certain events for: 
+Starting with Netdata v1.12, the agent collects and sends anonymous usage information to Google Analytics by default. We
+use the statistics gathered from this information for two purposes:
 
-1.  **Quality assurance**, to help us understand if Netdata behaves as expected and help us identify repeating issues for certain distributions or environments.
+1.  **Quality assurance**, to help us understand if Netdata behaves as expected, and to help us classify repeated
+     issues with certain distributions or environments.
 
-2.  **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extent our development decisions influence the community.
+2.  **Usage statistics**, to help us interpret how people use the Netdata agent in real-world environments, and to help
+     us identify how our development/design decisions influence the community.
 
-There are three ways to opt-out from anonymous statistics:
+Netdata sends information to Google Analytics via two different channels:
+
+-   Google Tag Manager fires when you access an agent's dashboard.
+-   The Netdata daemon executes the [`anonymous-statistics.sh`
+    script](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in)
+    when Netdata starts, stops cleanly, or fails.
+
+You can opt-out from sending anonymous statistics to Netdata through three different opt-out mechanisms:
 
 **Create a file called `.opt-out-from-anonymous-statistics`.** This empty file, stored in your Netdata configuration
-directory (usually `etc/netdata`), immediately stops the statistics script from running.
+directory (usually `etc/netdata`), immediately stops the statistics script from running, and works with any type of
+installation, including manual, offline, and macOS installations. Create the file by running `touch
+.opt-out-from-anonymous-statistics` from your Netdata configuration directory.
 
 **Pass the option `--disable-telemetry` to any of the installer scripts in the [installation
-docs](../packaging/installer/README.md).** You can append this option during initial installation or during a manual
+docs](../packaging/installer/README.md).** You can append this option during the initial installation or a manual
 update.
 
-**Set your `DO_NOT_TRACK` environmental variable to `1`.** You can set this variable with the following: `export
-DO_NOT_TRACK=1`. Read more on the [project's homepage](https://consoledonottrack.com/). This variable works with both
-the installer scripts and Docker-based installations.
+**Set your `DO_NOT_TRACK` environmental variable to `1`.** You can set this variable with the following command: `export
+DO_NOT_TRACK=1`. This variable must be present _during installation_ to make the necessary changes. Visit the [project's
+homepage](https://consoledonottrack.com/) for more details on the purpose and implementation of this environmental
+variable.
 
-Each of these opt-out procesess does the following:
+Each of these opt-out processes does the following:
 
 -   Prevents the daemon from executing the anonymous statistics script.
 -   Forces the anonymous statistics script to exit immediately.

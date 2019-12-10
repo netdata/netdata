@@ -66,7 +66,13 @@ If you don't want to use the apps.plugin functionality, you can remove the mount
 
 ### Opt-out from anonymous statistics
 
-**FINISH THIS**
+To opt-out from [anonymous statistics](../../docs/anonymous-statistics.md), which help us improve Netdata, you can set
+your `DO_NOT_TRACK` environmental variable to `1`. You can set this variable with the following command: `export
+DO_NOT_TRACK=1`. This variable must be present _during initialization of a Docker container_ to properly configure the
+daemon. 
+
+Visit the [project's homepage](https://consoledonottrack.com/) for more details on the purpose and implementation of
+this environmental variable.
 
 ### Docker container names resolution
 
