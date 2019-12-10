@@ -60,17 +60,20 @@ To see exactly what and how is collected, you can review the script template `da
 
 There are three ways of opting-out from anonymous statistics:
 
--   Create a file called `.opt-out-from-anonymous-statistics`.
--   Pass the option `--disable-telemetry` to any of the installer scripts.
--   Set the 
+**Create a file called `.opt-out-from-anonymous-statistics`.** This empty file, stored in your Netdata configuration
+directory (usually `etc/netdata`), immediately stops the statistics script from running.
 
+**Pass the option `--disable-telemetry` to any of the installer scripts in the [installation
+docs](../packaging/installer/README.md).** You can append this option during initial installation or during a manual
+update.
 
+**Set your `DO_NOT_TRACK` environmental variable to `1`.** You can set this variable with the following: `export
+DO_NOT_TRACK=1`. Read more on the [project's homepage](https://consoledonottrack.com/). This variable works with both
+the installer scripts and Docker-based installations.
 
-To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). The effect of creating the file is the following:
+Each of these opt-out procesess does the following:
 
--   The daemon will never execute the anonymous statistics script
--   The anonymous statistics script will exit immediately if called via any other way (e.g. shell)
--   The Google Tag Manager Javascript snippet will remain in the page, but the linked tag will not be fired. The effect
-    is that no data will ever be sent to GA. 
-
-You can also disable telemetry by passing the option `--disable-telemetry` to any of the installers.
+-   Prevents the daemon from executing the anonymous statistics script.
+-   Forces the anonymous statistics script to exit immediately.
+-   Stops the Google Tag Manager Javascript snippet, which remains on the dashboard, from firing and sending any data to
+    Google Analytics.

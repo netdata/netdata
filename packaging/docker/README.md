@@ -64,6 +64,10 @@ services:
 If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
 (they are used to get proper user and group names for the monitored host) to get slightly better security.
 
+### Opt-out from anonymous statistics
+
+**FINISH THIS**
+
 ### Docker container names resolution
 
 There are a few options for resolving container names within Netdata. Some methods of doing so will allow root access to
