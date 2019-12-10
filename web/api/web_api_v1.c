@@ -761,8 +761,7 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
-static inline void hostlabels2json(RRDHOST *host, BUFFER *wb) {
-    RRDHOST *rc;
+inline void hostlabels2json(RRDHOST *host, BUFFER *wb) {
     int count = 0;
     netdata_rwlock_rdlock(&host->labels_rwlock);;
     for (struct label *label = host->labels; label; label = label->next) {

@@ -878,6 +878,14 @@ components:
           type: number
           description: The default update frequency of the netdata server. All charts have
             an update frequency equal or bigger than this.
+        labels:
+          type: object
+          description: List of host labels.
+          properties:
+            app:
+              type: string
+              description: Host label.
+              example: netdata
         charts:
           type: object
           description: An object containing all the chart objects available at the netdata
