@@ -1357,6 +1357,14 @@ components:
                   format: nullable
                 value:
                   type: number
+        labels:
+          type: object
+          description: List of host labels.
+          properties:
+            app:
+              type: string
+              description: Host label.
+              example: netdata
     alarm_log_entry:
       type: object
       properties:
