@@ -14,14 +14,15 @@ static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
     size_t len = strlen(rt->labels)+1;
     char *cmp = mallocz(len);
     if(!cmp)
-        return 0;
+        return 1;
 
     int ret;
-    if(move && rt->labels) {
+    if(move) {
         netdata_rwlock_rdlock(&host->labels_rwlock);
         while(move) {
             snprintfz(cmp, len, "%s=%s", move->key, move->value);
-            if (simple_pattern_matches(rt->splabels, move->key) || simple_pattern_matches(rt->splabels, cmp)) {
+            if (simple_pattern_matches(rt->splabels, move->key) ||
+                simple_pattern_matches(rt->splabels, cmp)) {
                 break;
             }
             move = move->next;
@@ -42,8 +43,7 @@ static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
         ret =1;
     }
 
-    if(cmp)
-        freez(cmp);
+    freez(cmp);
 
     return ret;
 }

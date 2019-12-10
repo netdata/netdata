@@ -607,9 +607,12 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
 
 void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
     netdata_rwlock_rdlock(&host->labels_rwlock);
-
     RRDCALC *rc, *clean = NULL;
     for (rc = host->alarms; rc; rc = rc->next) {
+        if (!rc->labels) {
+            continue;
+        }
+
         if (clean) {
             error("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                   clean->name,
@@ -619,22 +622,33 @@ void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
             clean = NULL;
         }
 
-        struct label *move = host->labels;
-        if(rc->labels) {
-            while(move) {
-                if (simple_pattern_matches(rc->splabels, move->key)) {
-                    break;
-                }
-                move = move->next;
-            }
+        size_t len = strlen(rc->labels)+1;
+        char *cmp = mallocz(len);
+        if(!cmp)
+            break;
 
-            if(!move) {
-                clean = rc;
+        struct label *move = host->labels;
+        while(move) {
+            snprintfz(cmp, len, "%s=%s", move->key, move->value);
+            if (simple_pattern_matches(rc->splabels, move->key) ||
+                simple_pattern_matches(rc->splabels, cmp)) {
+                break;
             }
+            move = move->next;
+        }
+
+        freez(cmp);
+
+        if(!move) {
+            clean = rc;
         }
     }
 
     if (clean) {
+        error("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+              clean->name,
+              host->hostname,
+              clean->labels);
         rrdcalc_unlink_and_free(host, clean);
     }
 
