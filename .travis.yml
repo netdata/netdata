@@ -16,7 +16,7 @@ before_install:
 # Install dependencies for all, once
 #
 install:
-  - sudo apt-get install -y libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
+  - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
   - sudo apt install -y --only-upgrade docker-ce
   - sudo pip install git-semver==0.2.4 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
   - docker info
@@ -104,6 +104,10 @@ jobs:
       name: Run shellchecking on BASH
       script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
 
+      # Check if any of the C code deviates from our coding style
+    - name: Check coding style
+      script: .travis/clangformat.sh
+
       # This falls under same stage defined earlier
     - name: Run checksum checks on kickstart files
       script: ./tests/installer/checksums.sh
@@ -120,7 +124,7 @@ jobs:
 
       name: Standard netdata build
       script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
-      env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+      env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
 
     - name: Docker container build process (alpine installation)
@@ -158,10 +162,6 @@ jobs:
       env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "Unit testing failed"
 
-    - name: Build/install on ubuntu 14.04 (not containerized)
-      script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
-      after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 14.04"
-
     - name: Build/Install for ubuntu 18.04 (not containerized)
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
       after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 18.04"
@@ -173,10 +173,6 @@ jobs:
     - name: Run netdata lifecycle from stable to current, on CentOS 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on CentOS 7"
-
-    - name: Build/install for CentOS 6 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos6" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
-      after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on CentOS 6"
 
     - name: Build/install for CentOS 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "netdata/os-test:centos7" ./netdata-installer.sh --dont-wait --dont-start-it --install /tmp
@@ -201,10 +197,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.04"
 
       # Centos runs
-    - name: Run netdata lifecycle on CentOS 6 (Containerized)
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:6" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 6"
-
     - name: Run netdata lifecycle on CentOS 7 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "centos:7" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare CentOS 7"
@@ -357,15 +349,6 @@ jobs:
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-    - name: "Build & Publish DEB package for ubuntu/trusty"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="trusty" BUILD_STRING="ubuntu/trusty"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-
     - name: "Build & Publish DEB package for debian/buster"
       <<: *DEB_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Debian)?\]/
@@ -431,15 +414,7 @@ jobs:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
-      name: "Build & Publish RPM package for Enterprise Linux 6"
-      <<: *RPM_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) RPM( Enterprise Linux)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="6" BUILD_STRING="el/6"
-        - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish RPM package for Enterprise Linux 7"
+      name: "Build & Publish RPM package for Enterprise Linux 7"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Enterprise Linux)?\]/
       env:

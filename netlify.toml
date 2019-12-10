@@ -14,3 +14,7 @@
 [[redirects]]
   from = "/docs/GettingStarted/"
   to = "/docs/getting-started"
+
+[[redirects]]
+  from = "/docs/tutorials/dimension-templates/"
+  to = "/health/tutorials/dimension-templates/"

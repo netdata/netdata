@@ -522,6 +522,12 @@ netdataDashboard.menu = {
         title: 'AM2320 Sensor',
         icon: '<i class="fas fa-thermometer-half"></i>',
         info: 'Readings from the external AM2320 Sensor.'
+    },
+
+    'scaleio': {
+        title: 'ScaleIO',
+        icon: '<i class="fas fa-database"></i>',
+        info: 'Performance and health statistics for various ScaleIO components. Data collected via VxFlex OS Gateway REST API.'
     }
 
 };
@@ -716,6 +722,31 @@ netdataDashboard.context = {
     'system.load': {
         info: 'Current system load, i.e. the number of processes using CPU or waiting for system resources (usually CPU and disk). The 3 metrics refer to 1, 5 and 15 minute averages. The system calculates this once every 5 seconds. For more information check <a href="https://en.wikipedia.org/wiki/Load_(computing)" target="_blank">this wikipedia article</a>',
         height: 0.7
+    },
+
+    'system.cpu_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on CPU. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'system.memory_some_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on memory. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on memory simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
+    },
+
+    'system.io_some_pressure': {
+        info: '<a href="https://www.kernel.org/doc/html/latest/accounting/psi.html">Pressure Stall Information</a> ' +
+            'identifies and quantifies the disruptions caused by resource contentions. ' +
+            'The "some" line indicates the share of time in which at least <b>some</b> tasks are stalled on I/O. ' +
+            'The "full" line indicates the share of time in which <b>all non-idle</b> tasks are stalled on I/O simultaneously. ' +
+            'In this state actual CPU cycles are going to waste, and a workload that spends extended time in this state is considered to be thrashing. ' +
+            'The ratios (in %) are tracked as recent trends over 10-, 60-, and 300-second windows.'
     },
 
     'system.io': {
@@ -1822,7 +1853,7 @@ netdataDashboard.context = {
     // web_log
 
     'web_log.response_statuses': {
-        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b> and <b>304</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b>, <code>other</code> are all the other responses.',
+        info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>304</b> and <b>401</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b> except <b>401</b>, <code>other</code> are all the other responses.',
         mainheads: [
             function (os, id) {
                 void(os);
@@ -2405,34 +2436,6 @@ netdataDashboard.context = {
 
     'spigotmc.users': {
         info: 'The number of currently connect users on the monitored Spigot server.'
-    },
-
-    'unbound.queries': {
-        info: 'Shows the number of queries being processed of each type. Note that <code>Recursive</code> queries are also accounted as cache misses.'
-    },
-
-    'unbound.reqlist': {
-        info: 'Shows various stats about Unbound\'s internal request list.'
-    },
-
-    'unbound.recursion': {
-        info: 'Average and median time to complete recursive name resolution.'
-    },
-
-    'unbound.cache': {
-        info: 'The number of items in each of the various caches.'
-    },
-
-    'unbound.threads.queries': {
-        height: 0.2
-    },
-
-    'unbound.threads.reqlist': {
-        height: 0.2
-    },
-
-    'unbound.threads.recursion': {
-        height: 0.2
     },
 
     'boinc.tasks': {

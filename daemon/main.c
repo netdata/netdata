@@ -921,8 +921,10 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+#ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
+#endif
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -1282,6 +1284,11 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+
+    // ------------------------------------------------------------------------
+    // Initialize netdata agent command serving from cli and signals
+
+    commands_init();
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;

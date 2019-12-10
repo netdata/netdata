@@ -150,6 +150,8 @@ RRDHOST *rrdhost_create(const char *hostname,
 #ifdef ENABLE_HTTPS
     host->ssl.conn = NULL;
     host->ssl.flags = NETDATA_SSL_START;
+    host->stream_ssl.conn = NULL;
+    host->stream_ssl.flags = NETDATA_SSL_START;
 #endif
 
     netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);

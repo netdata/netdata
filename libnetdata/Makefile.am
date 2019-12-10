@@ -27,5 +27,5 @@ SUBDIRS = \
     $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)

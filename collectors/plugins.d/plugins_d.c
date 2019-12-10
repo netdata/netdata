@@ -258,17 +258,17 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 #ifdef ENABLE_HTTPS
         int normalread = 1;
         if(netdata_srv_ctx) {
-            if(host->ssl.conn && !host->ssl.flags) {
+            if(host->stream_ssl.conn && !host->stream_ssl.flags) {
                 if(!bytesleft) {
                     r = line;
                     readfrom = tmpbuffer;
-                    bytesleft = pluginsd_update_buffer(readfrom, host->ssl.conn);
+                    bytesleft = pluginsd_update_buffer(readfrom, host->stream_ssl.conn);
                     if(bytesleft <= 0) {
                         break;
                     }
                 }
 
-                readfrom =  pluginsd_get_from_buffer(line, &bytesleft, readfrom, host->ssl.conn, tmpbuffer);
+                readfrom =  pluginsd_get_from_buffer(line, &bytesleft, readfrom, host->stream_ssl.conn, tmpbuffer);
                 if(!readfrom) {
                     r = NULL;
                 }

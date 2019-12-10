@@ -37,6 +37,7 @@ sha256sums.txt
 
 # netdata binaries
 netdata
+netdatacli
 !netdata/
 upload/
 artifacts/
@@ -181,6 +182,8 @@ python.d/python-modules-installer.sh
 # documentation generated files
 docs/generator/src
 docs/generator/build
+docs/generator/doc
+docs/generator/localization
 docs/generator/mkdocs.yml
 
 .environment.sh

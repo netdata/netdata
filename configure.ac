@@ -279,6 +279,10 @@ AC_CHECK_LIB(
     [uv_fs_scandir_next],
     [UV_LIBS="-luv"]
 )
+test -z "${UV_LIBS}" && \
+    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
+OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 
 # -----------------------------------------------------------------------------
@@ -363,9 +367,6 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
 # DB engine and HTTPS
-test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
-    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
-
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
@@ -382,8 +383,6 @@ AC_MSG_CHECKING([if netdata dbengine should be used])
 if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
     enable_dbengine="yes"
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
-    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
-    OPTIONAL_UV_LIBS="${UV_LIBS}"
     OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
     OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
     OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"

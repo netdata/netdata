@@ -39,6 +39,9 @@ Resampling can come in many forms, from a simple *downsample* to sending the *av
         metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus
         protocol](prometheus/). Some comments on using the remote write backend can be found [here](prometheus/remote_write/).
 
+    -   ****TimescaleDB** via [community-built connector](TIMESCALE.md) that takes JSON streams from a Netdata client
+        and writes them to a TimescaleDB table.
+
     -   **AWS Kinesis Data Streams**
 
         metrics are sent to the service in `JSON` format.

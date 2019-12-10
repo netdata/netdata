@@ -21,6 +21,9 @@ static struct proc_module {
         { .name = "/proc/loadavg", .dim = "loadavg", .func = do_proc_loadavg },
         { .name = "/proc/sys/kernel/random/entropy_avail", .dim = "entropy", .func = do_proc_sys_kernel_random_entropy_avail },
 
+        // pressure metrics
+        { .name = "/proc/pressure", .dim = "pressure", .func = do_proc_pressure },
+
         // CPU metrics
         { .name = "/proc/interrupts", .dim = "interrupts", .func = do_proc_interrupts },
         { .name = "/proc/softirqs", .dim = "softirqs", .func = do_proc_softirqs },

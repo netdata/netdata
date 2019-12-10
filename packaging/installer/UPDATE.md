@@ -46,7 +46,7 @@ _Please, consider the risks of running an auto-update. Something can always go w
 Calling the `netdata-installer.sh` with the `--auto-update` or `-u` option will create the `netdata-updater` script under 
 either  `/etc/cron.daily/`, or `/etc/periodic/daily/`. Whenever the `netdata-updater` is executed, it checks if a newer nightly build is available and then handles the download, installation and Netdata restart.  
 
-Note that after Jan 2019, the `kickstart.sh` one-liner `bash <(curl -Ss https://my-netdata.io/kickstart.sh)` calls the `netdata-installer.sh` with the auto-update option. So if you just run the one-liner without options once, your Netdata will be kept auto-updated. The same applies to the `kickstart-static64.sh` one-liner since Oct 2019.
+Note that after Jan 2019, the `kickstart.sh` one-liner `bash <(curl -Ss https://my-netdata.io/kickstart.sh)` calls the `netdata-installer.sh` with the auto-update option. So if you just run the one-liner without options once, your Netdata will be kept auto-updated.
 
 ## You downloaded a binary package
 

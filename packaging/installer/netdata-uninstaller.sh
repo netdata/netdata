@@ -312,6 +312,7 @@ if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
 	rm_dir "${NETDATA_PREFIX}"
 else
 	rm_file "/usr/sbin/netdata"
+	rm_file "/usr/sbin/netdatacli"
 	rm_dir "/usr/share/netdata"
 	rm_dir "/usr/libexec/netdata"
 	rm_dir "/var/lib/netdata"

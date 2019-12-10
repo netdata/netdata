@@ -7,11 +7,10 @@ import subprocess
 import threading
 import xml.etree.ElementTree as et
 
-from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
+from bases.collection import find_binary
 
 disabled_by_default = True
-
 
 NVIDIA_SMI = 'nvidia-smi'
 
@@ -76,7 +75,8 @@ def gpu_charts(gpu):
             ]
         },
         ENCODER_UTIL: {
-            'options': [None, 'Encoder/Decoder Utilization', 'percentage', fam, 'nvidia_smi.encoder_utilization', 'line'],
+            'options': [None, 'Encoder/Decoder Utilization', 'percentage', fam, 'nvidia_smi.encoder_utilization',
+                        'line'],
             'lines': [
                 ['encoder_util', 'encoder'],
                 ['decoder_util', 'decoder'],
@@ -212,6 +212,7 @@ def handle_attr_error(method):
             return method(*args, **kwargs)
         except AttributeError:
             return None
+
     return on_call
 
 
@@ -221,6 +222,7 @@ def handle_value_error(method):
             return method(*args, **kwargs)
         except ValueError:
             return None
+
     return on_call
 
 
@@ -342,10 +344,11 @@ class Service(SimpleService):
         super(Service, self).__init__(configuration=configuration, name=name)
         self.order = list()
         self.definitions = dict()
+        self.loop_mode = configuration.get('loop_mode', True)
         poll = int(configuration.get('poll_seconds', 1))
         self.poller = NvidiaSMIPoller(poll)
 
-    def get_data(self):
+    def get_data_loop_mode(self):
         if not self.poller.is_started():
             self.poller.start()
 
@@ -353,7 +356,17 @@ class Service(SimpleService):
             self.debug('poller is off')
             return None
 
-        last_data = self.poller.data()
+        return self.poller.data()
+
+    def get_data_normal_mode(self):
+        return self.poller.run_once()
+
+    def get_data(self):
+        if self.loop_mode:
+            last_data = self.get_data_loop_mode()
+        else:
+            last_data = self.get_data_normal_mode()
+
         if not last_data:
             return None
 

@@ -47,7 +47,5 @@ statsd-stress: statsd-stress.c
 test-eval: test-eval.c
 	gcc ${CFLAGS} -o $@ $^ ${COMMON_LDFLAGS}
 
-
 clean:
 	rm -f benchmark-procfile-parser statsd-stress test-eval benchmark-dictionary benchmark-value-pairs
-

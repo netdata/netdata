@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	messagebird/README.md \
-	messagebird/Makefile.inc \
-	$(NULL)
+    messagebird/README.md \
+    messagebird/Makefile.inc \
+    $(NULL)
 

@@ -158,6 +158,8 @@ USAGE: ${PROGRAM} [options]
   --disable-go               Disable installation of go.d.plugin.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
+  --disable-https            Explicitly disable TLS support
+  --disable-dbengine         Explicitly disable DB engine support
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
   --disable-plugin-nfacct
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available
@@ -212,6 +214,8 @@ while [ -n "${1}" ]; do
 		"--stable-channel") RELEASE_CHANNEL="stable";;
 		"--enable-plugin-freeipmi")  NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi";;
 		"--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi";;
+		"--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https";;
+		"--disable-dbengine") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-dbengine/} --disable-dbengine";;
 		"--enable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-nfacct/} --enable-plugin-nfacct";;
 		"--disable-plugin-nfacct") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-nfacct/} --disable-plugin-nfacct";;
 		"--enable-plugin-xenstat") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-xenstat/} --enable-plugin-xenstat";;
@@ -586,7 +590,7 @@ if [ "${UID}" = "0" ]; then
 	ROOT_USER="root"
 else
 	NETDATA_USER="${USER}"
-	ROOT_USER="${NETDATA_USER}"
+	ROOT_USER="${USER}"
 fi
 NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
@@ -644,19 +648,6 @@ if [ ! -d "${NETDATA_RUN_DIR}" ]; then
 	# this is needed if NETDATA_PREFIX is not empty
 	run mkdir -p "${NETDATA_RUN_DIR}" || exit 1
 fi
-
-# --- conf dir ----
-
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "go.d" "custom-plugins.d" "ssl"; do
-	if [ ! -d "${NETDATA_USER_CONFIG_DIR}/${x}" ]; then
-		echo >&2 "Creating directory '${NETDATA_USER_CONFIG_DIR}/${x}'"
-		run mkdir -p "${NETDATA_USER_CONFIG_DIR}/${x}" || exit 1
-	fi
-done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_USER_CONFIG_DIR}"
-run find "${NETDATA_USER_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_USER_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
-run chmod 755 "${NETDATA_USER_CONFIG_DIR}/edit-config"
 
 # --- stock conf dir ----
 
@@ -916,10 +907,7 @@ else
 	run_ok "netdata started!"
 	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:${NETDATA_PORT}/netdata.conf"
 fi
-if [ "${UID}" -eq 0 ]; then
-	run chown "${NETDATA_USER}" "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
-fi
-run chmod 0664 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
 
 if [ "$(uname)" = "Linux" ]; then
 	# -------------------------------------------------------------------------
@@ -1001,14 +989,14 @@ either of the following sets of commands:
 
 To run apps.plugin with escalated capabilities:
 
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 0750 \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo setcap cap_dac_read_search,cap_sys_ptrace+ep \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo setcap cap_dac_read_search,cap_sys_ptrace+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
 
 or, to run apps.plugin as root:
 
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
-    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 4750 \"${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin\"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
+    ${TPUT_YELLOW}${TPUT_BOLD}sudo chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/apps.plugin"${TPUT_RESET}
 
 apps.plugin is performing a hard-coded function of data collection for all
 running processes. It cannot be instructed from the netdata daemon to perform
@@ -1051,7 +1039,7 @@ echo >&2 "Uninstall script copied to: ${TPUT_RED}${TPUT_BOLD}${NETDATA_PREFIX}/u
 echo >&2
 
 # -----------------------------------------------------------------------------
-progress "Install (but not enable) netdata updater tool"
+progress "Installing (but not enabling) the netdata updater tool"
 cleanup_old_netdata_updater || run_failed "Cannot cleanup old netdata updater tool."
 install_netdata_updater || run_failed "Cannot install netdata updater tool."
 
@@ -1082,6 +1070,7 @@ RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
 EOF
+run chmod 0644 "${NETDATA_USER_CONFIG_DIR}/.environment"
 
 echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
 cat <<EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"

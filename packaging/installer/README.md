@@ -48,9 +48,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 !!! note
     Do not use `sudo` for the one-line installer—it will escalate privileges itself if needed.
 
-```
+
 To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](#nightly-vs-stable-releases).
-```
 
 <details markdown="1"><summary>Click here for more information and advanced use of the one-line installation script.</summary>
 
@@ -105,20 +104,18 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 !!! note
     Do not use `sudo` for this installer—it will escalate privileges itself if needed.
 
-```
 To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](README.md#nightly-vs-stable-releases).
 
 If your system does not have `bash` installed, open the `More information and advanced uses of the kickstart-static64.sh script` dropdown for instructions to run the installer without `bash`.
 
 This script installs Netdata at `/opt/netdata`.
-```
 
 <details markdown="1"><summary>Click here for more information and advanced use of this command.</summary>
 
 Verify the integrity of the script with this:
 
 ```bash
-[ "7c3471506f548968edbbf8d085fbea65" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "8ad43ff960bf6f2487233682909f7a87" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -129,14 +126,13 @@ The `kickstart-static64.sh` script passes all its parameters to `netdata-install
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--local-files`: Used for offline installations. Pass two file paths, one for the tarball and one fir the checksum file, to force kickstart run the process using those files.
+-   `--local-files`: Used for offline installations. Pass two file paths, one for the tarball and one for the checksum file, to force kickstart run the process using those files.
 
 Example using all the above parameters:
 
 ```sh
 bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --dont-wait --dont-start-it --no-updates --stable-channel --local-files /tmp/my-selfdownloaded-tarball.tar.gz /tmp/checksums.txt
 ```
-Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 
 If your shell fails to handle the above one liner, do this:
 
@@ -209,13 +205,13 @@ Try our experimental automatic requirements installer (no need to be root). This
 Install the packages for having a **basic Netdata installation** (system monitoring and many applications, without  `mysql` / `mariadb`, `postgres`, `named`, hardware sensors and `SNMP`):
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/kickstart.sh && bash /tmp/kickstart.sh -i netdata
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata
 ```
 
 Install all the required packages for **monitoring everything Netdata can monitor**:
 
 ```sh
-curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/kickstart.sh && bash /tmp/kickstart.sh -i netdata-all
+curl -Ss 'https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh' >/tmp/install-required-packages.sh && bash /tmp/install-required-packages.sh -i netdata-all
 ```
 
 If the above do not work for you, please [open a github issue](https://github.com/netdata/netdata/issues/new?title=packages%20installer%20failed&labels=installation%20help&body=The%20experimental%20packages%20installer%20failed.%0A%0AThis%20is%20what%20it%20says:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20screen%20here%0A%0A%60%60%60) with a copy of the message you get on screen. We are trying to make it work everywhere (this is also why the script [reports back](https://github.com/netdata/netdata/issues/2054) success or failure for all its runs).
@@ -244,6 +240,7 @@ Once Netdata is compiled, to run it the following packages are required (already
 |:-----:|-----------|
 | `libuuid` | part of `util-linux` for GUIDs management|
 | `zlib`    | gzip compression for the internal Netdata web server|
+| `libuv`   | Multi-platform support library with a focus on asynchronous I/O, version 1 or greater|
 
 *Netdata will fail to start without the above.*
 
@@ -273,7 +270,6 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 
 | package  | description|
 |:-----:|-----------|
-| `libuv`  | Multi-platform support library with a focus on asynchronous I/O, version 1 or greater|
 | `liblz4` | Extremely fast compression algorithm, version r129 or greater|
 | `Judy`   | General purpose dynamic array|
 | `openssl`| Cryptography and SSL/TLS toolkit|
@@ -388,7 +384,7 @@ If you experience an issue with `/usr/bin/install` being absent in pfSense 2.3 o
 
 ##### FreeNAS
 
-On FreeNAS-Corral-RELEASE (>=10.0.3), Netdata is pre-installed.
+On FreeNAS-Corral-RELEASE (>=10.0.3 and <11.3), Netdata is pre-installed.
 
 To use Netdata, the service will need to be enabled and started from the FreeNAS **[CLI](https://github.com/freenas/cli)**.
 
