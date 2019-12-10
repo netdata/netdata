@@ -50,7 +50,11 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 print("2. Preparing repo on LXC container")
 common.prepare_repo(container)
 
-print("2.1 Install .DEB build support packages")
+print("2.1 Add extra repositories")
+if str(os.environ["BUILD_STRING"]).count("debian/jessie") == 1:
+    common.run_command(container, ["bash", "-c", "echo \"deb http://archive.debian.org/debian/ jessie-backports main contrib non-free\" > /etc/apt/sources.list.d/99-archived.list"])
+
+print("2.2 Install .DEB build support packages")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dpkg-dev"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libdistro-info-perl"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-make"])
@@ -58,7 +62,7 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-sys
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dh-autoreconf"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "git-buildpackage"])
 
-print("2.2 Add more dependencies")
+print("2.3 Add more dependencies")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnetfilter-acct-dev"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
 
