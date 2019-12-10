@@ -808,7 +808,7 @@ static int health_readfile(const char *filename, void *data) {
                     simple_pattern_free(rc->splabels);
                 }
 
-                rc->labels = strdupz(value);
+                rc->labels = simple_pattern_trim_around_equal(value);
                 rc->splabels = simple_pattern_create(rc->labels, NULL, SIMPLE_PATTERN_EXACT);
             }
             else {
@@ -953,7 +953,7 @@ static int health_readfile(const char *filename, void *data) {
                     simple_pattern_free(rt->splabels);
                 }
 
-                rt->labels = strdupz(value);
+                rt->labels = simple_pattern_trim_around_equal(value);
                 rt->splabels = simple_pattern_create(rt->labels, NULL, SIMPLE_PATTERN_EXACT);
             }
             else {
