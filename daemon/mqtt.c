@@ -362,7 +362,7 @@ int mqtt_init(MQTT_INIT_ACTION action)
 
     rc = mosquitto_reconnect_delay_set(mosq, NETDATA_MQTT_RECONNECT_DELAY, NETDATA_MQTT_MAX_RECONNECT_DELAY, 1);
 
-    mosquitto_tls_set(mosq, "/etc/netdata/mqtt/ca.crt", NULL, "/etc/netdata/mqtt/server.crt", "/etc/netdata/mqtt/server.key", NULL);
+    //mosquitto_tls_set(mosq, "/etc/netdata/mqtt/ca.crt", NULL, "/etc/netdata/mqtt/server.crt", "/etc/netdata/mqtt/server.key", NULL);
 
     rc = mosquitto_connect_async(mosq, mqtt_broker_hostname, mqtt_broker_port, NETDATA_MQTT_PING_INTERVAL);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
