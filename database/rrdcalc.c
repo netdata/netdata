@@ -605,10 +605,9 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     rrdcalc_free(rc);
 }
 
-void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
-    netdata_rwlock_rdlock(&host->labels_rwlock);
+static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
     RRDCALC *rc, *clean = NULL;
-    for (rc = host->alarms; rc; rc = rc->next) {
+    for (rc = alarms; rc; rc = rc->next) {
         if (!rc->labels) {
             continue;
         }
@@ -651,6 +650,15 @@ void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
               clean->labels);
         rrdcalc_unlink_and_free(host, clean);
     }
+
+
+}
+
+void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+
+    rrdcalc_labels_unlink_alarm_loop(host, host->alarms);
+    rrdcalc_labels_unlink_alarm_loop(host, host->alarms_with_foreach);
 
     netdata_rwlock_unlock(&host->labels_rwlock);
 }
