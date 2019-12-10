@@ -1018,6 +1018,14 @@ components:
         host:
           type: string
           description: The host containing the chart.
+        labels:
+          type: object
+          description: List of host labels.
+          properties:
+            app:
+              type: string
+              description: Host label.
+              example: netdata
         chart_variables:
           type: object
           additionalProperties:
