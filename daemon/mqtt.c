@@ -95,7 +95,7 @@ void *mqtt_main(void *ptr) {
         // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
         // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
         if (am_i_claimed() == 0) {
-            usleep(60000 * 1000);
+            sleep_usec(USEC_PER_SEC * 60);
             continue;
         }
 
@@ -103,7 +103,7 @@ void *mqtt_main(void *ptr) {
             info("Initializing connection");
             if (unlikely(mqtt_init(MQTT_INIT))) {
                 // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
-                usleep(60000 * 1000);
+                sleep_usec(USEC_PER_SEC * 60);
                 continue;
             }
             continue;
@@ -119,7 +119,7 @@ void *mqtt_main(void *ptr) {
                     mqtt_broker_hostname, mqtt_broker_port);
 
                 // TBD: Using delay
-                usleep(10000 * 1000);
+                sleep_usec(USEC_PER_SEC * 10);
             } else
                 error("Loop error code %d (%s)", rc, mosquitto_strerror(rc));
             continue;
@@ -182,7 +182,7 @@ int mqtt_send(char *base_topic, char *sub_topic, char *message)
         time_t now = now_realtime_sec();
 
         while (!mqtt_connection_initialized && (now_realtime_sec() - now) < NETDATA_MQTT_INITIALIZATION_WAIT) {
-            usleep(NETDATA_MQTT_INITIALIZATION_SLEEP_WAIT * 1000);
+            sleep_usec(USEC_PER_SEC * NETDATA_MQTT_INITIALIZATION_SLEEP_WAIT);
         }
 
         if (unlikely(!mqtt_connection_initialized)) {
