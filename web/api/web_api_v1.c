@@ -761,6 +761,19 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
+static inline void hostlabels2json(RRDHOST *host, BUFFER *wb) {
+    RRDHOST *rc;
+    int count = 0;
+    netdata_rwlock_rdlock(&host->labels_rwlock);;
+    for (struct label *label = host->labels; label; label = label->next) {
+        if(count > 0) buffer_strcat(wb, ",\n");
+        buffer_sprintf(wb, "\t\t\"%s\": \"%s\"", label->key, label->value);
+        count++;
+    }
+    buffer_strcat(wb, "\n");
+    netdata_rwlock_unlock(&host->labels_rwlock);;
+}
+
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
@@ -793,6 +806,10 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"virt_detection\": \"%s\",\n", (host->system_info->virt_detection) ? host->system_info->virt_detection : "");
     buffer_sprintf(wb, "\t\"container\": \"%s\",\n", (host->system_info->container) ? host->system_info->container : "");
     buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", (host->system_info->container_detection) ? host->system_info->container_detection : "");
+
+    buffer_strcat(wb, "\t\"labels\": {\n");
+    hostlabels2json(host, wb);
+    buffer_strcat(wb, "\t},\n");
 
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);
