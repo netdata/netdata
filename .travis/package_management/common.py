@@ -83,7 +83,7 @@ def prepare_repo(container):
         if str(os.environ["BUILD_STRING"]).count("debian/jessie") == 1:
             run_command(container, ["bash", "-c", "echo deb http://archive.debian.org/debian/ jessie-backports main contrib non-free >> /etc/apt/sources.list.d/99-archived.list"])
             run_command(container, [os.environ["REPO_TOOL"], "update", "-y", '-o', 'Acquire::Check-Valid-Until=false'])
-        else
+        else:
             run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
     else:
         run_command(container, [os.environ["REPO_TOOL"], "update", "-y"])
