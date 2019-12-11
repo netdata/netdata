@@ -401,33 +401,6 @@ RRDHOST *rrdhost_find_or_create(
                 , system_info
                 , 0
         );
-
-        static int is_master_label_updated = 0;
-        if (!is_master_label_updated) {
-            struct label *prev_label = NULL;
-            struct label *label = localhost->labels;
-
-            uint32_t is_master_hash = simple_hash("_is_master");
-
-            netdata_rwlock_wrlock(&localhost->labels_rwlock);
-            while (label) {
-                if (label->key_hash == is_master_hash && !strcmp(label->key, "_is_master")) {
-                    struct label *new_label = create_label("_is_master", "true", LABEL_SOURCE_AUTO);
-
-                    if (prev_label)
-                        prev_label->next = new_label;
-                    new_label->next = label->next;
-                    freez(label);
-
-                    is_master_label_updated = 1;
-                    break;
-                }
-                prev_label = label;
-                label = label->next;
-            }
-            netdata_rwlock_unlock(&localhost->labels_rwlock);
-
-        }
     }
     else {
         host->health_enabled = health_enabled;
