@@ -27,7 +27,7 @@ Once you use it on your systems, **there is no going back**! *You have been warn
 
 1.  [How it looks](#how-it-looks) - have a quick look at it
 2.  [User base](#user-base) - who uses Netdata?
-3.  [Quick Start](#quick-start) - try it now on your systems
+3.  [Quickstart](#quickstart) - try it now on your systems
 4.  [Why Netdata](#why-netdata) - why people love Netdata, how it compares with other solutions
 5.  [News](#news) - latest news about Netdata
 6.  [How it works](#how-it-works) - high level diagram of how Netdata works
