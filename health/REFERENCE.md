@@ -373,18 +373,43 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alarm line `label`
 
-Defines the list of labels expected on host, for example, case I want apply an alarm only on Netdata slave, I can specify
-this using the label `_is_master`
+Defines the list of labels expected on host, for example, let us suppose that `netdata.conf` is configured with the
+following labels:
 
 ```yaml
-label: _is_master = false
+[host labels]
+    installed = 20191211
+    room = server
 ```
- 
-This option accepts [Netdata simple patterns](../libnetdata/simple_pattern/), so, case you wanna apply an alarm to either
-a master or a slave, you can write:
+
+but, we also have for the workstations the following `netdata.conf`
 
 ```yaml
-label: _is_master = *
+[host labels]
+    installed = 201705
+    room = workstation
+```
+
+I have defined inside `netdata.conf` labels to classify hosts and now we can apply alarms for them using labels, for example,
+case I add the following line inside alarms:
+
+```yaml
+label: room = server
+```
+
+this will apply alarms only on hosts that have `room = server`. 
+It is also possible to combine labels to apply alarm, for example, case I want to raise a specific alarm only for hosts
+inside a room that were installed in a specific time, I can write the following label condition:
+
+```yaml
+label: room = workstation AND installed = 201705
+```
+
+It also possible to use [simple patterns](../libnetdata/simple_pattern/)  with labels. Continuing with our example, case
+I decided to create an alarm that will be applied to all hosts installed in the last decade, I can set label like:
+
+```yaml
+label: installed = 201*
 ```
 
 ## Expressions
