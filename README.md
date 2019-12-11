@@ -11,7 +11,8 @@ Netdata provides **unparalleled insights**, **in real-time**, of everything happ
 Netdata is **fast** and **efficient**, designed to permanently run on all systems (**physical** & **virtual** servers,
 **containers**, **IoT** devices), without disrupting their core function.
 
-Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**, among others.
+Netdata is **free, open-source software** and it currently runs on **Linux**, **FreeBSD**, and **MacOS**, along with
+other systems derived from them, such as **Kubernetes** and **Docker**.
 
 Netdata is not hosted by the CNCF but is the 3rd most starred open-source project in the [Cloud Native Computing Foundation (CNCF) landscape](https://landscape.cncf.io/format=card-mode&grouping=no&sort=stars).
 
@@ -198,42 +199,6 @@ to hard work from [Tom Buck](https://github.com/tommybuck).
 
 ---
 
-`Oct 18th, 2019` - **[Netdata v1.18.1 released!](https://github.com/netdata/netdata/releases)**
-
-Release v1.18.1 contains 17 bug fixes, 5 improvements, and 5 documentation updates.
-
-The patch has several bug fixes, mainly related to FreeBSD and the binary package generation process. 
-
-Netdata can now [send notifications to Google Hangouts Chat](https://docs.netdata.cloud/health/notifications/hangouts/)! 
-
-On certain systems, the `slabinfo` plugin introduced in v1.18.0 added thousands of new metrics. We decided the collector's usefulness to most users didn't justify the increase in resource requirements. This release disables the collector by default.
-
-Finally, we added a chart under **Netdata Monitoring** to present a better view of the RAM used by the [database engine (dbengine)](https://docs.netdata.cloud/database/engine/). The chart doesn't currently take into consideration the RAM used for slave nodes, so we intend to add more related charts in the future.
-
----
-
-`Oct 10th, 2019` - **[Netdata v1.18.0 released!](https://github.com/netdata/netdata/releases)**
-
-Release v1.18.0 contains 5 new collectors, 16 bug fixes, 27 improvements, and 20 documentation updates.
-
-The **database engine** is now the default method of storing metrics in Netdata. You immediately get more efficient and configurable long-term metrics storage without any work on your part. By saving recent metrics in RAM and "spilling" historical metrics to disk for long-term storage, the database engine is laying the foundation for many more improvements to distributed metrics.
-
-We even have a [tutorial](https://docs.netdata.cloud/docs/tutorials/longer-metrics-storage/) on switching to the
-database engine and getting the most from it. Or, just read up on the database engine's [raw
-performance](https://docs.netdata.cloud/database/engine/#evaluation).
-
-Both our `python.d` and `go.d` plugins now have more **intelligent auto-detection** by periodically dump a list of active modules to disk. When Netdata starts, such as after a reboot, the plugins use this list of known services to re-establish metrics collection much more reliably. No more worrying if the service or application you need to monitor starts up minutes after Netdata.
-
-Two of our new collectors will help those with Hadoop big data infrastructures. The **HDFS and Zookeeper collection modules** come with essential alarms requested by our community and Netdata's auto-detection capabilities to keep the required configuration to an absolute minimum. Read up on the process via our [HDFS and Zookeeper tutorial](https://docs.netdata.cloud/docs/tutorials/monitor-hadoop-cluster/).
-
-Speaking of new collectors—we also added the ability to collect metrics from SLAB cache, Gearman, and vCenter Server Appliances.
-
-Before v1.18, if you wanted to create alarms for each dimension in a single chart, you need to write separate entities for each dimension—not very efficient or user-friendly. New **dimension templates** fix that hassle. Now, a single entity can automatically generate alarms for any number of dimensions in a chart, even those you weren't aware of! Our [tutorial on dimension templates](https://docs.netdata.cloud/docs/tutorials/dimension-templates/) has all the details.
-
-v1.18 brings support for installing Netdata on offline or air-gapped systems. To help users comply with strict security policies, our installation scripts can now install Netdata using previously-downloaded tarball and checksums instead of downloading them at runtime. We have guides for installing offline via `kickstart.sh` or `kickstart-static64.sh` in our [installation documentation](https://docs.netdata.cloud/packaging/installer/#offline-installations). We're excited to bring real-time monitoring to once-inaccessible systems!
-
----
-
 See more news and previous releases at our [blog](https://blog.netdata.cloud) or our [releases
 page](https://github.com/netdata/netdata/releases).
 
@@ -248,7 +213,7 @@ This is how it works:
 |Function|Description|Documentation|
 |:------:|:----------|:-----------:|
 |**Collect**|Multiple independent data collection workers are collecting metrics from their sources using the optimal protocol for each application and push the metrics to the database. Each data collection worker has lockless write access to the metrics it collects.|[`collectors`](collectors/#data-collection-plugins)|
-|**Store**|Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage..|[`database`](database/#database)|
+|**Store**|Metrics are first stored in RAM in a custom database engine that then "spills" historical metrics to disk for efficient long-term metrics storage.|[`database`](database/#database)|
 |**Check**|A lockless independent watchdog is evaluating **health checks** on the collected metrics, triggers alarms, maintains a health transaction log and dispatches alarm notifications.|[`health`](health/#health-monitoring)|
 |**Stream**|A lockless independent worker is streaming metrics, in full detail and in real-time, to remote Netdata servers, as soon as they are collected.|[`streaming`](streaming/#streaming-and-replication)|
 |**Archive**|A lockless independent worker is down-sampling the metrics and pushes them to **backend** time-series databases.|[`backends`](backends/)|
