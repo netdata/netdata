@@ -49,8 +49,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 **Privileges and `sudo`:** Do not use <code>sudo</code> with the above script. The script will ask to escalate
 privileges itself if needed.
 
-**Disable anonymous statistics**: We use [anonymous statistics](../../docs/anonymous-statistics.md) for quality
-assurance and usage statistics. These anonymous statistics help us make Netdata better! By analyzing this data, we can
+**Disable telemetry**: We use telemetry sent from Netdata agents for quality assurance and usage statistics. These
+[anonymous statistics](../../docs/anonymous-statistics.md) help us make Netdata better! By analyzing this data, we can
 better understand which features to develop further or identify issues with specific distributions or environments.
 
 To opt-out, pass the <code>--disable-telemetry</code> option to the kickstart command above: `bash <(curl -Ss
@@ -87,8 +87,8 @@ customize your installation. Here are a few important parameters:
 -   `--stable-channel`: Automatically update only on the release of new major
     [versions](https://github.com/netdata/netdata/releases).
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--disable-telemetry`: Opt-out of sending anonymous statistics to Netdata for quality assurance and usage statistics
-    as described on our [anonymous statistics page](../../docs/anonymous-statistics.md).
+-   `--disable-telemetry`: Opt-out of telementry to Netdata for quality assurance and usage statistics as described on
+    our [anonymous statistics page](../../docs/anonymous-statistics.md).
 -   `--local-files`: Used for [offline installations](#offline-installations). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
@@ -128,8 +128,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 **Privileges and `sudo`:** Do not use <code>sudo</code> with the above script. The script will ask to escalate
 privileges itself if needed.
 
-**Disable anonymous statistics**: We use [anonymous statistics](../../docs/anonymous-statistics.md) for quality
-assurance and usage statistics. These anonymous statistics help us make Netdata better! By analyzing this data, we can
+**Disable telemetry**: We use telemetry sent from Netdata agents for quality assurance and usage statistics. These
+[anonymous statistics](../../docs/anonymous-statistics.md) help us make Netdata better! By analyzing this data, we can
 better understand which features to develop further or identify issues with specific distributions or environments.
 
 To opt-out, pass the <code>--disable-telemetry</code> option to the kickstart command above: `bash <(curl -Ss
@@ -169,8 +169,8 @@ to customize your installation. Here are a few important parameters:
 -   `--stable-channel`: Automatically update only on the release of new major
     [versions](https://github.com/netdata/netdata/releases).
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--disable-telemetry`: Opt-out of sending anonymous statistics to Netdata for quality assurance and usage statistics
-    as described on our [anonymous statistics page](../../docs/anonymous-statistics.md).
+-   `--disable-telemetry`: Opt-out of sending telemetry to Netdata for quality assurance and usage statistics as
+    described on our [anonymous statistics page](../../docs/anonymous-statistics.md).
 -   `--local-files`: Used for [offline installations](#offline-installations). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
@@ -325,8 +325,8 @@ cd netdata
 
 ### Notes on the `netdata-installer.sh` script
 
-**Disable anonymous statistics**: We use [anonymous statistics](../../docs/anonymous-statistics.md) for quality
-assurance and usage statistics. These anonymous statistics help us make Netdata better! By analyzing this data, we can
+**Disable telemetry**: We use telemetry sent from Netdata agents for quality assurance and usage statistics. These
+[anonymous statistics](../../docs/anonymous-statistics.md) help us make Netdata better! By analyzing this data, we can
 better understand which features to develop further or identify issues with specific distributions or environments.
 
 To opt-out, pass the <code>--disable-telemetry</code> option to the installer: `./netdata-installer.sh
@@ -352,8 +352,8 @@ The `netdata-installer.sh` script has many parameters to help you customize your
 -   `--stable-channel`: Automatically update only on the release of new major
     [versions](https://github.com/netdata/netdata/releases).
 -   `--no-updates`: Prevent automatic updates of any kind.
--   `--disable-telemetry`: Opt-out of sending anonymous statistics to Netdata for quality assurance and usage statistics
-    as described on our [anonymous statistics page](../../docs/anonymous-statistics.md).
+-   `--disable-telemetry`: Opt-out of sending telemetry to Netdata for quality assurance and usage statistics as
+    described on our [anonymous statistics page](../../docs/anonymous-statistics.md).
 -   `--local-files`: Used for [offline installations](#offline-installations). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
@@ -676,22 +676,18 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --no-updates
 
 With automatic updates disabled, you can choose exactly when and how you [update Netdata](UPDATE.md).
 
-## Opt-out from anonymous statistics
+## Opt-out from sending telemetry
 
-The best method to opt-out from anonymous statistics depends on your installation method and whether you already have
-Netdata installed or not. To change an existing installation, use the first option. For new installations, either 
+To opt-out from telemetry during installation, use either of these methods:
 
-**Create a file called `.opt-out-from-anonymous-statistics`.** This empty file, stored in your Netdata configuration
-directory (usually `etc/netdata`), immediately stops the statistics script from running, and works with any type of
-installation, including manual, offline, and macOS installations. Create the file by running `touch
-.opt-out-from-anonymous-statistics` from your Netdata configuration directory.
-
-**Pass the option `--disable-telemetry` to any of the installer scripts on this page.** You can append this option
-during the initial installation or a manual update.
+**Pass the option `--disable-telemetry`** to any of the installer scripts on this page as described in the _notes_
+section beneath each script.
 
 **Set your `DO_NOT_TRACK` environmental variable to `1`.** You can set this variable with the following command: `export
-DO_NOT_TRACK=1`. This variable must be present _during installation_ to make the necessary changes. Visit the [project's
-homepage](https://consoledonottrack.com/) for more details on the purpose and implementation of this environmental
-variable.
+DO_NOT_TRACK=1`. Visit the [project's homepage](https://consoledonottrack.com/) for more details on the purpose and
+implementation of this environmental variable.
+
+If you already installed Netdata, see our [anonymous statistics page](../../docs/anonymous-statistics.md#opt-out) for
+details on how to opt-out.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Finstaller%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
