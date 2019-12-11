@@ -612,16 +612,11 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
             continue;
         }
 
-        debug("Going to test labels for alarm '%s'", rc->name);
         if (clean) {
             info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                   clean->name,
                   host->hostname,
                   clean->labels);
-            debug("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
-                 clean->name,
-                 host->hostname,
-                 rrdcalc_unlink_and_free(host, clean);
             clean = NULL;
         }
 
