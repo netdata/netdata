@@ -50,11 +50,6 @@ common.run_command(container, ["useradd", "-m", os.environ['BUILDER_NAME']])
 print("2. Preparing repo on LXC container")
 common.prepare_repo(container)
 
-if str(os.environ["BUILD_STRING"]).count("debian/jessie") == 1:
-    print("2.0 Add extra repositories")
-    common.run_command(container, ["bash", "-c", "echo \"deb http://archive.debian.org/debian/ jessie-backports main contrib non-free\" >> /etc/apt/sources.list.d/99-archived.list"])
-    common.run_command(container, [os.environ["REPO_TOOL"], "update"])
-
 print("2.1 Install .DEB build support packages")
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "dpkg-dev"])
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libdistro-info-perl"])
