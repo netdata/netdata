@@ -763,7 +763,8 @@ struct label *load_auto_labels()
         label_list =
             add_label_to_list(label_list, "_container", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
 
-    label_list = add_label_to_list(label_list, "_is_master", localhost->next ? "true" : "false", LABEL_SOURCE_AUTO);
+    label_list = add_label_to_list(
+        label_list, "_is_master", (localhost->next || configured_as_master()) ? "true" : "false", LABEL_SOURCE_AUTO);
 
     if (localhost->rrdpush_send_destination)
         label_list =

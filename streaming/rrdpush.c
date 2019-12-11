@@ -151,6 +151,25 @@ static inline int should_send_chart_matching(RRDSET *st) {
     return(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND));
 }
 
+int configured_as_master() {
+    struct section *section = NULL;
+    int is_master = 0;
+
+    appconfig_wrlock(&stream_config);
+    for (section = stream_config.sections; section; section = section->next) {
+        char buf[GUID_LEN + 1];
+
+        if (regenerate_guid(section->name, buf) != -1 &&
+            appconfig_get_boolean(&stream_config, section->name, "enabled", 0)) {
+            is_master = 1;
+            break;
+        }
+    }
+    appconfig_unlock(&stream_config);
+
+    return is_master;
+}
+
 // checks if the current chart definition has been sent
 static inline int need_to_send_chart_definition(RRDSET *st) {
     rrdset_check_rdlock(st);
