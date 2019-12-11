@@ -23,11 +23,11 @@ inline void appconfig_unlock(struct config *root) {
     netdata_mutex_unlock(&root->mutex);
 }
 
-static inline void config_section_wrlock(struct section *co) {
+inline void config_section_wrlock(struct section *co) {
     netdata_mutex_lock(&co->mutex);
 }
 
-static inline void config_section_unlock(struct section *co) {
+inline void config_section_unlock(struct section *co) {
     netdata_mutex_unlock(&co->mutex);
 }
 
@@ -664,4 +664,9 @@ int config_parse_duration(const char* string, int* result) {
     fallback:
     *result = 0;
     return 0;
+}
+
+struct section *appconfig_get_section(struct config *root, const char *name)
+{
+    return appconfig_section_find(root, name);
 }

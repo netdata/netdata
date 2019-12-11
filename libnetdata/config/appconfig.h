@@ -144,6 +144,8 @@ struct config {
 #endif
 
 extern int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name);
+extern void config_section_wrlock(struct section *co);
+extern void config_section_unlock(struct section *co);
 
 extern char *appconfig_get(struct config *root, const char *section, const char *name, const char *default_value);
 extern long long appconfig_get_number(struct config *root, const char *section, const char *name, long long value);
@@ -166,6 +168,8 @@ extern void appconfig_generate(struct config *root, BUFFER *wb, int only_changed
 extern int appconfig_section_compare(void *a, void *b);
 
 extern int config_parse_duration(const char* string, int* result);
+
+extern struct section *appconfig_get_section(struct config *root, const char *name);
 
 extern void appconfig_wrlock(struct config *root);
 extern void appconfig_unlock(struct config *root);
