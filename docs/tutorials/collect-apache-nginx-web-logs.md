@@ -31,7 +31,7 @@ has readable access log file, you can configure the web log plugin to access and
 
 ## Configure the web log collector
 
-To use the Go version of this plugin, you need to explicitly enable it, and disable the depreciated Python version.
+To use the Go version of this plugin, you need to explicitly enable it, and disable the deprecated Python version.
 First, open `python.d.conf`:
 
 ```bash
