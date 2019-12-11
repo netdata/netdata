@@ -103,7 +103,7 @@ struct config_option {
 
     uint8_t flags;
     uint32_t hash;          // a simple hash to speed up searching
-    // we first compare hashes, and only if the hashes are equal we do string comparisons
+                            // we first compare hashes, and only if the hashes are equal we do string comparisons
 
     char *name;
     char *value;
@@ -115,7 +115,7 @@ struct section {
     avl avl;                // the index entry of this section - this has to be first!
 
     uint32_t hash;          // a simple hash to speed up searching
-    // we first compare hashes, and only if the hashes are equal we do string comparisons
+                            // we first compare hashes, and only if the hashes are equal we do string comparisons
 
     char *name;
 
@@ -125,7 +125,7 @@ struct section {
     avl_tree_lock values_index;
 
     netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
-    // readers are protected using the rwlock in avl_tree_lock
+                            // readers are protected using the rwlock in avl_tree_lock
 };
 
 struct config {
@@ -170,5 +170,8 @@ extern int appconfig_section_compare(void *a, void *b);
 extern int config_parse_duration(const char* string, int* result);
 
 extern struct section *appconfig_get_section(struct config *root, const char *name);
+
+extern void appconfig_wrlock(struct config *root);
+extern void appconfig_unlock(struct config *root);
 
 #endif /* NETDATA_CONFIG_H */

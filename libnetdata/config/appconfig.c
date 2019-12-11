@@ -12,15 +12,14 @@
 #define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
 
-
 // ----------------------------------------------------------------------------
 // locking
 
-static inline void appconfig_wrlock(struct config *root) {
+inline void appconfig_wrlock(struct config *root) {
     netdata_mutex_lock(&root->mutex);
 }
 
-static inline void appconfig_unlock(struct config *root) {
+inline void appconfig_unlock(struct config *root) {
     netdata_mutex_unlock(&root->mutex);
 }
 
