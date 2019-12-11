@@ -157,9 +157,9 @@ int configured_as_master() {
 
     appconfig_wrlock(&stream_config);
     for (section = stream_config.sections; section; section = section->next) {
-        char buf[GUID_LEN + 1];
+        uuid_t uuid;
 
-        if (regenerate_guid(section->name, buf) != -1 &&
+        if (uuid_parse(section->name, uuid) != -1 &&
             appconfig_get_boolean(&stream_config, section->name, "enabled", 0)) {
             is_master = 1;
             break;
