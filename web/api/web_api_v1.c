@@ -804,7 +804,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
     buffer_strcat(wb, "\t},\n");
 
-    buffer_sprintf(wb, "\t\"os_name\": %s,\n", (host->system_info->os_name) ? host->system_info->os_name : "\"\"");
+    buffer_sprintf(wb, "\t\"os_name\": \"%s\",\n", (host->system_info->os_name) ? host->system_info->os_name : "\"\"");
     buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", (host->system_info->os_id) ? host->system_info->os_id : "");
     buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", (host->system_info->os_id_like) ? host->system_info->os_id_like : "");
     buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->os_version) ? host->system_info->os_version : "");
