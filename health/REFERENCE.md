@@ -68,6 +68,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
 | [`option`](#alarm-line-option)                      | no              | Add an option to not clear alarms.                                                    |
+| [`label`](#alarm-line-label)                        | no              | List of labels present on a host.                                                     |
 
 The `alarm` or `template` line must be the first line of any entity.
 
@@ -369,6 +370,22 @@ cleared. As time passes, the newest window moves into the older, so the average 
 increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alarm.
 However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alarms, it's a
 good idea to tell Netdata to not clear the notification, by using the `no-clear-notification` option.
+
+#### Alarm line `label`
+
+Defines the list of labels expected on host, for example, case I want apply an alarm only on Netdata slave, I can specify
+this using the label `_is_master`
+
+```yaml
+label: _is_master = false
+```
+ 
+This option accepts [Netdata simple patterns](../libnetdata/simple_pattern/), so, case you wanna apply an alarm to either
+a master or a slave, you can write:
+
+```yaml
+label: _is_master = *
+```
 
 ## Expressions
 
