@@ -405,12 +405,14 @@ inside a room that were installed in a specific time, I can write the following 
 label: room = workstation AND installed = 201705
 ```
 
-It also possible to use [simple patterns](../libnetdata/simple_pattern/)  with labels. Continuing with our example, case
-I decided to create an alarm that will be applied to all hosts installed in the last decade, I can set label like:
+The `label` is a space-separate list that accepts simple patterns, for example, case I decided to create an alarm 
+that will be applied to all hosts installed in the last decade, I can set label like:
 
 ```yaml
 label: installed = 201*
 ```
+
+See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
 
 ## Expressions
 
