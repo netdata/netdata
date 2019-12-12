@@ -53,7 +53,7 @@ stored in the DB engine.
 ```
 
 The above values are the default and minimum values for Page Cache size and DB engine disk space quota. Both numbers are
-in **MiB**. **Each DB engine instance will allocate it's own page cache size and disk space**, thus for N instances, DBengine will need N * Resources.
+in **MiB**. **Each DB engine instance will allocate it's own page cache size and disk space**, thus for N instances, DB engine will need `N * Resources`.
 
 The `page cache size` option determines the amount of RAM in **MiB** that is dedicated to caching Netdata metric values
 themselves, as far as queries are concerned. The total page cache size will be greater since data collection itself will
@@ -62,7 +62,7 @@ consume additional memory as is described in the [Memory requirements](#memory-r
 The `dbengine disk space` option determines the amount of disk space in **MiB** that is dedicated to storing Netdata
 metric values and all related metadata describing them.
 
-### DBengine storage capacity in Metrics
+### DB engine storage capacity in Metrics
 
 Based on our testing, these default settings will retain about a day's worth of metrics when Netdata collects roughly 4,000 metrics every second. If you increase either page cache size or dbengine disk space, Netdata will retain even more historical metrics.
 
@@ -108,22 +108,30 @@ and streaming recipient nodes):
 
 An important observation is that RAM usage depends on both the `page cache size` and the `dbengine disk space` options.
 
-### Example:
+### Memory requirements calculation example
 
-Let's say we have 1 Netdata Master Node with 10 slaves. I want to save the data for 1 week without downsampling, and afterwards I will downsample to 1 sample per 5 minutes.
+Let's say we have 1 Netdata Master Node with 10 slaves. You want to save the data for 1 week without downsampling, and afterwards you will downsample to 1 sample per 5 minutes.
 
-For the archiving I will be using the Backends functionality, so we wont't elaborate any further here.
+For the archiving you will be using the Backends functionality, so we wont't elaborate any further here.
 
-For the one week's worth of data, I will have 10 DB engine instances for the *Slaves* and 1 for the *Master*.
+For the one week's worth of data, you will have 10 DB engine instances for the *Slaves* and 1 for the *Master*.
 
-Each Slave saves 2000 metrics/s, and Master Node only 1000/s.
+Each Slave saves 2000 metrics/s, and Master Node saves only 1000/s.
 
-Thus, taking into account that for 4000 metrics/s the default settings will save 1 day, with 2000 metrics/s I will save for 2 days.
+Thus, taking into account that for 4000 metrics/s the default settings will save 1 day, with 2000 metrics/s you will save for 2 days, and with 1000 metrics/s you will save for 4 days. We calculate using the default values (for 4000 metrics/s) and then we divide by `2` or by `4`.
 
-Final Disk Space = (256 * 10 slaves * 7 days ) / 2 + (256 * 7 * 1 Master) / 4 MiB
-
-Final RAM usage = (10 slaves + 1 Master)* (32 * 1.049 * 10^6) Page cache size + (2000 dimensions * 10 slaves * 4096 * 2 ) + (#pages-on-disk * 4096 * 0.03) + (1000 dimensions * 1 Master * 4096 * 2 ) + (#pages-on-disk * 4096 * 0.03) bytes
-
+**Final Disk Space**, in `MiB`
+```
+DISK = [ (256 * 10 slaves * 7 days ) / 2 ] + [ (256 * 7 * 1 Master) / 4 ] = 9408 MiB 
+```
+**Final RAM usage**, in `bytes`
+```
+RAM = (10 slaves + 1 Master) * (32 * 1.049 * 10^6) Page cache size 
++ (2000 dimensions * 4096 * 2 * 10 slaves) 
++ (#pages-on-disk * 4096 * 0.03) 
++ (1000 dimensions * 4096 * 2 * 1 Master) 
++ (#pages-on-disk * 4096 * 0.03) = 
+```
 
 
 ## File descriptor requirements
@@ -132,8 +140,8 @@ The Database Engine may keep a **significant** amount of files open per instance
 server). When configuring your system you should make sure there are at least 50 file descriptors available per
 `dbengine` instance.
 
-*Netdata allocates 25% of the available file descriptors to its Database Engine instances.* This means that only 25% of
-the file descriptors that are available to the Netdata service are accessible by dbengine instances. 
+_Netdata allocates 25% of the available file descriptors to its Database Engine instances._ This means that only 25% of
+the file descriptors that are available to the Netdata service are accessible by db engine instances. 
 
 You should take
 that into account when configuring your service or system-wide file descriptor limits. You can roughly estimate that the
