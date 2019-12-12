@@ -3,7 +3,9 @@ language: c
 services:
   - docker
 
-
+addons:
+  apt:
+    packages: ['moreutils']
 
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
@@ -11,6 +13,7 @@ matrix:
     - env: ALLOW_SOFT_FAILURE_HERE=true
 
 before_install:
+  - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
 
 # Install dependencies for all, once
