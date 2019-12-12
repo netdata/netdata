@@ -81,18 +81,18 @@ For a quick start, you can look at the [example plugin](example/example.chart.py
 
 ### How to test a new module
 
-Testing a new python plugin is fairly simple, the example assumes that Netdata executables are installed in `/usr/libexec/netdata` and the configuration files at `/etc/netdata`.
+To test a Python plugin, you need to follow 6 steps. The example assumes that Netdata executables are installed in `/usr/libexec/netdata` and the configuration files at `/etc/netdata`.
 
-1. Create a local folder with all the necessery files, for easy access:
+1. Create a local folder with all the necessary files, for easy access:
     - `<module_name>.chart.py`: The collector's script
     - `<module_name>.conf`: The collector's configuration file
 2. Edit the `python.d` configuration file using the command: `/etc/netdata/edit-config python.d` and add enable the plugin by adding the following line: `<module_name>: yes`.
 3. Place `<module_name>.chart.py` inside the directory `/usr/libexec/netdata/python.d/` and `<module_name>.conf` inside `/etc/netdata/python.d/`.
 4. Restart Netdata.
-5. *Optionally*, you can edit `web/gui/dashboard_info.js` to add your own icon for the collector. Find the icon you like at the FontAwesome website, **verify that it belongs to version 5.0.1 or prior** and use the `class` name that is listed in the website. 
-6. *Optionally*, you can create alarms for your new shining collector
+5. _Optionally_, you can edit `web/gui/dashboard_info.js` to add your own icon for the collector. Find the icon you like at the FontAwesome website, **verify that it belongs to version 5.0.1 or prior** and use the `class` name that is listed in the website. 
+6. _Optionally_, you can create alarms for your new shining collector
 
-The module *should* start automatically. If it doesn't, debug the module using the method mentioned above.
+The module _should_ start automatically. If it doesn't, debug the module using the method mentioned above.
 
 ### Global variables `ORDER` and `CHART`
 

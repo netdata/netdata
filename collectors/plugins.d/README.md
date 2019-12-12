@@ -24,11 +24,12 @@ from external processes, thus allowing Netdata to use **external plugins**.
 
 Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included.
 
- Writing modules for these plugins is easier than accessing the native Netdata API directly. **You will find numerous Modules already available** for each orchestrator under the directory of the particular plugin (e.g. under python.d.plugin for the python orchestrator).
+ Writing modules for these plugins is easier than accessing the native Netdata API directly. **You will find numerous modules already available** for each orchestrator under the directory of the particular plugin (e.g. under python.d.plugin for the python orchestrator).
 
-Each of these modular plugins has each own methods for defining modules. *Please refer to the documentation and the source code of already available modules.*
+Each of these modular plugins has each own methods for defining modules. _Please refer to the documentation and the source code of already available modules._
 
-For a list of the available Modules, please refer [here](/docs/Add-more-charts-to-netdata.md).
+For a list of the available Modules, please see [our documentation on adding more charts to Netdata](docs/Add-more-charts-to-netdata.md).
+
 
 ## Motivation
 

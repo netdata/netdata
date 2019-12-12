@@ -4,7 +4,8 @@ Module uses the `varnishstat` command to provide varnish cache statistics.
 
 ## Requirements
 
-User `netdata` should be added to the  `varnish` group. If you installed netdata **after** you installed varnish, then the user is already added to the proper group. Otherwise, please add it manually.
+User `netdata` should be added to the `varnish` group. If you installed Netdata **after** you installed varnish, then the user is already added to the proper group. Otherwise, please add it manually.
+
 ```bash
 sudo groupadd varnish #create varnish group
 sudo usermod -aG varnish netdata #add user

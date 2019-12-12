@@ -4,10 +4,11 @@ Module monitor docker health metrics.
 
 **Requirement:**
 
--   `docker` package, required version 3.2.0+
-- `netdata` user should be added to the group `docker` so it can access the socket. If you installed netdata **after** you installed docker, then the user is already added to the proper group. Otherwise, please add it manually.
+-  `docker` package, required version 3.2.0+
+-  `netdata` user should be added to the group `docker` so it can access the socket. If you installed Netdata **after** you installed docker, then the user is already added to the proper group. Otherwise, please add it manually.
 
-Read more at the [docker docks](https://docs.docker.com/install/linux/linux-postinstall/).
+Read more at the [Docker documentation](https://docs.docker.com/install/linux/linux-postinstall/).
+
 ```bash
 sudo groupadd docker #create docker group
 sudo usermod -aG docker netdata #add user
