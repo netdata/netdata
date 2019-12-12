@@ -27,7 +27,6 @@
 
 #define config_generate(buffer, only_changed) appconfig_generate(&netdata_config, buffer, only_changed)
 
-
 // ----------------------------------------------------------------------------
 // netdata include files
 
