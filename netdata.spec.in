@@ -433,7 +433,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %defattr(0755,netdata,netdata,0755)
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
-%{_sbindir}/%{name}cli
+
+%defattr(0755,root,root,0755)
+%{_sbindir}/netdatacli
 
 %defattr(4750,root,netdata,0750)
 
