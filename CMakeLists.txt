@@ -31,6 +31,7 @@ IF("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
     set(CXX_FORMAT_SECURITY "-Werror=format-security")
     set(CXX_STACK_PROTECTOR "-fstack-protector-all")
     set(CXX_FLAGS_DEBUG "-O0")
+    set(CMAKE_C_STANDARD 99)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR} ${CXX_FLAGS_DEBUG}")
 ELSE()
     message(STATUS "building for: release")
@@ -600,6 +601,23 @@ set(BACKENDS_PLUGIN_FILES
         backends/prometheus/backend_prometheus.h
         )
 
+set(EXPORTING_ENGINE_FILES
+        exporting/exporting_engine.c
+        exporting/exporting_engine.h
+        exporting/graphite/graphite.c
+        exporting/graphite/graphite.h
+        exporting/json/json.c
+        exporting/json/json.h
+        exporting/opentsdb/opentsdb.c
+        exporting/opentsdb/opentsdb.h
+        exporting/read_config.c
+        exporting/init_connectors.c
+        exporting/process_data.c
+        exporting/check_filters.c
+        exporting/send_data.c
+        exporting/send_internal_metrics.c
+        )
+
 set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis.c
         backends/aws_kinesis/aws_kinesis.h
@@ -639,6 +657,7 @@ set(NETDATA_FILES
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${BACKENDS_PLUGIN_FILES}
+        ${EXPORTING_ENGINE_FILES}
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
@@ -916,6 +935,48 @@ if(BUILD_TESTING)
     target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
     add_test(NAME test_storage_number COMMAND storage_number_testdriver)
 
+    set(EXPORTING_ENGINE_TEST_FILES
+        exporting/tests/test_exporting_engine.c
+        exporting/tests/test_exporting_engine.h
+        exporting/tests/exporting_fixtures.c
+        exporting/tests/exporting_doubles.c
+        exporting/tests/netdata_doubles.c
+        exporting/tests/system_doubles.c
+        )
+    set(TEST_NAME exporting_engine)
+    add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
+    target_compile_options(
+        ${TEST_NAME}_testdriver
+        PRIVATE
+        -DUNIT_TESTING
+    )
+    target_link_options(
+        ${TEST_NAME}_testdriver
+        PRIVATE
+        -Wl,--wrap=read_exporting_config
+        -Wl,--wrap=init_connectors
+        -Wl,--wrap=mark_scheduled_instances
+        -Wl,--wrap=rrdhost_is_exportable
+        -Wl,--wrap=rrdset_is_exportable
+        -Wl,--wrap=exporting_calculate_value_from_stored_data
+        -Wl,--wrap=prepare_buffers
+        -Wl,--wrap=notify_workers
+        -Wl,--wrap=send_internal_metrics
+        -Wl,--wrap=now_realtime_sec
+        -Wl,--wrap=uv_thread_create
+        -Wl,--wrap=uv_mutex_lock
+        -Wl,--wrap=uv_mutex_unlock
+        -Wl,--wrap=uv_cond_signal
+        -Wl,--wrap=uv_cond_wait
+        -Wl,--wrap=strdupz
+        -Wl,--wrap=info_int
+        -Wl,--wrap=recv
+        -Wl,--wrap=send
+        -Wl,--wrap=connect_to_one_of
+    )
+    target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)
+
     set(WEB_API_TEST_FILES
         web/api/tests/web_api.c
         web/server/web_client.c
@@ -969,11 +1030,11 @@ if(BUILD_TESTING)
     set_target_properties(
         str2ld_testdriver
         storage_number_testdriver
+        exporting_engine_testdriver
         web_api_testdriver
         valid_urls_testdriver
         PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests
     )
-
 
 endif()
 endif()

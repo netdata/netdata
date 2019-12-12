@@ -36,6 +36,7 @@ m4_ifdef([AM_SILENT_RULES], [
     ])
 AC_CANONICAL_HOST
 AC_PROG_CC
+AC_PROG_CC_C99
 AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_INSTALL
@@ -406,6 +407,20 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# Exporting engine
+AC_MSG_CHECKING([if netdata exporting engine should be used])
+if test "${UV_LIBS}"; then
+    enable_exporting_engine="yes"
+    AC_DEFINE([ENABLE_EXPORTING], [1], [netdata exporting engine usability])
+    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+    OPTIONAL_UV_LIBS="${UV_LIBS}"
+else
+    enable_exporting_engine="no"
+fi
+AC_MSG_RESULT([${enable_exporting_engine}])
+AM_CONDITIONAL([ENABLE_EXPORTING], [test "${enable_exporting_engine}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
@@ -1209,6 +1224,11 @@ AC_CONFIG_FILES([
     database/Makefile
     database/engine/Makefile
     diagrams/Makefile
+    exporting/Makefile
+    exporting/graphite/Makefile
+    exporting/json/Makefile
+    exporting/opentsdb/Makefile
+    exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile
