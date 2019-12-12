@@ -67,7 +67,6 @@ Briefly we currently evaluate the following activities:
 - Non containerized build and install on ubuntu 14.04
 - Non containerized build and install on ubuntu 18.04
 - Running the full Netdata lifecycle (install, update, uninstall) on ubuntu 18.04
-- Build and install on CentOS 6
 - Build and install on CentOS 7
 (More to come)
 
