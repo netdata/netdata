@@ -930,6 +930,8 @@ void reload_host_labels()
         old_labels = old_labels->next;
         freez(current);
     }
+
+    health_reload();
 }
 
 // ----------------------------------------------------------------------------

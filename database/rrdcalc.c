@@ -559,6 +559,8 @@ void rrdcalc_free(RRDCALC *rc) {
     freez(rc->units);
     freez(rc->info);
     simple_pattern_free(rc->spdim);
+    freez(rc->labels);
+    simple_pattern_free(rc->splabels);
     freez(rc);
 }
 
@@ -601,6 +603,83 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     }
 
     rrdcalc_free(rc);
+}
+
+static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
+    RRDCALC *rc, *clean = NULL;
+    for (rc = alarms; rc; rc = rc->next) {
+        if (!rc->labels) {
+            continue;
+        }
+
+        if (clean) {
+            info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+                  clean->name,
+                  host->hostname,
+                  clean->labels);
+            clean = NULL;
+        }
+
+        size_t len = strlen(rc->labels)+1;
+        char *cmp = mallocz(len);
+        if(!cmp)
+            break;
+
+        struct label *move = host->labels;
+        while(move) {
+            snprintfz(cmp, len, "%s=%s", move->key, move->value);
+            if (simple_pattern_matches(rc->splabels, move->key) ||
+                simple_pattern_matches(rc->splabels, cmp)) {
+                break;
+            }
+            move = move->next;
+        }
+
+        freez(cmp);
+
+        if(!move) {
+            clean = rc;
+        }
+    }
+
+    if (clean) {
+        info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+              clean->name,
+              host->hostname,
+              clean->labels);
+        rrdcalc_unlink_and_free(host, clean);
+    }
+
+
+}
+
+void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+
+    rrdcalc_labels_unlink_alarm_loop(host, host->alarms);
+    rrdcalc_labels_unlink_alarm_loop(host, host->alarms_with_foreach);
+
+    netdata_rwlock_unlock(&host->labels_rwlock);
+}
+
+void rrdcalc_labels_unlink() {
+    rrd_rdlock();
+
+    RRDHOST *host;
+    rrdhost_foreach_read(host) {
+        if (unlikely(!host->health_enabled))
+            continue;
+
+        if (host->labels) {
+            rrdhost_wrlock(host);
+
+            rrdcalc_labels_unlink_alarm_from_host(host);
+
+            rrdhost_unlock(host);
+        }
+    }
+
+    rrd_unlock();
 }
 
 // ----------------------------------------------------------------------------

@@ -4,6 +4,50 @@
 #include "rrd.h"
 
 // ----------------------------------------------------------------------------
+
+static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
+    if(!rt->labels)
+        return 1;
+
+    errno = 0;
+    struct label *move = host->labels;
+    size_t len = strlen(rt->labels)+1;
+    char *cmp = mallocz(len);
+    if(!cmp)
+        return 1;
+
+    int ret;
+    if(move) {
+        netdata_rwlock_rdlock(&host->labels_rwlock);
+        while(move) {
+            snprintfz(cmp, len, "%s=%s", move->key, move->value);
+            if (simple_pattern_matches(rt->splabels, move->key) ||
+                simple_pattern_matches(rt->splabels, cmp)) {
+                break;
+            }
+            move = move->next;
+        }
+        netdata_rwlock_unlock(&host->labels_rwlock);
+
+        if(!move) {
+            error("Health template '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+                   rt->name,
+                   host->hostname,
+                   rt->labels
+            );
+            ret = 0;
+        } else {
+            ret = 1;
+        }
+    } else {
+        ret =1;
+    }
+
+    freez(cmp);
+
+    return ret;
+}
+
 // RRDCALCTEMPLATE management
 /**
  * RRDCALC TEMPLATE LINK MATCHING
@@ -14,13 +58,18 @@
 void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host ) {
     if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
        && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
-        RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
-        if(unlikely(!rc))
-            info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed", rt->name, st->id, host->hostname);
+        if (rrdcalctemplate_has_label(rt, host)) {
+            RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
+            if (unlikely(!rc))
+                info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed",
+                     rt->name, st->id, host->hostname);
 #ifdef NETDATA_INTERNAL_CHECKS
-        else if(rc->rrdset != st && !rc->foreachdim) //When we have a template with foreadhdim, the child will be added to the index late
-            error("Health alarm '%s.%s' should be linked to chart '%s', but it is not", rc->chart?rc->chart:"NOCHART", rc->name, st->id);
+            else if (rc->rrdset != st &&
+                     !rc->foreachdim) //When we have a template with foreadhdim, the child will be added to the index late
+                error("Health alarm '%s.%s' should be linked to chart '%s', but it is not",
+                      rc->chart ? rc->chart : "NOCHART", rc->name, st->id);
 #endif
+        }
     }
 }
 
@@ -56,7 +105,9 @@ inline void rrdcalctemplate_free(RRDCALCTEMPLATE *rt) {
     freez(rt->info);
     freez(rt->dimensions);
     freez(rt->foreachdim);
+    freez(rt->labels);
     simple_pattern_free(rt->spdim);
+    simple_pattern_free(rt->splabels);
     freez(rt);
 }
 
