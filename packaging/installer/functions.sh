@@ -303,7 +303,7 @@ install_non_systemd_init() {
 				run rc-update add netdata default &&
 				return 0
 
-		elif [[ "${key}" =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+		elif [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
 			echo >&2 "Installing LSB init file..."
 			run cp system/netdata-lsb /etc/init.d/netdata &&
 				run chmod 755 /etc/init.d/netdata &&
@@ -337,6 +337,15 @@ NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
 	local uname="$(uname 2>/dev/null)"
+
+	local key="unknown"
+	if [ -f /etc/os-release ]; then
+		source /etc/os-release || return 1
+		key="${ID}-${VERSION_ID}"
+
+	elif [ -f /etc/redhat-release ]; then
+		key=$(</etc/redhat-release)
+	fi
 
 	if [ "${UID}" -eq 0 ]; then
 		if [ "${uname}" = "Darwin" ]; then
@@ -377,6 +386,10 @@ install_netdata_service() {
 				SYSTEMD_DIRECTORY="/lib/systemd/system"
 			elif [ -d "/usr/lib/systemd/system" ]; then
 				SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
+			fi
+
+			if [[ ${key} =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+				SYSTEMD_DIRECTORY="/etc/systemd/system"
 			fi
 
 			if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
