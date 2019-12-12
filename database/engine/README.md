@@ -79,11 +79,11 @@ When those pages fill up they are slowly compressed and flushed to disk. It can 
 minutes`, for a chart dimension that is being collected every 1 second, to fill a page. Pages can be cut short when we
 stop Netdata or the DB engine instance so as to not lose the data. When we query the DB engine for data we trigger disk
 read I/O requests that fill the Page Cache with the requested pages and potentially evict cold (not recently used)
-pages. 
+pages.
 
 When the disk quota is exceeded the oldest values are removed from the DB engine at real time, by automatically deleting
 the oldest datafile and journalfile pair. Any corresponding pages residing in the Page Cache will also be invalidated
-and removed. The DB engine logic will try to maintain between 10 and 20 file pairs at any point in time. 
+and removed. The DB engine logic will try to maintain between 10 and 20 file pairs at any point in time.
 
 The Database Engine uses direct I/O to avoid polluting the OS filesystem caches and does not generate excessive I/O
 traffic so as to create the minimum possible interference with other applications.
@@ -122,15 +122,15 @@ Thus, taking into account that for 4000 metrics/s the default settings will save
 
 **Final Disk Space**, in `MiB`
 ```
-DISK = [ (256 * 10 slaves * 7 days ) / 2 ] + [ (256 * 7 * 1 Master) / 4 ] = 9408 MiB 
+DISK = [ (256 * 10 slaves * 7 days ) / 2 ] + [ (256 * 7 * 1 Master) / 4 ] = 9408 MiB
 ```
 **Final RAM usage**, in `bytes`
 ```
-RAM = (10 slaves + 1 Master) * (32 * 1.049 * 10^6) Page cache size 
-+ (2000 dimensions * 4096 * 2 * 10 slaves) 
-+ (#pages-on-disk * 4096 * 0.03) 
-+ (1000 dimensions * 4096 * 2 * 1 Master) 
-+ (#pages-on-disk * 4096 * 0.03) = 
+RAM = (10 slaves + 1 Master) * (32 * 1.049 * 10^6) Page cache size
++ (2000 dimensions * 4096 * 2 * 10 slaves)
++ (#pages-on-disk * 4096 * 0.03)
++ (1000 dimensions * 4096 * 2 * 1 Master)
++ (#pages-on-disk * 4096 * 0.03)
 ```
 
 
@@ -141,7 +141,7 @@ server). When configuring your system you should make sure there are at least 50
 `dbengine` instance.
 
 _Netdata allocates 25% of the available file descriptors to its Database Engine instances._ This means that only 25% of
-the file descriptors that are available to the Netdata service are accessible by db engine instances. 
+the file descriptors that are available to the Netdata service are accessible by db engine instances.
 
 You should take
 that into account when configuring your service or system-wide file descriptor limits. You can roughly estimate that the
@@ -188,7 +188,7 @@ Seagate Constellation ES.3 2TB magnetic HDD and a SAMSUNG MZQLB960HAJR-00007 960
 For our workload, we defined 32 charts with 128 metrics each, giving us a total of 4096 metrics. We defined 1 worker
 thread per chart (32 threads) that generates new data points with a data generation interval of 1 second. The time axis
 of the time-series is emulated and accelerated so that the worker threads can generate as many data points as possible
-without delays. 
+without delays.
 
 We also defined 32 worker threads that perform queries on random metrics with semi-random time ranges. The
 starting time of the query is randomly selected between the beginning of the time-series and the time of the latest data
@@ -211,7 +211,7 @@ The reported numbers are the following:
 | N/A | 16 GiB | 6.8 GiB |118.2M | 30.2M |
 
 where "reads/sec" is the number of metric data points being read from the database via its API per second and
-"writes/sec" is the number of metric data points being written to the database per second. 
+"writes/sec" is the number of metric data points being written to the database per second.
 
 Notice that the HDD numbers are pretty high and not much slower than the SSD numbers. This is thanks to the database
 engine design being optimized for rotating media. In the database engine disk I/O requests are:

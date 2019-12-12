@@ -413,8 +413,9 @@ warn: $this > (($status >= $WARNING)  ? (75) : (85))
 crit: $this > (($status == $CRITICAL) ? (85) : (95))
 ```
 
-The above is graphically illustrated in the image bellow. Let's assume that the alert's metric, for some unknown reason, oscillates around 85. *With hysteresis taken into account,the alarm will be activated  only once.*
-![](hysteresis.png)
+The above is graphically illustrated in the image bellow. Let's assume that the alert's metric, for some unknown reason, oscillates around 85. _With hysteresis taken into account,the alarm will be activated  only once._
+
+![hysteresis example image](https://user-images.githubusercontent.com/1153921/70662401-61e43400-1c23-11ea-8ec1-7fc0be4ad49d.png)
 
 **In detail:**
 
