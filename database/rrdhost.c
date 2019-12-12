@@ -820,7 +820,7 @@ struct label *load_kubernetes_labels()
     } else {
         pid_t command_pid;
 
-        info("Attempting to fetch external labels via %s", label_script);
+        debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
 
         FILE *fp = mypopen(label_script, &command_pid);
         if(fp) {
@@ -837,15 +837,29 @@ struct label *load_kubernetes_labels()
                 char *eos=value;
                 while (*eos && *eos != '\n') eos++;
                 if (*eos == '\n') *eos = '\0';
-                if (strlen(value)>1) {
+                if (strlen(value)>0) {
                     if (is_valid_label_key(name)){
                         l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                    } else {
+                        info("Ignoring invalid label name '%s'", name);
                     }
                 } else {
-                    info("%s returned: '%s'", label_script, name);
+                    error("%s outputted unexpected result: '%s'", label_script, name);
                 }
             };
-            mypclose(fp, command_pid);
+            // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
+            // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
+            int retcode=mypclose(fp, command_pid);
+            if (retcode) {
+                error("%s exited abnormally. No kubernetes labels will be added to the host.", label_script);
+                struct label *ll=l;
+                while (ll != NULL) {
+                    info("Ignoring Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(ll->label_source), ll->key, ll->value);
+                    ll = ll->next;
+                    freez(l);
+                    l=ll;
+                }
+            }
         }
         freez(label_script);
     }
