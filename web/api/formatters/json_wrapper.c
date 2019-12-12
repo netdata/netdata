@@ -32,14 +32,20 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     RRDHOST *host = r->st->rrdhost;
     buffer_sprintf(wb, "   %slabels%s: {\n", kq, kq);
+
     int count = 0;
-    netdata_rwlock_rdlock(&host->labels_rwlock);;
+    netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
         if(count > 0) buffer_strcat(wb, ",\n");
-        buffer_sprintf(wb, "      %s%s%s: %s%s%s", kq, label->key, kq, sq, label->value, sq);
+
+        char value[CONFIG_MAX_VALUE + 1];
+        escape_json_string(value, label->value, CONFIG_MAX_VALUE);
+        buffer_sprintf(wb, "      %s%s%s: %s%s%s", kq, label->key, kq, sq, value, sq);
+
         count++;
     }
     netdata_rwlock_unlock(&host->labels_rwlock);
+
     buffer_strcat(wb, "\n   },\n");
 
     buffer_sprintf(wb, "   %sview_update_every%s: %d,\n"

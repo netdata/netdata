@@ -774,11 +774,15 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
     }
 
     int count = 0;
-    netdata_rwlock_rdlock(&host->labels_rwlock);;
+    netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
         if(count > 0) buffer_strcat(wb, ",\n");
         buffer_strcat(wb, tabs);
-        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, label->value);
+
+        char value[CONFIG_MAX_VALUE + 1];
+        escape_json_string(value, label->value, CONFIG_MAX_VALUE);
+        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, value);
+
         count++;
     }
     buffer_strcat(wb, "\n");
