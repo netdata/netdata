@@ -409,6 +409,20 @@ AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
 
 # -----------------------------------------------------------------------------
+# Exporting engine
+AC_MSG_CHECKING([if netdata exporting engine should be used])
+if test "${UV_LIBS}"; then
+    enable_exporting_engine="yes"
+    AC_DEFINE([ENABLE_EXPORTING], [1], [netdata exporting engine usability])
+    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+    OPTIONAL_UV_LIBS="${UV_LIBS}"
+else
+    enable_exporting_engine="no"
+fi
+AC_MSG_RESULT([${enable_exporting_engine}])
+AM_CONDITIONAL([ENABLE_EXPORTING], [test "${enable_exporting_engine}" = "yes"])
+
+# -----------------------------------------------------------------------------
 # JSON-C
 test "${enable_jsonc}" = "yes" -a -z "${JSONC_LIBS}" && \
     AC_MSG_ERROR([JSON-C required but not found. Try installing 'libjson-c-dev' or 'json-c'.])
@@ -1210,6 +1224,11 @@ AC_CONFIG_FILES([
     database/Makefile
     database/engine/Makefile
     diagrams/Makefile
+    exporting/Makefile
+    exporting/graphite/Makefile
+    exporting/json/Makefile
+    exporting/opentsdb/Makefile
+    exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile

@@ -6,7 +6,7 @@
 // ----------------------------------------------------------------------------
 // opentsdb backend
 
-int format_dimension_collected_opentsdb_telnet(
+int backends_format_dimension_collected_opentsdb_telnet(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -42,7 +42,7 @@ int format_dimension_collected_opentsdb_telnet(
     return 1;
 }
 
-int format_dimension_stored_opentsdb_telnet(
+int backends_format_dimension_stored_opentsdb_telnet(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -103,7 +103,7 @@ static inline void opentsdb_build_message(BUFFER *b, char *message, const char *
     );
 }
 
-int format_dimension_collected_opentsdb_http(
+int backends_format_dimension_collected_opentsdb_http(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -151,7 +151,7 @@ int format_dimension_collected_opentsdb_http(
     return 1;
 }
 
-int format_dimension_stored_opentsdb_http(
+int backends_format_dimension_stored_opentsdb_http(
         BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from

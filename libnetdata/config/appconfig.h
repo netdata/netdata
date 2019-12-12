@@ -82,16 +82,17 @@
 
 #define CONFIG_FILENAME "netdata.conf"
 
-#define CONFIG_SECTION_GLOBAL   "global"
-#define CONFIG_SECTION_WEB      "web"
-#define CONFIG_SECTION_STATSD   "statsd"
-#define CONFIG_SECTION_PLUGINS  "plugins"
-#define CONFIG_SECTION_CLOUD    "cloud"
-#define CONFIG_SECTION_REGISTRY "registry"
-#define CONFIG_SECTION_HEALTH   "health"
-#define CONFIG_SECTION_BACKEND  "backend"
-#define CONFIG_SECTION_STREAM   "stream"
-#define CONFIG_SECTION_HOST_LABEL   "host labels"
+#define CONFIG_SECTION_GLOBAL    "global"
+#define CONFIG_SECTION_WEB       "web"
+#define CONFIG_SECTION_STATSD    "statsd"
+#define CONFIG_SECTION_PLUGINS   "plugins"
+#define CONFIG_SECTION_CLOUD     "cloud"
+#define CONFIG_SECTION_REGISTRY  "registry"
+#define CONFIG_SECTION_HEALTH    "health"
+#define CONFIG_SECTION_BACKEND   "backend"
+#define CONFIG_SECTION_STREAM    "stream"
+#define CONFIG_SECTION_EXPORTING "exporting:global"
+#define EXPORTING_CONF           "exporting.conf"
 
 // these are used to limit the configuration names and values lengths
 // they are not enforced by config.c functions (they will strdup() all strings, no matter of their length)
@@ -134,6 +135,11 @@ struct config {
     avl_tree_lock index;
 };
 
+//struct connector_instance {
+//    char instance_name[CONFIG_MAX_NAME + 1];
+//    char connector_name[CONFIG_MAX_NAME + 1];
+//};
+
 #define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
 
 #define CONFIG_BOOLEAN_NO   0       // disabled
@@ -173,5 +179,20 @@ extern struct section *appconfig_get_section(struct config *root, const char *na
 
 extern void appconfig_wrlock(struct config *root);
 extern void appconfig_unlock(struct config *root);
+
+struct connector_instance {
+    char instance_name[CONFIG_MAX_NAME + 1];
+    char connector_name[CONFIG_MAX_NAME + 1];
+};
+
+typedef struct _connector_instance {
+    struct section *connector;        // actual connector
+    struct section *instance;         // This instance
+    char instance_name[CONFIG_MAX_NAME + 1];
+    char connector_name[CONFIG_MAX_NAME + 1];
+    struct _connector_instance *next; // Next instance
+} _CONNECTOR_INSTANCE;
+
+extern _CONNECTOR_INSTANCE *add_connector_instance(struct section *connector, struct section *instance);
 
 #endif /* NETDATA_CONFIG_H */

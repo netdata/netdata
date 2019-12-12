@@ -597,6 +597,8 @@ void rrdhost_free(RRDHOST *host) {
     while(host->rrdset_root)
         rrdset_free(host->rrdset_root);
 
+    freez(host->exporting_flags);
+
     while(host->alarms)
         rrdcalc_unlink_and_free(host, host->alarms);
 
