@@ -92,6 +92,7 @@
 #define CONFIG_SECTION_BACKEND   "backend"
 #define CONFIG_SECTION_STREAM    "stream"
 #define CONFIG_SECTION_EXPORTING "exporting:global"
+#define CONFIG_SECTION_HOST_LABEL   "host labels"
 #define EXPORTING_CONF           "exporting.conf"
 
 // these are used to limit the configuration names and values lengths
@@ -134,11 +135,6 @@ struct config {
     netdata_mutex_t mutex;
     avl_tree_lock index;
 };
-
-//struct connector_instance {
-//    char instance_name[CONFIG_MAX_NAME + 1];
-//    char connector_name[CONFIG_MAX_NAME + 1];
-//};
 
 #define CONFIG_BOOLEAN_INVALID 100  // an invalid value to check for validity (used as default initialization when needed)
 

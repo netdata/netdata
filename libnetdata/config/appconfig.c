@@ -12,36 +12,6 @@
 #define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
 #define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
 
-struct config_option {
-    avl avl;                // the index entry of this entry - this has to be first!
-
-    uint8_t flags;
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-    char *value;
-
-    struct config_option *next; // config->mutex protects just this
-};
-
-struct section {
-    avl avl;                // the index entry of this section - this has to be first!
-
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-
-    struct section *next;    // gloabl config_mutex protects just this
-
-    struct config_option *values;
-    avl_tree_lock values_index;
-
-    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
-                            // readers are protected using the rwlock in avl_tree_lock
-};
-
 /*
  * @Input:
  *      Connector / instance to add to an internal structure
@@ -545,14 +515,11 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
         return 0;
     }
 
-<<<<<<< HEAD
     uint32_t section_hash = 0;
     if(section_name) {
         section_hash = simple_hash(section_name);
     }
-=======
     is_exporter_config = (strstr(filename, EXPORTING_CONF) != NULL);
->>>>>>> master
 
     while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
         buffer[CONFIG_FILE_LINE_MAX] = '\0';
