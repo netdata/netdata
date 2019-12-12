@@ -7,7 +7,7 @@
 #include <mosquitto.h>
 
 #define NETDATA_MQTT_INITIALIZATION_WAIT 60     // Wait for MQTT to initialize in seconds (per msg)
-#define NETDATA_MQTT_INITIALIZATION_SLEEP_WAIT 1000  // Wait time @ spin lock for MQTT initialization in ms
+#define NETDATA_MQTT_INITIALIZATION_SLEEP_WAIT 1  // Wait time @ spin lock for MQTT initialization in seconds
 #define NETDATA_MQTT_QOS 1
 #define NETDATA_MQTT_PING_INTERVAL 60
 #define NETDATA_MQTT_LOOP_TIMEOUT  60           // seconds to wait for operations in the library loop
