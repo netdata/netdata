@@ -14,12 +14,5 @@ if [ -n "${KUBERNETES_SERVICE_HOST}" ] && [ -n "${KUBERNETES_PORT_443_TCP_PORT}"
 		exit 1
 	fi
 else
-	# Following is only for testing and will be removed
-	echo "app:netdata
-controller-revision-hash:64966d4b74
-pod-template-generation:4
-release:netdata
-role:slave
-a line to display as info"
 	exit 0
 fi
