@@ -1,19 +1,19 @@
 # Metrics long term archiving
 
-Netdata supports long-term archiving and graphing of historical data, by introducing a feature called "Backends". **Note that the speed of the Backend does not not affect Netdata in any way.**
+Netdata supports long-term archiving and graphing of historical data, by introducing a feature called "backends". **Note that the speed of the backend does not not affect Netdata in any way.**
 
-###It works like this:
+## How backends work
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/20649711/29f182ba-b4ce-11e6-97c8-ab2c0ab59833.png)
 
-Netdata serves thousands of metrics per second, per server. A throughput that could easily congest any backend server, especially taking into consideration that possibly several Netdata instances send simultaneously data to it. To amend for this, **Netdata supports resampling**.
+Netdata serves thousands of metrics per second, per server. This throughput could easily congest any backend server, especially when several Netdata agents are simultaneously sending metrics to a single backend. To mitigate high throughput, **Netdata supports resampling**.
 
-Resampling can come in many forms, from a simple *downsample* to sending the *average* or *sum* of an X interval. It's really up to you!
+Resampling can come in many forms, from a simple _downsample_ to sending the *average* or *sum* of an X interval. It's really up to you!
 
 
 ## features
 
-1.  Supported Backends:
+1.  Supported backends:
 
     -   **Graphite** (`plaintext interface`), used by **Graphite**, **InfluxDB**, **KairosDB**, **Blueflood**,
         **ElasticSearch**, etc.
@@ -21,25 +21,26 @@ Resampling can come in many forms, from a simple *downsample* to sending the *av
         metrics are sent to the backend server as `prefix.hostname.chart.dimension`. `prefix` is configured below,
         while `hostname` is the hostname of the machine (can also be configured).
 
-    -   **Opentsdb** (`telnet or HTTP interfaces`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc. )
+    -   **OpenTSDB** (`telnet or HTTP interfaces`, used by **OpenTSDB**, **InfluxDB**, **KairosDB**, etc. )
 
         metrics are sent to opentsdb as `prefix.chart.dimension` with tag `host=hostname`.
 
     -   **JSON** document DBs
 
-        metrics are sent to a Document Database, formatted in `JSON`.
+        metrics are sent to a document database, formatted in `JSON`.
 
-    -   **Prometheus** is described at [prometheus page](prometheus/), since *technically* it scrapes data from Netdata.
+    -   **Prometheus** backends are described at the [Prometheus page](prometheus/), since _technically_ it scrapes data from Netdata.
+
 
     -   **Prometheus Remote Write** (a binary snappy-compressed protocol buffer encoding over HTTP used by
         **Elasticsearch**, **Gnocchi**, **Graphite**, **InfluxDB**, **Kafka**, **OpenTSDB**, **PostgreSQL/TimescaleDB**,
-        **Splunk**, **VictoriaMetrics**, and others. [storage
+        **Splunk**, **VictoriaMetrics**, and other [storage
         providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage))
 
         metrics are labeled in the format, which is used by Netdata for the [plaintext prometheus
         protocol](prometheus/). Some comments on using the remote write backend can be found [here](prometheus/remote_write/).
 
-    -   ****TimescaleDB** via [community-built connector](TIMESCALE.md) that takes JSON streams from a Netdata client
+    -   **TimescaleDB** via [community-built connector](TIMESCALE.md) that takes JSON streams from a Netdata client
         and writes them to a TimescaleDB table.
 
     -   **AWS Kinesis Data Streams**
@@ -50,9 +51,9 @@ Resampling can come in many forms, from a simple *downsample* to sending the *av
 
         metrics are sent to the database in `JSON` format.
 
-2.  Currently, only one Backend can be active at a time. (Except for Prometheus who scrapes the data from Netdata API).
+2.  Currently, only one backend can be active at a time. (Except for Prometheus who scrapes the data from Netdata API).
 
-3.  Netdata supports the filtering of charts, so that the user can specify which metrics will be sent to the backend.
+3.  Netdata supports filtering charts so that the user can specify which metrics will be sent to the backend.
 
 4.  Netdata currently supports **three modes** of operation for all backends:
 
@@ -77,11 +78,11 @@ Resampling can come in many forms, from a simple *downsample* to sending the *av
     If, on the other hand, you just need long term archiving of Netdata metrics and you plan to mainly work with
     Netdata, we suggest to use `average`. It decouples visualization from data collection, so it will generally be a lot
     simpler. Furthermore, if you use `average`, the charts shown in the back-end will match exactly what you see in
-    Netdata. *It is not necessarily true for the other modes of operation.*
+    Netdata. _It is not necessarily true for the other modes of operation._
 
 ## configuration
 
-Using the command `/etc/netdata/edit-config netdata.conf`, you should be seeing something like this:
+Using the command `./edit-config netdata.conf`, you should be seeing something like this:
 
 ```conf
 [backend]
@@ -131,10 +132,10 @@ Using the command `/etc/netdata/edit-config netdata.conf`, you should be seeing 
 ```
 
    When multiple servers are defined, Netdata will try the next one when the first one fails. **This allows you to
-   load-balance different servers**: In each Netdata instance, specify the Backend servers in a different order.
+   load-balance different servers**: In each Netdata instance, specify the backend servers in a different order.
 
    Netdata also ships [`nc-backend.sh`](nc-backend.sh), a script that can be **used as a fallback backend** to save the
-   metrics to disk and push them to the time-series database when it becomes available again**. It can also be used to
+   metrics to disk and push them to the time-series database when it becomes available again. It can also be used to
    monitor / trace / debug the metrics Netdata generates.
 
    For kinesis backend `destination` should be set to an AWS region (for example, `us-east-1`).
