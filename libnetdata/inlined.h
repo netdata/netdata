@@ -251,7 +251,7 @@ static inline void escape_json_string(char *dst, char *src, size_t len) {
         if (*src == '\\' || *src == '\"' || *src < 0x1F) {
             *dst++ = '\\';
             *dst++ = *src++;
-            len =- 2;
+            len -= 2;
         } else {
             *dst++ = *src++;
             len--;
