@@ -317,7 +317,7 @@ Early adopters may experiment with our .DEB formatted packages using our nightly
 
 Our current packaging infrastructure provider is [Package Cloud](https://packagecloud.io).
 
-**Please Note** that you must add the proper Package Cloud repositories to the system Package sources **before** attempting to install Netdata (e.g `apt-get install netdata`).
+You must add the proper Package Cloud repositories to your system's package sources **before** attempting to install Netdata (e.g `apt-get install netdata`).
 
 We provide two separate repositories, one for our stable releases and one for our nightly releases.
 
@@ -326,7 +326,7 @@ We provide two separate repositories, one for our stable releases and one for ou
 
 Netdata is **committed** to support installation of our solution to **all operating systems**. This is a constant battle for Netdata, as we strive to automate and make things easier for our users.
 
-For the operating system support matrix, please visit our [distributions](../../packaging/DISTRIBUTIONS.md) support page.
+For the operating system support matrix, visit our [distributions support page](../../packaging/DISTRIBUTIONS.md).
 
 ---
 
@@ -476,7 +476,7 @@ The good news is that the 64-bit static installer works fine if your NAS is one 
 
 When Netdata is first installed, it will run as *root*. This may or may not be acceptable for you, and since other installations run it as the *netdata* user, you might wish to do the same. This requires some extra work:
 
-1.  Creat a group `netdata` via the Synology group interface. Give it no access to anything.
+1.  Create a group `netdata` via the Synology group interface. Give it no access to anything.
 2.  Create a user `netdata` via the Synology user interface. Give it no access to anything and a random password. Assign the user to the `netdata` group. Netdata will chuid to this user when running.
 3.  Change ownership of the following directories, as defined in [Netdata Security](../../docs/netdata-security.md#security-design):
 
