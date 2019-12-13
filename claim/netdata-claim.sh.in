@@ -83,12 +83,6 @@ if [ -r "${MACHINE_GUID_FILE}" ]; then
 	ID="$(cat "${MACHINE_GUID_FILE}")"
 fi
 
-# get the URL_BASE from netdata.conf if possible
-if [ -r "${NETDATA_USER_CONFIG_DIR}/netdata.conf" ]; then
-	CONF_URL=$(grep "cloud base url = " "${NETDATA_USER_CONFIG_DIR}/netdata.conf" | awk -F " = " '{print $2}')
-	[ -n "${CONF_URL}" ] && URL_BASE="${CONF_URL}"
-fi
-
 # get token from file
 if [ -r "${CLAIMING_DIR}/token" ]; then
 	TOKEN="$(cat "${CLAIMING_DIR}/token")"
@@ -121,7 +115,7 @@ echo >&2 "Hostname: $HOSTNAME"
 
 # create the claiming directory for this user
 if [ ! -d "${CLAIMING_DIR}" ] ; then
-	mkdir -p "${CLAIMING_DIR}" && chmod 0640 "${CLAIMING_DIR}"
+	mkdir -p "${CLAIMING_DIR}" && chmod 0750 "${CLAIMING_DIR}"
 # shellcheck disable=SC2181
 	if [ $? -ne 0 ] ; then
 		echo >&2 "Failed to create claiming working directory ${CLAIMING_DIR}"

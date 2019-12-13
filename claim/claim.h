@@ -5,4 +5,10 @@
 
 #include "../daemon/common.h"
 
+extern char *claiming_pending_arguments;
+
+void claim_agent(char *claiming_arguments);
+uint8_t is_agent_claimed(void);
+void load_claiming_state(void);
+
 #endif //NETDATA_CLAIM_H
