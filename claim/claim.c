@@ -41,7 +41,6 @@ void claim_agent(char *claiming_arguments)
     pid_t command_pid;
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
     FILE *fp;
-    char *cloud_base_url;
 
     snprintfz(command_buffer,
               CLAIMING_COMMAND_LENGTH,
@@ -51,7 +50,7 @@ void claim_agent(char *claiming_arguments)
               registry.cloud_base_url,
               claiming_arguments);
 
-    info("Executing agent claiming command '%s'", command_buffer);
+    info("Executing agent claiming command 'netdata-claim.sh'");
     fp = mypopen(command_buffer, &command_pid);
     if(!fp) {
         error("Cannot popen(\"%s\").", command_buffer);
@@ -81,7 +80,8 @@ void claim_agent(char *claiming_arguments)
     error("\"%s\"", claiming_errors[exit_code]);
 }
 
-void load_claiming_state(void) {
+void load_claiming_state(void)
+{
     char filename[FILENAME_MAX + 1];
     struct stat statbuf;
 

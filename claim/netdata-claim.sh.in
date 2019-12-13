@@ -107,7 +107,7 @@ do
 	shift 1
 done
 
-echo >&2 "Token: $TOKEN"
+echo >&2 "Token: ****************"
 echo >&2 "Base URL: $URL_BASE"
 echo >&2 "Id: $ID"
 echo >&2 "Rooms: $ROOMS"
@@ -115,7 +115,7 @@ echo >&2 "Hostname: $HOSTNAME"
 
 # create the claiming directory for this user
 if [ ! -d "${CLAIMING_DIR}" ] ; then
-	mkdir -p "${CLAIMING_DIR}" && chmod 0750 "${CLAIMING_DIR}"
+	mkdir -p "${CLAIMING_DIR}" && chmod 0770 "${CLAIMING_DIR}"
 # shellcheck disable=SC2181
 	if [ $? -ne 0 ] ; then
 		echo >&2 "Failed to create claiming working directory ${CLAIMING_DIR}"
@@ -206,6 +206,7 @@ if [ "${HTTP_STATUS_CODE}" -ne 200 ] ; then
 		*) EXIT_CODE=5 ;;
 	esac
 	echo >&2 "Failed to claim agent."
+	rm -f "${CLAIMING_DIR}/tmpout.txt"
 	exit $EXIT_CODE
 fi
 

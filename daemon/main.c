@@ -1269,6 +1269,14 @@ int main(int argc, char **argv) {
     get_system_info(system_info);
 
     rrd_init(netdata_configured_hostname, system_info);
+
+    // ------------------------------------------------------------------------
+    // Claim netdata agent to a cloud endpoint
+
+    if (claiming_pending_arguments)
+        claim_agent(claiming_pending_arguments);
+    load_claiming_state();
+
     // ------------------------------------------------------------------------
     // enable log flood protection
 
@@ -1296,13 +1304,6 @@ int main(int argc, char **argv) {
     // Initialize netdata agent command serving from cli and signals
 
     commands_init();
-
-    // ------------------------------------------------------------------------
-    // Claim netdata agent to a cloud endpoint
-
-    if (claiming_pending_arguments)
-        claim_agent(claiming_pending_arguments);
-    load_claiming_state();
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;
