@@ -176,7 +176,6 @@ static cmd_status_t cmd_fatal_execute(char *args, char **message)
 static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
 {
     (void)args;
-    (void)message;
     info("COMMAND: reloading host labels.");
     reload_host_labels();
 
@@ -184,8 +183,10 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
 
     netdata_rwlock_rdlock(&localhost->labels_rwlock);
     struct label *l=localhost->labels;
+    char value[CONFIG_FILE_LINE_MAX+1];
     while (l != NULL) {
-        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, l->value);
+        escape_json_string(value, l->value, strlen(l->value));
+        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, value);
         l = l->next;
     }
     netdata_rwlock_unlock(&localhost->labels_rwlock);
