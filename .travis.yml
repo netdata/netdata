@@ -421,6 +421,14 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
 
+    - name: "Build & Publish RPM package for Fedora 31"
+      <<: *RPM_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
     - name: "Build & Publish RPM package for Fedora 30"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
