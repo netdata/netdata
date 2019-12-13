@@ -136,14 +136,14 @@ So, Netdata supports [simple patterns](../libnetdata/simple_pattern/).
 
 ## Netdata labels
 
-Since version 1.20 netdata accepts user defined labels for hosts, the labels are defined in the section `[host labels]`. 
-To define a label inside this section, some rules needs to be follow for Netdata does not reject the label, for label name
- the following restrictions are applied:
+Since version 1.20, Netdata accepts user defined labels for host. The labels are defined in the section `[host labels]`. 
+To define a label inside this section, some rules needs to be followed, or Netdata will reject the label. The following 
+restrictions are applied for label names:
  
 - Names cannot start with `_`, but it can be present in other parts of the name.
-- Names only accept alphabet letters, numbers, dots and dashes.
+- Names only accept alphabet letters, numbers, dots, and dashes.
 
-The policy for values are more flexible, but you can not use exclamation ('!'), whitespaces(' ')  and asterisk('*'), because 
- they are used to compare label values in health alarms and templates.
+The policy for values are more flexible, but you can not use exclamation (`!`), whitespaces (` `)  and asterisk (`*`), 
+because they are used to compare label values in health alarms and templates.
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfiguration-guide&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
