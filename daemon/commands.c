@@ -183,16 +183,15 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
 
     netdata_rwlock_rdlock(&localhost->labels_rwlock);
     struct label *l=localhost->labels;
-    char value[CONFIG_FILE_LINE_MAX+1];
     while (l != NULL) {
-        escape_json_string(value, l->value, strlen(l->value));
-        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, value);
+        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, l->value);
         l = l->next;
     }
     netdata_rwlock_unlock(&localhost->labels_rwlock);
 
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);
+
     return CMD_STATUS_SUCCESS;
 }
 
