@@ -5,16 +5,16 @@
 
 // ----------------------------------------------------------------------------
 
-static int template_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
+static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
     if(!rt->labels)
-        return 1;
+        return 0;
 
     errno = 0;
     struct label *move = host->labels;
     size_t len = strlen(rt->labels)+1;
     char *cmp = mallocz(len);
     if(!cmp)
-        return 1;
+        return 0;
 
     int ret;
     if(move) {
@@ -35,12 +35,12 @@ static int template_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
                    host->hostname,
                    rt->labels
             );
-            ret = 0;
-        } else {
             ret = 1;
+        } else {
+            ret = 0;
         }
     } else {
-        ret =1;
+        ret =0;
     }
 
     freez(cmp);
@@ -58,7 +58,7 @@ static int template_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
 void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host ) {
     if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
        && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
-        if (template_has_label(rt, host)) {
+        if (!rrdcalctemplate_is_there_label_restriction(rt, host)) {
             RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
             if (unlikely(!rc))
                 info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed",
