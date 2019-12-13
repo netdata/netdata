@@ -2,8 +2,6 @@
 
 #include "../libnetdata.h"
 
-#define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
-
 /*
  * @Input:
  *      Connector / instance to add to an internal structure

@@ -11,16 +11,13 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
 
     errno = 0;
     struct label *move = host->labels;
-    size_t len = strlen(rt->labels)+1;
-    char *cmp = mallocz(len);
-    if(!cmp)
-        return 0;
+    char cmp[CONFIG_FILE_LINE_MAX+1];
 
     int ret;
     if(move) {
         netdata_rwlock_rdlock(&host->labels_rwlock);
         while(move) {
-            snprintfz(cmp, len, "%s=%s", move->key, move->value);
+            snprintfz(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
             if (simple_pattern_matches(rt->splabels, move->key) ||
                 simple_pattern_matches(rt->splabels, cmp)) {
                 break;
@@ -42,8 +39,6 @@ static int rrdcalctemplate_is_there_label_restriction(RRDCALCTEMPLATE *rt,  RRDH
     } else {
         ret =0;
     }
-
-    freez(cmp);
 
     return ret;
 }

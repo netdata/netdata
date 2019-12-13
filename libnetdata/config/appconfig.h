@@ -102,6 +102,7 @@
 
 // ----------------------------------------------------------------------------
 // Config definitions
+#define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
 
 #define CONFIG_VALUE_LOADED  0x01 // has been loaded from the config
 #define CONFIG_VALUE_USED    0x02 // has been accessed from the program

@@ -643,26 +643,22 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
             clean = NULL;
         }
 
-        size_t len = strlen(rc->labels)+1;
-        char *cmp = mallocz(len);
-        if(!cmp)
-            break;
+        char cmp[CONFIG_FILE_LINE_MAX+1];
 
         struct label *move = host->labels;
         while(move) {
-            snprintfz(cmp, len, "%s=%s", move->key, move->value);
+            snprintf(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
             if (simple_pattern_matches(rc->splabels, move->key) ||
                 simple_pattern_matches(rc->splabels, cmp)) {
                 break;
             }
+
             move = move->next;
         }
-
 
         if(!move) {
             clean = rc;
         }
-        freez(cmp);
     }
 
     if (clean) {
