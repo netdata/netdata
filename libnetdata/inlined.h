@@ -247,7 +247,7 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
 }
 
 static inline void escape_json_string(char *dst, char *src, size_t len) {
-    while (*src != '\0' && len > 0) {
+    while (*src != '\0' && len > 1) {
         if (*src == '\\' || *src == '\"' || *src < 0x1F) {
             *dst++ = '\\';
             *dst++ = *src++;
