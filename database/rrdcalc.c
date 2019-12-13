@@ -605,6 +605,24 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     rrdcalc_free(rc);
 }
 
+void rrdcalc_foreach_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
+
+    if(unlikely(rc == host->alarms_with_foreach))
+        host->alarms_with_foreach = rc->next;
+    else {
+        RRDCALC *t;
+        for(t = host->alarms_with_foreach; t && t->next != rc; t = t->next) ;
+        if(t) {
+            t->next = rc->next;
+            rc->next = NULL;
+        }
+        else
+            error("Cannot unlink alarm '%s.%s' from host '%s': not found", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
+    }
+
+    rrdcalc_free(rc);
+}
+
 static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
     RRDCALC *rc, *clean = NULL;
     for (rc = alarms; rc; rc = rc->next) {
@@ -617,6 +635,11 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
                   clean->name,
                   host->hostname,
                   clean->labels);
+            if(host->alarms == alarms)
+                rrdcalc_unlink_and_free(host, clean);
+            else
+                rrdcalc_foreach_unlink_and_free(host, clean);
+
             clean = NULL;
         }
 
@@ -635,11 +658,11 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
             move = move->next;
         }
 
-        freez(cmp);
 
         if(!move) {
             clean = rc;
         }
+        freez(cmp);
     }
 
     if (clean) {
@@ -647,9 +670,11 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
               clean->name,
               host->hostname,
               clean->labels);
-        rrdcalc_unlink_and_free(host, clean);
+        if(host->alarms == alarms)
+            rrdcalc_unlink_and_free(host, clean);
+        else
+            rrdcalc_foreach_unlink_and_free(host, clean);
     }
-
 
 }
 
