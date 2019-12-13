@@ -179,12 +179,17 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     (void)message;
     info("COMMAND: reloading host labels.");
     reload_host_labels();
-    struct label *l=localhost->labels;
+
     BUFFER *wb = buffer_create(10);
+
+    netdata_rwlock_rdlock(&localhost->labels_rwlock)
+    struct label *l=localhost->labels;
     while (l != NULL) {
         buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, l->value);
         l = l->next;
     }
+    netdata_rwlock_unlock(&localhost->labels_rwlock);
+
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
