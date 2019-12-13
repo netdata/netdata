@@ -32,10 +32,13 @@
 - Fixing errors in plugins.d/README.md [\#7340](https://github.com/netdata/netdata/pull/7340) ([joelhans](https://github.com/joelhans))
 - Health: Proposed restructuring of health documentation [\#7329](https://github.com/netdata/netdata/pull/7329) ([joelhans](https://github.com/joelhans))
 - Implement netdata command server and cli tool [\#7325](https://github.com/netdata/netdata/pull/7325) ([mfundul](https://github.com/mfundul))
+- Minor docker related cleanups [\#7240](https://github.com/netdata/netdata/pull/7240) ([knatsakis](https://github.com/knatsakis))
 - .travis.yml: Add timestamps to output [\#7239](https://github.com/netdata/netdata/pull/7239) ([knatsakis](https://github.com/knatsakis))
 - proc.plugin: add pressure stall information [\#7209](https://github.com/netdata/netdata/pull/7209) ([hexchain](https://github.com/hexchain))
 - Fixing linter errors in packaging/docker/README [\#7199](https://github.com/netdata/netdata/pull/7199) ([joelhans](https://github.com/joelhans))
+- Updates and grammar fixes to README.md [\#7193](https://github.com/netdata/netdata/pull/7193) ([joelhans](https://github.com/joelhans))
 - Add HP Smart Storage Array python plugin [\#7181](https://github.com/netdata/netdata/pull/7181) ([gnoddep](https://github.com/gnoddep))
+- Implement the main flow for the Exporting Engine [\#7149](https://github.com/netdata/netdata/pull/7149) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.19.0](https://github.com/netdata/netdata/tree/v1.19.0) (2019-11-27)
 
@@ -221,8 +224,6 @@
 - Fix some errors reported by Coverity [\#6797](https://github.com/netdata/netdata/pull/6797) ([thiagoftsm](https://github.com/thiagoftsm))
 - Allow hostnames in Access Control Lists [\#6796](https://github.com/netdata/netdata/pull/6796) ([amoss](https://github.com/amoss))
 - update grep to be more specific [\#6794](https://github.com/netdata/netdata/pull/6794) ([n0coast](https://github.com/n0coast))
-- Common pattern for web and alarms together with two bug fixes [\#6783](https://github.com/netdata/netdata/pull/6783) ([thiagoftsm](https://github.com/thiagoftsm))
-- Changes to launching the python.d plugin aggregator. [\#6781](https://github.com/netdata/netdata/pull/6781) ([amoss](https://github.com/amoss))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
@@ -236,7 +237,6 @@
 - netdata/ci: Fix author on triggering commits for packaging [\#6813](https://github.com/netdata/netdata/pull/6813) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/packaging: remove fedora/28, is no longer available [\#6808](https://github.com/netdata/netdata/pull/6808) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/ci: second batch of fixes for coverity scan script and others [\#6804](https://github.com/netdata/netdata/pull/6804) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging: work around redhat complaining on build-id binary [\#6792](https://github.com/netdata/netdata/pull/6792) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 
