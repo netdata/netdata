@@ -1,9 +1,9 @@
 dist: bionic
 language: c
-services:
-  - docker
 
-
+addons:
+  apt:
+    packages: ['moreutils']
 
 # This is a hook to help us introduce "soft" errors on our process
 matrix:
@@ -11,15 +11,14 @@ matrix:
     - env: ALLOW_SOFT_FAILURE_HERE=true
 
 before_install:
+  - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
 
 # Install dependencies for all, once
 #
 install:
   - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
-  - sudo apt install -y --only-upgrade docker-ce
   - sudo pip install git-semver==0.2.4 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
-  - docker info
   - source tests/installer/slack.sh
   - export NOTIF_CHANNEL="automation-beta"
   - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
@@ -161,10 +160,6 @@ jobs:
         - $HOME/netdata/usr/sbin/netdata -W unittest
       env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "Unit testing failed"
-
-    - name: Build/install on ubuntu 14.04 (not containerized)
-      script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
-      after_failure: post_message "TRAVIS_MESSAGE" "Build/Install failed on ubuntu 14.04"
 
     - name: Build/Install for ubuntu 18.04 (not containerized)
       script: fakeroot ./netdata-installer.sh --dont-wait --dont-start-it --install $HOME
@@ -352,15 +347,6 @@ jobs:
         - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="xenial" BUILD_STRING="ubuntu/xenial"
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
         - ALLOW_SOFT_FAILURE_HERE=true
-
-    - name: "Build & Publish DEB package for ubuntu/trusty"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="trusty" BUILD_STRING="ubuntu/trusty"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
 
     - name: "Build & Publish DEB package for debian/buster"
       <<: *DEB_TEMPLATE
