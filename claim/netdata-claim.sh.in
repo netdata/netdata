@@ -156,7 +156,7 @@ cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
     },
     "token": "$TOKEN",
     "rooms" : [ $ROOMS ],
-    "public_key" : "$KEY"
+    "publicKey" : "$KEY"
 }
 EMBED_JSON
 
