@@ -408,6 +408,7 @@ struct rrdset {
                                                     // it goes around in a round-robin fashion
 
     RRDSET_FLAGS flags;                             // configuration flags
+    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
@@ -627,6 +628,7 @@ struct rrdhost {
     const char *timezone;                           // the timezone of the host
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
+    RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts

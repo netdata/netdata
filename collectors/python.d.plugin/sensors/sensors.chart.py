@@ -162,4 +162,4 @@ class Service(SimpleService):
 
         self.create_definitions()
 
-        return True
+        return bool(self.get_data())

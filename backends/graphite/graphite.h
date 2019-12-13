@@ -6,7 +6,7 @@
 
 #include "backends/backends.h"
 
-extern int format_dimension_collected_graphite_plaintext(
+extern int backends_format_dimension_collected_graphite_plaintext(
           BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from
@@ -18,7 +18,7 @@ extern int format_dimension_collected_graphite_plaintext(
         , BACKEND_OPTIONS backend_options // BACKEND_SOURCE_* bitmap
 );
 
-extern int format_dimension_stored_graphite_plaintext(
+extern int backends_format_dimension_stored_graphite_plaintext(
           BUFFER *b                 // the buffer to write data to
         , const char *prefix        // the prefix to use
         , RRDHOST *host             // the host this chart comes from

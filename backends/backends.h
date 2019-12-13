@@ -23,9 +23,13 @@ typedef enum backend_types {
     BACKEND_TYPE_JSON,                      // Stores the data using JSON.
     BACKEND_TYPE_PROMETEUS,                 // The user selected to use Prometheus backend
     BACKEND_TYPE_KINESIS,                   // Send message to AWS Kinesis
-    BACKEND_TYPE_MONGODB                    // Send data to MongoDB collection
+    BACKEND_TYPE_MONGODB,                   // Send data to MongoDB collection
+    BACKEND_TYPE_NUM                        // Number of backend types
 } BACKEND_TYPE;
 
+#ifdef ENABLE_EXPORTING
+#include "exporting/exporting_engine.h"
+#endif
 
 typedef int (**backend_response_checker_t)(BUFFER *);
 typedef int (**backend_request_formatter_t)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS);
@@ -38,6 +42,7 @@ extern BACKEND_OPTIONS global_backend_options;
 extern const char *global_backend_prefix;
 
 extern void *backends_main(void *ptr);
+BACKEND_TYPE backend_select_type(const char *type);
 
 extern BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS backend_options);
 

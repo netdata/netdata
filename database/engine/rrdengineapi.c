@@ -628,13 +628,13 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     nr_committed_pages = ++pg_cache->committed_page_index.nr_committed_pages;
     uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
-    if (nr_committed_pages >= (pg_cache_hard_limit(ctx) - (unsigned long)ctx->stats.metric_API_producers) / 2) {
+    if (nr_committed_pages >= (ctx->max_cache_pages) / 2 + (unsigned long)ctx->stats.metric_API_producers) {
         /* 50% of pages have not been committed yet */
         if (0 == (unsigned long)ctx->stats.flushing_errors) {
             /* only print the first time */
-            error("Failed to flush quickly enough in dbengine instance \"%s\""
-                  ". Metric data will not be stored in the database"
-                  ", please reduce disk load or use a faster disk.", ctx->dbfiles_path);
+            error("Failed to flush dirty buffers quickly enough in dbengine instance \"%s\"."
+                  "Metric data at risk of not being stored in the database, "
+                  "please reduce disk load or use a faster disk.", ctx->dbfiles_path);
         }
         rrd_stat_atomic_add(&ctx->stats.flushing_errors, 1);
         rrd_stat_atomic_add(&global_flushing_errors, 1);
