@@ -390,10 +390,6 @@ but, we also have for the workstations the following `netdata.conf`
     room = workstation
 ```
 
-Before we proceed, it is necessary to explain something about possible values for labels. The labels do not have restrictions
- for their values, but their name only accepts ASCII characters, but it does not accept all the ASCII values, the 
- label's name only can contain alphabet letters and numbers.
-
 I have defined inside `netdata.conf` labels to classify hosts and now we can apply alarms for them using labels, for example,
 case I add the following line inside alarms:
 
