@@ -800,6 +800,7 @@ struct label *load_config_labels()
             char *name = cv->name;
             if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
                 l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
+                cv->flags |= CONFIG_VALUE_USED;
             } else {
                 error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s) or values."
                        , name);

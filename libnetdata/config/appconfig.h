@@ -100,6 +100,14 @@
 #define CONFIG_MAX_NAME 1024
 #define CONFIG_MAX_VALUE 2048
 
+// ----------------------------------------------------------------------------
+// Config definitions
+
+#define CONFIG_VALUE_LOADED  0x01 // has been loaded from the config
+#define CONFIG_VALUE_USED    0x02 // has been accessed from the program
+#define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
+#define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
+
 struct config_option {
     avl avl;                // the index entry of this entry - this has to be first!
 
