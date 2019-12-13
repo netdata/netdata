@@ -22,7 +22,7 @@ following arguments:
     where URL_BASE is the netdata cloud endpoint base URL. This is https://netdata.cloud by default.
 -id=AGENT_ID
     where AGENT_ID is the unique identifier of the agent. This is the agent's MACHINE_GUID by default.
-hostname=HOSTNAME
+-hostname=HOSTNAME
     where HOSTNAME is the result of of the hostname command by default.
 ```
 One claiming command example is:
