@@ -624,27 +624,14 @@ void rrdcalc_foreach_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
 }
 
 static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
-    RRDCALC *rc, *clean = NULL;
-    for (rc = alarms; rc; rc = rc->next) {
+    RRDCALC *rc = alarms;
+    while (rc) {
         if (!rc->labels) {
+            rc = rc->next;
             continue;
         }
 
-        if (clean) {
-            info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
-                  clean->name,
-                  host->hostname,
-                  clean->labels);
-            if(host->alarms == alarms)
-                rrdcalc_unlink_and_free(host, clean);
-            else
-                rrdcalc_foreach_unlink_and_free(host, clean);
-
-            clean = NULL;
-        }
-
         char cmp[CONFIG_FILE_LINE_MAX+1];
-
         struct label *move = host->labels;
         while(move) {
             snprintf(cmp, CONFIG_FILE_LINE_MAX, "%s=%s", move->key, move->value);
@@ -656,22 +643,22 @@ static void rrdcalc_labels_unlink_alarm_loop(RRDHOST *host, RRDCALC *alarms) {
             move = move->next;
         }
 
+        RRDCALC *next = rc->next;
         if(!move) {
-            clean = rc;
+            info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+                 rc->name,
+                 host->hostname,
+                 rc->labels);
+
+            if(host->alarms == alarms) {
+                rrdcalc_unlink_and_free(host, rc);
+            } else
+                rrdcalc_foreach_unlink_and_free(host, rc);
+
         }
-    }
 
-    if (clean) {
-        info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
-              clean->name,
-              host->hostname,
-              clean->labels);
-        if(host->alarms == alarms)
-            rrdcalc_unlink_and_free(host, clean);
-        else
-            rrdcalc_foreach_unlink_and_free(host, clean);
+        rc = next;
     }
-
 }
 
 void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host) {
