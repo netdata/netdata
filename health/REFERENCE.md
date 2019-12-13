@@ -373,7 +373,7 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alarm line `label`
 
-Defines the list of labels expected on host, for example, let us suppose that `netdata.conf` is configured with the
+Defines the list of labels expected on a host. For example, let's suppose that `netdata.conf` is configured with the
 following labels:
 
 ```yaml
@@ -382,7 +382,7 @@ following labels:
     room = server
 ```
 
-but, we also have for the workstations the following `netdata.conf`
+And more labels in `netdata.conf` for workstations:
 
 ```yaml
 [host labels]
@@ -390,23 +390,22 @@ but, we also have for the workstations the following `netdata.conf`
     room = workstation
 ```
 
-I have defined inside `netdata.conf` labels to classify hosts and now we can apply alarms for them using labels, for example,
-case I add the following line inside alarms:
+By defining labels inside of `netdata.conf`, you can now apply labels to alarms. For example, you can add the following 
+line to any alarms you'd like to apply to hosts that have the label `room = server`.
 
 ```yaml
 label: room = server
 ```
 
-this will apply alarms only on hosts that have `room = server`. 
-It is also possible to combine labels to apply alarm, for example, case I want to raise a specific alarm only for hosts
-inside a room that were installed in a specific time, I can write the following label condition:
+You can also combine labels when applying them to alarms. For example, if you want to raise a specific alarm only for hosts 
+inside a room that were installed at a specific time, you can write the following label line:
 
 ```yaml
 label: room = workstation AND installed = 201705
 ```
 
-The `label` is a space-separate list that accepts simple patterns, for example, case I decided to create an alarm 
-that will be applied to all hosts installed in the last decade, I can set label like:
+The `label` is a space-separated list that accepts simple patterns. For example, you can create an alarm 
+that will be applied to all hosts installed in the last decade with the following line:
 
 ```yaml
 label: installed = 201*
