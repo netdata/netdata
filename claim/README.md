@@ -36,7 +36,7 @@ netdatacli reload-claiming-state
 ```
 which reloads agent claiming state from disk.
 
-# netdata agent command line
+## netdata agent command line
 
 The user can trigger agent claiming by calling the `netdata` service binary with the additional command line parameters:
 ```sh
