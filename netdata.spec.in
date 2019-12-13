@@ -434,6 +434,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
 
+%defattr(0755,root,root,0755)
+%{_sbindir}/netdatacli
+
 %defattr(4750,root,netdata,0750)
 
 %dir %{_libexecdir}/%{name}/python.d
