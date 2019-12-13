@@ -5,7 +5,7 @@
 
 // ----------------------------------------------------------------------------
 
-static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
+static int template_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
     if(!rt->labels)
         return 1;
 
@@ -58,7 +58,7 @@ static int rrdcalctemplate_has_label(RRDCALCTEMPLATE *rt,  RRDHOST *host) {
 void rrdcalctemplate_link_matching_test(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host ) {
     if(rt->hash_context == st->hash_context && !strcmp(rt->context, st->context)
        && (!rt->family_pattern || simple_pattern_matches(rt->family_pattern, st->family))) {
-        if (rrdcalctemplate_has_label(rt, host)) {
+        if (template_has_label(rt, host)) {
             RRDCALC *rc = rrdcalc_create_from_template(host, rt, st->id);
             if (unlikely(!rc))
                 info("Health tried to create alarm from template '%s' on chart '%s' of host '%s', but it failed",
