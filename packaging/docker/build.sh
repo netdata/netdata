@@ -60,7 +60,7 @@ docker run --rm --privileged multiarch/qemu-user-static:register --reset
 
 # Build images using multi-arch Dockerfile.
 for ARCH in ${ARCHS[@]}; do
-     TAG="${REPOSITORY}:${VERSION}-${ARCH}"
+     TAG="${REPOSITORY,,}:${VERSION}-${ARCH}"
      echo "Building tag ${TAG}.."
      eval docker build --no-cache \
           --build-arg ARCH="${ARCH}" \
