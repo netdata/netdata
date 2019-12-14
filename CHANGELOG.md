@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Update Netdata RPM spec file to package netdatacli. [\#7513](https://github.com/netdata/netdata/pull/7513) ([Ferroin](https://github.com/Ferroin))
+- Remove `-f` option from `groupdel` in uninstaller. [\#7507](https://github.com/netdata/netdata/pull/7507) ([Ferroin](https://github.com/Ferroin))
+- Force the repo name to be lowercase in the tag for docker builds. [\#7506](https://github.com/netdata/netdata/pull/7506) ([Ferroin](https://github.com/Ferroin))
+- Inject archived backports repository on Debian Jessie for CI package builds. [\#7495](https://github.com/netdata/netdata/pull/7495) ([Ferroin](https://github.com/Ferroin))
 - ci: remove ubuntu trusty 14.04 from build [\#7481](https://github.com/netdata/netdata/pull/7481) ([ncmans](https://github.com/ncmans))
 - Fix race condition with page cache descriptors [\#7478](https://github.com/netdata/netdata/pull/7478) ([mfundul](https://github.com/mfundul))
 - Fix missing parenthesis on softnet.conf [\#7476](https://github.com/netdata/netdata/pull/7476) ([Steve8291](https://github.com/Steve8291))
@@ -219,11 +223,6 @@
 - netdata/packaging: no need to overengineer with these checks [\#6834](https://github.com/netdata/netdata/pull/6834) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Buffer overflow [\#6817](https://github.com/netdata/netdata/pull/6817) ([amoss](https://github.com/amoss))
 - Docs: Overhaul of Getting started guide [\#6811](https://github.com/netdata/netdata/pull/6811) ([joelhans](https://github.com/joelhans))
-- NPM Packages version update [\#6801](https://github.com/netdata/netdata/pull/6801) ([prhomhyse](https://github.com/prhomhyse))
-- Collector slabinfo [\#6800](https://github.com/netdata/netdata/pull/6800) ([Saruspete](https://github.com/Saruspete))
-- Fix some errors reported by Coverity [\#6797](https://github.com/netdata/netdata/pull/6797) ([thiagoftsm](https://github.com/thiagoftsm))
-- Allow hostnames in Access Control Lists [\#6796](https://github.com/netdata/netdata/pull/6796) ([amoss](https://github.com/amoss))
-- update grep to be more specific [\#6794](https://github.com/netdata/netdata/pull/6794) ([n0coast](https://github.com/n0coast))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
