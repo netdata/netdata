@@ -5,14 +5,14 @@
 * @ktsaou @cakrit @cosmix
 
 # Ownership by directory structure
-.travis/ @cakrit @cosmix @knatsakis
-.github/ @cakrit @cosmix @knatsakis
+.travis/ @cakrit @cosmix @netdata/automation
+.github/ @cakrit @cosmix @netdata/automation
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @cakrit @cosmix @knatsakis
+build/ @cakrit @cosmix @netdata/automation
 collectors/ @vlvkobal @mfundul @cakrit @cosmix
 collectors/charts.d.plugin/ @cakrit @cosmix
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cakrit @cosmix
@@ -30,7 +30,7 @@ health/ @thiagoftsm @vlvkobal @cakrit @cosmix
 health/health.d/ @thiagoftsm @vlvkobal @cakrit @cosmix
 health/notifications/ @Ferroin @thiagoftsm @cakrit @cosmix
 libnetdata/ @thiagofsm @mfundul @cakrit @cosmix
-packaging/ @cakrit @cosmix @knatsakis
+packaging/ @cakrit @cosmix @netdata/automation
 registry/ @VLegakis @cakrit @cosmix
 streaming/ @thiagoftsm @vlvkobal @cakrit @cosmix
 web/ @thiagoftsm @mfundul @vlvkobal @cakrit @cosmix
@@ -38,19 +38,19 @@ web/gui/ @VLegakis @cakrit @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @cakrit @cosmix @joelhans
-*.am @cakrit @cosmix @knatsakis
+*.am @cakrit @cosmix @netdata/automation
 
 # Ownership of specific files
-.gitignore @cakrit @cosmix @knatsakis
-.travis.yml @cakrit @cosmix @knatsakis
-.lgtm.yml @cakrit @cosmix @knatsakis
-.eslintrc @cakrit @cosmix @knatsakis
-.eslintignore @cakrit @cosmix @knatsakis
-.csslintrc @cakrit @cosmix @knatsakis
-.codeclimate.yml @cakrit @cosmix @knatsakis
-.codacy.yml @cakrit @cosmix @knatsakis
-netdata.spec.in @cakrit @cosmix @knatsakis
-netdata-installer.sh @cakrit @cosmix @knatsakis
+.gitignore @cakrit @cosmix @netdata/automation
+.travis.yml @cakrit @cosmix @netdata/automation
+.lgtm.yml @cakrit @cosmix @netdata/automation
+.eslintrc @cakrit @cosmix @netdata/automation
+.eslintignore @cakrit @cosmix @netdata/automation
+.csslintrc @cakrit @cosmix @netdata/automation
+.codeclimate.yml @cakrit @cosmix @netdata/automation
+.codacy.yml @cakrit @cosmix @netdata/automation
+netdata.spec.in @cakrit @cosmix @netdata/automation
+netdata-installer.sh @cakrit @cosmix @netdata/automation
 netlify.toml @cakrit @cosmix
 package.json @VLegakis
 packaging/version @netdatabot
