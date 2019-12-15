@@ -219,13 +219,17 @@ static void cmd_unlock_high_priority(unsigned index)
     (void)index;
 }
 
+static void pipe_close_cb(uv_handle_t* handle)
+{
+    freez(handle);
+}
+
 static void pipe_write_cb(uv_write_t* req, int status)
 {
     (void)status;
     uv_pipe_t *client = req->data;
 
-    uv_close((uv_handle_t *)client, NULL);
-    freez(client);
+    uv_close((uv_handle_t *)client, pipe_close_cb);
     --clients;
     info("Command Clients = %u\n", clients);
 }
@@ -360,8 +364,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     }
 
     if (nread < 0 && UV_EOF != nread) {
-        uv_close((uv_handle_t *)client, NULL);
-        freez(client);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
         --clients;
         info("Command Clients = %u\n", clients);
     }
@@ -391,8 +394,7 @@ static void connection_cb(uv_stream_t *server, int status)
     ret = uv_accept(server, (uv_stream_t *)client);
     if (ret) {
         error("uv_accept(): %s", uv_strerror(ret));
-        uv_close((uv_handle_t *)client, NULL);
-        freez(client);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
         return;
     }
 
@@ -405,8 +407,7 @@ static void connection_cb(uv_stream_t *server, int status)
     ret = uv_read_start((uv_stream_t*)client, alloc_cb, pipe_read_cb);
     if (ret) {
         error("uv_read_start(): %s", uv_strerror(ret));
-        uv_close((uv_handle_t *)client, NULL);
-        freez(client);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
         --clients;
         info("Command Clients = %u\n", clients);
         return;
