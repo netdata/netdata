@@ -739,7 +739,7 @@ static int port_stat_link_list(netdata_port_list_t *pl,uint16_t port, int versio
     int ret;
     pp = store_new_port_stat(port, 6); //tcp
     if(pp) {
-        rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
+        rp = (netdata_port_stats_t *)avl_insert_lock((version == AF_INET)?&connection_controller.port_stat_ipv4:&connection_controller.port_stat_ipv6, (avl *)pp);
         if (rp != pp) {
             error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
             ret = -1;
@@ -757,7 +757,7 @@ static int port_stat_link_list(netdata_port_list_t *pl,uint16_t port, int versio
 
         pp = store_new_port_stat(port, 17); //udp
         if(pp) {
-            rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
+            rp = (netdata_port_stats_t *)avl_insert_lock((version == AF_INET)?&connection_controller.port_stat_ipv4:&connection_controller.port_stat_ipv6, (avl *)pp);
             if (rp != pp) {
                 error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
                 ret = -1;
@@ -1047,7 +1047,7 @@ static void update_dimensions() {
         while (r) {
             //UPDATE TCP
             netdata_port_stats_t search_proto = { .port = r->port, .protocol = 6 };
-            netdata_port_stats_t *rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)&search_proto);
+            netdata_port_stats_t *rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat_ipv4, (avl *)&search_proto);
             if(rp) {
                 free(rp->dimension);
                 rp->dimension = strdup(r->value);
@@ -1062,7 +1062,7 @@ static void update_dimensions() {
 
             //UPDATE UDP
             search_proto.protocol = 17;
-            rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)&search_proto);
+            rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat_ipv4, (avl *)&search_proto);
             if(rp) {
                 free(rp->dimension);
                 rp->dimension = strdup(r->value);
