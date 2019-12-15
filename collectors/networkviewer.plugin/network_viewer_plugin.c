@@ -138,6 +138,18 @@ static void netdata_create_charts() {
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART6, "Network viewer TCP active connections per port.", "active connections", "TCP");
 
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections","UDP");
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART9, "Network Viewer TCP bytes received from request to specific port.", "kilobits/s", 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART10, "Network viewer TCP request length to specific port.", "kilobits/s", 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART11, "Network viewer UDP bytes received from request to specific port.", "kilobits/s", 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART12, "Network viewer UDP request length to specific port.", "kilobits/s", 1);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART14, "Network viewer TCP active connections per port.", "active connections", 0);
+
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART16, "Network viewer UDP active connections per port.", "active connections", 1);
 }
 
 static void write_connection(char *name, uint32_t *bytes) {
@@ -173,11 +185,10 @@ static void write_traffic(char *name, uint64_t *bytes) {
     printf("END\n");
 }
 
-static void netdata_publish_data() {
+static void netdata_publish_data(netdata_port_stats_t *move, int version) {
     //fill content
     uint16_t tcp = 0;
     uint16_t udp = 0;
-    netdata_port_stats_t *move = connection_controller.ports;
 
     uint64_t *ibytes;
     uint64_t *ebytes;
@@ -213,14 +224,25 @@ static void netdata_publish_data() {
         move = move->next;
     }
 
-    write_traffic(NETWORK_VIEWER_CHART1, ibytes_tcp);
-    write_traffic(NETWORK_VIEWER_CHART3, ibytes_udp);
+    if (version == AF_INET) {
+        write_traffic(NETWORK_VIEWER_CHART1, ibytes_tcp);
+        write_traffic(NETWORK_VIEWER_CHART3, ibytes_udp);
 
-    write_traffic(NETWORK_VIEWER_CHART2, ebytes_tcp);
-    write_traffic(NETWORK_VIEWER_CHART4, ebytes_udp);
+        write_traffic(NETWORK_VIEWER_CHART2, ebytes_tcp);
+        write_traffic(NETWORK_VIEWER_CHART4, ebytes_udp);
 
-    write_connection(NETWORK_VIEWER_CHART6, econn_tcp);
-    write_connection(NETWORK_VIEWER_CHART8, econn_udp);
+        write_connection(NETWORK_VIEWER_CHART6, econn_tcp);
+        write_connection(NETWORK_VIEWER_CHART8, econn_udp);
+    } else {
+        write_traffic(NETWORK_VIEWER_CHART9, ibytes_tcp);
+        write_traffic(NETWORK_VIEWER_CHART11, ibytes_udp);
+
+        write_traffic(NETWORK_VIEWER_CHART10, ebytes_tcp);
+        write_traffic(NETWORK_VIEWER_CHART12, ebytes_udp);
+
+        write_connection(NETWORK_VIEWER_CHART14, econn_tcp);
+        write_connection(NETWORK_VIEWER_CHART16, econn_udp);
+    }
 }
 
 void *network_viewer_publisher(void *ptr) {
@@ -234,7 +256,8 @@ void *network_viewer_publisher(void *ptr) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
-        netdata_publish_data();
+        netdata_publish_data(connection_controller.ports_ipv4, AF_INET);
+        netdata_publish_data(connection_controller.ports_ipv6, AF_INET6);
         fflush(stdout);
     }
 
@@ -245,9 +268,9 @@ void *network_viewer_publisher(void *ptr) {
 void netdata_set_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) {
     ncs->first = e->first;
     ncs->ct = e->ct;
-    ncs->saddr = e->saddr;
+    ncs->saddr.addr32[0] = e->saddr.addr32[0];
 
-    ncs->daddr = e->daddr;
+    ncs->daddr.addr32[0] = e->daddr.addr32[0];
 
     ncs->dport = e->dport;
     ncs->retransmit = e->retransmit;
@@ -255,6 +278,7 @@ void netdata_set_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) 
     ncs->recv = e->recv;
 
     ncs->protocol = e->protocol;
+    ncs->family = e->family;
 
     ncs->remove_time = (!e->removeme)?0:time(NULL) + 5;
 
@@ -285,7 +309,7 @@ void netdata_update_port_stats(netdata_port_stats_t *p, netdata_kern_stats_t *e)
     p->enow += e->sent;
 
     netdata_conn_stats_t *ret;
-    netdata_conn_stats_t search = { .daddr = e->daddr, .saddr = e->saddr, .dport = e->dport };
+    netdata_conn_stats_t search = { .daddr.addr32[0] = e->daddr.addr32[0], .saddr.addr32[0] = e->saddr.addr32[0], .dport = e->dport };
     netdata_conn_stats_t *ncs = (netdata_conn_stats_t *)avl_search_lock(&p->destination_port, (avl *)&search);
     if (!ncs) {
         ncs = store_new_connection_stat(e);
@@ -343,8 +367,8 @@ static int compare_destination_ip(void *a, void *b) {
 
     int ret = 0;
 
-    uint32_t ip1 = conn1->daddr;
-    uint32_t ip2 = conn2->daddr;
+    uint32_t ip1 = conn1->daddr.addr32[0];
+    uint32_t ip2 = conn2->daddr.addr32[0];
 
     if (ip1 < ip2) ret = -1;
     else if (ip1 > ip2) ret = 1;
@@ -357,8 +381,8 @@ static int compare_destination_ip(void *a, void *b) {
         else if (port1 > port2) ret = 1;
 
         if (!ret) {
-            ip1 = conn1->saddr;
-            ip2 = conn2->saddr;
+            ip1 = conn1->saddr.addr32[0];
+            ip2 = conn2->saddr.addr32[0];
 
             if (ip1 < ip2) ret = -1;
             else if (ip1 > ip2) ret = 1;
@@ -390,6 +414,9 @@ static int is_monitored_port(uint16_t port) {
 int netdata_store_bpf(void *data, int size) {
     (void)size;
 
+    if(netdata_exit)
+        return 0; //LIBBPF_PERF_EVENT_DONE
+
     netdata_kern_stats_t *e = data;
     if(!e->dport) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
@@ -399,13 +426,13 @@ int netdata_store_bpf(void *data, int size) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
 
-    int inside = is_ip_inside_table(e->saddr, e->daddr);
+    int inside = is_ip_inside_table(e->saddr.addr32[0], e->daddr.addr32[0]);
     if(inside < 0) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
 
     netdata_port_stats_t search_proto = { .port = e->dport, .protocol = e->protocol };
-    netdata_port_stats_t *pp = (netdata_port_stats_t *)avl_search_lock(&connection_controller.port_stat, (avl *)&search_proto);
+    netdata_port_stats_t *pp = (netdata_port_stats_t *)avl_search_lock((e->family == AF_INET)?&connection_controller.port_stat_ipv4:&connection_controller.port_stat_ipv6, (avl *)&search_proto);
     if (!pp) {
         return -2;
     } else {
@@ -481,17 +508,18 @@ static void clean_networks() {
 }
 
 void clean_port_index(netdata_port_stats_t *r) {
-    netdata_port_stats_t *ncs = (netdata_port_stats_t *)avl_search_lock(&connection_controller.port_stat, (avl *)r);
+    avl_tree_lock *ptr = (r->family == AF_INET)?&connection_controller.port_stat_ipv4:&connection_controller.port_stat_ipv6;
+    netdata_port_stats_t *ncs = (netdata_port_stats_t *)avl_search_lock(ptr, (avl *)r);
     if (ncs) {
-        ncs = (netdata_port_stats_t *)avl_remove_lock(&connection_controller.port_stat, (avl *)r);
+        ncs = (netdata_port_stats_t *)avl_remove_lock(ptr, (avl *)r);
         if (ncs != r) {
             error("[NETWORK VIEWER] Cannot remove a port");
         }
     }
 }
 
-void clean_ports() {
-    netdata_port_stats_t *move = connection_controller.ports->next;
+void clean_ports(netdata_port_stats_t *clean) {
+    netdata_port_stats_t *move = clean->next;
     while (move) {
         netdata_port_stats_t *next = move->next;
         clean_port_index(move);
@@ -501,7 +529,7 @@ void clean_ports() {
         free(move);
         move = next;
     }
-    free(connection_controller.ports);
+    free(clean);
 }
 
 void clean_connections() {
@@ -536,8 +564,12 @@ static void int_exit(int sig) {
         clean_connections();
     }
 
-    if(connection_controller.ports) {
-        clean_ports();
+    if(connection_controller.ports_ipv4) {
+        clean_ports(connection_controller.ports_ipv4);
+    }
+
+    if(connection_controller.ports_ipv6) {
+        clean_ports(connection_controller.ports_ipv6);
     }
 
     if(outgoing_table || ingoing_table) {
@@ -689,24 +721,38 @@ static int compare_port_value(void *a, void *b) {
     return 0;
 }
 
-static int port_stat_link_list(netdata_port_list_t *pl,uint16_t port) {
+static int port_stat_link_list(netdata_port_list_t *pl,uint16_t port, int version) {
     netdata_port_stats_t *pp;
     netdata_port_stats_t *rp;
+
+    netdata_port_stats_t *pi;
+    netdata_port_stats_t *lpi;
+
+    if (version == AF_INET) {
+        pi = connection_controller.ports_ipv4;
+        lpi = connection_controller.last_port_ipv4;
+    } else {
+        pi = connection_controller.ports_ipv6;
+        lpi = connection_controller.last_port_ipv6;
+    }
+
+    int ret;
     pp = store_new_port_stat(port, 6); //tcp
     if(pp) {
         rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
         if (rp != pp) {
             error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
-            return -1;
+            ret = -1;
+            goto endpsll;
         }
 
         pl->dimension = pp->dimension;
-        if (!connection_controller.ports) {
-            connection_controller.ports = pp;
-            connection_controller.last_port = pp;
+        if (!pi) {
+            pi = pp;
+            lpi = pp;
         } else {
-            connection_controller.last_port->next = pp;
-            connection_controller.last_port = pp;
+            lpi->next = pp;
+            lpi = pp;
         }
 
         pp = store_new_port_stat(port, 17); //udp
@@ -714,18 +760,33 @@ static int port_stat_link_list(netdata_port_list_t *pl,uint16_t port) {
             rp = (netdata_port_stats_t *)avl_insert_lock(&connection_controller.port_stat, (avl *)pp);
             if (rp != pp) {
                 error("[NETWORK VIEWER] Cannot insert a new port stat inside index.");
-                return -1;
+                ret = -1;
+                goto endpsll;
             }
-            connection_controller.last_port->next = pp;
-            connection_controller.last_port = pp;
+
+            lpi->next = pp;
+            lpi = pp;
         } else {
-            return -1;
+            ret = -1;
+            goto endpsll;
         }
     } else {
-        return -1;
+        ret = -1;
+        goto endpsll;
     }
 
-    return 0;
+    ret = 0;
+
+endpsll:
+    if (version == AF_INET) {
+        connection_controller.ports_ipv4 = pi;
+        connection_controller.last_port_ipv4 = lpi;
+    } else {
+        connection_controller.ports_ipv6 = pi;
+        connection_controller.last_port_ipv6 = lpi;
+    }
+
+    return ret;
 }
 
 netdata_port_list_t *netdata_list_ports(char *ports) {
@@ -755,7 +816,11 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                     error("[NETWORK VIEWER] Cannot insert port inside list.");
                 }
 
-                if ( port_stat_link_list(r, port) ) {
+                if ( port_stat_link_list(r, port, AF_INET) ) {
+                    return NULL;
+                }
+
+                if ( port_stat_link_list(set, port, AF_INET6) ) {
                     return NULL;
                 }
 
@@ -811,7 +876,11 @@ netdata_port_list_t *netdata_list_ports(char *ports) {
                             return NULL;
                         }
 
-                        if ( port_stat_link_list(set, port) ) {
+                        if ( port_stat_link_list(set, port, AF_INET) ) {
+                            return NULL;
+                        }
+
+                        if ( port_stat_link_list(set, port, AF_INET6) ) {
                             return NULL;
                         }
 
@@ -1050,7 +1119,8 @@ void parse_config() {
 
     memset(&connection_controller,0,sizeof(connection_controller));
     avl_init_lock(&connection_controller.port_list, compare_port_value);
-    avl_init_lock(&(connection_controller.port_stat), compare_port);
+    avl_init_lock(&(connection_controller.port_stat_ipv4), compare_port);
+    avl_init_lock(&(connection_controller.port_stat_ipv6), compare_port);
 
     if (!user_config_dir && !stock_config_dir) {
         return;

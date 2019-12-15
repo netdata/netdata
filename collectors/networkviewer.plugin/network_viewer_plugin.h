@@ -42,16 +42,22 @@
 # include "../../libnetdata/avl/avl.h"
 # include "../../libnetdata/clocks/clocks.h"
 
+union netdata_ip {
+    __u64 addr64[2];
+    __u32 addr32[4];
+};
+
 typedef struct {
     uint64_t first;
     uint64_t ct;
-    uint32_t saddr;
-    uint32_t daddr;
+    union netdata_ip saddr;
+    union netdata_ip daddr;
     uint16_t dport;
     uint16_t retransmit;
     uint64_t sent;
     uint64_t recv;
     uint8_t protocol;
+    uint16_t family;
     uint8_t removeme;
 }netdata_kern_stats_t;
 
@@ -67,13 +73,14 @@ typedef struct  netdata_conn_stats{
 
     uint64_t first;
     uint64_t ct;
-    uint32_t saddr;
-    uint32_t daddr;
+    union netdata_ip saddr;
+    union netdata_ip daddr;
     uint16_t dport;
     uint16_t retransmit;
     uint64_t sent;
     uint64_t recv;
     uint8_t protocol;
+    uint16_t family;
     time_t remove_time;
 
     struct netdata_conn_stats *prev;
@@ -85,6 +92,7 @@ typedef struct  netdata_port_stats {
 
     uint16_t port;
     uint8_t protocol;
+    uint16_t family;
 
     uint64_t iprev;
     uint64_t inow;
@@ -111,14 +119,20 @@ typedef struct netdata_port_list {
 }netdata_port_list_t;
 
 typedef struct netdata_control_connection{
-    avl_tree_lock port_stat;
+    avl_tree_lock port_stat_ipv4;
+    avl_tree_lock port_stat_ipv6;
+
     avl_tree_lock port_list;
 
     netdata_conn_stats_t *tree;
     netdata_conn_stats_t *last_connection;
 
-    netdata_port_stats_t *ports;
-    netdata_port_stats_t *last_port;
+    netdata_port_stats_t *ports_ipv4;
+    netdata_port_stats_t *last_port_ipv4;
+
+    netdata_port_stats_t *ports_ipv6;
+    netdata_port_stats_t *last_port_ipv6;
+
     uint16_t maxports;
     parse_text_input_t *pti;
 } netdata_control_connection_t;
@@ -141,10 +155,20 @@ typedef struct netdata_network {
 # define NETWORK_VIEWER_CHART3 "UDP_transf_inbound"
 # define NETWORK_VIEWER_CHART4 "UDP_transf_outbound"
 
-# define NETWORK_VIEWER_CHART5 "TCP_conn_inbound"
+//# define NETWORK_VIEWER_CHART5 "TCP_conn_inbound"
 # define NETWORK_VIEWER_CHART6 "TCP_conn_outbound"
-# define NETWORK_VIEWER_CHART7 "UDP_conn_inbound"
+//# define NETWORK_VIEWER_CHART7 "UDP_conn_inbound"
 # define NETWORK_VIEWER_CHART8 "UDP_conn_outbound"
+
+# define NETWORK_VIEWER_CHART9 "TCP_transf_inbound_ipv6"
+# define NETWORK_VIEWER_CHART10 "TCP_transf_outbound_ipv6"
+# define NETWORK_VIEWER_CHART11 "UDP_transf_inbound_ipv6"
+# define NETWORK_VIEWER_CHART12 "UDP_transf_outbound_ipv6"
+
+//# define NETWORK_VIEWER_CHART13 "TCP_conn_inbound_ipv6"
+# define NETWORK_VIEWER_CHART14 "TCP_conn_outbound_ipv6"
+//# define NETWORK_VIEWER_CHART15 "UDP_conn_inbound_ipv6"
+# define NETWORK_VIEWER_CHART16 "UDP_conn_outbound_ipv6"
 
 
 #endif
