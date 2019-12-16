@@ -148,6 +148,25 @@ typedef enum rrddim_flags {
 #define rrddim_flag_clear(rd, flag) (rd)->flags &= ~(flag)
 #endif
 
+typedef enum label_source {
+    LABEL_SOURCE_AUTO             = 0,
+    LABEL_SOURCE_NETDATA_CONF     = 1,
+    LABEL_SOURCE_DOCKER           = 2,
+    LABEL_SOURCE_ENVIRONMENT      = 3,
+    LABEL_SOURCE_KUBERNETES       = 4
+} LABEL_SOURCE;
+
+struct label {
+    char *key, *value;
+    uint32_t key_hash;
+    LABEL_SOURCE label_source;
+    struct label *next;
+};
+
+char *translate_label_source(LABEL_SOURCE l);
+struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
+struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+void reload_host_labels();
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -725,6 +744,11 @@ struct rrdhost {
     // locks
 
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
+
+    // ------------------------------------------------------------------------
+    // Support for host-level labels
+    struct label *labels;
+    netdata_rwlock_t labels_rwlock;         // lock for the label list
 
     // ------------------------------------------------------------------------
     // indexes

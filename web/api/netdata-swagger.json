@@ -988,6 +988,17 @@
             "description": "Container technology detection method.",
             "example": "dockerenv"
           },
+          "labels": {
+            "type": "object",
+            "description": "List of host labels.",
+            "properties": {
+              "app": {
+                "type": "string",
+                "description": "Host label.",
+                "example": "netdata"
+              }
+            }
+          },
           "collectors": {
             "type": "array",
             "items": {
@@ -1067,6 +1078,17 @@
           "update_every": {
             "type": "number",
             "description": "The default update frequency of the netdata server. All charts have an update frequency equal or bigger than this."
+          },
+          "labels": {
+            "type": "object",
+            "description": "List of host labels.",
+            "properties": {
+              "app": {
+                "type": "string",
+                "description": "Host label.",
+                "example": "netdata"
+              }
+            }
           },
           "charts": {
             "type": "object",
@@ -1170,6 +1192,17 @@
               }
             }
           },
+          "labels": {
+            "type": "object",
+            "description": "List of host labels.",
+            "properties": {
+              "app": {
+                "type": "string",
+                "description": "Host label.",
+                "example": "netdata"
+              }
+            }
+          },
           "chart_variables": {
             "type": "object",
             "additionalProperties": {
@@ -1210,6 +1243,17 @@
           "host": {
             "type": "string",
             "description": "The host containing the chart."
+          },
+          "labels": {
+            "type": "object",
+            "description": "List of host labels.",
+            "properties": {
+              "app": {
+                "type": "string",
+                "description": "Host label.",
+                "example": "netdata"
+              }
+            }
           },
           "chart_variables": {
             "type": "object",
@@ -1276,6 +1320,17 @@
           "name": {
             "type": "string",
             "description": "The name of the chart."
+          },
+          "labels": {
+            "type": "object",
+            "description": "List of host labels.",
+            "properties": {
+              "app": {
+                "type": "string",
+                "description": "Host label.",
+                "example": "netdata"
+              }
+            }
           },
           "update_every": {
             "type": "number",
@@ -1682,6 +1737,17 @@
                     "type": "number"
                   }
                 }
+              }
+            }
+          },
+          "labels": {
+            "type": "object",
+            "description": "List of host labels.",
+            "properties": {
+              "app": {
+                "type": "string",
+                "description": "Host label.",
+                "example": "netdata"
               }
             }
           }

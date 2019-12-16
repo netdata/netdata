@@ -703,20 +703,20 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     int ret = 0;
 
     if(filename && *filename) {
-        ret = config_load(filename, overwrite_used);
+        ret = config_load(filename, overwrite_used, NULL);
         if(!ret)
             error("CONFIG: cannot load config file '%s'.", filename);
     }
     else {
         filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
 
-        ret = config_load(filename, overwrite_used);
+        ret = config_load(filename, overwrite_used, NULL);
         if(!ret) {
             info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
             freez(filename);
 
             filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
-            ret = config_load(filename, overwrite_used);
+            ret = config_load(filename, overwrite_used, NULL);
             if(!ret)
                 info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
         }
@@ -1270,6 +1270,9 @@ int main(int argc, char **argv) {
     // enable log flood protection
 
     error_log_limit_reset();
+
+    // Load host labels
+    reload_host_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads

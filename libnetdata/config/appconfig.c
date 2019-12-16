@@ -2,46 +2,6 @@
 
 #include "../libnetdata.h"
 
-#define CONFIG_FILE_LINE_MAX ((CONFIG_MAX_NAME + CONFIG_MAX_VALUE + 1024) * 2)
-
-// ----------------------------------------------------------------------------
-// definitions
-
-#define CONFIG_VALUE_LOADED  0x01 // has been loaded from the config
-#define CONFIG_VALUE_USED    0x02 // has been accessed from the program
-#define CONFIG_VALUE_CHANGED 0x04 // has been changed from the loaded value or the internal default value
-#define CONFIG_VALUE_CHECKED 0x08 // has been checked if the value is different from the default
-
-struct config_option {
-    avl avl;                // the index entry of this entry - this has to be first!
-
-    uint8_t flags;
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-    char *value;
-
-    struct config_option *next; // config->mutex protects just this
-};
-
-struct section {
-    avl avl;                // the index entry of this section - this has to be first!
-
-    uint32_t hash;          // a simple hash to speed up searching
-                            // we first compare hashes, and only if the hashes are equal we do string comparisons
-
-    char *name;
-
-    struct section *next;    // gloabl config_mutex protects just this
-
-    struct config_option *values;
-    avl_tree_lock values_index;
-
-    netdata_mutex_t mutex;  // this locks only the writers, to ensure atomic updates
-                            // readers are protected using the rwlock in avl_tree_lock
-};
-
 /*
  * @Input:
  *      Connector / instance to add to an internal structure
@@ -129,19 +89,19 @@ int is_valid_connector(char *type, int check_reserved)
 // ----------------------------------------------------------------------------
 // locking
 
-static inline void appconfig_wrlock(struct config *root) {
+inline void appconfig_wrlock(struct config *root) {
     netdata_mutex_lock(&root->mutex);
 }
 
-static inline void appconfig_unlock(struct config *root) {
+inline void appconfig_unlock(struct config *root) {
     netdata_mutex_unlock(&root->mutex);
 }
 
-static inline void config_section_wrlock(struct section *co) {
+inline void config_section_wrlock(struct section *co) {
     netdata_mutex_lock(&co->mutex);
 }
 
-static inline void config_section_unlock(struct section *co) {
+inline void config_section_unlock(struct section *co) {
     netdata_mutex_unlock(&co->mutex);
 }
 
@@ -520,7 +480,7 @@ int appconfig_get_duration(struct config *root, const char *section, const char 
 // ----------------------------------------------------------------------------
 // config load/save
 
-int appconfig_load(struct config *root, char *filename, int overwrite_used)
+int appconfig_load(struct config *root, char *filename, int overwrite_used, const char *section_name)
 {
     int line = 0;
     struct section *co = NULL;
@@ -543,6 +503,10 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
         return 0;
     }
 
+    uint32_t section_hash = 0;
+    if(section_name) {
+        section_hash = simple_hash(section_name);
+    }
     is_exporter_config = (strstr(filename, EXPORTING_CONF) != NULL);
 
     while(fgets(buffer, CONFIG_FILE_LINE_MAX, fp) != NULL) {
@@ -592,12 +556,33 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
             co = appconfig_section_find(root, s);
             if(!co) co = appconfig_section_create(root, s);
 
+            if(co && section_name && overwrite_used && section_hash == co->hash && !strcmp(section_name, co->name)) {
+                config_section_wrlock(co);
+                struct config_option *cv2 = co->values;
+                while (cv2) {
+                    struct config_option *save = cv2->next;
+                    struct config_option *found = appconfig_option_index_del(co, cv2);
+                    if(found != cv2)
+                        error("INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
+                               cv2->name, co->name);
+
+                    free(cv2);
+                    cv2 = save;
+                }
+                co->values = NULL;
+                config_section_unlock(co);
+            }
+
             continue;
         }
 
         if(!co) {
             // line outside a section
             error("CONFIG: ignoring line %d ('%s') of file '%s', it is outside all sections.", line, s, filename);
+            continue;
+        }
+
+        if(section_name && overwrite_used && section_hash != co->hash && strcmp(section_name, co->name)) {
             continue;
         }
 
@@ -701,6 +686,7 @@ void appconfig_generate(struct config *root, BUFFER *wb, int only_changed)
                || !strcmp(co->name, CONFIG_SECTION_HEALTH)
                || !strcmp(co->name, CONFIG_SECTION_BACKEND)
                || !strcmp(co->name, CONFIG_SECTION_STREAM)
+               || !strcmp(co->name, CONFIG_SECTION_HOST_LABEL)
                     )
                 pri = 0;
             else if(!strncmp(co->name, "plugin:", 7)) pri = 1;
@@ -805,4 +791,9 @@ int config_parse_duration(const char* string, int* result) {
     fallback:
     *result = 0;
     return 0;
+}
+
+struct section *appconfig_get_section(struct config *root, const char *name)
+{
+    return appconfig_section_find(root, name);
 }

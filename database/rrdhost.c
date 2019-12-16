@@ -709,6 +709,248 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+static int is_valid_label_key(char *key) {
+    //Prometheus exporter
+    if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
+        return 0;
+
+    //Netdata and Prometheus  internal
+    if (*key == '_')
+        return 0;
+
+    while(*key) {
+        if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
+            return 0;
+
+        key++;
+    }
+
+    return 1;
+}
+
+char *translate_label_source(LABEL_SOURCE l) {
+    switch (l) {
+        case LABEL_SOURCE_AUTO:
+            return "AUTO";
+        case LABEL_SOURCE_NETDATA_CONF:
+            return "NETDATA.CONF";
+        case LABEL_SOURCE_DOCKER :
+            return "DOCKER";
+        case LABEL_SOURCE_ENVIRONMENT  :
+            return "ENVIRONMENT";
+        case LABEL_SOURCE_KUBERNETES :
+            return "KUBERNETES";
+        default:
+            return "Invalid label source";
+    }
+}
+
+struct label *load_auto_labels()
+{
+    struct label *label_list = NULL;
+
+    if (localhost->system_info->os_name)
+        label_list =
+            add_label_to_list(label_list, "_os_name", localhost->system_info->os_name, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->os_version)
+        label_list =
+            add_label_to_list(label_list, "_os_version", localhost->system_info->os_version, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->kernel_version)
+        label_list =
+            add_label_to_list(label_list, "_kernel_version", localhost->system_info->kernel_version, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->architecture)
+        label_list =
+            add_label_to_list(label_list, "_architecture", localhost->system_info->architecture, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->virtualization)
+        label_list =
+            add_label_to_list(label_list, "_virtualization", localhost->system_info->virtualization, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->virt_detection)
+        label_list =
+            add_label_to_list(label_list, "_container", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
+
+    label_list = add_label_to_list(
+        label_list, "_is_master", (localhost->next || configured_as_master()) ? "true" : "false", LABEL_SOURCE_AUTO);
+
+    if (localhost->rrdpush_send_destination)
+        label_list =
+            add_label_to_list(label_list, "_streams_to", localhost->rrdpush_send_destination, LABEL_SOURCE_AUTO);
+
+    return label_list;
+}
+
+struct label *load_config_labels()
+{
+    int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
+    if(!status) {
+        char *filename = CONFIG_DIR "/" CONFIG_FILENAME;
+        error("LABEL: Cannot reload the configuration file '%s', using labels in memory", filename);
+    }
+
+    struct label *l = NULL;
+    struct section *co = appconfig_get_section(&netdata_config, CONFIG_SECTION_HOST_LABEL);
+    if(co) {
+        config_section_wrlock(co);
+        struct config_option *cv;
+        for(cv = co->values; cv ; cv = cv->next) {
+            char *name = cv->name;
+            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
+                l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
+                cv->flags |= CONFIG_VALUE_USED;
+            } else {
+                error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s) or values."
+                       , name);
+            }
+        }
+        config_section_unlock(co);
+    }
+
+    return l;
+}
+
+struct label *load_kubernetes_labels()
+{
+    struct label *l=NULL;
+    char *label_script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("get-kubernetes-labels.sh") + 2));
+    sprintf(label_script, "%s/%s", netdata_configured_primary_plugins_dir, "get-kubernetes-labels.sh");
+    if (unlikely(access(label_script, R_OK) != 0)) {
+        error("Kubernetes pod label fetching script %s not found.",label_script);
+        freez(label_script);
+    } else {
+        pid_t command_pid;
+
+        debug(D_RRDHOST, "Attempting to fetch external labels via %s", label_script);
+
+        FILE *fp = mypopen(label_script, &command_pid);
+        if(fp) {
+            int MAX_LINE_SIZE=300;
+            char buffer[MAX_LINE_SIZE + 1];
+            while (fgets(buffer, MAX_LINE_SIZE, fp) != NULL) {
+                char *name=buffer;
+                char *value=buffer;
+                while (*value && *value != ':') value++;
+                if (*value == ':') {
+                    *value = '\0';
+                    value++;
+                }
+                char *eos=value;
+                while (*eos && *eos != '\n') eos++;
+                if (*eos == '\n') *eos = '\0';
+                if (strlen(value)>0) {
+                    if (is_valid_label_key(name)){
+                        l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
+                    } else {
+                        info("Ignoring invalid label name '%s'", name);
+                    }
+                } else {
+                    error("%s outputted unexpected result: '%s'", label_script, name);
+                }
+            };
+            // Non-zero exit code means that all the script output is error messages. We've shown already any message that didn't include a ':'
+            // Here we'll inform with an ERROR that the script failed, show whatever (if anything) was added to the list of labels, free the memory and set the return to null
+            int retcode=mypclose(fp, command_pid);
+            if (retcode) {
+                error("%s exited abnormally. No kubernetes labels will be added to the host.", label_script);
+                struct label *ll=l;
+                while (ll != NULL) {
+                    info("Ignoring Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(ll->label_source), ll->key, ll->value);
+                    ll = ll->next;
+                    freez(l);
+                    l=ll;
+                }
+            }
+        }
+        freez(label_script);
+    }
+
+    return l;
+}
+
+struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
+{
+    size_t key_len = strlen(key), value_len = strlen(value);
+    size_t n = sizeof(struct label) + key_len + 1 + value_len + 1;
+    struct label *result = callocz(1,n);
+    if (result != NULL) {
+        char *c = (char *)result;
+        c += sizeof(struct label);
+        strcpy(c, key);
+        result->key = c;
+        c += key_len + 1;
+        strcpy(c, value);
+        result->value = c;
+        result->label_source = label_source;
+        result->key_hash = simple_hash(result->key);
+    }
+    return result;
+}
+
+struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
+{
+    struct label *lab = create_label(key, value, label_source);
+    lab->next = l;
+    return lab;
+}
+
+int label_list_contains(struct label *head, struct label *check)
+{
+    while (head != NULL)
+    {
+        if (head->key_hash == check->key_hash && !strcmp(head->key, check->key))
+            return 1;
+        head = head->next;
+    }
+    return 0;
+}
+
+/* Create a list with entries from both lists.
+   If any entry in the low priority list is masked by an entry in the high priorty list then delete it.
+*/
+struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
+{
+    struct label *result = hi_pri;
+    while (lo_pri != NULL)
+    {
+        struct label *current = lo_pri;
+        lo_pri = lo_pri->next;
+        if (!label_list_contains(result, current)) {
+            current->next = result;
+            result = current;
+        }
+        else
+            freez(current);
+    }
+    return result;
+}
+
+void reload_host_labels()
+{
+    struct label *from_auto = load_auto_labels();
+    struct label *from_k8s = load_kubernetes_labels();
+    struct label *from_config = load_config_labels();
+
+    struct label *new_labels = merge_label_lists(from_auto, from_k8s);
+    new_labels = merge_label_lists(new_labels, from_config);
+
+    netdata_rwlock_wrlock(&localhost->labels_rwlock);
+    struct label *old_labels = localhost->labels;
+    localhost->labels = new_labels;
+    netdata_rwlock_unlock(&localhost->labels_rwlock);
+
+    while (old_labels != NULL)
+    {
+        struct label *current = old_labels;
+        old_labels = old_labels->next;
+        freez(current);
+    }
+
+    health_reload();
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - delete host files
 
