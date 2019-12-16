@@ -1,7 +1,5 @@
 dist: bionic
 language: c
-services:
-  - docker
 
 addons:
   apt:
@@ -20,9 +18,7 @@ before_install:
 #
 install:
   - sudo apt-get install -y libuv1-dev liblz4-dev libjudy-dev libcap2-bin zlib1g-dev uuid-dev fakeroot libipmimonitoring-dev libmnl-dev libnetfilter-acct-dev gnupg python-pip
-  - sudo apt install -y --only-upgrade docker-ce
   - sudo pip install git-semver==0.2.4 # 11/Sep/2019: git-semver tip was broken, so we had to force last good run of it
-  - docker info
   - source tests/installer/slack.sh
   - export NOTIF_CHANNEL="automation-beta"
   - if [ "${TRAVIS_REPO_SLUG}" = "netdata/netdata" ]; then export NOTIF_CHANNEL="automation"; fi;
