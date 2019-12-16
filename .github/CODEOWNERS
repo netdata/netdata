@@ -31,7 +31,7 @@ health/health.d/ @thiagoftsm @vlvkobal @cosmix
 health/notifications/ @Ferroin @thiagoftsm @cosmix
 libnetdata/ @thiagofsm @mfundul @cosmix
 packaging/ @cosmix @netdata/automation
-registry/ @VLegakis @cosmix
+registry/ @jacekkolasa @cosmix
 streaming/ @thiagoftsm @vlvkobal @cosmix
 web/ @thiagoftsm @mfundul @vlvkobal @cosmix
 web/gui/ @VLegakis @cosmix
