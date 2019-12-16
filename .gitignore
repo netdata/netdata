@@ -115,6 +115,7 @@ system/netdata-freebsd
 system/edit-config
 
 daemon/anonymous-statistics.sh
+daemon/get-kubernetes-labels.sh
 
 health/notifications/alarm-notify.sh
 collectors/cgroups.plugin/cgroup-name.sh

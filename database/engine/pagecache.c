@@ -101,6 +101,13 @@ void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr)
         uv_cond_broadcast(&pg_cache_descr->cond);
 }
 
+void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+{
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    pg_cache_wake_up_waiters_unsafe(descr);
+    rrdeng_page_descr_mutex_unlock(ctx, descr);
+}
+
 /*
  * The caller must hold page descriptor lock.
  * The lock will be released and re-acquired. The descriptor is not guaranteed
@@ -135,27 +142,6 @@ unsigned long pg_cache_wait_event(struct rrdengine_instance *ctx, struct rrdeng_
 
 /*
  * The caller must hold page descriptor lock.
- * Gets a reference to the page descriptor.
- * Returns 1 on success and 0 on failure.
- */
-int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access)
-{
-    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
-
-    if ((pg_cache_descr->flags & (RRD_PAGE_LOCKED | RRD_PAGE_READ_PENDING)) ||
-        (exclusive_access && pg_cache_descr->refcnt)) {
-        return 0;
-    }
-    if (exclusive_access)
-        pg_cache_descr->flags |= RRD_PAGE_LOCKED;
-    ++pg_cache_descr->refcnt;
-
-    return 1;
-}
-
-/*
- * The caller must hold page descriptor lock.
- * Same return values as pg_cache_try_get_unsafe() without doing anything.
  */
 int pg_cache_can_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access)
 {
@@ -165,6 +151,25 @@ int pg_cache_can_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_acces
         (exclusive_access && pg_cache_descr->refcnt)) {
         return 0;
     }
+
+    return 1;
+}
+
+/*
+ * The caller must hold page descriptor lock.
+ * Gets a reference to the page descriptor.
+ * Returns 1 on success and 0 on failure.
+ */
+int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access)
+{
+    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+
+    if (!pg_cache_can_get_unsafe(descr, exclusive_access))
+        return 0;
+
+    if (exclusive_access)
+        pg_cache_descr->flags |= RRD_PAGE_LOCKED;
+    ++pg_cache_descr->refcnt;
 
     return 1;
 }
@@ -429,8 +434,11 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
         uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
     }
     pg_cache_put(ctx, descr);
-    if (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED)
-        rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
+    rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
+    while (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED) {
+        rrdeng_try_deallocate_pg_cache_descr(ctx, descr); /* spin */
+        (void)sleep_usec(1000); /* 1 msec */
+    }
 destroy:
     freez(descr);
     pg_cache_update_metric_times(page_index);
