@@ -37,7 +37,7 @@ int init_json_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_json_plaintext;
 
     instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = flush_host_labels_json_plaintext;
+    instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
     instance->buffer = (void *)buffer_create(0);
@@ -93,23 +93,6 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
     netdata_rwlock_unlock(&host->labels_rwlock);
 
     buffer_strcat(instance->labels, "},");
-
-    return 0;
-}
-
-/**
- * Flush a buffer with host labels for JSON connector
- *
- * @param instance an instance data structure.
- * @param host a data collecting host.
- * @return Always returns 0.
- */
-int flush_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
-{
-    (void)host;
-
-    if (instance->labels)
-        buffer_flush(instance->labels);
 
     return 0;
 }

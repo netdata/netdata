@@ -185,6 +185,7 @@ int metric_formatting(struct engine *engine, RRDDIM *rd);
 int end_chart_formatting(struct engine *engine, RRDSET *st);
 int end_host_formatting(struct engine *engine, RRDHOST *host);
 int end_batch_formatting(struct engine *engine);
+int flush_host_labels(struct instance *instance, RRDHOST *host);
 
 int exporting_discard_response(BUFFER *buffer, struct instance *instance);
 void simple_connector_receive_response(int *sock, struct instance *instance);

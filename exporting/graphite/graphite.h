@@ -7,6 +7,9 @@
 
 int init_graphite_connector(struct connector *connector);
 int init_graphite_instance(struct instance *instance);
+
+int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *host);
+
 int format_dimension_collected_graphite_plaintext(struct instance *instance, RRDDIM *rd);
 int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM *rd);
 
