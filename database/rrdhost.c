@@ -889,6 +889,21 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
     return result;
 }
 
+void clean_label_list(RRDHOST *host, struct label *new_labels)
+{
+    netdata_rwlock_wrlock(&host->labels_rwlock);
+    struct label *old_labels = host->labels;
+    host->labels = new_labels;
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    while (old_labels != NULL)
+    {
+        struct label *current = old_labels;
+        old_labels = old_labels->next;
+        freez(current);
+    }
+}
+
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
 {
     struct label *lab = create_label(key, value, label_source);
@@ -936,16 +951,11 @@ void reload_host_labels()
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
     new_labels = merge_label_lists(new_labels, from_config);
 
-    netdata_rwlock_wrlock(&localhost->labels_rwlock);
-    struct label *old_labels = localhost->labels;
-    localhost->labels = new_labels;
-    netdata_rwlock_unlock(&localhost->labels_rwlock);
+    clean_label_list(localhost, new_labels);
 
-    while (old_labels != NULL)
-    {
-        struct label *current = old_labels;
-        old_labels = old_labels->next;
-        freez(current);
+    if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
+        localhost->labels_flag |= LABEL_FLAG_STREAM;
+        rrdpush_send_labels(localhost);
     }
 
     health_reload();

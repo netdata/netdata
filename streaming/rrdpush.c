@@ -48,6 +48,7 @@ unsigned int default_rrdpush_enabled = 0;
 char *default_rrdpush_destination = NULL;
 char *default_rrdpush_api_key = NULL;
 char *default_rrdpush_send_charts_matching = NULL;
+unsigned int disable_label = 1;
 #ifdef ENABLE_HTTPS
 int netdata_use_ssl_on_stream = NETDATA_SSL_OPTIONAL;
 char *netdata_ssl_ca_path = NULL;
@@ -78,6 +79,8 @@ int rrdpush_init() {
     default_rrdpush_api_key     = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "api key", "");
     default_rrdpush_send_charts_matching      = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "send charts matching", "*");
     rrdhost_free_orphan_time    = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup orphan hosts after seconds", rrdhost_free_orphan_time);
+    disable_label               = (unsigned int)appconfig_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "disable send label", disable_label);
+
 
     if(default_rrdpush_enabled && (!default_rrdpush_destination || !*default_rrdpush_destination || !default_rrdpush_api_key || !*default_rrdpush_api_key)) {
         error("STREAM [send]: cannot enable sending thread - information is missing.");
@@ -338,6 +341,36 @@ void rrdset_done_push(RRDSET *st) {
     rrdpush_buffer_unlock(host);
 }
 
+// labels
+void rrdpush_send_labels(RRDHOST *host) {
+    if (!host->labels || !(host->labels_flag & LABEL_FLAG_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
+        return;
+
+    rrdpush_buffer_lock(host);
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+
+    struct label *labels = host->labels;
+    while(labels) {
+        buffer_sprintf(host->rrdpush_sender_buffer
+                , "LABEL \"%s\" = %d %s\n"
+                , labels->key
+                , (int)labels->label_source
+                , labels->value);
+
+        labels = labels->next;
+    }
+
+    buffer_sprintf(host->rrdpush_sender_buffer
+            , "OVERWRITE %s\n", "labels");
+
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+
+    rrdpush_buffer_unlock(host);
+    host->labels_flag &= ~LABEL_FLAG_STREAM;
+}
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
@@ -629,6 +662,11 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     debug(D_STREAM, "STREAM: Connected on fd %d...", host->rrdpush_sender_socket);
 
+    if(!disable_label)
+        host->labels_flag |= LABEL_FLAG_STREAM;
+    else
+        host->labels_flag |= LABEL_FLAG_STOP_STREAM;
+
     return 1;
 }
 
@@ -814,6 +852,8 @@ void *rrdpush_sender_thread(void *ptr) {
                 }
 
                 if (ofd->revents & POLLOUT) {
+                    rrdpush_send_labels(host);
+
                     if (begin < buffer_strlen(host->rrdpush_sender_buffer)) {
                         debug(D_STREAM, "STREAM: Sending data (current buffer length %zu bytes, begin = %zu)...", buffer_strlen(host->rrdpush_sender_buffer), begin);
 
