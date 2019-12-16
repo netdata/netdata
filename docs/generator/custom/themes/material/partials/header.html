@@ -30,12 +30,7 @@
         </div>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
-        {% block search_box %}
-          {% if "search" in config["plugins"] %}
-            <label class="md-icon md-icon--search md-header-nav__button" for="__search"></label>
-            {% include "partials/search.html" %}
-          {% endif %}
-        {% endblock %}
+        <input id="search_algolia" type="text" name="search" placeholder="Search Netdata's docs...">
       </div>
 
       <!-- netdata -->

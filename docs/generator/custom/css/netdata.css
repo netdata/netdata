@@ -23,6 +23,15 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     background-color: #546e7a
 }
 
+.md-flex__cell {
+    vertical-align: middle;
+}
+
+.md-header-nav__button {
+    margin: 0;
+    padding: 0;
+}
+
 /* Main structure */
 .md-container {
     flex-flow: row wrap;
@@ -41,6 +50,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     margin-right: 0;
     margin-left: 0;
     max-width: 45rem;
+    overflow: hidden;
 }
 
 .md-sidebar[data-md-state="lock"] {
@@ -72,6 +82,27 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 
 /* Left-hand navigation */
 .md-nav {
+    font-size: 0.8rem;
+}
+
+/* Algolia search */
+
+#search_algolia {
+    font-size: 0.7rem;
+    padding: 0.4rem;
+    border-radius: 3px;
+    min-width: 300px;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--category-header {
+    font-size: 0.9rem !important;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--subcategory-column {
+    font-size: 0.7rem;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--title {
     font-size: 0.8rem;
 }
 
