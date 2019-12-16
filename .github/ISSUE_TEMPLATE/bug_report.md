@@ -23,7 +23,7 @@ When creating a bug report please:
 
 ##### Bug report summary
 
-##### OS / Environment
+##### OS / Environment (output of `uname -a; grep -Hv ^# /etc/*release`)
 
 ##### Netdata version (ouput of `netdata -V`)
 
