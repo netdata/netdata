@@ -460,8 +460,8 @@ static void test_format_dimension_collected_json_plaintext(void **state)
         buffer_tostring(engine->connector_root->instance_root->buffer),
         "{\"prefix\":\"netdata\",\"hostname\":\"test-host\",\"host_tags\":\"TAG1=VALUE1 TAG2=VALUE2\","
         "\"chart_id\":\"chart_id\",\"chart_name\":\"chart_name\",\"chart_family\":\"(null)\","
-        "\"chart_context\": \"(null)\",\"chart_type\":\"(null)\",\"units\": \"(null)\",\"id\":\"dimension_id\","
-        "\"name\":\"dimension_name\",\"value\":123000321,\"timestamp\": 15051}\n");
+        "\"chart_context\":\"(null)\",\"chart_type\":\"(null)\",\"units\":\"(null)\",\"id\":\"dimension_id\","
+        "\"name\":\"dimension_name\",\"value\":123000321,\"timestamp\":15051}\n");
 }
 
 static void test_format_dimension_stored_json_plaintext(void **state)

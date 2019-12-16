@@ -318,6 +318,18 @@ struct engine *read_exporting_config()
 
                 tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
 
+                if (exporter_get_boolean(
+                        instance_name, EXPORTER_SEND_CONFIGURED_LABELS, EXPORTER_SEND_CONFIGURED_LABELS_DEFAULT))
+                    tmp_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+                else
+                    tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+
+                if (exporter_get_boolean(
+                        instance_name, EXPORTER_SEND_AUTOMATIC_LABELS, EXPORTER_SEND_AUTOMATIC_LABELS_DEFAULT))
+                    tmp_instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+                else
+                    tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
                 if (exporter_get_boolean(instance_name, EXPORTER_SEND_NAMES, EXPORTER_SEND_NAMES_DEFAULT))
                     tmp_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;
                 else
