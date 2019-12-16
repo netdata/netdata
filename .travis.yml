@@ -5,11 +5,6 @@ addons:
   apt:
     packages: ['moreutils']
 
-# This is a hook to help us introduce "soft" errors on our process
-matrix:
-  allow_failures:
-    - env: ALLOW_SOFT_FAILURE_HERE=true
-
 before_install:
   - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
@@ -96,6 +91,9 @@ stages:
 # Define stage implementation details
 #
 jobs:
+  # This is a hook to help us introduce "soft" errors on our process
+  allow_failures:
+    - env: ALLOW_SOFT_FAILURE_HERE=true
   include:
       # Do code quality, syntax checking and other pre-build activities
     - stage: Code quality, linting, syntax, code style
