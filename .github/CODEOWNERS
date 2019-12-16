@@ -34,7 +34,7 @@ packaging/ @cosmix @netdata/automation
 registry/ @jacekkolasa @cosmix
 streaming/ @thiagoftsm @vlvkobal @cosmix
 web/ @thiagoftsm @mfundul @vlvkobal @cosmix
-web/gui/ @VLegakis @cosmix
+web/gui/ @jacekkolasa @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @cosmix @joelhans
