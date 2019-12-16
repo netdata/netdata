@@ -139,17 +139,17 @@ static void netdata_create_charts() {
 
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections","UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART9, "Network Viewer TCP bytes received from request to specific port.", "kilobits/s", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART9, "Network Viewer TCP bytes received from request to specific port.", "kilobits/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART10, "Network viewer TCP request length to specific port.", "kilobits/s", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART10, "Network viewer TCP request length to specific port.", "kilobits/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART11, "Network viewer UDP bytes received from request to specific port.", "kilobits/s", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART11, "Network viewer UDP bytes received from request to specific port.", "kilobits/s", "UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART12, "Network viewer UDP request length to specific port.", "kilobits/s", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART12, "Network viewer UDP request length to specific port.", "kilobits/s", "UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART14, "Network viewer TCP active connections per port.", "active connections", 0);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART14, "Network viewer TCP active connections per port.", "active connections", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART16, "Network viewer UDP active connections per port.", "active connections", 1);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART16, "Network viewer UDP active connections per port.", "active connections", "UDP");
 }
 
 static void write_connection(char *name, uint32_t *bytes) {
