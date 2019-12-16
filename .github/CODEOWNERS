@@ -52,7 +52,7 @@ web/gui/ @jacekkolasa @cosmix
 netdata.spec.in @cosmix @netdata/automation
 netdata-installer.sh @cosmix @netdata/automation
 netlify.toml @cosmix
-package.json @VLegakis
+package.json @jacekkolasa
 packaging/version @netdatabot
 
 LICENSE.md @cosmix @joelhans
