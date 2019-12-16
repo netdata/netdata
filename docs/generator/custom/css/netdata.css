@@ -1,15 +1,78 @@
-/* .md-nav__link {
-    white-space: nowrap;
-} */
+/* Fonts */
+@import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,400i,700,700i&display=swap');
 
-.md-typeset {
-    font-size: .75rem
+body, input {
+    font-family: "Source Sans Pro","Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 
-/* Underline text */
+.md-typeset {
+    font-size: .9rem;
+    line-height: 1.5;
+}
 
-.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
-    border-bottom: 1px solid #272b30;
+/* Header */
+[data-md-color-primary="blue-grey"] .md-header {
+    background: #35414A;
+}
+
+html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
+    background-color: #35414A;
+}
+
+[data-md-color-primary="blue-grey"] .md-nav__source {
+    background-color: #546e7a
+}
+
+/* Main structure */
+.md-container {
+    flex-flow: row wrap;
+}
+
+.md-grid {
+    max-width: 80rem;
+    display: flex;
+    position: relative;
+    overflow: visible;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.md-content {
+    margin-right: 0;
+    margin-left: 0;
+    max-width: 45rem;
+}
+
+.md-sidebar[data-md-state="lock"] {
+    position: sticky;
+}
+
+.md-sidebar {
+    position: sticky;
+    flex: 0 0 300px;
+}
+
+.md-sidebar--secondary {
+    right: 0;
+    margin-left: 0;
+    transform: none;
+    order: 3;
+}
+
+.md-content__inner {
+    margin-right: 2.5rem;
+    margin-left: 2.5rem;
+}
+
+@media screen and (max-width: 76.1875em) {
+    .md-sidebar--primary {
+        position: fixed;
+    }
+}
+
+/* Left-hand navigation */
+.md-nav {
+    font-size: 0.8rem;
 }
 
 /*  Custom styling for the new documentation homepage.
@@ -126,4 +189,9 @@
 /* Bold the first item on the docs sidebar: Netdata Documentation */
 .md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
     font-weight: 700;
+}
+
+/* Underline text */
+.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
+    border-bottom: 1px solid #272b30;
 }
