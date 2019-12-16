@@ -469,7 +469,6 @@ void *network_collector(void *ptr) {
     (void)ptr;
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
-    int netdata_exit = 0;
 
     netdata_perf_loop_multi(pmu_fd, headers, nprocs, &netdata_exit, netdata_store_bpf);
 
