@@ -525,8 +525,6 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
     int line = 0;
     struct section *co = NULL;
     int is_exporter_config = 0;
-    int is_backend_config = 0;
-    int have_backend_config = 0;
     int _backends = 0;              // number of backend sections we have
     char working_instance[CONFIG_MAX_NAME + 1];
     char working_connector[CONFIG_MAX_NAME + 1];
@@ -589,18 +587,6 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used)
                         continue;
                     }
                 }
-            }
-
-            is_backend_config = !(strcmp(s, CONFIG_SECTION_BACKEND));
-            if (!have_backend_config)
-                have_backend_config = is_backend_config;
-
-            if (is_backend_config) {
-                if (_backends) {
-                    sprintf(buffer, CONFIG_SECTION_BACKEND "/%d", _backends);
-                    s = buffer;
-                }
-                _backends++;
             }
 
             co = appconfig_section_find(root, s);
