@@ -31,7 +31,7 @@ echo "--- Initialize git configuration ---"
 git checkout "${1-master}"
 git pull
 
-if [ "$RELEASE_CHANNEL" = stable ]; then
+if [ "${RELEASE_CHANNEL}" == stable ]; then
   echo "--- Set default release channel to stable ---"
   sed -i 's/^RELEASE_CHANNEL="nightly" *#/RELEASE_CHANNEL="stable" #/' \
     netdata-installer.sh \
