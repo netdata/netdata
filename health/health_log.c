@@ -80,6 +80,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                         "\t%d\t%d\t%d\t%d"
                         "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
                         "\t%016lx"
+                        "\t%s"
                         "\n"
                             , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
                             , host->hostname
@@ -114,6 +115,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , ae->new_value
                             , ae->old_value
                             , (uint64_t)ae->last_repeat
+                            , (ae->labels)?ae->labels:""
         ) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", host->hostname, host->health_log_filename);
         else {
@@ -132,6 +134,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
+    netdata_rwlock_rdlock(&host->labels_rwlock);
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
         line++;
@@ -310,6 +313,12 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             ae->old_value_string = strdupz(format_value_and_unit(value_string, 100, ae->old_value, ae->units, -1));
             ae->new_value_string = strdupz(format_value_and_unit(value_string, 100, ae->new_value, ae->units, -1));
 
+            freez(ae->labels);
+            if(entries > 28)
+                ae->labels = strdupz(pointers[28]);
+            else
+                ae->labels = NULL;
+
             // add it to host if not already there
             if(unlikely(*pointers[0] == 'A')) {
                 ae->next = host->health_log.alarms;
@@ -330,6 +339,7 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
         }
     }
 
+    netdata_rwlock_unlock(&host->labels_rwlock);
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     freez(buf);
@@ -392,7 +402,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags
+        uint32_t flags,
+        const char *labels
 ) {
     debug(D_HEALTH, "Health adding alarm log entry with id: %u", host->health_log.next_log_id);
 
@@ -436,6 +447,8 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
+
+    ae->labels = (!labels)?NULL:strdupz(labels);
 
     return ae;
 }
@@ -494,6 +507,7 @@ inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
     freez(ae->info);
     freez(ae->old_value_string);
     freez(ae->new_value_string);
+    freez(ae->labels);
     freez(ae);
 }
 

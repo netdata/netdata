@@ -93,7 +93,8 @@ extern ALARM_ENTRY* health_create_alarm_entry(
         const char *units,
         const char *info,
         int delay,
-        uint32_t flags);
+        uint32_t flags,
+        const char *labels);
 
 extern void health_alarm_log(RRDHOST *host, ALARM_ENTRY *ae);
 
