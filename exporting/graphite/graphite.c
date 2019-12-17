@@ -87,9 +87,6 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
     if (!instance->labels)
         instance->labels = buffer_create(1024);
 
-    if (!instance->labels)
-        return 0;
-
     if (unlikely(
             !(instance->config.options &
               (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))))
