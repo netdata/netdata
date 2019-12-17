@@ -51,6 +51,30 @@ int init_graphite_instance(struct instance *instance)
     return 0;
 }
 
+static inline void fix_graphite_label_key(char *dst, char *src, size_t len) {
+    while (*src != '\0' && len) {
+        if (*src == ';' || *src == '!' || *src == '^' || *src == '=')
+            *dst++ = '_';
+        else
+            *dst++ = *src;
+        src++;
+        len--;
+    }
+    *dst = '\0';
+}
+
+static inline void fix_graphite_label_value(char *dst, char *src, size_t len) {
+    while (*src != '\0' && len) {
+        if (*src == ';' || *src == '~')
+            *dst++ = '_';
+        else
+            *dst++ = *src;
+        src++;
+        len--;
+    }
+    *dst = '\0';
+}
+
 /**
  * Format host labels for JSON connector
  *
@@ -79,10 +103,16 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
                label->label_source != LABEL_SOURCE_NETDATA_CONF)))
             continue;
 
-        char value[CONFIG_MAX_VALUE * 2 + 1];
-        escape_json_string(value, label->value, CONFIG_MAX_VALUE);
-        buffer_strcat(instance->labels, ";");
-        buffer_sprintf(instance->labels, "%s=%s", label->key, value);
+        char key[CONFIG_MAX_NAME + 1];
+        fix_graphite_label_key(key, label->key, CONFIG_MAX_NAME);
+
+        char value[CONFIG_MAX_VALUE + 1];
+        fix_graphite_label_value(value, label->value, CONFIG_MAX_VALUE);
+
+        if (*value) {
+            buffer_strcat(instance->labels, ";");
+            buffer_sprintf(instance->labels, "%s=%s", key, value);
+        }
     }
     netdata_rwlock_unlock(&host->labels_rwlock);
 
@@ -163,13 +193,14 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
 
     buffer_sprintf(
         instance->buffer,
-        "%s.%s.%s.%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
+        "%s.%s.%s.%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
         engine->config.prefix,
         engine->config.hostname,
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
         (host->tags) ? host->tags : "",
+        (instance->labels) ? buffer_tostring(instance->labels) : "",
         value,
         (unsigned long long)last_t);
 
