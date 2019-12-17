@@ -244,9 +244,9 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
 
-#    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
-#      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
-#      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
+    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
+      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
 
 
@@ -419,6 +419,14 @@ jobs:
       env:
         - BUILDER_NAME="builder" BUILD_DISTRO="centos" BUILD_RELEASE="7" BUILD_STRING="el/7"
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+    - name: "Build & Publish RPM package for Fedora 31"
+      <<: *RPM_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
         - ALLOW_SOFT_FAILURE_HERE=true
 
     - name: "Build & Publish RPM package for Fedora 30"
