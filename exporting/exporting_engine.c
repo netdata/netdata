@@ -2,6 +2,15 @@
 
 #include "exporting_engine.h"
 
+static void exporting_main_cleanup(void *ptr) {
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    info("cleaning up...");
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
 /**
  * Exporting engine main
  *
@@ -13,17 +22,17 @@
  */
 void *exporting_main(void *ptr)
 {
-    (void)ptr;
+    netdata_thread_cleanup_push(exporting_main_cleanup, ptr);
 
     struct engine *engine = read_exporting_config();
     if (!engine) {
         info("EXPORTING: no exporting connectors configured");
-        return NULL;
+        goto cleanup;
     }
 
     if (init_connectors(engine) != 0) {
         error("EXPORTING: cannot initialize exporting connectors");
-        return NULL;
+        goto cleanup;
     }
 
     usec_t step_ut = localhost->rrd_update_every * USEC_PER_SEC;
@@ -37,18 +46,18 @@ void *exporting_main(void *ptr)
         if (mark_scheduled_instances(engine)) {
             if (prepare_buffers(engine) != 0) {
                 error("EXPORTING: cannot prepare data to send");
-                return NULL;
+                break;
             }
         }
 
         if (notify_workers(engine) != 0) {
             error("EXPORTING: cannot communicate with exporting connector instance working threads");
-            return NULL;
+            break;
         }
 
         if (send_internal_metrics(engine) != 0) {
             error("EXPORTING: cannot send metrics for the operation of exporting engine");
-            return NULL;
+            break;
         }
 
 #ifdef UNIT_TESTING
@@ -56,5 +65,7 @@ void *exporting_main(void *ptr)
 #endif
     }
 
+cleanup:
+    netdata_thread_cleanup_pop(1);
     return NULL;
 }
