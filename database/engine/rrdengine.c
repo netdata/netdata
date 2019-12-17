@@ -134,7 +134,6 @@ after_crc_check:
             debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
             pg_cache_wake_up_waiters(ctx, descr);
         }
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
     }
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         freez(uncompressed_buf);
