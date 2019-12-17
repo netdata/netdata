@@ -129,7 +129,7 @@ after_crc_check:
         rrdeng_page_descr_mutex_unlock(ctx, descr);
         pg_cache_replaceQ_insert(ctx, descr);
         if (xt_io_descr->release_descr) {
-            pg_cache_put_unsafe(descr);
+            pg_cache_put(ctx, descr);
         } else {
             debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
             pg_cache_wake_up_waiters(ctx, descr);
