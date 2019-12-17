@@ -97,6 +97,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
         ff = procfile_readall(ff);
         resource_info[i].pf = ff;
         if (unlikely(!ff)) {
+            fail_count++;
             continue;
         }
 
