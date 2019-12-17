@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix backend config [\#7538](https://github.com/netdata/netdata/pull/7538) ([vlvkobal](https://github.com/vlvkobal))
+- Fix race condition in dbengine [\#7533](https://github.com/netdata/netdata/pull/7533) ([mfundul](https://github.com/mfundul))
+- Fix valgrind errors [\#7532](https://github.com/netdata/netdata/pull/7532) ([mfundul](https://github.com/mfundul))
+- Update codeowners [\#7530](https://github.com/netdata/netdata/pull/7530) ([knatsakis](https://github.com/knatsakis))
+- Labels issues [\#7515](https://github.com/netdata/netdata/pull/7515) ([amoss](https://github.com/amoss))
 - Update Netdata RPM spec file to package netdatacli. [\#7513](https://github.com/netdata/netdata/pull/7513) ([Ferroin](https://github.com/Ferroin))
 - Remove `-f` option from `groupdel` in uninstaller. [\#7507](https://github.com/netdata/netdata/pull/7507) ([Ferroin](https://github.com/Ferroin))
 - Force the repo name to be lowercase in the tag for docker builds. [\#7506](https://github.com/netdata/netdata/pull/7506) ([Ferroin](https://github.com/Ferroin))
@@ -221,8 +226,6 @@
 - netdata/packaging: we didnt fix changelog handling, fixes and nits now [\#6837](https://github.com/netdata/netdata/pull/6837) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Add news of 1.17.1 to README [\#6836](https://github.com/netdata/netdata/pull/6836) ([cakrit](https://github.com/cakrit))
 - netdata/packaging: no need to overengineer with these checks [\#6834](https://github.com/netdata/netdata/pull/6834) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Buffer overflow [\#6817](https://github.com/netdata/netdata/pull/6817) ([amoss](https://github.com/amoss))
-- Docs: Overhaul of Getting started guide [\#6811](https://github.com/netdata/netdata/pull/6811) ([joelhans](https://github.com/joelhans))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
@@ -232,9 +235,6 @@
 
 - netdata/packaging: fix ubuntu/xenial runtime dependencies [\#6825](https://github.com/netdata/netdata/pull/6825) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - netdata/ci: Force last good version of git-semver, they broke it [\#6820](https://github.com/netdata/netdata/pull/6820) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Stress test insertions into dbengine and bugfixes [\#6814](https://github.com/netdata/netdata/pull/6814) ([mfundul](https://github.com/mfundul))
-- netdata/ci: Fix author on triggering commits for packaging [\#6813](https://github.com/netdata/netdata/pull/6813) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging: remove fedora/28, is no longer available [\#6808](https://github.com/netdata/netdata/pull/6808) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 

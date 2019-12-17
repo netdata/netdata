@@ -68,6 +68,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
 | [`option`](#alarm-line-option)                      | no              | Add an option to not clear alarms.                                                    |
+| [`label`](#alarm-line-label)                        | no              | List of labels present on a host.                                                     |
 
 The `alarm` or `template` line must be the first line of any entity.
 
@@ -369,6 +370,48 @@ cleared. As time passes, the newest window moves into the older, so the average 
 increasing. Eventually, the comparison will find the averages in the two time-frames close enough to clear the alarm.
 However, the issue was not resolved, it's just a matter of the newer data "polluting" the old. For such alarms, it's a
 good idea to tell Netdata to not clear the notification, by using the `no-clear-notification` option.
+
+#### Alarm line `label`
+
+Defines the list of labels expected on a host. For example, let's suppose that `netdata.conf` is configured with the
+following labels:
+
+```yaml
+[host labels]
+    installed = 20191211
+    room = server
+```
+
+And more labels in `netdata.conf` for workstations:
+
+```yaml
+[host labels]
+    installed = 201705
+    room = workstation
+```
+
+By defining labels inside of `netdata.conf`, you can now apply labels to alarms. For example, you can add the following 
+line to any alarms you'd like to apply to hosts that have the label `room = server`.
+
+```yaml
+label: room = server
+```
+
+You can also combine labels when applying them to alarms. For example, if you want to raise a specific alarm only for hosts 
+inside a room that were installed at a specific time, you can write the following label line:
+
+```yaml
+label: room = workstation AND installed = 201705
+```
+
+The `label` is a space-separated list that accepts simple patterns. For example, you can create an alarm 
+that will be applied to all hosts installed in the last decade with the following line:
+
+```yaml
+label: installed = 201*
+```
+
+See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
 
 ## Expressions
 
