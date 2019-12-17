@@ -51,7 +51,7 @@ int init_graphite_instance(struct instance *instance)
     return 0;
 }
 
-static inline void fix_graphite_label_key(char *dst, char *src, size_t len) {
+static inline void sanitize_graphite_label_key(char *dst, char *src, size_t len) {
     while (*src != '\0' && len) {
         if (*src == ';' || *src == '!' || *src == '^' || *src == '=')
             *dst++ = '_';
@@ -63,7 +63,7 @@ static inline void fix_graphite_label_key(char *dst, char *src, size_t len) {
     *dst = '\0';
 }
 
-static inline void fix_graphite_label_value(char *dst, char *src, size_t len) {
+static inline void sanitize_graphite_label_value(char *dst, char *src, size_t len) {
     while (*src != '\0' && len) {
         if (*src == ';' || *src == '~')
             *dst++ = '_';
@@ -104,10 +104,10 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
             continue;
 
         char key[CONFIG_MAX_NAME + 1];
-        fix_graphite_label_key(key, label->key, CONFIG_MAX_NAME);
+        sanitize_graphite_label_key(key, label->key, CONFIG_MAX_NAME);
 
         char value[CONFIG_MAX_VALUE + 1];
-        fix_graphite_label_value(value, label->value, CONFIG_MAX_VALUE);
+        sanitize_graphite_label_value(value, label->value, CONFIG_MAX_VALUE);
 
         if (*value) {
             buffer_strcat(instance->labels, ";");
