@@ -468,9 +468,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_libdir}/%{name}/conf.d/
 
 %if %{with systemd}
-%{_unitdir}/netdata.service
+%attr(0644,root,root) %%{_unitdir}/netdata.service
 %else
-%{_sysconfdir}/rc.d/init.d/netdata
+%attr(0755,root,root) %{_sysconfdir}/rc.d/init.d/netdata
 %endif
 
 # Enforce 0644 for files and 0755 for directories
