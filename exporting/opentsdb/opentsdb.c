@@ -60,7 +60,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
 int init_opentsdb_http_instance(struct instance *instance)
 {
     instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = NULL;
+    instance->start_host_formatting = format_host_labels_opentsdb_http;
     instance->start_chart_formatting = NULL;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
@@ -69,7 +69,7 @@ int init_opentsdb_http_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_opentsdb_http;
 
     instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = NULL;
+    instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
     instance->buffer = (void *)buffer_create(0);
@@ -242,6 +242,45 @@ static inline void opentsdb_build_message(BUFFER *buffer, char *message, const c
 }
 
 /**
+ * Format host labels for OpenTSDB HTTP connector
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @return Always returns 0.
+ */
+int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
+{
+    if (!instance->labels)
+        instance->labels = buffer_create(1024);
+
+    if (unlikely(
+            !(instance->config.options &
+              (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))))
+        return 0;
+
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if (!((instance->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS &&
+               label->label_source == LABEL_SOURCE_NETDATA_CONF) ||
+              (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&
+               label->label_source != LABEL_SOURCE_NETDATA_CONF)))
+            continue;
+
+        char escaped_value[CONFIG_MAX_VALUE * 2 + 1];
+        escape_json_string(escaped_value, label->value, CONFIG_MAX_VALUE);
+
+        char value[CONFIG_MAX_VALUE + 1];
+        sanitize_opentsdb_telnet_label_value(value, escaped_value, CONFIG_MAX_VALUE);
+
+        buffer_strcat(instance->labels, ",");
+        buffer_sprintf(instance->labels, "\"%s\":\"%s\"", label->key, value);
+    }
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    return 0;
+}
+
+/**
  * Format dimension using collected data for OpenTSDB HTTP connector
  *
  * @param instance an instance data structure.
@@ -275,7 +314,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         "  \"timestamp\": %llu,"
         "  \"value\": " COLLECTED_NUMBER_FORMAT ","
         "  \"tags\": {"
-        "    \"host\": \"%s%s%s\""
+        "    \"host\": \"%s%s%s\"%s"
         "  }"
         "}",
         engine->config.prefix,
@@ -285,7 +324,8 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
         rd->last_collected_value,
         engine->config.hostname,
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "");
+        (host->tags) ? host->tags : "",
+        instance->labels ? buffer_tostring(instance->labels) : "");
 
     if (length > 0) {
         opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
@@ -334,7 +374,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         "  \"timestamp\": %llu,"
         "  \"value\": " CALCULATED_NUMBER_FORMAT ","
         "  \"tags\": {"
-        "    \"host\": \"%s%s%s\""
+        "    \"host\": \"%s%s%s\"%s"
         "  }"
         "}",
         engine->config.prefix,
@@ -344,7 +384,8 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
         value,
         engine->config.hostname,
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "");
+        (host->tags) ? host->tags : "",
+        instance->labels ? buffer_tostring(instance->labels) : "");
 
     if (length > 0) {
         opentsdb_build_message(instance->buffer, message, engine->config.hostname, length);
