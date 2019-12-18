@@ -33,24 +33,38 @@ run_c_unit_tests=
 if [ -z ${TRAVIS_COMMIT_RANGE} ] ; then
     # Travis gave us no commit range, so just run all the unit tests.
     # Per the docs, this is the case when a new branch is pushed for the first time.
+    echo "No commit range supplied, assuming the worst case and running all unit tests."
     run_c_unit_tests=1
 else
-    COMMIT1="$(echo ${TRAVIS_COMMIT_RANGE} | cut -f 1 -d '.')"
-    COMMIT2="$(echo ${TRAVIS_COMMIT_RANGE} | cut -f 4 -d '.')"
+    changed_paths=
 
-    if [ "$(git cat-file -t ${COMMIT1} 2>/dev/null)" = commit -a "$(git cat-file -t ${COMMIT2} 2>/dev/null)" = commit ] ; then
-        changed_paths="$(git diff --numstat ${COMMIT1}..${COMMIT2} --  | cut -f 3)"
+    if [ "${TRAVIS_PULL_REQUEST}" = "false" ] ; then
+        # This is not a PR build.
+        COMMIT1="$(echo ${TRAVIS_COMMIT_RANGE} | cut -f 1 -d '.')"
+        COMMIT2="$(echo ${TRAVIS_COMMIT_RANGE} | cut -f 4 -d '.')"
 
-        # Check for changes that would require the C code to be re-tested
-        if (echo ${changed_paths} | grep -qE "daemon/unit_test|database") ; then
+        if [ "$(git cat-file -t ${COMMIT1} 2>/dev/null)" = commit -a "$(git cat-file -t ${COMMIT2} 2>/dev/null)" = commit ] ; then
+            # Examine the exact set of commits passed by Travis.
+            changed_paths="$(git diff --name-only ${COMMIT1}..${COMMIT2} --)"
+        else
+            # We couldn't find at least one of the changesets, so this build
+            # was probably triggered by a history rewrite. Since we can't
+            # figure out what chnaged, we need to just run all the tests anyway.
+            echo "Cannot determine which commits we are testing, running all unit tests."
             run_c_unit_tests=1
         fi
     else
-        # We couldn't find at least one of the changesets, so this build
-        # was probably triggered by a history rewrite. Since we can't
-        # figure out what chnaged, we need to just run all the tests anyway.
-        echo "Cannot determine which commits we are testing, running all unit tests."
-        run_c_unit_tests=1
+        # This is a PR build, assume it's targeting `master` and look
+        # at everything from that to HEAD.
+        changed_paths="$(git diff --name-only master..HEAD --)"
+    fi
+
+    if [ -n "${changed_paths}" ] ; then
+        # Check for changes that would require the C code to be re-tested
+        if (echo ${changed_paths} | grep -qE "daemon/unit_test|database") ; then
+            echo "Commits appear to change C code with unit tests, queueing C unit tests."
+            run_c_unit_tests=1
+        fi
     fi
 fi
 
