@@ -61,7 +61,9 @@ static void test_exporting_engine(void **state)
     expect_memory(__wrap_send_internal_metrics, engine, engine, sizeof(struct engine));
     will_return(__wrap_send_internal_metrics, 0);
 
-    void *ptr = malloc(sizeof(int));
+    expect_function_call(__wrap_info_int);
+
+    void *ptr = malloc(sizeof(struct netdata_static_thread));
     assert_ptr_equal(exporting_main(ptr), NULL);
     assert_int_equal(engine->now, 2);
     free(ptr);
