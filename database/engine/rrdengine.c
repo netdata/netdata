@@ -121,19 +121,19 @@ after_crc_check:
         } else {
             (void) memcpy(page, uncompressed_buf + page_offset, descr->page_length);
         }
-        pg_cache_replaceQ_insert(ctx, descr);
         rrdeng_page_descr_mutex_lock(ctx, descr);
         pg_cache_descr = descr->pg_cache_descr;
         pg_cache_descr->page = page;
         pg_cache_descr->flags |= RRD_PAGE_POPULATED;
         pg_cache_descr->flags &= ~RRD_PAGE_READ_PENDING;
-        debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
-        if (xt_io_descr->release_descr) {
-            pg_cache_put_unsafe(descr);
-        } else {
-            pg_cache_wake_up_waiters_unsafe(descr);
-        }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
+        pg_cache_replaceQ_insert(ctx, descr);
+        if (xt_io_descr->release_descr) {
+            pg_cache_put(ctx, descr);
+        } else {
+            debug(D_RRDENGINE, "%s: Waking up waiters.", __func__);
+            pg_cache_wake_up_waiters(ctx, descr);
+        }
     }
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         freez(uncompressed_buf);
