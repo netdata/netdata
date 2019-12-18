@@ -54,7 +54,7 @@ netdataDashboard.menu = {
         title: 'Networking Stack',
         icon: '<i class="fas fa-cloud"></i>',
         info: function (os) {
-            if(os === "linux")
+            if (os === "linux")
                 return 'Metrics for the networking stack of the system. These metrics are collected from <code>/proc/net/netstat</code>, apply to both IPv4 and IPv6 traffic and are related to operation of the kernel networking stack.';
             else
                 return 'Metrics for the networking stack of the system.';
@@ -717,7 +717,7 @@ var cgroupMemLimitIsSet = 0;
 netdataDashboard.context = {
     'system.cpu': {
         info: function (os) {
-            void(os);
+            void (os);
             return 'Total CPU utilization (all cores). 100% here means there is no CPU idle time at all. You can get per core usage at the <a href="#menu_cpu">CPUs</a> section and per application usage at the <a href="#menu_apps">Applications Monitoring</a> section.'
                 + netdataDashboard.sparkline('<br/>Keep an eye on <b>iowait</b> ', 'system.cpu', 'iowait', '%', '. If it is constantly high, your disks are a bottleneck and they slow your system down.')
                 + netdataDashboard.sparkline('<br/>An important metric worth monitoring, is <b>softirq</b> ', 'system.cpu', 'softirq', '%', '. A constantly high percentage of softirq may indicate network driver issues.');
@@ -884,7 +884,7 @@ netdataDashboard.context = {
     'mem.ksm_ratios': {
         heads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-gauge-max-value="100"'
                     + ' data-chart-library="gauge"'
@@ -1117,7 +1117,7 @@ netdataDashboard.context = {
     'tc.qos': {
         heads: [
             function (os, id) {
-                void(os);
+                void (os);
 
                 if (id.match(/.*-ifb$/))
                     return netdataDashboard.gaugeChart('Inbound', '12%', '', '#5555AA');
@@ -1133,46 +1133,42 @@ netdataDashboard.context = {
     'net.net': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 if (id.match(/^cgroup_.*/)) {
                     var iface;
                     try {
                         iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
-                    }
-                    catch (e) {
+                    } catch (e) {
                         iface = '';
                     }
                     return netdataDashboard.gaugeChart('Received' + iface, '12%', 'received');
-                }
-                else
+                } else
                     return '';
             },
             function (os, id) {
-                void(os);
+                void (os);
                 if (id.match(/^cgroup_.*/)) {
                     var iface;
                     try {
                         iface = ' ' + id.substring(id.lastIndexOf('.net_') + 5, id.length);
-                    }
-                    catch (e) {
+                    } catch (e) {
                         iface = '';
                     }
                     return netdataDashboard.gaugeChart('Sent' + iface, '12%', 'sent');
-                }
-                else
+                } else
                     return '';
             }
         ],
         heads: [
             function (os, id) {
-                void(os);
+                void (os);
                 if (!id.match(/^cgroup_.*/))
                     return netdataDashboard.gaugeChart('Received', '12%', 'received');
                 else
                     return '';
             },
             function (os, id) {
-                void(os);
+                void (os);
                 if (!id.match(/^cgroup_.*/))
                     return netdataDashboard.gaugeChart('Sent', '12%', 'sent');
                 else
@@ -1424,7 +1420,7 @@ netdataDashboard.context = {
     'apache.workers': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="busy"'
                     + ' data-append-options="percentage"'
@@ -1485,7 +1481,7 @@ netdataDashboard.context = {
     'lighttpd.workers': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="busy"'
                     + ' data-append-options="percentage"'
@@ -1576,7 +1572,7 @@ netdataDashboard.context = {
         info: 'Number of (connected) RetroShare friends.',
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="peers_connected"'
                     + ' data-append-options="friends"'
@@ -1616,7 +1612,7 @@ netdataDashboard.context = {
         valueRange: "[0, null]",
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 cgroupCPULimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -1638,7 +1634,7 @@ netdataDashboard.context = {
     'cgroup.cpu': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 if (cgroupCPULimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -1651,8 +1647,7 @@ netdataDashboard.context = {
                         + ' data-points="CHART_DURATION"'
                         + ' data-colors="' + NETDATA.colors[4] + '"'
                         + ' role="application"></div>';
-                }
-                else
+                } else
                     return '';
             }
         ]
@@ -1661,7 +1656,7 @@ netdataDashboard.context = {
     'cgroup.mem_usage_limit': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 cgroupMemLimitIsSet = 1;
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="used"'
@@ -1684,7 +1679,7 @@ netdataDashboard.context = {
     'cgroup.mem_usage': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 if (cgroupMemLimitIsSet === 0) {
                     return '<div data-netdata="' + id + '"'
                         + ' data-chart-library="gauge"'
@@ -1697,8 +1692,7 @@ netdataDashboard.context = {
                         + ' data-points="CHART_DURATION"'
                         + ' data-colors="' + NETDATA.colors[1] + '"'
                         + ' role="application"></div>';
-                }
-                else
+                } else
                     return '';
             }
         ]
@@ -1707,7 +1701,7 @@ netdataDashboard.context = {
     'cgroup.throttle_io': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="read"'
                     + ' data-chart-library="gauge"'
@@ -1722,7 +1716,7 @@ netdataDashboard.context = {
                     + ' role="application"></div>';
             },
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="write"'
                     + ' data-chart-library="gauge"'
@@ -1862,7 +1856,7 @@ netdataDashboard.context = {
         info: 'Web server responses by type. <code>success</code> includes <b>1xx</b>, <b>2xx</b>, <b>304</b> and <b>401</b>, <code>error</code> includes <b>5xx</b>, <code>redirect</code> includes <b>3xx</b> except <b>304</b>, <code>bad</code> includes <b>4xx</b> except <b>401</b>, <code>other</code> are all the other responses.',
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="success"'
                     + ' data-chart-library="gauge"'
@@ -1880,7 +1874,7 @@ netdataDashboard.context = {
             },
 
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="redirect"'
                     + ' data-chart-library="gauge"'
@@ -1898,7 +1892,7 @@ netdataDashboard.context = {
             },
 
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="bad"'
                     + ' data-chart-library="gauge"'
@@ -1916,7 +1910,7 @@ netdataDashboard.context = {
             },
 
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="error"'
                     + ' data-chart-library="gauge"'
@@ -1949,7 +1943,7 @@ netdataDashboard.context = {
     'web_log.response_time': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="avg"'
                     + ' data-chart-library="gauge"'
@@ -1995,7 +1989,7 @@ netdataDashboard.context = {
             '<code>other</code> are all the other responses.',
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="success"'
                     + ' data-chart-library="gauge"'
@@ -2013,7 +2007,7 @@ netdataDashboard.context = {
             },
 
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="redirect"'
                     + ' data-chart-library="gauge"'
@@ -2031,7 +2025,7 @@ netdataDashboard.context = {
             },
 
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="bad"'
                     + ' data-chart-library="gauge"'
@@ -2049,7 +2043,7 @@ netdataDashboard.context = {
             },
 
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="error"'
                     + ' data-chart-library="gauge"'
@@ -2084,7 +2078,7 @@ netdataDashboard.context = {
     'web_log.squid_duration': {
         mainheads: [
             function (os, id) {
-                void(os);
+                void (os);
                 return '<div data-netdata="' + id + '"'
                     + ' data-dimensions="avg"'
                     + ' data-chart-library="gauge"'
@@ -2481,33 +2475,33 @@ netdataDashboard.context = {
 
     'proxysql.pool_status': {
         info: 'The status of the backend servers. ' +
-        '<code>1=ONLINE</code> backend server is fully operational, ' +
-        '<code>2=SHUNNED</code> backend sever is temporarily taken out of use because of either too many connection errors in a time that was too short, or replication lag exceeded the allowed threshold, ' +
-        '<code>3=OFFLINE_SOFT</code> when a server is put into OFFLINE_SOFT mode, new incoming connections aren\'t accepted anymore, while the existing connections are kept until they became inactive. In other words, connections are kept in use until the current transaction is completed. This allows to gracefully detach a backend, ' +
-        '<code>4=OFFLINE_HARD</code> when a server is put into OFFLINE_HARD mode, the existing connections are dropped, while new incoming connections aren\'t accepted either. This is equivalent to deleting the server from a hostgroup, or temporarily taking it out of the hostgroup for maintenance work, ' +
-        '<code>-1</code> Unknown status.'
+            '<code>1=ONLINE</code> backend server is fully operational, ' +
+            '<code>2=SHUNNED</code> backend sever is temporarily taken out of use because of either too many connection errors in a time that was too short, or replication lag exceeded the allowed threshold, ' +
+            '<code>3=OFFLINE_SOFT</code> when a server is put into OFFLINE_SOFT mode, new incoming connections aren\'t accepted anymore, while the existing connections are kept until they became inactive. In other words, connections are kept in use until the current transaction is completed. This allows to gracefully detach a backend, ' +
+            '<code>4=OFFLINE_HARD</code> when a server is put into OFFLINE_HARD mode, the existing connections are dropped, while new incoming connections aren\'t accepted either. This is equivalent to deleting the server from a hostgroup, or temporarily taking it out of the hostgroup for maintenance work, ' +
+            '<code>-1</code> Unknown status.'
     },
 
     'proxysql.pool_net': {
         info: 'The amount of data sent to/received from the backend ' +
-        '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
+            '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
     },
 
     'proxysql.pool_overall_net': {
         info: 'The amount of data sent to/received from the all backends ' +
-        '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
+            '(This does not include metadata (packets\' headers, OK/ERR packets, fields\' description, etc).'
     },
 
     'proxysql.questions': {
         info: '<code>questions</code> total number of queries sent from frontends, ' +
-        '<code>slow_queries</code> number of queries that ran for longer than the threshold in milliseconds defined in global variable <code>mysql-long_query_time</code>. '
+            '<code>slow_queries</code> number of queries that ran for longer than the threshold in milliseconds defined in global variable <code>mysql-long_query_time</code>. '
     },
 
     'proxysql.connections': {
         info: '<code>aborted</code> number of frontend connections aborted due to invalid credential or max_connections reached, ' +
-        '<code>connected</code> number of frontend connections currently connected, ' +
-        '<code>created</code> number of frontend connections created, ' +
-        '<code>non_idle</code> number of frontend connections that are not currently idle. '
+            '<code>connected</code> number of frontend connections currently connected, ' +
+            '<code>created</code> number of frontend connections created, ' +
+            '<code>non_idle</code> number of frontend connections that are not currently idle. '
     },
 
     'proxysql.pool_latency': {
@@ -2571,7 +2565,7 @@ netdataDashboard.context = {
 
     'vsphere.host_mem_usage': {
         info:
-            '<code>granted</code> is amount of machine memory that is mapped for a host, '+
+            '<code>granted</code> is amount of machine memory that is mapped for a host, ' +
             'it equals sum of all granted metrics for all powered-on virtual machines, plus machine memory for vSphere services on the host. ' +
             '<code>consumed</code> is amount of machine memory used on the host, it includes memory used by the Service Console, the VMkernel, vSphere services, plus the total consumed metrics for all running virtual machines. ' +
             '<code>consumed</code> = <code>total host memory</code> - <code>free host memory</code>.' +
@@ -2666,7 +2660,7 @@ netdataDashboard.context = {
             '<code>2</code>: one or more components in the appliance might be degraded; ' +
             '<code>3</code>: one or more components might be in an unusable status and the appliance might become unresponsive soon; ' +
             '<code>4</code>: no health data is available.'
-            },
+    },
 
     'vcsa.components_health': {
         info:
@@ -2676,7 +2670,7 @@ netdataDashboard.context = {
             '<code>2</code>: degraded, and may have serious problems; ' +
             '<code>3</code>: unavailable, or will stop functioning soon; ' +
             '<code>4</code>: no health data is available.'
-            },
+    },
 
     'vcsa.software_updates_health': {
         info:
@@ -2686,7 +2680,7 @@ netdataDashboard.context = {
             '<code>2</code>: non-security updates are available; ' +
             '<code>3</code>: security updates are available; ' +
             '<code>4</code>: an error retrieving information on software updates.'
-            },
+    },
 
     // ------------------------------------------------------------------------
     // Zookeeper
@@ -2698,7 +2692,7 @@ netdataDashboard.context = {
             '<code>2</code>: follower, ' +
             '<code>3</code>: observer, ' +
             '<code>4</code>: standalone.'
-            },
+    },
 
     // ------------------------------------------------------------------------
     // Squidlog
