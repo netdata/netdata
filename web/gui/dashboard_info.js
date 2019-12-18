@@ -2797,7 +2797,7 @@ netdataDashboard.context = {
             ' <li><code>MEM</code> the response object came from memory cache, avoiding disk accesses. Only seen on HIT responses.</li>' +
             ' <li><code>MISS</code> the response object delivered was the network response object.</li>' +
             ' <li><code>DENIED</code> the request was denied by access controls.</li>' +
-            ' <li><code>NOFETCH</code> an ICP specific type, indicating service is alive, but not to be used for this request (sent during "-Y" startup, or during frequent failures, a cache in hit only mode will return either UDP_HIT or UDP_MISS_NOFETCH. Neighbours will thus only fetch hits).</li>' +
+            ' <li><code>NOFETCH</code> an ICP specific type, indicating service is alive, but not to be used for this request.</li>' +
             ' <li><code>TUNNEL</code> a binary tunnel was established for this transaction.</li>' +
             ' </ul>'
     },
@@ -2828,6 +2828,6 @@ netdataDashboard.context = {
 
     'squidlog.mime_type_requests': {
         info: 'The content type of the object as seen in the HTTP reply header. Please note that ICP exchanges usually don\'t have any content type.'
-    },
+    }
 
 };
