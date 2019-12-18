@@ -237,7 +237,7 @@ second, per client. If you're using `mod_evasive` on your Apache web server, thi
 module's protection, and your dashboard will become unresponsive. You may even begin to see 403 errors.
 
 To mitigate this issue, you will need to change the value of the `DOSPageCount` option in your `mod_evasive.conf` file,
-which can typically be found at `/etc/httpd/conf.d/mod_evasive.conf`.
+which can typically be found at `/etc/httpd/conf.d/mod_evasive.conf` or `/etc/apache2/mods-enabled/evasive.conf`.
 
 The `DOSPageCount` option sets the limit fo the number of requests from a single IP address for the same page per page
 interval, which is usually 1 second. THe default value is `2` requests per second. Clearly, Netdata's typical usage will
@@ -249,6 +249,9 @@ errors while accessing the dashboard.
 ```conf
 DOSPageCount 30
 ```
+
+Restart Apache with `sudo service apache2 restart`, or the appropriate method to restart services on your system, to
+reload its configuration with your new values.
 
 See issues [#2011](https://github.com/netdata/netdata/issues/2011) and
 [#7658](https://github.com/netdata/netdata/issues/7568) for more information.
