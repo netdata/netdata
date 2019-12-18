@@ -71,6 +71,10 @@ Snapshots can be incredibly useful for diagnosing anomalies after they've alread
 an alarm while you were sleeping. In the morning, you can look up the exact moment the alarm was raised, export a
 snapshot, and send it to a colleague for further analysis.
 
+> ❗ Know how you shouldn't go around downloading software from suspicious-looking websites? Same policy goes for loading
+> snapshots from untrusted or anonymous sources. Importing a snapshot loads quite a bit of data into your web browser,
+> and so you should always err on the side of protecting your system.
+
 To export a snapshot, click on the **export** icon.
 
 ![Animated GIF of opening the export

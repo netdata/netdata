@@ -159,13 +159,20 @@ certain alarms, you might want to use a shorter duration, which you can specify 
 
 We'll put the next two lines—`warn` and `crit`—together. In these lines, you declare at which percentage you want to
 trigger a warning or critical alarm. Notice the variable `$this`, which is the value calculated by the `lookup` line.
-These lines will trigger a warning if that average RAM useag average goes above 80%, and a critical alert if it's above
-90%.
+These lines will trigger a warning if that average RAM usage goes above 80%, and a critical alert if it's above 90%.
 
 ```yaml
   warn: $this > 80
   crit: $this > 90
 ```
+
+> ❗ Most default Netdata alarms come with more complicated `warn` and `crit` lines. You may have noticed the line `warn:
+> $this > (($status >= $WARNING)  ? (75) : (85))` in one of the health entity examples above, which is an example of
+> using the [conditional operator for
+> hysteresis](https://docs.netdata.cloud/health/reference/#special-use-of-the-conditional-operator). Hysteresis is used
+> to keep Netdata from triggering a ton of alerts if the metric being tracked quickly goes above and then falls below
+> the threshold. For this very simple example, we'll skip hysteresis, but recommend implementing it in your future
+> health entities.
 
 Finish off with the `info` line, which creates a description of the alarm that will then appear in any
 [notification](#enable-netdatas-notification-systems) you set up. This line is optional, but it has value—think of it as

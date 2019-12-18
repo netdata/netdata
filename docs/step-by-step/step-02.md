@@ -142,6 +142,7 @@ exactly which aspect of your system is behaving strangely.
 ### Resize charts
 
 Additionally, resize charts by clicking-and-dragging the icon on the bottom-right corner of any chart. To restore the
+chart to its original height, double-click the same icon.
 
 ![Animated GIF of resizing a chart and resetting it to the default
 height](https://user-images.githubusercontent.com/1153921/65066675-aec4b100-d939-11e9-9b5d-cee7316428f6.gif)
