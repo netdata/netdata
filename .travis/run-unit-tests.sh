@@ -56,11 +56,11 @@ else
             run_c_unit_tests=1
         fi
     else
-        # This is a PR build, assume it's targeting `master` and look
-        # at everything from that to HEAD.
+        # This is a PR build, look at all commits from the target branch
+        # to HEAD.
         echo "Checking commits:"
-        git log --format=oneline --abbrev-commit master..HEAD
-        changed_paths="$(git diff --name-only master..HEAD --)"
+        git log --format=oneline --abbrev-commit ${TRAVIS_BRANCH}..HEAD
+        changed_paths="$(git diff --name-only ${TRAVIS_BRANCH}..HEAD --)"
     fi
 
     if [ -n "${changed_paths}" ] ; then
