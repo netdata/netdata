@@ -6,10 +6,15 @@
 
 **Merged pull requests:**
 
+- Revert "Fix race condition in dbengine \(\#7533\)" [\#7560](https://github.com/netdata/netdata/pull/7560) ([amoss](https://github.com/amoss))
+- Cleanup the main exporting engine thread on exit [\#7558](https://github.com/netdata/netdata/pull/7558) ([vlvkobal](https://github.com/vlvkobal))
+- proc\_pressure: increment fail\_count on read fail [\#7547](https://github.com/netdata/netdata/pull/7547) ([hexchain](https://github.com/hexchain))
+- Merge the matrix and jobs keys in Travis config. [\#7544](https://github.com/netdata/netdata/pull/7544) ([Ferroin](https://github.com/Ferroin))
 - Fix backend config [\#7538](https://github.com/netdata/netdata/pull/7538) ([vlvkobal](https://github.com/vlvkobal))
 - Fix race condition in dbengine [\#7533](https://github.com/netdata/netdata/pull/7533) ([mfundul](https://github.com/mfundul))
 - Fix valgrind errors [\#7532](https://github.com/netdata/netdata/pull/7532) ([mfundul](https://github.com/mfundul))
 - Update codeowners [\#7530](https://github.com/netdata/netdata/pull/7530) ([knatsakis](https://github.com/knatsakis))
+- Add Fedora 31 CI integrations. [\#7524](https://github.com/netdata/netdata/pull/7524) ([Ferroin](https://github.com/Ferroin))
 - Labels issues [\#7515](https://github.com/netdata/netdata/pull/7515) ([amoss](https://github.com/amoss))
 - Update Netdata RPM spec file to package netdatacli. [\#7513](https://github.com/netdata/netdata/pull/7513) ([Ferroin](https://github.com/Ferroin))
 - Remove `-f` option from `groupdel` in uninstaller. [\#7507](https://github.com/netdata/netdata/pull/7507) ([Ferroin](https://github.com/Ferroin))
@@ -230,11 +235,6 @@
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.17.0...v1.17.1)
-
-**Merged pull requests:**
-
-- netdata/packaging: fix ubuntu/xenial runtime dependencies [\#6825](https://github.com/netdata/netdata/pull/6825) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/ci: Force last good version of git-semver, they broke it [\#6820](https://github.com/netdata/netdata/pull/6820) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.17.0](https://github.com/netdata/netdata/tree/v1.17.0) (2019-09-03)
 

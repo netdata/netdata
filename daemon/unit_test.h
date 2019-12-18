@@ -12,7 +12,7 @@ extern int unit_test_buffer(void);
 extern int test_dbengine(void);
 extern void generate_dbengine_dataset(unsigned history_seconds);
 extern void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsigned QUERY_THREADS,
-                                 unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB, unsigned DISK_SPACE_MB);
+                                 unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB);
 
 #endif
 
