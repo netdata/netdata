@@ -243,7 +243,8 @@ The `DOSPageCount` option sets the limit fo the number of requests from a single
 interval, which is usually 1 second. THe default value is `2` requests per second. Clearly, Netdata's typical usage will
 exceed that threshold, and `mod_evasive` will add your IP address to a blocklist.
 
-Our users have found success by setting `DOSPageCount` to `30`.
+Our users have found success by setting `DOSPageCount` to `30`. Try this, and raise the value if you continue to see 403
+errors while accessing the dashboard.
 
 ```conf
 DOSPageCount 30
