@@ -2708,10 +2708,10 @@ netdataDashboard.context = {
     'squidlog.type_requests': {
         info: 'Requests by response type:<br>' +
             '<ul>' +
-            ' <li><code>success</code> includes 1xx, 2xx, 000, 304,401.</li>' +
+            ' <li><code>success</code> includes 1xx, 2xx, 000, 304, 401.</li>' +
             ' <li><code>error</code> includes 5xx and 6xx.</li>' +
             ' <li><code>redirect</code> includes 3xx except 304.</li>' +
-            ' <li><code>bad</code> includes 4xx except 401</li>' +
+            ' <li><code>bad</code> includes 4xx except 401.</li>' +
             ' </ul>'
     },
 
