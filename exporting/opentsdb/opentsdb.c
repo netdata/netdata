@@ -28,7 +28,7 @@ int init_opentsdb_connector(struct connector *connector)
 int init_opentsdb_telnet_instance(struct instance *instance)
 {
     instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = NULL;
+    instance->start_host_formatting = format_host_labels_opentsdb_telnet;
     instance->start_chart_formatting = NULL;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
@@ -37,7 +37,7 @@ int init_opentsdb_telnet_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_opentsdb_telnet;
 
     instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = NULL;
+    instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
     instance->buffer = (void *)buffer_create(0);
@@ -83,6 +83,53 @@ int init_opentsdb_http_instance(struct instance *instance)
     return 0;
 }
 
+static inline void sanitize_opentsdb_telnet_label_value(char *dst, char *src, size_t len) {
+    while (*src != '\0' && len) {
+        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/')
+            *dst++ = *src;
+        else
+            *dst++ = '_';
+        src++;
+        len--;
+    }
+    *dst = '\0';
+}
+
+/**
+ * Format host labels for JSON connector
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @return Always returns 0.
+ */
+int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
+{
+    if (!instance->labels)
+        instance->labels = buffer_create(1024);
+
+    if (unlikely(
+            !(instance->config.options &
+              (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))))
+        return 0;
+
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if (!((instance->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS &&
+               label->label_source == LABEL_SOURCE_NETDATA_CONF) ||
+              (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&
+               label->label_source != LABEL_SOURCE_NETDATA_CONF)))
+            continue;
+
+        char value[CONFIG_MAX_VALUE + 1];
+        sanitize_opentsdb_telnet_label_value(value, label->value, CONFIG_MAX_VALUE);
+
+        buffer_sprintf(instance->labels, " %s=%s", label->key, value);
+    }
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    return 0;
+}
+
 /**
  * Format dimension using collected data for OpenTSDB telnet connector
  *
@@ -110,7 +157,7 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
 
     buffer_sprintf(
         instance->buffer,
-        "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s%s\n",
+        "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s%s%s\n",
         engine->config.prefix,
         chart_name,
         dimension_name,
@@ -118,7 +165,8 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
         rd->last_collected_value,
         engine->config.hostname,
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "");
+        (host->tags) ? host->tags : "",
+        (instance->labels) ? buffer_tostring(instance->labels) : "");
 
     return 0;
 }
@@ -156,7 +204,7 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
 
     buffer_sprintf(
         instance->buffer,
-        "put %s.%s.%s %llu " CALCULATED_NUMBER_FORMAT " host=%s%s%s\n",
+        "put %s.%s.%s %llu " CALCULATED_NUMBER_FORMAT " host=%s%s%s%s\n",
         engine->config.prefix,
         chart_name,
         dimension_name,
@@ -164,7 +212,8 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
         value,
         engine->config.hostname,
         (host->tags) ? " " : "",
-        (host->tags) ? host->tags : "");
+        (host->tags) ? host->tags : "",
+        (instance->labels) ? buffer_tostring(instance->labels) : "");
 
     return 0;
 }
