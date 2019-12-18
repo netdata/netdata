@@ -64,7 +64,8 @@ Netdata can export and import snapshots of the contents of your dashboard at a g
 a snapshot created by any other Netdata agent.
 
 Snapshot files include all the information of the dashboard, including the URL of the origin server, its unique ID, and
-chart data queries for the visible timeframe. While snapshots are not in real-time, and thus won't update with new metrics, you can still pan, zoom, and highlight charts as you see fit.
+chart data queries for the visible timeframe. While snapshots are not in real-time, and thus won't update with new
+metrics, you can still pan, zoom, and highlight charts as you see fit.
 
 Snapshots can be incredibly useful for diagnosing anomalies after they've already happened. Let's say Netdata triggered
 an alarm while you were sleeping. In the morning, you can look up the exact moment the alarm was raised, export a
