@@ -1723,7 +1723,7 @@ int test_dbengine(void)
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
 
-    fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'\n");
+    debug(D_RRDHOST, "Initializing localhost with hostname 'unittest-dbengine'");
     host = dbengine_rrdhost_find_or_create("unittest-dbengine");
     if (NULL == host)
         return 1;
@@ -1915,9 +1915,6 @@ static void generate_dbengine_chart(void *arg)
         rrdset_done(st);
         thread_info->time_max = time_current;
     }
-    for (j = 0; j < DSET_DIMS; ++j) {
-        rrdeng_store_metric_finalize(rd[j]);
-    }
 }
 
 void generate_dbengine_dataset(unsigned history_seconds)
@@ -1938,7 +1935,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
     error_log_limit_unlimited();
-    fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'\n");
+    debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-dataset'");
 
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
     if (NULL == host)
@@ -1989,7 +1986,6 @@ struct dbengine_query_thread {
     unsigned history_seconds; /* how far back in the past to go */
     volatile long done; /* initialize to 0, set to 1 to stop thread */
     unsigned long errors, queries_nr, queried_metrics_nr; /* statistics */
-    uint8_t delete_old_data; /* if non zero then data are deleted when disk space is exhausted */
 
     struct dbengine_chart_thread *chart_threads[]; /* dset_charts elements */
 };
@@ -1999,7 +1995,7 @@ static void query_dbengine_chart(void *arg)
     struct dbengine_query_thread *thread_info = (struct dbengine_query_thread *)arg;
     const int DSET_CHARTS = thread_info->dset_charts;
     const int DSET_DIMS = thread_info->dset_dims;
-    time_t time_after, time_before, time_min, time_approx_min, time_max, duration;
+    time_t time_after, time_before, time_min, time_max, duration;
     int i, j, update_every = 1;
     RRDSET *st;
     RRDDIM *rd;
@@ -2019,13 +2015,6 @@ static void query_dbengine_chart(void *arg)
 
         time_min = thread_info->time_present - thread_info->history_seconds + 1;
         time_max = thread_info->chart_threads[i]->time_max;
-
-        if (thread_info->delete_old_data) {
-            /* A time window of twice the disk space is sufficient for compression space savings of up to 50% */
-            time_approx_min = time_max - (default_rrdeng_disk_quota_mb * 2 * 1024 * 1024) /
-                                         (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number));
-            time_min = MAX(time_min, time_approx_min);
-        }
         if (!time_max) {
             time_before = time_after = time_min;
         } else {
@@ -2041,22 +2030,18 @@ static void query_dbengine_chart(void *arg)
             expected = unpack_storage_number(pack_storage_number((calculated_number) generatedv, SN_EXISTS));
 
             if (unlikely(rd->state->query_ops.is_finished(&handle))) {
-                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected);
-                    ++thread_info->errors;
-                }
+                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
+                                CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
+                        st->name, rd->name, (unsigned long) time_now, expected);
+                ++thread_info->errors;
                 break;
             }
             n = rd->state->query_ops.next_metric(&handle, &time_retrieved);
             if (SN_EMPTY_SLOT == n) {
-                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected);
-                    ++thread_info->errors;
-                }
+                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
+                                CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
+                        st->name, rd->name, (unsigned long) time_now, expected);
+                ++thread_info->errors;
                 break;
             }
             ++thread_info->queried_metrics_nr;
@@ -2064,21 +2049,15 @@ static void query_dbengine_chart(void *arg)
 
             same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
             if (!same) {
-                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                    CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT
-                                    ", ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, expected, value);
-                    ++thread_info->errors;
-                }
+                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
+                                CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
+                        st->name, rd->name, (unsigned long) time_now, expected, value);
+                ++thread_info->errors;
             }
             if (time_retrieved != time_now) {
-                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
-                    fprintf(stderr,
-                            "    DB-engine stresstest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
-                            st->name, rd->name, (unsigned long) time_now, (unsigned long) time_retrieved);
-                    ++thread_info->errors;
-                }
+                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
+                        st->name, rd->name, (unsigned long) time_now, (unsigned long) time_retrieved);
+                ++thread_info->errors;
             }
         }
         rd->state->query_ops.finalize(&handle);
@@ -2086,18 +2065,16 @@ static void query_dbengine_chart(void *arg)
 }
 
 void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsigned QUERY_THREADS,
-                          unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB, unsigned DISK_SPACE_MB)
+                          unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB)
 {
     const unsigned DSET_DIMS = 128;
     const uint64_t EXPECTED_COMPRESSION_RATIO = 20;
-    const unsigned HISTORY_SECONDS = 3600 * 24 * 365 * 50; /* 50 years of history */
+    const unsigned HISTORY_SECONDS = 3600 * 24 * 365; /* 1 year of history */
     RRDHOST *host = NULL;
     struct dbengine_chart_thread **chart_threads;
     struct dbengine_query_thread **query_threads;
     unsigned i, j;
     time_t time_start, time_end;
-
-    error_log_limit_unlimited();
 
     if (!TEST_DURATION_SEC)
         TEST_DURATION_SEC = 10;
@@ -2110,18 +2087,13 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
     default_rrdeng_page_cache_mb = PAGE_CACHE_MB;
-    if (DISK_SPACE_MB) {
-        fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "
-                        "Data validation is turned off for this run.\n");
-        default_rrdeng_disk_quota_mb = DISK_SPACE_MB;
-    } else {
-        // Worst case for uncompressible data
-        default_rrdeng_disk_quota_mb =
-                (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * HISTORY_SECONDS) / (1024 * 1024);
-        default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
-    }
+    // Worst case for uncompressible data
+    default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * HISTORY_SECONDS) /
+                                   (1024 * 1024);
+    default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
-    fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
+    error_log_limit_unlimited();
+    debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-stress-test'");
 
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
     if (NULL == host)
@@ -2140,7 +2112,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
                     "%u MiB of page cache.\n",
                     RAMP_UP_SECONDS, TEST_DURATION_SEC, DSET_CHARTS, QUERY_THREADS, PAGE_CACHE_MB);
 
-    time_start = now_realtime_sec() + HISTORY_SECONDS; /* move history to the future */
+    time_start = now_realtime_sec();
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         chart_threads[i]->host = host;
         chart_threads[i]->chartname = "random";
@@ -2174,7 +2146,6 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         for (j = 0 ; j < DSET_CHARTS ; ++j) {
             query_threads[i]->chart_threads[j] = chart_threads[j];
         }
-        query_threads[i]->delete_old_data = DISK_SPACE_MB ? 1 : 0;
         assert(0 == uv_thread_create(&query_threads[i]->thread, query_dbengine_chart, query_threads[i]));
     }
     sleep(TEST_DURATION_SEC);
