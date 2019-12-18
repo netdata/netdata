@@ -45,6 +45,8 @@ else
 
         if [ "$(git cat-file -t ${COMMIT1} 2>/dev/null)" = commit -a "$(git cat-file -t ${COMMIT2} 2>/dev/null)" = commit ] ; then
             # Examine the exact set of commits passed by Travis.
+            echo "Checking commits:"
+            git log --format=oneline --abbrev-commit ${COMMIT1}..${COMMIT2}
             changed_paths="$(git diff --name-only ${COMMIT1}..${COMMIT2} --)"
         else
             # We couldn't find at least one of the changesets, so this build
@@ -56,6 +58,8 @@ else
     else
         # This is a PR build, assume it's targeting `master` and look
         # at everything from that to HEAD.
+        echo "Checking commits:"
+        git log --format=oneline --abbrev-commit master..HEAD
         changed_paths="$(git diff --name-only master..HEAD --)"
     fi
 
