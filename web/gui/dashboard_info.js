@@ -517,7 +517,7 @@ netdataDashboard.menu = {
         icon: '<i class="fas fa-folder-open"></i>',
         info: 'Provides <b><a href="https://hadoop.apache.org/docs/r3.2.0/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html">Hadoop Distributed File System</a></b> performance statistics. Module collects metrics over <code>Java Management Extensions</code> through the web interface of an <code>HDFS</code> daemon.'
     },
-    
+
     'am2320': {
         title: 'AM2320 Sensor',
         icon: '<i class="fas fa-thermometer-half"></i>',
@@ -528,6 +528,12 @@ netdataDashboard.menu = {
         title: 'ScaleIO',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance and health statistics for various ScaleIO components. Data collected via VxFlex OS Gateway REST API.'
+    },
+
+    'squidlog': {
+        title: 'Squid log',
+        icon: '<i class="fas fa-file-alt"></i>',
+        info: undefined
     }
 
 };
@@ -2692,5 +2698,142 @@ netdataDashboard.context = {
             '<code>2</code>: follower, ' +
             '<code>3</code>: observer, ' +
             '<code>4</code>: standalone.'
-            }
+            },
+
+    // ------------------------------------------------------------------------
+    // Squidlog
+
+    'squidlog.requests': {
+        info: 'Total number of requests (log lines read). It includes <code>unmatched</code>.'
+    },
+
+    'squidlog.excluded_requests': {
+        info: '<code>unmatched</code> counts the lines in the log file that are not matched by the plugin parser (<a href="https://github.com/netdata/netdata/issues/new?title=squidlog%20reports%20unmatched%20lines&body=squidlog%20plugin%20reports%20unmatched%20lines.%0A%0AThis%20is%20my%20log:%0A%0A%60%60%60txt%0A%0Aplease%20paste%20your%20squid%20server%20log%20here%0A%0A%60%60%60" target="_blank">let us know</a> if you have any unmatched).'
+    },
+
+    'squidlog.type_requests': {
+        info: 'Requests by response type:<br>' +
+            '<ul>' +
+            ' <li><code>success</code> includes 1xx, 2xx, 000, 304,401.</li>' +
+            ' <li><code>error</code> includes 5xx and 6xx.</li>' +
+            ' <li><code>redirect</code> includes 3xx except 304.</li>' +
+            ' <li><code>bad</code> includes 4xx except 401</li>' +
+            ' </ul>'
+    },
+
+    'squidlog.http_status_code_class_responses': {
+        info: 'The HTTP response status code classes. According to <a href="https://tools.ietf.org/html/rfc7231" target="_blank">rfc7231</a>:<br>' +
+            ' <li><code>1xx</code> is informational responses.</li>' +
+            ' <li><code>2xx</code> is successful responses.</li>' +
+            ' <li><code>3xx</code> is redirects.</li>' +
+            ' <li><code>4xx</code> is bad requests.</li>' +
+            ' <li><code>5xx</code> is internal server errors.</li>' +
+            ' </ul>' +
+            'Squid also uses <code>000</code> for a result code being unavailable, and <code>6xx</code> to signal an invalid header, a proxy error.'
+    },
+
+    'squidlog.http_status_code_responses': {
+        info: 'Number of responses for each http response status code individually.'
+    },
+
+    'squidlog.uniq_clients': {
+        info: 'Unique clients (requesting instances), within each data collection iteration. If data collection is <b>per second</b>, this chart shows <b>unique clients per second</b>.'
+    },
+
+    'squidlog.bandwidth': {
+        info: 'The size is the amount of data delivered to the clients. Mind that this does not constitute the net object size, as headers are also counted. ' +
+            'Also, failed requests may deliver an error page, the size of which is also logged here.'
+    },
+
+    'squidlog.response_time': {
+        info: 'The elapsed time considers how many milliseconds the transaction busied the cache. It differs in interpretation between TCP and UDP:' +
+            '<ul>' +
+            ' <li><code>TCP</code> this is basically the time from having received the request to when Squid finishes sending the last byte of the response.</li>' +
+            ' <li><code>UDP</code> this is the time between scheduling a reply and actually sending it.</li>' +
+            ' </ul>' +
+            'Please note that <b>the entries are logged after the reply finished being sent</b>, not during the lifetime of the transaction.'
+    },
+
+    'squidlog.cache_result_code_requests': {
+        info: 'The Squid result code is composed of several tags (separated by underscore characters) which describe the response sent to the client. ' +
+            'Check the <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Squid_result_codes">squid documentation</a> about them.'
+    },
+
+    'squidlog.cache_result_code_transport_tag_requests': {
+        info: 'These tags are always present and describe delivery method.<br>' +
+            '<ul>' +
+            ' <li><code>TCP</code> requests on the HTTP port (usually 3128).</li>' +
+            ' <li><code>UDP</code> requests on the ICP port (usually 3130) or HTCP port (usually 4128).</li>' +
+            ' <li><code>NONE</code> Squid delivered an unusual response or no response at all. Seen with cachemgr requests and errors, usually when the transaction fails before being classified into one of the above outcomes. Also seen with responses to CONNECT requests.</li>' +
+            ' </ul>'
+    },
+
+    'squidlog.cache_result_code_handling_tag_requests': {
+        info: 'These tags are optional and describe why the particular handling was performed or where the request came from.<br>' +
+            '<ul>' +
+            ' <li><code>CF</code> at least one request in this transaction was collapsed. See <a href="http://www.squid-cache.org/Doc/config/collapsed_forwarding/" target="_blank">collapsed_forwarding</a>  for more details about request collapsing.</li>' +
+            ' <li><code>CLIENT</code> usually seen with client issued a "no-cache", or analogous cache control command along with the request. Thus, the cache has to validate the object.</li>' +
+            ' <li><code>IMS</code> the client sent a revalidation (conditional) request.</li>' +
+            ' <li><code>ASYNC</code> the request was generated internally by Squid. Usually this is background fetches for cache information exchanges, background revalidation from <i>stale-while-revalidate</i> cache controls, or ESI sub-objects being loaded.</li>' +
+            ' <li><code>SWAPFAIL</code> the object was believed to be in the cache, but could not be accessed. A new copy was requested from the server.</li>' +
+            ' <li><code>REFRESH</code> a revalidation (conditional) request was sent to the server.</li>' +
+            ' <li><code>SHARED</code> this request was combined with an existing transaction by collapsed forwarding.</li>' +
+            ' <li><code>REPLY</code> the HTTP reply from server or peer. Usually seen on <code>DENIED</code> due to <a href="http://www.squid-cache.org/Doc/config/http_reply_access/" target="_blank">http_reply_access</a> ACLs preventing delivery of servers response object to the client.</li>' +
+            ' </ul>'
+    },
+
+    'squidlog.cache_code_object_tag_requests': {
+        info: 'These tags are optional and describe what type of object was produced.<br>' +
+            '<ul>' +
+            ' <li><code>NEGATIVE</code> only seen on HIT responses, indicating the response was a cached error response. e.g. <b>404 not found</b>.</li>' +
+            ' <li><code>STALE</code> the object was cached and served stale. This is usually caused by <i>stale-while-revalidate</i> or <i>stale-if-error</i> cache controls.</li>' +
+            ' <li><code>OFFLINE</code> the requested object was retrieved from the cache during <a href="http://www.squid-cache.org/Doc/config/offline_mode/" target="_blank">offline_mode</a>. The offline mode never validates any object.</li>' +
+            ' <li><code>INVALID</code> an invalid request was received. An error response was delivered indicating what the problem was.</li>' +
+            ' <li><code>FAILED</code> only seen on <code>REFRESH</code> to indicate the revalidation request failed. The response object may be the server provided network error or the stale object which was being revalidated depending on stale-if-error cache control.</li>' +
+            ' <li><code>MODIFIED</code> only seen on <code>REFRESH</code> responses to indicate revalidation produced a new modified object.</li>' +
+            ' <li><code>UNMODIFIED</code> only seen on <code>REFRESH</code> responses to indicate revalidation produced a 304 (Not Modified) status. The client gets either a full 200 (OK), a 304 (Not Modified), or (in theory) another response, depending on the client request and other details.</li>' +
+            ' <li><code>REDIRECT</code> Squid generated an HTTP redirect response to this request.</li>' +
+            ' </ul>'
+    },
+
+    'squidlog.cache_code_load_source_tag_requests': {
+        info: 'These tags are optional and describe whether the response was loaded from cache, network, or otherwise.<br>' +
+            '<ul>' +
+            ' <li><code>HIT</code> the response object delivered was the local cache object.</li>' +
+            ' <li><code>MEM</code> the response object came from memory cache, avoiding disk accesses. Only seen on HIT responses.</li>' +
+            ' <li><code>MISS</code> the response object delivered was the network response object.</li>' +
+            ' <li><code>DENIED</code> the request was denied by access controls.</li>' +
+            ' <li><code>NOFETCH</code> an ICP specific type, indicating service is alive, but not to be used for this request (sent during "-Y" startup, or during frequent failures, a cache in hit only mode will return either UDP_HIT or UDP_MISS_NOFETCH. Neighbours will thus only fetch hits).</li>' +
+            ' <li><code>TUNNEL</code> a binary tunnel was established for this transaction.</li>' +
+            ' </ul>'
+    },
+
+    'squidlog.cache_code_error_tag_requests': {
+        info: 'These tags are optional and describe some error conditions which occured during response delivery.<br>' +
+            '<ul>' +
+            ' <li><code>ABORTED</code> the response was not completed due to the connection being aborted (usually by the client).</li>' +
+            ' <li><code>TIMEOUT</code> the response was not completed due to a connection timeout.</li>' +
+            ' <li><code>IGNORED</code> while refreshing a previously cached response A, Squid got a response B that was older than A (as determined by the Date header field). Squid ignored response B (and attempted to use A instead).</li>' +
+            ' </ul>'
+    },
+
+    'squidlog.http_method_requests': {
+        info: 'The request method to obtain an object. Please refer to section <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Request_methods">request-methods</a> for available methods and their description.'
+    },
+
+    'squidlog.hier_code_requests': {
+        info: 'A code that explains how the request was handled, e.g. by forwarding it to a peer, or going straight to the source. ' +
+            'Any hierarchy tag may be prefixed with <code>TIMEOUT_</code>, if the timeout occurs waiting for all ICP replies to return from the neighbours. The timeout is either dynamic, if the <a href="http://www.squid-cache.org/Doc/config/icp_query_timeout/" target="_blank">icp_query_timeout</a> was not set, or the time configured there has run up. ' +
+            'Refer to <a href="https://wiki.squid-cache.org/SquidFaq/SquidLogs#Hierarchy_Codes" target="_blank">Hierarchy Codes</a> for details on hierarchy codes.'
+    },
+
+    'squidlog.server_address_forwarded_requests': {
+        info: 'The IP address or hostname where the request (if a miss) was forwarded. For requests sent to origin servers, this is the origin server\'s IP address. ' +
+            'For requests sent to a neighbor cache, this is the neighbor\'s hostname. NOTE: older versions of Squid would put the origin server hostname here.'
+    },
+
+    'squidlog.mime_type_requests': {
+        info: 'The content type of the object as seen in the HTTP reply header. Please note that ICP exchanges usually don\'t have any content type.'
+    },
+
 };
