@@ -134,7 +134,6 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
-    netdata_rwlock_rdlock(&host->labels_rwlock);
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
         host->health_log_entries_written++;
         line++;
@@ -339,7 +338,6 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
         }
     }
 
-    netdata_rwlock_unlock(&host->labels_rwlock);
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 
     freez(buf);
