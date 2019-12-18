@@ -246,6 +246,20 @@ static inline char *strncpyz(char *dst, const char *src, size_t n) {
     return p;
 }
 
+static inline void escape_json_string(char *dst, char *src, size_t len) {
+    while (*src != '\0' && len > 1) {
+        if (*src == '\\' || *src == '\"' || *src < 0x1F) {
+            *dst++ = '\\';
+            *dst++ = *src++;
+            len -= 2;
+        } else {
+            *dst++ = *src++;
+            len--;
+        }
+    }
+    *dst = '\0';
+}
+
 static inline int read_file(const char *filename, char *buffer, size_t size) {
     if(unlikely(!size)) return 3;
 

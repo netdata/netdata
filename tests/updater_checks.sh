@@ -47,6 +47,10 @@ case "${running_os}" in
 "opensuse-leap"|"opensuse-tumbleweed")
 	zypper update -y
 	zypper install -y bats curl
+
+	# Fixes curl: (60) SSL certificate problem: unable to get local issuer certificate
+	# https://travis-ci.com/netdata/netdata/jobs/267573805
+	update-ca-certificates
 	;;
 "arch")
 	pacman -Sy

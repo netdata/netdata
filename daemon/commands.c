@@ -18,16 +18,19 @@ char cmd_prefix_by_status[] = {
 static int command_thread_error;
 static int command_thread_shutdown;
 static unsigned clients = 0;
-static char command_string[MAX_COMMAND_LENGTH];
-static unsigned command_string_size;
 
 struct command_context {
+    /* embedded client pipe structure at address 0 */
+    uv_pipe_t client;
+
     uv_work_t work;
-    uv_stream_t *client;
+    uv_write_t write_req;
     cmd_t idx;
     char *args;
     char *message;
     cmd_status_t status;
+    char command_string[MAX_COMMAND_LENGTH];
+    unsigned command_string_size;
 };
 
 /* Forward declarations */
@@ -38,6 +41,7 @@ static cmd_status_t cmd_reopen_logs_execute(char *args, char **message);
 static cmd_status_t cmd_exit_execute(char *args, char **message);
 static cmd_status_t cmd_fatal_execute(char *args, char **message);
 static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message);
+static cmd_status_t cmd_reload_labels_execute(char *args, char **message);
 
 static command_info_t command_info_array[] = {
         {"help", cmd_help_execute, CMD_TYPE_HIGH_PRIORITY},                  // show help menu
@@ -47,6 +51,7 @@ static command_info_t command_info_array[] = {
         {"shutdown-agent", cmd_exit_execute, CMD_TYPE_EXCLUSIVE},            // exit cleanly
         {"fatal-agent", cmd_fatal_execute, CMD_TYPE_HIGH_PRIORITY},          // exit with fatal error
         {"reload-claiming-state", cmd_reload_claiming_state_execute, CMD_TYPE_ORTHOGONAL}, // reload claiming state
+        {"reload-labels", cmd_reload_labels_execute, CMD_TYPE_ORTHOGONAL},   // reload the labels
 };
 
 /* Mutexes for commands of type CMD_TYPE_ORTHOGONAL */
@@ -96,6 +101,8 @@ static cmd_status_t cmd_help_execute(char *args, char **message)
              "    Show this help menu.\n"
              "reload-health\n"
              "    Reload health configuration.\n"
+             "reload-labels\n"
+             "    Reload all labels.\n"
              "save-database\n"
              "    Save internal DB to disk for memory mode save.\n"
              "reopen-logs\n"
@@ -178,10 +185,34 @@ static cmd_status_t cmd_reload_claiming_state_execute(char *args, char **message
     (void)args;
     (void)message;
 
+    info("The claiming feature is still in development and subject to change before the next release");
+    return CMD_STATUS_FAILURE;
+
     error_log_limit_unlimited();
     info("COMMAND: Reloading Agent Claiming configuration.");
     load_claiming_state();
     error_log_limit_reset();
+    return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
+{
+    (void)args;
+    info("COMMAND: reloading host labels.");
+    reload_host_labels();
+
+    BUFFER *wb = buffer_create(10);
+
+    netdata_rwlock_rdlock(&localhost->labels_rwlock);
+    struct label *l=localhost->labels;
+    while (l != NULL) {
+        buffer_sprintf(wb,"Label [source id=%s]: \"%s\" -> \"%s\"\n", translate_label_source(l->label_source), l->key, l->value);
+        l = l->next;
+    }
+    netdata_rwlock_unlock(&localhost->labels_rwlock);
+
+    (*message)=strdupz(buffer_tostring(wb));
+    buffer_free(wb);
 
     return CMD_STATUS_SUCCESS;
 }
@@ -236,13 +267,18 @@ static void cmd_unlock_high_priority(unsigned index)
     (void)index;
 }
 
+static void pipe_close_cb(uv_handle_t* handle)
+{
+    /* Also frees command context */
+    freez(handle);
+}
+
 static void pipe_write_cb(uv_write_t* req, int status)
 {
     (void)status;
     uv_pipe_t *client = req->data;
 
-    uv_close((uv_handle_t *)client, NULL);
-    freez(client);
+    uv_close((uv_handle_t *)client, pipe_close_cb);
     --clients;
     info("Command Clients = %u\n", clients);
 }
@@ -261,14 +297,14 @@ static inline void add_string_to_command_reply(char *reply_string, unsigned *rep
     *reply_string_size += len;
 }
 
-static void send_command_reply(uv_stream_t *client, cmd_status_t status, char *message)
+static void send_command_reply(struct command_context *cmd_ctx, cmd_status_t status, char *message)
 {
     int ret;
     char reply_string[MAX_COMMAND_LENGTH] = {'\0', };
     char exit_status_string[MAX_EXIT_STATUS_LENGTH + 1] = {'\0', };
     unsigned reply_string_size = 0;
     uv_buf_t write_buf;
-    uv_write_t write_req;
+    uv_stream_t *client = (uv_stream_t *)(uv_pipe_t *)cmd_ctx;
 
     snprintfz(exit_status_string, MAX_EXIT_STATUS_LENGTH, "%u", status);
     add_char_to_command_reply(reply_string, &reply_string_size, CMD_PREFIX_EXIT_CODE);
@@ -280,10 +316,10 @@ static void send_command_reply(uv_stream_t *client, cmd_status_t status, char *m
         add_string_to_command_reply(reply_string, &reply_string_size, message);
     }
 
-    write_req.data = client;
+    cmd_ctx->write_req.data = client;
     write_buf.base = reply_string;
     write_buf.len = reply_string_size;
-    ret = uv_write(&write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
+    ret = uv_write(&cmd_ctx->write_req, (uv_stream_t *)client, &write_buf, 1, pipe_write_cb);
     if (ret) {
         error("uv_write(): %s", uv_strerror(ret));
     }
@@ -308,7 +344,7 @@ static void after_schedule_command(uv_work_t *req, int status)
 
     (void)status;
 
-    send_command_reply(cmd_ctx->client, cmd_ctx->status, cmd_ctx->message);
+    send_command_reply(cmd_ctx, cmd_ctx->status, cmd_ctx->message);
     if (cmd_ctx->message)
         freez(cmd_ctx->message);
 }
@@ -320,22 +356,19 @@ static void schedule_command(uv_work_t *req)
     cmd_ctx->status = execute_command(cmd_ctx->idx, cmd_ctx->args, &cmd_ctx->message);
 }
 
-static void parse_commands(uv_stream_t *client)
+static void parse_commands(struct command_context *cmd_ctx)
 {
     char *message = NULL, *pos;
     cmd_t i;
     cmd_status_t status;
-    struct command_context *cmd_ctx;
 
     status = CMD_STATUS_FAILURE;
 
     /* Skip white-space characters */
-    for (pos = command_string ; isspace(*pos) && ('\0' != *pos) ; ++pos) {;}
+    for (pos = cmd_ctx->command_string ; isspace(*pos) && ('\0' != *pos) ; ++pos) {;}
     for (i = 0 ; i < CMD_TOTAL_COMMANDS ; ++i) {
         if (!strncmp(pos, command_info_array[i].cmd_str, strlen(command_info_array[i].cmd_str))) {
-            cmd_ctx = mallocz(sizeof(*cmd_ctx));
             cmd_ctx->work.data = cmd_ctx;
-            cmd_ctx->client = client;
             cmd_ctx->idx = i;
             cmd_ctx->args = pos + strlen(command_info_array[i].cmd_str);
             cmd_ctx->message = NULL;
@@ -347,18 +380,20 @@ static void parse_commands(uv_stream_t *client)
     if (CMD_TOTAL_COMMANDS == i) {
         /* no command found */
         message = strdupz("Illegal command. Please type \"help\" for instructions.");
-        send_command_reply(client, status, message);
+        send_command_reply(cmd_ctx, status, message);
         freez(message);
     }
 }
 
 static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf)
 {
+    struct command_context *cmd_ctx = (struct command_context *)client;
+
     if (0 == nread) {
         info("%s: Zero bytes read by command pipe.", __func__);
     } else if (UV_EOF == nread) {
         info("EOF found in command pipe.");
-        parse_commands(client);
+        parse_commands(cmd_ctx);
     } else if (nread < 0) {
         error("%s: %s", __func__, uv_strerror(nread));
     }
@@ -368,17 +403,17 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
     } else if (nread) {
         size_t to_copy;
 
-        to_copy = MIN(nread, MAX_COMMAND_LENGTH - 1 - command_string_size);
-        strncpyz(command_string + command_string_size, buf->base, to_copy);
-        command_string_size += to_copy;
+        to_copy = MIN(nread, MAX_COMMAND_LENGTH - 1 - cmd_ctx->command_string_size);
+        memcpy(cmd_ctx->command_string + cmd_ctx->command_string_size, buf->base, to_copy);
+        cmd_ctx->command_string_size += to_copy;
+        cmd_ctx->command_string[cmd_ctx->command_string_size] = '\0';
     }
     if (buf && buf->len) {
         freez(buf->base);
     }
 
     if (nread < 0 && UV_EOF != nread) {
-        uv_close((uv_handle_t *)client, NULL);
-        freez(client);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
         --clients;
         info("Command Clients = %u\n", clients);
     }
@@ -396,34 +431,35 @@ static void connection_cb(uv_stream_t *server, int status)
 {
     int ret;
     uv_pipe_t *client;
+    struct command_context *cmd_ctx;
     assert(status == 0);
 
-    client = mallocz(sizeof(*client));
+    /* combined allocation of client pipe and command context */
+    cmd_ctx = mallocz(sizeof(*cmd_ctx));
+    client = (uv_pipe_t *)cmd_ctx;
     ret = uv_pipe_init(server->loop, client, 1);
     if (ret) {
         error("uv_pipe_init(): %s", uv_strerror(ret));
-        freez(client);
+        freez(cmd_ctx);
         return;
     }
     ret = uv_accept(server, (uv_stream_t *)client);
     if (ret) {
         error("uv_accept(): %s", uv_strerror(ret));
-        uv_close((uv_handle_t *)client, NULL);
-        freez(client);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
         return;
     }
 
     ++clients;
     info("Command Clients = %u\n", clients);
     /* Start parsing a new command */
-    command_string_size = 0;
-    command_string[0] = '\0';
+    cmd_ctx->command_string_size = 0;
+    cmd_ctx->command_string[0] = '\0';
 
     ret = uv_read_start((uv_stream_t*)client, alloc_cb, pipe_read_cb);
     if (ret) {
         error("uv_read_start(): %s", uv_strerror(ret));
-        uv_close((uv_handle_t *)client, NULL);
-        freez(client);
+        uv_close((uv_handle_t *)client, pipe_close_cb);
         --clients;
         info("Command Clients = %u\n", clients);
         return;

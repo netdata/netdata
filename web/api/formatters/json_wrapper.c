@@ -26,16 +26,35 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                        "   %sapi%s: 1,\n"
                        "   %sid%s: %s%s%s,\n"
                        "   %sname%s: %s%s%s,\n"
-                       "   %sview_update_every%s: %d,\n"
+                   , kq, kq
+                   , kq, kq, sq, r->st->id, sq
+                   , kq, kq, sq, r->st->name, sq);
+
+    RRDHOST *host = r->st->rrdhost;
+    buffer_sprintf(wb, "   %slabels%s: {\n", kq, kq);
+
+    int count = 0;
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if(count > 0) buffer_strcat(wb, ",\n");
+
+        char value[CONFIG_MAX_VALUE * 2 + 1];
+        escape_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
+        buffer_sprintf(wb, "      %s%s%s: %s%s%s", kq, label->key, kq, sq, value, sq);
+
+        count++;
+    }
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    buffer_strcat(wb, "\n   },\n");
+
+    buffer_sprintf(wb, "   %sview_update_every%s: %d,\n"
                        "   %supdate_every%s: %d,\n"
                        "   %sfirst_entry%s: %u,\n"
                        "   %slast_entry%s: %u,\n"
                        "   %sbefore%s: %u,\n"
                        "   %safter%s: %u,\n"
                        "   %sdimension_names%s: ["
-                   , kq, kq
-                   , kq, kq, sq, r->st->id, sq
-                   , kq, kq, sq, r->st->name, sq
                    , kq, kq, r->update_every
                    , kq, kq, r->st->update_every
                    , kq, kq, (uint32_t)rrdset_first_entry_t(r->st)

@@ -37,6 +37,9 @@ extern struct registry registry;
 /* rrd_init() must have been called before this function */
 void claim_agent(char *claiming_arguments)
 {
+    info("The claiming feature is under development and still subject to change before the next release");
+    return;
+
     int exit_code;
     pid_t command_pid;
     char command_buffer[CLAIMING_COMMAND_LENGTH + 1];
@@ -82,6 +85,9 @@ void claim_agent(char *claiming_arguments)
 
 void load_claiming_state(void)
 {
+    info("The claiming feature is under development and still subject to change before the next release");
+    return;
+
     char filename[FILENAME_MAX + 1];
     struct stat statbuf;
 

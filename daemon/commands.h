@@ -20,6 +20,7 @@ typedef enum cmd {
     CMD_EXIT,
     CMD_FATAL,
     CMD_RELOAD_CLAIMING_STATE,
+    CMD_RELOAD_LABELS,
     CMD_TOTAL_COMMANDS
 } cmd_t;
 
