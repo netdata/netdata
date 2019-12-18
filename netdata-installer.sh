@@ -588,9 +588,11 @@ config_option() {
 if [ "${UID}" = "0" ]; then
 	NETDATA_USER="$(config_option "global" "run as user" "netdata")"
 	ROOT_USER="root"
+	ROOT_GROUP="root"
 else
 	NETDATA_USER="${USER}"
 	ROOT_USER="${USER}"
+	ROOT_GROUP="${USER}"
 fi
 NETDATA_GROUP="$(id -g -n "${NETDATA_USER}")"
 [ -z "${NETDATA_GROUP}" ] && NETDATA_GROUP="${NETDATA_USER}"
@@ -700,7 +702,7 @@ if [ "${UID}" -eq 0 ]; then
 	test -z "${admin_group}" && admin_group="${NETDATA_GROUP}"
 
 	run chown "${NETDATA_USER}:${admin_group}" "${NETDATA_LOG_DIR}"
-	run chown -R "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata"
+	run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata"
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0750 {} \;
