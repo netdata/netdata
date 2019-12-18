@@ -169,7 +169,7 @@ struct label {
 char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
-extern void clean_label_list(RRDHOST *host, struct label *new_labels);
+extern void replace_label_list(RRDHOST *host, struct label *new_labels);
 void reload_host_labels();
 
 // ----------------------------------------------------------------------------

@@ -889,7 +889,7 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
     return result;
 }
 
-void clean_label_list(RRDHOST *host, struct label *new_labels)
+void replace_label_list(RRDHOST *host, struct label *new_labels)
 {
     netdata_rwlock_wrlock(&host->labels_rwlock);
     struct label *old_labels = host->labels;
@@ -951,7 +951,7 @@ void reload_host_labels()
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
     new_labels = merge_label_lists(new_labels, from_config);
 
-    clean_label_list(localhost, new_labels);
+    replace_label_list(localhost, new_labels);
 
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
         localhost->labels_flag |= LABEL_FLAG_STREAM;
