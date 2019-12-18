@@ -20,6 +20,6 @@ if [ -n "${PGID}" ]; then
     usermod -a -G ${PGID} ${DOCKER_USR} || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
-exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_PORT}" "$@"
+exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_PORT}" -W set web "web files group" root -W set web "web files owner" root "$@"
 
 echo "Netdata entrypoint script, completed!"
