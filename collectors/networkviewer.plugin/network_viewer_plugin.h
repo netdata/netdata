@@ -150,25 +150,25 @@ typedef struct netdata_network {
 # define NETDATA_MAX_DIMENSION 50
 
 # define NETWORK_VIEWER_FAMILY "network_viewer"
-# define NETWORK_VIEWER_CHART1 "TCP_transf_inbound"
-# define NETWORK_VIEWER_CHART2 "TCP_transf_outbound"
-# define NETWORK_VIEWER_CHART3 "UDP_transf_inbound"
-# define NETWORK_VIEWER_CHART4 "UDP_transf_outbound"
+# define NETWORK_VIEWER_TCP_INBOUND_IPV4 "TCP_transf_inbound_ipv4"
+# define NETWORK_VIEWER_TCP_OUTBOUND_IPV4 "TCP_transf_outbound_ipv4"
+# define NETWORK_VIEWER_UDP_INBOUND_IPV4 "UDP_transf_inbound_ipv4"
+# define NETWORK_VIEWER_UDP_OUTBOUND_IPV4 "UDP_transf_outbound_ipv4"
 
-//# define NETWORK_VIEWER_CHART5 "TCP_conn_inbound"
-# define NETWORK_VIEWER_CHART6 "TCP_conn_outbound"
-//# define NETWORK_VIEWER_CHART7 "UDP_conn_inbound"
-# define NETWORK_VIEWER_CHART8 "UDP_conn_outbound"
+//# define NETWORK_VIEWER_CHART5 "TCP_conn_inbound_ipv4"
+# define NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV4 "TCP_conn_outbound_ipv4"
+//# define NETWORK_VIEWER_CHART7 "UDP_conn_inbound_ipv4"
+# define NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV4 "UDP_conn_outbound_ipv4"
 
-# define NETWORK_VIEWER_CHART9 "TCP_transf_inbound_ipv6"
-# define NETWORK_VIEWER_CHART10 "TCP_transf_outbound_ipv6"
-# define NETWORK_VIEWER_CHART11 "UDP_transf_inbound_ipv6"
-# define NETWORK_VIEWER_CHART12 "UDP_transf_outbound_ipv6"
+# define NETWORK_VIEWER_TCP_INBOUND_IPV6 "TCP_transf_inbound_ipv6"
+# define NETWORK_VIEWER_TCP_OUTBOUND_IPV6 "TCP_transf_outbound_ipv6"
+# define NETWORK_VIEWER_UDP_INBOUND_IPV6 "UDP_transf_inbound_ipv6"
+# define NETWORK_VIEWER_UDP_OUTBOUND_IPV6 "UDP_transf_outbound_ipv6"
 
 //# define NETWORK_VIEWER_CHART13 "TCP_conn_inbound_ipv6"
-# define NETWORK_VIEWER_CHART14 "TCP_conn_outbound_ipv6"
+# define NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6 "TCP_conn_outbound_ipv6"
 //# define NETWORK_VIEWER_CHART15 "UDP_conn_inbound_ipv6"
-# define NETWORK_VIEWER_CHART16 "UDP_conn_outbound_ipv6"
+# define NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6 "UDP_conn_outbound_ipv6"
 
 
 #endif

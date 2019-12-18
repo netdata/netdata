@@ -127,29 +127,29 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
 }
 
 static void netdata_create_charts() {
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART1, "Network Viewer TCP bytes received from request to specific port.", "bytes/s", "TCP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV4, "Network Viewer TCP bytes received from request to specific port.", "bytes/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART2, "Network viewer TCP request length to specific port.", "bytes/s", "TCP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV4, "Network viewer TCP request length to specific port.", "bytes/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART3, "Network viewer UDP bytes received from request to specific port.", "bytes/s","UDP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV4, "Network viewer UDP bytes received from request to specific port.", "bytes/s","UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART4, "Network viewer UDP request length to specific port.", "bytes/s","UDP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV4, "Network viewer UDP request length to specific port.", "bytes/s","UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART6, "Network viewer TCP active connections per port.", "active connections", "TCP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV4, "Network viewer TCP active connections per port.", "active connections", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART8, "Network viewer UDP active connections per port.", "active connections","UDP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV4, "Network viewer UDP active connections per port.", "active connections","UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART9, "Network Viewer TCP bytes received from request to specific port.", "kilobits/s", "TCP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV6, "Network Viewer TCP bytes received from request to specific port.", "kilobits/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART10, "Network viewer TCP request length to specific port.", "kilobits/s", "TCP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV6, "Network viewer TCP request length to specific port.", "kilobits/s", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART11, "Network viewer UDP bytes received from request to specific port.", "kilobits/s", "UDP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV6, "Network viewer UDP bytes received from request to specific port.", "kilobits/s", "UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART12, "Network viewer UDP request length to specific port.", "kilobits/s", "UDP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV6, "Network viewer UDP request length to specific port.", "kilobits/s", "UDP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART14, "Network viewer TCP active connections per port.", "active connections", "TCP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6, "Network viewer TCP active connections per port.", "active connections", "TCP");
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_CHART16, "Network viewer UDP active connections per port.", "active connections", "UDP");
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6, "Network viewer UDP active connections per port.", "active connections", "UDP");
 }
 
 static void write_connection(char *name, uint32_t *bytes) {
@@ -225,23 +225,23 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version) {
     }
 
     if (version == AF_INET) {
-        write_traffic(NETWORK_VIEWER_CHART1, ibytes_tcp);
-        write_traffic(NETWORK_VIEWER_CHART3, ibytes_udp);
+        write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV4, ibytes_tcp);
+        write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV4, ibytes_udp);
 
-        write_traffic(NETWORK_VIEWER_CHART2, ebytes_tcp);
-        write_traffic(NETWORK_VIEWER_CHART4, ebytes_udp);
+        write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV4, ebytes_tcp);
+        write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV4, ebytes_udp);
 
-        write_connection(NETWORK_VIEWER_CHART6, econn_tcp);
-        write_connection(NETWORK_VIEWER_CHART8, econn_udp);
+        write_connection(NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV4, econn_tcp);
+        write_connection(NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV4, econn_udp);
     } else {
-        write_traffic(NETWORK_VIEWER_CHART9, ibytes_tcp);
-        write_traffic(NETWORK_VIEWER_CHART11, ibytes_udp);
+        write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV6, ibytes_tcp);
+        write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV6, ibytes_udp);
 
-        write_traffic(NETWORK_VIEWER_CHART10, ebytes_tcp);
-        write_traffic(NETWORK_VIEWER_CHART12, ebytes_udp);
+        write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV6, ebytes_tcp);
+        write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV6, ebytes_udp);
 
-        write_connection(NETWORK_VIEWER_CHART14, econn_tcp);
-        write_connection(NETWORK_VIEWER_CHART16, econn_udp);
+        write_connection(NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6, econn_tcp);
+        write_connection(NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6, econn_udp);
     }
 }
 
