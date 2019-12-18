@@ -2708,7 +2708,7 @@ netdataDashboard.context = {
     'squidlog.type_requests': {
         info: 'Requests by response type:<br>' +
             '<ul>' +
-            ' <li><code>success</code> includes 1xx, 2xx, 000, 304, 401.</li>' +
+            ' <li><code>success</code> includes 1xx, 2xx, 0, 304, 401.</li>' +
             ' <li><code>error</code> includes 5xx and 6xx.</li>' +
             ' <li><code>redirect</code> includes 3xx except 304.</li>' +
             ' <li><code>bad</code> includes 4xx except 401.</li>' +
@@ -2723,7 +2723,7 @@ netdataDashboard.context = {
             ' <li><code>4xx</code> is bad requests.</li>' +
             ' <li><code>5xx</code> is internal server errors.</li>' +
             ' </ul>' +
-            'Squid also uses <code>000</code> for a result code being unavailable, and <code>6xx</code> to signal an invalid header, a proxy error.'
+            'Squid also uses <code>0</code> for a result code being unavailable, and <code>6xx</code> to signal an invalid header, a proxy error.'
     },
 
     'squidlog.http_status_code_responses': {
