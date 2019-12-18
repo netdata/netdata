@@ -16,6 +16,18 @@ straight into code and configurations with our [getting started guide](../gettin
 > This tutorial contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
 > other supported operating systems, like FreeBSD and MacOS, but we can't make any guarantees.
 
+## Where to go if you need help
+
+No matter where you are in this Netdata tutorial, if you need help, head over to our [GitHub
+repository](https://github.com/netdata/netdata/). That's where we collect questions from users, help fix their bugs, and
+point people toward documentation that explains what they're having trouble with.
+
+Click on the **issues** tab to see all the conversations we're having with Netdata users. Use the search bar to find
+previously-written advice for your specific problem, and if you don't see any results, hit the **New issue** button to
+send us a question.
+
+Or, if that's too complicated, feel free to send this tutorial's author [an email](mailto:joel@netdata.cloud).
+
 ## Before we get started
 
 Let's make sure you have Netdata installed on your system!

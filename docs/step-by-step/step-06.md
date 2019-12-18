@@ -40,7 +40,8 @@ You don't need to explicitly enable plugins to auto-detect properly configured s
 enable or disable them.
 
 One reason you might want to _disable_ plugins is to improve Netdata's performance on low-resource systems, like
-ephemeral nodes or edge devices.
+ephemeral nodes or edge devices. Disabling orchestrator plugins like `python.d` can save significant resources—if you're
+not using any of its data collector modules.
 
 You can enable or disable plugins in the `[plugin]` section of `netdata.conf`. This section features a list of all the
 plugins with a boolean setting (`yes` or `no`) to enable or disable them. Be sure to uncomment the line by removing the

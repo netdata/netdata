@@ -16,6 +16,10 @@ and figure out the root cause analysis of any issue.
 Best of all, Netdata is entirely free, open-source software! Solo developers and enterprises with thousands of systems
 can both use it free of charge. We're hosted on [GitHub](https://github.com/netdata/netdata).
 
+Want to learn about the history of Netdata, and what inspired our CEO to build it in the first place, and where we're
+headed? Read Costa's comprehensive blog post: _[Redefining monitoring with Netdata (and how it came to
+be)](https://blog.netdata.cloud/posts/redefining-monitoring-netdata/)_.
+
 ## What you'll learn in this step
 
 In the first step of the Netdata guide, you'll learn about:
@@ -72,8 +76,13 @@ Our first principle is per-second data collection for all metrics.
 That matters because you can't monitor a 2-second service-level agreement (SLA) with 10-second metrics. You can't detect
 quick anomalies if your metrics don't show them.
 
-How do we solve this? By decentralizing monitoring. Each node collects metrics, triggers alarms, and builds dashboards
-locally. That means you can scale Netdata to any size of infrastructure and keep the power of per-second metrics.
+How do we solve this? By decentralizing monitoring. Each node is responsible for collecting metrics, triggering alamrs,
+and building dashboards locally, and we work hard to ensure it does each step (and others) with remarkable efficiency.
+For example, Netdata can [collect 100,000 metrics](https://github.com/netdata/netdata/issues/1323) every second while
+using only 9% of a single server-grade CPU core!
+
+By decentralizing monitoring and emphasizing speed at every turn, Netdata helps you scale your health monitoring and
+performance troubleshooting to an infrastructure of every size. _And_ you get to keep per-second metrics.
 
 ### Unlimited metrics
 
