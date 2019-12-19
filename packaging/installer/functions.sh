@@ -437,17 +437,27 @@ stop_netdata_on_pid() {
 
 	printf >&2 "Stopping netdata on pid %s ..." "${pid}"
 	while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
-		if [ ${count} -gt 45 ]; then
+		if [ ${count} -gt 24 ]; then
 			echo >&2 "Cannot stop the running netdata on pid ${pid}."
 			return 1
 		fi
 
 		count=$((count + 1))
 
-		run kill "${pid}" 2>/dev/null
-		ret=$?
+		pidisnetdata "${pid}" || ret=1
+		if [ ${ret} -eq 1 ] ; then
+			break
+		fi
 
-		test ${ret} -eq 0 && printf >&2 "." && sleep 2
+		if [ ${count} -lt 12 ] ; then
+			run kill "${pid}" 2>/dev/null
+			ret=$?
+		else
+			run kill -9 "${pid}" 2>/dev/null
+			ret=$?
+		fi
+
+		test ${ret} -eq 0 && printf >&2 "." && sleep 5
 
 	done
 
