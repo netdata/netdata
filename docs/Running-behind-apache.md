@@ -253,15 +253,17 @@ DOSPageCount 30
 Restart Apache with `sudo service apache2 restart`, or the appropriate method to restart services on your system, to
 reload its configuration with your new values.
 
+
+### Virtual host
 To adjust the `DOSPageCount` for a specific virtual host, open your virtual host config, which can be found at
 `/etc/httpd/conf/sites-available/my-domain.conf` or `/etc/apache2/sites-available/my-domain.conf` and add the
 following:
 
 ```conf
-	# Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
-	<IfModule mod_evasive20.c>
-		DOSPageCount        50
-	</IfModule>
+# Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
+<IfModule mod_evasive20.c>
+	DOSPageCount        30
+</IfModule>
 ```
 
 For example:
@@ -287,7 +289,7 @@ For example:
 
 	# Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
 	<IfModule mod_evasive20.c>
-		DOSPageCount        50
+		DOSPageCount        30
 	</IfModule>
 </VirtualHost>
 ```
