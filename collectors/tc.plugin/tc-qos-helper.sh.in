@@ -230,7 +230,7 @@ show_fireqos_names() {
 show_tc() {
 	local x="${1}"
 
-	echo "BEGIN ${x}"
+	echo "BEGIN ${x}" || exit
 
 	# netdata can parse the output of tc
 	${tc} -s ${tc_show} show dev "${x}"
@@ -240,7 +240,7 @@ show_tc() {
 		show_fireqos_names "${x}" || show_tc_cls "${x}"
 	fi
 
-	echo "END ${x}"
+	echo "END ${x}" || exit
 }
 
 find_tc_devices() {
@@ -289,7 +289,7 @@ while true; do
 		show_tc "${d}"
 	done
 
-	echo "WORKTIME ${LOOPSLEEPMS_LASTWORK}"
+	echo "WORKTIME ${LOOPSLEEPMS_LASTWORK}" || exit
 
 	loopsleepms ${update_every}
 
