@@ -148,6 +148,7 @@ struct page_cache { /* TODO: add statistics */
 };
 
 extern void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr);
+extern void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 extern void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr);
 extern unsigned long pg_cache_wait_event(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 extern void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx,

@@ -5,14 +5,14 @@
 * @ktsaou @cosmix
 
 # Ownership by directory structure
-.travis/ @cosmix @netdata/automation
-.github/ @cosmix @netdata/automation
+.travis/ @cosmix @Ferroin @knatsakis @ncmans @prologic
+.github/ @cosmix @Ferroin @knatsakis @ncmans @prologic
 backends/ @thiagoftsm @vlvkobal
 backends/graphite/ @thiagoftsm @vlvkobal
 backends/json/ @thiagoftsm @vlvkobal
 backends/opentsdb/ @thiagoftsm @vlvkobal
 backends/prometheus/ @vlvkobal @thiagoftsm
-build/ @cosmix @netdata/automation
+build/ @cosmix @Ferroin @knatsakis @ncmans @prologic
 collectors/ @vlvkobal @mfundul @cosmix
 collectors/charts.d.plugin/ @cosmix
 collectors/freebsd.plugin/ @vlvkobal @thiagoftsm @cosmix
@@ -30,7 +30,7 @@ health/ @thiagoftsm @vlvkobal @cosmix
 health/health.d/ @thiagoftsm @vlvkobal @cosmix
 health/notifications/ @Ferroin @thiagoftsm @cosmix
 libnetdata/ @thiagofsm @mfundul @cosmix
-packaging/ @cosmix @netdata/automation
+packaging/ @cosmix @Ferroin @knatsakis @ncmans @prologic
 registry/ @jacekkolasa @cosmix
 streaming/ @thiagoftsm @vlvkobal @cosmix
 web/ @thiagoftsm @mfundul @vlvkobal @cosmix
@@ -38,19 +38,19 @@ web/gui/ @jacekkolasa @cosmix
 
 # Ownership by filetype (overwrites ownership by directory)
 *.md @cosmix @joelhans
-*.am @cosmix @netdata/automation
+*.am @cosmix @Ferroin @knatsakis @ncmans @prologic
 
 # Ownership of specific files
-.gitignore @cosmix @netdata/automation
-.travis.yml @cosmix @netdata/automation
-.lgtm.yml @cosmix @netdata/automation
-.eslintrc @cosmix @netdata/automation
-.eslintignore @cosmix @netdata/automation
-.csslintrc @cosmix @netdata/automation
-.codeclimate.yml @cosmix @netdata/automation
-.codacy.yml @cosmix @netdata/automation
-netdata.spec.in @cosmix @netdata/automation
-netdata-installer.sh @cosmix @netdata/automation
+.gitignore @cosmix @Ferroin @knatsakis @ncmans @prologic
+.travis.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
+.lgtm.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
+.eslintrc @cosmix @Ferroin @knatsakis @ncmans @prologic
+.eslintignore @cosmix @Ferroin @knatsakis @ncmans @prologic
+.csslintrc @cosmix @Ferroin @knatsakis @ncmans @prologic
+.codeclimate.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
+.codacy.yml @cosmix @Ferroin @knatsakis @ncmans @prologic
+netdata.spec.in @cosmix @Ferroin @knatsakis @ncmans @prologic
+netdata-installer.sh @cosmix @Ferroin @knatsakis @ncmans @prologic
 netlify.toml @cosmix
 package.json @jacekkolasa
 packaging/version @netdatabot

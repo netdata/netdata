@@ -313,6 +313,7 @@ if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ]; then
 else
 	rm_file "/usr/sbin/netdata"
 	rm_file "/usr/sbin/netdatacli"
+	rm_file "/usr/sbin/netdata-claim.sh"
 	rm_dir "/usr/share/netdata"
 	rm_dir "/usr/libexec/netdata"
 	rm_dir "/var/lib/netdata"
