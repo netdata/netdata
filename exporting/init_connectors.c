@@ -65,6 +65,9 @@ int init_connectors(struct engine *engine)
 
             // dispatch the instance worker thread
             uv_thread_create(&instance->thread, connector->worker, instance);
+            char threadname[32];
+            snprintfz(threadname, 31, "EXPORTING-%zu", instance->index);
+            uv_thread_set_name(instance->thread, threadname);
         }
     }
 
