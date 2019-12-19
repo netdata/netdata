@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- CODEOWNERS: Replace @netdata/automation with individual team members [\#7581](https://github.com/netdata/netdata/pull/7581) ([knatsakis](https://github.com/knatsakis))
+- Docs: Add notice about mod\_evasive to Apache proxy guide [\#7578](https://github.com/netdata/netdata/pull/7578) ([joelhans](https://github.com/joelhans))
+- Fix race condition in dbengine [\#7565](https://github.com/netdata/netdata/pull/7565) ([thiagoftsm](https://github.com/thiagoftsm))
 - Revert "Fix race condition in dbengine \(\#7533\)" [\#7560](https://github.com/netdata/netdata/pull/7560) ([amoss](https://github.com/amoss))
+- Skip unit testing during CI when it's not needed. [\#7559](https://github.com/netdata/netdata/pull/7559) ([Ferroin](https://github.com/Ferroin))
 - Cleanup the main exporting engine thread on exit [\#7558](https://github.com/netdata/netdata/pull/7558) ([vlvkobal](https://github.com/vlvkobal))
 - proc\_pressure: increment fail\_count on read fail [\#7547](https://github.com/netdata/netdata/pull/7547) ([hexchain](https://github.com/hexchain))
 - Merge the matrix and jobs keys in Travis config. [\#7544](https://github.com/netdata/netdata/pull/7544) ([Ferroin](https://github.com/Ferroin))
@@ -14,6 +18,7 @@
 - Fix race condition in dbengine [\#7533](https://github.com/netdata/netdata/pull/7533) ([mfundul](https://github.com/mfundul))
 - Fix valgrind errors [\#7532](https://github.com/netdata/netdata/pull/7532) ([mfundul](https://github.com/mfundul))
 - Update codeowners [\#7530](https://github.com/netdata/netdata/pull/7530) ([knatsakis](https://github.com/knatsakis))
+- Agent claiming [\#7525](https://github.com/netdata/netdata/pull/7525) ([mfundul](https://github.com/mfundul))
 - Add Fedora 31 CI integrations. [\#7524](https://github.com/netdata/netdata/pull/7524) ([Ferroin](https://github.com/Ferroin))
 - Labels issues [\#7515](https://github.com/netdata/netdata/pull/7515) ([amoss](https://github.com/amoss))
 - Update Netdata RPM spec file to package netdatacli. [\#7513](https://github.com/netdata/netdata/pull/7513) ([Ferroin](https://github.com/Ferroin))
@@ -21,6 +26,7 @@
 - Force the repo name to be lowercase in the tag for docker builds. [\#7506](https://github.com/netdata/netdata/pull/7506) ([Ferroin](https://github.com/Ferroin))
 - Inject archived backports repository on Debian Jessie for CI package builds. [\#7495](https://github.com/netdata/netdata/pull/7495) ([Ferroin](https://github.com/Ferroin))
 - ci: remove ubuntu trusty 14.04 from build [\#7481](https://github.com/netdata/netdata/pull/7481) ([ncmans](https://github.com/ncmans))
+- silencers\_info: Change error to info [\#7479](https://github.com/netdata/netdata/pull/7479) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix race condition with page cache descriptors [\#7478](https://github.com/netdata/netdata/pull/7478) ([mfundul](https://github.com/mfundul))
 - Fix missing parenthesis on softnet.conf [\#7476](https://github.com/netdata/netdata/pull/7476) ([Steve8291](https://github.com/Steve8291))
 - Fix dbengine dirty page flushing warning [\#7469](https://github.com/netdata/netdata/pull/7469) ([mfundul](https://github.com/mfundul))
@@ -118,7 +124,6 @@
 - add support for am2320 sensor [\#7024](https://github.com/netdata/netdata/pull/7024) ([tommybuck](https://github.com/tommybuck))
 - mysql: add cluster\_status alarm [\#6989](https://github.com/netdata/netdata/pull/6989) ([ilyam8](https://github.com/ilyam8))
 - Netdata not returning correct value for unknow variables [\#6984](https://github.com/netdata/netdata/pull/6984) ([thiagoftsm](https://github.com/thiagoftsm))
-- \[collector/proc.plugin\] Add /proc/pagetypeinfo parser [\#6843](https://github.com/netdata/netdata/pull/6843) ([Saruspete](https://github.com/Saruspete))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
@@ -223,14 +228,6 @@
 - dont redirect when redirectURI is the same [\#6868](https://github.com/netdata/netdata/pull/6868) ([jacekkolasa](https://github.com/jacekkolasa))
 - /var/lib/netdata/registry was being left behind after purge [\#6867](https://github.com/netdata/netdata/pull/6867) ([davent](https://github.com/davent))
 - python.d.plugin: no job config build fix [\#6856](https://github.com/netdata/netdata/pull/6856) ([ilyam8](https://github.com/ilyam8))
-- Resolve broken links in The standard web dashboard doc [\#6854](https://github.com/netdata/netdata/pull/6854) ([prhomhyse](https://github.com/prhomhyse))
-- netdata/packaging: Bring on board two scripts that build libuv and judy from source [\#6850](https://github.com/netdata/netdata/pull/6850) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging: nits and fixes for packaging [\#6842](https://github.com/netdata/netdata/pull/6842) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging: nit - missed trailing slash [\#6840](https://github.com/netdata/netdata/pull/6840) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging: Ensure that we do not mess with CI tooling, when building stable [\#6838](https://github.com/netdata/netdata/pull/6838) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- netdata/packaging: we didnt fix changelog handling, fixes and nits now [\#6837](https://github.com/netdata/netdata/pull/6837) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Add news of 1.17.1 to README [\#6836](https://github.com/netdata/netdata/pull/6836) ([cakrit](https://github.com/cakrit))
-- netdata/packaging: no need to overengineer with these checks [\#6834](https://github.com/netdata/netdata/pull/6834) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 

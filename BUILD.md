@@ -1,4 +1,3 @@
-
 # The build system
 
 We are currently migrating from `autotools` to `CMake` as a build-system. This document 
