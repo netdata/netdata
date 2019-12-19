@@ -83,7 +83,7 @@ int init_opentsdb_http_instance(struct instance *instance)
     return 0;
 }
 
-static inline void sanitize_opentsdb_telnet_label_value(char *dst, char *src, size_t len) {
+static inline void sanitize_opentsdb_label_value(char *dst, char *src, size_t len) {
     while (*src != '\0' && len) {
         if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/')
             *dst++ = *src;
@@ -121,7 +121,7 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
             continue;
 
         char value[CONFIG_MAX_VALUE + 1];
-        sanitize_opentsdb_telnet_label_value(value, label->value, CONFIG_MAX_VALUE);
+        sanitize_opentsdb_label_value(value, label->value, CONFIG_MAX_VALUE);
 
         if (*value)
             buffer_sprintf(instance->labels, " %s=%s", label->key, value);
@@ -271,7 +271,7 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
         escape_json_string(escaped_value, label->value, CONFIG_MAX_VALUE);
 
         char value[CONFIG_MAX_VALUE + 1];
-        sanitize_opentsdb_telnet_label_value(value, escaped_value, CONFIG_MAX_VALUE);
+        sanitize_opentsdb_label_value(value, escaped_value, CONFIG_MAX_VALUE);
 
         if (*value) {
             buffer_strcat(instance->labels, ",");
