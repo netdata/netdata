@@ -134,6 +134,25 @@ static void thread_set_name(NETDATA_THREAD *nt) {
     }
 }
 
+void uv_thread_set_name(uv_thread_t ut, const char* name) {
+    int ret=0;
+
+    // Name is limited to 16 chars
+    char threadname[16];
+    strncpyz(threadname, name, 15);
+
+#if defined(__FreeBSD__)
+    ret = pthread_set_name_np(ut, threadname);
+#elif defined(__APPLE__)
+    // Apple can only set its own name
+#else
+    ret = pthread_setname_np(ut, threadname);
+#endif
+
+    if (ret)
+        error("cannot set libuv thread name to %s. Err: %d", threadname, ret);
+}
+
 static void *thread_start(void *ptr) {
     netdata_thread = (NETDATA_THREAD *)ptr;
 
