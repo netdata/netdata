@@ -123,7 +123,8 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
         char value[CONFIG_MAX_VALUE + 1];
         sanitize_opentsdb_telnet_label_value(value, label->value, CONFIG_MAX_VALUE);
 
-        buffer_sprintf(instance->labels, " %s=%s", label->key, value);
+        if (*value)
+            buffer_sprintf(instance->labels, " %s=%s", label->key, value);
     }
     netdata_rwlock_unlock(&host->labels_rwlock);
 
