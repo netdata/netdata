@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+# netdata
+# real-time performance and health monitoring, done right!
+# (C) 2017 Costa Tsaousis <costa@tsaousis.gr>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Exit code: 0 - Success
+# Exit code: 1 - Unknown argument
+# Exit code: 2 - Problems with claiming working directory
+# Exit code: 3 - Missing dependencies
+# Exit code: 4 - Failure to connect to endpoint
+# Exit code: 5 - Unknown HTTP error message
+#
+# OK: Agent claimed successfully
+# HTTP Status code: 200
+# Exit code: 0
+#
+# Error: The agent id is invalid; it does not fulfill the constraints
+# HTTP Status code: 422
+# Error message: "invalid agent id"
+# Exit code: 6
+#
+# Error: Invalid public key; the public key is empty or not present
+# HTTP Status code: 422
+# Error message: "invalid public key"
+# Exit code: 7
+#
+# Error: Expired token
+# HTTP Status code: 403
+# Error message: "token has expired"
+# Exit code: 8
+#
+# Error: Invalid claiming token; missing, undecryptable, invalid payload...
+# HTTP Status code: 422
+# Error message: "invalid token"
+# Exit code: 9
+#
+# Error: Duplicate agent id; an agent with the same id but a different public key is already registered in the cloud
+# HTTP Status code: 409
+# Error message: "duplicate agent id"
+# Exit code: 10
+#
+# Error: Already claimed in another workspace;
+#        this agent (same id, same public key) already belongs to another workspace
+# HTTP Status code: 403
+# Error message: "claimed in another workspace"
+# Exit code: 11
+#
+# Error: Internal server error. Any other unexpected error (DB problems, etc.)
+# HTTP Status code: 500
+# Error message: "internal server error"
+# Exit code: 12
+
+if command -v curl >/dev/null 2>&1 ; then
+	URLTOOL="curl"
+elif command -v wget >/dev/null 2>&1 ; then
+	URLTOOL="wget"
+else
+	echo >&2 "I need curl or wget to proceed, but neither is available on this system."
+	exit 3
+fi
+if ! command -v openssl >/dev/null 2>&1 ; then
+	echo >&2 "I need openssl to proceed, but neither is available on this system."
+	exit 3
+fi
+
+
+# -----------------------------------------------------------------------------
+# defaults to allow running this script by hand
+
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+MACHINE_GUID_FILE="@registrydir_POST@/netdata.public.unique.id"
+CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
+TOKEN="unknown"
+URL_BASE="https://netdata.cloud"
+ID="unknown"
+ROOMS=""
+HOSTNAME=$(hostname)
+CLOUD_CERTIFICATE_FILE="${CLAIMING_DIR}/cloud_fullchain.pem"
+
+# get the MACHINE_GUID by default
+if [ -r "${MACHINE_GUID_FILE}" ]; then
+	ID="$(cat "${MACHINE_GUID_FILE}")"
+fi
+
+# get token from file
+if [ -r "${CLAIMING_DIR}/token" ]; then
+	TOKEN="$(cat "${CLAIMING_DIR}/token")"
+fi
+
+# get rooms from file
+if [ -r "${CLAIMING_DIR}/rooms" ]; then
+	ROOMS="$(cat "${CLAIMING_DIR}/rooms")"
+fi
+
+for arg in "$@"
+do
+	case $arg in
+		-token=*) TOKEN=${arg:7} ;;
+		-url=*) URL_BASE=${arg:5} ;;
+		-id=*) ID=${arg:4} ;;
+		-rooms=*) ROOMS=${arg:7} ;;
+		-hostname=*) HOSTNAME=${arg:10} ;;
+		*)  echo >&2 "Unknown argument ${arg}"
+		    exit 1 ;;
+	esac
+	shift 1
+done
+
+echo >&2 "Token: ****************"
+echo >&2 "Base URL: $URL_BASE"
+echo >&2 "Id: $ID"
+echo >&2 "Rooms: $ROOMS"
+echo >&2 "Hostname: $HOSTNAME"
+
+# create the claiming directory for this user
+if [ ! -d "${CLAIMING_DIR}" ] ; then
+	mkdir -p "${CLAIMING_DIR}" && chmod 0770 "${CLAIMING_DIR}"
+# shellcheck disable=SC2181
+	if [ $? -ne 0 ] ; then
+		echo >&2 "Failed to create claiming working directory ${CLAIMING_DIR}"
+		exit 2
+	fi
+fi
+if [ ! -w "${CLAIMING_DIR}" ] ; then
+	echo >&2 "No write permission in claiming working directory ${CLAIMING_DIR}"
+	exit 2
+fi
+
+if [ ! -f "${CLAIMING_DIR}/private.pem" ] ; then
+	echo >&2 "Generating private/public key for the first time."
+	if ! openssl genrsa -out "${CLAIMING_DIR}/private.pem" 2048 ; then
+		echo >&2 "Failed to generate private/public key pair."
+		exit 2
+	fi
+fi
+if [ ! -f "${CLAIMING_DIR}/public.pem" ] ; then
+	echo >&2 "Extracting public key from private key."
+	if ! openssl rsa -in "${CLAIMING_DIR}/private.pem" -outform PEM -pubout -out "${CLAIMING_DIR}/public.pem" ; then
+		echo >&2 "Failed to extract public key."
+		exit 2
+	fi
+fi
+
+TARGET_URL="${URL_BASE}/api/v1/workspaces/agents/${ID}"
+# shellcheck disable=SC2002
+KEY=$(cat "${CLAIMING_DIR}/public.pem" | tr '\n' '!' | sed -e 's/!/\\n/g')
+# shellcheck disable=SC2001
+[ -n "$ROOMS" ] && ROOMS=\"$(echo "$ROOMS" | sed s'/,/", "/g')\"
+
+cat > "${CLAIMING_DIR}/tmpin.txt" <<EMBED_JSON
+{
+    "agent": {
+        "id": "$ID",
+        "hostname": "$HOSTNAME"
+    },
+    "token": "$TOKEN",
+    "rooms" : [ $ROOMS ],
+    "publicKey" : "$KEY"
+}
+EMBED_JSON
+
+
+if [ "${URLTOOL}" = "curl" ] ; then
+	URLCOMMAND="curl --connect-timeout 5 --retry 3 -s -i -X PUT -d \"@${CLAIMING_DIR}/tmpin.txt\""
+else
+	URLCOMMAND="wget -T 15 -O -  -q --save-headers --content-on-error=on --method=PUT \
+	--body-file=\"${CLAIMING_DIR}/tmpin.txt\""
+fi
+
+if [ -r "${CLOUD_CERTIFICATE_FILE}" ] ; then
+	if [ "${URLTOOL}" = "curl" ] ; then
+		URLCOMMAND="${URLCOMMAND} --cacert \"${CLOUD_CERTIFICATE_FILE}\""
+	else
+		URLCOMMAND="${URLCOMMAND} --ca-certificate \"${CLOUD_CERTIFICATE_FILE}\""
+	fi
+fi
+
+eval "${URLCOMMAND} \"${TARGET_URL}\"" | tee "${CLAIMING_DIR}/tmpout.txt"
+URLCOMMAND_EXIT_CODE=$?
+if [ "${URLTOOL}" = "wget" ] && [ "${URLCOMMAND_EXIT_CODE}" -eq 8 ] ; then
+# We consider the server issuing an error response a successful attempt at communicating
+	URLCOMMAND_EXIT_CODE=0
+fi
+
+rm -f "${CLAIMING_DIR}/tmpin.txt"
+
+# Check if URLCOMMAND connected and received reply
+if [ "${URLCOMMAND_EXIT_CODE}" -ne 0 ] ; then
+	echo >&2 "Failed to connect to ${URL_BASE}"
+	rm -f "${CLAIMING_DIR}/tmpout.txt"
+	exit 4
+fi
+
+HTTP_STATUS_CODE=$(grep "HTTP" "${CLAIMING_DIR}/tmpout.txt" | awk -F " " '{print $2}')
+if [ "${HTTP_STATUS_CODE}" -ne 200 ] ; then
+	ERROR_MESSAGE=$(grep "\"error\":" "${CLAIMING_DIR}/tmpout.txt" | awk -F "error\":\"" '{print $2}' | sed s'/"}//g')
+	case ${ERROR_MESSAGE} in
+		"invalid agent id") EXIT_CODE=6 ;;
+		"invalid public key") EXIT_CODE=7 ;;
+		"token has expired") EXIT_CODE=8 ;;
+		"invalid token") EXIT_CODE=9 ;;
+		"duplicate agent id") EXIT_CODE=10 ;;
+		"claimed in another workspace") EXIT_CODE=11 ;;
+		"internal server error") EXIT_CODE=12 ;;
+		*) EXIT_CODE=5 ;;
+	esac
+	echo >&2 "Failed to claim agent."
+	rm -f "${CLAIMING_DIR}/tmpout.txt"
+	exit $EXIT_CODE
+fi
+
+rm -f "${CLAIMING_DIR}/tmpout.txt"
+touch "${CLAIMING_DIR}/is_claimed"
+rm -f "${CLAIMING_DIR}/token"
+echo >&2 "Agent was successfully claimed."
