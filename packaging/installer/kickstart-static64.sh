@@ -8,7 +8,8 @@
 #  --non-interactive        do not wait for input
 #  --dont-start-it          do not start netdata after install
 #  --stable-channel         Use the stable release channel, rather than the nightly to fetch sources
-#  --local-files Use a manually provided tarball for the installation
+#  --disable-telemetry      Opt-out of anonymous telemetry program
+#  --local-files            Use a manually provided tarball for the installation
 #
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -198,6 +199,9 @@ while [ -n "${1}" ]; do
 		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
+		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
+		shift 1
+	elif [ "${1}" = "--disable-telemetry" ]; then
 		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
 		shift 1
 	elif [ "${1}" = "--local-files" ]; then

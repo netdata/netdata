@@ -1305,6 +1305,7 @@ AC_CONFIG_FILES([
     web/gui/Makefile
     web/server/Makefile
     web/server/static/Makefile
+    claim/Makefile
 ])
 AC_OUTPUT
 

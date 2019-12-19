@@ -63,7 +63,7 @@ that our product meets certain epxectations. At the current stage, we are focusi
 like installing in different distributions, running the full lifecycle of install-run-update-install and so on.
 We are still working on enriching this with more and more use cases, to get us closer to achieving full stability of our software.
 Briefly we currently evaluate the following activities:
-- Basic software unit testing
+- Basic software unit testing (only run when changes happen that require it)
 - Non containerized build and install on ubuntu 14.04
 - Non containerized build and install on ubuntu 18.04
 - Running the full Netdata lifecycle (install, update, uninstall) on ubuntu 18.04
