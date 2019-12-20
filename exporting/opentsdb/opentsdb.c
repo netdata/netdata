@@ -268,7 +268,7 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host)
             continue;
 
         char escaped_value[CONFIG_MAX_VALUE * 2 + 1];
-        escape_json_string(escaped_value, label->value, CONFIG_MAX_VALUE);
+        sanitize_json_string(escaped_value, label->value, CONFIG_MAX_VALUE);
 
         char value[CONFIG_MAX_VALUE + 1];
         sanitize_opentsdb_label_value(value, escaped_value, CONFIG_MAX_VALUE);

@@ -39,7 +39,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if(count > 0) buffer_strcat(wb, ",\n");
 
         char value[CONFIG_MAX_VALUE * 2 + 1];
-        escape_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
+        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
         buffer_sprintf(wb, "      %s%s%s: %s%s%s", kq, label->key, kq, sq, value, sq);
 
         count++;

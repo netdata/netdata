@@ -80,7 +80,7 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
             continue;
 
         char value[CONFIG_MAX_VALUE * 2 + 1];
-        escape_json_string(value, label->value, CONFIG_MAX_VALUE);
+        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE);
         if (count > 0)
             buffer_strcat(instance->labels, ",");
         buffer_sprintf(instance->labels, "\"%s\":\"%s\"", label->key, value);
