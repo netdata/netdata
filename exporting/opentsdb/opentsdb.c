@@ -83,7 +83,16 @@ int init_opentsdb_http_instance(struct instance *instance)
     return 0;
 }
 
-static inline void sanitize_opentsdb_label_value(char *dst, char *src, size_t len) {
+/**
+ * Copy a label value and substitute underscores in place of charachters which can't be used in OpenTSDB output
+ *
+ * @param dst a destination string.
+ * @param src a source string.
+ * @param len the maximum number of characters copied.
+ */
+
+void sanitize_opentsdb_label_value(char *dst, char *src, size_t len)
+{
     while (*src != '\0' && len) {
         if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/')
             *dst++ = *src;

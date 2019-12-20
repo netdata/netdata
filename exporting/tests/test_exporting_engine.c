@@ -680,6 +680,103 @@ static void test_simple_connector_worker(void **state)
     simple_connector_worker(instance);
 }
 
+static void test_sanitize_json_string(void **state)
+{
+    (void)state;
+
+    char *src = "check \t\\\" string";
+    char dst[19 + 1];
+
+    sanitize_json_string(dst, src, 19);
+
+    assert_string_equal(dst, "check _\\\\\\\" string");
+}
+
+static void test_sanitize_graphite_label_value(void **state)
+{
+    (void)state;
+
+    char *src = "check ;~ string";
+    char dst[15 + 1];
+
+    sanitize_graphite_label_value(dst, src, 15);
+
+    assert_string_equal(dst, "check____string");
+}
+
+static void test_sanitize_opentsdb_label_value(void **state)
+{
+    (void)state;
+
+    char *src = "check \t\\\" #&$? -_./ string";
+    char dst[26 + 1];
+
+    sanitize_opentsdb_label_value(dst, src, 26);
+
+    assert_string_equal(dst, "check__________-_./_string");
+}
+
+static void test_format_host_labels_json_plaintext(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    assert_int_equal(format_host_labels_json_plaintext(instance, localhost), 0);
+    assert_string_equal(buffer_tostring(instance->labels), "\"labels\":{\"key1\":\"value1\",\"key2\":\"value2\"},");
+}
+
+static void test_format_host_labels_graphite_plaintext(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    assert_int_equal(format_host_labels_graphite_plaintext(instance, localhost), 0);
+    assert_string_equal(buffer_tostring(instance->labels), ";key1=value1;key2=value2");
+}
+
+static void test_format_host_labels_opentsdb_telnet(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    assert_int_equal(format_host_labels_opentsdb_telnet(instance, localhost), 0);
+    assert_string_equal(buffer_tostring(instance->labels), " key1=value1 key2=value2");
+}
+
+static void test_format_host_labels_opentsdb_http(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+    instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+
+    assert_int_equal(format_host_labels_opentsdb_http(instance, localhost), 0);
+    assert_string_equal(buffer_tostring(instance->labels), ",\"key1\":\"value1\",\"key2\":\"value2\"");
+}
+
+static void test_flush_host_labels(void **state)
+{
+    struct engine *engine = *state;
+    struct instance *instance = engine->connector_root->instance_root;
+
+    instance->labels = buffer_create(12);
+    buffer_strcat(instance->labels, "check string");
+    assert_int_equal(buffer_strlen(instance->labels), 12);
+
+    assert_int_equal(flush_host_labels(instance, localhost), 0);
+    assert_int_equal(buffer_strlen(instance->labels), 0);
+}
+
 int main(void)
 {
     const struct CMUnitTest tests[] = {
@@ -736,5 +833,21 @@ int main(void)
             test_simple_connector_worker, setup_initialized_engine, teardown_initialized_engine),
     };
 
-    return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL);
+    const struct CMUnitTest label_tests[] = {
+        cmocka_unit_test(test_sanitize_json_string),
+        cmocka_unit_test(test_sanitize_graphite_label_value),
+        cmocka_unit_test(test_sanitize_opentsdb_label_value),
+        cmocka_unit_test_setup_teardown(
+            test_format_host_labels_json_plaintext, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_host_labels_graphite_plaintext, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_host_labels_opentsdb_telnet, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(
+            test_format_host_labels_opentsdb_http, setup_initialized_engine, teardown_initialized_engine),
+        cmocka_unit_test_setup_teardown(test_flush_host_labels, setup_initialized_engine, teardown_initialized_engine),
+    };
+
+    return cmocka_run_group_tests_name("exporting_engine", tests, NULL, NULL) +
+           cmocka_run_group_tests_name("labels_in_exporting_engine", label_tests, NULL, NULL);
 }
