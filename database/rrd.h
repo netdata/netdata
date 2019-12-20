@@ -595,8 +595,6 @@ struct alarm_entry {
 
     time_t last_repeat;
 
-    char *labels;
-
     struct alarm_entry *next;
 };
 

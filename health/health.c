@@ -878,8 +878,7 @@ void *health_main(void *ptr) {
                                     (
                                             ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                             ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
-                                    ),
-                                    rc->labels
+                                    )
                             );
                             health_alarm_log(host, ae);
                         }
@@ -927,8 +926,7 @@ void *health_main(void *ptr) {
                                 (
                                         ((rc->options & RRDCALC_FLAG_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                                         ((rc->rrdcalc_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0)
-                                ),
-                                rc->labels
+                                )
                         );
                         ae->last_repeat = rc->last_repeat;
                         if (!(rc->rrdcalc_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {

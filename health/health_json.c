@@ -45,7 +45,6 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                     "\t\t\"old_value_string\": \"%s\",\n"
                     "\t\t\"last_repeat\": \"%lu\",\n"
                     "\t\t\"silenced\": \"%s\",\n"
-                    "\t\t\"label\": \"%s\",\n"
                    , host->hostname
                    , ae->unique_id
                    , ae->alarm_id
@@ -75,7 +74,6 @@ static inline void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, R
                    , ae->old_value_string
                    , (unsigned long)ae->last_repeat
                    , (ae->flags & HEALTH_ENTRY_FLAG_SILENCED)?"true":"false"
-                   , (!ae->labels)?"null":ae->labels
     );
 
     health_string2json(wb, "\t\t", "info", ae->info?ae->info:"", ",\n");

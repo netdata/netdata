@@ -102,8 +102,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
                 rc->units,
                 rc->info,
                 0,
-                0,
-                rc->labels
+                0
         );
         health_alarm_log(host, ae);
     }
@@ -165,8 +164,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
                 rc->units,
                 rc->info,
                 0,
-                0,
-                rc->labels
+                0
         );
         health_alarm_log(host, ae);
     }
