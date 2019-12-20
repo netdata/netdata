@@ -75,7 +75,7 @@ inline void health_label_log_save(RRDHOST *host) {
         netdata_rwlock_rdlock(&host->labels_rwlock);
         struct label *l=localhost->labels;
         while (l != NULL) {
-            buffer_sprintf(wb,"%s=%s, ", l->key, l->value);
+            buffer_sprintf(wb,"%s=%s\t ", l->key, l->value);
             l = l->next;
         }
         netdata_rwlock_unlock(&host->labels_rwlock);
