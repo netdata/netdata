@@ -107,7 +107,7 @@ if [ "${CONTAINER}" = "unknown" ]; then
 	fi
 fi
 
-echo "NETDATA_SYSTEM_OS_NAME=\"${NAME}\""
+echo "NETDATA_SYSTEM_OS_NAME=${NAME}"
 echo "NETDATA_SYSTEM_OS_ID=${ID}"
 echo "NETDATA_SYSTEM_OS_ID_LIKE=${ID_LIKE}"
 echo "NETDATA_SYSTEM_OS_VERSION=${VERSION}"

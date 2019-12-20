@@ -93,11 +93,13 @@ SUBDIRS += \
     collectors \
     daemon \
     database \
+    exporting \
     health \
     libnetdata \
     registry \
     streaming \
     web \
+    claim \
     $(NULL)
 
 
@@ -453,6 +455,28 @@ BACKENDS_PLUGIN_FILES = \
     backends/prometheus/backend_prometheus.h \
     $(NULL)
 
+CLAIM_PLUGIN_FILES = \
+    claim/claim.c \
+    claim/claim.h \
+    $(NULL)
+
+EXPORTING_ENGINE_FILES = \
+    exporting/exporting_engine.c \
+    exporting/exporting_engine.h \
+    exporting/graphite/graphite.c \
+    exporting/graphite/graphite.h \
+    exporting/json/json.c \
+    exporting/json/json.h \
+    exporting/opentsdb/opentsdb.c \
+    exporting/opentsdb/opentsdb.h \
+    exporting/read_config.c \
+    exporting/init_connectors.c \
+    exporting/process_data.c \
+    exporting/check_filters.c \
+    exporting/send_data.c \
+    exporting/send_internal_metrics.c \
+    $(NULL)
+
 KINESIS_BACKEND_FILES = \
     backends/aws_kinesis/aws_kinesis.c \
     backends/aws_kinesis/aws_kinesis.h \
@@ -482,6 +506,8 @@ DAEMON_FILES = \
     daemon/main.h \
     daemon/signals.c \
     daemon/signals.h \
+    daemon/commands.c \
+    daemon/commands.h \
     daemon/unit_test.c \
     daemon/unit_test.h \
     $(NULL)
@@ -501,6 +527,7 @@ NETDATA_FILES = \
     $(STREAMING_PLUGIN_FILES) \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
+    $(CLAIM_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
@@ -525,6 +552,12 @@ if LINUX
 
 endif
 
+if ENABLE_EXPORTING
+    NETDATA_FILES += \
+        $(EXPORTING_ENGINE_FILES) \
+        $(NULL)
+endif
+
 NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MATH_LIBS) \
     $(OPTIONAL_ZLIB_LIBS) \
@@ -537,6 +570,13 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JSONC_LIBS) \
     $(NULL)
 
+NETDATACLI_FILES = \
+    daemon/commands.h \
+    $(LIBNETDATA_FILES) \
+    cli/cli.c \
+    cli/cli.h \
+    $(NULL)
+
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
@@ -546,6 +586,17 @@ if ENABLE_CXX_LINKER
     netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
 else
     netdata_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
+endif
+
+sbin_PROGRAMS += netdatacli
+netdatacli_SOURCES = $(NETDATACLI_FILES)
+netdatacli_LDADD = \
+    $(NETDATA_COMMON_LIBS) \
+    $(NULL)
+if ENABLE_CXX_LINKER
+    netdatacli_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
+else
+    netdatacli_LINK = $(CCLD) $(CFLAGS) $(LDFLAGS) -o $@
 endif
 
 if ENABLE_PLUGIN_APPS
@@ -646,6 +697,7 @@ if ENABLE_UNITTESTS
     check_PROGRAMS = \
         libnetdata/tests/str2ld_testdriver \
         libnetdata/storage_number/tests/storage_number_testdriver \
+        exporting/tests/exporting_engine_testdriver \
         web/api/tests/web_api_testdriver \
         web/api/tests/valid_urls_testdriver \
         $(NULL)
@@ -709,4 +761,46 @@ if ENABLE_UNITTESTS
         $(LIBNETDATA_FILES) \
         $(NULL)
     libnetdata_storage_number_tests_storage_number_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
+
+    EXPORTING_ENGINE_TEST_FILES = \
+        exporting/tests/test_exporting_engine.c \
+        exporting/tests/test_exporting_engine.h \
+        exporting/tests/exporting_fixtures.c \
+        exporting/tests/exporting_doubles.c \
+        exporting/tests/netdata_doubles.c \
+        exporting/tests/system_doubles.c \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_SOURCES = \
+        $(EXPORTING_ENGINE_TEST_FILES) \
+        $(EXPORTING_ENGINE_FILES) \
+        $(LIBNETDATA_FILES) \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_CFLAGS = \
+        $(AM_CFLAGS) \
+        -DUNIT_TESTING \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_LDFLAGS = \
+        -Wl,--wrap=read_exporting_config \
+        -Wl,--wrap=init_connectors \
+        -Wl,--wrap=mark_scheduled_instances \
+        -Wl,--wrap=rrdhost_is_exportable \
+        -Wl,--wrap=rrdset_is_exportable \
+        -Wl,--wrap=exporting_calculate_value_from_stored_data \
+        -Wl,--wrap=prepare_buffers \
+        -Wl,--wrap=notify_workers \
+        -Wl,--wrap=send_internal_metrics \
+        -Wl,--wrap=now_realtime_sec \
+        -Wl,--wrap=uv_thread_create \
+        -Wl,--wrap=uv_mutex_lock \
+        -Wl,--wrap=uv_mutex_unlock \
+        -Wl,--wrap=uv_cond_signal \
+        -Wl,--wrap=uv_cond_wait \
+        -Wl,--wrap=strdupz \
+        -Wl,--wrap=info_int \
+        -Wl,--wrap=recv \
+        -Wl,--wrap=send \
+        -Wl,--wrap=connect_to_one_of \
+        $(TEST_LDFLAGS) \
+        $(NULL)
+    exporting_tests_exporting_engine_testdriver_LDADD = $(NETDATA_COMMON_LIBS) $(TEST_LIBS)
 endif

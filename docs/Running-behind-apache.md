@@ -227,6 +227,35 @@ If you want to enable CSP within your Apache, you should consider some special r
 
 Note: Changes are applied by reloading or restarting Apache.
 
+## Using Netdata with Apache's `mod_evasive` module
+
+The `mod_evasive` Apache module helps system administrators protect their web server from brute force and distributed
+denial of service attack (DDoS) attacks.
+
+Because Netdata sends a request to the web server for every chart update, it's normal to create 20-30 requests per
+second, per client. If you're using `mod_evasive` on your Apache web server, this volume of requests will trigger the
+module's protection, and your dashboard will become unresponsive. You may even begin to see 403 errors.
+
+To mitigate this issue, you will need to change the value of the `DOSPageCount` option in your `mod_evasive.conf` file,
+which can typically be found at `/etc/httpd/conf.d/mod_evasive.conf` or `/etc/apache2/mods-enabled/evasive.conf`.
+
+The `DOSPageCount` option sets the limit fo the number of requests from a single IP address for the same page per page
+interval, which is usually 1 second. THe default value is `2` requests per second. Clearly, Netdata's typical usage will
+exceed that threshold, and `mod_evasive` will add your IP address to a blocklist.
+
+Our users have found success by setting `DOSPageCount` to `30`. Try this, and raise the value if you continue to see 403
+errors while accessing the dashboard.
+
+```conf
+DOSPageCount 30
+```
+
+Restart Apache with `sudo service apache2 restart`, or the appropriate method to restart services on your system, to
+reload its configuration with your new values.
+
+See issues [#2011](https://github.com/netdata/netdata/issues/2011) and
+[#7658](https://github.com/netdata/netdata/issues/7568) for more information.
+
 # Netdata configuration
 
 You might edit `/etc/netdata/netdata.conf` to optimize your setup a bit. For applying these changes you need to restart Netdata.

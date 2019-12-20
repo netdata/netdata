@@ -60,6 +60,8 @@ ARG NETDATA_UID=201
 ARG NETDATA_GID=201
 ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
+# If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
+#ENV DO_NOT_TRACK
 RUN \
     # provide judy installation to base image
     apk add make alpine-sdk shadow && \
@@ -74,13 +76,21 @@ RUN \
     addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
     adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}" && \
     # Apply the permissions as described in
-    # https://github.com/netdata/netdata/wiki/netdata-security#netdata-directories
-    chown -R root:netdata /etc/netdata && \
-    chown -R netdata:netdata /var/cache/netdata /var/lib/netdata /usr/share/netdata && \
-    chown -R root:netdata /usr/lib/netdata && \
-    chown -R root:netdata /usr/libexec/netdata/ && \
-    chmod 4750 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
-    chmod 0750 /var/lib/netdata /var/cache/netdata && \
+    # https://docs.netdata.cloud/docs/netdata-security/#netdata-directories, but own everything by root group due to https://github.com/netdata/netdata/pull/6543
+    chown -R root:root \
+        /etc/netdata \
+        /usr/share/netdata \
+        /usr/libexec/netdata && \
+    chown -R netdata:root \
+        /usr/lib/netdata \
+        /var/cache/netdata \
+        /var/lib/netdata \
+        /var/log/netdata && \
+    chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
+    chmod 4755 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
+    # Group write permissions due to: https://github.com/netdata/netdata/pull/6543chmod 0770 -R /var/lib/netdata /var/cache/netdata && \
+    find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
+    find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     # Link log files to stdout
     ln -sf /dev/stdout /var/log/netdata/access.log && \
     ln -sf /dev/stdout /var/log/netdata/debug.log && \

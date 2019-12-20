@@ -33,6 +33,8 @@ while [ "${1}" ]; do
 		"--auto-update"|"-u") AUTOUPDATE=1;;
 		"--stable-channel") RELEASE_CHANNEL="stable";;
 		"--nightly-channel") RELEASE_CHANNEL="nightly";;
+		"--disable-telemetry") DISABLE_TELEMETRY=1;;
+
 		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
 	esac
 	shift 1
@@ -135,6 +137,15 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
 
+# -----------------------------------------------------------------------------
+progress "Telemetry configuration"
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+  run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+else
+  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"

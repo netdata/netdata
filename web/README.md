@@ -175,7 +175,7 @@ shows you two pieces of information: the collector that produces the chart, and
 the chart's context.
 
 Netdata also uses [contexts for alarm
-templates](../health/#alarm-line-on). You can create an
+templates](../health/REFERENCE.md#alarm-line-on). You can create an
 alarm for the `net.packets` context to receive alerts for any chart with that
 context, no matter which family it's attached to.
 

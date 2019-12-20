@@ -56,7 +56,6 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                        ",\n\t\"history\": %ld"
                        ",\n\t\"memory_mode\": \"%s\""
                        ",\n\t\"custom_info\": \"%s\""
-                       ",\n\t\"charts\": {"
                    , host->hostname
                    , host->program_version
                    , get_release_channel()
@@ -67,6 +66,12 @@ void charts2json(RRDHOST *host, BUFFER *wb) {
                    , rrd_memory_mode_name(host->rrd_memory_mode)
                    , custom_dashboard_info_js_filename
     );
+
+    buffer_strcat(wb, ",\n\t\"labels\": {\n");
+    host_labels2json(host, wb, 2);
+    buffer_strcat(wb, "\t}");
+
+    buffer_strcat(wb, ",\n\t\"charts\": {");
 
     c = 0;
     rrdhost_rdlock(host);

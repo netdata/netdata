@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import xml.etree.ElementTree as ET
-
 from collections import namedtuple
 
 from bases.FrameworkServices.UrlService import UrlService
-
 
 MonitType = namedtuple('MonitType', ('index', 'name'))
 
@@ -122,7 +120,7 @@ CHARTS = {
 
 
 class BaseMonitService(object):
-    def __init__(self, typ, name,  status, monitor):
+    def __init__(self, typ, name, status, monitor):
         self.type = typ
         self.name = name
         self.status = status
@@ -153,11 +151,20 @@ class BaseMonitService(object):
 
 
 class ProcessMonitService(BaseMonitService):
-    def __init__(self, typ, name,  status, monitor):
+    def __init__(self, typ, name, status, monitor):
         super(ProcessMonitService, self).__init__(typ, name, status, monitor)
         self.uptime = None
         self.threads = None
         self.children = None
+
+    def __eq__(self, other):
+        return super(ProcessMonitService, self).__eq__(other)
+
+    def __ne__(self, other):
+        return super(ProcessMonitService, self).__ne__(other)
+
+    def __hash__(self):
+        return super(ProcessMonitService, self).__hash__()
 
     def uptime_key(self):
         return 'process_uptime_{0}'.format(self.name)
@@ -183,16 +190,25 @@ class ProcessMonitService(BaseMonitService):
 
 
 class HostMonitService(BaseMonitService):
-    def __init__(self, typ, name,  status, monitor):
+    def __init__(self, typ, name, status, monitor):
         super(HostMonitService, self).__init__(typ, name, status, monitor)
         self.latency = None
+
+    def __eq__(self, other):
+        return super(HostMonitService, self).__eq__(other)
+
+    def __ne__(self, other):
+        return super(HostMonitService, self).__ne__(other)
+
+    def __hash__(self):
+        return super(HostMonitService, self).__hash__()
 
     def latency_key(self):
         return 'host_latency_{0}'.format(self.name)
 
     def data(self):
         base_data = super(HostMonitService, self).data()
-        latency = float(self.latency) * 1000000 if self.latency  else None
+        latency = float(self.latency) * 1000000 if self.latency else None
         data = {self.latency_key(): latency}
         data.update(base_data)
 

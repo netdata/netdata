@@ -80,6 +80,7 @@ dist_healthconfig_DATA = \
     health.d/redis.conf \
     health.d/retroshare.conf \
     health.d/riakkv.conf \
+    health.d/scaleio.conf \
     health.d/softnet.conf \
     health.d/squid.conf \
     health.d/stiebeleltron.conf \
@@ -90,6 +91,7 @@ dist_healthconfig_DATA = \
     health.d/tcp_orphans.conf \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
+    health.d/unbound.conf \
     health.d/varnish.conf \
     health.d/vcsa.conf \
     health.d/vsphere.conf \

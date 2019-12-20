@@ -473,17 +473,18 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
         /* We need to get a new page */
         if (descr) {
             /* Drop old page's reference */
-            handle->next_page_time = (page_end_time / USEC_PER_SEC) + 1;
-            if (unlikely(handle->next_page_time > rrdimm_handle->end_time)) {
-                goto no_more_metrics;
-            }
-            next_page_time = handle->next_page_time * USEC_PER_SEC;
 #ifdef NETDATA_INTERNAL_CHECKS
             rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, -1);
 #endif
             pg_cache_put(ctx, descr);
             handle->descr = NULL;
+            handle->next_page_time = (page_end_time / USEC_PER_SEC) + 1;
+            if (unlikely(handle->next_page_time > rrdimm_handle->end_time)) {
+                goto no_more_metrics;
+            }
+            next_page_time = handle->next_page_time * USEC_PER_SEC;
         }
+
         descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
                                      next_page_time, rrdimm_handle->end_time * USEC_PER_SEC);
         if (NULL == descr) {
@@ -628,13 +629,13 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     nr_committed_pages = ++pg_cache->committed_page_index.nr_committed_pages;
     uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
 
-    if (nr_committed_pages >= (pg_cache_hard_limit(ctx) - (unsigned long)ctx->stats.metric_API_producers) / 2) {
+    if (nr_committed_pages >= (ctx->max_cache_pages) / 2 + (unsigned long)ctx->stats.metric_API_producers) {
         /* 50% of pages have not been committed yet */
         if (0 == (unsigned long)ctx->stats.flushing_errors) {
             /* only print the first time */
-            error("Failed to flush quickly enough in dbengine instance \"%s\""
-                  ". Metric data will not be stored in the database"
-                  ", please reduce disk load or use a faster disk.", ctx->dbfiles_path);
+            error("Failed to flush dirty buffers quickly enough in dbengine instance \"%s\"."
+                  "Metric data at risk of not being stored in the database, "
+                  "please reduce disk load or use a faster disk.", ctx->dbfiles_path);
         }
         rrd_stat_atomic_add(&ctx->stats.flushing_errors, 1);
         rrd_stat_atomic_add(&global_flushing_errors, 1);
@@ -744,8 +745,6 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     struct rrdengine_instance *ctx;
     int error;
     uint32_t max_open_files;
-
-    sanity_check();
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
 

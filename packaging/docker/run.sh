@@ -7,6 +7,10 @@
 # Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 set -e
 
+if [ -n "${DO_NOT_TRACK+x}" ]; then
+  touch /etc/netdata/.opt-out-from-anonymous-statistics
+fi
+
 echo "Netdata entrypoint script starting"
 if [ ${RESCRAMBLE+x} ]; then
 	echo "Reinstalling all packages to get the latest Polymorphic Linux scramble"
@@ -20,6 +24,6 @@ if [ -n "${PGID}" ]; then
     usermod -a -G ${PGID} ${DOCKER_USR} || echo >&2 "Could not add netdata user to group docker with ID ${PGID}"
 fi
 
-exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_PORT}" "$@"
+exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_PORT}" -W set web "web files group" root -W set web "web files owner" root "$@"
 
 echo "Netdata entrypoint script, completed!"
