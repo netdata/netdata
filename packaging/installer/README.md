@@ -1,39 +1,37 @@
-# Installation
+# Installation guide
 
-You can install Netdata in many different ways, but the following three methods are the best choice for you in most cases:
+Netdata is a monitoring agent designed to run on all your systems: physical and virtual servers, containers, even
+IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and all their derivatives.
 
-<div class="install-nav-buttons">
+The best way to install Netdata is with our **automatic one-line installation script**, which works with all Linux
+distributions. To see other installation methods, such as those for different operating systems including alternatives
+to the one-line installer script, see [Have a different operating system, or want to try another
+method?](#have-a-different-operating-system-or-want-to-try-another-method)
 
-  <div>
-    <div class="inner">
-      <a class="nav-button" href="#one-line-installation">One-line installation (recommended)</a>
-      <p>Use Netdata's completely automated one-line installation process to install Netdata on all Linux distributions directly from source.</p>
-    </div>
-  </div>
-  <div>
-    <a class="nav-button" href="#binary-packages">Binary packages</a>
-    <p>Use your distribution's package manager to install Netdata via RPM or DEB binary packages.</p>
-  </div>
-  <div>
-    <a class="nav-button" href="../docker/">Docker container</a>
-    <p>Use our <code>Dockerfile</code> to test Netdata or install it in an existing Docker-based infrastructure.</p>
-  </div>
-</div>
+Some third parties, such as the packaging teams at various Linux distributions, distribute old, broken, or altered
+packages. We recommend you install Netdata using one of the above methods to guarantee you get the latest and
+checksum-verified packages.
 
-To see whether Netdata supports your system, please visit our [distribution support matrix](../../packaging/DISTRIBUTIONS.md).
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+about the information collected, and learn how to-opt, on our [anonymous statistics](docs/anonymous-statistics.md) page.
 
-### Other installation methods for macOS, Kubernetes, FreeBSD, and more
+The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+_actively_ contributing to Netdata's future.
 
-- [Pre-built static binary for Linux 64-bit](OTHERS.md#pre-built-static-binary-for-linux-64-bit)
-- [Manual installation](MANUAL-INSTALLATION.md)
-- [Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
-- [macOS (OS X)](OTHERS.md#macos)
-- [FreeBSD](OTHERS.md#freebsd)
-- [pfSense](OTHERS.md#pfsense)
-- [FreeNAS](OTHERS.md#freenas)
-- [Alpine 3.x](OTHERS.md#alpine-3-x)
-- [Synology](OTHERS.md#synology)
-- See the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, and other niche systems.
+## Automatic one-line installation script
+
+![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
+
+This method is fully automatic on all Linux distributions. To install Netdata from source and get _automatic nightly
+updates_, run the following:
+
+```bash
+bash <(curl -Ss https://my-netdata.io/kickstart.sh)
+```
+
+
+
+## Have a different operating system, or want to try another method?
 
 !!! note
     By default, Netdata collects anonymous usage information and sends it to Google Analytics. To read more about what information is collected and how to opt-out, check out the [anonymous statistics page](../../docs/anonymous-statistics.md).
