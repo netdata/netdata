@@ -58,6 +58,11 @@ menus and submenus may look a little different for each one.
 To learn more about menus, see our documentation about [navigating the standard
 dashboard](../../web/gui/README.md#menus).
 
+> ❗ By default, Netdata only creates and displays charts if the metrics are _not zero_. So, you may be missing some
+> charts, menus, and submenus if those charts have zero metrics. You can change this by changing the **Which dimensions
+> to show?** setting to **All**. In addition, if you start Netdata and immediately load the dashboard, not all
+> charts/menus/submenus may be displayed, as some collectors can take a while to initialize.
+
 ## Read the descriptions accompanying charts
 
 Many charts come with a short description of what dimensions the chart is displaying and why they matter.
