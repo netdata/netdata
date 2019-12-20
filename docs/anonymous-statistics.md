@@ -1,18 +1,22 @@
-# Anonymous Statistics
+# Anonymous statistics
 
-From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. 
-The statistics calculated from this information will be used for:
+Starting with Netdata v1.12, and by default, the agent collects and sends anonymous telemetry to Google Analytics. We
+use the statistics gathered from this information for two purposes:
 
-1.  **Quality assurance**, to help us understand if Netdata behaves as expected and help us identify repeating issues for certain distributions or environment.
+1.  **Quality assurance**, to help us understand if Netdata behaves as expected, and to help us classify repeated
+     issues with certain distributions or environments.
 
-2.  **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extend our development decisions influence the community.
+2.  **Usage statistics**, to help us interpret how people use the Netdata agent in real-world environments, and to help
+     us identify how our development/design decisions influence the community.
 
-Information is sent to Netdata via two different channels:
+Netdata sends information to Google Analytics via two different channels:
 
--   Google Tag Manager is used when an agent's dashboard is accessed.
--   The script `anonymous-statistics.sh` is executed by the Netdata daemon, when Netdata starts, stops cleanly, or fails.
+-   Google Tag Manager fires when you access an agent's dashboard.
+-   The Netdata daemon executes the [`anonymous-statistics.sh`
+    script](https://github.com/netdata/netdata/blob/6469cf92724644f5facf343e4bdd76ac0551a418/daemon/anonymous-statistics.sh.in)
+    when Netdata starts, stops cleanly, or fails.
 
-Both methods are controlled via the same [opt-out mechanism](#opt-out)
+You can opt-out from sending anonymous statistics to Netdata through three different [opt-out mechanisms](#opt-out).
 
 ## Google tag manager
 
@@ -55,12 +59,27 @@ Furthermore, the FATAL event sends the Netdata process & thread name, along with
 
 To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins directory`, which is usually `/usr/libexec/netdata/plugins.d`. 
 
-## Opt-Out
+## Opt-out
 
-To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). The effect of creating the file is the following:
+You can opt-out from sending anonymous statistics to Netdata through three different opt-out mechanisms:
 
--   The daemon will never execute the anonymous statistics script
--   The anonymous statistics script will exit immediately if called via any other way (e.g. shell)
--   The Google Tag Manager Javascript snippet will remain in the page, but the linked tag will not be fired. The effect is that no data will ever be sent to GA. 
+**Create a file called `.opt-out-from-anonymous-statistics`.** This empty file, stored in your Netdata configuration
+directory (usually `etc/netdata`), immediately stops the statistics script from running, and works with any type of
+installation, including manual, offline, and macOS installations. Create the file by running `touch
+.opt-out-from-anonymous-statistics` from your Netdata configuration directory.
 
-You can also disable telemetry by passing the option `--disable-telemetry` to any of the installers.
+**Pass the option `--disable-telemetry` to any of the installer scripts in the [installation
+docs](../packaging/installer/README.md).** You can append this option during the initial installation or a manual
+update.
+
+**Set your `DO_NOT_TRACK` environmental variable to `1`.** You can set this variable with the following command: `export
+DO_NOT_TRACK=1`. This variable must be present _during installation_ to make the necessary changes. Visit the [project's
+homepage](https://consoledonottrack.com/) for more details on the purpose and implementation of this environmental
+variable.
+
+Each of these opt-out processes does the following:
+
+-   Prevents the daemon from executing the anonymous statistics script.
+-   Forces the anonymous statistics script to exit immediately.
+-   Stops the Google Tag Manager Javascript snippet, which remains on the dashboard, from firing and sending any data to
+    Google Analytics.
