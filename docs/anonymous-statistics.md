@@ -1,7 +1,7 @@
 # Anonymous statistics
 
-Starting with Netdata v1.12, and by default, the agent collects and sends anonymous telemetry to Google Analytics. We
-use the statistics gathered from this information for two purposes:
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. We use
+the statistics gathered from this information for two purposes:
 
 1.  **Quality assurance**, to help us understand if Netdata behaves as expected, and to help us classify repeated
      issues with certain distributions or environments.
