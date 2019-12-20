@@ -436,6 +436,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 
 %defattr(0755,root,root,0755)
 %{_sbindir}/netdatacli
+%{_sbindir}/netdata-claim.sh
 
 %defattr(4750,root,netdata,0750)
 
