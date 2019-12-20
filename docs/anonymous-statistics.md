@@ -64,7 +64,7 @@ To see exactly what and how is collected, you can review the script template `da
 You can opt-out from sending anonymous statistics to Netdata through three different opt-out mechanisms:
 
 **Create a file called `.opt-out-from-anonymous-statistics`.** This empty file, stored in your Netdata configuration
-directory (usually `etc/netdata`), immediately stops the statistics script from running, and works with any type of
+directory (usually `/etc/netdata`), immediately stops the statistics script from running, and works with any type of
 installation, including manual, offline, and macOS installations. Create the file by running `touch
 .opt-out-from-anonymous-statistics` from your Netdata configuration directory.
 
