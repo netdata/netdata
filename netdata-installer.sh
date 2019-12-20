@@ -155,6 +155,8 @@ USAGE: ${PROGRAM} [options]
   --auto-update or -u        Install netdata-updater in cron to update netdata automatically once per day
   --stable-channel           Use packages from GitHub release pages instead of GCS (nightly updates).
                              This results in less frequent updates.
+  --nightly-channel          Use most recent nightly udpates instead of GitHub releases.
+                             This results in more frequent updates.
   --disable-go               Disable installation of go.d.plugin.
   --enable-plugin-freeipmi   Enable the FreeIPMI plugin. Default: enable it when libipmimonitoring is available.
   --disable-plugin-freeipmi
@@ -202,7 +204,7 @@ AUTOUPDATE=0
 NETDATA_PREFIX=
 LIBS_ARE_HERE=0
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS-}"
-RELEASE_CHANNEL="nightly"
+RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
 while [ -n "${1}" ]; do
 	case "${1}" in
@@ -212,6 +214,7 @@ while [ -n "${1}" ]; do
 		"--dont-wait") DONOTWAIT=1;;
 		"--auto-update"|"-u") AUTOUPDATE=1;;
 		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--nightly-channel") RELEASE_CHANNEL="nightly";;
 		"--enable-plugin-freeipmi")  NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--enable-plugin-freeipmi/} --enable-plugin-freeipmi";;
 		"--disable-plugin-freeipmi") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-plugin-freeipmi/} --disable-plugin-freeipmi";;
 		"--disable-https") NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS//--disable-https/} --disable-https";;
@@ -288,6 +291,16 @@ cat <<BANNER3
   Press Control-C and run the same command with --help for help.
 
 BANNER3
+
+if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
+  cat <<BANNER4
+
+  ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
+  Anonymous usage stats will be collected and sent to Google Analytics.
+  To opt-out, pass --disable-telemetry option to the installer.
+
+BANNER4
+fi
 
 have_autotools=
 if [ "$(type autoreconf 2>/dev/null)" ]; then
@@ -617,6 +630,7 @@ NETDATA_LOG_DIR="$(config_option "global" "log directory" "${NETDATA_PREFIX}/var
 NETDATA_USER_CONFIG_DIR="$(config_option "global" "config directory" "${NETDATA_PREFIX}/etc/netdata")"
 NETDATA_STOCK_CONFIG_DIR="$(config_option "global" "stock config directory" "${NETDATA_PREFIX}/usr/lib/netdata/conf.d")"
 NETDATA_RUN_DIR="${NETDATA_PREFIX}/var/run"
+NETDATA_CLAIMING_DIR="${NETDATA_USER_CONFIG_DIR}/claim.d"
 
 cat <<OPTIONSEOF
 
@@ -689,6 +703,15 @@ for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
 done
 
 run chmod 755 "${NETDATA_LOG_DIR}"
+
+# --- claiming dir ----
+
+if [ ! -d "${NETDATA_CLAIMING_DIR}" ]; then
+	echo >&2 "Creating directory '${NETDATA_CLAIMING_DIR}'"
+	run mkdir -p "${NETDATA_CLAIMING_DIR}" || exit 1
+fi
+run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
+run chmod 770 "${NETDATA_CLAIMING_DIR}"
 
 # --- plugins ----
 

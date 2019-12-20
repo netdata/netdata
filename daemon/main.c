@@ -344,13 +344,15 @@ int help(int exitcode) {
             "                           Run a DB engine stress test for A seconds,\n"
             "                           with B writers and C readers, with a ramp up\n"
             "                           time of D seconds for writers, a page cache\n"
-            "                           size of E MiB, an optional disk space limit\n"
+            "                           size of E MiB, an optional disk space limit"
             "                           of F MiB and exit.\n\n"
 #endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
+            "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
+            "                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.\n\n"
     );
 
     fprintf(stream, "\n Signals netdata handles:\n\n"
@@ -926,6 +928,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+                        char* claim_string = "claim";
 #ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
@@ -972,6 +975,7 @@ int main(int argc, char **argv) {
                                 page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
                                 disk_space_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+
                             dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
                                                  page_cache_mb, disk_space_mb);
                             return 0;
@@ -1084,6 +1088,10 @@ int main(int argc, char **argv) {
                             const char *value = config_get(section, key, def);
                             printf("%s\n", value);
                             return 0;
+                        }
+                        else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
+                            /* will trigger a claiming attempt when the agent is initialized */
+                            claiming_pending_arguments = optarg + strlen(claim_string);
                         }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
@@ -1270,6 +1278,14 @@ int main(int argc, char **argv) {
     get_system_info(system_info);
 
     rrd_init(netdata_configured_hostname, system_info);
+
+    // ------------------------------------------------------------------------
+    // Claim netdata agent to a cloud endpoint
+
+    if (claiming_pending_arguments)
+         claim_agent(claiming_pending_arguments);
+    load_claiming_state();
+
     // ------------------------------------------------------------------------
     // enable log flood protection
 

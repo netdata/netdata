@@ -484,6 +484,7 @@ storage_number rrdeng_load_metric_next(struct rrddim_query_handle *rrdimm_handle
             }
             next_page_time = handle->next_page_time * USEC_PER_SEC;
         }
+
         descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
                                      next_page_time, rrdimm_handle->end_time * USEC_PER_SEC);
         if (NULL == descr) {
@@ -791,6 +792,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     /* wait for worker thread to initialize */
     wait_for_completion(&ctx->rrdengine_completion);
     destroy_completion(&ctx->rrdengine_completion);
+    uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }

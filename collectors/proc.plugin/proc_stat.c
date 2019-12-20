@@ -1007,6 +1007,8 @@ int do_proc_stat(int update_every, usec_t dt) {
                     error("Cannot create wake_cpu_thread");
                 else if(unlikely(pthread_join(thread, NULL)))
                     error("Cannot join wake_cpu_thread");
+                if(thread)
+                    pthread_setname_np(thread, "PLUGIN[cpuidle]");
                 cpu_states_updated = 1;
             }
         }

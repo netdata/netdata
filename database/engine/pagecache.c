@@ -414,7 +414,9 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
             print_page_cache_descr(descr);
         pg_cache_wait_event_unsafe(descr);
     }
-    if (!remove_dirty) {
+    if (remove_dirty) {
+        pg_cache_descr->flags &= ~RRD_PAGE_DIRTY;
+    } else {
         /* even a locked page could be dirty */
         while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
             debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);

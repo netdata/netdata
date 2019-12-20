@@ -5,11 +5,6 @@ addons:
   apt:
     packages: ['moreutils']
 
-# This is a hook to help us introduce "soft" errors on our process
-matrix:
-  allow_failures:
-    - env: ALLOW_SOFT_FAILURE_HERE=true
-
 before_install:
   - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
@@ -96,6 +91,9 @@ stages:
 # Define stage implementation details
 #
 jobs:
+  # This is a hook to help us introduce "soft" errors on our process
+  allow_failures:
+    - env: ALLOW_SOFT_FAILURE_HERE=true
   include:
       # Do code quality, syntax checking and other pre-build activities
     - stage: Code quality, linting, syntax, code style
@@ -156,9 +154,11 @@ jobs:
 
       name: Unit Testing
       script:
-        - fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
-        - $HOME/netdata/usr/sbin/netdata -W unittest
+        - .travis/run-unit-tests.sh
       env: CFLAGS='-O1 -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1'
+      # We need a full deep clone for the checks done by the unit testing script to work.
+      git:
+        depth: false
       after_failure: post_message "TRAVIS_MESSAGE" "Unit testing failed"
 
     - name: Build/Install for ubuntu 18.04 (not containerized)
@@ -244,9 +244,9 @@ jobs:
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:30" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 30"
 
-#    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
-#      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
-#      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
+    - name: Run netdata lifecycle, on Fedora 31 (Containerized)
+      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:31" tests/updater_checks.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 31"
 
 
 
@@ -421,6 +421,14 @@ jobs:
         - PACKAGE_TYPE="rpm" REPO_TOOL="yum"
         - ALLOW_SOFT_FAILURE_HERE=true
 
+    - name: "Build & Publish RPM package for Fedora 31"
+      <<: *RPM_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="fedora" BUILD_RELEASE="31" BUILD_STRING="fedora/31"
+        - PACKAGE_TYPE="rpm" REPO_TOOL="dnf"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
     - name: "Build & Publish RPM package for Fedora 30"
       <<: *RPM_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64) RPM( Fedora)?\]/
@@ -501,6 +509,8 @@ jobs:
     - name: Create release draft
       git:
         depth: false
+      env:
+        - RELEASE_CHANNEL=stable
       before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
