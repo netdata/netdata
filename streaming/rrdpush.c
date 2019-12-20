@@ -26,6 +26,7 @@
  */
 
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
+#define START_STREAMING_PROMPT_V2 "Hit me baby, push them over and bring the host labels..."
 
 typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
