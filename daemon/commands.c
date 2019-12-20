@@ -575,6 +575,7 @@ void commands_init(void)
     /* wait for worker thread to initialize */
     wait_for_completion(&completion);
     destroy_completion(&completion);
+    uv_thread_set_name_np(thread, "DAEMON_COMMAND");
 
     if (command_thread_error) {
         error = uv_thread_join(&thread);
