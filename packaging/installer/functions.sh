@@ -490,6 +490,12 @@ netdata_pids() {
 
 stop_all_netdata() {
 	local p
+
+	if [ -n $(netdata_pids) -a -n "$(builtin type -P netdatacli)" ] ; then
+		netdatacli shutdown-agent
+		sleep 20
+	fi
+
 	for p in $(netdata_pids); do
 		# shellcheck disable=SC2086
 		stop_netdata_on_pid ${p}
