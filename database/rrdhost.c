@@ -941,6 +941,8 @@ void reload_host_labels()
     localhost->labels = new_labels;
     netdata_rwlock_unlock(&localhost->labels_rwlock);
 
+    health_label_log_save(localhost);
+
     while (old_labels != NULL)
     {
         struct label *current = old_labels;
