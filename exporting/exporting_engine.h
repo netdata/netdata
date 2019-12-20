@@ -60,6 +60,15 @@ typedef enum exporting_options {
     (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM)
 #define EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) (exporting_options & EXPORTING_OPTIONS_SOURCE_BITS)
 
+#define sending_labels_configured(instance)                                                                            \
+    (instance->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
+
+#define should_send_label(instance, label)                                                                             \
+    ((instance->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS &&                                            \
+      label->label_source == LABEL_SOURCE_NETDATA_CONF) ||                                                             \
+     (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&                                             \
+      label->label_source != LABEL_SOURCE_NETDATA_CONF))
+
 struct engine;
 
 struct instance_config {

@@ -75,17 +75,12 @@ int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *ho
     if (!instance->labels)
         instance->labels = buffer_create(1024);
 
-    if (unlikely(
-            !(instance->config.options &
-              (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))))
+    if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
     netdata_rwlock_rdlock(&host->labels_rwlock);
     for (struct label *label = host->labels; label; label = label->next) {
-        if (!((instance->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS &&
-               label->label_source == LABEL_SOURCE_NETDATA_CONF) ||
-              (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&
-               label->label_source != LABEL_SOURCE_NETDATA_CONF)))
+        if (!should_send_label(instance, label))
             continue;
 
         char value[CONFIG_MAX_VALUE + 1];
