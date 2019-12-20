@@ -1249,6 +1249,7 @@ AC_CONFIG_FILES([
     libnetdata/statistical/Makefile
     libnetdata/storage_number/Makefile
     libnetdata/storage_number/tests/Makefile
+    libnetdata/string/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
     libnetdata/json/Makefile

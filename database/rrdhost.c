@@ -709,6 +709,19 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+static int is_valid_label_value(char *key) {
+    while(*key) {
+        int length = url_utf8_get_byte_length(*key);
+        if(length == 1 && (*key == '"' || *key == '\'')) {
+            return 0;
+        }
+
+        key += length;
+    }
+
+    return 1;
+}
+
 static int is_valid_label_key(char *key) {
     //Prometheus exporter
     if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
@@ -798,7 +811,7 @@ struct label *load_config_labels()
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
             char *name = cv->name;
-            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
+            if(is_valid_label_key(name) && is_valid_label_value(cv->value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
                 l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
                 cv->flags |= CONFIG_VALUE_USED;
             } else {

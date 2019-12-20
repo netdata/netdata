@@ -21,6 +21,7 @@ SUBDIRS = \
     socket \
     statistical \
     storage_number \
+    string \
     threads \
     url \
     tests \
