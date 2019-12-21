@@ -2728,7 +2728,7 @@ netdataDashboard.context = {
         info: 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
     },
     'edgex.memory_liveObjects':{
-        info: 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>
+        info: 'LiveObjects: the number of live objects is (Mallocs - Frees) . Provided by the Golang runtime Package. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
     },
     // ------------------------------------------------------------------------
     // Squidlog
