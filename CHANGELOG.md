@@ -6,8 +6,12 @@
 
 **Merged pull requests:**
 
+- Add netdata-claim.sh to the RPM spec file. [\#7592](https://github.com/netdata/netdata/pull/7592) ([Ferroin](https://github.com/Ferroin))
+- Set standard name to non-libnetdata threads \(libuv, pthread\) [\#7584](https://github.com/netdata/netdata/pull/7584) ([Saruspete](https://github.com/Saruspete))
 - CODEOWNERS: Replace @netdata/automation with individual team members [\#7581](https://github.com/netdata/netdata/pull/7581) ([knatsakis](https://github.com/knatsakis))
+- Fix not detecting more than one adapter in hpssa collector [\#7580](https://github.com/netdata/netdata/pull/7580) ([gnoddep](https://github.com/gnoddep))
 - Docs: Add notice about mod\_evasive to Apache proxy guide [\#7578](https://github.com/netdata/netdata/pull/7578) ([joelhans](https://github.com/joelhans))
+- installer: include go.d.plugin version v0.13.0 [\#7574](https://github.com/netdata/netdata/pull/7574) ([ilyam8](https://github.com/ilyam8))
 - Fix race condition in dbengine [\#7565](https://github.com/netdata/netdata/pull/7565) ([thiagoftsm](https://github.com/thiagoftsm))
 - Revert "Fix race condition in dbengine \(\#7533\)" [\#7560](https://github.com/netdata/netdata/pull/7560) ([amoss](https://github.com/amoss))
 - Skip unit testing during CI when it's not needed. [\#7559](https://github.com/netdata/netdata/pull/7559) ([Ferroin](https://github.com/Ferroin))
@@ -25,6 +29,7 @@
 - Remove `-f` option from `groupdel` in uninstaller. [\#7507](https://github.com/netdata/netdata/pull/7507) ([Ferroin](https://github.com/Ferroin))
 - Force the repo name to be lowercase in the tag for docker builds. [\#7506](https://github.com/netdata/netdata/pull/7506) ([Ferroin](https://github.com/Ferroin))
 - Inject archived backports repository on Debian Jessie for CI package builds. [\#7495](https://github.com/netdata/netdata/pull/7495) ([Ferroin](https://github.com/Ferroin))
+- The step-by-step Netdata tutorial [\#7489](https://github.com/netdata/netdata/pull/7489) ([joelhans](https://github.com/joelhans))
 - ci: remove ubuntu trusty 14.04 from build [\#7481](https://github.com/netdata/netdata/pull/7481) ([ncmans](https://github.com/ncmans))
 - silencers\_info: Change error to info [\#7479](https://github.com/netdata/netdata/pull/7479) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix race condition with page cache descriptors [\#7478](https://github.com/netdata/netdata/pull/7478) ([mfundul](https://github.com/mfundul))
@@ -33,6 +38,7 @@
 - rabbitmq: fix handle\_disabled\_disk\_monitoring [\#7464](https://github.com/netdata/netdata/pull/7464) ([ilyam8](https://github.com/ilyam8))
 - sensors: check fix [\#7447](https://github.com/netdata/netdata/pull/7447) ([ilyam8](https://github.com/ilyam8))
 - address lgtm alerts [\#7441](https://github.com/netdata/netdata/pull/7441) ([jacekkolasa](https://github.com/jacekkolasa))
+- Add anon tracking notice for installers [\#7437](https://github.com/netdata/netdata/pull/7437) ([ncmans](https://github.com/ncmans))
 - Docs: Change build process to allow apostrophes in headers [\#7431](https://github.com/netdata/netdata/pull/7431) ([joelhans](https://github.com/joelhans))
 - Indicate we no longer build packages for CentOS 6 [\#7430](https://github.com/netdata/netdata/pull/7430) ([ncmans](https://github.com/ncmans))
 - .travis.yml: Remove CentOS 6 package building and lifecycle tests [\#7425](https://github.com/netdata/netdata/pull/7425) ([knatsakis](https://github.com/knatsakis))
@@ -40,6 +46,7 @@
 - Docs: Fixes to new health documentation structure [\#7419](https://github.com/netdata/netdata/pull/7419) ([joelhans](https://github.com/joelhans))
 - installer: include go.d.plugin version v0.12.0 [\#7418](https://github.com/netdata/netdata/pull/7418) ([ilyam8](https://github.com/ilyam8))
 - Attempt to fix broken docs builds [\#7409](https://github.com/netdata/netdata/pull/7409) ([joelhans](https://github.com/joelhans))
+- packaging: Set default release channel to stable for gh releases [\#7399](https://github.com/netdata/netdata/pull/7399) ([ncmans](https://github.com/ncmans))
 - fix to wrong instructions during a non-privileged install from installer [\#7393](https://github.com/netdata/netdata/pull/7393) ([julidegulen](https://github.com/julidegulen))
 - monit: overwrite \_\_eq\_\_, \_\_ne\_\_ in child classes \(lgtm warnings\) [\#7387](https://github.com/netdata/netdata/pull/7387) ([ilyam8](https://github.com/ilyam8))
 - smartd\_log: change ATTR5 chart algorithm to absolute [\#7384](https://github.com/netdata/netdata/pull/7384) ([ilyam8](https://github.com/ilyam8))
@@ -221,13 +228,6 @@
 - Remove Dollar sign from Bash code in documentation and fix remark-lint warnings [\#6880](https://github.com/netdata/netdata/pull/6880) ([prhomhyse](https://github.com/prhomhyse))
 - Markdown syntax fixes for MDX parser [\#6877](https://github.com/netdata/netdata/pull/6877) ([joelhans](https://github.com/joelhans))
 - fix LGTM warnings [\#6875](https://github.com/netdata/netdata/pull/6875) ([jacekkolasa](https://github.com/jacekkolasa))
-- Update python.d module checklist to match the current paths and build system. [\#6874](https://github.com/netdata/netdata/pull/6874) ([Ferroin](https://github.com/Ferroin))
-- installer: include go.d.plugin version v0.9.0 [\#6872](https://github.com/netdata/netdata/pull/6872) ([ilyam8](https://github.com/ilyam8))
-- Instructions for simple SMTP transport [\#6870](https://github.com/netdata/netdata/pull/6870) ([cakrit](https://github.com/cakrit))
-- Add example for prometheus archiving source parameter [\#6869](https://github.com/netdata/netdata/pull/6869) ([cakrit](https://github.com/cakrit))
-- dont redirect when redirectURI is the same [\#6868](https://github.com/netdata/netdata/pull/6868) ([jacekkolasa](https://github.com/jacekkolasa))
-- /var/lib/netdata/registry was being left behind after purge [\#6867](https://github.com/netdata/netdata/pull/6867) ([davent](https://github.com/davent))
-- python.d.plugin: no job config build fix [\#6856](https://github.com/netdata/netdata/pull/6856) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
