@@ -1628,9 +1628,10 @@ send_irc() {
 		*) color="#777777" ;;
 		esac
 
+		SNDMESSAGE="${MESSAGE//$'\n'/", "}"
 		for CHANNEL in ${CHANNELS}; do
 			error=0
-			send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${MESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
+			send_alarm=$(echo -e "USER ${NICKNAME} guest ${REALNAME} ${SERVERNAME}\\nNICK ${NICKNAME}\\nJOIN ${CHANNEL}\\nPRIVMSG ${CHANNEL} :${SNDMESSAGE}\\nQUIT\\n" \  | nc "${NETWORK}" 6667)
 			reply_codes=$(echo "${send_alarm}" | cut -d ' ' -f 2 | grep -o '[0-9]*')
 			for code in ${reply_codes}; do
 				if [ "${code}" -ge 400 ] && [ "${code}" -le 599 ]; then

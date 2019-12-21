@@ -761,10 +761,37 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
+inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
+    char tabs[11];
+
+    if (indentation > 10)
+        indentation = 10;
+
+    tabs[0] = '\0';
+    while (indentation) {
+        strcat(tabs, "\t");
+        indentation--;
+    }
+
+    int count = 0;
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if(count > 0) buffer_strcat(wb, ",\n");
+        buffer_strcat(wb, tabs);
+
+        char value[CONFIG_MAX_VALUE * 2 + 1];
+        escape_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
+        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, value);
+
+        count++;
+    }
+    buffer_strcat(wb, "\n");
+    netdata_rwlock_unlock(&host->labels_rwlock);
+}
+
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;
@@ -781,7 +808,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
     buffer_strcat(wb, "\t},\n");
 
-    buffer_sprintf(wb, "\t\"os_name\": %s,\n", (host->system_info->os_name) ? host->system_info->os_name : "\"\"");
+    buffer_sprintf(wb, "\t\"os_name\": \"%s\",\n", (host->system_info->os_name) ? host->system_info->os_name : "\"\"");
     buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", (host->system_info->os_id) ? host->system_info->os_id : "");
     buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", (host->system_info->os_id_like) ? host->system_info->os_id_like : "");
     buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->os_version) ? host->system_info->os_version : "");
@@ -794,6 +821,10 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"virt_detection\": \"%s\",\n", (host->system_info->virt_detection) ? host->system_info->virt_detection : "");
     buffer_sprintf(wb, "\t\"container\": \"%s\",\n", (host->system_info->container) ? host->system_info->container : "");
     buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", (host->system_info->container_detection) ? host->system_info->container_detection : "");
+
+    buffer_strcat(wb, "\t\"labels\": {\n");
+    host_labels2json(host, wb, 2);
+    buffer_strcat(wb, "\t},\n");
 
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);

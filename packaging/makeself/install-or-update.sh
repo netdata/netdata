@@ -25,13 +25,16 @@ fi
 
 STARTIT=1
 AUTOUPDATE=0
-RELEASE_CHANNEL="nightly"
+RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 
 while [ "${1}" ]; do
 	case "${1}" in
 		"--dont-start-it") STARTIT=0;;
 		"--auto-update"|"-u") AUTOUPDATE=1;;
 		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--nightly-channel") RELEASE_CHANNEL="nightly";;
+		"--disable-telemetry") DISABLE_TELEMETRY=1;;
+
 		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
 	esac
 	shift 1
@@ -134,6 +137,15 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
 
+# -----------------------------------------------------------------------------
+progress "Telemetry configuration"
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+  run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+else
+  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
@@ -201,19 +213,6 @@ fi
 
 
 # -----------------------------------------------------------------------------
-
-progress "create user config directories"
-
-for x in "python.d" "charts.d" "node.d" "health.d" "statsd.d" "custom-plugins.d" "ssl"
-do
-    if [ ! -d "etc/netdata/${x}" ]
-        then
-        run mkdir -p "etc/netdata/${x}" || exit 1
-    fi
-done
-
-
-# -----------------------------------------------------------------------------
 progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
@@ -244,20 +243,18 @@ fi
 
 
 # -----------------------------------------------------------------------------
-
 if [ ${STARTIT} -eq 0 ]; then
-    create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
-    netdata_banner "is installed now!"
+	create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+	netdata_banner "is installed now!"
 else
-    progress "starting netdata"
+	progress "starting netdata"
 
-    if ! restart_netdata "/opt/netdata/bin/netdata"; then
-        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf"
-        netdata_banner "is installed and running now!"
-    else
-        create_netdata_conf "/opt/netdata/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
-        netdata_banner "is installed now!"
-    fi
+	if ! restart_netdata "${NETDATA_PREFIX}/bin/netdata"; then
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+		netdata_banner "is installed and running now!"
+	else
+		create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
+		netdata_banner "is installed now!"
+	fi
 fi
-run chown "${NETDATA_USER}:${NETDATA_GROUP}" "/opt/netdata/etc/netdata/netdata.conf"
-run chmod 0664 "/opt/netdata/etc/netdata/netdata.conf"
+run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"

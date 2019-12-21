@@ -24,6 +24,7 @@
 #define HEALTH_DELAY_KEY "delay"
 #define HEALTH_OPTIONS_KEY "options"
 #define HEALTH_REPEAT_KEY "repeat"
+#define HEALTH_LABEL_KEY "label"
 
 static inline int rrdcalc_add_alarm_from_config(RRDHOST *host, RRDCALC *rc) {
     if(!rc->chart) {
@@ -497,7 +498,8 @@ static int health_readfile(const char *filename, void *data) {
             hash_recipient = 0,
             hash_delay = 0,
             hash_options = 0,
-            hash_repeat = 0;
+            hash_repeat = 0,
+            hash_label = 0;
 
     char buffer[HEALTH_CONF_MAX_LINE + 1];
 
@@ -522,6 +524,7 @@ static int health_readfile(const char *filename, void *data) {
         hash_delay = simple_uhash(HEALTH_DELAY_KEY);
         hash_options = simple_uhash(HEALTH_OPTIONS_KEY);
         hash_repeat = simple_uhash(HEALTH_REPEAT_KEY);
+        hash_label = simple_uhash(HEALTH_LABEL_KEY);
     }
 
     FILE *fp = fopen(filename, "r");
@@ -795,6 +798,19 @@ static int health_readfile(const char *filename, void *data) {
                                     &rc->warn_repeat_every,
                                     &rc->crit_repeat_every);
             }
+            else if(hash == hash_label && !strcasecmp(key, HEALTH_LABEL_KEY)) {
+                if(rc->labels) {
+                    if(strcmp(rc->labels, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for alarm '%s' has key '%s' twice, once with value '%s' and later with value '%s'.",
+                              line, filename, rc->name, key, value, value);
+
+                    freez(rc->labels);
+                    simple_pattern_free(rc->splabels);
+                }
+
+                rc->labels = simple_pattern_trim_around_equal(value);
+                rc->splabels = simple_pattern_create(rc->labels, NULL, SIMPLE_PATTERN_EXACT);
+            }
             else {
                 error("Health configuration at line %zu of file '%s' for alarm '%s' has unknown key '%s'.",
                         line, filename, rc->name, key);
@@ -926,6 +942,19 @@ static int health_readfile(const char *filename, void *data) {
                 health_parse_repeat(line, filename, value,
                                     &rt->warn_repeat_every,
                                     &rt->crit_repeat_every);
+            }
+            else if(hash == hash_label && !strcasecmp(key, HEALTH_LABEL_KEY)) {
+                if(rt->labels) {
+                    if(strcmp(rt->labels, value) != 0)
+                        error("Health configuration at line %zu of file '%s' for template '%s' has key '%s' twice, once with value '%s' and later with value '%s'. Using ('%s').",
+                              line, filename, rt->name, key, rt->labels, value, value);
+
+                    freez(rt->labels);
+                    simple_pattern_free(rt->splabels);
+                }
+
+                rt->labels = simple_pattern_trim_around_equal(value);
+                rt->splabels = simple_pattern_create(rt->labels, NULL, SIMPLE_PATTERN_EXACT);
             }
             else {
                 error("Health configuration at line %zu of file '%s' for template '%s' has unknown key '%s'.",

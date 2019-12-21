@@ -4,19 +4,19 @@ Your ability to monitor the health of your systems and applications relies on yo
 the best set of alarms for your particular needs.
 
 In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of writing [alarm
-entities](../../health/README.md#entities-in-the-health-files) for charts with many dimensions.
+entities](../REFERENCE.md#health-entity-reference) for charts with many dimensions.
 
 Dimension templates can condense many individual entities into one—no more copy-pasting one entity and changing the
 `alarm`/`template` and `lookup` lines for each dimension you'd like to monitor.
 
 They are, however, an advanced health monitoring feature. For more basic instructions on creating your first alarm,
-check out our [health monitoring documentation](../../health/), which also includes
-[examples](../../health/README.md#examples).
+check out our [health monitoring documentation](../README.md), which also includes
+[examples](../REFERENCE.md#example-alarms).
 
 ## The fundamentals of `foreach`
 
 Our dimension templates update creates a new `foreach` parameter to the existing [`lookup`
-line](../../health/README.md#alarm-line-lookup). This is where the magic happens.
+line](../REFERENCE.md#alarm-line-lookup). This is where the magic happens.
 
 You use the `foreach` parameter to specify which dimensions you want to monitor with this single alarm. You can separate
 them with a comma (`,`) or a pipe (`|`). You can also use a [Netdata simple pattern](../../libnetdata/simple_pattern/README.md)
@@ -113,7 +113,7 @@ documentation](../../libnetdata/simple_pattern/README.md).
 
 ## Using `foreach` with alarm templates
 
-Dimension templates also work with [alarm templates](../../health/README.md#entities-in-the-health-files). Alarm
+Dimension templates also work with [alarm templates](../REFERENCE.md#alarm-line-alarm-or-template). Alarm
 templates help you create alarms for all the charts with a given context—for example, all the cores of your system's
 CPU.
 
@@ -167,3 +167,5 @@ Or, at the very least, simplify your configuration files.
 
 For information about other advanced features in Netdata's health monitoring toolkit, check out our [health
 documentation](../../health/). And if you have some cool alarms you built using dimension templates, 
+
+[![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fhealth%2Ftutorials%2dimension-templates&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

@@ -57,12 +57,12 @@ char *netdata_ssl_ca_file = NULL;
 static void load_stream_conf() {
     errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
-    if(!appconfig_load(&stream_config, filename, 0)) {
+    if(!appconfig_load(&stream_config, filename, 0, NULL)) {
         info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
-        if(!appconfig_load(&stream_config, filename, 0))
+        if(!appconfig_load(&stream_config, filename, 0, NULL))
             info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
@@ -149,6 +149,25 @@ static inline int should_send_chart_matching(RRDSET *st) {
     }
 
     return(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND));
+}
+
+int configured_as_master() {
+    struct section *section = NULL;
+    int is_master = 0;
+
+    appconfig_wrlock(&stream_config);
+    for (section = stream_config.sections; section; section = section->next) {
+        uuid_t uuid;
+
+        if (uuid_parse(section->name, uuid) != -1 &&
+            appconfig_get_boolean(&stream_config, section->name, "enabled", 0)) {
+            is_master = 1;
+            break;
+        }
+    }
+    appconfig_unlock(&stream_config);
+
+    return is_master;
 }
 
 // checks if the current chart definition has been sent
@@ -1079,8 +1098,8 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
 #ifdef ENABLE_HTTPS
-    host->ssl.conn = ssl->conn;
-    host->ssl.flags = ssl->flags;
+    host->stream_ssl.conn = ssl->conn;
+    host->stream_ssl.flags = ssl->flags;
     if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
 #else
     if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {

@@ -4,9 +4,9 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
-	remote_write \
-	$(NULL)
+    remote_write \
+    $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)

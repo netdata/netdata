@@ -28,10 +28,6 @@ debian/%.postinst: debian/%.postinst.in
 override_dh_install: debian/netdata.postinst
 	dh_install
 
-	# Remove unneeded .keep files
-	#
-	find "$(TOP)" -name .keep -exec rm '{}' ';'
-
 	# Set the CUPS plugin install rule
 	#
 	mkdir -p $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d
@@ -40,24 +36,9 @@ override_dh_install: debian/netdata.postinst
 
 	# Set the rest of the software in the main package
 	#
-	cp -rp $(TEMPTOP)/usr $(TOP)/usr
-	cp -rp $(TEMPTOP)/var $(TOP)/var
-	#cp -rp $(TEMPTOP)/etc $(TOP)/etc
-
-	# Copy sample netdata.conf
-	cp -p $(CURDIR)/system/edit-config $(TOP)/etc/netdata/
-
-	# Create placeholder dirs in netdata configuration directory
-	#
-	mkdir -p $(TOP)/etc/netdata/health.d
-	mkdir -p $(TOP)/etc/netdata/python.d
-	mkdir -p $(TOP)/etc/netdata/charts.d
-	mkdir -p $(TOP)/etc/netdata/cystonm-plugins.d
-	mkdir -p $(TOP)/etc/netdata/go.d
-	mkdir -p $(TOP)/etc/netdata/ssl
-	mkdir -p $(TOP)/etc/netdata/node.d
-	mkdir -p $(TOP)/etc/netdata/statsd.d
-
+	cp -rp $(TEMPTOP)/usr $(TOP)
+	cp -rp $(TEMPTOP)/var $(TOP)
+	cp -rp $(TEMPTOP)/etc $(TOP)
 
 	# Move files that local user shouldn't be editing to /usr/share/netdata
 	#
@@ -109,10 +90,6 @@ override_dh_fixperms:
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/slabinfo.plugin
 	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
-
-	# Support script for configuration file management
-	#
-	chmod 0750 $(TOP)/etc/netdata/edit-config
 
 	# CUPS plugin package
 	chmod 0750 $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin

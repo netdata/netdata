@@ -6,6 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	hangouts/README.md \
-	hangouts/Makefile.inc \
-	$(NULL)
+    hangouts/README.md \
+    hangouts/Makefile.inc \
+    $(NULL)
+

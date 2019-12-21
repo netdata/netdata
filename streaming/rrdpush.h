@@ -13,6 +13,7 @@ extern char *default_rrdpush_send_charts_matching;
 extern unsigned int remote_clock_resync_iterations;
 
 extern int rrdpush_init();
+extern int configured_as_master();
 extern void rrdset_done_push(RRDSET *st);
 extern void rrdset_push_chart_definition_now(RRDSET *st);
 extern void *rrdpush_sender_thread(void *ptr);

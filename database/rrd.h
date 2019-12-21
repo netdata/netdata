@@ -148,6 +148,25 @@ typedef enum rrddim_flags {
 #define rrddim_flag_clear(rd, flag) (rd)->flags &= ~(flag)
 #endif
 
+typedef enum label_source {
+    LABEL_SOURCE_AUTO             = 0,
+    LABEL_SOURCE_NETDATA_CONF     = 1,
+    LABEL_SOURCE_DOCKER           = 2,
+    LABEL_SOURCE_ENVIRONMENT      = 3,
+    LABEL_SOURCE_KUBERNETES       = 4
+} LABEL_SOURCE;
+
+struct label {
+    char *key, *value;
+    uint32_t key_hash;
+    LABEL_SOURCE label_source;
+    struct label *next;
+};
+
+char *translate_label_source(LABEL_SOURCE l);
+struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
+struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+void reload_host_labels();
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -408,6 +427,7 @@ struct rrdset {
                                                     // it goes around in a round-robin fashion
 
     RRDSET_FLAGS flags;                             // configuration flags
+    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
@@ -627,6 +647,7 @@ struct rrdhost {
     const char *timezone;                           // the timezone of the host
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
+    RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
@@ -725,6 +746,11 @@ struct rrdhost {
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
 
     // ------------------------------------------------------------------------
+    // Support for host-level labels
+    struct label *labels;
+    netdata_rwlock_t labels_rwlock;         // lock for the label list
+
+    // ------------------------------------------------------------------------
     // indexes
 
     avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
@@ -739,6 +765,7 @@ struct rrdhost {
 
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection
+    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
     struct rrdhost *next;

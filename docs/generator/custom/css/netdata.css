@@ -1,6 +1,6 @@
-.md-nav__link {
+/* .md-nav__link {
     white-space: nowrap;
-}
+} */
 
 .md-typeset {
     font-size: .75rem
@@ -15,20 +15,53 @@
 /*  Custom styling for the new documentation homepage.
     In particular, the three buttons for install/getting started/configuration. */
 .homepage-nav {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4,[col-start] 1fr);
+    grid-gap: 2rem;
     margin-top: 1.4rem;
+    margin-bottom: 2rem;
 }
 
-.homepage-nav div {
-    flex: 1;
+.nav-page {
+    grid-column: span 2;
+    border-radius: 3px;
+    border: 1px solid #EFEFEF;
+    box-shadow: 0 8px 48px 4px rgba(86,91,115,0.15);
 }
 
-.homepage-nav .nav-install {
-    margin-right: 1rem;
+.button-header {
+    padding: 1rem 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient( to right, #306BAC, #56B2FF 140%);
+    border-radius: 3px 3px 0 0;
 }
 
-.homepage-nav .nav-configuration {
-    margin-left: 1rem;
+.button-header h3 {
+    color: white;
+    margin: 0;
+}
+
+.button-header svg {
+    color: white;
+    position: relative;
+    transition-property: left;
+    transition-timing-function: ease-in-out;
+    transition-duration: 200ms;
+}
+
+.nav-page:hover svg {
+    left: 4px;
+}
+
+.button-text {
+    color: #35414A;
+    padding: 1rem 1.4rem;
+}
+
+.button-text p {
+    margin: 0;
 }
 
 .nav-button {

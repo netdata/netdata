@@ -8,16 +8,20 @@ SUBDIRS = \
     $(NULL)
 
 CLEANFILES = \
-	$(NULL)
+    $(NULL)
 
 dist_noinst_DATA = \
-	README.md \
-	$(NULL)
+    README.md \
+    $(NULL)
 
 userhealthconfigdir=$(configdir)/health.d
 dist_userhealthconfig_DATA = \
     .keep \
     $(NULL)
+
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(userhealthconfigdir)
 
 healthconfigdir=$(libconfigdir)/health.d
 dist_healthconfig_DATA = \
@@ -76,6 +80,7 @@ dist_healthconfig_DATA = \
     health.d/redis.conf \
     health.d/retroshare.conf \
     health.d/riakkv.conf \
+    health.d/scaleio.conf \
     health.d/softnet.conf \
     health.d/squid.conf \
     health.d/stiebeleltron.conf \
@@ -86,6 +91,7 @@ dist_healthconfig_DATA = \
     health.d/tcp_orphans.conf \
     health.d/tcp_resets.conf \
     health.d/udp_errors.conf \
+    health.d/unbound.conf \
     health.d/varnish.conf \
     health.d/vcsa.conf \
     health.d/vsphere.conf \

@@ -36,6 +36,7 @@ m4_ifdef([AM_SILENT_RULES], [
     ])
 AC_CANONICAL_HOST
 AC_PROG_CC
+AC_PROG_CC_C99
 AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_INSTALL
@@ -279,6 +280,10 @@ AC_CHECK_LIB(
     [uv_fs_scandir_next],
     [UV_LIBS="-luv"]
 )
+test -z "${UV_LIBS}" && \
+    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
+OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 
 # -----------------------------------------------------------------------------
@@ -363,9 +368,6 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
 # DB engine and HTTPS
-test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
-    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
-
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
@@ -382,8 +384,6 @@ AC_MSG_CHECKING([if netdata dbengine should be used])
 if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
     enable_dbengine="yes"
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
-    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
-    OPTIONAL_UV_LIBS="${UV_LIBS}"
     OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
     OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
     OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
@@ -407,6 +407,20 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# Exporting engine
+AC_MSG_CHECKING([if netdata exporting engine should be used])
+if test "${UV_LIBS}"; then
+    enable_exporting_engine="yes"
+    AC_DEFINE([ENABLE_EXPORTING], [1], [netdata exporting engine usability])
+    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+    OPTIONAL_UV_LIBS="${UV_LIBS}"
+else
+    enable_exporting_engine="no"
+fi
+AC_MSG_RESULT([${enable_exporting_engine}])
+AM_CONDITIONAL([ENABLE_EXPORTING], [test "${enable_exporting_engine}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
@@ -1210,6 +1224,11 @@ AC_CONFIG_FILES([
     database/Makefile
     database/engine/Makefile
     diagrams/Makefile
+    exporting/Makefile
+    exporting/graphite/Makefile
+    exporting/json/Makefile
+    exporting/opentsdb/Makefile
+    exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile
@@ -1263,6 +1282,7 @@ AC_CONFIG_FILES([
     web/gui/Makefile
     web/server/Makefile
     web/server/static/Makefile
+    claim/Makefile
 ])
 AC_OUTPUT
 
