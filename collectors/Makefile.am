@@ -15,6 +15,7 @@ SUBDIRS = \
     freebsd.plugin \
     freeipmi.plugin \
     idlejitter.plugin \
+    networkviewer.plugin \
     macos.plugin \
     nfacct.plugin \
     xenstat.plugin \

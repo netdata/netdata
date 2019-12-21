@@ -1234,6 +1234,7 @@ AC_CONFIG_FILES([
     collectors/idlejitter.plugin/Makefile
     collectors/macos.plugin/Makefile
     collectors/nfacct.plugin/Makefile
+    collectors/networkviewer.plugin/Makefile
     collectors/node.d.plugin/Makefile
     collectors/plugins.d/Makefile
     collectors/proc.plugin/Makefile
