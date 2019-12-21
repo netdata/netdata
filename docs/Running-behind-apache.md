@@ -255,38 +255,14 @@ reload its configuration with your new values.
 
 
 ### Virtual host
+
 To adjust the `DOSPageCount` for a specific virtual host, open your virtual host config, which can be found at
 `/etc/httpd/conf/sites-available/my-domain.conf` or `/etc/apache2/sites-available/my-domain.conf` and add the
 following:
 
 ```conf
-# Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
-<IfModule mod_evasive20.c>
-	DOSPageCount        30
-</IfModule>
-```
-
-For example:
-
-```conf
 <VirtualHost *:80>
-	RewriteEngine On
-	ProxyRequests Off
-	ProxyPreserveHost On
-	
-	ServerName netdata.domain.tld
-
-	<Proxy *>
-		AllowOverride None
-		AuthType Basic
-		AuthName "Protected site"
-		AuthUserFile /etc/apache2/.htpasswd
-		Require valid-user
-	</Proxy>
-
-	ProxyPass "/" "http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
-	ProxyPassReverse "/" "http://localhost:19999/"
-
+	...
 	# Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
 	<IfModule mod_evasive20.c>
 		DOSPageCount        30
