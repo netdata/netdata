@@ -1,10 +1,13 @@
 # Getting started guide
 
-Thanks for trying Netdata! In this guide, we'll quickly walk you through the first steps you should take after getting
-Netdata installed.
+Thanks for trying Netdata! In this getting started guide, we'll quickly walk you through the first steps you should take
+after getting Netdata installed.
 
 Netdata can collect thousands of metrics in real-time without any configuration, but there are some valuable things to
 know to get the most of out Netdata based on your needs.
+
+We'll skip right into some technical details, so if you're brand-new to monitoring the health and performance of systems
+and applications, our [**step-by-step tutorial**](step-by-step/step-00.md) might be a better fit.
 
 > If you haven't installed Netdata yet, visit the [installation instructions](../packaging/installer) for details,
 > including our one-liner script, which automatically installs Netdata on almost all Linux distributions.
