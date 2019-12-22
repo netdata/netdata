@@ -8,6 +8,7 @@
 
 - Add netdata-claim.sh to the RPM spec file. [\#7592](https://github.com/netdata/netdata/pull/7592) ([Ferroin](https://github.com/Ferroin))
 - Set standard name to non-libnetdata threads \(libuv, pthread\) [\#7584](https://github.com/netdata/netdata/pull/7584) ([Saruspete](https://github.com/Saruspete))
+- Docs: add configuration details for vhost about DOSPageCount to Apache proxy guide [\#7582](https://github.com/netdata/netdata/pull/7582) ([kkoomen](https://github.com/kkoomen))
 - CODEOWNERS: Replace @netdata/automation with individual team members [\#7581](https://github.com/netdata/netdata/pull/7581) ([knatsakis](https://github.com/knatsakis))
 - Fix not detecting more than one adapter in hpssa collector [\#7580](https://github.com/netdata/netdata/pull/7580) ([gnoddep](https://github.com/gnoddep))
 - Docs: Add notice about mod\_evasive to Apache proxy guide [\#7578](https://github.com/netdata/netdata/pull/7578) ([joelhans](https://github.com/joelhans))
@@ -226,8 +227,6 @@
 - Resolve all Kubernetes container names [\#6885](https://github.com/netdata/netdata/pull/6885) ([cakrit](https://github.com/cakrit))
 - Update docs for offline install [\#6884](https://github.com/netdata/netdata/pull/6884) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Remove Dollar sign from Bash code in documentation and fix remark-lint warnings [\#6880](https://github.com/netdata/netdata/pull/6880) ([prhomhyse](https://github.com/prhomhyse))
-- Markdown syntax fixes for MDX parser [\#6877](https://github.com/netdata/netdata/pull/6877) ([joelhans](https://github.com/joelhans))
-- fix LGTM warnings [\#6875](https://github.com/netdata/netdata/pull/6875) ([jacekkolasa](https://github.com/jacekkolasa))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
