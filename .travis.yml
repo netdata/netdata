@@ -509,6 +509,8 @@ jobs:
     - name: Create release draft
       git:
         depth: false
+      env:
+        - RELEASE_CHANNEL=stable
       before_script: post_message "TRAVIS_MESSAGE" "Drafting release on github" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
