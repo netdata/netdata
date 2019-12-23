@@ -795,6 +795,10 @@ struct label *load_auto_labels()
     return label_list;
 }
 
+static inline int is_valid_label_config_option(char *name, char *value) {
+    return (is_valid_label_name(name) && is_valid_label_value(value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") );
+ }
+
 struct label *load_config_labels()
 {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
@@ -810,7 +814,7 @@ struct label *load_config_labels()
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
             char *name = cv->name;
-            if(is_valid_label_name(name) && is_valid_label_value(cv->value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
+            if( is_valid_label_config_option(name, cv->value)) {
                 l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
                 cv->flags |= CONFIG_VALUE_USED;
             } else {
