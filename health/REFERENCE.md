@@ -394,21 +394,21 @@ By defining labels inside of `netdata.conf`, you can now apply labels to alarms.
 line to any alarms you'd like to apply to hosts that have the label `room = server`.
 
 ```yaml
-host lables: room = server
+host labels: room = server
 ```
 
 You can also combine labels when applying them to alarms. For example, if you want to raise a specific alarm only for hosts 
 inside a room that were installed at a specific time, you can write the following label line:
 
 ```yaml
-host lables: room = workstation AND installed = 201705
+host labels: room = workstation AND installed = 201705
 ```
 
 The `label` is a space-separated list that accepts simple patterns. For example, you can create an alarm 
 that will be applied to all hosts installed in the last decade with the following line:
 
 ```yaml
-host lables: installed = 201*
+host labels: installed = 201*
 ```
 
 See our [simple patterns docs](../libnetdata/simple_pattern/) for more examples.
