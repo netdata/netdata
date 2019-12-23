@@ -226,7 +226,6 @@
 - Change the log level for chart updates [\#6887](https://github.com/netdata/netdata/pull/6887) ([vlvkobal](https://github.com/vlvkobal))
 - Resolve all Kubernetes container names [\#6885](https://github.com/netdata/netdata/pull/6885) ([cakrit](https://github.com/cakrit))
 - Update docs for offline install [\#6884](https://github.com/netdata/netdata/pull/6884) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Remove Dollar sign from Bash code in documentation and fix remark-lint warnings [\#6880](https://github.com/netdata/netdata/pull/6880) ([prhomhyse](https://github.com/prhomhyse))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
