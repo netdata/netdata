@@ -77,7 +77,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it 
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
+Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
+overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
+Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/step-00.md)!
 
 ---
 
@@ -146,7 +148,9 @@ sh /tmp/kickstart-static64.sh
 
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
+Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
+overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
+Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/step-00.md)!
 
 ---
 
@@ -583,8 +587,10 @@ bash kickstart.sh --local-files /tmp/netdata-version-number-here.tar.gz /tmp/sha
 bash kickstart-static64.sh --local-files /tmp/netdata-version-number-here.gz.run /tmp/sha256sums.txt
 ```
 
-Now that you're finished with your offline installation, you can move on to our
-[getting started guide](../../docs/getting-started.md)!
+Now that you're finished with your offline installation, you can move on to our [getting started
+guide](../../docs/getting-started.md) for a quick overview of configuring Netdata, enabling plugins, and controlling
+Netdata's daemon. Or, get the full guided tour of Netdata's capabilities with our [step-by-step
+tutorial](../../docs/step-by-step/step-00.md)!
 
 ## Automatic updates
 
