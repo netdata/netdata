@@ -426,9 +426,11 @@ int netdata_store_bpf(void *data, int size) {
         return -2;//LIBBPF_PERF_EVENT_CONT;
     }
 
-    int inside = is_ip_inside_table(e->saddr.addr32[0], e->daddr.addr32[0]);
-    if(inside < 0) {
-        return -2;//LIBBPF_PERF_EVENT_CONT;
+    if(e->family == AF_INET) {
+        int inside = is_ip_inside_table(e->saddr.addr32[0], e->daddr.addr32[0]);
+        if(inside < 0) {
+            return -2;//LIBBPF_PERF_EVENT_CONT;
+        }
     }
 
     netdata_port_stats_t search_proto = { .port = e->dport, .protocol = e->protocol };
