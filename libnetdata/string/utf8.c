@@ -16,7 +16,7 @@ char url_utf8_get_byte_length(char c) {
         return 1;
 
     char length = 0;
-    while(likely(c & 0x80)) {
+    while(likely(IS_UTF8_BYTE(c))) {
         length++;
         c <<= 1;
     }
