@@ -709,14 +709,14 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
-static int is_valid_label_value(char *key) {
-    while(*key) {
-        int length = url_utf8_get_byte_length(*key);
-        if(length == 1 && (*key == '"' || *key == '\'')) {
+static int is_valid_label_value(char *value) {
+    while(*value) {
+        int length = url_utf8_get_byte_length(*value);
+        if(length == 1 && (*value == '"' || *value == '\'')) {
             return 0;
         }
 
-        key += length;
+        value += length;
     }
 
     return 1;
