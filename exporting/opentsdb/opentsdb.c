@@ -94,7 +94,7 @@ int init_opentsdb_http_instance(struct instance *instance)
 void sanitize_opentsdb_label_value(char *dst, char *src, size_t len)
 {
     while (*src != '\0' && len) {
-        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/')
+        if (isalpha(*src) || isdigit(*src) || *src == '-' || *src == '_' || *src == '.' || *src == '/' || IS_UTF8_BYTE(*src))
             *dst++ = *src;
         else
             *dst++ = '_';
