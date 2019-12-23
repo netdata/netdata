@@ -721,20 +721,20 @@ static int is_valid_label_value(char *value) {
     return 1;
 }
 
-static int is_valid_label_key(char *key) {
+static int is_valid_label_name(char *name) {
     //Prometheus exporter
-    if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
+    if(!strcmp(name, "chart") || !strcmp(name, "family")  || !strcmp(name, "dimension"))
         return 0;
 
     //Netdata and Prometheus  internal
-    if (*key == '_')
+    if (*name == '_')
         return 0;
 
-    while(*key) {
-        if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
+    while(*name) {
+        if(!(isdigit(*name) || isalpha(*name) || *name == '.' || *name == '_' || *name == '-'))
             return 0;
 
-        key++;
+        name++;
     }
 
     return 1;
@@ -810,7 +810,7 @@ struct label *load_config_labels()
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
             char *name = cv->name;
-            if(is_valid_label_key(name) && is_valid_label_value(cv->value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
+            if(is_valid_label_name(name) && is_valid_label_value(cv->value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
                 l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
                 cv->flags |= CONFIG_VALUE_USED;
             } else {
@@ -853,7 +853,7 @@ struct label *load_kubernetes_labels()
                 while (*eos && *eos != '\n') eos++;
                 if (*eos == '\n') *eos = '\0';
                 if (strlen(value)>0) {
-                    if (is_valid_label_key(name)){
+                    if (is_valid_label_name(name)){
                         l = add_label_to_list(l, name, value, LABEL_SOURCE_KUBERNETES);
                     } else {
                         info("Ignoring invalid label name '%s'", name);
