@@ -152,7 +152,7 @@ class UrlService(SimpleService):
         )
         if isinstance(response.data, str):
             return response.status, response.data
-        return response.status, response.data.decode()
+        return response.status, response.data.decode(errors='ignore')
 
     def check(self):
         """
