@@ -68,7 +68,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 | [`delay`](#alarm-line-delay)                        | no              | Optional hysteresis settings to prevent floods of notifications.                      |
 | [`repeat`](#alarm-line-repeat)                      | no              | The interval for sending notifications when an alarm is in WARNING or CRITICAL mode.  |
 | [`option`](#alarm-line-option)                      | no              | Add an option to not clear alarms.                                                    |
-| [`host labels`](#alarm-line-host-label)                   | no              | List of labels present on a host.                                                     |
+| [`host labels`](#alarm-line-host-label)             | no              | List of labels present on a host.                                                     |
 
 The `alarm` or `template` line must be the first line of any entity.
 
