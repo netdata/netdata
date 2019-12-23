@@ -716,7 +716,7 @@ static int is_valid_label_value(char *value) {
             return 0;
         }
 
-        value += length;
+        value++;
     }
 
     return 1;
