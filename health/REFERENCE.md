@@ -397,7 +397,7 @@ line to any alarms you'd like to apply to hosts that have the label `room = serv
 host labels: room = server
 ```
 
-The `label` is a space-separated list that accepts simple patterns. For example, you can create an alarm 
+The `host labels` is a space-separated list that accepts simple patterns. For example, you can create an alarm 
 that will be applied to all hosts installed in the last decade with the following line:
 
 ```yaml
