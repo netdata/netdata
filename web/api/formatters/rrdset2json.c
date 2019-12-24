@@ -73,11 +73,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
     if(dimensions_count) *dimensions_count += dimensions;
     if(memory_used) *memory_used += memory;
 
-    buffer_strcat(wb, "\n\t\t\t},\n\t\t\t\"labels\": {\n");
-    host_labels2json(st->rrdhost, wb, 4);
-    buffer_strcat(wb, "\t\t\t}");
-
-    buffer_sprintf(wb, ",\n\t\t\t\"chart_variables\": ");
+    buffer_sprintf(wb, "\n\t\t\t},\n\t\t\t\"chart_variables\": ");
     health_api_v1_chart_custom_variables2json(st, wb);
 
     buffer_strcat(wb, ",\n\t\t\t\"green\": ");
