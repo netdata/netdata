@@ -721,20 +721,20 @@ static int is_valid_label_value(char *value) {
     return 1;
 }
 
-static int is_valid_label_name(char *name) {
+static int is_valid_label_name(char *key) {
     //Prometheus exporter
-    if(!strcmp(name, "chart") || !strcmp(name, "family")  || !strcmp(name, "dimension"))
+    if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
         return 0;
 
     //Netdata and Prometheus  internal
-    if (*name == '_')
+    if (*key == '_')
         return 0;
 
-    while(*name) {
-        if(!(isdigit(*name) || isalpha(*name) || *name == '.' || *name == '_' || *name == '-'))
+    while(*key) {
+        if(!(isdigit(*key) || isalpha(*key) || *key == '.' || *key == '_' || *key == '-'))
             return 0;
 
-        name++;
+        key++;
     }
 
     return 1;
