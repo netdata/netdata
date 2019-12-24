@@ -256,7 +256,7 @@ find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
 # -----------------------------------------------------------------------------
 # Detect libprotobuf
 
-pkg_check_modules(PROTOBUF protobuf)
+pkg_check_modules(PROTOBUF protobuf>=3.1)
 # later we use:
 # ${PROTOBUF_LIBRARIES}
 # ${PROTOBUF_CFLAGS_OTHER}
