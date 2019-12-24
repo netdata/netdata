@@ -231,8 +231,8 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version) {
         write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV6, ibytes_tcp);
         write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV6, ibytes_udp);
 
-        write_traffic(NETWORK_VIEWER_TCP_INBOUND_IPV6, ebytes_tcp);
-        write_traffic(NETWORK_VIEWER_UDP_INBOUND_IPV6, ebytes_udp);
+        write_traffic(NETWORK_VIEWER_TCP_OUTBOUND_IPV6, ebytes_tcp);
+        write_traffic(NETWORK_VIEWER_UDP_OUTBOUND_IPV6, ebytes_udp);
 
         write_connection(NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6, econn_tcp);
         write_connection(NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6, econn_udp);
