@@ -201,10 +201,10 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version) {
         }
 
         if(move->inow != move->iprev) {
-            *ibytes = move->inow - move->iprev;
+            *ibytes = (move->inow - move->iprev)/1000;
             move->iprev = move->inow;
 
-            *ebytes = move->enow - move->eprev;
+            *ebytes = (move->enow - move->eprev)/1000;
             move->eprev = move->enow;
 
             *econn = move->etot;
