@@ -95,6 +95,8 @@ def unicode_str(arg):
     :return: <str>
     """
     try:
+        if isinstance(arg, unicode):
+            return arg
         return unicode(arg, errors='ignore')
     except NameError:
         return str(arg)
