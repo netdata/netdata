@@ -625,7 +625,7 @@ int network_viewer_load_libraries() {
     char *err = NULL;
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, "libnetdata_network_viewer.so");
+    build_complete_path(lpath, 4096, "libnetdata_ebpf.so");
     libnetdatanv = dlopen(lpath ,RTLD_LAZY);
     if (!libnetdatanv) {
         error("[NETWORK VIEWER] Cannot load %s.", lpath);
