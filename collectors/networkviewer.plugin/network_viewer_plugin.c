@@ -461,7 +461,7 @@ static int compare_port(void *a, void *b) {
     return ret;
 }
 
-void *network_collector(void *ptr) {
+void *network_viewer_collector(void *ptr) {
     (void)ptr;
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
@@ -1222,7 +1222,7 @@ int main(int argc, char **argv) {
     int i;
     int end = 2;
     for ( i = 0; i < end ; i++ ) {
-        if ( ( pthread_create(&thread[i], &attr, (!i)?network_viewer_publisher:network_collector, NULL) ) ) {
+        if ( ( pthread_create(&thread[i], &attr, (!i)?network_viewer_publisher:network_viewer_collector, NULL) ) ) {
             error("[NETWORK VIEWER] Cannot create the necessaries threads.");
             int_exit(8);
         }
