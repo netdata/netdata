@@ -232,10 +232,6 @@ jobs:
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare archlinux/base:latest"
 
       # Fedora runs
-    - name: Run netdata lifecycle, on Fedora 28
-      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:28" tests/updater_checks.sh
-      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 28"
-
     - name: Run netdata lifecycle, on Fedora 29
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "fedora:29" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Fedora 29"
