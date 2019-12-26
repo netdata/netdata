@@ -1,6 +1,6 @@
 # networkviewer.plugin
 
-This plugin uses eBPF to bring connection information from the kernel ring to user ring. 
+This plugin uses eBPF to bring connection information from the kernel. 
 
 The default behavior of this plugin is to monitor all connections from the privates IPs defined inside the RFC 1918 
 (https://tools.ietf.org/html/rfc1918) to any destination, this default behavior can be changed with the configuration file
@@ -8,16 +8,15 @@ The default behavior of this plugin is to monitor all connections from the priva
 
 ## Only Linux for while
 
-This plugin for while works only on Linux, but we are monitoring the development of eBPF on other Operate Systems. For 
-Linux there is also a limitation, the collector won't work for kernel verson smaller than `4.11.0` .
+For now this plugin only works on Linux, but we are monitoring the development of eBPF on other Operate Systems. 'On Linux, 
+the plugin requires kernel version 4.11.0 or newer.'
 
 ## Kprobe and tracing file system
 
-For this collector works it will be necessary your kernel to be compiled with support to `k[ret]probe`, case this was not
-done, the collector won't be able to monitor the traffic of data.
+'This collector requires the kernel to be built with support for kprobes (`CONFIG_KPROBES=y`).
 
-Another requirement for this collector works is the necessity to have mounted both `debugfs` and `tracingfs`, case they
-are not mount by default, add the following lines to your `/etc/fstab`:
+Additionally, this collector requies that you have both `debugfs` and `tracingfs` mounted. If your system does not mount 
+them by default, you can add the following lines to your /etc/fstab to have them mounted on boot:
 
 ```
 debugfs    /sys/kernel/debug   debugfs   defaults         0   0
