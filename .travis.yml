@@ -320,14 +320,6 @@ jobs:
         - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
         - ALLOW_SOFT_FAILURE_HERE=true
 
-    - name: "Build & Publish DEB package for ubuntu/cosmic"
-      <<: *DEB_TEMPLATE
-      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
-      env:
-        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="cosmic" BUILD_STRING="ubuntu/cosmic"
-        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
-        - ALLOW_SOFT_FAILURE_HERE=true
-
     - name: "Build & Publish DEB package for ubuntu/bionic"
       <<: *DEB_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
