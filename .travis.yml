@@ -186,7 +186,6 @@ jobs:
       script: sudo -E tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 16.04"
 
-      # Ubuntu runs
     - name: Run netdata lifecycle, on Ubuntu 18.04 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:18.04" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 18.04"
@@ -194,6 +193,10 @@ jobs:
     - name: Run netdata lifecycle, on Ubuntu 19.04 (Containerized)
       script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.04" tests/updater_checks.sh
       after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.04"
+
+    - name: Run netdata lifecycle, on Ubuntu 19.10 (Containerized)
+      script: docker run -it -v "${PWD}:/netdata:rw" -w /netdata "ubuntu:19.10" tests/updater_checks.sh
+      after_failure: post_message "TRAVIS_MESSAGE" "Netdata updater process failed on bare Ubuntu 19.10"
 
       # Centos runs
     - name: Run netdata lifecycle on CentOS 7 (Containerized)
@@ -316,7 +319,15 @@ jobs:
           - if [ -n "${BUILDER_NAME}" ]; then rm -rf /home/${BUILDER_NAME}/* && echo "Cleared /home/${BUILDER_NAME} directory" || echo "Failed to clean /home/${BUILDER_NAME} directory"; fi;
           - if [ -d "${PACKAGES_DIRECTORY}" ]; then rm -rf "${PACKAGES_DIRECTORY}"; fi;
 
-      name: "Build & Publish DEB package for ubuntu/disco"
+      name: "Build & Publish DEB package for ubuntu/eoan"
+      <<: *DEB_TEMPLATE
+      if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
+      env:
+        - BUILDER_NAME="builder" BUILD_DISTRO="ubuntu" BUILD_RELEASE="eoan" BUILD_STRING="ubuntu/eoan"
+        - PACKAGE_TYPE="deb" REPO_TOOL="apt-get"
+        - ALLOW_SOFT_FAILURE_HERE=true
+
+    - name: "Build & Publish DEB package for ubuntu/disco"
       <<: *DEB_TEMPLATE
       if: commit_message =~ /\[Package (amd64|arm64|i386) DEB( Ubuntu)?\]/
       env:
