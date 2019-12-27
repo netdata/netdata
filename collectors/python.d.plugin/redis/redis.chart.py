@@ -209,6 +209,9 @@ class Service(SocketService):
                 if k.startswith('db') and k not in self.keyspace_dbs:
                     self.keyspace_dbs.add(k)
                     self.charts['keys_redis'].add_dimension([k, None, 'absolute'])
+            for db in self.keyspace_dbs:
+                if db not in data:
+                    data[db] = 0
 
         return data
 
