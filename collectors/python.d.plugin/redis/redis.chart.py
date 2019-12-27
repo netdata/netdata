@@ -37,7 +37,6 @@ PIKA_ORDER = [
     'uptime',
 ]
 
-
 CHARTS = {
     'operations': {
         'options': [None, 'Operations', 'operations/s', 'operations', 'redis.operations', 'line'],
@@ -156,6 +155,7 @@ class Service(SocketService):
         self.auth_request = 'AUTH {0} \r\n'.format(p).encode() if p else None
         self.request = 'INFO\r\n'.encode()
         self.bgsave_time = 0
+        self.keyspace_dbs = set()
 
     def do_auth(self):
         resp = self._get_raw_data(request=self.auth_request)
@@ -194,14 +194,21 @@ class Service(SocketService):
             return None
 
         try:
-            data['hit_rate'] = (
-                    (int(data['keyspace_hits']) * 100) / (int(data['keyspace_hits']) + int(data['keyspace_misses']))
-            )
+            hits = int(data['keyspace_hits'])
+            misses = int(data['keyspace_misses'])
+            data['hit_rate'] = hits * 100 / (hits + misses)
         except (KeyError, ZeroDivisionError):
             data['hit_rate'] = 0
 
         if data.get('redis_version') and data.get('rdb_bgsave_in_progress'):
             self.get_data_redis_specific(data)
+
+        if data.get('redis_version'):
+            for k in data:
+                # db0:keys=2,expires=0,avg_ttl=0
+                if k.startswith('db') and k not in self.keyspace_dbs:
+                    self.keyspace_dbs.add(k)
+                    self.charts['keys_redis'].add_dimension([k, None, 'absolute'])
 
         return data
 
@@ -228,11 +235,6 @@ class Service(SocketService):
 
         for n in self.order:
             self.definitions.update(copy_chart(n))
-
-        if data.get('redis_version'):
-            for k in data:
-                if k.startswith('db'):
-                    self.definitions['keys_redis']['lines'].append([k, None, 'absolute'])
 
         return True
 
