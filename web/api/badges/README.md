@@ -12,11 +12,11 @@ For each metric/dimension and for arbitrary time-frames badges can show **min**,
 
 For example, there is [a chart in Netdata that shows the current requests/s of nginx](http://london.my-netdata.io/#nginx_local_nginx). Using this chart alone we can show the following badges (we could add more time-frames, like **today**, **yesterday**, etc):
 
-<a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&value_color=grey:null%7Cblue&label=nginx%20active%20connections%20now&units=null&precision=0"/></a>  <a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&after=-3600&value_color=orange&label=last%20hour%20average&units=null&options=unaligned&precision=0"/></a> <a href="https://registry.my-netdata.io/#nginx_local_nginx"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&group=max&after=-3600&value_color=red&label=last%20hour%20max&units=null&options=unaligned&precision=0"/></a>
+<a href="https://registry.my-netdata.io/#nginx_local_nginx" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&value_color=grey:null%7Cblue&label=nginx%20active%20connections%20now&units=null&precision=0"/></a>  <a href="https://registry.my-netdata.io/#nginx_local_nginx" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&after=-3600&value_color=orange&label=last%20hour%20average&units=null&options=unaligned&precision=0"/></a> <a href="https://registry.my-netdata.io/#nginx_local_nginx" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=nginx_local.connections&dimensions=active&group=max&after=-3600&value_color=red&label=last%20hour%20max&units=null&options=unaligned&precision=0"/></a>
 
 Similarly, there is [a chart that shows outbound bandwidth per class](http://london.my-netdata.io/#tc_eth0), using QoS data. So it shows `kilobits/s` per class. Using this chart we can show:
 
-<a href="https://registry.my-netdata.io/#tc_eth0"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&value_color=green&label=web%20server%20sends%20now&units=kbps"/></a> <a href="https://registry.my-netdata.io/#tc_eth0"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&after=-86400&options=unaligned&group=sum&divide=8388608&value_color=blue&label=web%20server%20sent%20today&units=GB"/></a>
+<a href="https://registry.my-netdata.io/#tc_eth0" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&value_color=green&label=web%20server%20sends%20now&units=kbps"/></a> <a href="https://registry.my-netdata.io/#tc_eth0" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=tc.world_out&dimensions=web_server&after=-86400&options=unaligned&group=sum&divide=8388608&value_color=blue&label=web%20server%20sent%20today&units=GB"/></a>
 
 The right one is a **volume** calculation. Netdata calculated the total of the last 86.400 seconds (a day) which gives `kilobits`, then divided it by 8 to make it KB, then by 1024 to make it MB and then by 1024 to make it GB. Calculations like this are quite accurate, since for every value collected, every second, Netdata interpolates it to second boundary using microsecond calculations.
 
@@ -24,15 +24,15 @@ Let's see a few more badge examples (they come from the [Netdata registry](../..
 
 -   **cpu usage of user `root`** (you can pick any user; 100% = 1 core). This will be `green <10%`, `yellow <20%`, `orange <50%`, `blue <100%` (1 core), `red` otherwise (you define thresholds and colors on the URL).
 
-    <a href="https://registry.my-netdata.io/#apps_cpu"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img></a> <a href="https://registry.my-netdata.io/#apps_cpu"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&after=-3600&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20average%20cpu%20last%20hour&units=%25"></img></a>
+    <a href="https://registry.my-netdata.io/#apps_cpu" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img></a> <a href="https://registry.my-netdata.io/#apps_cpu" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&after=-3600&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20average%20cpu%20last%20hour&units=%25"></img></a>
 
 -   **mysql queries per second**
 
-    <a href="https://registry.my-netdata.io/#mysql_local"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&label=mysql%20queries%20now&value_color=red&units=%5Cs"></img></a> <a href="https://registry.my-netdata.io/#mysql_local"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-3600&options=unaligned&group=sum&label=mysql%20queries%20this%20hour&value_color=green&units=null"></img></a> <a href="https://registry.my-netdata.io/#mysql_local"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-86400&options=unaligned&group=sum&label=mysql%20queries%20today&value_color=blue&units=null"></img></a>
+    <a href="https://registry.my-netdata.io/#mysql_local" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&label=mysql%20queries%20now&value_color=red&units=%5Cs"></img></a> <a href="https://registry.my-netdata.io/#mysql_local" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-3600&options=unaligned&group=sum&label=mysql%20queries%20this%20hour&value_color=green&units=null"></img></a> <a href="https://registry.my-netdata.io/#mysql_local" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.queries&dimensions=questions&after=-86400&options=unaligned&group=sum&label=mysql%20queries%20today&value_color=blue&units=null"></img></a>
 
     niche ones: **mysql SELECT statements with JOIN, which did full table scans**:
 
-    <a href="https://registry.my-netdata.io/#mysql_local_issues"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.join_issues&dimensions=scan&after=-3600&label=full%20table%20scans%20the%20last%20hour&value_color=orange&group=sum&units=null"></img></a>
+    <a href="https://registry.my-netdata.io/#mysql_local_issues" class="bdge-sample"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=mysql_local.join_issues&dimensions=scan&after=-3600&label=full%20table%20scans%20the%20last%20hour&value_color=orange&group=sum&units=null" class="bdge-sample"></img></a>
 
 ---
 
@@ -62,7 +62,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
 
   Which produces this:
 
-  <a href="#">
+  <a href="#" class="bdge-sample">
      <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu"></img>
   </a>
 
@@ -90,7 +90,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
 
   Which produces this:
 
-  <a href="#">
+  <a href="#" class="bdge-sample">
      <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&dimensions=system%7Cnice"></img>
   </a>
 
@@ -112,7 +112,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
 
   Which produces the average of last complete minute (XX:XX:00 - XX:XX:59):
 
-  <a href="#">
+  <a href="#" class="bdge-sample">
      <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&after=-60"></img>
   </a>
 
@@ -126,7 +126,7 @@ Here is what you can put for `options` (these are standard Netdata API options):
 
   It produces this:
 
-  <a href="#">
+  <a href="#" class="bdge-sample">
      <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=system.cpu&before=-60&after=-60"></img>
   </a>
 
@@ -298,7 +298,7 @@ For example, this is the cpu badge shown above:
 
 Both produce this:
 
-<a href="https://registry.my-netdata.io/#apps_cpu">
+<a href="https://registry.my-netdata.io/#apps_cpu" class="bdge-sample">
     <img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=users.cpu&dimensions=root&value_color=grey:null%7Cgreen%3C10%7Cyellow%3C20%7Corange%3C50%7Cblue%3C100%7Cred&label=root%20user%20cpu%20now&units=%25"></img>
 </a>
 

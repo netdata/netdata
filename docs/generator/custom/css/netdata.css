@@ -8,7 +8,7 @@
 
 /* Underline text */
 
-.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
+.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink):not(.bdge-sample) {
     border-bottom: 1px solid #272b30;
 }
 
