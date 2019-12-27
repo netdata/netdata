@@ -260,11 +260,21 @@ void *network_viewer_publisher(void *ptr) {
 
 // ----------------------------------------------------------------------
 void netdata_set_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) {
+    uint16_t family = e->family;
     ncs->first = e->first;
     ncs->ct = e->ct;
-    ncs->saddr.addr32[0] = e->saddr.addr32[0];
 
+    ncs->saddr.addr32[0] = e->saddr.addr32[0];
     ncs->daddr.addr32[0] = e->daddr.addr32[0];
+    if (family == AF_INET6) {
+        ncs->saddr.addr32[1] = e->saddr.addr32[1];
+        ncs->saddr.addr32[2] = e->saddr.addr32[2];
+        ncs->saddr.addr32[3] = e->saddr.addr32[3];
+
+        ncs->daddr.addr32[1] = e->daddr.addr32[1];
+        ncs->daddr.addr32[2] = e->daddr.addr32[2];
+        ncs->daddr.addr32[3] = e->daddr.addr32[3];
+    }
 
     ncs->dport = e->dport;
     ncs->retransmit = e->retransmit;
@@ -272,7 +282,7 @@ void netdata_set_conn_stats(netdata_conn_stats_t *ncs, netdata_kern_stats_t *e) 
     ncs->recv = e->recv;
 
     ncs->protocol = e->protocol;
-    ncs->family = e->family;
+    ncs->family = family;
 
     ncs->remove_time = (!e->removeme)?0:time(NULL) + 5;
 
