@@ -406,6 +406,10 @@ set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
         )
 
+set(SYSCALL_PLUGIN_FILES
+        collectors/syscall.plugin/syscall_plugin.c
+        )
+
 set(PROC_PLUGIN_FILES
         collectors/proc.plugin/ipc.c
         collectors/proc.plugin/plugin_proc.c
@@ -770,6 +774,7 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
+    SET(ENABLE_PLUGIN_SYSCALL True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -780,6 +785,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_SYSCALL False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -790,6 +796,7 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
+    SET(ENABLE_PLUGIN_SYSCALL False)
 
 ENDIF()
 
@@ -893,6 +900,20 @@ IF(ENABLE_PLUGIN_PERF)
     target_compile_options(perf.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
     message(STATUS "perf.plugin: disabled")
+ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# syscall.plugin
+
+IF(ENABLE_PLUGIN_SLABINFO)
+    message(STATUS "syscall.plugin: enabled")
+    add_executable(syscall.plugin config.h ${SYSCALL_PLUGIN_FILES})
+    target_link_libraries (syscall.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(syscall.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(syscall.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+ELSE()
+    message(STATUS "syscall.plugin: disabled")
 ENDIF()
 
 

@@ -254,6 +254,12 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
+SYSCALL_PLUGIN_FILES = \
+    collectors/syscall.plugin/syscall_plugin.c \
+    collectors/syscall.plugin/syscall_plugin.h \
+    $(LIBNETDATA_FILES) \
+    $(NULL)
+
 PROC_PLUGIN_FILES = \
     collectors/proc.plugin/ipc.c \
     collectors/proc.plugin/plugin_proc.c \
@@ -568,6 +574,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
+    $(OPTIONAL_SYSCALL_LIBS) \
     $(NULL)
 
 NETDATACLI_FILES = \
@@ -622,6 +629,14 @@ if ENABLE_PLUGIN_FREEIPMI
     freeipmi_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(OPTIONAL_IPMIMONITORING_LIBS) \
+        $(NULL)
+endif
+
+if ENABLE_PLUGIN_SYSCALL
+    plugins_PROGRAMS += syscall.plugin
+    syscall_plugin_SOURCES = $(SYSCALL_PLUGIN_FILES)
+    syscall_plugin_LDADD = \
+        $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
 

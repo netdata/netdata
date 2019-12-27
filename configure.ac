@@ -367,6 +367,18 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
+# Syscall plugin libs
+
+
+AC_CHECK_LIB(
+    [dl],
+    [dlopen],
+    [SYSCALL_LIBS="-ldl"]
+)
+
+OPTIONAL_SYSCALL_LIBS="${SYSCALL_LIBS}"
+
+# -----------------------------------------------------------------------------
 # DB engine and HTTPS
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
@@ -802,6 +814,17 @@ fi
 AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
+# -----------------------------------------------------------------------------
+# syscall.plugin
+
+AC_MSG_CHECKING([if syscall.plugin should be enabled])
+if test "${build_target}" == "linux" -a "${SYSCALL_LIBS}"; then
+    enable_syscall="yes"
+else
+    enable_syscall="no"
+fi
+AC_MSG_RESULT([${enable_syscall}])
+AM_CONDITIONAL([ENABLE_PLUGIN_SYSCALL], [test "${enable_syscall}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin
@@ -1138,6 +1161,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
+AC_SUBST([OPTIONAL_SYSCALL_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
@@ -1217,6 +1241,7 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/slabinfo.plugin/Makefile
     collectors/statsd.plugin/Makefile
+    collectors/syscall.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile
