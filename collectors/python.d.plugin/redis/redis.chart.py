@@ -189,10 +189,16 @@ class Service(SocketService):
         :return: dict
         """
         data = self.get_raw_and_parse()
-
         if not data:
             return None
 
+        self.calc_hit_rate(data)
+        self.calc_redis_keys(data)
+        self.calc_redis_rdb_save_operations(data)
+        return data
+
+    @staticmethod
+    def calc_hit_rate(data):
         try:
             hits = int(data['keyspace_hits'])
             misses = int(data['keyspace_misses'])
@@ -200,22 +206,21 @@ class Service(SocketService):
         except (KeyError, ZeroDivisionError):
             data['hit_rate'] = 0
 
-        if data.get('redis_version') and data.get('rdb_bgsave_in_progress'):
-            self.get_data_redis_specific(data)
+    def calc_redis_keys(self, data):
+        if not data.get('redis_version'):
+            return
+        # db0:keys=2,expires=0,avg_ttl=0
+        new_keyspace_dbs = [k for k in data if k.startswith('db') and k not in self.keyspace_dbs]
+        for db in new_keyspace_dbs:
+            self.keyspace_dbs.add(db)
+            self.charts['keys_redis'].add_dimension([db, None, 'absolute'])
+        for db in self.keyspace_dbs:
+            if db not in data:
+                data[db] = 0
 
-        if data.get('redis_version'):
-            for k in data:
-                # db0:keys=2,expires=0,avg_ttl=0
-                if k.startswith('db') and k not in self.keyspace_dbs:
-                    self.keyspace_dbs.add(k)
-                    self.charts['keys_redis'].add_dimension([k, None, 'absolute'])
-            for db in self.keyspace_dbs:
-                if db not in data:
-                    data[db] = 0
-
-        return data
-
-    def get_data_redis_specific(self, data):
+    def calc_redis_rdb_save_operations(self, data):
+        if not (data.get('redis_version') and data.get('rdb_bgsave_in_progress')):
+            return
         if data['rdb_bgsave_in_progress'] != '0':
             self.bgsave_time += self.update_every
         else:
