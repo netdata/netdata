@@ -490,6 +490,15 @@ BUFFER *_buffer_create(size_t size, uint8_t options){
 static inline void buffer_mempool_free(BUFFER *b) {
     int i;
     buffer_mempool_thread_local_t *mempool = buffer_mempool_get();
+    if(unlikely(!mempool)) {
+        if(unlikely( pthread_once(&buffer_mempool_once, buffer_mempool_once_init) != 0 )) { //libuv_migration uv_once
+            error("buffer_mempool: init fail.");
+            fatal("pthread_once failed to initialize per thread buffer mempool.");
+        }
+        mempool = callocz(1, sizeof(buffer_mempool_thread_local_t));
+        debug(D_BUFFER_MEMPOOL, "buffer_mempool: Initialized for this thread in free! (this buffer was created in another thread?) mempoolid=%p", mempool);
+        pthread_setspecific(buffer_mempool_key, (void*)mempool);
+    }
     debug(D_BUFFER_MEMPOOL, "buffer_mempool_free: mempoolid=%p.", mempool);
     if(b->size >= 100 && b->size <= BUFFER_MEMPOOL_MAXSIZE) {
         for(i = 0; i < BUFFER_MEMPOOL_SIZE; i++) {
