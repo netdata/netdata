@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck disable=SC2046,SC2086,SC2166
+# shellcheck disable=SC2046,SC2086,SC2166,SC2059,SC2009
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
@@ -516,7 +516,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 	}
 
 	# clean up stock config files from the user configuration directory
-	for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)); do
+	while read -r -d '' x ; do
 		if [ -f "${x}" ]; then
 			# find it relative filename
 			f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
@@ -529,7 +529,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 
 			if [ -z "${md5sum}" -o ! -x "${md5sum}" ]; then
 				# we don't have md5sum - keep it
-				echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
+				echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED}is not known to distribution${TPUT_RESET}. Keeping it."
 			else
 				# find its checksum
 				md5="$(${md5sum} <"${x}" | cut -d ' ' -f 1)"
@@ -545,7 +545,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 				fi
 			fi
 		fi
-	done
+	done < <(find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \))
 fi
 touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 
@@ -680,7 +680,7 @@ fi
 helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
 [ ${deleted_stock_configs} -eq 0 ] && helplink=""
 for link in "orig" "${helplink}"; do
-	if [ ! -z "${link}" ]; then
+	if [ -n "${link}" ]; then
 		[ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
 		run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
 	fi
