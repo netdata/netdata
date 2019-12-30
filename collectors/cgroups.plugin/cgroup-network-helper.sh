@@ -76,7 +76,7 @@ debug() {
 
 pid=
 cgroup=
-while [ ! -z "${1}" ]
+while [ -n "${1}" ]
 do
     case "${1}" in
         --cgroup) cgroup="${2}"; shift 1;;
@@ -164,12 +164,12 @@ virsh_find_all_interfaces_for_cgroup() {
     # shellcheck disable=SC2230
     virsh="$(which virsh 2>/dev/null || command -v virsh 2>/dev/null)"
 
-    if [ ! -z "${virsh}" ]
+    if [ -n "${virsh}" ]
     then
         local d
         d="$(virsh_cgroup_to_domain_name "${c}")"
 
-        if [ ! -z "${d}" ]
+        if [ -n "${d}" ]
         then
             debug "running: virsh domiflist ${d}; to find the network interfaces"
 
@@ -195,8 +195,9 @@ netnsid_find_all_interfaces_for_pid() {
     local pid="${1}"
     [ -z "${pid}" ] && return 1
 
-    local nsid=$(lsns -t net -p ${pid} -o NETNSID -nr)
-    [ -z "${nsid}" -o "${nsid}" = "unassigned" ] && return 1
+    # shellcheck disable=SC2155
+    local nsid=$(lsns -t net -p "${pid}" -o NETNSID -nr)
+    if [ -z "${nsid}" ] || [ "${nsid}" = "unassigned" ] ; then return 1 ; fi
 
     set_source "netnsid"
     ip link show |\
@@ -226,14 +227,14 @@ netnsid_find_all_interfaces_for_cgroup() {
 find_all_interfaces_of_pid_or_cgroup() {
     local p="${1}" c="${2}" # the pid and the cgroup path
 
-    if [ ! -z "${pid}" ]
+    if [ -n "${pid}" ]
     then
         # we have been called with a pid
 
         proc_pid_fdinfo_iff "${p}"
         netnsid_find_all_interfaces_for_pid "${p}"
 
-    elif [ ! -z "${c}" ]
+    elif [ -n "${c}" ]
     then
         # we have been called with a cgroup
 
