@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2181,SC2039,SC2059,SC2006,SC2164
+# shellcheck disable=SC2181,SC2039,SC2059,SC2086,SC2164
 
 # buildhtml.sh
 
