@@ -6,6 +6,7 @@
 # Copyright: SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Author: Paul Emm. Katsoulakis <paul@netdata.cloud>
+# shellcheck disable=SC2164
 
 # Packaging update
 apk update

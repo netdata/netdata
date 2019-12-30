@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC2155
 
 # -----------------------------------------------------------------------------
 
@@ -49,6 +50,7 @@ fetch() {
 # -----------------------------------------------------------------------------
 
 # load the functions of the netdata-installer.sh
+# shellcheck source=packaging/installer/functions.sh
 . "${NETDATA_SOURCE_PATH}/packaging/installer/functions.sh"
 
 # -----------------------------------------------------------------------------

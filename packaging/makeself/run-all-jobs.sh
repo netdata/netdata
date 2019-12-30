@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck disable=SC2155
 
 LC_ALL=C
 umask 002
@@ -30,6 +31,7 @@ export NULL=
 
 cd "${NETDATA_MAKESELF_PATH}" || exit 1
 
+# shellcheck source=packaging/makeself/functions.sh
 . ./functions.sh "${@}" || exit 1
 
 for x in jobs/*.install.sh

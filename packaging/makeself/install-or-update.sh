@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-. $(dirname "${0}")/functions.sh
+# shellcheck source=packaging/makseself/functions.sh
+. "$(dirname "${0}")/functions.sh"
 
 export LC_ALL=C
 umask 002
@@ -33,7 +34,7 @@ while [ "${1}" ]; do
 		"--auto-update"|"-u") AUTOUPDATE=1;;
 		"--stable-channel") RELEASE_CHANNEL="stable";;
 		"--nightly-channel") RELEASE_CHANNEL="nightly";;
-		"--disable-telemetry") DISABLE_TELEMETRY=1;;
+		"--disable-telemetry") NETDATA_DISABLE_TELEMETRY=1;;
 
 		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
 	esac
@@ -55,9 +56,9 @@ then
         run mkdir -p etc/netdata
     fi
 
+    # shellcheck disable=SC2230
     md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-    for x in $(find etc -type f)
-    do
+    while IFS= read -r -d '' x ; do
         # find it relative filename
         f="${x/etc\/netdata\//}"
 
@@ -65,7 +66,7 @@ then
         t="${f/.conf.old/.conf}"
         t="${t/.conf.orig/.conf}"
 
-        if [ ! -z "${md5sum}" ]
+        if [ -n "${md5sum}" ]
             then
             # find the checksum of the existing file
             md5="$( ${md5sum} <"${x}" | cut -d ' ' -f 1)"
@@ -79,7 +80,7 @@ then
                 deleted_stock_configs=$(( deleted_stock_configs + 1 ))
             fi
         fi
-    done
+    done < <(find etc -type f)
 
     touch "etc/netdata/.installer-cleanup-of-stock-configs-done"
 fi
@@ -98,7 +99,11 @@ if portable_add_group netdata; then
 		progress "Add user netdata to required user groups"
 		for g in ${NETDATA_WANTED_GROUPS}; do
 			# shellcheck disable=SC2086
-			portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}" || run_failed "Failed to add netdata user to secondary groups"
+			if portable_add_user_to_group ${g} netdata ; then
+				NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+			else
+				run_failed "Failed to add netdata user to secondary groups"
+			fi
 		done
 		NETDATA_USER="netdata"
 		NETDATA_GROUP="netdata"
@@ -121,7 +126,7 @@ then
         # CentOS
         [ -f "/etc/ssl/certs/ca-bundle.crt" ] && cacert="/etc/ssl/certs/ca-bundle.crt"
 
-        if [ ! -z "${cacert}" ]
+        if [ -n "${cacert}" ]
         then
             echo "Creating /opt/netdata/.curlrc with cacert=${cacert}"
             echo >/opt/netdata/.curlrc "cacert=${cacert}"
@@ -144,7 +149,7 @@ progress "Telemetry configuration"
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
   run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 else
-  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file %s/.opt-out-from-anonymous-statistics \n\n" "${NETDATA_USER_CONFIG_DIR}"
 fi
 
 # -----------------------------------------------------------------------------
@@ -189,6 +194,7 @@ dir_should_be_link() {
     fi
 
     run ln -s "${t}" "${d}"
+    # shellcheck disable=SC2164
     cd "${old}"
 }
 

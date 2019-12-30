@@ -6,7 +6,7 @@
 
 export NETDATA_BUILD_WITH_DEBUG=0
 
-while [ ! -z "${1}" ]
+while [ -n "${1}" ]
 do
     case "${1}" in
         debug)
@@ -27,7 +27,7 @@ done
 # the required packages. build-x86_64-static.sh will do this for you
 # using docker.
 
-cd $(dirname "$0") || exit 1
+cd "$(dirname "$0")" || exit 1
 
 # if we don't run inside the netdata repo
 # download it and run from it
