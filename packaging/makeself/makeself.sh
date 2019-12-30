@@ -492,6 +492,7 @@ if test -f "$HEADER"; then
 	archname="$tmpfile"
 	# Generate a fake header to count its lines
 	SKIP=0
+    # shellcheck source=packaging/makeself/makeself-header.sh
     . "$HEADER"
     SKIP="$(wc -l "$tmpfile")"
 	# Get rid of any spaces

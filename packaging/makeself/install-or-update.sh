@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# shellcheck source=packaging/makseself/functions.sh
+# shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/functions.sh"
 
 export LC_ALL=C

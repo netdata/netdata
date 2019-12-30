@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck disable=SC2155
+# shellcheck disable=SC2155,SC2103
 
 # -----------------------------------------------------------------------------
 
