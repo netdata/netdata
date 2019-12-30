@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # #No shebang necessary
 # BASH Lib: Simple incoming webhook for slack integration.
 # 
@@ -9,6 +10,8 @@
 # Copyright:
 #
 # Author: Pavlos Emm. Katsoulakis <paul@netdata.cloud
+#
+# shellcheck disable=SC2039,SC2059,SC2086
 
 post_message() {
 	TYPE="$1"
@@ -21,7 +24,7 @@ post_message() {
 			;;
 		"TRAVIS_MESSAGE")
 			EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}', on '${TRAVIS_OS_NAME}'"
-			if [ "$TRAVIS_EVENT_TYPE}" == "pull_request" ]; then
+			if [ "${TRAVIS_EVENT_TYPE}" == "pull_request" ]; then
 				EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}' #${TRAVIS_PULL_REQUEST}, on '${TRAVIS_OS_NAME}' "
 			fi
 
