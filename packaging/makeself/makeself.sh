@@ -74,12 +74,13 @@
 # This software is released under the terms of the GNU GPL version 2 and above
 # Please read the license at http://www.gnu.org/copyleft/gpl.html
 #
+# shellcheck disable=SC2230
 
 MS_VERSION=2.3.1
 MS_COMMAND="$0"
 unset CDPATH
 
-for f in "${1+"$@"}"; do
+for f in ${1+"$@"}; do
     MS_COMMAND="$MS_COMMAND \\\\
     \\\"$f\\\""
 done
@@ -154,7 +155,7 @@ MS_Usage()
 }
 
 # Default settings
-if type gzip 2>&1 > /dev/null; then
+if type gzip > /dev/null 2>&1; then
     COMPRESS=gzip
 else
     COMPRESS=Unix
@@ -175,10 +176,10 @@ TAR_ARGS=cvf
 TAR_EXTRA=""
 GPG_EXTRA=""
 DU_ARGS=-ks
-HEADER=`dirname "$0"`/makeself-header.sh
+HEADER="$(dirname "$0")"/makeself-header.sh
 TARGETDIR=""
 NOOVERWRITE=n
-DATE=`LC_ALL=C date`
+DATE="$(LC_ALL=C date)"
 EXPORT_CONF=n
 
 # LSM file stuff
@@ -290,7 +291,7 @@ do
         if ! shift 2; then MS_Help; exit 1; fi
 	;;
     --license)
-        LICENSE=`cat $2`
+        LICENSE="$(cat "$2")"
         if ! shift 2; then MS_Help; exit 1; fi
 	;;
     --follow)
@@ -331,7 +332,7 @@ do
 	if ! shift 2; then MS_Help; exit 1; fi
         ;;
     --help-header)
-	HELPHEADER=`sed -e "s/'/'\\\\\''/g" $2`
+	HELPHEADER="$(sed -e "s/'/'\\\\\''/g" "$2")"
     if ! shift 2; then MS_Help; exit 1; fi
 	[ -n "$HELPHEADER" ] && HELPHEADER="$HELPHEADER
 "
@@ -391,7 +392,7 @@ if test "$APPEND" = y; then
     fi
 
     # Gather the info from the original archive
-    OLDENV=`sh "$archname" --dumpconf`
+    OLDENV="$(sh "$archname" --dumpconf)"
     if test $? -ne 0; then
 	echo "Unable to update archive: $archname" >&2
 	exit 1
@@ -407,10 +408,10 @@ else
     # We don't want to create an absolute directory unless a target directory is defined
     if test "$CURRENT" = y; then
 	archdirname="."
-    elif test x$TARGETDIR != x; then
+    elif test "x$TARGETDIR" != x; then
 	archdirname="$TARGETDIR"
     else
-	archdirname=`basename "$1"`
+	archdirname="$(basename "$1")"
     fi
 
     if test $# -lt 3; then
@@ -492,12 +493,12 @@ if test -f "$HEADER"; then
 	# Generate a fake header to count its lines
 	SKIP=0
     . "$HEADER"
-    SKIP=`cat "$tmpfile" |wc -l`
+    SKIP="$(wc -l "$tmpfile")"
 	# Get rid of any spaces
-	SKIP=`expr $SKIP`
+	SKIP="$(expr "$SKIP")"
 	rm -f "$tmpfile"
     if test "$QUIET" = "n";then
-	echo Header is $SKIP lines long >&2
+	echo Header is "$SKIP" lines long >&2
     fi
 
 	archname="$oldarchname"
@@ -516,25 +517,26 @@ if test "$APPEND" = n; then
     fi
 fi
 
-USIZE=`du $DU_ARGS "$archdir" | awk '{print $1}'`
+USIZE="$(du $DU_ARGS "$archdir" | awk '{print $1}')"
 
 if test "." = "$archdirname"; then
 	if test "$KEEP" = n; then
-		archdirname="makeself-$$-`date +%Y%m%d%H%M%S`"
+		archdirname="makeself-$$-$(date +%Y%m%d%H%M%S)"
 	fi
 fi
 
 test -d "$archdir" || { echo "Error: $archdir does not exist."; rm -f "$tmpfile"; exit 1; }
 if test "$QUIET" = "n";then
-   echo About to compress $USIZE KB of data...
-   echo Adding files to archive named \"$archname\"...
+   echo About to compress "$USIZE" KB of data...
+   echo Adding files to archive named \""$archname"\"...
 fi
 exec 3<> "$tmpfile"
+# shellcheck disable=SC2086
 ( cd "$archdir" && ( tar $TAR_EXTRA -$TAR_ARGS - . | eval "$GZIP_CMD" >&3 ) ) || \
     { echo Aborting: archive directory not found or temporary file: "$tmpfile" could not be created.; exec 3>&-; rm -f "$tmpfile"; exit 1; }
 exec 3>&- # try to close the archive
 
-fsize=`cat "$tmpfile" | wc -c | tr -d " "`
+fsize="$(wc -c "$tmpfile" | tr -d " ")"
 
 # Compute the checksums
 
@@ -546,7 +548,8 @@ if test "$NOCRC" = y; then
 		echo "skipping crc at user request"
 	fi
 else
-	crcsum=`cat "$tmpfile" | CMD_ENV=xpg4 cksum | sed -e 's/ /Z/' -e 's/	/Z/' | cut -dZ -f1`
+	# shellcheck disable=SC2002
+	crcsum="$(cat "$tmpfile" | CMD_ENV=xpg4 cksum | sed -e 's/ /Z/' -e 's/	/Z/' | cut -dZ -f1)"
 	if test "$QUIET" = "n";then
 		echo "CRC: $crcsum"
 	fi
@@ -561,15 +564,16 @@ else
 	OLD_PATH=$PATH
 	PATH=${GUESS_MD5_PATH:-"$OLD_PATH:/bin:/usr/bin:/sbin:/usr/local/ssl/bin:/usr/local/bin:/opt/openssl/bin"}
 	MD5_ARG=""
-	MD5_PATH=`exec <&- 2>&-; which md5sum || command -v md5sum || type md5sum`
-	test -x "$MD5_PATH" || MD5_PATH=`exec <&- 2>&-; which md5 || command -v md5 || type md5`
-	test -x "$MD5_PATH" || MD5_PATH=`exec <&- 2>&-; which digest || command -v digest || type digest`
+	MD5_PATH="$(exec <&- 2>&-; which md5sum || command -v md5sum || type md5sum)"
+	test -x "$MD5_PATH" || MD5_PATH="$(exec <&- 2>&-; which md5 || command -v md5 || type md5)"
+	test -x "$MD5_PATH" || MD5_PATH="$(exec <&- 2>&-; which digest || command -v digest || type digest)"
 	PATH=$OLD_PATH
 	if test -x "$MD5_PATH"; then
-		if test `basename ${MD5_PATH}`x = digestx; then
+		if test "$(basename "${MD5_PATH}")"x = digestx; then
 			MD5_ARG="-a md5"
 		fi
-		md5sum=`cat "$tmpfile" | eval "$MD5_PATH $MD5_ARG" | cut -b-32`;
+		# shellcheck disable=SC2002
+		md5sum="$(cat "$tmpfile" | eval "$MD5_PATH $MD5_ARG" | cut -b-32)";
 		if test "$QUIET" = "n";then
 			echo "MD5: $md5sum"
 		fi
@@ -587,18 +591,19 @@ if test "$APPEND" = y; then
     filesizes="$filesizes $fsize"
     CRCsum="$CRCsum $crcsum"
     MD5sum="$MD5sum $md5sum"
-    USIZE=`expr $USIZE + $OLDUSIZE`
+    USIZE="$(expr "$USIZE" + "$OLDUSIZE")"
     # Generate the header
+    # shellcheck source=packaging/makeself/makeself-header.sh
     . "$HEADER"
     # Append the original data
-    tail -n +$OLDSKIP "$archname".bak >> "$archname"
+    tail -n +"$OLDSKIP" "$archname".bak >> "$archname"
     # Append the new data
     cat "$tmpfile" >> "$archname"
 
     chmod +x "$archname"
     rm -f "$archname".bak
     if test "$QUIET" = "n";then
-	echo Self-extractable archive \"$archname\" successfully updated.
+	echo Self-extractable archive \""$archname"\" successfully updated.
     fi
 else
     filesizes="$fsize"
@@ -606,6 +611,7 @@ else
     MD5sum="$md5sum"
 
     # Generate the header
+    # shellcheck source=packaging/makeself/makeself-header.sh
     . "$HEADER"
 
     # Append the compressed tar data after the stub
@@ -615,7 +621,7 @@ else
     cat "$tmpfile" >> "$archname"
     chmod +x "$archname"
     if test "$QUIET" = "n";then
-	echo Self-extractable archive \"$archname\" successfully created.
+	echo Self-extractable archive \""$archname"\" successfully created.
     fi
 fi
 rm -f "$tmpfile"
