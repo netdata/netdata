@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 # -------------------------------------------------------------------------------------------------
 # detect the kernel
@@ -21,9 +21,9 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
 	# Mac OS
 	OIFS="$IFS"
 	IFS=$'\n'
-	set $(sw_vers) > /dev/null
-	NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
-	VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
+	set "$(sw_vers)" > /dev/null
+	NAME=$(echo "$1" | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
+	VERSION=$(echo "$2" | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
 	ID="mac"
 	ID_LIKE="mac"
 	OS_DETECTION="sw_vers"
