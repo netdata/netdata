@@ -99,7 +99,7 @@ jobs:
     - stage: Code quality, linting, syntax, code style
 
       name: Run shellchecking on BASH
-      script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
+      script: shellcheck --format=gcc $(find . -regex '.*\.sh\(\.in\)?' -not -iwholename '*.git*')
 
       # Check if any of the C code deviates from our coding style
     - name: Check coding style
