@@ -157,7 +157,7 @@ void *syscall_publisher(void *ptr)
 
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
-    heartbeat_init(&hb)
+    heartbeat_init(&hb);
     while(!netdata_exit) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
