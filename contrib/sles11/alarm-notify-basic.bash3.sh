@@ -26,6 +26,8 @@
 #  - syslog messages by @Ferroin
 #  - all the rest is pruned :)
 
+# shellcheck source=/dev/null disable=SC2166,SC2230,SC2050,SC2155,SC2181
+
 # -----------------------------------------------------------------------------
 # testing notifications
 
@@ -115,12 +117,12 @@ docurl() {
     if [ "${debug}" = "1" ]
         then
         echo >&2 "--- BEGIN curl command ---"
-        printf >&2 "%q " ${curl} "${@}"
+        printf >&2 "%q " "${curl}" "${@}"
         echo >&2
         echo >&2 "--- END curl command ---"
 
         local out=$(mktemp /tmp/netdata-health-alarm-notify-XXXXXXXX)
-        local code=$(${curl} ${curl_options} --write-out %{http_code} --output "${out}" --silent --show-error "${@}")
+        local code=$(${curl} "${curl_options}" --write-out "%{http_code}" --output "${out}" --silent --show-error "${@}")
         local ret=$?
         echo >&2 "--- BEGIN received response ---"
         cat >&2 "${out}"
@@ -132,7 +134,7 @@ docurl() {
         return ${ret}
     fi
 
-    ${curl} ${curl_options} --write-out %{http_code} --output /dev/null --silent --show-error "${@}"
+    ${curl} "${curl_options}" --write-out "%{http_code}" --output /dev/null --silent --show-error "${@}"
     return $?
 }
 
@@ -147,7 +149,7 @@ custom_sender() {
 # -----------------------------------------------------------------------------
 
 # check for BASH v4+ (required for associative arrays)
-[ $(( ${BASH_VERSINFO[0]} )) -lt 3 ] && \
+[ $(( BASH_VERSINFO[0] )) -lt 3 ] && \
     fatal "BASH version 3 or later is required (this is ${BASH_VERSION})."
 
 # -----------------------------------------------------------------------------
@@ -172,14 +174,11 @@ family="${9}"              # the family of the chart
 status="${10}"             # the current status : REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 old_status="${11}"         # the previous status: REMOVED, UNINITIALIZED, UNDEFINED, CLEAR, WARNING, CRITICAL
 value="${12}"              # the current value of the alarm
-old_value="${13}"          # the previous value of the alarm
 src="${14}"                # the line number and file the alarm has been configured
 duration="${15}"           # the duration in seconds of the previous alarm state
 non_clear_duration="${16}" # the total duration in seconds this is/was non-clear
-units="${17}"              # the units of the value
 info="${18}"               # a short description of the alarm
 value_string="${19}"       # friendly value (with units)
-old_value_string="${20}"   # friendly old value (with units)
 
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
@@ -206,12 +205,6 @@ fi
 
 # -----------------------------------------------------------------------------
 # load configuration
-
-# By default fetch images from the global public registry.
-# This is required by default, since all notification methods need to download
-# images via the Internet, and private registries might not be reachable.
-# This can be overwritten at the configuration file.
-images_base_url="https://registry.my-netdata.io"
 
 # curl options to use
 curl_options=
@@ -245,12 +238,13 @@ fi
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
 # should be correct for almost all modern UNIX systems.
-if [ -z ${EMAIL_CHARSET} ]
+if [ -z "${EMAIL_CHARSET}" ]
     then
     EMAIL_CHARSET="UTF-8"
 fi
 
 # disable if role = silent or disabled
+# shellcheck disable=SC2154
 if [[ "${role}" = "silent" || "${role}" = "disabled" ]]; then
     SEND_EMAIL="NO"
     SEND_SYSLOG="NO"
@@ -301,9 +295,9 @@ fi
 # -----------------------------------------------------------------------------
 # get the date the alarm happened
 
-date=$(date --date=@${when} "${DATE_FORMAT}" 2>/dev/null)
+date=$(date --date=@"${when}" "${DATE_FORMAT}" 2>/dev/null)
 [ -z "${date}" ] && date=$(date "${DATE_FORMAT}" 2>/dev/null)
-[ -z "${date}" ] && date=$(date --date=@${when} 2>/dev/null)
+[ -z "${date}" ] && date=$(date --date=@"${when}" 2>/dev/null)
 [ -z "${date}" ] && date=$(date 2>/dev/null)
 
 # -----------------------------------------------------------------------------
@@ -390,11 +384,11 @@ duration4human() {
 # email sender
 
 send_email() {
-    local ret= opts=
+    local ret='' opts=''
     if [[ "${SEND_EMAIL}" == "YES" ]]
         then
 
-        if [[ ! -z "${EMAIL_SENDER}" ]]
+        if [[ -n "${EMAIL_SENDER}" ]]
             then
             if [[ "${EMAIL_SENDER}" =~ \".*\"\ \<.*\> ]]
                 then
@@ -417,12 +411,12 @@ send_email() {
         if [[ "${debug}" = "1" ]]
             then
             echo >&2 "--- BEGIN sendmail command ---"
-            printf >&2 "%q " "${sendmail}" -t ${opts}
+            printf >&2 "%q " "${sendmail}" -t "${opts}"
             echo >&2
             echo >&2 "--- END sendmail command ---"
         fi
 
-        "${sendmail}" -t ${opts}
+        "${sendmail}" -t "${opts}"
         ret=$?
 
         if [ ${ret} -eq 0 ]
@@ -463,31 +457,31 @@ send_syslog() {
         temp1=''
         temp2=''
 
-        prefix=$(echo ${target} | cut -d '/' -f 2)
-        temp1=$(echo ${target} | cut -d '/' -f 1)
+        prefix=$(echo "${target}" | cut -d '/' -f 2)
+        temp1=$(echo "${target}" | cut -d '/' -f 1)
 
-        if [[ ${prefix} != ${temp1} ]] ; then
-            if (echo ${temp1} | grep -q '@' ) ; then
-                temp2=$(echo ${temp1} | cut -d '@' -f 1)
-                host=$(echo ${temp1} | cut -d '@' -f 2)
+        if [[ "${prefix}" != "${temp1}" ]] ; then
+            if (echo "${temp1}" | grep -q '@' ) ; then
+                temp2=$(echo "${temp1}" | cut -d '@' -f 1)
+                host=$(echo "${temp1}" | cut -d '@' -f 2)
 
-                if [ ${temp2} != ${host} ] ; then
-                    priority=${temp2}
+                if [ "${temp2}" != "${host}" ] ; then
+                    priority="${temp2}"
                 fi
 
-                port=$(echo ${host} | rev | cut -d ':' -f 1 | rev)
+                port=$(echo "${host}" | rev | cut -d ':' -f 1 | rev)
 
-                if ( echo ${host} | grep -E -q '\[.*\]' ) ; then
-                    if ( echo ${port} | grep -q ']' ) ; then
+                if ( echo "${host}" | grep -E -q '\[.*\]' ) ; then
+                    if ( echo "${port}" | grep -q ']' ) ; then
                         port=''
                     else
-                        host=$(echo ${host} | rev | cut -d ':' -f 2- | rev)
+                        host=$(echo "${host}" | rev | cut -d ':' -f 2- | rev)
                     fi
                 else
-                    if [ ${port} = ${host} ] ; then
+                    if [ "${port}" = "${host}" ] ; then
                         port=''
                     else
-                        host=$(echo ${host} | cut -d ':' -f 1)
+                        host=$(echo "${host}" | cut -d ':' -f 1)
                     fi
                 fi
             else
@@ -499,14 +493,14 @@ send_syslog() {
 
         message="${prefix} ${status}: ${chart} ${value_string}"
 
-        if [ ${host} ] ; then
+        if [ "${host}" ] ; then
             logger_options="${logger_options} -n ${host}"
-            if [ ${port} ] ; then
+            if [ "${port}" ] ; then
                 logger_options="${logger_options} -P ${port}"
             fi
         fi
 
-        ${logger} -p ${priority} ${logger_options} "${message}"
+        ${logger} -p "${priority}" "${logger_options}" "${message}"
     done
 
     return $?
@@ -527,8 +521,8 @@ goto_url="${NETDATA_REGISTRY_URL}/goto-host-from-alarm.html?host=${url_host}&cha
 severity="${status}"
 
 # the time the alarm was raised
-duration4human ${duration} >/dev/null; duration_txt="${REPLY}"
-duration4human ${non_clear_duration} >/dev/null; non_clear_duration_txt="${REPLY}"
+duration4human "${duration}" >/dev/null; duration_txt="${REPLY}"
+duration4human "${non_clear_duration}" >/dev/null; non_clear_duration_txt="${REPLY}"
 raised_for="(was ${old_status} for ${duration_txt})"
 
 # the key status message
@@ -540,34 +534,10 @@ color="grey"
 # the alarm value
 alarm="${name//_/ } = ${value_string}"
 
-# the image of the alarm
-image="${images_base_url}/images/seo-performance-128.png"
-
-# prepare the title based on status
-case "${status}" in
-	CRITICAL)
-        image="${images_base_url}/images/alert-128-red.png"
-        status_message="is critical"
-        color="#ca414b"
-        ;;
-
-    WARNING)
-        image="${images_base_url}/images/alert-128-orange.png"
-        status_message="needs attention"
-        color="#ffc107"
-		;;
-
-	CLEAR)
-        image="${images_base_url}/images/check-mark-2-128-green.png"
-    	status_message="recovered"
-		color="#77ca6d"
-		;;
-esac
-
 if [ "${status}" = "CLEAR" ]
 then
     severity="Recovered from ${old_status}"
-    if [ ${non_clear_duration} -gt ${duration} ]
+    if [ "${non_clear_duration}" -gt "${duration}" ]
     then
         raised_for="(alarm was raised for ${non_clear_duration_txt})"
     fi
@@ -579,7 +549,7 @@ then
 elif [ "${old_status}" = "WARNING" -a "${status}" = "CRITICAL" ]
 then
     severity="Escalated to ${status}"
-    if [ ${non_clear_duration} -gt ${duration} ]
+    if [ "${non_clear_duration}" -gt "${duration}" ]
     then
         raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
@@ -587,7 +557,7 @@ then
 elif [ "${old_status}" = "CRITICAL" -a "${status}" = "WARNING" ]
 then
     severity="Demoted to ${status}"
-    if [ ${non_clear_duration} -gt ${duration} ]
+    if [ "${non_clear_duration}" -gt "${duration}" ]
     then
         raised_for="(alarm is raised for ${non_clear_duration_txt})"
     fi
@@ -598,10 +568,10 @@ fi
 
 # prepare HTML versions of elements
 info_html=
-[ ! -z "${info}" ] && info_html=" <small><br/>${info}</small>"
+[ -n "${info}" ] && info_html=" <small><br/>${info}</small>"
 
 raised_for_html=
-[ ! -z "${raised_for}" ] && raised_for_html="<br/><small>${raised_for}</small>"
+[ -n "${raised_for}" ] && raised_for_html="<br/><small>${raised_for}</small>"
 
 
 # -----------------------------------------------------------------------------
