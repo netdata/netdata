@@ -353,6 +353,18 @@ int syscall_load_libraries()
     return 0;
 }
 
+int syscall_load_ebpf() {
+    char lpath[4096];
+
+    build_complete_path(lpath, 4096, "netdata_ebpf_syscall.o" );
+    if (load_bpf_file(lpath) ) {
+        error("[SYSCALL] Cannot load program: %s.", lpath);
+        return -1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -368,20 +380,26 @@ int main(int argc, char **argv)
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+        error("[NETWORK VIEWER] setrlimit(RLIMIT_MEMLOCK)");
+        return 1;
+    }
+
     //Get environment variables
     user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
 
     if(syscall_load_libraries()) {
-        error("[SYSCALL] Cannot load eBPF program.");
+        error("[SYSCALL] Cannot load library.");
         int_exit(2);
     }
 
     signal(SIGINT, int_exit);
     signal(SIGTERM, int_exit);
 
-    if (load_bpf_file("netdata_ebpf_syscall.o")) {
+    if (syscall_load_ebpf()) {
         int_exit(3);
     }
 
