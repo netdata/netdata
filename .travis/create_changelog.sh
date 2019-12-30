@@ -43,4 +43,4 @@ docker run -it -v "$(pwd)":/project markmandel/github-changelog-generator:latest
 	--no-issues \
 	--exclude-labels "stale,duplicate,question,invalid,wontfix,discussion,no changelog" \
 	--max-issues 500 \
-	--bug-labels IGNOREBUGS ${OPTS}
+	--bug-labels IGNOREBUGS "${OPTS}"

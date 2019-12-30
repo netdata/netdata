@@ -16,6 +16,7 @@ fi
 echo "Running changelog generation mechanism since ${LATEST_RELEASE_VERSION}"
 
 echo "Entering ${UNPACKAGED_NETDATA_PATH}"
+# shellcheck disable=SC2164
 cd "${UNPACKAGED_NETDATA_PATH}"
 
 echo "Linking debian -> contrib/debian"

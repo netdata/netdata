@@ -1,4 +1,5 @@
 # no-shebang-needed-its-a-library
+# shellcheck shell=bash
 #
 # Utility functions for packaging in travis CI
 #

@@ -49,12 +49,12 @@ if [ -z "${DEPLOY_REPO}" ]; then
 	exit 1
 fi
 
-if [ -z ${PKG_CLOUD_TOKEN} ]; then
+if [ -z "${PKG_CLOUD_TOKEN}" ]; then
 	echo "No PKG_CLOUD_TOKEN variable found"
 	exit 1
 fi
 
-if [ -z ${PACKAGE_CLOUD_RETENTION_DAYS} ]; then
+if [ -z "${PACKAGE_CLOUD_RETENTION_DAYS}" ]; then
 	echo "No PACKAGE_CLOUD_RETENTION_DAYS variable found"
 	exit 1
 fi
