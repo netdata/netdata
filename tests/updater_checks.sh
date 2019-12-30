@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 #
 # Wrapper script that installs the required dependencies
 # for the BATS script to run successfully
@@ -25,9 +25,9 @@ blind_arch_grep_install() {
 }
 blind_arch_grep_install || echo "Workaround failed, proceed as usual"
 
-running_os="$(cat /etc/os-release |grep '^ID=' | cut -d'=' -f2 | sed -e 's/"//g')"
+running_os="$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | sed -e 's/"//g')"
 # Special case for older centos
-[[ -f /etc/centos-release ]] && [[ -z "${running_os}" ]] && running_os="$(cat /etc/centos-release | grep "CentOS release 6" | cut -d' ' -f 1)"
+[[ -f /etc/centos-release ]] && [[ -z "${running_os}" ]] && running_os="$(grep "CentOS release 6" /etc/centos-release | cut -d' ' -f 1)"
 
 case "${running_os}" in
 "centos"|"fedora"|"CentOS")
