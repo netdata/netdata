@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck shell=bash disable=SC2154
+# shellcheck shell=bash disable=SC2154,SC2003
 cat << EOF  > "$archname"
 #!/bin/sh
 # This script was generated using Makeself $MS_VERSION

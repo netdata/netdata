@@ -23,10 +23,10 @@ post_message() {
 			curl -X POST --data-urlencode "payload={\"channel\": \"${SLACK_CHANNEL}\", \"username\": \"${SLACK_BOT_NAME}\", \"text\": \"${MESSAGE}\", \"icon_emoji\": \":space_invader:\"}" ${SLACK_NOTIFY_WEBHOOK_URL}
 			;;
 		"TRAVIS_MESSAGE")
-			EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}', on '${TRAVIS_OS_NAME}'"
-			if [ "${TRAVIS_EVENT_TYPE}" == "pull_request" ]; then
-				EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}' #${TRAVIS_PULL_REQUEST}, on '${TRAVIS_OS_NAME}' "
-			fi
+			#EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}', on '${TRAVIS_OS_NAME}'"
+			#if [ "${TRAVIS_EVENT_TYPE}" == "pull_request" ]; then
+			#	EVENT_LINE="${TRAVIS_JOB_NUMBER}: Event type '${TRAVIS_EVENT_TYPE}' #${TRAVIS_PULL_REQUEST}, on '${TRAVIS_OS_NAME}' "
+			#fi
 
 			if [ -n "${CUSTOM_CHANNEL}" ]; then
 				echo "Sending travis message to custom channel ${CUSTOM_CHANNEL}"

@@ -74,7 +74,7 @@
 # This software is released under the terms of the GNU GPL version 2 and above
 # Please read the license at http://www.gnu.org/copyleft/gpl.html
 #
-# shellcheck disable=SC2230
+# shellcheck disable=SC2230,SC2003
 
 MS_VERSION=2.3.1
 MS_COMMAND="$0"

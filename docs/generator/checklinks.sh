@@ -23,7 +23,6 @@ printhelp () {
 	By default, nothing is actually checked. The following options tell it what to check:
 	 -a Check all link types
 	 -w Check wiki links (and just warn if you see one)
-	 -b Check absolute links to the Netdata repo (and change them to relative). Only checks links to https://github.com/netdata/netdata/????/master*
 	 -l Check relative links to the Netdata repo (and replace them with links that the html static site can live with, under docs/generator/src only)
 	 -e Check external links, outside the wiki or the repo (useless without adding the -u option, to verify that they're not broken)
 	"
@@ -265,7 +264,6 @@ VERBOSE=0
 RECURSIVE=0
 EXECUTE=0
 CHKWIKI=0
-CHKABSOLUTE=0
 CHKEXTERNAL=0
 CHKRELATIVE=0
 while getopts :f:rxuvwbela option
@@ -289,9 +287,6 @@ do
 	w)
 		CHKWIKI=1
 		;;
-	b)
-		CHKABSOLUTE=1
-		;;
 	e)
 		CHKEXTERNAL=1
 		;;
@@ -300,7 +295,6 @@ do
 		;;	
 	a)
 		CHKWIKI=1
-		CHKABSOLUTE=1
 		CHKEXTERNAL=1
 		CHKRELATIVE=1
 		;;

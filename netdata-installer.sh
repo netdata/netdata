@@ -495,6 +495,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 	if [ "${BASH_VERSINFO[0]}" -ge "4" ]; then
 		declare -A configs_signatures=()
 		if [ -f "configs.signatures" ]; then
+			# shellcheck disable=1091
 			source "configs.signatures" || echo >&2 "ERROR: Failed to load configs.signatures !"
 		fi
 	fi
