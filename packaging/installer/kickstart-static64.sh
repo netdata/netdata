@@ -161,9 +161,11 @@ safe_sha256sum() {
 	# Within the contexct of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum "$*"
+		# shellcheck disable=SC2068
+		sha256sum $@
 	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 "$*"
+		# shellcheck disable=SC2068
+		shasum -a 256 $@
 	else
 		fatal "I could not find a suitable checksum binary to use"
 	fi

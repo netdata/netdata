@@ -31,9 +31,11 @@ safe_sha256sum() {
 	# Within the contexct of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum "$*"
+		# shellcheck disable=SC2068
+		sha256sum $@
 	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 "$*"
+		# shellcheck disable=SC2068
+		shasum -a 256 $@
 	else
 		fatal "I could not find a suitable checksum binary to use"
 	fi
@@ -114,7 +116,7 @@ update() {
 			if ! grep netdata-latest.tar.gz sha256sum.txt | safe_sha256sum -c - >&3 2>&3; then
 				fatal "Tarball checksum validation failed. Stopping netdata upgrade and leaving tarball in ${tmpdir}"
 			fi
-			NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2>/dev/null| cut -d' ' -f1)"
+			NEW_CHECKSUM="$(safe_sha256sum netdata-latest.tar.gz 2>/dev/null | cut -d ' ' -f1)"
 			tar -xf netdata-latest.tar.gz >&3 2>&3
 			rm netdata-latest.tar.gz >&3 2>&3
 			cd netdata-*
