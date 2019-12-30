@@ -309,7 +309,7 @@ int syscall_load_libraries()
     char lpath[4096];
 
     build_complete_path(lpath, 4096, "libnetdata_ebpf.so");
-    libnetdatanv = dlopen("./libnetdata_ebpf.so", RTLD_LAZY);
+    libnetdatanv = dlopen(lpath, RTLD_LAZY);
     if (!libnetdatanv)
     {
         error("[SYSCALL] Cannot load %s.", lpath);
@@ -348,8 +348,6 @@ int syscall_load_libraries()
             fputs(error, stderr);
             return -1;
         }
-
-        fprintf(stdout,"All symbols loaded with success\n");
     }
 
     return 0;
