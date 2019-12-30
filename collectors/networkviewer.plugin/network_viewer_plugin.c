@@ -1172,11 +1172,14 @@ int main(int argc, char **argv) {
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
 
+    /*
+     * Sometimes this call raises an error when software is called from Netdata, it is necessary to investigate
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         error("[NETWORK VIEWER] setrlimit(RLIMIT_MEMLOCK)");
         return 1;
     }
+     */
 
     if (argc) {
         update_every = (int)strtol(argv[1], NULL, 10);
