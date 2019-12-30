@@ -59,6 +59,7 @@ run_failed() {
 
 ESCAPED_PRINT_METHOD=
 printf "%q " test >/dev/null 2>&1
+# shellcheck disable=SC2181
 [ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
 escaped_print() {
 	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
@@ -85,9 +86,11 @@ run() {
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	printf >>"${run_logfile}" "${info}"
-	escaped_print >>"${run_logfile}" "${@}"
-	printf >>"${run_logfile}" " ... "
+	{
+		printf "${info}"
+		escaped_print "${@}"
+		printf " ... "
+	} >> "${run_logfile}"
 
 	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
 	escaped_print >&2 "${@}"
@@ -97,10 +100,10 @@ run() {
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		run_failed
+		run_failed "${@}"
 		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
 	else
-		run_ok
+		run_ok "${@}"
 		printf >>"${run_logfile}" "OK\n"
 	fi
 
@@ -158,9 +161,9 @@ safe_sha256sum() {
 	# Within the contexct of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum $@
+		sha256sum "$@"
 	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 $@
+		shasum -a 256 "$@"
 	else
 		fatal "I could not find a suitable checksum binary to use"
 	fi
@@ -226,6 +229,7 @@ done
 
 # ---------------------------------------------------------------------------------------------------------------------
 TMPDIR=$(create_tmp_directory)
+# shellcheck disable=SC2164
 cd "${TMPDIR}"
 
 if [ -z "${NETDATA_LOCAL_TARBALL_OVERRIDE}" ]; then

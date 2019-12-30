@@ -31,9 +31,9 @@ safe_sha256sum() {
 	# Within the contexct of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum $@
+		sha256sum "$@"
 	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 $@
+		shasum -a 256 "$@"
 	else
 		fatal "I could not find a suitable checksum binary to use"
 	fi
@@ -76,7 +76,7 @@ download() {
 set_tarball_urls() {
 	local extension="tar.gz"
 
-	if [ ! -z "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
+	if [ -n "${NETDATA_LOCAL_TARBAL_OVERRIDE}" ]; then
 		info "Not fetching remote tarballs, local override was given"
 		return
 	fi
@@ -123,7 +123,7 @@ update() {
 	else
 		info "!!Local tarball override detected!! - Entering directory ${NETDATA_LOCAL_TARBAL_OVERRIDE} for installation, not downloading anything"
 		RUN_INSTALLER=1
-		cd ${NETDATA_LOCAL_TARBAL_OVERRIDE}
+		cd "${NETDATA_LOCAL_TARBAL_OVERRIDE}"
 	fi
 
 

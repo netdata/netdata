@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#shellcheck disable=SC2181
+#shellcheck disable=SC2181,2059
 #
 # This is the netdata uninstaller script
 #
@@ -128,9 +128,11 @@ run() {
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	printf >>"${run_logfile}" "${info}"
-	escaped_print >>"${run_logfile}" "${@}"
-	printf >>"${run_logfile}" " ... "
+	{
+		printf "${info}"
+		escaped_print "${@}"
+		printf " ... "
+	} >> "${run_logfile}"
 
 	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
 	escaped_print >&2 "${@}"
@@ -140,10 +142,10 @@ run() {
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		run_failed
+		run_failed "${*}"
 		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
 	else
-		run_ok
+		run_ok "${*}"
 		printf >>"${run_logfile}" "OK\n"
 	fi
 
@@ -162,7 +164,7 @@ portable_del_group() {
 		  run groupdel "${groupname}" && return 0
 		else
 		  echo >&2 "Group ${groupname} already removed in a previous step."
-		  run_ok
+		  run_ok "${*}"
 		fi
 	fi
 

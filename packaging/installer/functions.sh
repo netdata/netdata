@@ -1,6 +1,7 @@
 # no shebang necessary - this is a library to be sourced
 # SPDX-License-Identifier: GPL-3.0-or-later
 # shellcheck disable=SC1091,SC1117,SC2002,SC2004,SC2034,SC2046,SC2059,SC2086,SC2129,SC2148,SC2154,SC2155,SC2162,SC2166,SC2181,SC2193
+# shellcheck shell=bash
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
@@ -539,7 +540,7 @@ restart_netdata() {
 
 	if [ ${started} -eq 0 ]; then
 		# still not started... another forced attempt, just run the binary
-		echo >&2 "Netdata service still not started, attempting another forced restart by running '${netdata} ${@}'"
+		echo >&2 "Netdata service still not started, attempting another forced restart by running '${netdata} ${*}'"
 		run stop_all_netdata
 		run "${netdata}" "${@}"
 		return $?
@@ -736,9 +737,9 @@ safe_sha256sum() {
 	# Within the contexct of the installer, we only use -c option that is common between the two commands
 	# We will have to reconsider if we start non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum $@
+		sha256sum "$@"
 	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 $@
+		shasum -a 256 "$@"
 	else
 		fatal "I could not find a suitable checksum binary to use"
 	fi
