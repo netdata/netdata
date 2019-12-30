@@ -274,7 +274,7 @@ CHART mysql_$x.files_rate '' "mysql Opened Files Rate" "files/s" files mysql.fil
 DIMENSION Opened_files files incremental 1 1
 EOF
 
-		if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]; then
+		if [ -n "${mysql_data[Binlog_stmt_cache_disk_use]}" ]; then
 			cat <<EOF
 CHART mysql_$x.binlog_stmt_cache '' "mysql Binlog Statement Cache" "statements/s" binlog mysql.binlog_stmt_cache line $((mysql_priority + 50)) $mysql_update_every
 DIMENSION Binlog_stmt_cache_disk_use disk incremental 1 1
@@ -282,7 +282,7 @@ DIMENSION Binlog_stmt_cache_use all incremental 1 1
 EOF
 		fi
 
-		if [ ! -z "${mysql_data[Connection_errors_accept]}" ]; then
+		if [ -n "${mysql_data[Connection_errors_accept]}" ]; then
 			cat <<EOF
 CHART mysql_$x.connection_errors '' "mysql Connection Errors" "connections/s" connections mysql.connection_errors line $((mysql_priority + 51)) $mysql_update_every
 DIMENSION Connection_errors_accept accept incremental 1 1
@@ -483,7 +483,7 @@ SET Opened_files = ${mysql_data[Opened_files]}
 END
 VALUESEOF
 
-		if [ ! -z "${mysql_data[Binlog_stmt_cache_disk_use]}" ]; then
+		if [ -n "${mysql_data[Binlog_stmt_cache_disk_use]}" ]; then
 			cat <<VALUESEOF
 BEGIN mysql_$x.binlog_stmt_cache $1
 SET Binlog_stmt_cache_disk_use = ${mysql_data[Binlog_stmt_cache_disk_use]}
@@ -492,7 +492,7 @@ END
 VALUESEOF
 		fi
 
-		if [ ! -z "${mysql_data[Connection_errors_accept]}" ]; then
+		if [ -n "${mysql_data[Connection_errors_accept]}" ]; then
 			cat <<VALUESEOF
 BEGIN mysql_$x.connection_errors $1
 SET Connection_errors_accept = ${mysql_data[Connection_errors_accept]}

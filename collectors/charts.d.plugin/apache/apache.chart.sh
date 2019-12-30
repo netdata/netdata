@@ -82,10 +82,10 @@ apache_detect() {
 	[ -z "${apache_key_idleworkers}" ] && error "missing 'IdleWorkers' from apache server: ${*}" && return 1
 	[ -z "${apache_key_scoreboard}" ] && error "missing 'Scoreboard' from apache server: ${*}" && return 1
 
-	if [ ! -z "${apache_key_connstotal}" ] &&
-		[ ! -z "${apache_key_connsasyncwriting}" ] &&
-		[ ! -z "${apache_key_connsasynckeepalive}" ] &&
-		[ ! -z "${apache_key_connsasyncclosing}" ]; then
+	if [ -n "${apache_key_connstotal}" ] &&
+		[ -n "${apache_key_connsasyncwriting}" ] &&
+		[ -n "${apache_key_connsasynckeepalive}" ] &&
+		[ -n "${apache_key_connsasyncclosing}" ]; then
 		apache_has_conns=1
 	else
 		apache_has_conns=0

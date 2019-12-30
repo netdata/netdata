@@ -56,7 +56,7 @@ nut_check() {
 		nut_get "$x" >/dev/null
 		# shellcheck disable=SC2181
 		if [ $? -eq 0 ]; then
-			if [ ! -z "${nut_names[${x}]}" ]; then
+			if [ -n "${nut_names[${x}]}" ]; then
 				nut_ids[$x]="$(fixid "${nut_names[${x}]}")"
 			else
 				nut_ids[$x]="$(fixid "$x")"

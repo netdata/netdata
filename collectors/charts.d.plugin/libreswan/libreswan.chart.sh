@@ -104,7 +104,7 @@ libreswan_create_one() {
 
 	name="${libreswan_connected_tunnels[${n}]}"
 
-	[ ! -z "${libreswan_tunnel_charts[${name}]}" ] && return 0
+	[ -n "${libreswan_tunnel_charts[${name}]}" ] && return 0
 
 	libreswan_tunnel_charts[${name}]="$(fixid "${name}")"
 

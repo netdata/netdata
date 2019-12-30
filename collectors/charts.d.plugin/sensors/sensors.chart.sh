@@ -111,11 +111,11 @@ sensors_create() {
 		name=
 
 		[ -h "$path/device" ] && device=$(readlink -f "$path/device")
-		[ ! -z "$device" ] && device=$(basename "$device")
+		[ -n "$device" ] && device=$(basename "$device")
 		[ -z "$device" ] && device="$dir"
 
 		[ -h "$path/subsystem" ] && subsystem=$(readlink -f "$path/subsystem")
-		[ ! -z "$subsystem" ] && subsystem=$(basename "$subsystem")
+		[ -n "$subsystem" ] && subsystem=$(basename "$subsystem")
 		[ -z "$subsystem" ] && subsystem="$dir"
 
 		[ -f "$path/name" ] && name=$(cat "$path/name")

@@ -28,7 +28,7 @@ squid_autodetect() {
 	for port in 3128 8080; do
 		for url in "cache_object://$host:$port/counters" "/squid-internal-mgr/counters"; do
 			x=$(squid_get_stats_internal "$host" "$port" "$url" | grep client_http.requests)
-			if [ ! -z "$x" ]; then
+			if [ -n "$x" ]; then
 				squid_host="$host"
 				squid_port="$port"
 				squid_url="$url"
