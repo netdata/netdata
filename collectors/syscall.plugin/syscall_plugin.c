@@ -373,12 +373,6 @@ int main(int argc, char **argv)
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
 
-    struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-        perror("setrlimit(RLIMIT_MEMLOCK)");
-        int_exit(1);
-    }
-
     if(syscall_load_libraries()) {
         error("[SYSCALL] Cannot load eBPF program.");
         int_exit(2);
