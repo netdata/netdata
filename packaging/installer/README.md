@@ -52,7 +52,7 @@ To learn more about the pros and cons of using *nightly* vs. *stable* releases, 
 Verify the integrity of the script with this:
 
 ```bash
-[ "6662041af873a0c3a1cdfc9e5830ef41" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "7278ce1688b16dd3156613971726ba01" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 _It should print `OK, VALID` if the script is the one we ship._
@@ -116,7 +116,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "ee2b1ba4ee3fa07f4019570cbfd73398" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "cb7974aaa6241b084af1887a5834ce67" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
