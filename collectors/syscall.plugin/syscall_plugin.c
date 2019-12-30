@@ -54,6 +54,8 @@ netdata_syscall_stat_t *file_syscall = NULL;
 
 netdata_publish_syscall_t *publish_file = NULL;
 
+static int update_every = 1;
+
 static void int_exit(int sig)
 {
     (void)sig;
@@ -153,8 +155,12 @@ void *syscall_publisher(void *ptr)
     (void)ptr;
     netdata_create_charts();
 
+    usec_t step = update_every * USEC_PER_SEC;
+    heartbeat_t hb;
+    heartbeat_init(&hb)
     while(!netdata_exit) {
-        sleep(1);
+        usec_t dt = heartbeat_next(&hb, step);
+        (void)dt;
 
         netdata_publish_data();
 
@@ -379,6 +385,10 @@ int main(int argc, char **argv)
     // set errors flood protection to 100 logs per hour
     error_log_errors_per_period = 100;
     error_log_throttle_period = 3600;
+
+    if (argc > 1) {
+        update_every = (int)strtol(argv[1], NULL, 10);
+    }
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
