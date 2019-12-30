@@ -19,14 +19,14 @@ VERSION="$1"
 declare -A ARCH_MAP
 ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
-[ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[@]}" # Use default ARCHS unless ARCHS are externally provided
+[ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[*]}" # Use default ARCHS unless ARCHS are externally provided
 DOCKER_CMD="docker --config ${WORKDIR}"
 GIT_MAIL=${GIT_MAIL:-"bot@netdata.cloud"}
 GIT_USER=${GIT_USER:-"netdatabot"}
 
-if [ -z ${REPOSITORY} ]; then
+if [ -z "${REPOSITORY}" ]; then
 	REPOSITORY="${TRAVIS_REPO_SLUG}"
-	if [ -z ${REPOSITORY} ]; then
+	if [ -z "${REPOSITORY}" ]; then
 		echo "REPOSITORY not set, publish cannot proceed"
 		exit 1
 	else
@@ -35,8 +35,8 @@ if [ -z ${REPOSITORY} ]; then
 fi
 
 # When development mode is set, build on DEVEL_ARCHS
-if [ ! -z ${DEVEL+x} ]; then
-    declare -a ARCHS=(${DEVEL_ARCHS[@]})
+if [ -n "${DEVEL+x}" ]; then
+    ARCHS="${DEVEL_ARCHS[*]}"
 fi
 
 # Ensure there is a version, the most appropriate one
@@ -49,7 +49,8 @@ fi
 MANIFEST_LIST="${REPOSITORY}:${VERSION}"
 
 # There is no reason to continue if we cannot log in to docker hub
-if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PWD+x} ]; then
+# shellcheck disable=SC2153
+if [ -z "${DOCKER_USERNAME+x}" ] || [ -z "${DOCKER_PWD+x}" ]; then
     echo "No docker hub username or password found, aborting without publishing"
     exit 1
 fi
@@ -57,7 +58,7 @@ fi
 # If we are not in netdata git repo, at the top level directory, fail
 TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel)")
 CWD=$(git rev-parse --show-cdup)
-if [ ! -z $CWD ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
+if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
     echo "Run as ./packaging/docker/$(basename "$0") from top level directory of netdata git repository"
     echo "Docker build process aborted"
     exit 1
@@ -76,7 +77,7 @@ echo '{"experimental":"enabled"}' > "${WORKDIR}"/config.json
 echo "$DOCKER_PWD" | $DOCKER_CMD login -u "$DOCKER_USERNAME" --password-stdin
 
 # Push images to registry
-for ARCH in ${ARCHS[@]}; do
+for ARCH in ${ARCHS}; do
     TAG="${MANIFEST_LIST}-${ARCH}"
     echo "Publishing image ${TAG}.."
     $DOCKER_CMD push "${TAG}" &
@@ -88,7 +89,8 @@ wait
 
 # Recreate docker manifest list
 echo "Getting tag list for version '${VERSION}'.."
-TAGS=($(curl -s https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/tags/ | jq -r '.results[]["name"]' | grep "^${VERSION}-"))
+declare -a TAGS
+read -r -a TAGS < <(curl -s "https://registry.hub.docker.com/v2/repositories/${REPOSITORY}/tags/" | jq -r '.results[]["name"]' | grep "^${VERSION}-")
 
 echo "Creating manifest list.."
 $DOCKER_CMD manifest create --amend "${MANIFEST_LIST}" "${TAGS[@]/#/${REPOSITORY}:}"

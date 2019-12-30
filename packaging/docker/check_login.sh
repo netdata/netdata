@@ -17,6 +17,7 @@ fi
 DOCKER_CMD="docker "
 
 # There is no reason to continue if we cannot log in to docker hub
+# shellcheck disable=SC2153
 if [ -z ${DOCKER_USERNAME+x} ] || [ -z ${DOCKER_PWD+x} ]; then
     echo "No docker hub username or password found, aborting without publishing"
     exit 1
