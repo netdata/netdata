@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-. $(dirname "${0}")/../functions.sh "${@}" || exit 1
+# shellcheck source=packaging/makeself/functions.sh
+. "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
 run cd "${NETDATA_SOURCE_PATH}" || exit 1
 
@@ -81,7 +82,7 @@ run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
     "${NETDATA_INSTALL_PATH}.gz.run" \
     "netdata, the real-time performance and health monitoring system" \
     ./system/post-installer.sh \
-    ${NULL}
+
 
 run rm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp"
 
