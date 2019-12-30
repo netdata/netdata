@@ -99,10 +99,16 @@ static void netdata_create_charts() {
 static void netdata_update_publish(netdata_publish_syscall_t *publish, netdata_syscall_stat_t *input) {
     while(publish) {
         if(input->call != publish->pcall) {
-            publish->ncall = (input->call - publish->pcall);
+            //This condition happens to avoid initial values with dimensions higher than normal values.
+            if(publish->pcall) {
+                publish->ncall = (input->call - publish->pcall);
+                publish->nbyte = (input->bytes - publish->nbyte);
+            } else {
+                publish->ncall = input->call;
+                publish->nbyte = input->bytes;
+            }
             publish->pcall = input->call;
 
-            publish->nbyte = (input->bytes - publish->nbyte);
             publish->pbyte = input->bytes;
         } else {
             publish->ncall = 0;
