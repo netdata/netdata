@@ -1,5 +1,5 @@
 #!/bin/bash
-# shellcheck disable=SC2181
+# shellcheck disable=SC2181,SC2039,SC2059,SC2086,SC2164,SC2103,SC2094
 
 # Doc link checker
 # Validates and tries to fix all links that will cause issues either in the repo, or in the html site
@@ -213,7 +213,7 @@ ck_netdata_relative () {
 			;;
 		esac
 		
-		if [[ ! -z $s ]] ; then
+		if [[ -n $s ]] ; then
 			srch=$(echo "$rlnk" | sed 's/\//\\\//g')
 			rplc=$(echo "$s" | sed 's/\//\\\//g')
 			fix "sed -i 's/($srch)/($rplc)/g' $f"
@@ -319,9 +319,9 @@ if [ -z "${file}" ] ; then
 		exit 1
 	fi
 	cd ${DOCS_DIR}
-	for f in $(find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print); do
+	while IFS= read -r -d '' f; do
 		checklinks "$f"
-	done
+	done < <(find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print)
 	cd -
 else
 	if [ $RECURSIVE -eq 1 ] ; then 
