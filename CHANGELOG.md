@@ -220,7 +220,6 @@
 - Improve documentation for the SNMP collector [\#6915](https://github.com/netdata/netdata/pull/6915) ([cakrit](https://github.com/cakrit))
 - netdata/ci: nits and fixes around package release workflow [\#6914](https://github.com/netdata/netdata/pull/6914) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Detect deadlock in dbengine page cache [\#6911](https://github.com/netdata/netdata/pull/6911) ([mfundul](https://github.com/mfundul))
-- Correct read length of silencers file [\#6909](https://github.com/netdata/netdata/pull/6909) ([cakrit](https://github.com/cakrit))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
