@@ -128,20 +128,20 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
 }
 
 static void netdata_create_charts() {
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV6, "TCP request size to specific port.", "kilobits/s", "TCP", 1000);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV6, "TCP receive size from specific port.", "kilobits/s", "TCP", 999);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV6, "TCP request size to specific port.", "bytes/s", "TCP", 1000);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV6, "TCP receive size from specific port.", "bytes/s", "TCP", 999);
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV6, "TCP active connections per port.", "active connections", "TCP", 998);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV6, "UDP request size to specific port.", "kilobits/s", "UDP", 997);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV6, "UDP receive size from specific port.", "kilobits/s", "UDP", 996);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV6, "UDP request size to specific port.", "bytes/s", "UDP", 997);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV6, "UDP receive size from specific port.", "bytes/s", "UDP", 996);
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV6, "UDP active connections per port.", "active connections", "UDP", 995);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV4, "TCP request size to specific port.", "kilobits/s", "TCP", 994);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV4, "TCP receive size from specific port.", "kilobits/s", "TCP", 993);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_OUTBOUND_IPV4, "TCP request size to specific port.", "bytes/s", "TCP", 994);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_INBOUND_IPV4, "TCP receive size from specific port.", "bytes/s", "TCP", 993);
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_TCP_CONNECTION_OUTBOUND_IPV4, "TCP active connections per port.", "active connections", "TCP", 992);
 
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV4, "UDP request size to specific port.", "kilobits/s","UDP", 991);
-    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV4, "UDP receive size from specific port.", "kilobits/s","UDP", 990);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_OUTBOUND_IPV4, "UDP request size to specific port.", "bytes/s","UDP", 991);
+    netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_INBOUND_IPV4, "UDP receive size from specific port.", "bytes/s","UDP", 990);
     netdata_create_chart(NETWORK_VIEWER_FAMILY, NETWORK_VIEWER_UDP_CONNECTION_OUTBOUND_IPV4, "UDP active connections per port.", "active connections","UDP", 989);
 
 }
@@ -201,10 +201,15 @@ static void netdata_publish_data(netdata_port_stats_t *move, int version) {
         }
 
         if(move->inow != move->iprev) {
-            *ibytes = (move->inow - move->iprev)/1000;
-            move->iprev = move->inow;
+            if(move->iprev) {
+                *ibytes = move->inow - move->iprev;
+                *ebytes = move->enow - move->eprev;
+            } else {
+                *ibytes = 0;
+                *ebytes = 0;
+            }
 
-            *ebytes = (move->enow - move->eprev)/1000;
+            move->iprev = move->inow;
             move->eprev = move->enow;
 
             *econn = move->etot;
