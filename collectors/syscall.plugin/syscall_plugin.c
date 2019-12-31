@@ -104,8 +104,8 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish, netdata_s
                 publish->ncall = (input->call - publish->pcall);
                 publish->nbyte = (input->bytes - publish->nbyte);
             } else {
-                publish->ncall = input->call;
-                publish->nbyte = input->bytes;
+                publish->ncall = 0;
+                publish->nbyte = 0;
             }
             publish->pcall = input->call;
 
