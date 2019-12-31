@@ -104,7 +104,7 @@ def unicode_str(arg):
         if isinstance(arg, unicode):
             return arg
         return unicode(arg, errors='ignore')
-    # https://github.com/netdata/netdata/issues/7613
+    # https://github.com/netdata/netdata/issues/7642
     except TypeError:
         return unicode(arg)
     except NameError:
