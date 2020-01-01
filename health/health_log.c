@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
-#include "../daemon/mqtt.h"
+#include "../aclk/agent_cloud_link.h"
 
 // ----------------------------------------------------------------------------
 // health alarm log load/save
@@ -71,9 +71,9 @@ inline void health_log_rotate(RRDHOST *host) {
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
 
-    char  mqtt_message[8192];
+    char  cloud_message[8192];
 
-    sprintf(mqtt_message,"%c\t%s"
+    sprintf(cloud_message,"%c\t%s"
         "\t%08x\t%08x\t%08x\t%08x\t%08x"
         "\t%08x\t%08x\t%08x"
         "\t%08x\t%08x\t%08x"
@@ -117,7 +117,7 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
         , (uint64_t)ae->last_repeat);
 
 
-    sprintf(mqtt_message,"%c|%s"
+    sprintf(cloud_message,"%c|%s"
                      "|%08x|%08x|%08x|%08x|%08x"
                      "|%08x|%08x|%08x"
                      "|%08x|%08x|%08x"
@@ -164,20 +164,20 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     // Sample MQTT send ; to be changed
     {
         int rc;
-        static int mqtt_error = 0;
+        static int cloud_error = 0;
 
-        rc = mqtt_send(NULL, "alarm", mqtt_message);
+        rc = aclk_send_message(NULL, "alarm", cloud_message);
 
         if (rc != MOSQ_ERR_SUCCESS) {
             errno = 0;
-            if (!mqtt_error) {
-                mqtt_error = 1;
+            if (!cloud_error) {
+                cloud_error = 1;
                 error("MQTT send failed with %d - (%s)",rc, mosquitto_strerror(rc));
             }
         }
         else {
-            if (mqtt_error) {
-                mqtt_error = 0;
+            if (cloud_error) {
+                cloud_error = 0;
                 error("MQTT send OK");
             }
         }

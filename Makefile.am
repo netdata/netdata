@@ -100,6 +100,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
+	aclk \
     $(NULL)
 
 
@@ -461,6 +462,13 @@ CLAIM_PLUGIN_FILES = \
     claim/claim.h \
     $(NULL)
 
+ACLK_PLUGIN_FILES = \
+    aclk/agent_cloud_link.c \
+    aclk/agent_cloud_link.h \
+    aclk/mqtt.c \
+    aclk/mqtt.h \
+	$(NULL)
+
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
     exporting/exporting_engine.h \
@@ -505,8 +513,6 @@ DAEMON_FILES = \
     daemon/global_statistics.h \
     daemon/main.c \
     daemon/main.h \
-	daemon/mqtt.c \
-	daemon/mqtt.h \
     daemon/signals.c \
     daemon/signals.h \
     daemon/commands.c \
@@ -531,6 +537,7 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_PLUGIN_FILES) \
+	$(ACLK_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD

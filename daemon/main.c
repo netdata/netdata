@@ -2,7 +2,6 @@
 
 #include <stdbool.h>
 #include "common.h"
-#include "mqtt.h"
 
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
@@ -75,7 +74,7 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
 
-    NETDATA_MQTT_HOOK
+    NETDATA_ACLK_HOOK
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},

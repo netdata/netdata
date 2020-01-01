@@ -340,7 +340,7 @@ add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 
 set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c
-        )
+        aclk/agent_cloud_link.c aclk/agent_cloud_link.h aclk/mqtt.c aclk/mqtt.h)
 
 set(CHECKS_PLUGIN_FILES
         collectors/checks.plugin/plugin_checks.c
@@ -606,6 +606,11 @@ set(CLAIM_PLUGIN_FILES
         claim/claim.h
         )
 
+set(ACLK_PLUGIN_FILES
+        aclk/agent_cloud_link.c
+        aclk/agent_cloud_link.h
+       )
+
 set(EXPORTING_ENGINE_FILES
         exporting/exporting_engine.c
         exporting/exporting_engine.h
@@ -655,7 +660,7 @@ set(DAEMON_FILES
         daemon/commands.h
         daemon/unit_test.c
         daemon/unit_test.h
-        daemon/mqtt.c daemon/mqtt.h)
+        )
 
 set(NETDATA_FILES
         collectors/all.h
@@ -673,6 +678,7 @@ set(NETDATA_FILES
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
         ${CLAIM_PLUGIN_FILES}
+        ${ACLK_PLUGIN_FILES}
         )
 
 set(NETDATACLI_FILES
