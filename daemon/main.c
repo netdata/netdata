@@ -942,7 +942,7 @@ int main(int argc, char **argv) {
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
                             if(!rrd_init("unittest", NULL))
-                                fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+                                fatal("rrd_init failed for unittest");
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
