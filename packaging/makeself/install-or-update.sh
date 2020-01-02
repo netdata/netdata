@@ -58,7 +58,7 @@ then
 
     # shellcheck disable=SC2230
     md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-    while IFS= read -r -d '' x ; do
+    find etc -type f | while IFS= read -r x ; do
         # find it relative filename
         f="${x/etc\/netdata\//}"
 
@@ -80,7 +80,7 @@ then
                 deleted_stock_configs=$(( deleted_stock_configs + 1 ))
             fi
         fi
-    done < <(find etc -type f)
+    done
 
     touch "etc/netdata/.installer-cleanup-of-stock-configs-done"
 fi

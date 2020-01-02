@@ -313,9 +313,9 @@ if [ -z "${file}" ] ; then
 		exit 1
 	fi
 	cd ${DOCS_DIR}
-	while IFS= read -r -d '' f; do
+	find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o name "*.md" -print | while IFS= read -r f ; do
 		checklinks "$f"
-	done < <(find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -print)
+	done
 	cd -
 else
 	if [ $RECURSIVE -eq 1 ] ; then 
