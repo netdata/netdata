@@ -72,10 +72,10 @@ installation, including manual, offline, and macOS installations. Create the fil
 docs](../packaging/installer/README.md).** You can append this option during the initial installation or a manual
 update.
 
-**Set your `DO_NOT_TRACK` environmental variable to `1`.** You can set this variable with the following command: `export
-DO_NOT_TRACK=1`. This variable must be present _during installation_ to make the necessary changes. Visit the [project's
-homepage](https://consoledonottrack.com/) for more details on the purpose and implementation of this environmental
-variable.
+When using Docker, **set your `DO_NOT_TRACK` environment variable to `1`.** You can set this variable with the following
+command: `export DO_NOT_TRACK=1`. When creating a container using Netdata's [Docker
+image](../packaging/docker/README.md#run-netdata-with-the-docker-command) for the first time, this variable will disable
+the anonymous statistics script inside of the container.
 
 Each of these opt-out processes does the following:
 
