@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- python.d logger: unicode\_str handle TypeError [\#7645](https://github.com/netdata/netdata/pull/7645) ([ilyam8](https://github.com/ilyam8))
+- redis: populate `keys\_redis` chart in runtime [\#7639](https://github.com/netdata/netdata/pull/7639) ([ilyam8](https://github.com/ilyam8))
+- Minor: Documentation Typo alamrs -\> alarms [\#7637](https://github.com/netdata/netdata/pull/7637) ([underhood](https://github.com/underhood))
 - python.d logger: do not unicode decode if it is already unicode [\#7614](https://github.com/netdata/netdata/pull/7614) ([ilyam8](https://github.com/ilyam8))
 - Fix a warning in prometheus remote write backend [\#7609](https://github.com/netdata/netdata/pull/7609) ([vlvkobal](https://github.com/vlvkobal))
 - python.d.plugin: UrlService bytes decode, logger unicode encoding fix [\#7601](https://github.com/netdata/netdata/pull/7601) ([ilyam8](https://github.com/ilyam8))
@@ -217,10 +220,6 @@
 - Suggest using /run or /var/run for the unix socket [\#6916](https://github.com/netdata/netdata/pull/6916) ([cakrit](https://github.com/cakrit))
 - Improve documentation for the SNMP collector [\#6915](https://github.com/netdata/netdata/pull/6915) ([cakrit](https://github.com/cakrit))
 - netdata/ci: nits and fixes around package release workflow [\#6914](https://github.com/netdata/netdata/pull/6914) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Detect deadlock in dbengine page cache [\#6911](https://github.com/netdata/netdata/pull/6911) ([mfundul](https://github.com/mfundul))
-- Correct read length of silencers file [\#6909](https://github.com/netdata/netdata/pull/6909) ([cakrit](https://github.com/cakrit))
-- netdata/ci: fix branch check [\#6905](https://github.com/netdata/netdata/pull/6905) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- \#3925 implementation [\#6903](https://github.com/netdata/netdata/pull/6903) ([underhood](https://github.com/underhood))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
