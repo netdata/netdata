@@ -148,7 +148,7 @@ void uv_thread_set_name_np(uv_thread_t ut, const char* name) {
 #endif
 
     if (ret)
-        error("cannot set libuv thread name to %s. Err: %d", threadname, ret);
+        info("cannot set libuv thread name to %s. Err: %d", threadname, ret);
 }
 
 static void *thread_start(void *ptr) {
