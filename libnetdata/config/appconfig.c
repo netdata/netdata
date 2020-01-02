@@ -566,7 +566,9 @@ int appconfig_load(struct config *root, char *filename, int overwrite_used, cons
                         error("INTERNAL ERROR: Cannot remove '%s' from  section '%s', it was not inserted before.",
                                cv2->name, co->name);
 
-                    free(cv2);
+                    freez(cv2->name);
+                    freez(cv2->value);
+                    freez(cv2);
                     cv2 = save;
                 }
                 co->values = NULL;

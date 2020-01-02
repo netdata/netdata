@@ -657,6 +657,7 @@ void rrdhost_free(RRDHOST *host) {
     // free it
 
     freez((void *)host->tags);
+    free_host_labels(host->labels);
     freez((void *)host->os);
     freez((void *)host->timezone);
     freez(host->program_version);
@@ -938,6 +939,16 @@ struct label *merge_label_lists(struct label *lo_pri, struct label *hi_pri)
     return result;
 }
 
+void free_host_labels(struct label *labels)
+{
+    while (labels != NULL)
+    {
+        struct label *current = labels;
+        labels = labels->next;
+        freez(current);
+    }
+}
+
 void reload_host_labels()
 {
     struct label *from_auto = load_auto_labels();
@@ -954,12 +965,7 @@ void reload_host_labels()
     localhost->labels = new_labels;
     netdata_rwlock_unlock(&localhost->labels_rwlock);
 
-    while (old_labels != NULL)
-    {
-        struct label *current = old_labels;
-        old_labels = old_labels->next;
-        freez(current);
-    }
+    free_host_labels(old_labels);
 
     health_reload();
 }
