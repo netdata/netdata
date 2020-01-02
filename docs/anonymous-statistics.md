@@ -20,34 +20,39 @@ You can opt-out from sending anonymous statistics to Netdata through three diffe
 
 ## Google tag manager
 
-Google tag manager (GTM) is the recommended way of collecting statistics for new implementations using GA. Unlike the older API, the logic of when to send information to GA and what information to send is controlled centrally.
+Google tag manager (GTM) is the recommended way of collecting statistics for new implementations using GA. Unlike the
+older API, the logic of when to send information to GA and what information to send is controlled centrally.
 
-We have configured GTM to trigger the tag only when the variable `anonymous_statistics` is true. The value of this variable is controlled via the [opt-out mechanism](#opt-out).
+We have configured GTM to trigger the tag only when the variable `anonymous_statistics` is true. The value of this
+variable is controlled via the [opt-out mechanism](#opt-out).
 
 To ensure anonymity of the stored information, we have configured GTM's GA variable "Fields to set" as follows: 
 
-| Field Name|Value|
-|----------|-----|
-| page|netdata-dashboard|
-| hostname|dashboard.my-netdata.io|
-| anonymizeIp|true|
-| title|Netdata dashboard|
-| campaignSource|{{machine_guid}}|
-| campaignMedium|web|
-| referrer|<http://dashboard.my-netdata.io>|
-| Page URL|<http://dashboard.my-netdata.io/netdata-dashboard>|
-| Page Hostname|<http://dashboard.my-netdata.io>|
-| Page Path|/netdata-dashboard|
-| location|<http://dashboard.my-netdata.io>|
+| Field name     | Value                                              |
+| -------------- | -------------------------------------------------- |
+| page           | netdata-dashboard                                  |
+| hostname       | dashboard.my-netdata.io                            |
+| anonymizeIp    | true                                               |
+| title          | Netdata dashboard                                  |
+| campaignSource | {{machine_guid}}                                   |
+| campaignMedium | web                                                |
+| referrer       | <http://dashboard.my-netdata.io>                   |
+| Page URL       | <http://dashboard.my-netdata.io/netdata-dashboard> |
+| Page Hostname  | <http://dashboard.my-netdata.io>                   |
+| Page Path      | /netdata-dashboard                                 |
+| location       | <http://dashboard.my-netdata.io>                   |
 
 In addition, the Netdata-generated unique machine guid is sent to GA via a custom dimension.
 You can verify the effect of these settings by examining the GA `collect` request parameters.
 
-The only thing that's impossible for us to prevent from being **sent** is the URL in the "Referrer" Header of the browser request to GA. However, the settings above ensure that all **stored** URLs and host names are anonymized.
+The only thing that's impossible for us to prevent from being **sent** is the URL in the "Referrer" Header of the
+browser request to GA. However, the settings above ensure that all **stored** URLs and host names are anonymized.
 
 ## Anonymous Statistics Script
 
-Every time the daemon is started or stopped and every time a fatal condition is encountered, Netdata uses the anonymous statistics script to collect system information and send it to GA via an http call. The information collected for all events is:
+Every time the daemon is started or stopped and every time a fatal condition is encountered, Netdata uses the anonymous
+statistics script to collect system information and send it to GA via an http call. The information collected for all
+events is:
 
 -   Netdata version
 -   OS name, version, id, id_like
@@ -55,9 +60,12 @@ Every time the daemon is started or stopped and every time a fatal condition is 
 -   Virtualization technology 
 -   Containerization technology 
 
-Furthermore, the FATAL event sends the Netdata process & thread name, along with the source code function, source code filename and source code line number of the fatal error.
+Furthermore, the FATAL event sends the Netdata process & thread name, along with the source code function, source code
+filename and source code line number of the fatal error.
 
-To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins directory`, which is usually `/usr/libexec/netdata/plugins.d`. 
+To see exactly what and how is collected, you can review the script template `daemon/anonymous-statistics.sh.in`. The
+template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins
+directory`, which is usually `/usr/libexec/netdata/plugins.d`. 
 
 ## Opt-out
 
