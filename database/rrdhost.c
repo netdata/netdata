@@ -812,6 +812,17 @@ struct label *load_config_labels()
     return l;
 }
 
+struct label *load_labels_from_tags()
+{
+    struct label *label_list = NULL;
+
+    if (localhost->tags)
+        label_list =
+            add_label_to_list(label_list, "tags", localhost->tags, LABEL_SOURCE_NETDATA_CONF);
+
+    return label_list;
+}
+
 struct label *load_kubernetes_labels()
 {
     struct label *l=NULL;
@@ -932,8 +943,10 @@ void reload_host_labels()
     struct label *from_auto = load_auto_labels();
     struct label *from_k8s = load_kubernetes_labels();
     struct label *from_config = load_config_labels();
+    struct label *from_tags = load_labels_from_tags();
 
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
+    new_labels = merge_label_lists(new_labels, from_tags);
     new_labels = merge_label_lists(new_labels, from_config);
 
     netdata_rwlock_wrlock(&localhost->labels_rwlock);
