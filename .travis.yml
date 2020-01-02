@@ -60,7 +60,7 @@ stages:
 
     # Scheduled releases
   - name: Support activities on main branch
-    if: branch = master AND type != pull_request AND type != cron
+    if: branch = master AND type != pull_request AND type != cron AND repo = netdata/netdata
 
     # We don't run on release candidates
   - name: Publish for release
