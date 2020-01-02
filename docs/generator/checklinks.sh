@@ -313,7 +313,8 @@ if [ -z "${file}" ] ; then
 		exit 1
 	fi
 	cd ${DOCS_DIR}
-	find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o name "*.md" -print | while IFS= read -r f ; do
+	# shellcheck disable=SC2644
+	for f in $(find -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o name "*.md" -print) ; do
 		checklinks "$f"
 	done
 	cd -
