@@ -1,35 +1,13 @@
 /* Fonts */
-@import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,400i,700,700i&display=swap');
+@import url('https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,400i,700,700i&display=swap');
 
 body, input {
-    font-family: "Source Sans Pro","Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;
+    font-family: "IBM Plex Sans","Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
 
 .md-typeset {
     font-size: .9rem;
     line-height: 1.5;
-}
-
-/* Header */
-[data-md-color-primary="blue-grey"] .md-header {
-    background: #35414A;
-}
-
-html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
-    background-color: #35414A;
-}
-
-[data-md-color-primary="blue-grey"] .md-nav__source {
-    background-color: #546e7a
-}
-
-.md-flex__cell {
-    vertical-align: middle;
-}
-
-.md-header-nav__button {
-    margin: 0;
-    padding: 0;
 }
 
 /* Main structure */
@@ -48,6 +26,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 
 .md-content {
     margin-right: 0;
+    margin-bottom: 6rem;
     margin-left: 0;
     max-width: 45rem;
     overflow: hidden;
@@ -80,18 +59,62 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     }
 }
 
-/* Left-hand navigation */
-.md-nav {
-    font-size: 0.8rem;
+/*
+   Navigation
+*/
+
+.md-header-nav {
+    padding: 0 0.6rem;
+}
+
+@media only screen and (max-width: 76.25em) {
+    .md-header-nav {
+        padding: 0 2.5rem;
+    }
+}
+
+[data-md-color-primary="blue-grey"] .md-header {
+    background: #35414A;
+}
+
+html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
+    background-color: #35414A;
+}
+
+[data-md-color-primary="blue-grey"] .md-nav__source {
+    background-color: #546e7a
+}
+
+.md-flex__cell {
+    vertical-align: middle;
+}
+
+.md-header-nav__button {
+    margin: 0;
+    padding: 0;
+    top: 2px;
+}
+
+/* Change the language selector dropdown to match new color. */
+.md-header-nav select#sel {
+    background-color: rgba(0,0,0,.26) !important;
+    padding: 3px;
+    margin-left: 5px;
+    margin-right: 20px;
 }
 
 /* Algolia search */
-
 #search_algolia {
     font-size: 0.7rem;
     padding: 0.4rem;
     border-radius: 3px;
     min-width: 300px;
+}
+
+@media only screen and (max-width: 76.25em) {
+    #search_algolia {
+        min-width: 100px;
+    }
 }
 
 .algolia-autocomplete .algolia-docsearch-suggestion--category-header {
@@ -106,8 +129,33 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     font-size: 0.8rem;
 }
 
-/*  Custom styling for the new documentation homepage.
-    In particular, the three buttons for install/getting started/configuration. */
+/*
+   Left-hand navigation
+*/
+
+.md-nav {
+    font-size: 0.8rem;
+}
+
+/* Bold the first item on the docs sidebar: Netdata Documentation. */
+.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
+    font-weight: 700;
+}
+
+/* Hide the label at the top of the navigation menu. Does nothing. 
+   Well, it does do something on mobile, and this media query makes
+   sure it's hidden only on screens wide enough to not use the mobile sidebar. */
+@media only screen and (min-width:76.25em) {
+    .md-nav--primary .md-nav__title {
+        display: none;
+    }
+}
+
+/*
+   Documentation homepage
+   In particular, the three buttons for install/getting started/configuration.
+*/
+
 .homepage-nav {
     display: grid;
     grid-template-columns: repeat(4,[col-start] 1fr);
@@ -118,9 +166,9 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 
 .nav-page {
     grid-column: span 2;
-    border-radius: 3px;
-    border: 1px solid #EFEFEF;
-    box-shadow: 0 8px 48px 4px rgba(86,91,115,0.15);
+    border-radius: 2px;
+    /* border: 1px solid #AEB3B7; */
+    /* box-shadow: 0 8px 48px 4px rgba(86,91,115,0.15); */
 }
 
 .button-header {
@@ -128,17 +176,18 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient( to right, #306BAC, #56B2FF 140%);
+    border: 2px solid #00AB44;
     border-radius: 3px 3px 0 0;
 }
 
 .button-header h3 {
-    color: white;
+    color: #35414A;
+    font-weight: 700;
     margin: 0;
 }
 
 .button-header svg {
-    color: white;
+    color: #35414A;
     position: relative;
     transition-property: left;
     transition-timing-function: ease-in-out;
@@ -152,6 +201,10 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 .button-text {
     color: #35414A;
     padding: 1rem 1.4rem;
+    border-right: 1px solid #AEB3B7;
+    border-bottom: 1px solid #AEB3B7;
+    border-left: 1px solid #AEB3B7;
+    border-radius: 0 0 3px 3px;
 }
 
 .button-text p {
@@ -168,26 +221,17 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     text-align: center;
 }
 
-/* Hide the label at the top of the navigation menu. Does nothing. 
-   Well, it does do something on mobile, and this media query makes
-   sure it's hidden only on screens wide enough to not use the mobile sidebar. */
-@media only screen and (min-width:76.25em) {
-    .md-nav--primary .md-nav__title {
-        display: none;
-    }
-}
+/*
+   Markdown/body content
+*/
 
-/* Change the language selector dropdown to match new color. */
-.md-header-nav select#sel {
-    background-color: rgba(0,0,0,.26) !important;
-    padding: 3px;
-    margin-left: 5px;
-    margin-right: 20px;
-}
-
-/* Add some whitespace to the bottom of each doc. */
-.md-content {
-    margin-bottom: 6rem;
+/* Make header a bit bolder with new IBM Plex Sans font. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5 {
+    font-weight: 500;
 }
 
 /* Make sure inline code in tables don't break. */
@@ -217,12 +261,12 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     padding: 0;
 }
 
-/* Bold the first item on the docs sidebar: Netdata Documentation */
-.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
-    font-weight: 700;
-}
-
-/* Underline text */
+/* Underline links, but not badges/icons. */
 .md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
     border-bottom: 1px solid #272b30;
+}
+
+/* Fix the font size of admonition and details sections. */
+.md-typeset .admonition, .md-typeset details {
+    font-size: 0.75rem;
 }

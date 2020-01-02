@@ -59,29 +59,36 @@ Or, explore all of Netdata's documentation using the table of contents to your l
 
 </div>
 
-**Netdata Cloud**: Use [Netdata Cloud](docs/netdata-cloud/) and the [Nodes View](docs/netdata-cloud/nodes-view.md) to view real-time, distributed health monitoring and performance troubleshooting data for all your systems in one place. Add as many nodes as you'd like!
+**Netdata Cloud**: Use [Netdata Cloud](docs/netdata-cloud/) and the [Nodes View](docs/netdata-cloud/nodes-view.md) to
+view real-time, distributed health monitoring and performance troubleshooting data for all your systems in one place.
+Add as many nodes as you'd like!
 
-**Advanced users**: For those who already understand how to access a Netdata dashboard and perform basic configuration, feel free to see what's behind any of these other doors.
+**Advanced users**: For those who already understand how to access a Netdata dashboard and perform basic configuration,
+feel free to see what's behind any of these other doors.
 
--   [Netdata Behind Nginx](docs/Running-behind-nginx.md): Use an Nginx web server instead of Netdata's built-in server to enable TLS, HTTPS, and basic authentication.
--   [Add More Charts](docs/Add-more-charts-to-netdata.md): Enable new internal or external plugins and understand when auto-detection works.
--   [Performance](docs/Performance.md): Tips on running Netdata on devices with limited CPU and RAM resources, such as embedded devices, IoT, and edge devices.
--   [Streaming](streaming/): Information for those who want to centralize Netdata metrics from any number of distributed agents.
--   [Backends](backends/): Learn how to archive Netdata's real-time metrics to a time series database (like Prometheus) for long-term archiving.
+-   [Netdata Behind Nginx](docs/Running-behind-nginx.md): Use an Nginx web server instead of Netdata's built-in server
+    to enable TLS, HTTPS, and basic authentication.
+-   [Add More Charts](docs/Add-more-charts-to-netdata.md): Enable new internal or external plugins and understand when
+    auto-detection works.
+-   [Performance](docs/Performance.md): Tips on running Netdata on devices with limited CPU and RAM resources, such as
+    embedded devices, IoT, and edge devices.
+-   [Streaming](streaming/): Information for those who want to centralize Netdata metrics from any number of distributed
+    agents.
+-   [Backends](backends/): Learn how to archive Netdata's real-time metrics to a time series database (like Prometheus)
+    for long-term archiving.
 
-Visit the [contributing guide](CONTRIBUTING.md), [contributing to documentation guide](docs/contributing/contributing-documentation.md), and [documentation style guide](docs/contributing/style-guide.md) to learn more about our community and how you can get started contributing to Netdata.
+Visit the [contributing guide](CONTRIBUTING.md), [contributing to documentation
+guide](docs/contributing/contributing-documentation.md), and [documentation style
+guide](docs/contributing/style-guide.md) to learn more about our community and how you can get started contributing to
+Netdata.
 
-## Subscribe for news and tips from monitoring pros
+Want to get news, how-tos, and heaps of monitoring savvy straight from Netdata? Subscribe to our newsletter to monitor
+our team of monitoring pros.
 
 <script charset="utf-8" type="text/javascript" src="//js.hsforms.net/forms/shell.js"></script>
-
 <script>
   hbspt.forms.create({
     portalId: "4567453",
     formId: "6a20deb5-a1e6-4312-9c4d-f6862f947fe0"
-});
+  });
 </script>
-
----
-
-![A GIF of the standard Netdata dashboard](https://user-images.githubusercontent.com/2662304/48346998-96cf3180-e685-11e8-9f4e-059d23aa3aa5.gif)
