@@ -58,7 +58,8 @@ then
 
     # shellcheck disable=SC2230
     md5sum="$(which md5sum 2>/dev/null || command -v md5sum 2>/dev/null || command -v md5 2>/dev/null)"
-    find etc -type f | while IFS= read -r x ; do
+    # shellcheck disable=2044
+    for x in find etc -type f ; do
         # find it relative filename
         f="${x/etc\/netdata\//}"
 

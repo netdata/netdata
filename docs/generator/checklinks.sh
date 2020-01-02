@@ -313,7 +313,7 @@ if [ -z "${file}" ] ; then
 		exit 1
 	fi
 	cd ${DOCS_DIR}
-	# shellcheck disable=SC2644
+	# shellcheck disable=SC2044
 	for f in $(find -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o name "*.md" -print) ; do
 		checklinks "$f"
 	done
