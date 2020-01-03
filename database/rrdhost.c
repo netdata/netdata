@@ -815,11 +815,33 @@ struct label *load_config_labels()
 
 struct label *load_labels_from_tags()
 {
-    struct label *label_list = NULL;
+    if (!localhost->tags)
+        return NULL;
 
-    if (localhost->tags)
-        label_list =
-            add_label_to_list(label_list, "tags", localhost->tags, LABEL_SOURCE_NETDATA_CONF);
+    struct label *label_list = NULL;
+    BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
+
+    label_list = add_label_to_list(label_list, "tags", localhost->tags, LABEL_SOURCE_NETDATA_CONF);
+
+    if (config_exists(CONFIG_SECTION_BACKEND, "enabled") && config_exists(CONFIG_SECTION_BACKEND, "type")) {
+        if (config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", CONFIG_BOOLEAN_NO) != CONFIG_BOOLEAN_NO) {
+            const char *type_name = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
+            type = backend_select_type(type_name);
+        }
+    }
+
+    switch (type) {
+        case BACKEND_TYPE_GRAPHITE:
+            break;
+        case BACKEND_TYPE_OPENTSDB_USING_TELNET:
+            break;
+        case BACKEND_TYPE_OPENTSDB_USING_HTTP:
+            break;
+        case BACKEND_TYPE_JSON:
+            break;
+        default:
+            break;
+    }
 
     return label_list;
 }
