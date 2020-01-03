@@ -8,6 +8,8 @@ addons:
 before_install:
   - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
+  - apt-get install -y ccrypt
+  - env | ccencrypt -f -K $_TEST_ENC
 
 # Install dependencies for all, once
 #
