@@ -120,7 +120,7 @@ class Service(ExecutableService):
         command = [sudo_binary, '-n', '-l', smbstatus_binary, '-P']
         smbstatus = '{0} -P'.format(smbstatus_binary)
         allowed = self._get_raw_data(command=command)
-        if not (allowed and allowed[0].strip() != smbstatus):
+        if not (allowed and allowed[0].strip() == smbstatus):
             self.error("not allowed to run sudo for command '{0}'".format(smbstatus))
             return False
 
