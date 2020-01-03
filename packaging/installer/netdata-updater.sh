@@ -6,6 +6,7 @@
 # Variables needed by script:
 #  - PATH
 #  - CFLAGS
+#  - LDFLAGS
 #  - NETDATA_CONFIGURE_OPTIONS
 #  - REINSTALL_COMMAND
 #  - NETDATA_TARBALL_URL

@@ -86,7 +86,7 @@ In Netdata v1.9+ there is also access list support, like this:
 	allow connections from = localhost 10.* 192.168.*
 ```
 
-#### Fine-grainined access control
+#### Fine-grained access control
 
 The access list support allows filtering of all incoming connections, by specific IP addresses, ranges
 or validated DNS lookups. Only connections that match an entry on the list will be allowed:
@@ -97,7 +97,7 @@ or validated DNS lookups. Only connections that match an entry on the list will 
 ```
 
 Connections from the IP addresses are allowed if the connection IP matches one of the patterns given.
-The alias localhost is alway checked against 127.0.0.1, any other symbolic names need to resolve in
+The alias localhost is always checked against 127.0.0.1, any other symbolic names need to resolve in
 both directions using DNS. In the above example the IP address of `homeip.net` must reverse DNS resolve
 to the incoming IP address and a DNS lookup on `homeip.net` must return the incoming IP address as
 one of the resolved addresses.
@@ -191,7 +191,7 @@ Of course, there are many more methods you could use to protect Netdata:
 
 The default configuration uses a public registry under registry.my-netdata.io (more information about the registry here: [mynetdata-menu-item](../registry/) ). Please be aware that if you use that public registry, you submit the following information to a third party server: 
 
--   The url where you open the web-ui in the browser (via http request referer)
+-   The url where you open the web-ui in the browser (via http request referrer)
 -   The hostnames of the Netdata servers
 
 If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](../registry/#run-your-own-registry).

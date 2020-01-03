@@ -430,6 +430,17 @@ sudo ./netdata-installer.sh --install /usr/local
 
 The installer will also install a startup plist to start Netdata when your Mac boots.
 
+**Note:** Should you wish to install Netdata with TLS support:
+1. Install OpenSSL via brew by executing `brew install openssl`
+2. Run the installer with the extra CFLAGS and LDFLAGS, since your OpenSSL installation is not automatically symlinked to `/usr/local`
+
+```sh
+# install Netdata in /usr/local/netdata
+cd netdata
+CFLAGS="-I$(brew --prefix)/opt/openssl/include" LDFLAGS="${LDFLAGS} -L$(brew --prefix)/opt/openssl/lib" sudo -E ./netdata-installer.sh --install /usr/local
+```
+
+
 ##### Alpine 3.x
 
 Execute these commands to install Netdata in Alpine Linux 3.x:
