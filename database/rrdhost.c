@@ -813,17 +813,21 @@ struct label *load_config_labels()
     return l;
 }
 
+static inline void strip_last_symbol(char *str, char symbol)
+{
+    char *end = str;
+
+    while (*end && *end != symbol)
+        end++;
+    if (*end && *end == symbol)
+        *end = '\0';
+}
+
 static inline char *strip_double_quotes(char *str)
 {
     if (*str == '"') {
-        char *end = ++str;
-        size_t len = strlen(str);
-
-        if (len)
-            end = str + len - 1;
-
-        if (*end == '"')
-            *end = '\0';
+        str++;
+        strip_last_symbol(str, '"');
     }
 
     return str;
@@ -867,6 +871,40 @@ struct label *parse_simple_tags(
     return label_list;
 }
 
+struct label *parse_json_tags(struct label *label_list, const char *tags)
+{
+    char tags_buf[CONFIG_MAX_VALUE + 1];
+    strncpy(tags_buf, tags, CONFIG_MAX_VALUE);
+    char *str = tags_buf;
+
+    switch (*str) {
+    case '{':
+        str++;
+        strip_last_symbol(str, '}');
+
+        // TODO: skip escaped quotes in quoted words and parse labels
+        label_list = parse_simple_tags(label_list, str, ':', ',', 1, 1);
+
+        break;
+    case '[':
+        str++;
+        strip_last_symbol(str, ']');
+
+        // TODO: skip escaped quotes quoted words, create consecutive label keys, and parse values
+        label_list = add_label_to_list(label_list, "host_tag", str, LABEL_SOURCE_NETDATA_CONF);
+
+        break;
+    case '"':
+        label_list = add_label_to_list(label_list, "host_tag", strip_double_quotes(str), LABEL_SOURCE_NETDATA_CONF);
+        break;
+    default:
+        label_list = add_label_to_list(label_list, "host_tag", str, LABEL_SOURCE_NETDATA_CONF);
+        break;
+    }
+
+    return label_list;
+}
+
 struct label *load_labels_from_tags()
 {
     if (!localhost->tags)
@@ -895,6 +933,7 @@ struct label *load_labels_from_tags()
             label_list = parse_simple_tags(label_list, localhost->tags, ':', ',', 1, 1);
             break;
         case BACKEND_TYPE_JSON:
+            label_list = parse_json_tags(label_list, localhost->tags);
             break;
         default:
             label_list = parse_simple_tags(label_list, localhost->tags, '=', ',', 0, 1);
