@@ -813,6 +813,60 @@ struct label *load_config_labels()
     return l;
 }
 
+static inline char *strip_double_quotes(char *str)
+{
+    if (*str == '"') {
+        char *end = ++str;
+        size_t len = strlen(str);
+
+        if (len)
+            end = str + len - 1;
+
+        if (*end == '"')
+            *end = '\0';
+    }
+
+    return str;
+}
+
+struct label *parse_simple_tags(
+    struct label *label_list,
+    const char *tags,
+    char key_value_separator,
+    char label_separator,
+    int strip_quotes_from_key,
+    int strip_quotes_from_value)
+{
+    const char *end = tags;
+
+    while (*end) {
+        const char *start = end;
+        char key[CONFIG_MAX_VALUE + 1];
+        char value[CONFIG_MAX_VALUE + 1];
+
+        while (*end && *end != key_value_separator)
+            end++;
+        strncpyz(key, start, end - start);
+
+        if (*end)
+            start = ++end;
+        while (*end && *end != label_separator)
+            end++;
+        strncpyz(value, start, end - start);
+
+        label_list = add_label_to_list(
+            label_list,
+            strip_quotes_from_key ? strip_double_quotes(trim(key)) : trim(key),
+            strip_quotes_from_value ? strip_double_quotes(trim(value)) : trim(value),
+            LABEL_SOURCE_NETDATA_CONF);
+
+        if (*end)
+            end++;
+    }
+
+    return label_list;
+}
+
 struct label *load_labels_from_tags()
 {
     if (!localhost->tags)
@@ -821,9 +875,9 @@ struct label *load_labels_from_tags()
     struct label *label_list = NULL;
     BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
 
-    label_list = add_label_to_list(label_list, "tags", localhost->tags, LABEL_SOURCE_NETDATA_CONF);
+    label_list = add_label_to_list(label_list, "tags", (char *)localhost->tags, LABEL_SOURCE_NETDATA_CONF);
 
-    if (config_exists(CONFIG_SECTION_BACKEND, "enabled") && config_exists(CONFIG_SECTION_BACKEND, "type")) {
+    if (config_exists(CONFIG_SECTION_BACKEND, "enabled")) {
         if (config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", CONFIG_BOOLEAN_NO) != CONFIG_BOOLEAN_NO) {
             const char *type_name = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
             type = backend_select_type(type_name);
@@ -832,14 +886,18 @@ struct label *load_labels_from_tags()
 
     switch (type) {
         case BACKEND_TYPE_GRAPHITE:
+            label_list = parse_simple_tags(label_list, localhost->tags, '=', ';', 0, 0);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_TELNET:
+            label_list = parse_simple_tags(label_list, localhost->tags, '=', ' ', 0, 0);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_HTTP:
+            label_list = parse_simple_tags(label_list, localhost->tags, ':', ',', 1, 1);
             break;
         case BACKEND_TYPE_JSON:
             break;
         default:
+            label_list = parse_simple_tags(label_list, localhost->tags, '=', ',', 0, 1);
             break;
     }
 
