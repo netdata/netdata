@@ -878,14 +878,6 @@ components:
           type: number
           description: The default update frequency of the netdata server. All charts have
             an update frequency equal or bigger than this.
-        labels:
-          type: object
-          description: List of host labels.
-          properties:
-            app:
-              type: string
-              description: Host label.
-              example: netdata
         charts:
           type: object
           description: An object containing all the chart objects available at the netdata
@@ -979,14 +971,6 @@ components:
               name:
                 type: string
                 description: The name of the dimension
-        labels:
-          type: object
-          description: List of host labels.
-          properties:
-            app:
-              type: string
-              description: Host label.
-              example: netdata
         chart_variables:
           type: object
           additionalProperties:
@@ -1018,14 +1002,6 @@ components:
         host:
           type: string
           description: The host containing the chart.
-        labels:
-          type: object
-          description: List of host labels.
-          properties:
-            app:
-              type: string
-              description: Host label.
-              example: netdata
         chart_variables:
           type: object
           additionalProperties:
@@ -1073,14 +1049,6 @@ components:
         name:
           type: string
           description: The name of the chart.
-        labels:
-          type: object
-          description: List of host labels.
-          properties:
-            app:
-              type: string
-              description: Host label.
-              example: netdata
         update_every:
           type: number
           description: The update frequency of this chart, in seconds. One value every this
@@ -1373,14 +1341,6 @@ components:
                   format: nullable
                 value:
                   type: number
-        labels:
-          type: object
-          description: List of host labels.
-          properties:
-            app:
-              type: string
-              description: Host label.
-              example: netdata
     alarm_log_entry:
       type: object
       properties:

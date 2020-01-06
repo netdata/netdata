@@ -822,7 +822,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"container\": \"%s\",\n", (host->system_info->container) ? host->system_info->container : "");
     buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", (host->system_info->container_detection) ? host->system_info->container_detection : "");
 
-    buffer_strcat(wb, "\t\"labels\": {\n");
+    buffer_strcat(wb, "\t\"host_labels\": {\n");
     host_labels2json(host, wb, 2);
     buffer_strcat(wb, "\t},\n");
 

@@ -57,7 +57,7 @@ Make changes as you see fit.
 You can use the `Preview changes` button to ensure your Markdown syntax is working properly.
 
 Under the `Propose file change` header, write in a descriptive title for your requested change. 
-Beneath that, add a concise descrition of what you've changed and why you think it's important. Then, click the `Propose file change` button. 
+Beneath that, add a concise description of what you've changed and why you think it's important. Then, click the `Propose file change` button. 
 
 After you've hit that button, 
 jump down to our instructions on [pull requests and cleanup](#pull-requests-and-final-steps) for your next steps. 
@@ -95,7 +95,7 @@ corresponds to. Many sub-folders contain a `README.md` file,
 which is then used to populate the documentation about that feature/component of Netdata.
 
 For example, the file at `packaging/installer/README.md` becomes `https://docs.netdata.cloud/packaging/installer/` 
-and is our installation documentation. By co-locating it with quick-start installtion code, 
+and is our installation documentation. By co-locating it with quick-start installation code, 
 we ensure documentation is always tightly knit with the functions it describes.
 
 You might find other `.md` files within these directories. The `packaging/installer/` folder also contains `UPDATE.md` 
@@ -112,7 +112,7 @@ a direct relationship to a specific component of Netdata. It's where we house ou
 guide](../../docs/getting-started.md), guides on [running Netdata behind Nginx](../../docs/Running-behind-nginx.md), and
 more.
 
-If the documentation you're working on doesn't have a direct relaionship to a component of Netdata, 
+If the documentation you're working on doesn't have a direct relationship to a component of Netdata, 
 it can be placed in this `docs/` folder.
 
 ### Make your edits
@@ -141,7 +141,7 @@ Follow the [Python installation instructions](https://www.python.org/downloads/)
 
 Use `pip`, which was installed alongside Python, to install `mkdocs` and `mkdocs-material`. 
 Your operating system might force you to use `pip2` or `pip3` instead, 
-dependin on which version of Python you have installed.
+depending on which version of Python you have installed.
 
 ```bash
 pip install mkdocs mkdocs-material
