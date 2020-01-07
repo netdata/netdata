@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#shellcheck disable=SC2181,2059
+#shellcheck disable=SC2181,2059,SC2155
 #
 # This is the netdata uninstaller script
 #
@@ -276,6 +276,7 @@ safe_pidof() {
 
 pidisnetdata() {
 	if [ -d /proc/self ]; then
+		# shellcheck disable=SC2166
 		[ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
 		[ "$(cut -d '(' -f 2 "/proc/$1/stat" | cut -d ')' -f 1)" = "netdata" ] && return 0
 		return 1
@@ -344,7 +345,7 @@ netdata_pids() {
 stop_all_netdata() {
 	local p
 
-	if [ -n "$(netdata_pids)" -a -n "$(builtin type -P netdatacli)" ] ; then
+	if [ -n "$(netdata_pids)" ] && [ -n "$(builtin type -P netdatacli)" ] ; then
 		netdatacli shutdown-agent
 		sleep 20
 	fi
