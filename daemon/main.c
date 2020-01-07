@@ -75,6 +75,9 @@ struct netdata_static_thread static_threads[] = {
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
+#ifdef ENABLE_EXPORTING
+    {"EXPORTING",            NULL,                    NULL,         1, NULL, NULL, exporting_main},
+#endif
     {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
 
@@ -337,15 +340,19 @@ int help(int exitcode) {
             "  -W unittest              Run internal unittests and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
-            "  -W stresstest=A,B,C,D,E  Run a DB engine stress test for A seconds,\n"
+            "  -W stresstest=A,B,C,D,E,F\n"
+            "                           Run a DB engine stress test for A seconds,\n"
             "                           with B writers and C readers, with a ramp up\n"
             "                           time of D seconds for writers, a page cache\n"
-            "                           size of E MiB, and exit.\n\n"
+            "                           size of E MiB, an optional disk space limit"
+            "                           of F MiB and exit.\n\n"
 #endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
+            "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
+            "                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.\n\n"
     );
 
     fprintf(stream, "\n Signals netdata handles:\n\n"
@@ -700,20 +707,20 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     int ret = 0;
 
     if(filename && *filename) {
-        ret = config_load(filename, overwrite_used);
+        ret = config_load(filename, overwrite_used, NULL);
         if(!ret)
             error("CONFIG: cannot load config file '%s'.", filename);
     }
     else {
         filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
 
-        ret = config_load(filename, overwrite_used);
+        ret = config_load(filename, overwrite_used, NULL);
         if(!ret) {
             info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
             freez(filename);
 
             filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
-            ret = config_load(filename, overwrite_used);
+            ret = config_load(filename, overwrite_used, NULL);
             if(!ret)
                 info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
         }
@@ -921,6 +928,7 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+                        char* claim_string = "claim";
 #ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
@@ -953,7 +961,7 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
                             char *endptr;
                             unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
-                            page_cache_mb = 0;
+                            page_cache_mb = 0, disk_space_mb = 0;
 
                             optarg += strlen(stresstest_string);
                             test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
@@ -965,8 +973,11 @@ int main(int argc, char **argv) {
                                 ramp_up_seconds = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
                                 page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                disk_space_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+
                             dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
-                                                 page_cache_mb);
+                                                 page_cache_mb, disk_space_mb);
                             return 0;
                         }
 #endif
@@ -1078,6 +1089,10 @@ int main(int argc, char **argv) {
                             printf("%s\n", value);
                             return 0;
                         }
+                        else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
+                            /* will trigger a claiming attempt when the agent is initialized */
+                            claiming_pending_arguments = optarg + strlen(claim_string);
+                        }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
                             return help(1);
@@ -1104,6 +1119,7 @@ int main(int argc, char **argv) {
 
     if(!config_loaded)
         load_netdata_conf(NULL, 0);
+
 
     // ------------------------------------------------------------------------
     // initialize netdata
@@ -1262,10 +1278,21 @@ int main(int argc, char **argv) {
     get_system_info(system_info);
 
     rrd_init(netdata_configured_hostname, system_info);
+
+    // ------------------------------------------------------------------------
+    // Claim netdata agent to a cloud endpoint
+
+    if (claiming_pending_arguments)
+         claim_agent(claiming_pending_arguments);
+    load_claiming_state();
+
     // ------------------------------------------------------------------------
     // enable log flood protection
 
     error_log_limit_reset();
+
+    // Load host labels
+    reload_host_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads
@@ -1284,6 +1311,11 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+
+    // ------------------------------------------------------------------------
+    // Initialize netdata agent command serving from cli and signals
+
+    commands_init();
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;

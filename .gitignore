@@ -37,6 +37,7 @@ sha256sums.txt
 
 # netdata binaries
 netdata
+netdatacli
 !netdata/
 upload/
 artifacts/
@@ -112,8 +113,10 @@ system/netdata-freebsd
 system/edit-config
 
 daemon/anonymous-statistics.sh
+daemon/get-kubernetes-labels.sh
 
 health/notifications/alarm-notify.sh
+claim/netdata-claim.sh
 collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh
 collectors/charts.d.plugin/charts.d.plugin
@@ -181,6 +184,8 @@ python.d/python-modules-installer.sh
 # documentation generated files
 docs/generator/src
 docs/generator/build
+docs/generator/doc
+docs/generator/localization
 docs/generator/mkdocs.yml
 
 .environment.sh

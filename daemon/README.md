@@ -185,6 +185,8 @@ The command line options of the Netdata 1.10.0 version are the following:
   - USR2                   Reload health configuration.
 ```
 
+You can send commands during runtime via [netdatacli](../cli).
+
 ## Log files
 
 Netdata uses 3 log files:

@@ -291,5 +291,5 @@ def handle_disabled_disk_monitoring(node_stats):
     # https://github.com/netdata/netdata/issues/7218
     # can be "disk_free": "disk_free_monitoring_disabled"
     v = node_stats.get('disk_free')
-    if v and isinstance(v, str):
+    if v and not isinstance(v, int):
         del node_stats['disk_free']
