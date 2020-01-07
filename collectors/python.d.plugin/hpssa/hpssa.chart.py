@@ -176,6 +176,9 @@ class HPSSA(object):
         for line in self:
             if error_match.match(line):
                 raise HPSSAException('Error: {}'.format(line))
+            elif adapter_regex.match(line):
+                self.rewind()
+                break
             elif array_regex.match(line):
                 self.parse_array(adapter)
             elif line == 'Unassigned':

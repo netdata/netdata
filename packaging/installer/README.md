@@ -65,6 +65,7 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 -   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
+-   `--nightly-channel`: Automatically update on every new nightly build.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--local-files`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
 
@@ -76,7 +77,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it 
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
+Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
+overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
+Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/step-00.md)!
 
 ---
 
@@ -106,7 +109,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "8ad43ff960bf6f2487233682909f7a87" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "23e0f38dfb9d517be16393c3ed1f88bd" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -145,7 +148,9 @@ sh /tmp/kickstart-static64.sh
 
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
+Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
+overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
+Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/step-00.md)!
 
 ---
 
@@ -425,6 +430,17 @@ sudo ./netdata-installer.sh --install /usr/local
 
 The installer will also install a startup plist to start Netdata when your Mac boots.
 
+**Note:** Should you wish to install Netdata with TLS support:
+1. Install OpenSSL via brew by executing `brew install openssl`
+2. Run the installer with the extra CFLAGS and LDFLAGS, since your OpenSSL installation is not automatically symlinked to `/usr/local`
+
+```sh
+# install Netdata in /usr/local/netdata
+cd netdata
+CFLAGS="-I$(brew --prefix)/opt/openssl/include" LDFLAGS="${LDFLAGS} -L$(brew --prefix)/opt/openssl/lib" sudo -E ./netdata-installer.sh --install /usr/local
+```
+
+
 ##### Alpine 3.x
 
 Execute these commands to install Netdata in Alpine Linux 3.x:
@@ -582,8 +598,10 @@ bash kickstart.sh --local-files /tmp/netdata-version-number-here.tar.gz /tmp/sha
 bash kickstart-static64.sh --local-files /tmp/netdata-version-number-here.gz.run /tmp/sha256sums.txt
 ```
 
-Now that you're finished with your offline installation, you can move on to our
-[getting started guide](../../docs/getting-started.md)!
+Now that you're finished with your offline installation, you can move on to our [getting started
+guide](../../docs/getting-started.md) for a quick overview of configuring Netdata, enabling plugins, and controlling
+Netdata's daemon. Or, get the full guided tour of Netdata's capabilities with our [step-by-step
+tutorial](../../docs/step-by-step/step-00.md)!
 
 ## Automatic updates
 

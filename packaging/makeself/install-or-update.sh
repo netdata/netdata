@@ -25,13 +25,16 @@ fi
 
 STARTIT=1
 AUTOUPDATE=0
-RELEASE_CHANNEL="nightly"
+RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 
 while [ "${1}" ]; do
 	case "${1}" in
 		"--dont-start-it") STARTIT=0;;
 		"--auto-update"|"-u") AUTOUPDATE=1;;
 		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--nightly-channel") RELEASE_CHANNEL="nightly";;
+		"--disable-telemetry") DISABLE_TELEMETRY=1;;
+
 		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
 	esac
 	shift 1
@@ -134,6 +137,15 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
 
+# -----------------------------------------------------------------------------
+progress "Telemetry configuration"
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+  run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+else
+  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"

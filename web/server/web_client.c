@@ -1339,8 +1339,16 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
 
+        if(!url) { //no delim found
+            debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
+            buffer_sprintf(w->response.header, "Location: http://%s%s/\r\n", w->server_host, w->last_url);
+            buffer_strcat(w->response.data, "Permanent redirect");
+            return HTTP_RESP_REDIR_PERM;
+        }
+
         // copy the URL, we need it to serve files
         w->last_url[0] = '/';
+
         if(url && *url) strncpyz(&w->last_url[1], url, NETDATA_WEB_REQUEST_URL_SIZE - 1);
         else w->last_url[1] = '\0';
 

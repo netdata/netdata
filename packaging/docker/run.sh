@@ -7,6 +7,10 @@
 # Author  : Pavlos Emm. Katsoulakis <paul@netdata.cloud>
 set -e
 
+if [ -n "${DO_NOT_TRACK+x}" ]; then
+  touch /etc/netdata/.opt-out-from-anonymous-statistics
+fi
+
 echo "Netdata entrypoint script starting"
 if [ ${RESCRAMBLE+x} ]; then
 	echo "Reinstalling all packages to get the latest Polymorphic Linux scramble"

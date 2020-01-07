@@ -239,8 +239,8 @@ module's protection, and your dashboard will become unresponsive. You may even b
 To mitigate this issue, you will need to change the value of the `DOSPageCount` option in your `mod_evasive.conf` file,
 which can typically be found at `/etc/httpd/conf.d/mod_evasive.conf` or `/etc/apache2/mods-enabled/evasive.conf`.
 
-The `DOSPageCount` option sets the limit fo the number of requests from a single IP address for the same page per page
-interval, which is usually 1 second. THe default value is `2` requests per second. Clearly, Netdata's typical usage will
+The `DOSPageCount` option sets the limit of the number of requests from a single IP address for the same page per page
+interval, which is usually 1 second. The default value is `2` requests per second. Clearly, Netdata's typical usage will
 exceed that threshold, and `mod_evasive` will add your IP address to a blocklist.
 
 Our users have found success by setting `DOSPageCount` to `30`. Try this, and raise the value if you continue to see 403
@@ -252,6 +252,23 @@ DOSPageCount 30
 
 Restart Apache with `sudo service apache2 restart`, or the appropriate method to restart services on your system, to
 reload its configuration with your new values.
+
+
+### Virtual host
+
+To adjust the `DOSPageCount` for a specific virtual host, open your virtual host config, which can be found at
+`/etc/httpd/conf/sites-available/my-domain.conf` or `/etc/apache2/sites-available/my-domain.conf` and add the
+following:
+
+```conf
+<VirtualHost *:80>
+	...
+	# Increase the DOSPageCount to prevent 403 errors and IP addresses being blocked.
+	<IfModule mod_evasive20.c>
+		DOSPageCount        30
+	</IfModule>
+</VirtualHost>
+```
 
 See issues [#2011](https://github.com/netdata/netdata/issues/2011) and
 [#7658](https://github.com/netdata/netdata/issues/7568) for more information.
