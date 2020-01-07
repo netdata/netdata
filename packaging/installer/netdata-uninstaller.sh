@@ -258,22 +258,98 @@ rm_dir() {
 	fi
 }
 
+safe_pidof() {
+	local pidof_cmd="$(command -v pidof 2>/dev/null)"
+	if [ -n "${pidof_cmd}" ]; then
+		${pidof_cmd} "${@}"
+		return $?
+	else
+		ps -acxo pid,comm |
+			sed "s/^ *//g" |
+			grep netdata |
+			cut -d ' ' -f 1
+		return $?
+	fi
+}
+
+pidisnetdata() {
+	if [ -d /proc/self ]; then
+		[ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+		[ "$(cut -d '(' -f 2 "/proc/$1/stat" | cut -d ')' -f 1)" = "netdata" ] && return 0
+		return 1
+	fi
+	return 0
+}
+
+stop_netdata_on_pid() {
+	local pid="${1}" ret=0 count=0
+
+	pidisnetdata "${pid}" || return 0
+
+	printf >&2 "Stopping netdata on pid %s ..." "${pid}"
+	while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
+		if [ ${count} -gt 24 ]; then
+			echo >&2 "Cannot stop the running netdata on pid ${pid}."
+			return 1
+		fi
+
+		count=$((count + 1))
+
+		pidisnetdata "${pid}" || ret=1
+		if [ ${ret} -eq 1 ] ; then
+			break
+		fi
+
+		if [ ${count} -lt 12 ] ; then
+			run kill "${pid}" 2>/dev/null
+			ret=$?
+		else
+			run kill -9 "${pid}" 2>/dev/null
+			ret=$?
+		fi
+
+		test ${ret} -eq 0 && printf >&2 "." && sleep 5
+
+	done
+
+	echo >&2
+	if [ ${ret} -eq 0 ]; then
+		echo >&2 "SORRY! CANNOT STOP netdata ON PID ${pid} !"
+		return 1
+	fi
+
+	echo >&2 "netdata on pid ${pid} stopped."
+	return 0
+}
+
 netdata_pids() {
 	local p myns ns
+
 	myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+
 	for p in \
 		$(cat /var/run/netdata.pid 2>/dev/null) \
 		$(cat /var/run/netdata/netdata.pid 2>/dev/null) \
-		$(pidof netdata 2>/dev/null); do
-
+		$(safe_pidof netdata 2>/dev/null); do
 		ns="$(readlink "/proc/${p}/ns/pid" 2>/dev/null)"
-		#shellcheck disable=SC2002
+
 		if [ -z "${myns}" ] || [ -z "${ns}" ] || [ "${myns}" = "${ns}" ]; then
-			name="$(cat "/proc/${p}/stat" 2>/dev/null | cut -d '(' -f 2 | cut -d ')' -f 1)"
-			if [ "${name}" = "netdata" ]; then
-				echo "${p}"
-			fi
+			pidisnetdata "${p}" && echo "${p}"
 		fi
+	done
+}
+
+stop_all_netdata() {
+	local p
+
+	if [ -n $(netdata_pids) -a -n "$(builtin type -P netdatacli)" ] ; then
+		netdatacli shutdown-agent
+		sleep 20
+	fi
+
+	for p in $(netdata_pids); do
+		# shellcheck disable=SC2086
+		stop_netdata_on_pid ${p}
 	done
 }
 
@@ -284,20 +360,7 @@ source "${ENVIRONMENT_FILE}" || exit 1
 
 #### STOP NETDATA
 echo >&2 "Stopping a possibly running netdata..."
-for p in $(netdata_pids); do
-	i=0
-	while kill "${p}" 2>/dev/null; do
-		if [ "$i" -gt 30 ]; then
-			echo >&2 "Forcefully stopping netdata with pid ${p}"
-			run kill -9 "${p}"
-			run sleep 2
-			break
-		fi
-		sleep 1
-		i=$((i + 1))
-	done
-done
-sleep 2
+stop_all_netdata
 
 #### REMOVE NETDATA FILES
 rm_file /etc/logrotate.d/netdata

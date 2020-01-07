@@ -932,7 +932,7 @@ AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "ye
 
 PKG_CHECK_MODULES(
     [PROTOBUF],
-    [protobuf >= 3.1],
+    [protobuf >= 3],
     [have_libprotobuf=yes],
     [have_libprotobuf=no]
 )
@@ -999,7 +999,7 @@ test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler
     AC_MSG_ERROR([C++ compiler required but not found. try installing g++])
 
 AC_MSG_CHECKING([if prometheus remote write backend should be enabled])
-if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
+if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
