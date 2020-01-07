@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
+#include "../aclk/agent_cloud_link.h"
 
 // ----------------------------------------------------------------------------
 // health alarm log load/save
@@ -69,6 +70,119 @@ inline void health_log_rotate(RRDHOST *host) {
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
+
+    char  cloud_message[8192];
+
+    sprintf(cloud_message,"%c\t%s"
+        "\t%08x\t%08x\t%08x\t%08x\t%08x"
+        "\t%08x\t%08x\t%08x"
+        "\t%08x\t%08x\t%08x"
+        "\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s"
+        "\t%d\t%d\t%d\t%d"
+        "\t" CALCULATED_NUMBER_FORMAT_AUTO "\t" CALCULATED_NUMBER_FORMAT_AUTO
+        "\t%016lx"
+        "\n"
+        , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
+        , host->hostname
+
+        , ae->unique_id
+        , ae->alarm_id
+        , ae->alarm_event_id
+        , ae->updated_by_id
+        , ae->updates_id
+
+        , (uint32_t)ae->when
+        , (uint32_t)ae->duration
+        , (uint32_t)ae->non_clear_duration
+        , (uint32_t)ae->flags
+        , (uint32_t)ae->exec_run_timestamp
+        , (uint32_t)ae->delay_up_to_timestamp
+
+        , (ae->name)?ae->name:""
+        , (ae->chart)?ae->chart:""
+        , (ae->family)?ae->family:""
+        , (ae->exec)?ae->exec:""
+        , (ae->recipient)?ae->recipient:""
+        , (ae->source)?ae->source:""
+        , (ae->units)?ae->units:""
+        , (ae->info)?ae->info:""
+
+        , ae->exec_code
+        , ae->new_status
+        , ae->old_status
+        , ae->delay
+
+        , ae->new_value
+        , ae->old_value
+        , (uint64_t)ae->last_repeat);
+
+
+    sprintf(cloud_message,"%c|%s"
+                     "|%08x|%08x|%08x|%08x|%08x"
+                     "|%08x|%08x|%08x"
+                     "|%08x|%08x|%08x"
+                     "|%s|%s|%s|%s|%s|%s|%s|%s"
+                     "|%d|%d|%d|%d"
+                     "|" CALCULATED_NUMBER_FORMAT_AUTO "|" CALCULATED_NUMBER_FORMAT_AUTO
+                     "|%016lx"
+                     "\n"
+        , (ae->flags & HEALTH_ENTRY_FLAG_SAVED)?'U':'A'
+        , host->hostname
+
+        , ae->unique_id
+        , ae->alarm_id
+        , ae->alarm_event_id
+        , ae->updated_by_id
+        , ae->updates_id
+
+        , (uint32_t)ae->when
+        , (uint32_t)ae->duration
+        , (uint32_t)ae->non_clear_duration
+        , (uint32_t)ae->flags
+        , (uint32_t)ae->exec_run_timestamp
+        , (uint32_t)ae->delay_up_to_timestamp
+
+        , (ae->name)?ae->name:""
+        , (ae->chart)?ae->chart:""
+        , (ae->family)?ae->family:""
+        , (ae->exec)?ae->exec:""
+        , (ae->recipient)?ae->recipient:""
+        , (ae->source)?ae->source:""
+        , (ae->units)?ae->units:""
+        , (ae->info)?ae->info:""
+
+        , ae->exec_code
+        , ae->new_status
+        , ae->old_status
+        , ae->delay
+
+        , ae->new_value
+        , ae->old_value
+        , (uint64_t)ae->last_repeat);
+
+
+    // Sample MQTT send ; to be changed
+//    {
+//        int rc;
+//        static int cloud_error = 0;
+//
+//        rc = aclk_send_message(NULL, "alarm", cloud_message);
+//
+//        if (rc != MOSQ_ERR_SUCCESS) {
+//            errno = 0;
+//            if (!cloud_error) {
+//                cloud_error = 1;
+//                error("MQTT send failed with %d - (%s)",rc, mosquitto_strerror(rc));
+//            }
+//        }
+//        else {
+//            if (cloud_error) {
+//                cloud_error = 0;
+//                error("MQTT send OK");
+//            }
+//        }
+//
+//    }
 
     if(likely(host->health_log_fp)) {
         if(unlikely(fprintf(host->health_log_fp

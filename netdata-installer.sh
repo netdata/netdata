@@ -410,6 +410,7 @@ if [ ${LIBS_ARE_HERE} -eq 1 ]; then
 	export ZLIB_LIBS="-lz"
 	export UUID_CFLAGS=" "
 	export UUID_LIBS="-luuid"
+    export MQTT_LIBS="-lmosquitto"
 fi
 
 trap build_error EXIT

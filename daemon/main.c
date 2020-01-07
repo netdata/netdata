@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <stdbool.h>
 #include "common.h"
 
 int netdata_zero_metrics_enabled;
@@ -72,6 +73,8 @@ struct netdata_static_thread static_threads[] = {
 
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
+
+    NETDATA_ACLK_HOOK
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
@@ -779,6 +782,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
 void send_statistics( const char *action, const char *action_result, const char *action_data) {
     static char *as_script;
+
     if (netdata_anonymous_statistics_enabled == -1) {
         char *optout_file = mallocz(sizeof(char) * (strlen(netdata_configured_user_config_dir) +strlen(".opt-out-from-anonymous-statistics") + 2));
         sprintf(optout_file, "%s/%s", netdata_configured_user_config_dir, ".opt-out-from-anonymous-statistics");
