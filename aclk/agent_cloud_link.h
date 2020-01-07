@@ -62,7 +62,7 @@ char    *get_base_topic();
 int aclk_subscribe(char  *topic);
 void aclk_shutdown();
 void aclk_message_callback(
-    struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg, const mosquitto_property *props);
+    struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg);
 
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
