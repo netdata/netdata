@@ -23,7 +23,7 @@ inline const char *_link_strerror(int rc)
 }
 
 void mqtt_message_callback(
-    struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg, const mosquitto_property *props)
+    struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg)
 {
     info("MQTT received message %d [%s]", msg->payloadlen, (char *)msg->payload);
 
@@ -39,7 +39,7 @@ void mqtt_message_callback(
     }
 }
 
-void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags, const mosquitto_property *props)
+void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
 {
     info("Connection to cloud estabilished");
 
@@ -50,7 +50,7 @@ void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags, cons
 }
 
 
-void disconnect_callback(struct mosquitto *mosq, void *obj, int rc, int flags, const mosquitto_property *props)
+void disconnect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
 {
     info("Connection to cloud failed");
     // TODO: Keep the connection "alive" for now. The library will reconnect.
