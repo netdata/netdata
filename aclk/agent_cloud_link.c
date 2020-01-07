@@ -293,8 +293,7 @@ void *aclk_main(void *ptr) {
         // Call the loop to handle inbound and outbound messages  // Timeout after 60 seconds
 
         if (unlikely(!aclk_subscribed)) {
-            rc = _link_subscribe("netdata/command");
-            aclk_subscribed = !rc;
+            aclk_subscribed = !_link_subscribe("netdata/command");
         }
 
         aclk_heartbeat();

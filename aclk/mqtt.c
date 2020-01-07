@@ -98,26 +98,16 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
     _on_connect = on_connect;
     _on_disconnect = on_disconnect;
 
-    mosquitto_connect_v5_callback_set(mosq, connect_callback);
-    mosquitto_disconnect_v5_callback_set(mosq, disconnect_callback);
+    mosquitto_connect_callback_set(mosq, connect_callback);
+    mosquitto_disconnect_callback_set(mosq, disconnect_callback);
 
     rc = mosquitto_threaded_set(mosq, 1);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("Failed to tune the thread model for libmoquitto (%s)", mosquitto_strerror(rc));
 
-    // attempt V5 protocol for now, no doc on the return status for now
-    rc = mosquitto_int_option(mosq, MQTT_PROTOCOL_V5, 0);
+    rc = mosquitto_int_option(mosq, MQTT_PROTOCOL_V311, 0);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("MQTT protocol specification rc = %d (%s)", rc, mosquitto_strerror(rc));
-
-    // These added for the V5 -- may need to be removed if we go to 3.x
-    //rc = mosquitto_int_option(mosq, MOSQ_OPT_RECEIVE_MAXIMUM, mqtt_recv_maximum);
-    //if (unlikely(rc != MOSQ_ERR_SUCCESS))
-    //  error("MQTT receive maximum queue set failed rc = %d (%s)", rc, mosquitto_strerror(rc));
-
-    //rc = mosquitto_int_option(mosq, MOSQ_OPT_SEND_MAXIMUM, mqtt_send_maximum);
-    //if (unlikely(rc != MOSQ_ERR_SUCCESS))
-    //  error("MQTT send maximum queue set failed rc = %d (%s)", rc, mosquitto_strerror(rc));
 
     rc = mosquitto_int_option(mosq, MOSQ_OPT_SEND_MAXIMUM, 1);
     info("MQTT in flight messages set to 1  -- %s", mosquitto_strerror(rc));
@@ -185,10 +175,9 @@ int _link_subscribe(char  *topic)
     if (unlikely(!mosq))
         return 1;
 
-    mosquitto_message_v5_callback_set(mosq, mqtt_message_callback);
+    mosquitto_message_callback_set(mosq, mqtt_message_callback);
 
-    // TODO: remove hard coded params
-    rc = mosquitto_subscribe_v5(mosq, NULL, "netdata/command", 1, 0, NULL);
+    rc = mosquitto_subscribe(mosq, NULL, topic, ACLK_QOS);
     if (unlikely(rc)) {
         errno = 0;
         error("Failed to register subscription %d (%s)", rc, mosquitto_strerror(rc));
@@ -220,7 +209,7 @@ int _link_send_message(char *topic, char *message)
     //if (unlikely(rc != MOSQ_ERR_SUCCESS))
     //    return rc;
 
-    rc = mosquitto_publish_v5(mosq, NULL, topic, msg_len, message, ACLK_QOS , 0, NULL);
+    rc = mosquitto_publish(mosq, NULL, topic, msg_len, message, ACLK_QOS, 0);
 
     // TODO: Add better handling -- error will flood the logfile here
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
