@@ -156,7 +156,7 @@ typedef enum label_source {
     LABEL_SOURCE_KUBERNETES       = 4
 } LABEL_SOURCE;
 
-#define LABEL_FLAG_STREAM 1
+#define LABEL_FLAG_UPDATE_STREAM 1
 #define LABEL_FLAG_STOP_STREAM 2
 
 struct label {

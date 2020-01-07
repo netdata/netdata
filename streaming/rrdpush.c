@@ -343,7 +343,7 @@ void rrdset_done_push(RRDSET *st) {
 
 // labels
 void rrdpush_send_labels(RRDHOST *host) {
-    if (!host->labels || !(host->labels_flag & LABEL_FLAG_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
+    if (!host->labels || !(host->labels_flag & LABEL_FLAG_UPDATE_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
         return;
 
     rrdpush_buffer_lock(host);
@@ -369,7 +369,7 @@ void rrdpush_send_labels(RRDHOST *host) {
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
 
     rrdpush_buffer_unlock(host);
-    host->labels_flag &= ~LABEL_FLAG_STREAM;
+    host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
 }
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
@@ -650,13 +650,13 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     int answer = strncmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
     if(!answer) {
-        host->labels_flag |= LABEL_FLAG_STREAM;
+        host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
         host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
     } else {
         answer = strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
         if(!answer) {
             host->labels_flag |= LABEL_FLAG_STOP_STREAM;
-            host->labels_flag &= ~LABEL_FLAG_STREAM;
+            host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
             info("STREAM %s [send to %s]: is using an old Netdata.", host->hostname,  connected_to);
         }
     }
@@ -1149,7 +1149,7 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
     char *initial_response;
-    if (stream_flags & LABEL_FLAG_STREAM) {
+    if (stream_flags & LABEL_FLAG_UPDATE_STREAM) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the newest stream protocol.", host->hostname, client_ip, client_port);
         initial_response = START_STREAMING_PROMPT_V2;
     } else {
@@ -1393,7 +1393,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             tags = value;
         else {
             if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
-                stream_flags = LABEL_FLAG_STREAM;
+                stream_flags = LABEL_FLAG_UPDATE_STREAM;
             else
                 if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
                     info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",

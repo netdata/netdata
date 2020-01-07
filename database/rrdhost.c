@@ -954,7 +954,7 @@ void reload_host_labels()
     replace_label_list(localhost, new_labels);
 
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
-        localhost->labels_flag |= LABEL_FLAG_STREAM;
+        localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
         rrdpush_send_labels(localhost);
     }
 
