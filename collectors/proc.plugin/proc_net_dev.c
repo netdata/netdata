@@ -10,7 +10,9 @@ const char *operstate_names[] = { "unknown", "notpresent", "down", "lowerlayerdo
 
 static inline int get_operstate(char *operstate)
 {
-    for (int i = 0; i < (int) (sizeof(operstate_names) / sizeof(char *)); i++) {
+    int i;
+
+    for (i = 0; i < (int) (sizeof(operstate_names) / sizeof(char *)); i++) {
         if (!strcmp(operstate, operstate_names[i])) {
             return i;
         }
