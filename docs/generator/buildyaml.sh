@@ -37,7 +37,7 @@ navpart() {
 	if [ -z "$maxdepth" ]; then maxdepth=1; fi
 	if [[ -n $excludefirstlevel ]]; then mindepth=2; else mindepth=1; fi
 
-	for f in $(find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h\0%d\0%p\n' | sort -t '\0' -n | awk -F '\0' '{print $3}'); do
+	for f in $(find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h|%d|%p\n' | sort -t '|' -n | awk -F '|' '{print $3}'); do
 		# If I'm adding a section, I need the child links to be one level deeper than the requested level in "tabs"
 		if [ -z "$section" ]; then
 			echo "$spc- '$f'"
