@@ -80,6 +80,7 @@ umask 002
 renice 19 $$ >/dev/null 2>/dev/null
 
 # you can set CFLAGS before running installer
+LDFLAGS="${LDFLAGS}"
 CFLAGS="${CFLAGS--O2}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
 
@@ -88,6 +89,7 @@ CFLAGS="${CFLAGS--O2}"
 printf "\\n# " >>netdata-installer.log
 date >>netdata-installer.log
 printf 'CFLAGS="%s" ' "${CFLAGS}" >>netdata-installer.log
+printf 'LDFLAGS="%s" ' "${LDFLAGS}" >>netdata-installer.log
 printf "%q " "${PROGRAM}" "${@}" >>netdata-installer.log
 printf "\\n" >>netdata-installer.log
 
@@ -186,6 +188,14 @@ Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
 
   CFLAGS="<gcc options>" ${PROGRAM} [options]
+
+If you also need to provide different LDFLAGS, use something like this:
+
+  LDFLAGS="<extra ldflag options>" ${PROGRAM} [options]
+
+or use the following if both LDFLAGS and CFLAGS need to be overriden:
+
+  CFLAGS="<gcc options>" LDFLAGS="<extra ld options>" ${PROGRAM} [options]
 
 For the installer to complete successfully, you will need these packages installed:
 
@@ -422,7 +432,7 @@ run ./configure \
 	--with-math \
 	--with-user=netdata \
 	${NETDATA_CONFIGURE_OPTIONS} \
-	CFLAGS="${CFLAGS}" || exit 1
+	CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" || exit 1
 
 # remove the build_error hook
 trap - EXIT
@@ -1083,6 +1093,7 @@ cat <<EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 # Created by installer
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
+LDFLAGS="${LDFLAGS}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
