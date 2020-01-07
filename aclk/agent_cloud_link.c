@@ -270,7 +270,7 @@ void *aclk_main(void *ptr) {
             aclk_subscribed = !_link_subscribe("netdata/command");
         }
 
-        aclk_heartbeat();
+        //aclk_heartbeat();
 
         aclk_process_queries();
 
