@@ -8,74 +8,10 @@ KERNEL_VERSION="$(uname -r)"
 ARCHITECTURE="$(uname -m)"
 
 # -------------------------------------------------------------------------------------------------
-# detect the operating system
+# detect containers with heuristics
 
-OS_DETECTION="unknown"
-NAME="unknown"
-VERSION="unknown"
-VERSION_ID="unknown"
-ID="unknown"
-ID_LIKE="unknown"
-
-if [ "${KERNEL_NAME}" = "Darwin" ]; then
-	# Mac OS
-	OIFS="$IFS"
-	IFS=$'\n'
-	set $(sw_vers) > /dev/null
-	NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
-	VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
-	ID="mac"
-	ID_LIKE="mac"
-	OS_DETECTION="sw_vers"
-	IFS="$OIFS"
-else
-	if [ -f "/etc/os-release" ]; then
-		OS_DETECTION="/etc/os-release"
-		eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release)"
-	fi
-
-	if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
-		if [ -f "/etc/lsb-release" ]; then
-			if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="/etc/lsb-release"; else OS_DETECTION="Mixed"; fi
-			DISTRIB_ID="unknown"
-			DISTRIB_RELEASE="unknown"
-			DISTRIB_CODENAME="unknown"
-			eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
-			if [ "${NAME}" = "unknown" ]; then NAME="${DISTRIB_ID}"; fi
-			if [ "${VERSION}" = "unknown" ]; then VERSION="${DISTRIB_RELEASE}"; fi
-			if [ "${ID}" = "unknown" ]; then ID="${DISTRIB_CODENAME}"; fi
-		fi
-		if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-			if [ "${OS_DETECTION}" = "unknown" ]; then OS_DETECTION="lsb_release"; else OS_DETECTION="Mixed"; fi
-			if [ "${NAME}" = "unknown" ]; then NAME="$(lsb_release -is 2>/dev/null)"; fi
-			if [ "${VERSION}" = "unknown" ]; then VERSION="$(lsb_release -rs 2>/dev/null)"; fi
-			if [ "${ID}" = "unknown" ]; then ID="$(lsb_release -cs 2>/dev/null)"; fi
-		fi
-	fi
-fi
-
-# -------------------------------------------------------------------------------------------------
-# detect the virtualization
-
-VIRTUALIZATION="unknown"
-VIRT_DETECTION="none"
 CONTAINER="unknown"
 CONT_DETECTION="none"
-
-if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
-	VIRTUALIZATION="$(systemd-detect-virt -v)"
-	VIRT_DETECTION="systemd-detect-virt"
-	CONTAINER="$(systemd-detect-virt -c)"
-	CONT_DETECTION="systemd-detect-virt"
-else
-	if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
-		VIRTUALIZATION="hypervisor"
-		VIRT_DETECTION="/proc/cpuinfo"
-	fi
-fi
-
-# -------------------------------------------------------------------------------------------------
-# detect containers with heuristics
 
 if [ "${CONTAINER}" = "unknown" ]; then
 	if [ -f /proc/1/sched ] ; then
@@ -105,8 +41,131 @@ if [ "${CONTAINER}" = "unknown" ]; then
 		CONTAINER="docker"
 		CONT_DETECTION="dockerenv"
 	fi
+
 fi
 
+# -------------------------------------------------------------------------------------------------
+# detect the operating system
+
+OS_DETECTION="unknown"
+NAME="unknown"
+VERSION="unknown"
+VERSION_ID="unknown"
+ID="unknown"
+ID_LIKE="unknown"
+
+# Initially assume all OS detection values are for a container, these are moved later if we are bare-metal
+
+if [ "${KERNEL_NAME}" == "Darwin" ]; then
+	# Mac OS
+	OIFS="$IFS"
+	IFS=$'\n'
+	set $(sw_vers) > /dev/null
+	NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
+	VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
+	ID="mac"
+	ID_LIKE="mac"
+	OS_DETECTION="sw_vers"
+	IFS="$OIFS"
+elif [ "${KERNEL_NAME}" == "FreeBSD" ]; then
+
+else
+        if [ -f "/etc/os-release" ]; then
+                OS_DETECTION="/etc/os-release"
+                eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release | sed 's/^/CONTAINER_/')"
+                CONTAINER_OS_DETECTION="/etc/os-release"
+        fi
+
+	if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
+		if [ -f "/etc/lsb-release" ]; then
+			if [ "${OS_DETECTION}" = "unknown" ]; then 
+                                CONTAINER_OS_DETECTION="/etc/lsb-release"
+                        else 
+                                CONTAINER_OS_DETECTION="Mixed"
+                        fi
+			DISTRIB_ID="unknown"
+			DISTRIB_RELEASE="unknown"
+			DISTRIB_CODENAME="unknown"
+			eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
+			if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
+			if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
+			if [ "${ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
+		fi
+		if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+			if [ "${OS_DETECTION}" = "unknown" ]; then 
+                                CONTAINER_OS_DETECTION="lsb_release"
+                        else 
+                                CONTAINER_OS_DETECTION="Mixed"
+                        fi
+			if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2>/dev/null)"; fi
+			if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
+			if [ "${ID}" = "unknown" ]; then CONTAINER_ID="$(lsb_release -cs 2>/dev/null)"; fi
+		fi
+	fi
+fi
+
+# If Netdata is not running in a container then use the local detection as the host
+if [ "${CONTAINER}" == "unknown" ]; then
+        for v in NAME ID ID_LIKE VERSION VERSION_ID; do
+                eval "HOST_$v=CONTAINER_$v; unset CONTAINER_$v"
+        done
+else
+# Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
+        if [ -e "/host/etc/os-release" ]; then
+                OS_DETECTION="/etc/os-release"
+                eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </host/etc/os-release | sed 's/^/HOST_/')"
+                HOST_OS_DETECTION="/host/etc/os-release"
+        fi
+	if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
+		if [ -f "/host/etc/lsb-release" ]; then
+			if [ "${HOST_OS_DETECTION}" = "unknown" ]; then 
+                                HOST_OS_DETECTION="/etc/lsb-release"
+                        else 
+                                HOST_OS_DETECTION="Mixed"
+                        fi
+			DISTRIB_ID="unknown"
+			DISTRIB_RELEASE="unknown"
+			DISTRIB_CODENAME="unknown"
+			eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
+			if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
+			if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
+			if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
+		fi
+		if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+			if [ "${HOST_OS_DETECTION}" = "unknown" ]; then HOST_OS_DETECTION="lsb_release"; else HOST_OS_DETECTION="Mixed"; fi
+			if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="$(lsb_release -is 2>/dev/null)"; fi
+			if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
+			if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="$(lsb_release -cs 2>/dev/null)"; fi
+		fi
+	fi
+fi
+
+
+# -------------------------------------------------------------------------------------------------
+# detect the virtualization
+
+VIRTUALIZATION="unknown"
+VIRT_DETECTION="none"
+
+if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
+	VIRTUALIZATION="$(systemd-detect-virt -v)"
+	VIRT_DETECTION="systemd-detect-virt"
+	CONTAINER="$(systemd-detect-virt -c)"
+	CONT_DETECTION="systemd-detect-virt"
+else
+	if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
+		VIRTUALIZATION="hypervisor"
+		VIRT_DETECTION="/proc/cpuinfo"
+	fi
+fi
+
+# FIX THESE UP FOR BOTH CASES
+echo "NETDATA_CONTAINER_OS_NAME=${}"
+echo "NETDATA_CONTAINER_OS_ID=${}"
+echo "NETDATA_CONTAINER_OS_ID_LIKE=${}"
+echo "NETDATA_CONTAINER_OS_VERSION=${}"
+echo "NETDATA_CONTAINER_OS_VERSION_ID=${}"
+echo "NETDATA_CONTAINER_OS_DETECTION=${}"
 echo "NETDATA_SYSTEM_OS_NAME=${NAME}"
 echo "NETDATA_SYSTEM_OS_ID=${ID}"
 echo "NETDATA_SYSTEM_OS_ID_LIKE=${ID_LIKE}"
