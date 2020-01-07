@@ -932,7 +932,7 @@ AM_CONDITIONAL([ENABLE_BACKEND_KINESIS], [test "${enable_backend_kinesis}" = "ye
 
 PKG_CHECK_MODULES(
     [PROTOBUF],
-    [protobuf >= 3.1],
+    [protobuf >= 3],
     [have_libprotobuf=yes],
     [have_libprotobuf=no]
 )
