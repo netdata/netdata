@@ -1,4 +1,4 @@
-    // SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "agent_cloud_link.h"
 #include "../daemon/common.h"
@@ -68,9 +68,6 @@ int     aclk_queue_query(char *token, char *query)
 
     ACLK_LOCK;
 
-    //if (unlikely(!aclk_queue))
-    //    aclk_queue = callocz(1, sizeof(aclk_queue));
-
     if (likely(aclk_queue.aclk_query_tail)) {
         aclk_queue.aclk_query_tail->next = new_query;
         aclk_queue.aclk_query_tail = new_query;
@@ -104,11 +101,6 @@ struct aclk_query  *aclk_queue_pop()
     struct aclk_query      *this_query;
 
     ACLK_LOCK;
-
-    //if (unlikely(!aclk_queue)) {
-      //  ACLK_UNLOCK;
-        //return NULL;
-    //}
 
     if (likely(!aclk_queue.aclk_query_head)) {
         ACLK_UNLOCK;
@@ -144,7 +136,6 @@ char *get_publish_base_topic(PUBLISH_TOPIC_ACTION action)
     ACLK_LOCK;
 
     if (unlikely(action == PUBLICH_TOPIC_FREE)) {
-        // TODO: the following is not safe
         if (likely(topic)) {
             freez(topic);
             topic = NULL;
@@ -196,23 +187,6 @@ int aclk_process_query()
 
     query_count++;
     info("Processsing query #%d  (%s) (%s) queued for %d seconds", query_count, this_query->token, this_query->query, now_realtime_sec() - this_query->created);
-
-//    struct web_client *w;
-//
-//    w = callocz(1, sizeof(struct web_client));
-//    w->id = 1000;
-//    w->acl = WEB_CLIENT_ACL_DASHBOARD;
-//    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-//    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
-//    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
-//
-//    strcpy(w->decoded_url, this_query->query);
-//    rc = web_client_api_request_v1(localhost, w, "data");
-//    info("Result = %d", rc);
-//    if (w->response.data)
-//        info("R: [%s]", w->response.data);
-//
-//    freez(w);
 
     aclk_query_free(this_query);
 
@@ -373,9 +347,9 @@ int aclk_send_message(char *base_topic, char *sub_topic, char *message)
     }
 
     //info("Sending message: (%s) - (%s)", final_topic, message);
-//    ACLK_LOCK;
+    ACLK_LOCK;
     rc = _link_send_message(final_topic, message);
-  //  ACLK_UNLOCK;
+    ACLK_UNLOCK;
 
     // TODO: Add better handling -- error will flood the logfile here
     if (unlikely(rc))
