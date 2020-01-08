@@ -116,6 +116,7 @@ daemon/anonymous-statistics.sh
 daemon/get-kubernetes-labels.sh
 
 health/notifications/alarm-notify.sh
+claim/netdata-claim.sh
 collectors/cgroups.plugin/cgroup-name.sh
 collectors/tc.plugin/tc-qos-helper.sh
 collectors/charts.d.plugin/charts.d.plugin

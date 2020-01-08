@@ -256,7 +256,7 @@ find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
 # -----------------------------------------------------------------------------
 # Detect libprotobuf
 
-pkg_check_modules(PROTOBUF protobuf)
+pkg_check_modules(PROTOBUF protobuf>=3)
 # later we use:
 # ${PROTOBUF_LIBRARIES}
 # ${PROTOBUF_CFLAGS_OTHER}
@@ -601,6 +601,11 @@ set(BACKENDS_PLUGIN_FILES
         backends/prometheus/backend_prometheus.h
         )
 
+set(CLAIM_PLUGIN_FILES
+        claim/claim.c
+        claim/claim.h
+        )
+
 set(EXPORTING_ENGINE_FILES
         exporting/exporting_engine.c
         exporting/exporting_engine.h
@@ -667,6 +672,7 @@ set(NETDATA_FILES
         ${STATSD_PLUGIN_FILES}
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
+        ${CLAIM_PLUGIN_FILES}
         )
 
 set(NETDATACLI_FILES

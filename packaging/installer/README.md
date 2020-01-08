@@ -4,8 +4,18 @@ Netdata is a **monitoring agent**. It is designed to be installed and run on all
 
 The best way to install Netdata is directly from source. Our **automatic installer** will install any required system packages and compile Netdata directly on your systems.
 
-!!! warning
-    You can find Netdata packages distributed by third parties. In many cases, these packages are either too old or broken. So, the suggested ways to install Netdata are the ones in this page.
+Some third parties, such as the packaging teams at various Linux distributions, distribute old, broken, or altered
+packages. We recommend you install Netdata using one of the above methods to guarantee you get the latest and
+checksum-verified packages.
+
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
+page.
+
+The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+_actively_ contributing to Netdata's future.
+
+## Installation methods
 
 1.  [Automatic one line installation](#one-line-installation), easy installation from source, **this is the default**
 2.  [Install pre-built static binary on any 64bit Linux](#linux-64bit-pre-built-static-binary)
@@ -17,12 +27,7 @@ The best way to install Netdata is directly from source. Our **automatic install
 8.  [Install on macOS (OS X)](#macos)
 9.  [Install on a Kubernetes cluster](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)
 10. [Install using binary packages](#binary-packages)
-
-See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
-
-Note: From Netdata v1.12 and above, anonymous usage information is collected by default and sent to Google Analytics. To read more about the information collected and how to opt-out, check the [anonymous statistics page](../../docs/anonymous-statistics.md).
-
----
+11. See also the list of Netdata [package maintainers](../maintainers) for ASUSTOR NAS, OpenWRT, ReadyNAS, etc.
 
 ## One-line installation
 
@@ -65,6 +70,9 @@ The `kickstart.sh` script passes all its parameters to `netdata-installer.sh`, s
 -   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
+-   `--nightly-channel`: Automatically update on every new nightly build.
+-   `--disable telemetry`: Opt-out of [anonymous statistics](../../docs/anonymous-statistics.md) we use to make Netdata
+    better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--local-files`: Used for offline installations. Pass four file paths: the Netdata tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the process using those files.
 
@@ -76,7 +84,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-wait --dont-start-it 
 Note: `--stable-channel` and `--local-files` overlap, if you use the tarball override the stable channel option is not effective
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
+Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
+overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
+Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/step-00.md)!
 
 ---
 
@@ -106,7 +116,7 @@ This script installs Netdata at `/opt/netdata`.
 Verify the integrity of the script with this:
 
 ```bash
-[ "8ad43ff960bf6f2487233682909f7a87" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+[ "23e0f38dfb9d517be16393c3ed1f88bd" = "$(curl -Ss https://my-netdata.io/kickstart-static64.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
 ```
 
 *It should print `OK, VALID` if the script is the one we ship.*
@@ -116,6 +126,8 @@ The `kickstart-static64.sh` script passes all its parameters to `netdata-install
 -   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
+-   `--disable telemetry`: Opt-out of [anonymous statistics](../../docs/anonymous-statistics.md) we use to make Netdata
+    better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--local-files`: Used for offline installations. Pass two file paths, one for the tarball and one for the checksum file, to force kickstart run the process using those files.
 
@@ -145,7 +157,9 @@ sh /tmp/kickstart-static64.sh
 
 </details>
 
-Once Netdata is installed, see [Getting Started](../../docs/getting-started.md).
+Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
+overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
+Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/step-00.md)!
 
 ---
 
@@ -286,6 +300,9 @@ cd netdata
 
 -   You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
+-   You can append `--disable telemetry` to opt-out of [anonymous statistics](../../docs/anonymous-statistics.md) we use
+    to make Netdata better.
+
 -   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
 
 -   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
@@ -424,6 +441,17 @@ sudo ./netdata-installer.sh --install /usr/local
 ```
 
 The installer will also install a startup plist to start Netdata when your Mac boots.
+
+**Note:** Should you wish to install Netdata with TLS support:
+1. Install OpenSSL via brew by executing `brew install openssl`
+2. Run the installer with the extra CFLAGS and LDFLAGS, since your OpenSSL installation is not automatically symlinked to `/usr/local`
+
+```sh
+# install Netdata in /usr/local/netdata
+cd netdata
+CFLAGS="-I$(brew --prefix)/opt/openssl/include" LDFLAGS="${LDFLAGS} -L$(brew --prefix)/opt/openssl/lib" sudo -E ./netdata-installer.sh --install /usr/local
+```
+
 
 ##### Alpine 3.x
 
@@ -582,8 +610,10 @@ bash kickstart.sh --local-files /tmp/netdata-version-number-here.tar.gz /tmp/sha
 bash kickstart-static64.sh --local-files /tmp/netdata-version-number-here.gz.run /tmp/sha256sums.txt
 ```
 
-Now that you're finished with your offline installation, you can move on to our
-[getting started guide](../../docs/getting-started.md)!
+Now that you're finished with your offline installation, you can move on to our [getting started
+guide](../../docs/getting-started.md) for a quick overview of configuring Netdata, enabling plugins, and controlling
+Netdata's daemon. Or, get the full guided tour of Netdata's capabilities with our [step-by-step
+tutorial](../../docs/step-by-step/step-00.md)!
 
 ## Automatic updates
 

@@ -304,12 +304,8 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
 //    for(rt = host->templates; rt ; rt = rt->next)
 //        health_rrdcalctemplate2json_nolock(wb, rt);
 
-    buffer_strcat(wb, "\n\t},");
+    buffer_strcat(wb, "\n\t}\n}\n");
     rrdhost_unlock(host);
-
-    buffer_strcat(wb, "\n\t\"labels\": {\n");
-    host_labels2json(host, wb, 2);
-    buffer_strcat(wb, "\t}\n}\n");
 }
 
 

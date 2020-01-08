@@ -91,6 +91,12 @@ bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+about the information collected, and learn how to-opt, on our [anonymous statistics](docs/anonymous-statistics.md) page.
+
+The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+_actively_ contributing to Netdata's future.
+
 To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](packaging/installer/README.md#nightly-vs-stable-releases).
 
 The above command will:
@@ -98,7 +104,9 @@ The above command will:
 -   Install any required packages on your system (it will ask you to confirm before doing so)
 -   Compile it, install it, and start it.
 
-More installation methods and additional options can be found at the [installation page](packaging/installer/#installation).
+More installation methods and additional options can be found at the [installation page](packaging/installer/README.md).
+
+---
 
 To try Netdata in a docker container, run this:
 

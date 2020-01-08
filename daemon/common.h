@@ -60,6 +60,9 @@
 // netdata unit tests
 #include "unit_test.h"
 
+// netdata agent claiming
+#include "claim/claim.h"
+
 // the netdata deamon
 #include "daemon.h"
 #include "main.h"
