@@ -507,6 +507,7 @@ void *backends_main(void *ptr) {
     const char *destination     = config_get(CONFIG_SECTION_BACKEND, "destination", "localhost");
     global_backend_prefix       = config_get(CONFIG_SECTION_BACKEND, "prefix", "netdata");
     const char *hostname        = config_get(CONFIG_SECTION_BACKEND, "hostname", localhost->hostname);
+    const char *remote_hostname = config_get(CONFIG_SECTION_BACKEND, "remote hostname", "localhost");
     global_backend_update_every = (int)config_get_number(CONFIG_SECTION_BACKEND, "update every", global_backend_update_every);
     int buffer_on_failures      = (int)config_get_number(CONFIG_SECTION_BACKEND, "buffer on failures", 10);
     long timeoutms              = config_get_number(CONFIG_SECTION_BACKEND, "timeout ms", global_backend_update_every * 2 * 1000);
@@ -1069,7 +1070,7 @@ void *backends_main(void *ptr) {
                                     "Content-Length: %zu\r\n"
                                     "Content-Type: application/x-www-form-urlencoded\r\n\r\n",
                                     remote_write_path,
-                                    hostname,
+                                    remote_hostname,
                                     data_size
                     );
 
