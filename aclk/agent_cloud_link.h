@@ -3,7 +3,8 @@
 #ifndef NETDATA_AGENT_CLOUD_LINK_H
 #define NETDATA_AGENT_CLOUD_LINK_H
 
-#include "mqtt.h"
+#define WITH_TLS 1
+#include "mosquitto/lib/mosquitto.h"
 
 #define ACLK_INITIALIZATION_WAIT 60        // Wait for link to initialize in seconds (per msg)
 #define ACLK_INITIALIZATION_SLEEP_WAIT 1  // Wait time @ spin lock for MQTT initialization in seconds
@@ -49,11 +50,11 @@ void *aclk_main(void *ptr);
         .start_routine = aclk_main \
     },
 
-extern int aclk_send_message(char *sub_topic, char *message);
-//extern char *is_agent_claimed(void);
+extern int aclk_send_message(char *base_topic, char *sub_topic, char *message);
 
 int     aclk_init();
 char    *get_base_topic();
+
 
 
 // callbacks for agent cloud link
@@ -65,7 +66,6 @@ void aclk_message_callback(
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
 int aclk_heartbeat();
-int aclk_send_metadata();
 
 
 
