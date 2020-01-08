@@ -303,7 +303,7 @@ install_non_systemd_init() {
 				run rc-update add netdata default &&
 				return 0
 
-		elif [ "${key}" =~ ^devuan* ] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+		elif [[ "${key}" =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
 			echo >&2 "Installing LSB init file..."
 			run cp system/netdata-lsb /etc/init.d/netdata &&
 				run chmod 755 /etc/init.d/netdata &&
