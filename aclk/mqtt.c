@@ -36,6 +36,12 @@ void mqtt_message_callback(
         health_reload();
         error_log_limit_reset();
     }
+
+    if (strcmp((char *)msg->payload, "info") == 0) {
+        error_log_limit_unlimited();
+        aclk_send_metadata();
+        error_log_limit_reset();
+    }
 }
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)

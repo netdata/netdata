@@ -23,7 +23,7 @@ extern int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 extern int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *w, char *url);
 extern int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url);
 extern int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url);
-
+extern int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb);
 extern void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation);
 
 extern void web_client_api_v1_init(void);

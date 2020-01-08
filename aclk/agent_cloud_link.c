@@ -12,6 +12,11 @@ int aclk_port = 0;              // default 1883
 char *aclk_hostname = NULL;     //default localhost
 int aclk_subscribed = 0;
 
+int aclk_metadata_submitted = 0;
+
+BUFFER *aclk_buffer = NULL;
+
+
 // TODO: set the variable when is_agent_claimed() returns non empty string
 int agent_claimed = 1;
 
@@ -185,6 +190,10 @@ int aclk_process_query()
 
     //last_beat = current_beat;
 
+    if (!aclk_connection_initialized)
+        return 0;
+
+
     this_query = aclk_queue_pop();
     if (likely(!this_query)) {
         //info("No pending queries");
@@ -207,6 +216,11 @@ int aclk_process_query()
 int aclk_process_queries()
 {
     int rc;
+
+    if (unlikely(!aclk_metadata_submitted)) {
+        aclk_send_metadata();
+        aclk_metadata_submitted = 1;
+    }
 
     // Return if no queries pendning
     if (likely(!aclk_queue.count))
@@ -246,6 +260,8 @@ void *aclk_main(void *ptr) {
 
     netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
+
+
     while(!netdata_exit) {
         int rc;
 
@@ -275,11 +291,13 @@ void *aclk_main(void *ptr) {
 
         if (unlikely(!aclk_subscribed)) {
             aclk_subscribed = !_link_subscribe("netdata/command");
+
         }
 
         //aclk_heartbeat();
 
-        aclk_process_queries();
+        if (likely(aclk_connection_initialized))
+            aclk_process_queries();
 
         rc = _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
 
@@ -456,5 +474,25 @@ int aclk_heartbeat()
         last_beat = current_beat;
         aclk_send_message("heartbeat", "ping");
     }
+    return 0;
+}
+
+// Send metadata to the cloud if the link is established
+int aclk_send_metadata()
+{
+    ACLK_LOCK;
+
+    if (unlikely(!aclk_buffer))
+        aclk_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+
+    buffer_flush(aclk_buffer);
+
+    web_client_api_request_v1_info_fill_buffer(localhost, aclk_buffer);
+    aclk_buffer->contenttype = CT_APPLICATION_JSON;
+
+    ACLK_UNLOCK;
+
+    aclk_send_message("metadata", aclk_buffer->buffer);
+
     return 0;
 }
