@@ -250,10 +250,7 @@ jobs:
 
 
     - stage: Support activities on main branch
-      name: Run labeler on github issues
-      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
-
-    - name: Generate changelog for release (only on special and tagged commit msg)
+      name: Generate changelog for release (only on special and tagged commit msg)
       before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
@@ -542,9 +539,6 @@ jobs:
 
     - name: Kickstart files integrity testing (extended)
       script: ./tests/installer/checksums.sh
-
-    - name: Run labeler on github issues
-      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
 
       # This is generating the changelog for nightly release and publish it
     - name: Generate nightly changelog
