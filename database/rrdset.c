@@ -1094,6 +1094,7 @@ static inline size_t rrdset_done_interpolate(
                 );
                 #endif
 
+                fprintf(stderr,"KILLME RRDSET_DONE_OK %s.%s UPDATED=%d COUNTER=%lu ITERATIONS=%ld GAP_LOST_ITER=%d\n", st->name, rd->name, rd->updated, rd->collections_counter, iterations, st->gap_when_lost_iterations_above);
             }
             else {
 
@@ -1107,6 +1108,7 @@ static inline size_t rrdset_done_interpolate(
 //                rd->values[current_entry] = SN_EMPTY_SLOT; // pack_storage_number(0, SN_NOT_EXISTS);
                 rd->state->collect_ops.store_metric(rd, next_store_ut, SN_EMPTY_SLOT); //pack_storage_number(0, SN_NOT_EXISTS)
                 rd->last_stored_value = NAN;
+                fprintf(stderr,"KILLME RRDSET_DONE_INTERPOLATION %s.%s UPDATED=%d COUNTER=%lu ITERATIONS=%ld GAP_LOST_ITER=%d\n", st->name, rd->name, rd->updated, rd->collections_counter, iterations, st->gap_when_lost_iterations_above);
             }
 
             stored_entries++;
@@ -1311,6 +1313,7 @@ void rrdset_done(RRDSET *st) {
     now_collect_ut = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
     last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
+    error("KILLME RRDSET_DONE_BEFORE %s.%s %lu %lu %lu", st->name, rd->name, now_collect_ut, last_stored_ut, next_store_ut);
 
     if(unlikely(!st->counter_done)) {
         // if we have not collected metrics this session (st->counter_done == 0)
