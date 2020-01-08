@@ -170,71 +170,74 @@ struct host_variables_callback_options {
 static int print_host_variables(RRDVAR *rv, void *data) {
     struct host_variables_callback_options *opts = data;
 
-    if(rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
-        if(!opts->host_header_printed) {
-            opts->host_header_printed = 1;
+    if(likely(backends_can_send_rrdvar(opts->backend_options, rv))) {
+      if(rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
+          if(!opts->host_header_printed) {
+              opts->host_header_printed = 1;
 
-            if(opts->output_options & PROMETHEUS_OUTPUT_HELP) {
-                buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
-            }
-        }
+              if(opts->output_options & PROMETHEUS_OUTPUT_HELP) {
+                  buffer_sprintf(opts->wb, "\n# COMMENT global host and chart variables\n");
+              }
+          }
 
-        calculated_number value = rrdvar2number(rv);
-        if(isnan(value) || isinf(value)) {
-            if(opts->output_options & PROMETHEUS_OUTPUT_HELP)
-                buffer_sprintf(opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rv->name, (isnan(value))?"NAN":"INF");
+          calculated_number value = rrdvar2number(rv);
+          if(isnan(value) || isinf(value)) {
+              if(opts->output_options & PROMETHEUS_OUTPUT_HELP)
+                  buffer_sprintf(opts->wb, "# COMMENT variable \"%s\" is %s. Skipped.\n", rv->name, (isnan(value))?"NAN":"INF");
 
-            return 0;
-        }
+              return 0;
+          }
 
-        char *label_pre = "";
-        char *label_post = "";
-        if(opts->labels && *opts->labels) {
-            label_pre = "{";
-            label_post = "}";
-        }
+          char *label_pre = "";
+          char *label_post = "";
+          if(opts->labels && *opts->labels) {
+              label_pre = "{";
+              label_post = "}";
+          }
 
-        prometheus_name_copy(opts->name, rv->name, sizeof(opts->name));
+          prometheus_name_copy(opts->name, rv->name, sizeof(opts->name));
 
-        if(opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
-            buffer_sprintf(opts->wb
-                           , "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n"
-                           , opts->prefix
-                           , opts->name
-                           , label_pre
-                           , opts->labels
-                           , label_post
-                           , value
-                           , ((rv->last_updated) ? rv->last_updated : opts->now) * 1000ULL
-            );
-        else
-            buffer_sprintf(opts->wb, "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n"
-                           , opts->prefix
-                           , opts->name
-                           , label_pre
-                           , opts->labels
-                           , label_post
-                           , value
-            );
+          if(opts->output_options & PROMETHEUS_OUTPUT_TIMESTAMPS)
+              buffer_sprintf(opts->wb
+                             , "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n"
+                             , opts->prefix
+                             , opts->name
+                             , label_pre
+                             , opts->labels
+                             , label_post
+                             , value
+                             , ((rv->last_updated) ? rv->last_updated : opts->now) * 1000ULL
+              );
+          else
+              buffer_sprintf(opts->wb, "%s_%s%s%s%s " CALCULATED_NUMBER_FORMAT "\n"
+                             , opts->prefix
+                             , opts->name
+                             , label_pre
+                             , opts->labels
+                             , label_post
+                             , value
+              );
 
-        return 1;
+          return 1;
+      }
     }
-
+    
     return 0;
 }
 
 static int remote_write_host_variables(RRDVAR *rv, void *data) {
     struct host_variables_callback_options *opts = data;
+    if(likely(backends_can_send_rrdvar(opts->backend_options, rv))) {
+      if(rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
+          calculated_number value = rrdvar2number(rv);
+          if(isnan(value) || isinf(value)) {
+              return 0;
+          }
 
-    if(rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
-        calculated_number value = rrdvar2number(rv);
-        if(isnan(value) || isinf(value)) {
-            return 0;
-        }
-
-        snprintf(opts->name, PROMETHEUS_LABELS_MAX, "%s_%s", opts->prefix, rv->name);
-        add_variable(opts->name, opts->host->hostname, value, opts->now * 1000ULL);
-        return 1;
+          snprintf(opts->name, PROMETHEUS_LABELS_MAX, "%s_%s", opts->prefix, rv->name);
+          add_variable(opts->name, opts->host->hostname, value, opts->now * 1000ULL);
+          return 1;
+      }
     }
     return 0;
 }

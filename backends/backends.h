@@ -44,6 +44,7 @@ extern BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPT
 #ifdef BACKENDS_INTERNALS
 
 extern int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st);
+extern int backends_can_send_rrdvar(BACKEND_OPTIONS backend_options, RRDVAR *rv);
 extern calculated_number backend_calculate_value_from_stored_data(
         RRDSET *st                  // the chart
         , RRDDIM *rd                // the dimension

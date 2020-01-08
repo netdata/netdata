@@ -218,6 +218,13 @@ inline int backends_can_send_rrdset(BACKEND_OPTIONS backend_options, RRDSET *st)
     return 1;
 }
 
+inline int backends_can_send_rrdvar(BACKEND_OPTIONS backend_options, RRDVAR *rv) {
+    if (!simple_pattern_matches(charts_pattern, rv->name)) {
+        return 0;
+    }
+    return 1;
+}
+
 inline BACKEND_OPTIONS backend_parse_data_source(const char *source, BACKEND_OPTIONS backend_options) {
     if(!strcmp(source, "raw") || !strcmp(source, "as collected") || !strcmp(source, "as-collected") || !strcmp(source, "as_collected") || !strcmp(source, "ascollected")) {
         backend_options |= BACKEND_SOURCE_DATA_AS_COLLECTED;
