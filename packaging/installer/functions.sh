@@ -491,7 +491,7 @@ netdata_pids() {
 stop_all_netdata() {
 	local p
 
-	if [ -n $(netdata_pids) -a -n "$(builtin type -P netdatacli)" ] ; then
+	if [ -n "$(netdata_pids)" -a -n "$(builtin type -P netdatacli)" ] ; then
 		netdatacli shutdown-agent
 		sleep 20
 	fi
