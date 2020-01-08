@@ -25,13 +25,17 @@ _actively_ contributing to Netdata's future.
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
 This method is fully automatic on all Linux distributions. To install Netdata from source and get _automatic nightly
-updates_, run the following:
+updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ```
 
-> Do not use `sudo`—the installer will escalate privileges if needed.
+To see more information about this installation script, including how to disable automatic updates, get nightly vs.
+stable releases, or disable anonymous statistics, see the [`kickstart.sh` method page](methods/kickstart.md). 
+
+Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
+releases](#nightly-vs-stable-releases).
 
 Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
 overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
@@ -39,13 +43,91 @@ Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/
 
 ## Have a different operating system, or want to try another method?
 
+Netdata works on many different operating systems. See below for the recommended and alternative installation methods
+for a variety of popular operating systems. To see the full list of compatible operating systems and versions, see our
+[distribution matrix](../DISTRIBUTIONS.md). 
 
+### Operating systems 
+
+<div class="installer-grid">
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />Docker</h3>
+    <ul>
+      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
+      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using a `docker-compose.yml` file</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71960868-c1236d00-31fe-11ea-859e-902d36233e38.png" alt="Install Netdata on Kubernetes" />Kubernetes</h3>
+    <ul>
+      <li><a href="https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments">Using a Kubernetes Helm</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71904232-6f330680-316e-11ea-8999-06842b094625.png" alt="Install Netdata on Ubuntu" /> Ubuntu</h3>
+    <ul>
+      <li><a href="methods/kickstart.md">Automatic one-line installation script</a></li>
+      <li><a href="methods/packages.md">Binary packages</a> </li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71905343-a60a1c00-3170-11ea-94c8-718d2fcdf790.png" alt="Install Netdata on Fedora" />Fedora</h3>
+    <ul>
+      <li>Automatic one-line installation script</li>
+      <li>Binary packages</li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71961672-8cb0b080-3200-11ea-84f8-9139c7434110.png" alt="Install Netdata on macOS" />macOS</h3>
+    <ul>
+      <li><a href="methods/macos.md#with-homebrew">Homebrew</a></li>
+      <li><a href="methods/macos.md#from-source">Manual installation from source</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71961245-a3a2d300-31ff-11ea-89bf-b90e7242d9a5.png" alt="Install Netdata on FreeBSD" />FreeBSD</h3>
+    <ul>
+      <li><a href="methods/pfsense.md">Installation on FreeBSD</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71961918-13fe2400-3201-11ea-9a91-fe6f5b27df0c.png" alt="Install Netdata on PFSense" />PFSense</h3>
+    <ul>
+      <li><a href="methods/pfsense.md">Installation on PFSense</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71962148-853dd700-3201-11ea-9a09-16fdb39e9ee4.png" alt="Install Netdata on Synology" />Synology</h3>
+    <ul>
+      <li><a href="methods/synology.md">Installation on Synology</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3>FreeNAS</h3>
+    <ul>
+      <li><a href="methods/freenas.md">Manual installation on FreeNAS</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3>Alpine</h3>
+    <ul>
+      <li><a href="methods/alpine.md">Manual installation on Alpine</a></li>
+    </ul>
+  </div>
+</div>
+
+### Additional methods
+
+-   [Install Netdata manually from source](methods/manual.md)
+-   [Install Netdata on offline systems](methods/offline.md)
 
 ## Automatic updates
 
 By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
 
-If you would prefer to manually update your Netdata agent, you can disable automatic updates by using the `--no-updates` option when you install or update Netdata using the [one-line installation script](#one-line-installation).
+If you would prefer to manually update your Netdata agent, you can disable automatic updates by using the `--no-updates`
+option when you install or update Netdata using the [automatic one-line installation
+script](#automatic-one-line-installation-script).
 
 ```bash
 # kickstart.sh

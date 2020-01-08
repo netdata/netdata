@@ -398,6 +398,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     color: #546e7a;
 }
 
+<<<<<<< HEAD
 /* Underline links, but not badges/icons. */
 .md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link) {
     color: #00AB44;
@@ -427,4 +428,50 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 /* Fix the font size of admonition and details sections. */
 .md-typeset .admonition, .md-typeset details {
     font-size: 0.75rem;
+=======
+/* Bold the first item on the docs sidebar: Netdata Documentation */
+.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
+    font-weight: 700;
+}
+
+/* Installation / OS and method grid */
+.installer-grid {
+    display: grid;
+    grid-template-columns: repeat(4, [col-start] 1fr);
+    grid-gap: 2rem;
+}
+
+.grid-item {
+    grid-column: span 2;
+    border-radius: 2px;
+    border: 1px solid black;
+    padding: 1rem;
+}
+
+.md-typeset .grid-item img {
+    border: 0;
+    display: inline;
+    margin: 0 1rem 0 0;
+    max-height: 52px;
+    vertical-align: middle;
+}
+
+.grid-item h3 {
+    margin-top: 0;
+}
+
+.grid-item ul {
+    margin-bottom: 0;
+}
+
+.grid-item ul li {
+    list-style-type: disclosure-closed;
+    margin: 0;
+}
+
+.md-typeset .grid-item li a {
+    border-bottom: 0px !important;
+    text-decoration: none;
+    display: inline;
+>>>>>>> Lots of new pages, lots of improvements
 }
