@@ -2,6 +2,8 @@
 
 #ifndef NETDATA_MQTT_H
 #define NETDATA_MQTT_H
+#include "mosquitto/lib/mosquitto.h"
+
 
 void _show_mqtt_info();
 int _link_event_loop(int timeout);
