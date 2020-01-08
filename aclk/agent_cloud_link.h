@@ -65,6 +65,7 @@ void aclk_message_callback(
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
 int aclk_heartbeat();
+int aclk_send_metadata();
 
 
 
