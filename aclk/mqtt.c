@@ -2,7 +2,6 @@
 
 #include "../daemon/common.h"
 #include "mqtt.h"
-#include "mosquitto/lib/mosquitto.h"
 
 void (*_on_connect)(void *ptr) = NULL;
 void (*_on_disconnect)(void *ptr) = NULL;
@@ -74,9 +73,30 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 {
     int rc;
     int libmosq_major, libmosq_minor, libmosq_revision, libmosq_version;
+    char *ca_crt;
+    char *server_crt;
+    char *server_key;
 
     // show library info so can have in in the logfile
     libmosq_version = mosquitto_lib_version(&libmosq_major, &libmosq_minor, &libmosq_revision);
+    ca_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link cert", "*");
+    server_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link server cert", "*");
+    server_key = config_get(CONFIG_SECTION_ACLK, "agent cloud link server key", "*");
+
+    if (ca_crt[0] == '*') {
+        freez(ca_crt);
+        ca_crt = NULL;
+    }
+
+    if (server_crt[0] == '*') {
+        freez(server_crt);
+        server_crt = NULL;
+    }
+
+    if (server_key[0] == '*') {
+        freez(server_key);
+        server_key = NULL;
+    }
 
     info(
         "Detected libmosquitto library version %d, %d.%d.%d", libmosq_version, libmosq_major, libmosq_minor,
@@ -114,8 +134,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 
     rc = mosquitto_reconnect_delay_set(mosq, ACLK_RECONNECT_DELAY, ACLK_MAX_RECONNECT_DELAY, 1);
 
-    //mosquitto_tls_set(
-      //  mosq, "/etc/netdata/mqtt/ca.crt", NULL, "/etc/netdata/mqtt/server.crt", "/etc/netdata/mqtt/server.key", NULL);
+    //mosquitto_tls_set(mosq, ca_crt, NULL, server_crt, server_key, NULL);
 
     rc = mosquitto_connect_async(mosq, aclk_hostname, aclk_port, ACLK_PING_INTERVAL);
 
@@ -135,7 +154,7 @@ int _link_event_loop(int timeout)
 
     rc = mosquitto_loop(mosq, timeout, 1);
 
-    if (unlikely(rc !=MOSQ_ERR_SUCCESS )) {
+    if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
         errno = 0;
         error("Loop error code %d (%s)", rc, mosquitto_strerror(rc));
         rc = mosquitto_reconnect(mosq);
