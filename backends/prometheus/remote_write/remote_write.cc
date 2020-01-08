@@ -97,6 +97,26 @@ void add_metric(const char *name, const char *chart, const char *family, const c
     sample->set_timestamp(timestamp);
 }
 
+void add_variable(const char *name, const char *instance, const double value, const int64_t timestamp) {
+    TimeSeries *timeseries;
+    Sample *sample;
+    Label *label;
+
+    timeseries = write_request->add_timeseries();
+
+    label = timeseries->add_labels();
+    label->set_name("__name__");
+    label->set_value(name);
+
+    label = timeseries->add_labels();
+    label->set_name("instance");
+    label->set_value(instance);
+
+    sample = timeseries->add_samples();
+    sample->set_value(value);
+    sample->set_timestamp(timestamp);
+}
+
 size_t get_write_request_size(){
     size_t size = (size_t)snappy::MaxCompressedLength(write_request->ByteSize());
 

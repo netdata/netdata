@@ -223,6 +223,22 @@ static int print_host_variables(RRDVAR *rv, void *data) {
     return 0;
 }
 
+static int remote_write_host_variables(RRDVAR *rv, void *data) {
+    struct host_variables_callback_options *opts = data;
+
+    if(rv->options & (RRDVAR_OPTION_CUSTOM_HOST_VAR|RRDVAR_OPTION_CUSTOM_CHART_VAR)) {
+        calculated_number value = rrdvar2number(rv);
+        if(isnan(value) || isinf(value)) {
+            return 0;
+        }
+
+        snprintf(opts->name, PROMETHEUS_LABELS_MAX, "%s_%s", opts->prefix, rv->name);
+        add_variable(opts->name, opts->host->hostname, value, opts->now * 1000ULL);
+        return 1;
+    }
+    return 0;
+}
+
 static void rrd_stats_api_v1_charts_allmetrics_prometheus(RRDHOST *host, BUFFER *wb, const char *prefix, BACKEND_OPTIONS backend_options, time_t after, time_t before, int allhosts, PROMETHEUS_OUTPUT_OPTIONS output_options) {
     rrdhost_rdlock(host);
 
@@ -611,6 +627,14 @@ void rrd_stats_remote_write_allmetrics_prometheus(
             add_tag(words[i], words[i + 1]);
         }
     }
+
+    // send custom variables set for the host
+    struct host_variables_callback_options opts = {
+            .host = host,
+            .prefix = prefix,
+            .now = now_realtime_sec()
+    };
+    foreach_host_variable_callback(host, remote_write_host_variables, &opts);
 
     // for each chart
     RRDSET *st;
