@@ -4,7 +4,7 @@
 #define NETDATA_AGENT_CLOUD_LINK_H
 
 #define WITH_TLS 1
-#include <mosquitto.h>
+#include "mosquitto/lib/mosquitto.h"
 
 #define ACLK_INITIALIZATION_WAIT 60        // Wait for link to initialize in seconds (per msg)
 #define ACLK_INITIALIZATION_SLEEP_WAIT 1  // Wait time @ spin lock for MQTT initialization in seconds
