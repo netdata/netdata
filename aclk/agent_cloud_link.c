@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "agent_cloud_link.h"
 #include "../daemon/common.h"
+#include "agent_cloud_link.h"
 #include "mqtt.h"
 
 // Read from the config file -- new section [agent_cloud_link]

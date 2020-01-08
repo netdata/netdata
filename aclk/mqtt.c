@@ -2,7 +2,7 @@
 
 #include "../daemon/common.h"
 #include "mqtt.h"
-#include <mosquitto.h>
+#include "mosquitto/lib/mosquitto.h"
 
 void (*_on_connect)(void *ptr) = NULL;
 void (*_on_disconnect)(void *ptr) = NULL;
