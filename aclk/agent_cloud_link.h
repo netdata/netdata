@@ -51,7 +51,6 @@ void *aclk_main(void *ptr);
     },
 
 extern int aclk_send_message(char *base_topic, char *sub_topic, char *message);
-extern uint8_t is_agent_claimed(void);
 
 int     aclk_init();
 char    *get_base_topic();
