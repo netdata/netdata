@@ -2,7 +2,6 @@
 
 #include "../daemon/common.h"
 #include "agent_cloud_link.h"
-#include "mqtt.h"
 
 // Read from the config file -- new section [agent_cloud_link]
 // Defaults are supplied
@@ -12,6 +11,14 @@ int aclk_send_maximum = 0;      // default 20
 int aclk_port = 0;              // default 1883
 char *aclk_hostname = NULL;     //default localhost
 int aclk_subscribed = 0;
+
+int aclk_metadata_submitted = 0;
+
+BUFFER *aclk_buffer = NULL;
+
+
+// TODO: set the variable when is_agent_claimed() returns non empty string
+int agent_claimed = 1;
 
 // Set when we have connection up and running from the connection callback
 int aclk_connection_initialized = 0;
@@ -152,8 +159,12 @@ char *get_publish_base_topic(PUBLISH_TOPIC_ACTION action)
         return get_publish_base_topic(PUBLICH_TOPIC_GET);
     }
 
-    if (unlikely(!topic))
-        topic = strdupz("netdata");
+    if (unlikely(!topic)) {
+        char tmp_topic[ACLK_MAX_TOPIC+1];
+
+        sprintf(tmp_topic,"/agent/%s", localhost->machine_guid);
+        topic = strdupz(tmp_topic);
+    }
 
     ACLK_UNLOCK;
     return topic;
@@ -179,6 +190,10 @@ int aclk_process_query()
 
     //last_beat = current_beat;
 
+    if (!aclk_connection_initialized)
+        return 0;
+
+
     this_query = aclk_queue_pop();
     if (likely(!this_query)) {
         //info("No pending queries");
@@ -202,11 +217,16 @@ int aclk_process_queries()
 {
     int rc;
 
+    if (unlikely(!aclk_metadata_submitted)) {
+        aclk_send_metadata();
+        aclk_metadata_submitted = 1;
+    }
+
     // Return if no queries pendning
     if (likely(!aclk_queue.count))
         return 1;
 
-    info("Processing %d queries", aclk_queue.count);
+    info("Processing %ld queries", aclk_queue.count);
 
     while (aclk_process_query()) {
         rc = _link_event_loop(0);
@@ -240,12 +260,14 @@ void *aclk_main(void *ptr) {
 
     netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
+
+
     while(!netdata_exit) {
         int rc;
 
         // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
         // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
-        if (is_agent_claimed() == 1) {
+        if (likely(!agent_claimed)) {
             sleep_usec(USEC_PER_SEC * 60);
             info("Checking agent claiming status");
             continue;
@@ -261,18 +283,21 @@ void *aclk_main(void *ptr) {
             else {
                 sleep_usec(USEC_PER_SEC * 1);
             }
-            //continue;
+            _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
+            continue;
         }
 
         // Call the loop to handle inbound and outbound messages  // Timeout after 60 seconds
 
         if (unlikely(!aclk_subscribed)) {
             aclk_subscribed = !_link_subscribe("netdata/command");
+
         }
 
         //aclk_heartbeat();
 
-        aclk_process_queries();
+        if (likely(aclk_connection_initialized))
+            aclk_process_queries();
 
         rc = _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
 
@@ -291,7 +316,7 @@ void *aclk_main(void *ptr) {
  * If base_topic is missing then the global_base_topic will be used (if available)
  *
  */
-int aclk_send_message(char *base_topic, char *sub_topic, char *message)
+int aclk_send_message(char *sub_topic, char *message)
 {
     int rc;
     static int skip_due_to_shutdown = 0;
@@ -299,8 +324,8 @@ int aclk_send_message(char *base_topic, char *sub_topic, char *message)
     char topic[ACLK_MAX_TOPIC + 1];
     char *final_topic;
 
-    //if (!is_agent_claimed() == 1)
-      //  return 0;
+    if (!aclk_connection_initialized)
+        return 0;
 
     if (unlikely(netdata_exit)) {
 
@@ -334,17 +359,17 @@ int aclk_send_message(char *base_topic, char *sub_topic, char *message)
     if (unlikely(!global_base_topic))
         global_base_topic = GET_PUBLISH_BASE_TOPIC;
 
-    if (unlikely(!base_topic)) {
-        if (unlikely(!global_base_topic))
-            final_topic = sub_topic;
-        else {
-            snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", global_base_topic, sub_topic);
-            final_topic = topic;
-        }
-    } else {
-        snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", base_topic, sub_topic);
+    //if (unlikely(!base_topic)) {
+    if (unlikely(!global_base_topic))
+        final_topic = sub_topic;
+    else {
+        snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", global_base_topic, sub_topic);
         final_topic = topic;
     }
+//    } else {
+//        snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", base_topic, sub_topic);
+//        final_topic = topic;
+//    }
 
     //info("Sending message: (%s) - (%s)", final_topic, message);
     ACLK_LOCK;
@@ -447,7 +472,27 @@ int aclk_heartbeat()
 
     if (unlikely(current_beat - last_beat >= ACLK_HEARTBEAT_INTERVAL)) {
         last_beat = current_beat;
-        aclk_send_message(NULL, "heartbeat", "ping");
+        aclk_send_message("heartbeat", "ping");
     }
+    return 0;
+}
+
+// Send metadata to the cloud if the link is established
+int aclk_send_metadata()
+{
+    ACLK_LOCK;
+
+    if (unlikely(!aclk_buffer))
+        aclk_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+
+    buffer_flush(aclk_buffer);
+
+    web_client_api_request_v1_info_fill_buffer(localhost, aclk_buffer);
+    aclk_buffer->contenttype = CT_APPLICATION_JSON;
+
+    ACLK_UNLOCK;
+
+    aclk_send_message("metadata", aclk_buffer->buffer);
+
     return 0;
 }
