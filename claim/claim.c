@@ -104,4 +104,7 @@ void load_claiming_state(void)
         claimed_id[bytes_read] = 0;
         info("File '%s' was found. Setting state to AGENT_CLAIMED using agent_id=.", filename, claimed_id);
     }
+
+    snprintfz(filename, FILENAME_MAX, "%s/claim.d/private.pem", netdata_configured_user_config_dir);
+
 }
