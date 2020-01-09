@@ -332,7 +332,7 @@ install_non_systemd_init() {
 
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
-NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+NETDATA_INSTALLER_START_CMD=""
 NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
@@ -512,6 +512,10 @@ restart_netdata() {
 	local started=0
 
 	progress "Restarting netdata instance"
+
+	if [ -z "${NETDATA_INSTALLER_START_CMD}" ] ; then
+		NETDATA_INSTALLER_START_CMD="${netdata}"
+	fi
 
 	if [ "${UID}" -eq 0 ]; then
 		echo >&2
