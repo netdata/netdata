@@ -1095,6 +1095,7 @@ static inline size_t rrdset_done_interpolate(
                           , unpack_storage_number(rd->values[current_entry]), new_value
                 );
                 #endif
+
             }
             else {
 
