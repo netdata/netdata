@@ -43,9 +43,13 @@ Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/
 
 ## Have a different operating system, or want to try another method?
 
-Netdata works on many different operating systems. See below for the recommended and alternative installation methods
-for a variety of popular operating systems. To see the full list of compatible operating systems and versions, see our
-[distribution matrix](../DISTRIBUTIONS.md). 
+Netdata works on many different operating systems. To see the full list of compatible operating systems and versions,
+see our [distribution matrix](../DISTRIBUTIONS.md).
+
+Below, you can find 
+
+See below for the recommended and alternative installation methods
+for a variety of popular operating systems. 
 
 ### Operating systems 
 
@@ -58,23 +62,16 @@ for a variety of popular operating systems. To see the full list of compatible o
     </ul>
   </div>
   <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />Docker</h3>
+    <ul>
+      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
+      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using a <code>docker-compose.yml</code> file</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71960868-c1236d00-31fe-11ea-859e-902d36233e38.png" alt="Install Netdata on Kubernetes" />Kubernetes</h3>
     <ul>
       <li><a href="https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments">Using a Kubernetes Helm</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71904232-6f330680-316e-11ea-8999-06842b094625.png" alt="Install Netdata on Ubuntu" /> Ubuntu</h3>
-    <ul>
-      <li><a href="methods/kickstart.md">Automatic one-line installation script</a></li>
-      <li><a href="methods/packages.md">Binary packages</a> </li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71905343-a60a1c00-3170-11ea-94c8-718d2fcdf790.png" alt="Install Netdata on Fedora" />Fedora</h3>
-    <ul>
-      <li>Automatic one-line installation script</li>
-      <li>Binary packages</li>
     </ul>
   </div>
   <div class="grid-item">
@@ -91,6 +88,18 @@ for a variety of popular operating systems. To see the full list of compatible o
     </ul>
   </div>
   <div class="grid-item">
+    <h3><img src="" alt="Install Netdata manually" />Manual</h3>
+    <ul>
+      <li><a href="methods/manual/">Install manually from source</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="" alt="Install Netdata on offline systems" />Offline</h3>
+    <ul>
+      <li><a href="methods/offline/">Install on offline/air-gapped systems</li>
+    </ul>
+  </div>
+  <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71961918-13fe2400-3201-11ea-9a91-fe6f5b27df0c.png" alt="Install Netdata on PFSense" />PFSense</h3>
     <ul>
       <li><a href="methods/pfsense.md">Installation on PFSense</a></li>
@@ -103,13 +112,13 @@ for a variety of popular operating systems. To see the full list of compatible o
     </ul>
   </div>
   <div class="grid-item">
-    <h3>FreeNAS</h3>
+    <h3><img src="https://user-images.githubusercontent.com/1153921/72070923-543dcf00-32f3-11ea-8053-d61bc96529b5.png" alt="Install Netdata on Alpine FreeNAS" />FreeNAS</h3>
     <ul>
       <li><a href="methods/freenas.md">Manual installation on FreeNAS</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3>Alpine</h3>
+    <h3><img src="https://user-images.githubusercontent.com/1153921/72070921-53a53880-32f3-11ea-80f1-7d00cd8a7906.png" alt="Install Netdata on Alpine Linux" />Alpine</h3>
     <ul>
       <li><a href="methods/alpine.md">Manual installation on Alpine</a></li>
     </ul>
