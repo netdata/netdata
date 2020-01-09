@@ -13,6 +13,11 @@ ENV JUDY_VER 1.0.5
 COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
+RUN git clone https://github.com/netdata/mosquitto.git mosquitto/
+WORKDIR /opt/netdata.git/mosquitto/libmosquitto
+RUN make
+WORKDIR /opt/netdata.git
+
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \

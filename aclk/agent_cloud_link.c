@@ -35,8 +35,6 @@ char *send_http_request(char *host, char *port, char *url, BUFFER *b) {
     close(sock);
 }
 
-// TODO: set the variable when is_agent_claimed() returns non empty string
-int agent_claimed = 1;
 
 // Set when we have connection up and running from the connection callback
 int aclk_connection_initialized = 0;
@@ -65,7 +63,7 @@ struct aclk_query_queue {
 };
 
 /*
- * Add a query to execute, the result will be send to the specified topic (token)
+ * Free a query structure when done
  */
 
 void aclk_query_free(struct aclk_query *this_query)
@@ -78,6 +76,10 @@ void aclk_query_free(struct aclk_query *this_query)
     freez(this_query);
     return;
 }
+
+/*
+ * Add a query to execute, the result will be send to the specified topic (token)
+ */
 
 int     aclk_queue_query(char *token, char *query)
 {
@@ -158,6 +160,9 @@ char *get_publish_base_topic(PUBLISH_TOPIC_ACTION action)
 {
     static char  *topic = NULL;
 
+    if (unlikely(!is_agent_claimed()))
+        return NULL;
+
     ACLK_LOCK;
 
     if (unlikely(action == PUBLICH_TOPIC_FREE)) {
@@ -180,12 +185,30 @@ char *get_publish_base_topic(PUBLISH_TOPIC_ACTION action)
     if (unlikely(!topic)) {
         char tmp_topic[ACLK_MAX_TOPIC+1];
 
-        sprintf(tmp_topic,"/agent/%s", localhost->machine_guid);
+        sprintf(tmp_topic,ACLK_TOPIC_STRUCTURE, is_agent_claimed());
         topic = strdupz(tmp_topic);
     }
 
     ACLK_UNLOCK;
     return topic;
+}
+
+// Wait for ACLK connection to be established
+int aclk_wait_for_initialization() {
+    if (unlikely(!aclk_connection_initialized)) {
+        time_t now = now_realtime_sec();
+
+        while (!aclk_connection_initialized && (now_realtime_sec() - now) < ACLK_INITIALIZATION_WAIT) {
+            sleep_usec(USEC_PER_SEC * ACLK_INITIALIZATION_SLEEP_WAIT);
+            _link_event_loop(0);
+        }
+
+        if (unlikely(!aclk_connection_initialized)) {
+            error("ACLK connection cannot be established");
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /*
@@ -210,7 +233,6 @@ int aclk_process_query()
 
     if (!aclk_connection_initialized)
         return 0;
-
 
     this_query = aclk_queue_pop();
     if (likely(!this_query)) {
@@ -278,7 +300,6 @@ void *aclk_main(void *ptr) {
 
     netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
-
     if (unlikely(!aclk_buffer))
         aclk_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
@@ -287,7 +308,7 @@ void *aclk_main(void *ptr) {
 
         // TODO: This may change when we have enough info from the claiming itself to avoid wasting 60 seconds
         // TODO: Handle the unclaim command as well -- we may need to shutdown the connection
-        if (likely(!agent_claimed)) {
+        if (likely(!is_agent_claimed())) {
             sleep_usec(USEC_PER_SEC * 60);
             info("Checking agent claiming status");
             continue;
@@ -308,11 +329,8 @@ void *aclk_main(void *ptr) {
             continue;
         }
 
-        // Call the loop to handle inbound and outbound messages  // Timeout after 60 seconds
-
         if (unlikely(!aclk_subscribed)) {
-            aclk_subscribed = !_link_subscribe("netdata/command");
-
+            aclk_subscribed = !aclk_subscribe(ACLK_COMMAND_TOPIC, 2);
         }
 
         //aclk_heartbeat();
@@ -320,9 +338,8 @@ void *aclk_main(void *ptr) {
         if (likely(aclk_connection_initialized))
             aclk_process_queries();
 
+        // Call the loop to handle inbound and outbound messages
         rc = _link_event_loop(ACLK_LOOP_TIMEOUT * 1000);
-
-        //info("loop timeout");
 
     } // forever
     aclk_shutdown();
@@ -362,20 +379,8 @@ int aclk_send_message(char *sub_topic, char *message)
     if (unlikely(!message))
         return 0;
 
-    // Just wait to be initialized
-    if (unlikely(!aclk_connection_initialized)) {
-        time_t now = now_realtime_sec();
-
-        while (!aclk_connection_initialized && (now_realtime_sec() - now) < ACLK_INITIALIZATION_WAIT) {
-            sleep_usec(USEC_PER_SEC * ACLK_INITIALIZATION_SLEEP_WAIT);
-            _link_event_loop(0);
-        }
-
-        if (unlikely(!aclk_connection_initialized)) {
-            error("connection is not active");
-            return 1;
-        }
-    }
+    if (unlikely(aclk_wait_for_initialization()))
+        return 1;
 
     if (unlikely(!global_base_topic))
         global_base_topic = GET_PUBLISH_BASE_TOPIC;
@@ -387,12 +392,7 @@ int aclk_send_message(char *sub_topic, char *message)
         snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", global_base_topic, sub_topic);
         final_topic = topic;
     }
-//    } else {
-//        snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", base_topic, sub_topic);
-//        final_topic = topic;
-//    }
 
-    //info("Sending message: (%s) - (%s)", final_topic, message);
     ACLK_LOCK;
     rc = _link_send_message(final_topic, message);
     ACLK_UNLOCK;
@@ -404,12 +404,50 @@ int aclk_send_message(char *sub_topic, char *message)
     return rc;
 }
 
-//TODO: placeholder for password check if we need it
-//int password_callback(char *buf, int size, int rwflag, void *userdata)
-//{
-//    strcpy(buf,"1234678");
-//    return 8;
-//}
+/*
+ * Subscribe to a topic in the cloud
+ * The final subscription will be in the form
+ * /agent/claim_id/<sub_topic>
+ */
+int aclk_subscribe(char *sub_topic, int qos)
+{
+    int rc;
+    static char *global_base_topic = NULL;
+    char topic[ACLK_MAX_TOPIC + 1];
+    char *final_topic;
+
+    if (!aclk_connection_initialized)
+        return 0;
+
+    if (unlikely(netdata_exit)) {
+        return 1;
+    }
+
+    if (unlikely(aclk_wait_for_initialization()))
+        return 1;
+
+    if (unlikely(!global_base_topic))
+        global_base_topic = GET_PUBLISH_BASE_TOPIC;
+
+    if (unlikely(!global_base_topic))
+        final_topic = sub_topic;
+    else {
+        snprintfz(topic, ACLK_MAX_TOPIC, "%s/%s", global_base_topic, sub_topic);
+        final_topic = topic;
+    }
+
+    //info("Sending message: (%s) - (%s)", final_topic, message);
+    ACLK_LOCK;
+    rc = _link_subscribe(final_topic, qos);
+    ACLK_UNLOCK;
+
+    // TODO: Add better handling -- error will flood the logfile here
+    if (unlikely(rc))
+        error("Failed to send message, error code %d (%s)", rc, _link_strerror(rc));
+
+    return rc;
+}
+
 
 // This is called from a callback when the link goes up
 void aclk_connect(void *ptr)
@@ -513,7 +551,7 @@ int aclk_send_metadata()
 
     ACLK_UNLOCK;
 
-    aclk_send_message("metadata", aclk_buffer->buffer);
+    aclk_send_message(ACLK_METADATA_TOPIC, aclk_buffer->buffer);
 
     return 0;
 }
