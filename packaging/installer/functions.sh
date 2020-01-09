@@ -332,7 +332,7 @@ install_non_systemd_init() {
 
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
-NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+NETDATA_INSTALLER_START_CMD=""
 NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
@@ -513,6 +513,10 @@ restart_netdata() {
 
 	progress "Restarting netdata instance"
 
+	if [ -z "${NETDATA_INSTALLER_START_CMD}" ] ; then
+		NETDATA_INSTALLER_START_CMD="${netdata}"
+	fi
+
 	if [ "${UID}" -eq 0 ]; then
 		echo >&2
 		echo >&2 "Stopping all netdata threads"
@@ -627,7 +631,7 @@ portable_add_user() {
 	echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
 	# shellcheck disable=SC2230
-	local nologin="$(command -v nologin >/dev/null 2>&1 || echo '/bin/false')"
+	local nologin="$(command -v nologin || echo '/bin/false')"
 
 	# Linux
 	if command -v useradd 1>/dev/null 2>&1; then
