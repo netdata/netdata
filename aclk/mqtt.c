@@ -115,7 +115,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
         return 1;
     }
 
-    mosq = mosquitto_new(NULL, true, NULL);
+    mosq = mosquitto_new("anon", true, NULL);
     if (unlikely(!mosq)) {
         mosquitto_lib_cleanup();
         error("MQTT new structure  -- %s", mosquitto_strerror(errno));
