@@ -530,6 +530,12 @@ int aclk_send_metadata()
     ACLK_UNLOCK;
 
     aclk_send_message(ACLK_METADATA_TOPIC, aclk_buffer->buffer);
+//
+//    buffer_flush(aclk_buffer);
+//    aclk_buffer->contenttype = CT_APPLICATION_JSON;
+//    charts2json(localhost, aclk_buffer);
+//
+//    aclk_send_message(ACLK_METADATA_TOPIC, aclk_buffer->buffer);
 
     return 0;
 }
