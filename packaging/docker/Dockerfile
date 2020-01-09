@@ -24,7 +24,7 @@ RUN chmod +x netdata-installer.sh && \
    ./netdata-installer.sh --dont-wait --dont-start-it
 
 # Fake claiming
-ENV CLAIMED_ID
+ARG CLAIMED_ID
 RUN echo ${CLAIMED_ID} >/etc/netdata/claim.d/claimed_id
 
 # files to one directory
