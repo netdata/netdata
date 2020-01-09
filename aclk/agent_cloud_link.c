@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "libnetdata/libnetdata.h"
 #include "../daemon/common.h"
 #include "agent_cloud_link.h"
 
@@ -16,6 +17,23 @@ int aclk_metadata_submitted = 0;
 
 BUFFER *aclk_buffer = NULL;
 
+char *send_http_request(char *host, char *port, char *url, BUFFER *b) {
+    struct timeval timeout = {.tv_sec = 30, .tv_usec = 0};
+    buffer_flush(b);
+    buffer_sprintf(b, "GET %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
+                   url, host);
+    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, "443", &timeout);
+    SSL_CTX *ctx = security_initialize_openssl_client();
+    // Certificate chain: not updating the stores - do we need private CA roots?
+    // Calls to SSL_CTX_load_verify_locations would go here.
+    SSL *ssl = SSL_new(ctx);
+    SSL_set_fd(ssl, sock);
+    int err = SSL_connect(ssl);
+    SSL_write(ssl, b->buffer, b->len);   // Timeout options?
+    int bytes_read = SSL_read(ssl, b->buffer, b->len);
+    SSL_shutdown(ssl);
+    close(sock);
+}
 
 
 // Set when we have connection up and running from the connection callback
@@ -282,6 +300,9 @@ void *aclk_main(void *ptr) {
 
     netdata_thread_cleanup_push(aclk_main_cleanup, ptr);
 
+    if (unlikely(!aclk_buffer))
+        aclk_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+
     while(!netdata_exit) {
         int rc;
 
@@ -295,6 +316,7 @@ void *aclk_main(void *ptr) {
 
         if (unlikely(!aclk_connection_initialized)) {
             info("Initializing connection");
+            send_http_request(aclk_hostname, "443", "/auth/challenge?id=blah", aclk_buffer);
             if (unlikely(aclk_init(ACLK_INIT))) {
                 // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
                 sleep_usec(USEC_PER_SEC * 60);

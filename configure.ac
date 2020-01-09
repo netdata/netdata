@@ -14,6 +14,7 @@ AC_INIT([netdata], VERSION_STRING[])
 AM_MAINTAINER_MODE([disable])
 if test x"$USE_MAINTAINER_MODE" = xyes; then
 AC_MSG_NOTICE(***************** MAINTAINER MODE *****************)
+CFLAGS="${CFLAGS} -Wincompatible-pointer-types -Wimplicit-function-declaration"
 fi
 
 PACKAGE_RPM_VERSION="VERSION_STRING"

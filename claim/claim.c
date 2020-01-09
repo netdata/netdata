@@ -96,6 +96,7 @@ void load_claiming_state(void)
     // check if the file exists
     if (lstat(filename, &statbuf) != 0) {
         info("File '%s' was not found. Setting state to AGENT_UNCLAIMED.", filename);
+        return;
    } else {
         FILE *f = fopen(filename,"rt");
         claimed_id = callocz(1,statbuf.st_size+1);
