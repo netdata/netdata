@@ -89,6 +89,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
     server_crt = config_get(CONFIG_SECTION_ACLK, "agent cloud link server cert", "*");
     server_key = config_get(CONFIG_SECTION_ACLK, "agent cloud link server key", "*");
 
+
     if (ca_crt[0] == '*') {
         freez(ca_crt);
         ca_crt = NULL;
@@ -126,6 +127,8 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 
     mosquitto_connect_callback_set(mosq, connect_callback);
     mosquitto_disconnect_callback_set(mosq, disconnect_callback);
+
+    mosquitto_username_pw_set(mosq, "anon", "anon");
 
     rc = mosquitto_threaded_set(mosq, 1);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
