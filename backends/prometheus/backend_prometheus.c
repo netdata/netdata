@@ -221,7 +221,7 @@ static int print_host_variables(RRDVAR *rv, void *data) {
           return 1;
       }
     }
-    
+
     return 0;
 }
 
@@ -234,7 +234,7 @@ static int remote_write_host_variables(RRDVAR *rv, void *data) {
               return 0;
           }
 
-          snprintf(opts->name, PROMETHEUS_LABELS_MAX, "%s_%s", opts->prefix, rv->name);
+          snprintf(opts->name, PROMETHEUS_VARIABLE_MAX, "%s_%s", opts->prefix, rv->name);
           add_variable(opts->name, opts->host->hostname, value, opts->now * 1000ULL);
           return 1;
       }
