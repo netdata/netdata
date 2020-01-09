@@ -131,27 +131,27 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("Failed to tune the thread model for libmoquitto (%s)", mosquitto_strerror(rc));
 
+#if defined(LIBMOSQUITTO_VERSION_NUMBER) >= 1006000
     rc = mosquitto_int_option(mosq, MQTT_PROTOCOL_V311, 0);
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("MQTT protocol specification rc = %d (%s)", rc, mosquitto_strerror(rc));
 
     rc = mosquitto_int_option(mosq, MOSQ_OPT_SEND_MAXIMUM, 1);
     info("MQTT in flight messages set to 1  -- %s", mosquitto_strerror(rc));
+#endif
 
     rc = mosquitto_reconnect_delay_set(mosq, ACLK_RECONNECT_DELAY, ACLK_MAX_RECONNECT_DELAY, 1);
 
-    //mosquitto_tls_set(mosq, ca_crt, NULL, server_crt, server_key, NULL);
+    mosquitto_tls_set(mosq, ca_crt, NULL, server_crt, server_key, NULL);
 
     rc = mosquitto_connect_async(mosq, aclk_hostname, aclk_port, ACLK_PING_INTERVAL);
 
-    if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
+    if (unlikely(rc != MOSQ_ERR_SUCCESS))
         error("Connect %s MQTT status = %d (%s)", aclk_hostname, rc, mosquitto_strerror(rc));
-        return 1;
-    }
     else
         info("Establishing MQTT link to %s", aclk_hostname);
 
-    return 0;
+    return rc;
 }
 
 int _link_event_loop(int timeout)
@@ -193,7 +193,7 @@ void _link_shutdown()
 }
 
 
-int _link_subscribe(char  *topic)
+int _link_subscribe(char  *topic, int qos)
 {
     int rc;
 
@@ -202,7 +202,7 @@ int _link_subscribe(char  *topic)
 
     mosquitto_message_callback_set(mosq, mqtt_message_callback);
 
-    rc = mosquitto_subscribe(mosq, NULL, topic, ACLK_QOS);
+    rc = mosquitto_subscribe(mosq, NULL, topic, qos);
     if (unlikely(rc)) {
         errno = 0;
         error("Failed to register subscription %d (%s)", rc, mosquitto_strerror(rc));
@@ -216,14 +216,13 @@ int _link_subscribe(char  *topic)
 /*
  * Send a message to the cloud to specific topic
  *
- * If base_topic is missing then the global_base_topic will be used (if available)
- *
  */
 int _link_send_message(char *topic, char *message)
 {
     int rc;
 
     rc = mosquitto_pub_topic_check(topic);
+
     if (unlikely(rc != MOSQ_ERR_SUCCESS))
         return rc;
 
@@ -237,8 +236,20 @@ int _link_send_message(char *topic, char *message)
     rc = mosquitto_publish(mosq, NULL, topic, msg_len, message, ACLK_QOS, 0);
 
     // TODO: Add better handling -- error will flood the logfile here
-    if (unlikely(rc != MOSQ_ERR_SUCCESS))
-        error("MQTT message failed : %s",mosquitto_strerror(rc));
+    if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
+        error("MQTT message failed : %s", mosquitto_strerror(rc));
+    }
 
     return rc;
 }
+
+//TODO: placeholder for password check if we need it
+//int password_callback(char *buf, int size, int rwflag, void *userdata)
+//{
+//    strcpy(buf,"1234678");
+//    return 8;
+//}
+
+//ibmosq_EXPORT int mosquitto_username_pw_set(	struct 	mosquitto 	*	mosq,
+//                                                const 	char 	*	username,
+//                                                const 	char 	*	password	)
