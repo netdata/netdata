@@ -162,27 +162,27 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
 
 
     // Sample MQTT send ; to be changed
-    {
-        int rc;
-        static int cloud_error = 0;
-
-        rc = aclk_send_message("alarm", cloud_message);
-
-        if ((unlikely(rc))) {
-            errno = 0;
-            if (!cloud_error) {
-                cloud_error = 1;
-                error("ACLK message submission failed with code %d",rc);
-            }
-        }
-        else {
-            if (cloud_error) {
-                cloud_error = 0;
-                error("ACLK message submission OK");
-            }
-        }
-
-    }
+//    {
+//        int rc;
+//        static int cloud_error = 0;
+//
+//        rc = aclk_send_message("alarm", cloud_message);
+//
+//        if ((unlikely(rc))) {
+//            errno = 0;
+//            if (!cloud_error) {
+//                cloud_error = 1;
+//                error("ACLK message submission failed with code %d",rc);
+//            }
+//        }
+//        else {
+//            if (cloud_error) {
+//                cloud_error = 0;
+//                error("ACLK message submission OK");
+//            }
+//        }
+//
+//    }
 
     if(likely(host->health_log_fp)) {
         if(unlikely(fprintf(host->health_log_fp

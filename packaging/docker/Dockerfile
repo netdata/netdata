@@ -14,7 +14,7 @@ COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 RUN git clone https://github.com/netdata/mosquitto.git mosquitto/
-WORKDIR /opt/netdata.git/mosquitto/libmosquitto
+WORKDIR /opt/netdata.git/mosquitto/lib
 RUN make
 WORKDIR /opt/netdata.git
 
