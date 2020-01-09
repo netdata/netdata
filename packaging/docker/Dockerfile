@@ -23,6 +23,10 @@ RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
    ./netdata-installer.sh --dont-wait --dont-start-it
 
+# Fake claiming
+ENV CLAIMED_ID
+RUN echo ${CLAIMED_ID} >/etc/netdata/claim.d/claimed_id
+
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
              /app/usr/share \
