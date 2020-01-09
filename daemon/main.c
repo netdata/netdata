@@ -941,7 +941,10 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
-                            rrd_init("unittest", NULL);
+                            if(rrd_init("unittest", NULL)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
@@ -1277,7 +1280,8 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
-    rrd_init(netdata_configured_hostname, system_info);
+    if(rrd_init(netdata_configured_hostname, system_info))
+        fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint

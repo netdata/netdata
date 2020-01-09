@@ -483,7 +483,7 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1)
@@ -517,6 +517,7 @@ void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     );
     rrd_unlock();
 	web_client_api_v1_management_init();
+    return localhost==NULL;
 }
 
 // ----------------------------------------------------------------------------
