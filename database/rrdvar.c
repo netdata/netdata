@@ -227,7 +227,7 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
         return 1;
     }
 
-    rv = rrdvar_index_find(&st->rrdvar_health_index, variable, hash);
+    rv = rrdvar_index_find(&st->rrdvar_alarm_name_index, variable, hash);
     if(rv) {
         *result = rrdvar2number(rv);
         return 1;

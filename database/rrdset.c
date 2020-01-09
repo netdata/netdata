@@ -583,7 +583,7 @@ RRDSET *rrdset_create_custom(
             memset(&st->avl, 0, sizeof(avl));
             memset(&st->avlname, 0, sizeof(avl));
             memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
-            memset(&st->rrdvar_health_index, 0, sizeof(avl_tree_lock));
+            memset(&st->rrdvar_alarm_name_index, 0, sizeof(avl_tree_lock));
             memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
             memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
 
@@ -726,7 +726,7 @@ RRDSET *rrdset_create_custom(
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
-    avl_init_lock(&st->rrdvar_health_index, rrdvar_compare);
+    avl_init_lock(&st->rrdvar_alarm_name_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
