@@ -517,7 +517,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     );
     rrd_unlock();
 	web_client_api_v1_management_init();
-    return localhost!=NULL;
+    return localhost==NULL;
 }
 
 // ----------------------------------------------------------------------------
