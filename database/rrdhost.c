@@ -889,6 +889,16 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
     return result;
 }
 
+void free_host_labels(struct label *labels)
+{
+    while (labels != NULL)
+    {
+        struct label *current = labels;
+        labels = labels->next;
+        freez(current);
+    }
+}
+
 void replace_label_list(RRDHOST *host, struct label *new_labels)
 {
     netdata_rwlock_wrlock(&host->labels_rwlock);
@@ -896,12 +906,7 @@ void replace_label_list(RRDHOST *host, struct label *new_labels)
     host->labels = new_labels;
     netdata_rwlock_unlock(&host->labels_rwlock);
 
-    while (old_labels != NULL)
-    {
-        struct label *current = old_labels;
-        old_labels = old_labels->next;
-        freez(current);
-    }
+    free_host_labels(old_labels);
 }
 
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
