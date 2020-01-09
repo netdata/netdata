@@ -120,7 +120,6 @@ static inline void rrddimvar_create_variables(RRDDIMVAR *rs) {
     // - $name
 
     rs->var_local_id           = rrdvar_create_and_index("local", &st->rrdvar_root_index, rs->key_id, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
-    error("KILLME DIM CREATE VARIABLE %s.%s = %p", st->name, rs->key_name, rs->value);
     rs->var_local_name         = rrdvar_create_and_index("local", &st->rrdvar_root_index, rs->key_name, rs->type, RRDVAR_OPTION_DEFAULT, rs->value);
 
     // FAMILY VARIABLES FOR THIS DIMENSION

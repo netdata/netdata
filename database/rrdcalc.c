@@ -66,7 +66,7 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         st->red = rc->red;
     }
 
-    rc->local  = rrdvar_create_and_index("local",  &st->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+    rc->local  = rrdvar_create_and_index("local",  &st->rrdvar_health_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
     rc->family = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
@@ -183,7 +183,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     rc->rrdset_prev = rc->rrdset_next = NULL;
 
-    rrdvar_free(host, &st->rrdvar_root_index, rc->local);
+    rrdvar_free(host, &st->rrdvar_health_index, rc->local);
     rc->local = NULL;
 
     rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rc->family);

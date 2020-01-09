@@ -103,6 +103,7 @@ struct rrdcalc {
 
     calculated_number value;        // the current value of the alarm
     calculated_number old_value;    // the previous value of the alarm
+    calculated_number index_value;  // the current value of the alarm
 
     uint32_t rrdcalc_flags;         // check RRDCALC_FLAG_*
 

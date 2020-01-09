@@ -168,7 +168,6 @@ static inline calculated_number eval_variable(EVAL_EXPRESSION *exp, EVAL_VARIABL
     }
 
     if(exp->rrdcalc && health_variable_lookup(v->name, v->hash, exp->rrdcalc, &n)) {
-        error("KILLME EVAL VARIABLE "CALCULATED_NUMBER_FORMAT" ", n);
         buffer_sprintf(exp->error_msg, "[ ${%s} = ", v->name);
         print_parsed_as_constant(exp->error_msg, n);
         buffer_strcat(exp->error_msg, " ] ");

@@ -185,7 +185,6 @@ calculated_number rrdvar2number(RRDVAR *rv) {
     switch(rv->type) {
         case RRDVAR_TYPE_CALCULATED: {
             calculated_number *n = (calculated_number *)rv->value;
-            error("KILLME RRDVAR2NUMBER CALCULATED "CALCULATED_NUMBER_FORMAT" ", *n);
             return *n;
         }
 
@@ -225,7 +224,12 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
     rv = rrdvar_index_find(&st->rrdvar_root_index, variable, hash);
     if(rv) {
         *result = rrdvar2number(rv);
-        error("KILLME VARIABLE LOOKUP %s "CALCULATED_NUMBER_FORMAT" ", variable, *result);
+        return 1;
+    }
+
+    rv = rrdvar_index_find(&st->rrdvar_health_index, variable, hash);
+    if(rv) {
+        *result = rrdvar2number(rv);
         return 1;
     }
 

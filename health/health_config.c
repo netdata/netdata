@@ -605,6 +605,7 @@ static int health_readfile(const char *filename, void *data) {
             rc->green = NAN;
             rc->red = NAN;
             rc->value = NAN;
+            rc->index_value = 1;
             rc->old_value = NAN;
             rc->delay_multiplier = 1.0;
             rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
