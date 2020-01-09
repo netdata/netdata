@@ -7,6 +7,7 @@
 #  - PATH
 #  - CFLAGS
 #  - LDFLAGS
+#  - IS_NETDATA_STATIC_BINARY
 #  - NETDATA_CONFIGURE_OPTIONS
 #  - REINSTALL_OPTIONS
 #  - NETDATA_TARBALL_URL
@@ -202,7 +203,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
 	fi
 
 	# Do not pass any options other than the accept, for now
-	sh "${TMPDIR}/netdata-latest.gz.run" --accept
+	sh "${TMPDIR}/netdata-latest.gz.run" --accept ${REINSTALL_OPTIONS}
 
 	#shellcheck disable=SC2181
 	if [ $? -eq 0 ]; then
