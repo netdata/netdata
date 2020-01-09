@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix a syntax error in the packaging functions. [\#7686](https://github.com/netdata/netdata/pull/7686) ([Ferroin](https://github.com/Ferroin))
+- Add missing quoting in shell scripts. [\#7685](https://github.com/netdata/netdata/pull/7685) ([Ferroin](https://github.com/Ferroin))
 - Restore support for protobuf 3.0 [\#7683](https://github.com/netdata/netdata/pull/7683) ([vlvkobal](https://github.com/vlvkobal))
 - Fix spelling of Prometheus \(\#7673\) [\#7674](https://github.com/netdata/netdata/pull/7674) ([candrews](https://github.com/candrews))
 - installer: include go.d.plugin version v0.14.0 [\#7666](https://github.com/netdata/netdata/pull/7666) ([ilyam8](https://github.com/ilyam8))
@@ -19,6 +21,7 @@
 - redis: populate `keys\_redis` chart in runtime [\#7639](https://github.com/netdata/netdata/pull/7639) ([ilyam8](https://github.com/ilyam8))
 - Minor: Documentation Typo alamrs -\> alarms [\#7637](https://github.com/netdata/netdata/pull/7637) ([underhood](https://github.com/underhood))
 - Update the distribution support matrix to represent reality. [\#7636](https://github.com/netdata/netdata/pull/7636) ([Ferroin](https://github.com/Ferroin))
+- Switch PR labeling to use GitHub Actions. [\#7630](https://github.com/netdata/netdata/pull/7630) ([Ferroin](https://github.com/Ferroin))
 - Add Ubuntu 19.10 to packaging and lifecycle checks. [\#7629](https://github.com/netdata/netdata/pull/7629) ([Ferroin](https://github.com/Ferroin))
 - Remove EOL distros from CI jobs. [\#7628](https://github.com/netdata/netdata/pull/7628) ([Ferroin](https://github.com/Ferroin))
 - Clean up host labels in API responses [\#7616](https://github.com/netdata/netdata/pull/7616) ([vlvkobal](https://github.com/vlvkobal))
@@ -26,6 +29,7 @@
 - Fix a warning in prometheus remote write backend [\#7609](https://github.com/netdata/netdata/pull/7609) ([vlvkobal](https://github.com/vlvkobal))
 - python.d.plugin: UrlService bytes decode, logger unicode encoding fix [\#7601](https://github.com/netdata/netdata/pull/7601) ([ilyam8](https://github.com/ilyam8))
 - Adjust alarm labels [\#7600](https://github.com/netdata/netdata/pull/7600) ([thiagoftsm](https://github.com/thiagoftsm))
+- Docs: Improve documentation of opting out of anonymous statistics [\#7597](https://github.com/netdata/netdata/pull/7597) ([joelhans](https://github.com/joelhans))
 - Update handling of shutdown of the Netdata agent on update and uninstall. [\#7595](https://github.com/netdata/netdata/pull/7595) ([Ferroin](https://github.com/Ferroin))
 - Add netdata-claim.sh to the RPM spec file. [\#7592](https://github.com/netdata/netdata/pull/7592) ([Ferroin](https://github.com/Ferroin))
 - Set standard name to non-libnetdata threads \(libuv, pthread\) [\#7584](https://github.com/netdata/netdata/pull/7584) ([Saruspete](https://github.com/Saruspete))
@@ -71,10 +75,9 @@
 - installer: include go.d.plugin version v0.12.0 [\#7418](https://github.com/netdata/netdata/pull/7418) ([ilyam8](https://github.com/ilyam8))
 - Attempt to fix broken docs builds [\#7409](https://github.com/netdata/netdata/pull/7409) ([joelhans](https://github.com/joelhans))
 - packaging: Set default release channel to stable for gh releases [\#7399](https://github.com/netdata/netdata/pull/7399) ([ncmans](https://github.com/ncmans))
+- network interface speed, duplex, operstate \#5989 [\#7395](https://github.com/netdata/netdata/pull/7395) ([stelfrag](https://github.com/stelfrag))
 - fix to wrong instructions during a non-privileged install from installer [\#7393](https://github.com/netdata/netdata/pull/7393) ([julidegulen](https://github.com/julidegulen))
 - monit: overwrite \_\_eq\_\_, \_\_ne\_\_ in child classes \(lgtm warnings\) [\#7387](https://github.com/netdata/netdata/pull/7387) ([ilyam8](https://github.com/ilyam8))
-- smartd\_log: change ATTR5 chart algorithm to absolute [\#7384](https://github.com/netdata/netdata/pull/7384) ([ilyam8](https://github.com/ilyam8))
-- Do not crash when logging UTF-8 data in Python 2 [\#7376](https://github.com/netdata/netdata/pull/7376) ([vzDevelopment](https://github.com/vzDevelopment))
 - Fix typos in documentation [\#7375](https://github.com/netdata/netdata/pull/7375) ([rex4539](https://github.com/rex4539))
 - Fix typo and markup in packaging/installer README [\#7368](https://github.com/netdata/netdata/pull/7368) ([nabijaczleweli](https://github.com/nabijaczleweli))
 - Update python.d README  [\#7357](https://github.com/netdata/netdata/pull/7357) ([OdysLam](https://github.com/OdysLam))
@@ -211,11 +214,6 @@
 - Remove warning from Coverity [\#6992](https://github.com/netdata/netdata/pull/6992) ([thiagoftsm](https://github.com/thiagoftsm))
 - netdata/installer: allow netdata service install, when docker runs systemd [\#6987](https://github.com/netdata/netdata/pull/6987) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - Fixing broken links found via linkchecker [\#6983](https://github.com/netdata/netdata/pull/6983) ([joelhans](https://github.com/joelhans))
-- Fix dbengine consistency [\#6979](https://github.com/netdata/netdata/pull/6979) ([mfundul](https://github.com/mfundul))
-- Make dbengine the default memory mode [\#6977](https://github.com/netdata/netdata/pull/6977) ([mfundul](https://github.com/mfundul))
-- rabbitmq: collect vhosts msg metrics from `/api/vhosts` [\#6976](https://github.com/netdata/netdata/pull/6976) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity erro \(CID 349552\) double lock [\#6970](https://github.com/netdata/netdata/pull/6970) ([thiagoftsm](https://github.com/thiagoftsm))
-- web api: include family into allmetrics json response [\#6966](https://github.com/netdata/netdata/pull/6966) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
