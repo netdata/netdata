@@ -2,16 +2,14 @@
 # Handles labelling of PR's.
 name: Pull Request Labeler
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronized
-      - reopened
-      - ready_for_review
+  schedule:
+    - cron: '*/5 * * * *'
 jobs:
   labeler:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/labeler@v2
-        with:
-          repo-token: "${{ secrets.NETDATABOT_TOKEN }}"
+      - uses: paulfantom/periodic-labeler@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LABEL_MAPPINGS_FILE: .github/labeler.yml
