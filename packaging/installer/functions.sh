@@ -631,7 +631,7 @@ portable_add_user() {
 	echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
 	# shellcheck disable=SC2230
-	local nologin="$(command -v nologin >/dev/null 2>&1 || echo '/bin/false')"
+	local nologin="$(command -v nologin || echo '/bin/false')"
 
 	# Linux
 	if command -v useradd 1>/dev/null 2>&1; then
