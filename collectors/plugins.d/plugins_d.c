@@ -664,7 +664,7 @@ cleanup:
     cd->enabled = enabled;
 
     if(new_labels)
-        freez(new_labels);
+        free_host_labels(new_labels);
 
     if(likely(count)) {
         cd->successful_collections += count;
