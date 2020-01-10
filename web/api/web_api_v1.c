@@ -780,7 +780,7 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
         buffer_strcat(wb, tabs);
 
         char value[CONFIG_MAX_VALUE * 2 + 1];
-        escape_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
+        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
         buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, value);
 
         count++;
