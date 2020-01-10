@@ -145,7 +145,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
 
     rc = mosquitto_reconnect_delay_set(mosq, ACLK_RECONNECT_DELAY, ACLK_MAX_RECONNECT_DELAY, 1);
 
-    //mosquitto_tls_set(mosq, ca_crt, NULL, server_crt, server_key, NULL);
+    mosquitto_tls_set(mosq, ca_crt, NULL, server_crt, server_key, NULL);
 
     rc = mosquitto_connect_async(mosq, aclk_hostname, aclk_port, ACLK_PING_INTERVAL);
 
