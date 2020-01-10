@@ -6,12 +6,18 @@
 
 **Merged pull requests:**
 
+- Fix PR labeling \(again\). [\#7699](https://github.com/netdata/netdata/pull/7699) ([Ferroin](https://github.com/Ferroin))
+- General fixes to the installer. [\#7698](https://github.com/netdata/netdata/pull/7698) ([Ferroin](https://github.com/Ferroin))
+- Fix PR labeling GitHub Action. [\#7697](https://github.com/netdata/netdata/pull/7697) ([Ferroin](https://github.com/Ferroin))
+- Fixes \#7680 Remote write [\#7694](https://github.com/netdata/netdata/pull/7694) ([Ehekatl](https://github.com/Ehekatl))
+- Fix unclosed brackets in softnet alarm [\#7693](https://github.com/netdata/netdata/pull/7693) ([Ehekatl](https://github.com/Ehekatl))
 - Fix a syntax error in the packaging functions. [\#7686](https://github.com/netdata/netdata/pull/7686) ([Ferroin](https://github.com/Ferroin))
 - Add missing quoting in shell scripts. [\#7685](https://github.com/netdata/netdata/pull/7685) ([Ferroin](https://github.com/Ferroin))
 - Restore support for protobuf 3.0 [\#7683](https://github.com/netdata/netdata/pull/7683) ([vlvkobal](https://github.com/vlvkobal))
 - Fix spelling of Prometheus \(\#7673\) [\#7674](https://github.com/netdata/netdata/pull/7674) ([candrews](https://github.com/candrews))
 - installer: include go.d.plugin version v0.14.0 [\#7666](https://github.com/netdata/netdata/pull/7666) ([ilyam8](https://github.com/ilyam8))
 - \[Fix\] remove pthread\_setname\_np segfault on musl [\#7664](https://github.com/netdata/netdata/pull/7664) ([Saruspete](https://github.com/Saruspete))
+- error exit when rrdhost localhost init fails \#7504 [\#7663](https://github.com/netdata/netdata/pull/7663) ([underhood](https://github.com/underhood))
 - Fix buildyaml.sh script so that docs generation works correctly. [\#7662](https://github.com/netdata/netdata/pull/7662) ([Ferroin](https://github.com/Ferroin))
 - samba: properly check if it is allowed to run smbstatus with sudo [\#7655](https://github.com/netdata/netdata/pull/7655) ([ilyam8](https://github.com/ilyam8))
 - Bump handlebars from 4.2.0 to 4.5.3 [\#7654](https://github.com/netdata/netdata/pull/7654) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -42,6 +48,7 @@
 - Revert "Fix race condition in dbengine \(\#7533\)" [\#7560](https://github.com/netdata/netdata/pull/7560) ([amoss](https://github.com/amoss))
 - Skip unit testing during CI when it's not needed. [\#7559](https://github.com/netdata/netdata/pull/7559) ([Ferroin](https://github.com/Ferroin))
 - Cleanup the main exporting engine thread on exit [\#7558](https://github.com/netdata/netdata/pull/7558) ([vlvkobal](https://github.com/vlvkobal))
+- Send host labels via exporting connectors  [\#7554](https://github.com/netdata/netdata/pull/7554) ([vlvkobal](https://github.com/vlvkobal))
 - \[github/templates\] Add samples cmds to get OS env [\#7550](https://github.com/netdata/netdata/pull/7550) ([Saruspete](https://github.com/Saruspete))
 - proc\_pressure: increment fail\_count on read fail [\#7547](https://github.com/netdata/netdata/pull/7547) ([hexchain](https://github.com/hexchain))
 - Merge the matrix and jobs keys in Travis config. [\#7544](https://github.com/netdata/netdata/pull/7544) ([Ferroin](https://github.com/Ferroin))
@@ -79,16 +86,11 @@
 - fix to wrong instructions during a non-privileged install from installer [\#7393](https://github.com/netdata/netdata/pull/7393) ([julidegulen](https://github.com/julidegulen))
 - monit: overwrite \_\_eq\_\_, \_\_ne\_\_ in child classes \(lgtm warnings\) [\#7387](https://github.com/netdata/netdata/pull/7387) ([ilyam8](https://github.com/ilyam8))
 - Fix typos in documentation [\#7375](https://github.com/netdata/netdata/pull/7375) ([rex4539](https://github.com/rex4539))
-- Fix typo and markup in packaging/installer README [\#7368](https://github.com/netdata/netdata/pull/7368) ([nabijaczleweli](https://github.com/nabijaczleweli))
-- Update python.d README  [\#7357](https://github.com/netdata/netdata/pull/7357) ([OdysLam](https://github.com/OdysLam))
 - Documentation on per-chart configuration options [\#7345](https://github.com/netdata/netdata/pull/7345) ([joelhans](https://github.com/joelhans))
-- Fixing errors in plugins.d/README.md [\#7340](https://github.com/netdata/netdata/pull/7340) ([joelhans](https://github.com/joelhans))
 - Health: Proposed restructuring of health documentation [\#7329](https://github.com/netdata/netdata/pull/7329) ([joelhans](https://github.com/joelhans))
 - Implement netdata command server and cli tool [\#7325](https://github.com/netdata/netdata/pull/7325) ([mfundul](https://github.com/mfundul))
 - Minor docker related cleanups [\#7240](https://github.com/netdata/netdata/pull/7240) ([knatsakis](https://github.com/knatsakis))
 - .travis.yml: Add timestamps to output [\#7239](https://github.com/netdata/netdata/pull/7239) ([knatsakis](https://github.com/knatsakis))
-- proc.plugin: add pressure stall information [\#7209](https://github.com/netdata/netdata/pull/7209) ([hexchain](https://github.com/hexchain))
-- Fixing linter errors in packaging/docker/README [\#7199](https://github.com/netdata/netdata/pull/7199) ([joelhans](https://github.com/joelhans))
 - Updates and grammar fixes to README.md [\#7193](https://github.com/netdata/netdata/pull/7193) ([joelhans](https://github.com/joelhans))
 - Add HP Smart Storage Array python plugin [\#7181](https://github.com/netdata/netdata/pull/7181) ([gnoddep](https://github.com/gnoddep))
 - Implement the main flow for the Exporting Engine [\#7149](https://github.com/netdata/netdata/pull/7149) ([vlvkobal](https://github.com/vlvkobal))
@@ -156,8 +158,6 @@
 - telegram: fix broken links, add setup instructions [\#7033](https://github.com/netdata/netdata/pull/7033) ([half-duplex](https://github.com/half-duplex))
 - netdata/installer: add missing flags on installer [\#7027](https://github.com/netdata/netdata/pull/7027) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
 - add support for am2320 sensor [\#7024](https://github.com/netdata/netdata/pull/7024) ([tommybuck](https://github.com/tommybuck))
-- mysql: add cluster\_status alarm [\#6989](https://github.com/netdata/netdata/pull/6989) ([ilyam8](https://github.com/ilyam8))
-- Netdata not returning correct value for unknow variables [\#6984](https://github.com/netdata/netdata/pull/6984) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
@@ -192,8 +192,6 @@
 - Don't write an HTTP response 204 to logs [\#7035](https://github.com/netdata/netdata/pull/7035) ([vlvkobal](https://github.com/vlvkobal))
 - Implement hangouts chat notifications [\#7013](https://github.com/netdata/netdata/pull/7013) ([hendrikhofstadt](https://github.com/hendrikhofstadt))
 - Documenting the structure of the data responses. [\#7012](https://github.com/netdata/netdata/pull/7012) ([amoss](https://github.com/amoss))
-- Tutorials to support v1.18 features [\#6993](https://github.com/netdata/netdata/pull/6993) ([joelhans](https://github.com/joelhans))
-- Add CMocka unit tests [\#6985](https://github.com/netdata/netdata/pull/6985) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.18.0](https://github.com/netdata/netdata/tree/v1.18.0) (2019-10-10)
 
@@ -209,11 +207,6 @@
 - Remove hard cap from page cache size to eliminate deadlocks. [\#7006](https://github.com/netdata/netdata/pull/7006) ([mfundul](https://github.com/mfundul))
 - Add Portuguese \(Brazil\) as a language option [\#7004](https://github.com/netdata/netdata/pull/7004) ([cakrit](https://github.com/cakrit))
 - fix issue \#7002 [\#7003](https://github.com/netdata/netdata/pull/7003) ([OneCodeMonkey](https://github.com/OneCodeMonkey))
-- Increase dbengine default cache size [\#6997](https://github.com/netdata/netdata/pull/6997) ([mfundul](https://github.com/mfundul))
-- Checklinks fix [\#6994](https://github.com/netdata/netdata/pull/6994) ([cakrit](https://github.com/cakrit))
-- Remove warning from Coverity [\#6992](https://github.com/netdata/netdata/pull/6992) ([thiagoftsm](https://github.com/thiagoftsm))
-- netdata/installer: allow netdata service install, when docker runs systemd [\#6987](https://github.com/netdata/netdata/pull/6987) ([paulkatsoulakis](https://github.com/paulkatsoulakis))
-- Fixing broken links found via linkchecker [\#6983](https://github.com/netdata/netdata/pull/6983) ([joelhans](https://github.com/joelhans))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
