@@ -199,6 +199,7 @@ while [ -n "${1}" ]; do
 		shift 1
 	elif [ "${1}" = "--auto-update" ]; then
 		true # This is the default behaviour, so ignore it.
+		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
 		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
