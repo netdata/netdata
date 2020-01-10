@@ -207,6 +207,7 @@ while [ -n "${1}" ]; do
 		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
 		shift 1
 	elif [ "${1}" = "--local-files" ]; then
+		NETDATA_UPDATES="" # Disable autoupdates if using pre-downloaded files.
 		shift 1
 		if [ -z "${1}" ]; then
 			fatal "Option --local-files requires extra information. The desired tarball full filename is needed"
