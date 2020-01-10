@@ -153,6 +153,7 @@ sh /tmp/kickstart-static64.sh
 -   The static binary files are kept in repo [binary-packages](https://github.com/netdata/binary-packages). You can download any of the `.run` files, and run it. These files are self-extracting shell scripts built with [makeself](https://github.com/megastep/makeself).
 -   The target system does **not** need to have bash installed.
 -   The same files can be used for updates too.
+-   If the `--local-files` option was not specified, installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated daily (you will get a message from cron only if the update fails).
 -   For QA purposes, this installation method lets us know if it succeed or failed.
 
 </details>
