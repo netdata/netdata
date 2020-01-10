@@ -19,7 +19,7 @@ ARCH_MAP=(["i386"]="386" ["amd64"]="amd64" ["armhf"]="arm" ["aarch64"]="arm64")
 DEVEL_ARCHS=(amd64)
 [ "${ARCHS}" ] || ARCHS="${!ARCH_MAP[@]}" # Use default ARCHS unless ARCHS are externally provided
 
-if [ "$RELEASE_CHANNEL" != "nightly" ] && [ "$RELEASE_CHANNEL" != "stable" ]; then
+if [ "${RELEASE_CHANNEL}" != "nightly" ] && [ "${RELEASE_CHANNEL}" != "stable" ]; then
   echo "RELEASE_CHANNEL must be set to either 'nightly' or 'stable' - build cannot proceed"
   exit 1
 fi
