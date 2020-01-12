@@ -87,7 +87,6 @@
 - fix to wrong instructions during a non-privileged install from installer [\#7393](https://github.com/netdata/netdata/pull/7393) ([julidegulen](https://github.com/julidegulen))
 - monit: overwrite \_\_eq\_\_, \_\_ne\_\_ in child classes \(lgtm warnings\) [\#7387](https://github.com/netdata/netdata/pull/7387) ([ilyam8](https://github.com/ilyam8))
 - Fix typos in documentation [\#7375](https://github.com/netdata/netdata/pull/7375) ([rex4539](https://github.com/rex4539))
-- Documentation on per-chart configuration options [\#7345](https://github.com/netdata/netdata/pull/7345) ([joelhans](https://github.com/joelhans))
 - Implement netdata command server and cli tool [\#7325](https://github.com/netdata/netdata/pull/7325) ([mfundul](https://github.com/mfundul))
 - Minor docker related cleanups [\#7240](https://github.com/netdata/netdata/pull/7240) ([knatsakis](https://github.com/knatsakis))
 - .travis.yml: Add timestamps to output [\#7239](https://github.com/netdata/netdata/pull/7239) ([knatsakis](https://github.com/knatsakis))
@@ -206,7 +205,6 @@
 - Fix a resource leak [\#7007](https://github.com/netdata/netdata/pull/7007) ([vlvkobal](https://github.com/vlvkobal))
 - Remove hard cap from page cache size to eliminate deadlocks. [\#7006](https://github.com/netdata/netdata/pull/7006) ([mfundul](https://github.com/mfundul))
 - Add Portuguese \(Brazil\) as a language option [\#7004](https://github.com/netdata/netdata/pull/7004) ([cakrit](https://github.com/cakrit))
-- fix issue \#7002 [\#7003](https://github.com/netdata/netdata/pull/7003) ([OneCodeMonkey](https://github.com/OneCodeMonkey))
 
 ## [v1.17.1](https://github.com/netdata/netdata/tree/v1.17.1) (2019-09-12)
 
