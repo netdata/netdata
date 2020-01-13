@@ -547,12 +547,13 @@ int aclk_heartbeat()
 // encapsulate contents into metadata message as per ACLK documentation
 void aclk_create_metadata_message(BUFFER *dest, char *type, BUFFER *contents)
 {
-    buffer_sprintf(aclk_buffer,
-        "{\"type\":\"info\","
+    buffer_sprintf(dest,
+        "{\"type\":\"%s\","
         "\"msg-id\":\"\","
         "\"ads-id\":\"\","
         "\"callback_topic\":null,"
         "\"contents\":%s}",
+        type,
         contents->buffer);
 }
 
