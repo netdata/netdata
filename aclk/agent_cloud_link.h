@@ -5,8 +5,8 @@
 
 #include "mqtt.h"
 
-#define ACLK_METADATA_TOPIC "metadata"
-#define ACLK_COMMAND_TOPIC "command"
+#define ACLK_METADATA_TOPIC "meta"
+#define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
 #define ACLK_INITIALIZATION_WAIT 60        // Wait for link to initialize in seconds (per msg)
