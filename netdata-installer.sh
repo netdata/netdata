@@ -98,7 +98,7 @@ REINSTALL_OPTIONS="$(
 	printf "\\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
-REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | sed 's/--dont-wait//g' - | sed 's/--dont-start-it//g' -)"
+REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | sed 's/--dont-wait//g' | sed 's/--dont-start-it//g')"
 
 banner_nonroot_install() {
 	cat <<NONROOTNOPREFIX
