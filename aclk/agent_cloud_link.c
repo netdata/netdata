@@ -544,6 +544,18 @@ int aclk_heartbeat()
     return 0;
 }
 
+// encapsulate contents into metadata message as per ACLK documentation
+void aclk_create_metadata_message(BUFFER *dest, char *type, BUFFER *contents)
+{
+    buffer_sprintf(aclk_buffer,
+        "{\"type\":\"info\","
+        "\"msg-id\":\"\","
+        "\"ads-id\":\"\","
+        "\"callback_topic\":null,"
+        "\"contents\":%s}",
+        contents->buffer);
+}
+
 // Send info metadata message to the cloud if the link is established
 // or on request
 int aclk_send_metadata_info()
@@ -559,13 +571,7 @@ int aclk_send_metadata_info()
 
     web_client_api_request_v1_info_fill_buffer(localhost, info_json);
 
-    buffer_sprintf(aclk_buffer,
-        "{\"type\":\"info\","
-        "\"msg-id\":\"\","
-        "\"ads-id\":\"\","
-        "\"callback_topic\":null,"
-        "\"contents\":%s}",
-        info_json->buffer);
+    aclk_create_metadata_message(aclk_buffer, "info", info_json);
 
     buffer_free(info_json);
 
