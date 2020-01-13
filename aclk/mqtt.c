@@ -21,6 +21,8 @@ inline const char *_link_strerror(int rc)
     return mosquitto_strerror(rc);
 }
 
+extern int cmdpause;
+
 void mqtt_message_callback(
     struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg)
 {
@@ -28,20 +30,32 @@ void mqtt_message_callback(
 
     // TODO: handle commands in a more efficient way, if we have many
 
-    aclk_queue_query(msg->topic, msg->payload);
+    if (strcmp((char *)msg->payload, "pause") == 0) {
+        cmdpause = 1;
+        return;
+    }
+
+    if (strcmp((char *)msg->payload, "resume") == 0) {
+        cmdpause = 0;
+        return;
+    }
 
     if (strcmp((char *)msg->payload, "reload") == 0) {
         error_log_limit_unlimited();
         info("Reloading health configuration");
         health_reload();
         error_log_limit_reset();
+        return;
     }
 
     if (strcmp((char *)msg->payload, "info") == 0) {
         error_log_limit_unlimited();
         aclk_send_metadata();
         error_log_limit_reset();
+        return;
     }
+
+    aclk_queue_query(msg->topic, msg->payload);
 }
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)

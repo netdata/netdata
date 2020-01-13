@@ -14,6 +14,7 @@ char *aclk_hostname = NULL;     //default localhost
 int aclk_subscribed = 0;
 
 int aclk_metadata_submitted = 0;
+int cmdpause = 0;               // Used to pause query processing
 
 BUFFER *aclk_buffer = NULL;
 
@@ -223,6 +224,10 @@ int aclk_process_query()
     int  rc;
     time_t current_beat;
 
+
+    if (unlikely(cmdpause))
+        return 0;
+
     current_beat = now_realtime_sec();
 
     //if (unlikely(current_beat - last_beat < ACLK_HEARTBEAT_INTERVAL && last_beat > 0)) {
@@ -242,6 +247,30 @@ int aclk_process_query()
 
     query_count++;
     info("Processsing query #%d  (%s) (%s) queued for %d seconds", query_count, this_query->token, this_query->query, now_realtime_sec() - this_query->created);
+
+    if (strncmp((char *) this_query->query, "data:", 5) == 0) {
+
+        struct web_client *w = (struct web_client *)malloc(sizeof(struct web_client));
+        memset(w, 0, sizeof(struct web_client));
+        w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+        w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+        w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+        strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
+        w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
+        w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
+        w->acl = 0x1f;
+
+        error_log_limit_unlimited();
+        web_client_api_request_v1_data(localhost, w, this_query->query+5);
+        //info("RESP: (%d) %s", w->response.data->len, w->response.data->buffer);
+        aclk_send_message("data", w->response.data->buffer);
+        error_log_limit_reset();
+
+        buffer_free(w->response.data);
+        buffer_free(w->response.header);
+        buffer_free(w->response.header_output);
+        free(w);
+    }
 
     aclk_query_free(this_query);
 
@@ -461,6 +490,7 @@ void aclk_disconnect(void *ptr)
 {
     info("Disconnect detected");
     aclk_subscribed = 0;
+    aclk_metadata_submitted = 0;
     return;
 }
 
