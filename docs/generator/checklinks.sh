@@ -212,7 +212,7 @@ ck_netdata_relative () {
 			;;
 		esac
 		
-		if [[ -n $s ]] ; then
+		if [ -n "$s" ] ; then
 			srch=$(echo "$rlnk" | sed 's/\//\\\//g')
 			rplc=$(echo "$s" | sed 's/\//\\\//g')
 			fix "sed -i 's/($srch)/($rplc)/g' $f"
