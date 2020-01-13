@@ -50,7 +50,7 @@ void mqtt_message_callback(
 
     if (strcmp((char *)msg->payload, "info") == 0) {
         error_log_limit_unlimited();
-        aclk_send_metadata();
+        aclk_send_metadata_info();
         error_log_limit_reset();
         return;
     }

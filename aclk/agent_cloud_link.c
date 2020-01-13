@@ -269,7 +269,7 @@ int aclk_process_queries()
     int rc;
 
     if (unlikely(!aclk_metadata_submitted)) {
-        aclk_send_metadata();
+        aclk_send_metadata_info();
         aclk_metadata_submitted = 1;
     }
 
@@ -544,8 +544,9 @@ int aclk_heartbeat()
     return 0;
 }
 
-// Send metadata to the cloud if the link is established
-int aclk_send_metadata()
+// Send info metadata message to the cloud if the link is established
+// or on request
+int aclk_send_metadata_info()
 {
     ACLK_LOCK;
 
@@ -554,7 +555,20 @@ int aclk_send_metadata()
 
     buffer_flush(aclk_buffer);
 
-    web_client_api_request_v1_info_fill_buffer(localhost, aclk_buffer);
+    BUFFER *info_json = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+
+    web_client_api_request_v1_info_fill_buffer(localhost, info_json);
+
+    buffer_sprintf(aclk_buffer,
+        "{\"type\":\"info\","
+        "\"msg-id\":\"\","
+        "\"ads-id\":\"\","
+        "\"callback_topic\":null,"
+        "\"contents\":%s}",
+        info_json->buffer);
+
+    buffer_free(info_json);
+
     aclk_buffer->contenttype = CT_APPLICATION_JSON;
 
     ACLK_UNLOCK;

@@ -68,7 +68,7 @@ void aclk_message_callback(struct mosquitto *moqs, void *obj, const struct mosqu
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
 int aclk_heartbeat();
-int aclk_send_metadata();
+int aclk_send_metadata_info();
 int aclk_wait_for_initialization();
 
 
