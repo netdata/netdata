@@ -6,7 +6,7 @@ body, input {
 }
 
 .md-typeset {
-    font-size: .9rem;
+    font-size: .85rem;
     line-height: 1.5;
 }
 
@@ -264,6 +264,22 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 /* Underline links, but not badges/icons. */
 .md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
     border-bottom: 1px solid #272b30;
+}
+
+/* Remove underlines on specific badges. */
+.md-typeset a[href='https://travis-ci.com/netdata/netdata'],
+.md-typeset a[href='https://bestpractices.coreinfrastructure.org/projects/2231'],
+.md-typeset a[href='https://www.gnu.org/licenses/gpl-3.0'],
+.md-typeset a[href='https://codeclimate.com/github/netdata/netdata'],
+.md-typeset a[href='https://www.codacy.com/app/netdata/netdata?utm_source=github.com&utm_medium=referral&utm_content=netdata/netdata&utm_campaign=Badge_Grade'],
+.md-typeset a[href='https://lgtm.com/projects/g/netdata/netdata/context:cpp'],
+.md-typeset a[href='https://lgtm.com/projects/g/netdata/netdata/context:javascript'],
+.md-typeset a[href='https://lgtm.com/projects/g/netdata/netdata/context:python'],
+.md-typeset a[href='https://hub.docker.com/r/netdata/netdata/'],
+.md-typeset a[href='https://hub.docker.com/r/firehol/netdata/'],
+.md-typeset a[href='https://hub.docker.com/r/titpetric/netdata/'],
+.md-typeset a[href='https://registry.my-netdata.io/#menu_netdata_submenu_registry'] {
+    border-bottom: 0 !important;
 }
 
 /* Fix the font size of admonition and details sections. */

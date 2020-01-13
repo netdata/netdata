@@ -82,8 +82,8 @@ guide](docs/contributing/contributing-documentation.md), and [documentation styl
 guide](docs/contributing/style-guide.md) to learn more about our community and how you can get started contributing to
 Netdata.
 
-Want to get news, how-tos, and heaps of monitoring savvy straight from Netdata? Subscribe to our newsletter to monitor
-our team of monitoring pros.
+**Want to get news, how-tos, and heaps of monitoring savvy straight from Netdata? Subscribe to our newsletter to monitor
+our team of monitoring pros.**
 
 <script charset="utf-8" type="text/javascript" src="//js.hsforms.net/forms/shell.js"></script>
 <script>
