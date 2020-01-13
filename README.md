@@ -131,7 +131,7 @@ about the information collected, and learn how to-opt, on our [anonymous statist
 The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
 _actively_ contributing to Netdata's future.
 
-To learn more about the pros and cons of using *nightly* vs. *stable* releases, see our [notice about the two options](packaging/installer/README.md#nightly-vs-stable-releases).
+To learn more about the pros and cons of using _nightly_ vs. _stable_ releases, see our [notice about the two options](packaging/installer/README.md#nightly-vs-stable-releases).
 
 The above command will:
 
