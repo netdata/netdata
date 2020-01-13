@@ -21,11 +21,8 @@ WORKDIR /opt/netdata.git
 # Install from source
 RUN chmod +x netdata-installer.sh && \
    cp -rp /deps/* /usr/local/ && \
-   ./netdata-installer.sh --dont-wait --dont-start-it
-
-# Fake claiming
-ARG CLAIMED_ID
-RUN echo ${CLAIMED_ID} >/etc/netdata/claim.d/claimed_id
+   ./netdata-installer.sh --dont-wait
+   #--dont-start-it
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
@@ -102,6 +99,14 @@ RUN \
     ln -sf /dev/stdout /var/log/netdata/access.log && \
     ln -sf /dev/stdout /var/log/netdata/debug.log && \
     ln -sf /dev/stderr /var/log/netdata/error.log
+
+# Fake claiming
+ARG CLAIMED_ID
+RUN echo -n ${CLAIMED_ID} >/etc/netdata/claim.d/claimed_id
+RUN chown -R netdata:netdata /etc/netdata/claim.d/
+RUN echo "" >> /etc/netdata/netdata.conf
+RUN echo "[agent_cloud_link]" >> /etc/netdata/netdata.conf
+RUN echo "    agent cloud link hostname = vernemq" >> /etc/netdata/netdata.conf
 
 ENV NETDATA_PORT 19999
 EXPOSE $NETDATA_PORT
