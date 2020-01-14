@@ -18,7 +18,7 @@ printhelp () {
 	-f Just check the passed md file
 	General Options:
 	 -x Execute commands. By default the script runs in test mode with no files changed by the script (results and fixes are just shown). Use -x to have it apply the changes.
-	 -u trys to follow URLs using curl
+	 -u Tries to follow URLs using curl
 	 -v Outputs debugging messages
 	By default, nothing is actually checked. The following options tell it what to check:
 	 -a Check all link types

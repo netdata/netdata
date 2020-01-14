@@ -39,6 +39,18 @@ int setup_rrdhost()
 
     localhost->tags = strdupz("TAG1=VALUE1 TAG2=VALUE2");
 
+    struct label *label = calloc(1, sizeof(struct label));
+    label->key = strdupz("key1");
+    label->value = strdupz("value1");
+    label->label_source = LABEL_SOURCE_NETDATA_CONF;
+    localhost->labels = label;
+
+    label = calloc(1, sizeof(struct label));
+    label->key = strdupz("key2");
+    label->value = strdupz("value2");
+    label->label_source = LABEL_SOURCE_AUTO;
+    localhost->labels->next = label;
+
     localhost->rrdset_root = calloc(1, sizeof(RRDSET));
     RRDSET *st = localhost->rrdset_root;
     st->rrdhost = localhost;
@@ -80,6 +92,13 @@ int teardown_rrdhost()
     free((void *)st->name);
     free(st);
 
+    free(localhost->labels->next->key);
+    free(localhost->labels->next->value);
+    free(localhost->labels->next);
+    free(localhost->labels->key);
+    free(localhost->labels->value);
+    free(localhost->labels);
+
     free((void *)localhost->tags);
     free(localhost);
 
@@ -103,6 +122,7 @@ int teardown_initialized_engine(void **state)
     struct engine *engine = *state;
 
     teardown_rrdhost();
+    buffer_free(engine->connector_root->instance_root->labels);
     buffer_free(engine->connector_root->instance_root->buffer);
     teardown_configured_engine(state);
 

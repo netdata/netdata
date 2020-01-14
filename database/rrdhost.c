@@ -483,7 +483,7 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1)
@@ -517,6 +517,7 @@ void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     );
     rrd_unlock();
 	web_client_api_v1_management_init();
+    return localhost==NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -889,6 +890,26 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
     return result;
 }
 
+void free_host_labels(struct label *labels)
+{
+    while (labels != NULL)
+    {
+        struct label *current = labels;
+        labels = labels->next;
+        freez(current);
+    }
+}
+
+void replace_label_list(RRDHOST *host, struct label *new_labels)
+{
+    netdata_rwlock_wrlock(&host->labels_rwlock);
+    struct label *old_labels = host->labels;
+    host->labels = new_labels;
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    free_host_labels(old_labels);
+}
+
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
 {
     struct label *lab = create_label(key, value, label_source);
@@ -936,16 +957,11 @@ void reload_host_labels()
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
     new_labels = merge_label_lists(new_labels, from_config);
 
-    netdata_rwlock_wrlock(&localhost->labels_rwlock);
-    struct label *old_labels = localhost->labels;
-    localhost->labels = new_labels;
-    netdata_rwlock_unlock(&localhost->labels_rwlock);
+    replace_label_list(localhost, new_labels);
 
-    while (old_labels != NULL)
-    {
-        struct label *current = old_labels;
-        old_labels = old_labels->next;
-        freez(current);
+    if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
+        localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+        rrdpush_send_labels(localhost);
     }
 
     health_reload();

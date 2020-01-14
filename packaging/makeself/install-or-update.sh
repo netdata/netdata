@@ -25,15 +25,31 @@ fi
 
 STARTIT=1
 AUTOUPDATE=0
+REINSTALL_OPTIONS=""
 RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 
 while [ "${1}" ]; do
 	case "${1}" in
-		"--dont-start-it") STARTIT=0;;
-		"--auto-update"|"-u") AUTOUPDATE=1;;
-		"--stable-channel") RELEASE_CHANNEL="stable";;
-		"--nightly-channel") RELEASE_CHANNEL="nightly";;
-		"--disable-telemetry") DISABLE_TELEMETRY=1;;
+		"--dont-start-it")
+			STARTIT=0
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--auto-update"|"-u")
+			AUTOUPDATE=1
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--stable-channel")
+			RELEASE_CHANNEL="stable"
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--nightly-channel")
+			RELEASE_CHANNEL="nightly"
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--disable-telemetry")
+			DISABLE_TELEMETRY=1
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
 
 		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
 	esac
@@ -241,6 +257,11 @@ then
     run chmod 4750 bin/fping
 fi
 
+# -----------------------------------------------------------------------------
+
+echo "Save install options"
+grep -qv 'IS_NETDATA_STATIC_BINARY="yes"' "${NETDATA_PREFIX}/etc/netdata/.environment" || echo IS_NETDATA_STATIC_BINARY=\"yes\" >> "${NETDATA_PREFIX}/etc/netdata/.environment"
+sed -i "s/REINSTALL_OPTIONS=\".*\"/REINSTALL_OPTIONS=\"${REINSTALL_OPTIONS}\"/" "${NETDATA_PREFIX}/etc/netdata/.environment"
 
 # -----------------------------------------------------------------------------
 if [ ${STARTIT} -eq 0 ]; then
