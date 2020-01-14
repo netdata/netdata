@@ -374,10 +374,12 @@ install_netdata_service() {
 
             SYSTEMD_DIRECTORY=""
 
-            if [ -d "/lib/systemd/system" ]; then
+            if [ -w "/lib/systemd/system" ]; then
                 SYSTEMD_DIRECTORY="/lib/systemd/system"
-            elif [ -d "/usr/lib/systemd/system" ]; then
+            elif [ -w "/usr/lib/systemd/system" ]; then
                 SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
+            elif [ -w "/etc/systemd/system" ]; then
+                SYSTEM_DIRECTORY="/etc/systemd/system"
             fi
 
             if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
