@@ -7,8 +7,9 @@
 #  - PATH
 #  - CFLAGS
 #  - LDFLAGS
+#  - IS_NETDATA_STATIC_BINARY
 #  - NETDATA_CONFIGURE_OPTIONS
-#  - REINSTALL_COMMAND
+#  - REINSTALL_OPTIONS
 #  - NETDATA_TARBALL_URL
 #  - NETDATA_TARBALL_CHECKSUM_URL
 #  - NETDATA_TARBALL_CHECKSUM
@@ -141,8 +142,9 @@ update() {
 			do_not_start="--dont-start-it"
 		fi
 
+		echo "${REINSTALL_OPTIONS}"
 		info "Re-installing netdata..."
-		eval "${REINSTALL_COMMAND} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
+		eval "./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 
 		# We no longer store checksum info here. but leave this so that we clean up all environment files upon next update.
 		sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
@@ -201,7 +203,7 @@ if [ "${IS_NETDATA_STATIC_BINARY}" == "yes" ]; then
 	fi
 
 	# Do not pass any options other than the accept, for now
-	sh "${TMPDIR}/netdata-latest.gz.run" --accept
+	sh "${TMPDIR}/netdata-latest.gz.run" --accept ${REINSTALL_OPTIONS}
 
 	#shellcheck disable=SC2181
 	if [ $? -eq 0 ]; then

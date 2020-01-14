@@ -1,0 +1,91 @@
+# This configures label matching for PR's.
+#
+# The keys are labels, and the values are lists of minimatch patterns
+# to which those labels apply.
+#
+# NOTE: This can only add labels, not remove them.
+# NOTE: Due to YAML syntax limitations, patterns or labels which start
+# with a character that is part of the standard YAML syntax must be
+# quoted.
+#
+# Please keep the labels sorted and deduplicated.
+
+area/backends:
+  - backends/*
+  - backends/**
+  - exporting/*
+  - exporting/**/*
+
+area/ci:
+  - .travis/*
+  - .travis/**/*
+  - .github/*
+  - .github/**/*
+
+area/collectors:
+  - collectors/*
+  - collectors/**/*
+
+area/daemon:
+  - daemon/*
+  - daemon/**/*
+
+area/database:
+  - database/*
+  - database/**/*
+
+area/docs:
+  - "**/*.md"
+  - diagrams/*
+  - diagrams/**/*
+  - netlify.toml
+
+area/external/python:
+  - collectors/python.d.plugin/*
+  - collectors/python.d.plugin/**/*
+
+area/external:
+  - collectors/charts.d.plugin/*
+  - collectors/charts.d.plugin/**/*
+  - collectors/node.d.plugin/*
+  - collectors/node.d.plugin/**/*
+
+area/health:
+  - health/*
+  - health/**/*
+
+area/packaging:
+  - build/*
+  - build/**/*
+  - contrib/*
+  - contrib/**/*
+  - packaging/*
+  - packaging/**/*
+  - system/*
+  - system/**/*
+  - netdata-installer.sh
+  - CMakeLists.txt
+  - configure.ac
+  - Makefile.am
+  - "**/Makefile.am"
+  - netdata.spec.in
+
+area/registry:
+  - registry/*
+  - registry/**/*
+
+area/streaming:
+  - streaming/*
+  - streaming/**/*
+
+area/tests:
+  - tests/*
+  - tests/**/*
+  - daemon/unit_test*
+  - coverity-scan.sh
+  - cppcheck.sh
+  - netdata.cppcheck
+
+area/web:
+  - web/*
+  - web/**/*
