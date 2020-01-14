@@ -211,7 +211,7 @@ show_fireqos_names() {
 
 	if [ -f "${fireqos_run_dir}/ifaces/${x}" ]; then
 		name="$(<"${fireqos_run_dir}/ifaces/${x}")"
-		echo "SETDEVICENAME ${name}"
+		echo "SETDEVICENAME ${name}" || exit
 
 		#shellcheck source=/dev/null
 		source "${fireqos_run_dir}/${name}.conf"
@@ -219,7 +219,7 @@ show_fireqos_names() {
 			# shellcheck disable=SC2086
 			setclassname ${n//|/ }
 		done
-		[ -n "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}"
+		[ -n "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}" || exit
 
 		return 0
 	fi
