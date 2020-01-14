@@ -38,7 +38,7 @@ body, input {
 
 .md-sidebar {
     position: sticky;
-    flex: 0 0 300px;
+    flex: 0 0 320px;
 }
 
 .md-sidebar--secondary {
@@ -263,7 +263,12 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 
 /* Underline links, but not badges/icons. */
 .md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
-    border-bottom: 1px solid #272b30;
+    color: #00AB44;
+}
+
+.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink):hover {
+    color: #35414A;
+    border-bottom: 1px solid #35414A;
 }
 
 /* Remove underlines on specific badges. */
