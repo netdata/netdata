@@ -234,9 +234,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     uint32_t DIMENSION_HASH = simple_hash(PLUGINSD_KEYWORD_DIMENSION);
     uint32_t DISABLE_HASH = simple_hash(PLUGINSD_KEYWORD_DISABLE);
     uint32_t VARIABLE_HASH = simple_hash(PLUGINSD_KEYWORD_VARIABLE);
+    uint32_t LABEL_HASH = simple_hash(PLUGINSD_KEYWORD_LABEL);
+    uint32_t OVERWRITE_HASH = simple_hash(PLUGINSD_KEYWORD_OVERWRITE);
 
     RRDSET *st = NULL;
     uint32_t hash;
+    struct label *new_labels = NULL;
 
     errno = 0;
     clearerr(fp);
@@ -283,6 +286,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 #else
         r = fgets(line, PLUGINSD_LINE_MAX, fp);
 #endif
+
         if(unlikely(!r)) {
             if(feof(fp))
                 error("read failed: end of file");
@@ -616,6 +620,39 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             enabled = 0;
             break;
         }
+        else if(likely(hash == LABEL_HASH && !strcmp(s, PLUGINSD_KEYWORD_LABEL))) {
+            debug(D_PLUGINSD, "requested a LABEL CHANGE");
+            char *store;
+            if(!words[4])
+                store = words[3];
+            else {
+                store = callocz(PLUGINSD_LINE_MAX + 1, sizeof(char));
+                char *move = store;
+                int i = 3;
+                while (i < w) {
+                    size_t length = strlen(words[i]);
+                    memcpy(move, words[i], length);
+                    move += length;
+                    *move++ = ' ';
+
+                    i++;
+                    if(!words[i])
+                        break;
+                }
+            }
+
+            new_labels = add_label_to_list(new_labels, words[1], store, strtol(words[2], NULL, 10));
+        }
+        else if(likely(hash == OVERWRITE_HASH && !strcmp(s, PLUGINSD_KEYWORD_OVERWRITE))) {
+            debug(D_PLUGINSD, "requested a OVERWITE a variable");
+            if(!host->labels) {
+                host->labels = new_labels;
+            } else {
+                replace_label_list(host, new_labels);
+            }
+
+            new_labels = NULL;
+        }
         else {
             error("sent command '%s' which is not known by netdata, for host '%s'. Disabling it.", s, host->hostname);
             enabled = 0;
@@ -625,6 +662,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
 cleanup:
     cd->enabled = enabled;
+
+    if(new_labels)
+        free_host_labels(new_labels);
 
     if(likely(count)) {
         cd->successful_collections += count;

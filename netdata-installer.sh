@@ -93,16 +93,12 @@ printf 'LDFLAGS="%s" ' "${LDFLAGS}" >>netdata-installer.log
 printf "%q " "${PROGRAM}" "${@}" >>netdata-installer.log
 printf "\\n" >>netdata-installer.log
 
-REINSTALL_COMMAND="$(
-	printf "%q " "${PROGRAM}" "${@}"
+REINSTALL_OPTIONS="$(
+	printf "%s" "${*}"
 	printf "\\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
-REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
-REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
-if [ "${REINSTALL_COMMAND:0:1}" != "." ] && [ "${REINSTALL_COMMAND:0:1}" != "/" ] && [ -f "./${PROGRAM}" ]; then
-	REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
-fi
+REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | sed 's/--dont-wait//g' | sed 's/--dont-start-it//g')"
 
 banner_nonroot_install() {
 	cat <<NONROOTNOPREFIX
@@ -1099,7 +1095,7 @@ NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
 NETDATA_GROUP="${NETDATA_GROUP}"
-REINSTALL_COMMAND="${REINSTALL_COMMAND}"
+REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"

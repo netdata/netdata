@@ -156,6 +156,9 @@ typedef enum label_source {
     LABEL_SOURCE_KUBERNETES       = 4
 } LABEL_SOURCE;
 
+#define LABEL_FLAG_UPDATE_STREAM 1
+#define LABEL_FLAG_STOP_STREAM 2
+
 struct label {
     char *key, *value;
     uint32_t key_hash;
@@ -166,6 +169,8 @@ struct label {
 char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+extern void replace_label_list(RRDHOST *host, struct label *new_labels);
+extern void free_host_labels(struct label *labels);
 void reload_host_labels();
 
 // ----------------------------------------------------------------------------
@@ -749,6 +754,7 @@ struct rrdhost {
     // Support for host-level labels
     struct label *labels;
     netdata_rwlock_t labels_rwlock;         // lock for the label list
+    uint32_t labels_flag;                   //Flags for labels
 
     // ------------------------------------------------------------------------
     // indexes
