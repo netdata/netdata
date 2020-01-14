@@ -280,7 +280,6 @@ jobs:
           - sudo apt-get install -y wget lxc python3-lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
           - source tests/installer/slack.sh
         before_script:
-          - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
           - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
         script:
           - echo "GIT Branch:" && git branch
@@ -378,7 +377,6 @@ jobs:
           - sudo apt-get install -y wget lxc lxc-templates python3-lxc python-lxc
           - source tests/installer/slack.sh
         before_script:
-          - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
           - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
         script:
           - echo "GIT Branch:" && git branch
@@ -466,7 +464,6 @@ jobs:
       _template: &RELEASE_TEMPLATE
         git:
           depth: false
-        before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images" "${NOTIF_CHANNEL}"
         script:
           - echo "GIT Branch:" && git branch
           - echo "Last commit:" && git log -1
@@ -529,7 +526,6 @@ jobs:
 
       name: Run coverity scan
       before_script:
-        - post_message "TRAVIS_MESSAGE" "Starting nightly operations" "${NOTIF_CHANNEL}"
         - bash <(curl -sS https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh) --dont-wait --non-interactive netdata
         - sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
       script: ./coverity-scan.sh --with-install
@@ -542,7 +538,6 @@ jobs:
 
       # This is generating the changelog for nightly release and publish it
     - name: Generate nightly changelog
-      before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation for nightlies" "${NOTIF_CHANNEL}"
       script:
         - ".travis/nightlies.sh"
         - ".travis/check_changelog_last_modification.sh"
@@ -551,7 +546,6 @@ jobs:
         depth: false
 
     - name: Clean up package cloud nightly repository from old versions
-      before_script: post_message "TRAVIS_MESSAGE" "Starting package cloud repository clean up" "${NOTIF_CHANNEL}"
       script:
         - DEPLOY_REPO="netdata-edge" .travis/package_management/old_package_purging.sh
         - DEPLOY_REPO="netdata-devel" .travis/package_management/old_package_purging.sh
@@ -562,7 +556,6 @@ jobs:
       _template: &NIGHTLY_TEMPLATE
         git:
           depth: false
-        before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "${NOTIF_CHANNEL}"
         script:
           - echo "GIT Branch:" && git branch
           - echo "Last commit:" && git log -1
@@ -598,7 +591,6 @@ jobs:
         - ARCHS=aarch64
 
     - name: Create nightly release artifacts, publish to GCS
-      before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
         - echo "Last commit:" && git log -1
