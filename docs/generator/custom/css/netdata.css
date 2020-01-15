@@ -1,5 +1,5 @@
 /* Fonts */
-@import url('https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,400i,700,700i&display=swap');
+@import url('https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,400i,500,700,700i&display=swap');
 
 body, input {
     font-family: "IBM Plex Sans","Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;
@@ -187,6 +187,16 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     }
 }
 
+/* D */
+
+.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
+    font-weight: 500;
+}
+
+[data-md-color-primary="blue-grey"] .md-nav__link--active, [data-md-color-primary="blue-grey"] .md-nav__link:active {
+    color: #00AB44;
+}
+
 /*
    Documentation homepage
    In particular, the three buttons for install/getting started/configuration.
@@ -302,7 +312,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 }
 
 /* Underline links, but not badges/icons. */
-.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
+.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink):not(.md-footer-social__link) {
     color: #00AB44;
 }
 
