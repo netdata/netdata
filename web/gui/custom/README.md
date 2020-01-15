@@ -16,7 +16,7 @@ source](../demo.html)**.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](../dashboard.html). 
+supported charts. The code is [here](../dashboard.html).
 
 If you plan to put the dashboard on TV, check out [tv.html](../tv.html). Here's
 is a screenshot of it, monitoring two servers on the same page:
@@ -65,7 +65,11 @@ header:
 
 ## Dash (Multi-Host Dashboard)
 
-`dash-example.html` is an all-in-one page that automatically fetches graphs from all your hosts. Just add your graphs and charts (or use the defaults) one time using the `dash-*` syntax and it will be automatically replicated for all of your hosts; showing alarms and graphs for all your hosts on **one page!**
+`dash-example.html` is an all-in-one page that automatically fetches graphs from all your hosts. Just add your graphs and charts (or use the defaults) one time using the `dash-*` syntax, and your selections will be automatically replicated for all of your hosts; showing alarms and graphs for all your hosts on **one page!**
+
+__**Dash will only work if you have implemented netdata streaming using `stream.conf`**__
+
+`dash-example.html` was created as an experiment to demonstrate the capabilities of netdata in a multi-host environment. If you desire more features, submit a pull request or check out netdata cloud!
 
 ### Configure Dash
 
@@ -74,7 +78,7 @@ First, rename the file so it doesn't get overwritten. For instance, with a webro
 cp /usr/share/netdata/web/dash-example.html /usr/share/netdata/web/dash.html
 ```
 
-Change the following line in `dash.html` to reflect your URLs. The second URL is used if you access your netdata dashboard from a reverse proxy. The reverse proxy URL is optional, if it is not set then both will use the netdata host URL.
+Find and change the following line in `dash.html` to reflect your netdata URLs. The second URL is only used if you access your netdata dashboard through a reverse proxy. The reverse proxy URL is optional; if it is not set then both will use the netdata host URL.
 
 ```js
 /*
@@ -85,7 +89,9 @@ Change the following line in `dash.html` to reflect your URLs. The second URL is
 var dash = new Dash('http://localhost:19999');
 ```
 
-If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. child divs will be generated to create your graph/chart:
+### The `dash-*` Syntax
+
+If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. Child divs will be generated to create your graph/chart:
 ```
 <div class="dash-graph"                     <---- 	Use class dash-graph for line graphs, etc
 	data-dash-netdata="system.cpu"          <---- 	REQUIRED: Use data-dash-netdata to set the data source
@@ -114,6 +120,10 @@ this.options = {
 ```
 
 To change the display order of your hosts, which is saved in localStorage, click the settings gear in the lower right corner
+
+We hope you like it!
+
+---
 
 
 ## dashboard.js

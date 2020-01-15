@@ -18,7 +18,6 @@
 	</div>
 	<div id="dash">
 		<div class="netdata-host-stats-container template">
-			<div class="drag-anchor"></div>
 			<div class="netdata-host-name">host</div>
 			<div class="netdata-host-stats">
 				<div class="dash-graph"
@@ -31,6 +30,9 @@
 				<div class="dash-graph"
 					data-dash-netdata="system.ram">
 				</div>
+        <div class="dash-graph"
+          data-dash-netdata="disk_space._">
+        </div>
 				<div class="dash-graph"
 					data-dash-netdata="system.net">
 				</div>
@@ -941,27 +943,24 @@ class PickNSort {
 		background: #424242;
 	}
 
-	.drag-anchor {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 2em;
-		background: #111;
-
-	}
-
 	.netdata-host-name {
 		font-size: 3em;
 		color: #FFF;
 		text-align: center;
 		white-space: nowrap;
+    background: inherit;
+    position: sticky;
+    top: 0;
+    z-index: 9998;
+    box-shadow: 0 0.5em 1em #232323;
+    margin-bottom: 0.5em;
+    border-bottom: solid 0.1em #AAA;
 	}
 
 	.netdata-host-stats-container {
 		position: relative;
 		margin: 0 1em;
-		padding: 3em 2em;
+		padding: 1em 2em;
 		display: inline-block;
 		text-align: center;
 		color: #CCC;
