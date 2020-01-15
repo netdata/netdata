@@ -59,6 +59,13 @@ body, input {
     }
 }
 
+@media only screen and (max-width: 500px) {
+    .md-content__inner {
+        margin-right: 1rem;
+        margin-left: 1rem;
+    }
+}
+
 /*
    Navigation
 */
@@ -70,6 +77,16 @@ body, input {
 @media only screen and (max-width: 76.25em) {
     .md-header-nav {
         padding: 0 2.5rem;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    .md-header-nav {
+        padding: 0.3rem 1rem;
+    }
+
+    .md-header-nav__title {
+        display: none;
     }
 }
 
@@ -103,6 +120,16 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     margin-right: 20px;
 }
 
+@media only screen and (max-width: 500px) {
+    img[src='/custom/img/geography-16.png'] {
+        display: none;
+    }
+
+    .md-header-nav select#sel {
+        margin: 0;
+    }
+}
+
 /* Algolia search */
 #search_algolia {
     font-size: 0.7rem;
@@ -114,6 +141,18 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 @media only screen and (max-width: 76.25em) {
     #search_algolia {
         min-width: 100px;
+    }
+}
+
+@media only screen and (max-width: 700px) {
+    #search_algolia {
+        width: 150px;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    #search_algolia {
+        width: 100px;
     }
 }
 
