@@ -295,6 +295,17 @@ AC_CHECK_LIB(
     [LZ4_LIBS="-llz4"]
 )
 
+# -----------------------------------------------------------------------------
+# libwebsockets pure C library for implementing modern network protocols
+
+if test "${ACLK}" = "yes"; then
+    AC_CHECK_LIB(
+        [websockets],
+        [lws_create_context],
+        [LWS_LIBS="-lwebsockets"]
+    )
+fi
+
 
 # -----------------------------------------------------------------------------
 # Judy General purpose dynamic array
@@ -1129,7 +1140,7 @@ AC_SUBST([webdir])
 
 CFLAGS="${CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
-    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS}"
+    ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} ${OPTIONAL_MONGOC_CFLAGS} ${LWS_LIBS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
