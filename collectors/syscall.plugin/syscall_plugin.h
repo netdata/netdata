@@ -35,7 +35,7 @@ enum netdata_map_syscall {
 };
 
 typedef struct netdata_syscall_kern_stat {
-    uint64_t pid;
+    uint32_t pid;
     uint16_t sc_num;
     uint8_t idx;
     enum netdata_map_syscall type;

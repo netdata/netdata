@@ -34,7 +34,7 @@ void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
 // ----------------------------------------------------------------------
-void *libnetdatanv = NULL;
+void *libnetdata = NULL;
 int (*load_bpf_file)(char *) = NULL;
 int (*test_bpf_perf_event)(int);
 int (*perf_event_mmap)(int);
@@ -60,8 +60,8 @@ static void int_exit(int sig)
 {
     (void)sig;
 
-    if(libnetdatanv) {
-        dlclose(libnetdatanv);
+    if(libnetdata) {
+        dlclose(libnetdata);
     }
 
     if(file_syscall) {
@@ -321,40 +321,40 @@ int syscall_load_libraries()
     char lpath[4096];
 
     build_complete_path(lpath, 4096, "libnetdata_ebpf.so");
-    libnetdatanv = dlopen(lpath, RTLD_LAZY);
-    if (!libnetdatanv)
+    libnetdata = dlopen(lpath, RTLD_LAZY);
+    if (!libnetdata)
     {
         error("[SYSCALL] Cannot load %s.", lpath);
         return -1;
     }
     else
     {
-        load_bpf_file = dlsym(libnetdatanv, "load_bpf_file");
+        load_bpf_file = dlsym(libnetdata, "load_bpf_file");
         if ((error = dlerror()) != NULL) {
             error("[SYSCALL] Cannot find load_bpf_file: %s", error);
             return -1;
         }
 
-        test_bpf_perf_event = dlsym(libnetdatanv, "test_bpf_perf_event");
+        test_bpf_perf_event = dlsym(libnetdata, "test_bpf_perf_event");
         if ((error = dlerror()) != NULL) {
             error("[SYSCALL] Cannot find test_bpf_perf_event: %s", error);
             return -1;
         }
 
-        netdata_perf_loop_multi = dlsym(libnetdatanv, "my_perf_loop_multi");
+        netdata_perf_loop_multi = dlsym(libnetdata, "my_perf_loop_multi");
         if ((error = dlerror()) != NULL) {
             error("[SYSCALL] Cannot find netdata_perf_loop_multi: %s", error);
             return -1;
         }
 
-        perf_event_mmap =  dlsym(libnetdatanv, "perf_event_mmap");
+        perf_event_mmap =  dlsym(libnetdata, "perf_event_mmap");
         if ((error = dlerror()) != NULL) {
             error("[SYSCALL] Cannot find perf_event_mmap: %s", error);
             fputs(error, stderr);
             return -1;
         }
 
-        perf_event_mmap_header =  dlsym(libnetdatanv, "perf_event_mmap_header");
+        perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
         if ((error = dlerror()) != NULL) {
             error("[SYSCALL] Cannot find  perf_event_mmap_header: %s", error);
             fputs(error, stderr);
