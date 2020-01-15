@@ -1,4 +1,6 @@
-FROM debian:buster
+FROM ubuntu:20.04
+RUN apt-get update
+RUN apt-get install -y zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc make git autoconf autoconf-archive autogen automake pkg-config curl python
 
 RUN apt-get update
 RUN apt-get install -y zlib1g-dev uuid-dev libuv1-dev liblz4-dev libjudy-dev libssl-dev libmnl-dev gcc \
@@ -24,3 +26,5 @@ RUN CFLAGS="-O1 -ggdb -Wall -Wextra -Wformat-signedness -fstack-protector-all -D
 RUN ln -sf /dev/stdout /var/log/netdata/access.log
 RUN ln -sf /dev/stdout /var/log/netdata/debug.log
 RUN ln -sf /dev/stderr /var/log/netdata/error.log
+
+
