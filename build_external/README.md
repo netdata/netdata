@@ -4,10 +4,29 @@ This allows the agent to be built and tested on various linux distros regardless
 host system. In particular this allows MacOS to be used as a build host via Docker For
 Mac. For configurations that involve building and running the agent alone, we still use
 `docker-compose` for consistency with more complex configurations. The more complex
-configurations allow the agent to be run in conjunction with parts of the cloud 
+configurations allow the agent to be run in conjunction with parts of the cloud
 infrastructure (these parts of the code are not public), or with external brokers
-(such as MQTT), or with other external tools (such as TSDB to allow the agent to
+(such as VerneMQ for MQTT), or with other external tools (such as TSDB to allow the agent to
 export metrics).
+
+This differs from the packaging dockerfiles as it designed to be used for local development.
+The main difference is that these files are designed to support incremental compilation in
+the following way:
+
+1. The initial build should use of the `clean_build` dockerfiles to create a docker image
+   with the agent built from the source tree and installed into standard system paths
+   using `netdata-installer.sh`.
+2. When one of the `make_install` dockerfiles is used it will start on an image with the
+   last built version of the agent, the docker-cache will be aligned with changes in the
+   source repo (to prevent rebuilding intermediate images or re-running install steps),
+   the `make install` inside the container will only rebuild the changed files.
+
+The exact improvement on the compile-cycle depends on the speed of the network connection
+to pull the netdata dependencies, but should shrink the time considerably. For example,
+on a macbook pro the initial install takes about 1min + network delay and the incremental
+step only takes 15s. On a debian host with a fast network this reduces 1m30 -> 13s.
+
+# NOT UPDATED YET
 
 Each of the Dockerfiles is a known configuration (linux distro and version). To use the
 build-system it needs to be configured with an appropriate source. This can be done in

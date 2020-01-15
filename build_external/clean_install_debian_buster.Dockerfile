@@ -8,6 +8,8 @@ WORKDIR /opt/netdata/source
 
 # RUN make distclean   -> not safe if tree state changed on host since last config
 # Kill everything that is not in .gitignore preserving any fresh changes
+RUN git config --global user.email "root@container"
+RUN git config --global user.name "Fake root"
 RUN git stash && git clean -dxf && (git stash apply || true)
 # Not everybody is updating distclean properly - fix.
 RUN find . -name '*.Po' -exec rm \{\} \;
