@@ -165,7 +165,7 @@ We use several different languages and have had contributions from several peopl
 For C contributions in particular, we try to respect the [Linux kernel style](https://www.kernel.org/doc/html/v4.10/process/coding-style.html), with the following exceptions:
 
 -   Use 4 space indentation instead of 8
--   We occassionally have multiple statements on a single line (e.g. `if (a) b;`)
+-   We occasionally have multiple statements on a single line (e.g. `if (a) b;`)
 -   Allow max line length of 120 chars 
 -   Allow opening brace at the end of a function declaration: `function() {`. 
 -   Allow trailing comments
