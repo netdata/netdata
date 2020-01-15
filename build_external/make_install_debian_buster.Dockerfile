@@ -1,4 +1,4 @@
-FROM debian_buster_clean_install:latest
+FROM debian_buster_dev:latest
 
 # Sanitize new source tree by removing config-time state
 COPY . /opt/netdata/latest
