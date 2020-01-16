@@ -170,7 +170,6 @@ LIBNETDATA_FILES = \
     libnetdata/json/jsmn.h \
     libnetdata/health/health.c \
     libnetdata/health/health.h \
-    libnetdata/string/utf8.c \
     libnetdata/string/utf8.h \
     $(NULL)
 

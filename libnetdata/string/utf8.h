@@ -6,6 +6,4 @@
 #define IS_UTF8_BYTE(x) (x & 0x80)
 #define IS_UTF8_STARTBYTE(x) (IS_UTF8_BYTE(x)&&(x & 0x40))
 
-extern char url_utf8_get_byte_length(char c);
-
 #endif /* NETDATA_STRING_UTF8_H */
