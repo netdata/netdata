@@ -90,11 +90,10 @@ elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
         CONTAINER_ID_LIKE="FreeBSD"
         CONTAINER_NAME="FreeBSD"
         CONTAINER_OS_DETECTION="uname"
+        CONTAINER_VERSION=$(uname -r)
         KERNEL_VERSION=$(uname -K)
-        VERSION=$(uname -r)
 else
         if [ -f "/etc/os-release" ]; then
-                OS_DETECTION="/etc/os-release"
                 eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </etc/os-release | sed 's/^/CONTAINER_/')"
                 CONTAINER_OS_DETECTION="/etc/os-release"
         fi
@@ -129,7 +128,7 @@ fi
 
 # If Netdata is not running in a container then use the local detection as the host
 if [ "${CONTAINER}" = "unknown" ]; then
-        for v in NAME ID ID_LIKE VERSION VERSION_ID; do
+        for v in NAME ID ID_LIKE VERSION VERSION_ID OS_DETECTION; do
                 eval "HOST_$v=\$CONTAINER_$v; unset CONTAINER_$v"
         done
 else
