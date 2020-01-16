@@ -27,7 +27,7 @@ if [ -z ${VIRTUALIZATION} ]; then
                     # Virtualization detection from https://unix.stackexchange.com/questions/89714/easy-way-to-determine-virtualization-technology
                     # This only works as root
                     if dmidecode -s system-product-name 2>/dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
-                            VIRTUALIZATION="$(dmidecode -s)"
+                            VIRTUALIZATION="$(dmidecode -s system-product-name)"
                             VIRT_DETECTION="dmidecode"
                     fi
             fi
