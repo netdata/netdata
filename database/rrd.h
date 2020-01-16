@@ -618,12 +618,18 @@ typedef struct alarm_log {
 // RRD HOST
 
 struct rrdhost_system_info {
-    char *os_name;
-    char *os_id;
-    char *os_id_like;
-    char *os_version;
-    char *os_version_id;
-    char *os_detection;
+    char *host_os_name;
+    char *host_os_id;
+    char *host_os_id_like;
+    char *host_os_version;
+    char *host_os_version_id;
+    char *host_os_detection;
+    char *container_os_name;
+    char *container_os_id;
+    char *container_os_id_like;
+    char *container_os_version;
+    char *container_os_version_id;
+    char *container_os_detection;
     char *kernel_name;
     char *kernel_version;
     char *architecture;

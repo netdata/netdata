@@ -581,12 +581,12 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->os
               , host->timezone
               , (host->tags) ? host->tags : ""
-              , (host->system_info->os_name) ? host->system_info->os_name : ""
-              , (host->system_info->os_id) ? host->system_info->os_id : ""
-              , (host->system_info->os_id_like) ? host->system_info->os_id_like : ""
-              , (host->system_info->os_version) ? host->system_info->os_version : ""
-              , (host->system_info->os_version_id) ? host->system_info->os_version_id : ""
-              , (host->system_info->os_detection) ? host->system_info->os_detection : ""
+              , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
+              , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
+              , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
+              , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
+              , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
+              , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
               , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
               , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
               , (host->system_info->architecture) ? host->system_info->architecture : ""

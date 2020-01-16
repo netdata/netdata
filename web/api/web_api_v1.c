@@ -808,12 +808,26 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
     buffer_strcat(wb, "\t},\n");
 
-    buffer_sprintf(wb, "\t\"os_name\": \"%s\",\n", (host->system_info->os_name) ? host->system_info->os_name : "\"\"");
-    buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", (host->system_info->os_id) ? host->system_info->os_id : "");
-    buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", (host->system_info->os_id_like) ? host->system_info->os_id_like : "");
-    buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->os_version) ? host->system_info->os_version : "");
-    buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", (host->system_info->os_version_id) ? host->system_info->os_version_id : "");
-    buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", (host->system_info->os_detection) ? host->system_info->os_detection : "");
+    buffer_sprintf(wb, "\t\"os_name\": \"%s\",\n", (host->system_info->host_os_name) ? host->system_info->host_os_name : "");
+    buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", (host->system_info->host_os_id) ? host->system_info->host_os_id : "");
+    buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : "");
+    buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->host_os_version) ? host->system_info->host_os_version : "");
+    buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : "");
+    buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", (host->system_info->host_os_detection) ? host->system_info->host_os_detection : "");
+
+    if (host->system_info->container_os_name)
+        buffer_sprintf(wb, "\t\"container_os_name\": \"%s\",\n", host->system_info->container_os_name);
+    if (host->system_info->container_os_id)
+        buffer_sprintf(wb, "\t\"container_os_id\": \"%s\",\n", host->system_info->container_os_id);
+    if (host->system_info->container_os_id_like)
+        buffer_sprintf(wb, "\t\"container_os_id_like\": \"%s\",\n", host->system_info->container_os_id_like);
+    if (host->system_info->container_os_version)
+        buffer_sprintf(wb, "\t\"container_os_version\": \"%s\",\n", host->system_info->container_os_version);
+    if (host->system_info->container_os_version_id)
+        buffer_sprintf(wb, "\t\"container_os_version_id\": \"%s\",\n", host->system_info->container_os_version_id);
+    if (host->system_info->container_os_detection)
+        buffer_sprintf(wb, "\t\"container_os_detection\": \"%s\",\n", host->system_info->container_os_detection);
+
     buffer_sprintf(wb, "\t\"kernel_name\": \"%s\",\n", (host->system_info->kernel_name) ? host->system_info->kernel_name : "");
     buffer_sprintf(wb, "\t\"kernel_version\": \"%s\",\n", (host->system_info->kernel_version) ? host->system_info->kernel_version : "");
     buffer_sprintf(wb, "\t\"architecture\": \"%s\",\n", (host->system_info->architecture) ? host->system_info->architecture : "");
