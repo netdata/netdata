@@ -77,14 +77,14 @@ fi
 # -------------------------------------------------------------------------------------------------
 # detect the operating system
 
-OS_DETECTION="unknown"
-NAME="unknown"
-VERSION="unknown"
-VERSION_ID="unknown"
-ID="unknown"
-ID_LIKE="unknown"
-
 # Initially assume all OS detection values are for a container, these are moved later if we are bare-metal
+
+CONTAINER_OS_DETECTION="unknown"
+CONTAINER_NAME="unknown"
+CONTAINER_VERSION="unknown"
+CONTAINER_VERSION_ID="unknown"
+CONTAINER_ID="unknown"
+CONTAINER_ID_LIKE="unknown"
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
         # Mac OS
