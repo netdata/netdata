@@ -710,6 +710,18 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+static int is_valid_label_value(char *value) {
+    while(*value) {
+        if(*value == '"' || *value == '\'' || *value == '*' || *value == '!') {
+            return 0;
+        }
+
+        value++;
+    }
+
+    return 1;
+}
+
 static int is_valid_label_key(char *key) {
     //Prometheus exporter
     if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
@@ -784,6 +796,10 @@ struct label *load_auto_labels()
     return label_list;
 }
 
+static inline int is_valid_label_config_option(char *name, char *value) {
+    return (is_valid_label_key(name) && is_valid_label_value(value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") );
+ }
+
 struct label *load_config_labels()
 {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
@@ -798,13 +814,12 @@ struct label *load_config_labels()
         config_section_wrlock(co);
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
-            char *name = cv->name;
-            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
-                l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
+            if( is_valid_label_config_option(cv->name, cv->value)) {
+                l = add_label_to_list(l, cv->name, cv->value, LABEL_SOURCE_NETDATA_CONF);
                 cv->flags |= CONFIG_VALUE_USED;
             } else {
                 error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s) or values."
-                       , name);
+                       , cv->name);
             }
         }
         config_section_unlock(co);

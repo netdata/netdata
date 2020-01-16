@@ -707,10 +707,9 @@ function clearMyNetdataMenu() {
 }
 
 function errorMyNetdataMenu() {
-    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
+    setMyNetdataMenu(`<div class="agent-item" style="padding: 0 8px">
         <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        Cannot load known netdata agents from netdata.cloud!
-        <div></div>
+        Cannot load known Netdata agents from Netdata Cloud! Please make sure you have the latest version of Netdata.
     </div>`);
 }
 
@@ -965,7 +964,7 @@ function gotoServerModalHandler(guid) {
 
     if (!isSignedIn()) {
         // When the registry is enabled, if the user's known URLs are not working
-        // we consult the registry to get additional URLs.  
+        // we consult the registry to get additional URLs.
         setTimeout(function () {
             if (gotoServerStop === false) {
                 document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
@@ -5129,7 +5128,7 @@ function netdataRegistryCallback(machinesArray) {
     registryAgents = machinesArray;
 
     if (isSignedIn()) {
-        // We call getCloudAccountAgents() here because it requires that 
+        // We call getCloudAccountAgents() here because it requires that
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
         getCloudAccountAgents().then((agents) => {
@@ -5155,8 +5154,8 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// If we know the cloudBaseURL and agentID from local storage render (eagerly) 
-// the account ui before receiving the definitive response from the web server. 
+// If we know the cloudBaseURL and agentID from local storage render (eagerly)
+// the account ui before receiving the definitive response from the web server.
 // This improves the perceived performance.
 function tryFastInitCloud() {
     const baseURL = localStorage.getItem("cloud.baseURL");

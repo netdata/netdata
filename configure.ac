@@ -687,6 +687,7 @@ if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes"
     enable_plugin_nfacct="yes"
     AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
     AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
+    AC_DEFINE([HAVE_LINUX_NETFILTER_NFNETLINK_CONNTRACK_H], [1], [libnetfilter_nfnetlink_conntrack header usability])
     OPTIONAL_NFACCT_CFLAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
     OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
 else

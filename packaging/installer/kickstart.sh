@@ -27,7 +27,7 @@
 # shellcheck disable=SC2039,SC2059,SC2086
 
 # External files
-PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"
+PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
