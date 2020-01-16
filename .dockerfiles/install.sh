@@ -10,8 +10,6 @@ install_deb() {
 		netcat=1.10-41.1 \
 		jq=1.5+dfsg-2+b1
 	apt-get install -y "/artifacts/netdata_${VERSION}_${ARCH}.deb"
-	apt-get clean
-	rm -rf /var/lib/apt/lists/*
 }
 
 install_rpm() {
