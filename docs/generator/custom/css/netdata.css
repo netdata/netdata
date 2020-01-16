@@ -226,7 +226,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     }
 }
 
-/* D */
+/* Differentiate between main TOC items and sub-items. */
 
 .md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
     font-weight: 500;
@@ -240,7 +240,6 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
    Documentation homepage
    In particular, the three buttons for install/getting started/configuration.
 */
-
 .homepage-nav {
     display: flex;
     flex-flow: row wrap;
