@@ -76,7 +76,7 @@ Our first principle is per-second data collection for all metrics.
 That matters because you can't monitor a 2-second service-level agreement (SLA) with 10-second metrics. You can't detect
 quick anomalies if your metrics don't show them.
 
-How do we solve this? By decentralizing monitoring. Each node is responsible for collecting metrics, triggering alamrs,
+How do we solve this? By decentralizing monitoring. Each node is responsible for collecting metrics, triggering alarms,
 and building dashboards locally, and we work hard to ensure it does each step (and others) with remarkable efficiency.
 For example, Netdata can [collect 100,000 metrics](https://github.com/netdata/netdata/issues/1323) every second while
 using only 9% of a single server-grade CPU core!

@@ -13,43 +13,61 @@
 
 extern struct config exporting_config;
 
-#define EXPORTER_DATA_SOURCE                 "data source"
-#define EXPORTER_DATA_SOURCE_DEFAULT         "average"
+#define EXPORTER_DATA_SOURCE                    "data source"
+#define EXPORTER_DATA_SOURCE_DEFAULT            "average"
 
-#define EXPORTER_DESTINATION                "destination"
-#define EXPORTER_DESTINATION_DEFAULT        "localhost"
+#define EXPORTER_DESTINATION                    "destination"
+#define EXPORTER_DESTINATION_DEFAULT            "localhost"
 
-#define EXPORTER_UPDATE_EVERY               "update every"
-#define EXPORTER_UPDATE_EVERY_DEFAULT       10
+#define EXPORTER_UPDATE_EVERY                   "update every"
+#define EXPORTER_UPDATE_EVERY_DEFAULT           10
 
-#define EXPORTER_BUF_ONFAIL                 "buffer on failures"
-#define EXPORTER_BUF_ONFAIL_DEFAULT         10
+#define EXPORTER_BUF_ONFAIL                     "buffer on failures"
+#define EXPORTER_BUF_ONFAIL_DEFAULT             10
 
-#define EXPORTER_TIMEOUT_MS                 "timeout ms"
-#define EXPORTER_TIMEOUT_MS_DEFAULT         10000
+#define EXPORTER_TIMEOUT_MS                     "timeout ms"
+#define EXPORTER_TIMEOUT_MS_DEFAULT             10000
 
-#define EXPORTER_SEND_CHART_MATCH           "send charts matching"
-#define EXPORTER_SEND_CHART_MATCH_DEFAULT   "*"
+#define EXPORTER_SEND_CHART_MATCH               "send charts matching"
+#define EXPORTER_SEND_CHART_MATCH_DEFAULT       "*"
 
-#define EXPORTER_SEND_HOST_MATCH            "send hosts matching"
-#define EXPORTER_SEND_HOST_MATCH_DEFAULT    "localhost *"
+#define EXPORTER_SEND_HOST_MATCH                "send hosts matching"
+#define EXPORTER_SEND_HOST_MATCH_DEFAULT        "localhost *"
 
-#define EXPORTER_SEND_NAMES                 "send names instead of ids"
-#define EXPORTER_SEND_NAMES_DEFAULT         CONFIG_BOOLEAN_YES
+#define EXPORTER_SEND_CONFIGURED_LABELS         "send configured labels"
+#define EXPORTER_SEND_CONFIGURED_LABELS_DEFAULT CONFIG_BOOLEAN_YES
+
+#define EXPORTER_SEND_AUTOMATIC_LABELS          "send automatic labels"
+#define EXPORTER_SEND_AUTOMATIC_LABELS_DEFAULT  CONFIG_BOOLEAN_NO
+
+#define EXPORTER_SEND_NAMES                     "send names instead of ids"
+#define EXPORTER_SEND_NAMES_DEFAULT             CONFIG_BOOLEAN_YES
 
 typedef enum exporting_options {
-    EXPORTING_OPTION_NONE              = 0,
+    EXPORTING_OPTION_NONE                   = 0,
 
-    EXPORTING_SOURCE_DATA_AS_COLLECTED = (1 << 0),
-    EXPORTING_SOURCE_DATA_AVERAGE      = (1 << 1),
-    EXPORTING_SOURCE_DATA_SUM          = (1 << 2),
+    EXPORTING_SOURCE_DATA_AS_COLLECTED      = (1 << 0),
+    EXPORTING_SOURCE_DATA_AVERAGE           = (1 << 1),
+    EXPORTING_SOURCE_DATA_SUM               = (1 << 2),
 
-    EXPORTING_OPTION_SEND_NAMES        = (1 << 16)
+    EXPORTING_OPTION_SEND_CONFIGURED_LABELS = (1 << 3),
+    EXPORTING_OPTION_SEND_AUTOMATIC_LABELS  = (1 << 4),
+
+    EXPORTING_OPTION_SEND_NAMES             = (1 << 16)
 } EXPORTING_OPTIONS;
 
 #define EXPORTING_OPTIONS_SOURCE_BITS                                                                                  \
     (EXPORTING_SOURCE_DATA_AS_COLLECTED | EXPORTING_SOURCE_DATA_AVERAGE | EXPORTING_SOURCE_DATA_SUM)
 #define EXPORTING_OPTIONS_DATA_SOURCE(exporting_options) (exporting_options & EXPORTING_OPTIONS_SOURCE_BITS)
+
+#define sending_labels_configured(instance)                                                                            \
+    (instance->config.options & (EXPORTING_OPTION_SEND_CONFIGURED_LABELS | EXPORTING_OPTION_SEND_AUTOMATIC_LABELS))
+
+#define should_send_label(instance, label)                                                                             \
+    ((instance->config.options & EXPORTING_OPTION_SEND_CONFIGURED_LABELS &&                                            \
+      label->label_source == LABEL_SOURCE_NETDATA_CONF) ||                                                             \
+     (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS &&                                             \
+      label->label_source != LABEL_SOURCE_NETDATA_CONF))
 
 struct engine;
 
@@ -106,6 +124,8 @@ struct instance {
     int scheduled;
     int skip_host;
     int skip_chart;
+
+    BUFFER *labels;
 
     time_t after;
     time_t before;
@@ -174,6 +194,7 @@ int metric_formatting(struct engine *engine, RRDDIM *rd);
 int end_chart_formatting(struct engine *engine, RRDSET *st);
 int end_host_formatting(struct engine *engine, RRDHOST *host);
 int end_batch_formatting(struct engine *engine);
+int flush_host_labels(struct instance *instance, RRDHOST *host);
 
 int exporting_discard_response(BUFFER *buffer, struct instance *instance);
 void simple_connector_receive_response(int *sock, struct instance *instance);

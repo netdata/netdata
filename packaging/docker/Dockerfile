@@ -14,12 +14,15 @@ COPY . /opt/netdata.git
 WORKDIR /opt/netdata.git
 
 # Install from source
-RUN chmod +x netdata-installer.sh && ./netdata-installer.sh --dont-wait --dont-start-it
+RUN chmod +x netdata-installer.sh && \
+   cp -rp /deps/* /usr/local/ && \
+   ./netdata-installer.sh --dont-wait --dont-start-it
 
 # files to one directory
 RUN mkdir -p /app/usr/sbin/ \
              /app/usr/share \
              /app/usr/libexec \
+             /app/usr/local \
              /app/usr/lib \
              /app/var/cache \
              /app/var/lib \
@@ -31,8 +34,8 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /var/lib/netdata     /app/var/lib/ && \
     mv /etc/netdata         /app/etc/ && \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
-    mv /judy-${JUDY_VER}    /app/judy-${JUDY_VER} && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
+    cp -rp /deps/* /app/usr/local/ && \
     chmod +x /app/usr/sbin/run.sh
 
 #####################################################################
@@ -40,7 +43,7 @@ ARG ARCH
 # This image contains preinstalled dependecies
 FROM netdata/base:${ARCH}
 
-# Conditional subscribiton to Polyverse's Polymorphic Linux repositories
+# Conditional subscription to Polyverse's Polymorphic Linux repositories
 RUN if [ "$(uname -m)" == "x86_64" ]; then \
         apk update && apk upgrade; \
         curl https://sh.polyverse.io | sh -s install gcxce5byVQbtRz0iwfGkozZwy support+netdata@polyverse.io; \
@@ -63,11 +66,6 @@ ENV DOCKER_USR netdata
 # If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
 #ENV DO_NOT_TRACK
 RUN \
-    # provide judy installation to base image
-    apk add make alpine-sdk shadow && \
-    cd /judy-${JUDY_VER} && make install && cd / && \
-    # Clean the source stuff once judy is installed
-    rm -rf /judy-${JUDY_VER} && apk del make alpine-sdk && \
     # fping from alpine apk is on a different location. Moving it.
     mv /usr/sbin/fping /usr/local/bin/fping && \
     chmod 4755 /usr/local/bin/fping && \
@@ -88,7 +86,7 @@ RUN \
         /var/log/netdata && \
     chmod 0755 /usr/libexec/netdata/plugins.d/*.plugin && \
     chmod 4755 /usr/libexec/netdata/plugins.d/cgroup-network /usr/libexec/netdata/plugins.d/apps.plugin && \
-    # Group write permissions due to: https://github.com/netdata/netdata/pull/6543chmod 0770 -R /var/lib/netdata /var/cache/netdata && \
+    # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
     # Link log files to stdout

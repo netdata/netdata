@@ -178,7 +178,7 @@ class Service(SimpleService):
 
 def parse_file(data, lines):
     for line in lines:
-        if not line.startswith(('BPS_IN:', 'MAXCONN:', 'REQ_RATE []:')):
+        if not line.startswith(('BPS_IN:', 'MAXCONN:', 'PLAINCONN:', 'REQ_RATE []:')):
             continue
         m = dict(RE.findall(line))
         for v in T:

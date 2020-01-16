@@ -1003,12 +1003,11 @@ int do_proc_stat(int update_every, usec_t dt) {
                 else
                     error("Cannot read current process affinity");
 
+                // These threads are very ephemeral and don't need to have a specific name
                 if(unlikely(pthread_create(&thread, NULL, wake_cpu_thread, (void *)&core)))
                     error("Cannot create wake_cpu_thread");
                 else if(unlikely(pthread_join(thread, NULL)))
                     error("Cannot join wake_cpu_thread");
-                if(thread)
-                    pthread_setname_np(thread, "PLUGIN[cpuidle]");
                 cpu_states_updated = 1;
             }
         }

@@ -26,7 +26,7 @@ The monitoring industry believes there is this "IT Operations Hero", a person co
 
 1.  Has a deep understanding of IT architectures and is a skillful SysAdmin.
 2.  Is a superb Network Administrator (can even read and understand the Linux kernel networking stack).
-3.  Is a exceptional database administrator.
+3.  Is an exceptional database administrator.
 4.  Is fluent in software engineering, capable of understanding the internal workings of applications.
 5.  Masters Data Science, statistical algorithms and is fluent in writing advanced mathematical queries to reveal the meaning of metrics.
 
