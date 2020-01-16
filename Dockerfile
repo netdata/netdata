@@ -27,12 +27,11 @@ ENV VERSION="${VERSION:-0}"
 # This is needed to ensure package installs don't prompt for any user input.
 ENV DEBIAN_FRONTEND=noninteractive
 
+COPY .dockerfiles/install.sh /install.sh
 COPY .dockerfiles/test.sh /test.sh
 
-COPY --from=build /netdata_${VERSION}_${ARCH}.deb .
+COPY --from=build /netdata/artifacts /artifacts
 
-RUN apt-get update && \
-	apt-get install -y curl netcat jq && \
-	apt install -y /netdata_${VERSION}_${ARCH}.deb
+RUN /install.sh || exit 1
 
 CMD ["/test.sh"]
