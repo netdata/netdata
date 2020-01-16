@@ -4,9 +4,10 @@ Netdata is a monitoring agent designed to run on all your systems: physical and 
 IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and all their derivatives.
 
 The best way to install Netdata is with our [**automatic one-line installation
-script**](#automatic-one-line-installation-script), which works with all Linux distributions. To see other installation
-methods, such as those for different operating systems including alternatives to the one-line installer script, see
-[Have a different operating system, or want to try another
+script**](#automatic-one-line-installation-script), which works with all Linux distributions. 
+
+If you want to install Netdata with Docker, on a Kubernetes cluster, or on a different operating system, see [Have a
+different operating system, or want to try another
 method?](#have-a-different-operating-system-or-want-to-try-another-method)
 
 Some third parties, such as the packaging teams at various Linux distributions, distribute old, broken, or altered
@@ -24,8 +25,9 @@ _actively_ contributing to Netdata's future.
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=installations&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_per_url&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=installations&precision=0)
 
-This method is fully automatic on all Linux distributions. To install Netdata from source and get _automatic nightly
-updates_, run the following as your normal user:
+This method is fully automatic on all Linux distributions, including Ubuntu, Debian, Fedora, CentOS, and others.
+
+To install Netdata from source and get _automatic nightly updates_, run the following as your normal user:
 
 ```bash
 bash <(curl -Ss https://my-netdata.io/kickstart.sh)
@@ -43,13 +45,40 @@ Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/
 
 ## Have a different operating system, or want to try another method?
 
-Netdata works on many different operating systems. To see the full list of compatible operating systems and versions,
-see our [distribution matrix](../DISTRIBUTIONS.md).
+Netdata works on many different operating systems, each with a few possible installation methods. To see the full list
+of approved methods for each operating system/version we support, see our [distribution matrix](../DISTRIBUTIONS.md).
 
-Below, you can find 
+Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
+operating systems.
 
-See below for the recommended and alternative installation methods
-for a variety of popular operating systems. 
+### Alternative methods
+
+<div class="installer-grid">
+  <div class="grid-item">
+    <h3><img src="" alt="Install with .deb or .rpm packages" />Packages</h3>
+    <ul>
+      <li><a href="methods/packages/">Install with <code>.deb</code> or <code>.rpm</code> packages</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="" alt="Install with a pre-built static binary for 64-bit systems" />Static binary</h3>
+    <ul>
+      <li><a href="methods/kickstart-64/">Install with a pre-built static binary for 64-bit systems</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="" alt="Install manually from source" />Manual</h3>
+    <ul>
+      <li><a href="methods/manual/">Install manually from source</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="" alt="Install on offline/air-gapped systems" />Offline</h3>
+    <ul>
+      <li><a href="methods/offline/">Install on offline/air-gapped systems</a></li>
+    </ul>
+  </div>
+</div>
 
 ### Operating systems 
 
@@ -57,15 +86,8 @@ for a variety of popular operating systems.
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />Docker</h3>
     <ul>
-      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
-      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using a `docker-compose.yml` file</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <h3><img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />Docker</h3>
-    <ul>
-      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
-      <li><a href="docker/README.md#run-netdata-with-the-docker-command">Using a <code>docker-compose.yml</code> file</a></li>
+      <li><a href="docker/#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
+      <li><a href="docker/#run-netdata-with-the-docker-command">Using a `docker-compose.yml` file</a></li>
     </ul>
   </div>
   <div class="grid-item">
@@ -77,26 +99,14 @@ for a variety of popular operating systems.
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71961672-8cb0b080-3200-11ea-84f8-9139c7434110.png" alt="Install Netdata on macOS" />macOS</h3>
     <ul>
-      <li><a href="methods/macos.md#with-homebrew">Homebrew</a></li>
-      <li><a href="methods/macos.md#from-source">Manual installation from source</a></li>
+      <li><a href="methods/macos/#with-homebrew">Homebrew</a></li>
+      <li><a href="methods/macos/#from-source">Manual installation from source</a></li>
     </ul>
   </div>
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71961245-a3a2d300-31ff-11ea-89bf-b90e7242d9a5.png" alt="Install Netdata on FreeBSD" />FreeBSD</h3>
     <ul>
       <li><a href="methods/pfsense.md">Installation on FreeBSD</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <h3><img src="" alt="Install Netdata manually" />Manual</h3>
-    <ul>
-      <li><a href="methods/manual/">Install manually from source</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <h3><img src="" alt="Install Netdata on offline systems" />Offline</h3>
-    <ul>
-      <li><a href="methods/offline/">Install on offline/air-gapped systems</li>
     </ul>
   </div>
   <div class="grid-item">
@@ -125,11 +135,6 @@ for a variety of popular operating systems.
   </div>
 </div>
 
-### Additional methods
-
--   [Install Netdata manually from source](methods/manual.md)
--   [Install Netdata on offline systems](methods/offline.md)
-
 ## Automatic updates
 
 By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
@@ -139,11 +144,7 @@ option when you install or update Netdata using the [automatic one-line installa
 script](#automatic-one-line-installation-script).
 
 ```bash
-# kickstart.sh
 bash <(curl -Ss https://my-netdata.io/kickstart.sh) --no-updates
-
-# kickstart-static64.sh
-bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh) --no-updates
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update Netdata](UPDATE.md).
@@ -165,10 +166,10 @@ the community helps fix any bugs that might have been introduced in previous rel
 
 **Pros of using nightly releases:**
 
-  - Get the latest features and bug fixes as soon as they're available
-  - Receive security-related fixes immediately
-  - Use stable, fully-tested code that's always improving
-  - Leverage the same Netdata experience our community is using
+-   Get the latest features and bug fixes as soon as they're available
+-   Receive security-related fixes immediately
+-   Use stable, fully-tested code that's always improving
+-   Leverage the same Netdata experience our community is using
 
 **Pros of using stable releases:**
 
