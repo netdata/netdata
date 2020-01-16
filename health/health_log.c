@@ -93,6 +93,8 @@ inline void health_label_log_save(RRDHOST *host) {
         else {
             host->health_log_entries_written++;
         }
+
+        buffer_free(wb);
     }
 }
 
