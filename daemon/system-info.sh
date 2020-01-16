@@ -22,6 +22,12 @@ else
         if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
                 VIRTUALIZATION="hypervisor"
                 VIRT_DETECTION="/proc/cpuinfo"
+        elif [ -n "$(command -v dmidecode)" ]; then
+                # Virtualization detection from https://unix.stackexchange.com/questions/89714/easy-way-to-determine-virtualization-technology
+                if dmidecode -s | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
+                        VIRTUALIZATION="$(dmidecode -s)"
+                        VIRT_DETECTION="dmidecode"
+                fi
         fi
 fi
 
