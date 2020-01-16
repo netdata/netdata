@@ -30,9 +30,9 @@
 				<div class="dash-graph"
 					data-dash-netdata="system.ram">
 				</div>
-        <div class="dash-graph"
-          data-dash-netdata="disk_space._">
-        </div>
+				<div class="dash-graph"
+					data-dash-netdata="disk_space._">
+				</div>
 				<div class="dash-graph"
 					data-dash-netdata="system.net">
 				</div>
@@ -102,298 +102,298 @@
 class PickNSort {
 	// PickNSort.js
 
-    constructor (dark) {
-        this.items = [];
-        this.callback = function (output, disabled) { console.log(output, disabled) };
-        this.reset = function () { this.items = [] };
-        this.last_output = {
-            enabled: [],
-            disabled: []
-        }
+		constructor (dark) {
+				this.items = [];
+				this.callback = function (output, disabled) { console.log(output, disabled) };
+				this.reset = function () { this.items = [] };
+				this.last_output = {
+						enabled: [],
+						disabled: []
+				}
 
-        this.add_css_to_page(dark);
-    }
+				this.add_css_to_page(dark);
+		}
 
-    create_modal () {
-        $("<div></div>", {
-            id: "picknsort-container"
-        }).appendTo('body');
+		create_modal () {
+				$("<div></div>", {
+						id: "picknsort-container"
+				}).appendTo('body');
 
-        $("<div></div>", {
-            id: 'picknsort-window'
-        }).appendTo('#picknsort-container');
+				$("<div></div>", {
+						id: 'picknsort-window'
+				}).appendTo('#picknsort-container');
 
-        $("<div></div>", {
-            id: "picknsort-close-button",
-            text: '\u2573'
-        }).appendTo('#picknsort-window');
+				$("<div></div>", {
+						id: "picknsort-close-button",
+						text: '\u2573'
+				}).appendTo('#picknsort-window');
 
-        $("<div></div>", {
-            id: "picknsort-item-list"
-        }).appendTo('#picknsort-window')
+				$("<div></div>", {
+						id: "picknsort-item-list"
+				}).appendTo('#picknsort-window')
 
-        $("<div></div>", {
-            text: "Apply",
-            id: "picknsort-apply-button"
-        }).appendTo('#picknsort-window');
+				$("<div></div>", {
+						text: "Apply",
+						id: "picknsort-apply-button"
+				}).appendTo('#picknsort-window');
 
-        $("<div></div>", {
-            text: "Reset",
-            id: "picknsort-reset-button"
-        }).appendTo('#picknsort-window');
+				$("<div></div>", {
+						text: "Reset",
+						id: "picknsort-reset-button"
+				}).appendTo('#picknsort-window');
 
-        $('#picknsort-close-button').click(function () {
-            picknsort.destroy_modal();
-            picknsort.callback(null, null);
-        });
+				$('#picknsort-close-button').click(function () {
+						picknsort.destroy_modal();
+						picknsort.callback(null, null);
+				});
 
-        $('#picknsort-apply-button').click(function () {
-            picknsort.apply();
-        });
+				$('#picknsort-apply-button').click(function () {
+						picknsort.apply();
+				});
 
-        $('#picknsort-reset-button').click(function () {
-            picknsort.reset();
-        });
-    }
+				$('#picknsort-reset-button').click(function () {
+						picknsort.reset();
+				});
+		}
 
-    destroy_modal () {
-        $('#picknsort-container').remove();
-    }
+		destroy_modal () {
+				$('#picknsort-container').remove();
+		}
 
-    populate_list () {
-        this.clear_list();
+		populate_list () {
+				this.clear_list();
 
-        for (var i=0, len=this.items.length; i<len; i++) {
-            this.draw_item(i);
-        }
-    }
+				for (var i=0, len=this.items.length; i<len; i++) {
+						this.draw_item(i);
+				}
+		}
 
-    draw_item (index) {
-        var item = this.items[index];
+		draw_item (index) {
+				var item = this.items[index];
 
-        var $item = $("<div></div>").addClass("picknsort-item");
+				var $item = $("<div></div>").addClass("picknsort-item");
 
-        var $checkbox= $("<div></div>").addClass('picknsort-item-checkbox-wrapper');
+				var $checkbox= $("<div></div>").addClass('picknsort-item-checkbox-wrapper');
 
-        $("<input>", {
-            type: "checkbox",
-            checked: item.enabled
-        }).addClass('picknsort-item-checkbox')
-        .appendTo($checkbox);
+				$("<input>", {
+						type: "checkbox",
+						checked: item.enabled
+				}).addClass('picknsort-item-checkbox')
+				.appendTo($checkbox);
 
-        var $value = $("<div></div>", {
-            text: item.value
-        }).addClass("picknsort-item-value");
+				var $value = $("<div></div>", {
+						text: item.value
+				}).addClass("picknsort-item-value");
 
-        var $nav = $("<div></div>").addClass("picknsort-item-nav")
-        .append("<div class='picknsort-item-down' data-index='" + index + "' onclick='picknsort.shift_down(this)'>&#8595;</div>")
-        .append("<div class='picknsort-item-up' data-index='" + index + "' onclick='picknsort.shift_up(this)'>&#8593;</div>");
+				var $nav = $("<div></div>").addClass("picknsort-item-nav")
+				.append("<div class='picknsort-item-down' data-index='" + index + "' onclick='picknsort.shift_down(this)'>&#8595;</div>")
+				.append("<div class='picknsort-item-up' data-index='" + index + "' onclick='picknsort.shift_up(this)'>&#8593;</div>");
 
-        $item.append($checkbox).append($value).append($nav).appendTo('#picknsort-item-list');
-    }
+				$item.append($checkbox).append($value).append($nav).appendTo('#picknsort-item-list');
+		}
 
-    clear_list () {
-        $('#picknsort-item-list').html('');
-    }
+		clear_list () {
+				$('#picknsort-item-list').html('');
+		}
 
-    popup (callback, reset, options={}) {
-        this.callback = callback || this.callback;
-        this.reset = reset || this.reset;
-        if (!options.enabled) {
-            options.enabled = this.last_output.enabled;
-        }
-        if (!options.disabled) {
-            options.disabled = this.last_output.disabled;
-        }
+		popup (callback, reset, options={}) {
+				this.callback = callback || this.callback;
+				this.reset = reset || this.reset;
+				if (!options.enabled) {
+						options.enabled = this.last_output.enabled;
+				}
+				if (!options.disabled) {
+						options.disabled = this.last_output.disabled;
+				}
 
-        this.parse_items(options.enabled, options.disabled);
-        if (this.items.length) {
-            this.create_modal();
-            this.populate_list();
-        }
+				this.parse_items(options.enabled, options.disabled);
+				if (this.items.length) {
+						this.create_modal();
+						this.populate_list();
+				}
 
-    }
+		}
 
-    parse_items (enabled, disabled) {
-        this.items = [];
+		parse_items (enabled, disabled) {
+				this.items = [];
 
-        for (var i=0, len=enabled.length; i<len; i++) {
-            this.items.push({
-                value: enabled[i],
-                enabled: true
-            });
-        }
+				for (var i=0, len=enabled.length; i<len; i++) {
+						this.items.push({
+								value: enabled[i],
+								enabled: true
+						});
+				}
 
-        for (var i=0, len=disabled.length; i<len; i++) {
-            this.items.push({
-                value: disabled[i],
-                enabled: false
-            });
-        }
-    }
+				for (var i=0, len=disabled.length; i<len; i++) {
+						this.items.push({
+								value: disabled[i],
+								enabled: false
+						});
+				}
+		}
 
-    shift_down (el) {
-        var index = $(el).data('index');
-        if (index === this.items.length - 1) {
-            return;
-        }
-        var temp = this.items[index];
-        this.items[index] = this.items[index + 1];
-        this.items[index + 1] = temp;
-        this.move_element_down(index);
-    }
+		shift_down (el) {
+				var index = $(el).data('index');
+				if (index === this.items.length - 1) {
+						return;
+				}
+				var temp = this.items[index];
+				this.items[index] = this.items[index + 1];
+				this.items[index + 1] = temp;
+				this.move_element_down(index);
+		}
 
-    shift_up (el) {
-        var index = $(el).data('index');
-        if (index === 0) {
-            return;
-        }
-        var temp = this.items[index];
-        this.items[index] = this.items[index - 1];
-        this.items[index - 1] = temp;
-        this.move_element_up(index);
-    }
+		shift_up (el) {
+				var index = $(el).data('index');
+				if (index === 0) {
+						return;
+				}
+				var temp = this.items[index];
+				this.items[index] = this.items[index - 1];
+				this.items[index - 1] = temp;
+				this.move_element_up(index);
+		}
 
-    move_element_up (index) {
-        var $src = $('.picknsort-item:eq(' + index + ')');
-        var $dest = $('.picknsort-item:eq(' + (index-1) + ')');
-        $src.insertBefore($dest);
+		move_element_up (index) {
+				var $src = $('.picknsort-item:eq(' + index + ')');
+				var $dest = $('.picknsort-item:eq(' + (index-1) + ')');
+				$src.insertBefore($dest);
 
-        // Update data-index
-        $src.find('.picknsort-item-down, .picknsort-item-up').data("index", index-1);
-        $dest.find('.picknsort-item-down, .picknsort-item-up').data("index", index);
-    }
+				// Update data-index
+				$src.find('.picknsort-item-down, .picknsort-item-up').data("index", index-1);
+				$dest.find('.picknsort-item-down, .picknsort-item-up').data("index", index);
+		}
 
-    move_element_down (index) {
-        var $src = $('.picknsort-item:eq(' + index + ')');
-        var $dest = $('.picknsort-item:eq(' + (index+1) + ')');
-        $src.insertAfter($dest);
+		move_element_down (index) {
+				var $src = $('.picknsort-item:eq(' + index + ')');
+				var $dest = $('.picknsort-item:eq(' + (index+1) + ')');
+				$src.insertAfter($dest);
 
-        // Update data-index
-        $src.find('.picknsort-item-down, .picknsort-item-up').data("index", index+1);
-        $dest.find('.picknsort-item-down, .picknsort-item-up').data("index", index);
-    }
+				// Update data-index
+				$src.find('.picknsort-item-down, .picknsort-item-up').data("index", index+1);
+				$dest.find('.picknsort-item-down, .picknsort-item-up').data("index", index);
+		}
 
-    apply () {
-        var out = [];
-        for (var i=0, len=this.items.length; i<len; i++) {
-            out.push(this.items[i].value);
-        }
-        var disabled = [];
-        $('input.picknsort-item-checkbox:not(:checked)').each(function (elindex) {
-            var itemindex = $('input.picknsort-item-checkbox').index($(this));
-            // Adjust for deleted elements
-            var spliceindex = itemindex - (1 * elindex);
-            var del = out.splice(spliceindex, 1);
-            disabled.push(del[0]);
-        });
-        this.callback(out, disabled);
-        this.last_output = {
-            enabled: out,
-            disabled: disabled
-        }
-        this.destroy_modal();
-    }
+		apply () {
+				var out = [];
+				for (var i=0, len=this.items.length; i<len; i++) {
+						out.push(this.items[i].value);
+				}
+				var disabled = [];
+				$('input.picknsort-item-checkbox:not(:checked)').each(function (elindex) {
+						var itemindex = $('input.picknsort-item-checkbox').index($(this));
+						// Adjust for deleted elements
+						var spliceindex = itemindex - (1 * elindex);
+						var del = out.splice(spliceindex, 1);
+						disabled.push(del[0]);
+				});
+				this.callback(out, disabled);
+				this.last_output = {
+						enabled: out,
+						disabled: disabled
+				}
+				this.destroy_modal();
+		}
 
-    add_css_to_page (dark) {
-        var light_theme = {
-            windowbg: "#FFF",
-            itembg: "#F4F4F4",
-            itemcolor: "#535353"
-        }
-        var dark_theme = {
-            windowbg: "#444",
-            itembg: "#333",
-            itemcolor: "#DBDBDB"
-        }
-        var current_theme = (dark) ? dark_theme : light_theme;
-        $("<style>")
-            .prop("type", "text/css")
-            .html(`
+		add_css_to_page (dark) {
+				var light_theme = {
+						windowbg: "#FFF",
+						itembg: "#F4F4F4",
+						itemcolor: "#535353"
+				}
+				var dark_theme = {
+						windowbg: "#444",
+						itembg: "#333",
+						itemcolor: "#DBDBDB"
+				}
+				var current_theme = (dark) ? dark_theme : light_theme;
+				$("<style>")
+						.prop("type", "text/css")
+						.html(`
 #picknsort-container {
-    position: fixed;
-    z-index: 9999 !important;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0,0,0,0.5);
+		position: fixed;
+		z-index: 9999 !important;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		background: rgba(0,0,0,0.5);
 }
 #picknsort-window {
-    max-height: 90vh;
-    width: 40em;
-    background: ${current_theme.windowbg};
-    position: absolute;
-    top: 5em;
-    left: calc(50% - 20em);
-    padding: 2em;
-    padding-top: 4em;
+		max-height: 90vh;
+		width: 40em;
+		background: ${current_theme.windowbg};
+		position: absolute;
+		top: 5em;
+		left: calc(50% - 20em);
+		padding: 2em;
+		padding-top: 4em;
 }
 #picknsort-close-button {
-    position: absolute;
-    top: 1em;
-    font-size: 1.5em;
-    color: #666;
-    right: 1em;
-    cursor: pointer;
+		position: absolute;
+		top: 1em;
+		font-size: 1.5em;
+		color: #666;
+		right: 1em;
+		cursor: pointer;
 }
 #picknsort-item-list {
-    max-height: 60vh;
-    overflow-y: scroll;
-    margin-bottom: 1em;
+		max-height: 60vh;
+		overflow-y: scroll;
+		margin-bottom: 1em;
 }
 #picknsort-apply-button, #picknsort-reset-button {
-    text-align: center;
-    font-size: 1.5em;
-    padding: 1em;
-    background: rgb(106, 232, 165);
-    font-weight: bold;
-    color: #FFF;
-    cursor: pointer;
-    margin-top: 1em;
+		text-align: center;
+		font-size: 1.5em;
+		padding: 1em;
+		background: rgb(106, 232, 165);
+		font-weight: bold;
+		color: #FFF;
+		cursor: pointer;
+		margin-top: 1em;
 }
 #picknsort-reset-button {
-    background: #CCC;
+		background: #CCC;
 }
 .picknsort-item {
-    padding: 1em;
-    border-top: solid 1px #CCC;
-    margin-bottom: 1em;
-    position: relative;
-    background: ${current_theme.itembg};
-    color: ${current_theme.itemcolor}
+		padding: 1em;
+		border-top: solid 1px #CCC;
+		margin-bottom: 1em;
+		position: relative;
+		background: ${current_theme.itembg};
+		color: ${current_theme.itemcolor}
 }
 .picknsort-item-checkbox-wrapper {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 3em;
-    text-align: center;
+		position: absolute;
+		top: 0;
+		left: 0;
+		bottom: 0;
+		width: 3em;
+		text-align: center;
 }
 .picknsort-item-checkbox {
-    transform: scale(1.5);
-    margin-top: 1.3em !important;
+		transform: scale(1.5);
+		margin-top: 1.3em !important;
 }
 .picknsort-item-value {
-    margin-left: 3em;
+		margin-left: 3em;
 }
 .picknsort-item-nav {
-    font-size: 2em;
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    color: #CCC;
-    cursor: pointer;
+		font-size: 2em;
+		position: absolute;
+		right: 0;
+		top: 0;
+		bottom: 0;
+		color: #CCC;
+		cursor: pointer;
 }
 .picknsort-item-down, .picknsort-item-up {
-    display: inline-block;
-    padding: 0em 0.5em;
-    height: calc(100% - 0.2em);
+		display: inline-block;
+		padding: 0em 0.5em;
+		height: calc(100% - 0.2em);
 }
-        `).appendTo("head");
-    }
+				`).appendTo("head");
+		}
 }
 </script>
 <script type="text/javascript">
@@ -948,13 +948,13 @@ class PickNSort {
 		color: #FFF;
 		text-align: center;
 		white-space: nowrap;
-    background: inherit;
-    position: sticky;
-    top: 0;
-    z-index: 9998;
-    box-shadow: 0 0.5em 1em #232323;
-    margin-bottom: 0.5em;
-    border-bottom: solid 0.1em #AAA;
+		background: inherit;
+		position: sticky;
+		top: 0;
+		z-index: 9998;
+		box-shadow: 0 0.5em 1em #232323;
+		margin-bottom: 0.5em;
+		border-bottom: solid 0.1em #AAA;
 	}
 
 	.netdata-host-stats-container {
