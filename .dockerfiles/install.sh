@@ -5,18 +5,24 @@ install_deb() {
 	ENV DEBIAN_FRONTEND=noninteractive
 
 	apt-get update
-	apt-get install -y --no-install-recommends \
-		curl=7.64.0-4 \
-		netcat=1.10-41.1 \
-		jq=1.5+dfsg-2+b1
+
+	# Install NetData
 	apt-get install -y "/artifacts/netdata_${VERSION}_${ARCH}.deb"
+
+	# Install testing tools
+	apt-get install -y --no-install-recommends \
+		curl netcat jq
 }
 
 install_rpm() {
 	# Using a glob pattern here because I can't reliably determine what the
 	# resulting package name will be (TODO: There must be a better way!)
-	dnf install -y curl nc jq
+
+	# Install NetData
 	dnf install -y /artifacts/netdata-"${VERSION}"-*.rpm
+
+	# Install testing tools
+	dnf install -y curl nc jq
 }
 
 case "${DISTRO}" in
