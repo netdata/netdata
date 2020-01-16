@@ -10,25 +10,31 @@ ARCHITECTURE="$(uname -m)"
 # -------------------------------------------------------------------------------------------------
 # detect the virtualization
 
-VIRTUALIZATION="unknown"
-VIRT_DETECTION="none"
+if [ -z ${VIRTUALIZATION} ]; then
+    VIRTUALIZATION="unknown"
+    VIRT_DETECTION="none"
 
-if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
-        VIRTUALIZATION="$(systemd-detect-virt -v)"
-        VIRT_DETECTION="systemd-detect-virt"
-        CONTAINER="$(systemd-detect-virt -c)"
-        CONT_DETECTION="systemd-detect-virt"
+    if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
+            VIRTUALIZATION="$(systemd-detect-virt -v)"
+            VIRT_DETECTION="systemd-detect-virt"
+            CONTAINER="$(systemd-detect-virt -c)"
+            CONT_DETECTION="systemd-detect-virt"
+    else
+            if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
+                    VIRTUALIZATION="hypervisor"
+                    VIRT_DETECTION="/proc/cpuinfo"
+            elif [ -n "$(command -v dmidecode)" ]; then
+                    # Virtualization detection from https://unix.stackexchange.com/questions/89714/easy-way-to-determine-virtualization-technology
+                    # This only works as root
+                    if dmidecode -s system-product-name 2>/dev/null | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
+                            VIRTUALIZATION="$(dmidecode -s)"
+                            VIRT_DETECTION="dmidecode"
+                    fi
+            fi
+    fi
 else
-        if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
-                VIRTUALIZATION="hypervisor"
-                VIRT_DETECTION="/proc/cpuinfo"
-        elif [ -n "$(command -v dmidecode)" ]; then
-                # Virtualization detection from https://unix.stackexchange.com/questions/89714/easy-way-to-determine-virtualization-technology
-                if dmidecode -s system-product-name | grep -q "VMware\|Virtual\|KVM\|Bochs"; then
-                        VIRTUALIZATION="$(dmidecode -s)"
-                        VIRT_DETECTION="dmidecode"
-                fi
-        fi
+    # Passed from outside - probably in docker run
+    VIRT_DETECTION="provided"
 fi
 
 # -------------------------------------------------------------------------------------------------
