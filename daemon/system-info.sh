@@ -14,33 +14,33 @@ CONTAINER="unknown"
 CONT_DETECTION="none"
 
 if [ "${CONTAINER}" = "unknown" ]; then
-	if [ -f /proc/1/sched ] ; then
-		IFS='(, ' read -r process _ </proc/1/sched
-		if [ "${process}" = "netdata" ]; then
-			CONTAINER="container"
-			CONT_DETECTION="process"
-		fi
-	fi
-	# ubuntu and debian supply /bin/running-in-container
-	# https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
-	if /bin/running-in-container >/dev/null 2>&1; then
-		CONTAINER="container"
-		CONT_DETECTION="/bin/running-in-container"
-	fi
+        if [ -f /proc/1/sched ] ; then
+                IFS='(, ' read -r process _ </proc/1/sched
+                if [ "${process}" = "netdata" ]; then
+                        CONTAINER="container"
+                        CONT_DETECTION="process"
+                fi
+        fi
+        # ubuntu and debian supply /bin/running-in-container
+        # https://www.apt-browse.org/browse/ubuntu/trusty/main/i386/upstart/1.12.1-0ubuntu4/file/bin/running-in-container
+        if /bin/running-in-container >/dev/null 2>&1; then
+                CONTAINER="container"
+                CONT_DETECTION="/bin/running-in-container"
+        fi
 
-	# lxc sets environment variable 'container'
-	#shellcheck disable=SC2154
-	if [ -n "${container}" ]; then
-		CONTAINER="lxc"
-		CONT_DETECTION="containerenv"
-	fi
+        # lxc sets environment variable 'container'
+        #shellcheck disable=SC2154
+        if [ -n "${container}" ]; then
+                CONTAINER="lxc"
+                CONT_DETECTION="containerenv"
+        fi
 
-	# docker creates /.dockerenv
-	# http://stackoverflow.com/a/25518345
-	if [ -f "/.dockerenv" ]; then
-		CONTAINER="docker"
-		CONT_DETECTION="dockerenv"
-	fi
+        # docker creates /.dockerenv
+        # http://stackoverflow.com/a/25518345
+        if [ -f "/.dockerenv" ]; then
+                CONTAINER="docker"
+                CONT_DETECTION="dockerenv"
+        fi
 
 fi
 
@@ -57,16 +57,16 @@ ID_LIKE="unknown"
 # Initially assume all OS detection values are for a container, these are moved later if we are bare-metal
 
 if [ "${KERNEL_NAME}" == "Darwin" ]; then
-	# Mac OS
-	OIFS="$IFS"
-	IFS=$'\n'
-	set $(sw_vers) > /dev/null
-	NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
-	VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
-	ID="mac"
-	ID_LIKE="mac"
-	OS_DETECTION="sw_vers"
-	IFS="$OIFS"
+        # Mac OS
+        OIFS="$IFS"
+        IFS=$'\n'
+        set $(sw_vers) > /dev/null
+        NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
+        VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
+        ID="mac"
+        ID_LIKE="mac"
+        OS_DETECTION="sw_vers"
+        IFS="$OIFS"
 elif [ "${KERNEL_NAME}" == "FreeBSD" ]; then
 
 else
@@ -76,32 +76,32 @@ else
                 CONTAINER_OS_DETECTION="/etc/os-release"
         fi
 
-	if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
-		if [ -f "/etc/lsb-release" ]; then
-			if [ "${OS_DETECTION}" = "unknown" ]; then 
+        if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
+                if [ -f "/etc/lsb-release" ]; then
+                        if [ "${OS_DETECTION}" = "unknown" ]; then 
                                 CONTAINER_OS_DETECTION="/etc/lsb-release"
                         else 
                                 CONTAINER_OS_DETECTION="Mixed"
                         fi
-			DISTRIB_ID="unknown"
-			DISTRIB_RELEASE="unknown"
-			DISTRIB_CODENAME="unknown"
-			eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
-			if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
-			if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
-			if [ "${ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
-		fi
-		if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-			if [ "${OS_DETECTION}" = "unknown" ]; then 
+                        DISTRIB_ID="unknown"
+                        DISTRIB_RELEASE="unknown"
+                        DISTRIB_CODENAME="unknown"
+                        eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
+                        if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="${DISTRIB_ID}"; fi
+                        if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="${DISTRIB_RELEASE}"; fi
+                        if [ "${ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
+                fi
+                if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+                        if [ "${OS_DETECTION}" = "unknown" ]; then 
                                 CONTAINER_OS_DETECTION="lsb_release"
                         else 
                                 CONTAINER_OS_DETECTION="Mixed"
                         fi
-			if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2>/dev/null)"; fi
-			if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
-			if [ "${ID}" = "unknown" ]; then CONTAINER_ID="$(lsb_release -cs 2>/dev/null)"; fi
-		fi
-	fi
+                        if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2>/dev/null)"; fi
+                        if [ "${VERSION}" = "unknown" ]; then CONTAINER_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
+                        if [ "${ID}" = "unknown" ]; then CONTAINER_ID="$(lsb_release -cs 2>/dev/null)"; fi
+                fi
+        fi
 fi
 
 # If Netdata is not running in a container then use the local detection as the host
@@ -116,28 +116,28 @@ else
                 eval "$(grep -E "^(NAME|ID|ID_LIKE|VERSION|VERSION_ID)=" </host/etc/os-release | sed 's/^/HOST_/')"
                 HOST_OS_DETECTION="/host/etc/os-release"
         fi
-	if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
-		if [ -f "/host/etc/lsb-release" ]; then
-			if [ "${HOST_OS_DETECTION}" = "unknown" ]; then 
+        if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
+                if [ -f "/host/etc/lsb-release" ]; then
+                        if [ "${HOST_OS_DETECTION}" = "unknown" ]; then 
                                 HOST_OS_DETECTION="/etc/lsb-release"
                         else 
                                 HOST_OS_DETECTION="Mixed"
                         fi
-			DISTRIB_ID="unknown"
-			DISTRIB_RELEASE="unknown"
-			DISTRIB_CODENAME="unknown"
-			eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
-			if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
-			if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
-			if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
-		fi
-		if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-			if [ "${HOST_OS_DETECTION}" = "unknown" ]; then HOST_OS_DETECTION="lsb_release"; else HOST_OS_DETECTION="Mixed"; fi
-			if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="$(lsb_release -is 2>/dev/null)"; fi
-			if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
-			if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="$(lsb_release -cs 2>/dev/null)"; fi
-		fi
-	fi
+                        DISTRIB_ID="unknown"
+                        DISTRIB_RELEASE="unknown"
+                        DISTRIB_CODENAME="unknown"
+                        eval "$(grep -E "^(DISTRIB_ID|DISTRIB_RELEASE|DISTRIB_CODENAME)=" </etc/lsb-release)"
+                        if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="${DISTRIB_ID}"; fi
+                        if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
+                        if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
+                fi
+                if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
+                        if [ "${HOST_OS_DETECTION}" = "unknown" ]; then HOST_OS_DETECTION="lsb_release"; else HOST_OS_DETECTION="Mixed"; fi
+                        if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="$(lsb_release -is 2>/dev/null)"; fi
+                        if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
+                        if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="$(lsb_release -cs 2>/dev/null)"; fi
+                fi
+        fi
 fi
 
 
@@ -148,15 +148,15 @@ VIRTUALIZATION="unknown"
 VIRT_DETECTION="none"
 
 if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
-	VIRTUALIZATION="$(systemd-detect-virt -v)"
-	VIRT_DETECTION="systemd-detect-virt"
-	CONTAINER="$(systemd-detect-virt -c)"
-	CONT_DETECTION="systemd-detect-virt"
+        VIRTUALIZATION="$(systemd-detect-virt -v)"
+        VIRT_DETECTION="systemd-detect-virt"
+        CONTAINER="$(systemd-detect-virt -c)"
+        CONT_DETECTION="systemd-detect-virt"
 else
-	if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
-		VIRTUALIZATION="hypervisor"
-		VIRT_DETECTION="/proc/cpuinfo"
-	fi
+        if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
+                VIRTUALIZATION="hypervisor"
+                VIRT_DETECTION="/proc/cpuinfo"
+        fi
 fi
 
 # FIX THESE UP FOR BOTH CASES
