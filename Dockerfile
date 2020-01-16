@@ -5,11 +5,15 @@ ARG VERSION=0
 
 FROM netdata/builder:${DISTRO}_${DISTRO_VERSION} AS build
 
-# WIth no build context yet we cant use the ARG(s) above so these are dupes
-ENV ARCH="${ARCH:-amd64}"
-ENV DISTRO="${DISTRO:-debian}"
-ENV DISTRO_VERSION="${DISTRO_VERSION:-buster}"
-ENV VERSION="${VERSION:-0}"
+ARG ARCH
+ARG DISTRO
+ARG DISTRO_VERSION
+ARG VERSION
+
+ENV ARCH=$ARCH
+ENV DISTRO=$DISTRO
+ENV DISTRO_VERSION=$DISTRO_VERSION
+ENV VERSION=$VERSION
 
 WORKDIR /netdata
 COPY . .
@@ -18,14 +22,15 @@ RUN /build.sh
 
 FROM ${DISTRO}:${DISTRO_VERSION} AS runtime
 
-# WIth no build context yet we cant use the ARG(s) above so these are dupes
-ENV ARCH="${ARCH:-amd64}"
-ENV DISTRO="${DISTRO:-debian}"
-ENV DISTRO_VERSION="${DISTRO_VERSION:-buster}"
-ENV VERSION="${VERSION:-0}"
+ARG ARCH
+ARG DISTRO
+ARG DISTRO_VERSION
+ARG VERSION
 
-# This is needed to ensure package installs don't prompt for any user input.
-ENV DEBIAN_FRONTEND=noninteractive
+ENV ARCH=$ARCH
+ENV DISTRO=$DISTRO
+ENV DISTRO_VERSION=$DISTRO_VERSION
+ENV VERSION=$VERSION
 
 COPY .dockerfiles/install.sh /install.sh
 COPY .dockerfiles/test.sh /test.sh
