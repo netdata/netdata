@@ -86,6 +86,10 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
         OS_DETECTION="sw_vers"
         IFS="$OIFS"
 elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
+        CONTAINER_ID="FreeBSD"
+        CONTAINER_ID_LIKE="FreeBSD"
+        CONTAINER_NAME="FreeBSD"
+        CONTAINER_OS_DETECTION="uname"
         KERNEL_VERSION=$(uname -K)
         VERSION=$(uname -r)
 else
