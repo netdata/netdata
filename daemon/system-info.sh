@@ -8,6 +8,24 @@ KERNEL_VERSION="$(uname -r)"
 ARCHITECTURE="$(uname -m)"
 
 # -------------------------------------------------------------------------------------------------
+# detect the virtualization
+
+VIRTUALIZATION="unknown"
+VIRT_DETECTION="none"
+
+if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
+        VIRTUALIZATION="$(systemd-detect-virt -v)"
+        VIRT_DETECTION="systemd-detect-virt"
+        CONTAINER="$(systemd-detect-virt -c)"
+        CONT_DETECTION="systemd-detect-virt"
+else
+        if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
+                VIRTUALIZATION="hypervisor"
+                VIRT_DETECTION="/proc/cpuinfo"
+        fi
+fi
+
+# -------------------------------------------------------------------------------------------------
 # detect containers with heuristics
 
 CONTAINER="unknown"
@@ -56,7 +74,7 @@ ID_LIKE="unknown"
 
 # Initially assume all OS detection values are for a container, these are moved later if we are bare-metal
 
-if [ "${KERNEL_NAME}" == "Darwin" ]; then
+if [ "${KERNEL_NAME}" = "Darwin" ]; then
         # Mac OS
         OIFS="$IFS"
         IFS=$'\n'
@@ -67,8 +85,9 @@ if [ "${KERNEL_NAME}" == "Darwin" ]; then
         ID_LIKE="mac"
         OS_DETECTION="sw_vers"
         IFS="$OIFS"
-elif [ "${KERNEL_NAME}" == "FreeBSD" ]; then
-
+elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
+        KERNEL_VERSION=$(uname -K)
+        VERSION=$(uname -r)
 else
         if [ -f "/etc/os-release" ]; then
                 OS_DETECTION="/etc/os-release"
@@ -78,9 +97,9 @@ else
 
         if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
                 if [ -f "/etc/lsb-release" ]; then
-                        if [ "${OS_DETECTION}" = "unknown" ]; then 
+                        if [ "${OS_DETECTION}" = "unknown" ]; then
                                 CONTAINER_OS_DETECTION="/etc/lsb-release"
-                        else 
+                        else
                                 CONTAINER_OS_DETECTION="Mixed"
                         fi
                         DISTRIB_ID="unknown"
@@ -105,9 +124,9 @@ else
 fi
 
 # If Netdata is not running in a container then use the local detection as the host
-if [ "${CONTAINER}" == "unknown" ]; then
+if [ "${CONTAINER}" = "unknown" ]; then
         for v in NAME ID ID_LIKE VERSION VERSION_ID; do
-                eval "HOST_$v=CONTAINER_$v; unset CONTAINER_$v"
+                eval "HOST_$v=\$CONTAINER_$v; unset CONTAINER_$v"
         done
 else
 # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
@@ -118,9 +137,9 @@ else
         fi
         if [ "${HOST_NAME}" = "unknown" ] || [ "${HOST_VERSION}" = "unknown" ] || [ "${HOST_ID}" = "unknown" ]; then
                 if [ -f "/host/etc/lsb-release" ]; then
-                        if [ "${HOST_OS_DETECTION}" = "unknown" ]; then 
+                        if [ "${HOST_OS_DETECTION}" = "unknown" ]; then
                                 HOST_OS_DETECTION="/etc/lsb-release"
-                        else 
+                        else
                                 HOST_OS_DETECTION="Mixed"
                         fi
                         DISTRIB_ID="unknown"
@@ -141,37 +160,21 @@ else
 fi
 
 
-# -------------------------------------------------------------------------------------------------
-# detect the virtualization
-
-VIRTUALIZATION="unknown"
-VIRT_DETECTION="none"
-
-if [ -n "$(command -v systemd-detect-virt 2>/dev/null)" ]; then
-        VIRTUALIZATION="$(systemd-detect-virt -v)"
-        VIRT_DETECTION="systemd-detect-virt"
-        CONTAINER="$(systemd-detect-virt -c)"
-        CONT_DETECTION="systemd-detect-virt"
-else
-        if grep -q "^flags.*hypervisor" /proc/cpuinfo 2>/dev/null; then
-                VIRTUALIZATION="hypervisor"
-                VIRT_DETECTION="/proc/cpuinfo"
-        fi
-fi
-
 # FIX THESE UP FOR BOTH CASES
-echo "NETDATA_CONTAINER_OS_NAME=${}"
-echo "NETDATA_CONTAINER_OS_ID=${}"
-echo "NETDATA_CONTAINER_OS_ID_LIKE=${}"
-echo "NETDATA_CONTAINER_OS_VERSION=${}"
-echo "NETDATA_CONTAINER_OS_VERSION_ID=${}"
-echo "NETDATA_CONTAINER_OS_DETECTION=${}"
-echo "NETDATA_SYSTEM_OS_NAME=${NAME}"
-echo "NETDATA_SYSTEM_OS_ID=${ID}"
-echo "NETDATA_SYSTEM_OS_ID_LIKE=${ID_LIKE}"
-echo "NETDATA_SYSTEM_OS_VERSION=${VERSION}"
-echo "NETDATA_SYSTEM_OS_VERSION_ID=${VERSION_ID}"
-echo "NETDATA_SYSTEM_OS_DETECTION=${OS_DETECTION}"
+if [ "${CONTAINER}" != "unknown" ]; then
+    echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
+    echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
+    echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
+    echo "NETDATA_CONTAINER_OS_VERSION=${CONTAINER_VERSION}"
+    echo "NETDATA_CONTAINER_OS_VERSION_ID=${CONTAINER_VERSION_ID}"
+    echo "NETDATA_CONTAINER_OS_DETECTION=${CONTAINER_OS_DETECTION}"
+fi
+echo "NETDATA_HOST_OS_NAME=${HOST_NAME}"
+echo "NETDATA_HOST_OS_ID=${HOST_ID}"
+echo "NETDATA_HOST_OS_ID_LIKE=${HOST_ID_LIKE}"
+echo "NETDATA_HOST_OS_VERSION=${HOST_VERSION}"
+echo "NETDATA_HOST_OS_VERSION_ID=${HOST_VERSION_ID}"
+echo "NETDATA_HOST_OS_DETECTION=${HOST_OS_DETECTION}"
 echo "NETDATA_SYSTEM_KERNEL_NAME=${KERNEL_NAME}"
 echo "NETDATA_SYSTEM_KERNEL_VERSION=${KERNEL_VERSION}"
 echo "NETDATA_SYSTEM_ARCHITECTURE=${ARCHITECTURE}"
