@@ -242,21 +242,26 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 */
 
 .homepage-nav {
-    display: grid;
-    grid-template-columns: repeat(4,[col-start] 1fr);
-    grid-gap: 2rem;
-    margin-top: 1.4rem;
-    margin-bottom: 2rem;
+    display: flex;
+    flex-flow: row wrap;
+    margin: 1.4rem -1rem 2rem -1rem;
 }
 
 .nav-page {
-    grid-column: span 2;
+    display: flex;
+    flex: 1 1 calc(50% - 2rem);
+    flex-direction: column;
+    margin: 1rem;
     border-radius: 2px;
+}
+
+.md-typeset .nav-page:hover {
+    border: 0;
 }
 
 @media only screen and (max-width:76.25em) {
     .nav-page {
-        grid-column: span 4;
+        flex: 1 1 100%;
     }
 }
 
@@ -288,6 +293,7 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 }
 
 .button-text {
+    flex: 1 1 auto;
     color: #35414A;
     padding: 1rem 1.4rem;
     border-right: 1px solid #AEB3B7;
@@ -351,11 +357,11 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 }
 
 /* Underline links, but not badges/icons. */
-.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink):not(.md-footer-social__link) {
+.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link) {
     color: #00AB44;
 }
 
-.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink):hover {
+.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link):hover {
     color: #35414A;
     border-bottom: 1px solid #35414A;
 }
