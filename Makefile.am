@@ -463,7 +463,9 @@ ACLK_PLUGIN_FILES = \
     aclk/agent_cloud_link.h \
     aclk/mqtt.c \
     aclk/mqtt.h \
-    $(NULL)
+    aclk/aclk_lws_wss_client.c \
+    aclk/aclk_lws_wss_client.h \
+	$(NULL)
 
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
