@@ -1115,27 +1115,27 @@ restart_after_removal:
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
 
-    if(!strcmp(name, "NETDATA_SYSTEM_OS_NAME")){
+    if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
         freez(system_info->os_name);
         system_info->os_name = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID")){
+    else if(!strcmp(name, "NETDATA_HOSTSYSTEM_OS_ID")){
         freez(system_info->os_id);
         system_info->os_id = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE")){
+    else if(!strcmp(name, "NETDATA_HOST_OS_ID_LIKE")){
         freez(system_info->os_id_like);
         system_info->os_id_like = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION")){
+    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION")){
         freez(system_info->os_version);
         system_info->os_version = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID")){
+    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION_ID")){
         freez(system_info->os_version_id);
         system_info->os_version_id = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION")){
+    else if(!strcmp(name, "NETDATA_HOST_OS_DETECTION")){
         freez(system_info->os_detection);
         system_info->os_detection = strdupz(value);
     }

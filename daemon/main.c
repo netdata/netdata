@@ -751,7 +751,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
         while (fgets(line, 200, fp) != NULL) {
-            char *value=buffer;
+            char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
                 *value='\0';
