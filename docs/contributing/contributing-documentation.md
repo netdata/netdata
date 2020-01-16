@@ -131,10 +131,21 @@ reason.
 Building the documentation periodically gives you a glimpse into the final product, and is generally required if you're
 making changes to the table of contents.
 
-!!! attention "" We have only tested the build process on Linux. Initial tests on OS X have been unsuccessful. Windows
-    is fully untested at this point, but we would love to know if it works there as well!
+We have a [netdata/docs Docker Image](https://hub.docker.com/r/netdata/os-test) available on the Docker Hub
+that greatly simplifies building the documentation on any [Docker](https://www.docker.com) supported platform.
 
-To build the documentation, you need `python`/`pip`, `mkdocs`, and `mkdocs-material` installed on your machine.
+To build the docs using this image via Docker simply run the following commands in your shell:
+
+```bash
+cd /path/to/netdata
+docker run -i -t -v $PWD:/netdata netdata/docs
+```
+
+----
+
+if you are using a GNU/Linux based system for developing / contribiting to our documentation, you may build the
+docs with the provided Shell scripts in `./docs/generator/buildhtml.sh`. This requires GNU Bash and findutils
+as well as Python/pip and some Python packages `mkdocs` and `mkdocs-material` installed in your environment.
 
 Follow the [Python installation instructions](https://www.python.org/downloads/) for your machine.
 
