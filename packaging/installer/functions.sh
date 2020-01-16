@@ -303,7 +303,7 @@ install_non_systemd_init() {
 				run rc-update add netdata default &&
 				return 0
 
-		elif [ "${key}" =~ ^devuan* ] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
+		elif [[ "${key}" =~ ^devuan* ]] || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
 			echo >&2 "Installing LSB init file..."
 			run cp system/netdata-lsb /etc/init.d/netdata &&
 				run chmod 755 /etc/init.d/netdata &&
@@ -332,7 +332,7 @@ install_non_systemd_init() {
 
 NETDATA_START_CMD="netdata"
 NETDATA_STOP_CMD="killall netdata"
-NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
+NETDATA_INSTALLER_START_CMD=""
 NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
@@ -424,7 +424,7 @@ install_netdata_service() {
 pidisnetdata() {
 	if [ -d /proc/self ]; then
 		[ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
-		[ "$(cat "/proc/$1/stat" | cut -d '(' -f 2 | cut -d ')' -f 1)" = "netdata" ] && return 0
+		[ "$(cut -d '(' -f 2 "/proc/$1/stat" | cut -d ')' -f 1)" = "netdata" ] && return 0
 		return 1
 	fi
 	return 0
@@ -437,17 +437,27 @@ stop_netdata_on_pid() {
 
 	printf >&2 "Stopping netdata on pid %s ..." "${pid}"
 	while [ -n "$pid" ] && [ ${ret} -eq 0 ]; do
-		if [ ${count} -gt 45 ]; then
+		if [ ${count} -gt 24 ]; then
 			echo >&2 "Cannot stop the running netdata on pid ${pid}."
 			return 1
 		fi
 
 		count=$((count + 1))
 
-		run kill "${pid}" 2>/dev/null
-		ret=$?
+		pidisnetdata "${pid}" || ret=1
+		if [ ${ret} -eq 1 ] ; then
+			break
+		fi
 
-		test ${ret} -eq 0 && printf >&2 "." && sleep 2
+		if [ ${count} -lt 12 ] ; then
+			run kill "${pid}" 2>/dev/null
+			ret=$?
+		else
+			run kill -9 "${pid}" 2>/dev/null
+			ret=$?
+		fi
+
+		test ${ret} -eq 0 && printf >&2 "." && sleep 5
 
 	done
 
@@ -480,6 +490,12 @@ netdata_pids() {
 
 stop_all_netdata() {
 	local p
+
+	if [ -n "$(netdata_pids)" -a -n "$(builtin type -P netdatacli)" ] ; then
+		netdatacli shutdown-agent
+		sleep 20
+	fi
+
 	for p in $(netdata_pids); do
 		# shellcheck disable=SC2086
 		stop_netdata_on_pid ${p}
@@ -496,6 +512,10 @@ restart_netdata() {
 	local started=0
 
 	progress "Restarting netdata instance"
+
+	if [ -z "${NETDATA_INSTALLER_START_CMD}" ] ; then
+		NETDATA_INSTALLER_START_CMD="${netdata}"
+	fi
 
 	if [ "${UID}" -eq 0 ]; then
 		echo >&2
@@ -611,7 +631,7 @@ portable_add_user() {
 	echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
 	# shellcheck disable=SC2230
-	local nologin="$(command -v nologin >/dev/null 2>&1 || echo '/bin/false')"
+	local nologin="$(command -v nologin || echo '/bin/false')"
 
 	# Linux
 	if command -v useradd 1>/dev/null 2>&1; then

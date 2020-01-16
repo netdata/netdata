@@ -389,6 +389,23 @@ int prepare_buffers(struct engine *engine)
 }
 
 /**
+ * Flush a buffer with host labels
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @return Always returns 0.
+ */
+int flush_host_labels(struct instance *instance, RRDHOST *host)
+{
+    (void)host;
+
+    if (instance->labels)
+        buffer_flush(instance->labels);
+
+    return 0;
+}
+
+/**
  * Notify workers
  *
  * Notify exporting connector instance working threads that data is ready to send.

@@ -64,6 +64,13 @@ services:
 If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
 (they are used to get proper user and group names for the monitored host) to get slightly better security.
 
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
+page.
+
+The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+_actively_ contributing to Netdata's future.
+
 ### Docker container names resolution
 
 There are a few options for resolving container names within Netdata. Some methods of doing so will allow root access to
