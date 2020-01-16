@@ -712,7 +712,7 @@ void rrdhost_save_charts(RRDHOST *host) {
 
 static int is_valid_label_value(char *value) {
     while(*value) {
-        if(*value == '"' || *value == '\'') {
+        if(*value == '"' || *value == '\'' || *value == '*' || *value == '!') {
             return 0;
         }
 
