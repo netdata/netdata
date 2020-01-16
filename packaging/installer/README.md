@@ -67,23 +67,6 @@ operating systems.
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="" alt="Install manually from source" />Manual</h3>
-    <ul>
-      <li><a href="methods/manual/">Install manually from source</a></li>
-    </ul>
-  </div>
-  <div class="grid-item">
-    <h3><img src="" alt="Install on offline/air-gapped systems" />Offline</h3>
-    <ul>
-      <li><a href="methods/offline/">Install on offline/air-gapped systems</a></li>
-    </ul>
-  </div>
-</div>
-
-### Operating systems 
-
-<div class="installer-grid">
-  <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />Docker</h3>
     <ul>
       <li><a href="docker/#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
@@ -107,6 +90,18 @@ operating systems.
     <h3><img src="https://user-images.githubusercontent.com/1153921/71961245-a3a2d300-31ff-11ea-89bf-b90e7242d9a5.png" alt="Install Netdata on FreeBSD" />FreeBSD</h3>
     <ul>
       <li><a href="methods/pfsense.md">Installation on FreeBSD</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="" alt="Install manually from source" />Manual</h3>
+    <ul>
+      <li><a href="methods/manual/">Install manually from source</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
+    <h3><img src="" alt="Install on offline/air-gapped systems" />Offline</h3>
+    <ul>
+      <li><a href="methods/offline/">Install on offline/air-gapped systems</a></li>
     </ul>
   </div>
   <div class="grid-item">

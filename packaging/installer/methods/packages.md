@@ -1,4 +1,4 @@
-# Install Netdata with .DEB/.RPM binary packages
+# Install Netdata with .deb/.rpm packages
 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
 
