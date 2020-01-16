@@ -296,6 +296,22 @@ class PickNSort {
 	}
 
 	add_css_to_page (dark) {
+		/*
+		* TUTORIAL: Change your theme colors here. Not sure how well it will work...
+		*/
+		var light_theme = {
+			windowbg: "#FFF",
+			itembg: "#F4F4F4",
+			itemcolor: "#535353"
+		}
+		var dark_theme = {
+			windowbg: "#444",
+			itembg: "#333",
+			itemcolor: "#DBDBDB"
+		}
+		
+		var current_theme = (dark) ? dark_theme : light_theme;
+
 		var css_string = `
 #picknsort-container {
 	position: fixed;
@@ -381,17 +397,7 @@ class PickNSort {
 }
 		` // End multiline string
 
-		var light_theme = {
-			windowbg: "#FFF",
-			itembg: "#F4F4F4",
-			itemcolor: "#535353"
-		}
-		var dark_theme = {
-			windowbg: "#444",
-			itembg: "#333",
-			itemcolor: "#DBDBDB"
-		}
-		var current_theme = (dark) ? dark_theme : light_theme;
+
 		$("<style>")
 			.prop("type", "text/css")
 			.html(css_string).appendTo("head");
