@@ -143,7 +143,7 @@ restrictions are applied for label names:
 - Names cannot start with `_`, but it can be present in other parts of the name.
 - Names only accept alphabet letters, numbers, dots, and dashes.
 
-The policy for values are more flexible, but you can not use exclamation (`!`), whitespaces (` `), single quotes (`'`),
+The policy for values is more flexible, but you can not use exclamation marks (`!`), whitespaces (` `), single quotes (`'`),
 double quotes (`"`), and asterisk (`*`), 
 because they are used to compare label values in health alarms and templates.
 
