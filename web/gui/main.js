@@ -709,7 +709,7 @@ function clearMyNetdataMenu() {
 function errorMyNetdataMenu() {
     setMyNetdataMenu(`<div class="agent-item" style="padding: 0 8px">
         <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        Cannot load known netdata agents from netdata.cloud! Please make sure you have the latest netdata version.
+        Cannot load known Netdata agents from netdata.cloud! Please make sure you have the latest version of Netdata.
     </div>`);
 }
 
