@@ -73,7 +73,15 @@ Some of the bind-mounts are optional depending on how you use Netdata:
 
 * If your host is virtualized then Netdata cannot detect it from inside the container and will output the wrong
   metadata (e.g. on `/api/v1/info` queries). You can fix this by setting a variable that overrides the detection
-  using, e.g. `--env VIRTUALIZATION=VirtualBox`.
+  using, e.g. `--env VIRTUALIZATION=$(systemd-detect-virt -v)`. If you are using a `docker-compose.yml` then add:
+```
+    environment:
+      - VIRTUALIZATION=${VIRTUALIZATION}
+```
+This allows the information to be passed into `docker-compose` using:
+```
+VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
+```
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
