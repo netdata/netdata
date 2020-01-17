@@ -1,7 +1,7 @@
 ARG ARCH=amd64
 ARG DISTRO=debian
 ARG DISTRO_VERSION=buster
-ARG VERSION=0
+ARG VERSION=0.1
 
 FROM netdata/builder:${DISTRO}_${DISTRO_VERSION} AS build
 
