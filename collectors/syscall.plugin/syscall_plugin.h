@@ -1,5 +1,5 @@
-#ifndef _NETDATA_SYSCALL_EBPF_H_
-# define _NETDATA_SYSCALL_EBPF_H_ 1
+#ifndef _NETDATA_VFS_EBPF_H_
+# define _NETDATA_VFS_EBPF_H_ 1
 
 # include <stdint.h>
 
@@ -60,10 +60,10 @@ typedef struct netdata_publish_syscall {
     struct netdata_publish_syscall *next;
 }netdata_publish_syscall_t;
 
-# define SYSCALL_FAMILY "Virtual_File_System"
+# define NETDATA_VFS_FAMILY "Virtual_File_System"
 
-# define SYSCALL_IO_FILE_COUNT "File_IO_Count"
-# define SYSCALL_IO_FILE_BYTES "File_IO_Bytes"
+# define NETDATA_VFS_FILE_OPEN_COUNT "Open_Files"
+# define NETDATA_VFS_IO_FILE_BYTES "File_IO_Bytes"
 
 # define NETDATA_MAX_PROCESSOR 128
 

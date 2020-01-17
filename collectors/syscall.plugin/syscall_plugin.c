@@ -92,8 +92,8 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
 
 
 static void netdata_create_charts() {
-    netdata_create_chart(SYSCALL_FAMILY, SYSCALL_IO_FILE_COUNT, "Number of calls for file IO.", "Number of calls", 970, publish_file);
-    netdata_create_chart(SYSCALL_FAMILY, SYSCALL_IO_FILE_BYTES, "Number of bytes transferred during file IO..", "bytes/s", 971, &publish_file[NETDATA_IO_START_BYTE]);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_OPEN_COUNT, "Number of calls for file IO.", "Number of calls", 970, publish_file);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_IO_FILE_BYTES, "Number of bytes transferred during file IO..", "bytes/s", 971, &publish_file[NETDATA_IO_START_BYTE]);
 }
 
 static void netdata_update_publish(netdata_publish_syscall_t *publish, netdata_syscall_stat_t *input) {
@@ -122,7 +122,7 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish, netdata_s
 
 static void write_count_chart(char *name,netdata_publish_syscall_t *move) {
     printf( "BEGIN %s.%s\n"
-            , SYSCALL_FAMILY
+            , NETDATA_VFS_FAMILY
             , name);
 
     while (move) {
@@ -136,7 +136,7 @@ static void write_count_chart(char *name,netdata_publish_syscall_t *move) {
 
 static void write_bytes_chart(char *name,netdata_publish_syscall_t *move) {
     printf( "BEGIN %s.%s\n"
-            , SYSCALL_FAMILY
+            , NETDATA_VFS_FAMILY
             , name);
 
     while (move) {
@@ -151,9 +151,9 @@ static void write_bytes_chart(char *name,netdata_publish_syscall_t *move) {
 static void netdata_publish_data() {
     netdata_update_publish(publish_file, file_syscall);
 
-    write_count_chart(SYSCALL_IO_FILE_COUNT, publish_file);
+    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, publish_file);
 
-    write_bytes_chart(SYSCALL_IO_FILE_BYTES, &publish_file[NETDATA_IO_START_BYTE]);
+    write_bytes_chart(NETDATA_VFS_IO_FILE_BYTES, &publish_file[NETDATA_IO_START_BYTE]);
 }
 
 void *syscall_publisher(void *ptr)
@@ -238,11 +238,11 @@ void *syscall_collector(void *ptr)
 void set_file_values() {
     int i;
 
-    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "truncate", "mknod", "write", "read", "writev", "readv" };
+    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "truncate", "mknod", "write", "writev", "read", "readv" };
 #ifdef __x86_64__
-    uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 2, 87, 76, 133, 1, 0,  20,  19 };
+    static uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 2, 87, 76, 133, 1, 20, 0,  19 };
 #else
-    uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 5, 10, 92,  14, 4, 3, 146, 145 };
+    static uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 5, 10, 92,  14, 4, 146, 3, 145 };
 #endif
 
     netdata_syscall_stat_t *is = file_syscall;
