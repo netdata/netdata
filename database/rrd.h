@@ -488,7 +488,7 @@ struct rrdset {
     calculated_number red;                          // red threshold for this chart
 
     avl_tree_lock rrdvar_root_index;                // RRDVAR index for this chart
-    avl_tree_lock rrdvar_alarm_name_index;          // RRDVAR index to store the alarm names assoacited with this chart
+    avl_tree_lock rrdvar_alarm_name_index;          // RRDVAR index to store the alarm names associated with this chart
     RRDSETVAR *variables;                           // RRDSETVAR linked list for this chart (one RRDSETVAR, many RRDVARs)
     RRDCALC *alarms;                                // RRDCALC linked list for this chart
 
