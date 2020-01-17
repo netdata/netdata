@@ -71,6 +71,12 @@ int aclk_heartbeat();
 void aclk_create_metadata_message(BUFFER *dest, char *type, BUFFER *contents);
 int aclk_send_metadata_info();
 int aclk_wait_for_initialization();
+int aclk_sent_charts(RRDHOST *host, BUFFER *wb);
+int aclk_collect_active_charts();       // Find the active charts that we need to send to the cloud
+int aclk_send_single_chart(char *chart);
+int aclk_queue_query(char *token, char *query, int run_after, int repeat_every, int repeat_count);
+struct aclk_query  *aclk_query_find(char *token, char *query);
+
 
 
 

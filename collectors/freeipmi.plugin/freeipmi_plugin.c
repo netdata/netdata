@@ -183,7 +183,7 @@ _init_ipmi_config (struct ipmi_monitoring_ipmi_config *ipmi_config)
 }
 
 #ifdef NETDATA_COMMENTED
-static const char *
+    static const char *
 _get_sensor_type_string (int sensor_type)
 {
     switch (sensor_type)

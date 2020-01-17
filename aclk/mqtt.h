@@ -14,7 +14,7 @@ int _link_send_message(char *topic, char *message);
 const char *_link_strerror(int rc);
 
 extern int aclk_connection_initialized;
-extern int aclk_queue_query(char *token, char *query);
+int aclk_queue_query(char *token, char *query, int run_after, int repeat_every, int repeat_count);
 
 
 #endif //NETDATA_MQTT_H
