@@ -11,8 +11,7 @@ wait_for() {
 	i=0
 	while ! nc -z "${host}" "${port}"; do
 		sleep 1
-		i=$((i + 1))
-		if [ "$i" -gt "$timeout" ]; then
+		if [ "$((++i))" -gt "$timeout" ]; then
 			printf "Timed out!\n"
 			return 1
 		fi

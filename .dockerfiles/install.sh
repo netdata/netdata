@@ -2,7 +2,7 @@
 
 install_debian_like() {
 	# This is needed to ensure package installs don't prompt for any user input.
-	ENV DEBIAN_FRONTEND=noninteractive
+	export DEBIAN_FRONTEND=noninteractive
 
 	apt-get update
 

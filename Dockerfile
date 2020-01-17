@@ -37,6 +37,6 @@ COPY .dockerfiles/test.sh /test.sh
 
 COPY --from=build /netdata/artifacts /artifacts
 
-RUN /install.sh || exit 1
+RUN /install.sh
 
 CMD ["/test.sh"]
