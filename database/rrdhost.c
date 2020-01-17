@@ -1133,7 +1133,7 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
         freez(system_info->container_os_name);
         system_info->container_os_name = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_CONTAINERSYSTEM_OS_ID")){
+    else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID")){
         freez(system_info->container_os_id);
         system_info->container_os_id = strdupz(value);
     }
