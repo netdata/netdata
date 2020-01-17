@@ -483,7 +483,7 @@ restart_after_removal:
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
-void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_GLOBAL, "cleanup obsolete charts after seconds", rrdset_free_obsolete_time);
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_GLOBAL, "gap when lost iterations above", gap_when_lost_iterations_above);
     if (gap_when_lost_iterations_above < 1)
@@ -517,6 +517,7 @@ void rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
     );
     rrd_unlock();
 	web_client_api_v1_management_init();
+    return localhost==NULL;
 }
 
 // ----------------------------------------------------------------------------
@@ -709,6 +710,18 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdhost_unlock(host);
 }
 
+static int is_valid_label_value(char *value) {
+    while(*value) {
+        if(*value == '"' || *value == '\'' || *value == '*' || *value == '!') {
+            return 0;
+        }
+
+        value++;
+    }
+
+    return 1;
+}
+
 static int is_valid_label_key(char *key) {
     //Prometheus exporter
     if(!strcmp(key, "chart") || !strcmp(key, "family")  || !strcmp(key, "dimension"))
@@ -783,6 +796,10 @@ struct label *load_auto_labels()
     return label_list;
 }
 
+static inline int is_valid_label_config_option(char *name, char *value) {
+    return (is_valid_label_key(name) && is_valid_label_value(value) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") );
+ }
+
 struct label *load_config_labels()
 {
     int status = config_load(NULL, 1, CONFIG_SECTION_HOST_LABEL);
@@ -797,13 +814,12 @@ struct label *load_config_labels()
         config_section_wrlock(co);
         struct config_option *cv;
         for(cv = co->values; cv ; cv = cv->next) {
-            char *name = cv->name;
-            if(is_valid_label_key(name) && strcmp(name, "from environment") && strcmp(name, "from kubernetes pods") ) {
-                l = add_label_to_list(l, name, cv->value, LABEL_SOURCE_NETDATA_CONF);
+            if( is_valid_label_config_option(cv->name, cv->value)) {
+                l = add_label_to_list(l, cv->name, cv->value, LABEL_SOURCE_NETDATA_CONF);
                 cv->flags |= CONFIG_VALUE_USED;
             } else {
                 error("LABELS: It was not possible to create the label '%s' because it contains invalid character(s) or values."
-                       , name);
+                       , cv->name);
             }
         }
         config_section_unlock(co);
@@ -889,6 +905,26 @@ struct label *create_label(char *key, char *value, LABEL_SOURCE label_source)
     return result;
 }
 
+void free_host_labels(struct label *labels)
+{
+    while (labels != NULL)
+    {
+        struct label *current = labels;
+        labels = labels->next;
+        freez(current);
+    }
+}
+
+void replace_label_list(RRDHOST *host, struct label *new_labels)
+{
+    netdata_rwlock_wrlock(&host->labels_rwlock);
+    struct label *old_labels = host->labels;
+    host->labels = new_labels;
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    free_host_labels(old_labels);
+}
+
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source)
 {
     struct label *lab = create_label(key, value, label_source);
@@ -936,16 +972,13 @@ void reload_host_labels()
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
     new_labels = merge_label_lists(new_labels, from_config);
 
-    netdata_rwlock_wrlock(&localhost->labels_rwlock);
-    struct label *old_labels = localhost->labels;
-    localhost->labels = new_labels;
-    netdata_rwlock_unlock(&localhost->labels_rwlock);
+    replace_label_list(localhost, new_labels);
 
-    while (old_labels != NULL)
-    {
-        struct label *current = old_labels;
-        old_labels = old_labels->next;
-        freez(current);
+    health_label_log_save(localhost);
+
+    if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
+        localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+        rrdpush_send_labels(localhost);
     }
 
     health_reload();

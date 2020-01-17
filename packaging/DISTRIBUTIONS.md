@@ -84,7 +84,7 @@ have complete visibility over the range of support.
 | Arch Linux (latest) | Arch | &#10007; | &#63; | &#10007; | N/A | &#10007; | &#10004; | &#10004; | &#10007; | &#63;
 | All other linux | Other | &#10007; | &#63; | &#63; | &#10007; | &#10007; | &#63; | &#63; | &#10007; | &#63;
 
-## Supported functionalities accross different distribution channels
+## Supported functionalities across different distribution channels
 
 On the following section we try to depict what functionalities are available, across the different distribution channels.
 There are various limitations and problems we try to attend as we evolve and grow. Through this report we want to provide some clarity as to what is available and in what way. Of course we strive to deliver our full solution through all channels, but that may not be feasible yet for some cases.
