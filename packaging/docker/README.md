@@ -40,11 +40,6 @@ docker run -d --name=netdata \
   --security-opt apparmor=unconfined \
   netdata/netdata
 ```
-Note: most modern linux distos supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
-this is the case you can change the line above that mounts the file inside the container to:
-```
-  -v /etc/lsb-release:/host/etc/lsb-release:ro \
-```
 
 The above can be converted to a `docker-compose.yml` file for ease of management:
 
@@ -67,8 +62,18 @@ services:
       - /sys:/host/sys:ro
 ```
 
-If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
-(they are used to get proper user and group names for the monitored host) to get slightly better security.
+Some of the bind-mounts are optional depending on how you use Netdata:
+
+* If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
+  (they are used to get proper user and group names for the monitored host) to get slightly better security.
+
+* Most modern linux distos supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
+  this is the case you can change the line above that mounts the file inside the container to
+  `-v /etc/lsb-release:/host/etc/lsb-release:ro`.
+
+* If your host is virtualized then Netdata cannot detect it from inside the container and will output the wrong
+  metadata (e.g. on `/api/v1/info` queries). You can fix this by setting a variable that overrides the detection
+  using, e.g. `--env VIRTUALIZATION=VirtualBox`.
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
