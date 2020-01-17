@@ -562,6 +562,20 @@
             }
           },
           {
+            "name": "variables",
+            "in": "query",
+            "description": "When enabled, netdata will expose various system configuration metrics.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "yes",
+                "no"
+              ],
+              "default": "no"
+            }
+          },
+          {
             "name": "help",
             "in": "query",
             "description": "Enable or disable HELP lines in prometheus output.",
