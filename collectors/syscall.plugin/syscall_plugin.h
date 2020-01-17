@@ -41,6 +41,7 @@ typedef struct netdata_syscall_kern_stat {
     enum netdata_map_syscall type;
     unsigned long bytes;
     unsigned long path;
+    uint8_t error;
 }netdata_syscall_kern_stat_t;
 
 typedef struct netdata_syscall_stat {
