@@ -14,7 +14,6 @@
 int init_connectors(struct engine *engine)
 {
     engine->now = now_realtime_sec();
-
     for (struct connector *connector = engine->connector_root; connector; connector = connector->next) {
         switch (connector->config.type) {
             case BACKEND_TYPE_GRAPHITE:
