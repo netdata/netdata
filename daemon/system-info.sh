@@ -165,12 +165,6 @@ else
                         if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="${DISTRIB_RELEASE}"; fi
                         if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="${DISTRIB_CODENAME}"; fi
                 fi
-                if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-                        if [ "${HOST_OS_DETECTION}" = "unknown" ]; then HOST_OS_DETECTION="lsb_release"; else HOST_OS_DETECTION="Mixed"; fi
-                        if [ "${HOST_NAME}" = "unknown" ]; then HOST_NAME="$(lsb_release -is 2>/dev/null)"; fi
-                        if [ "${HOST_VERSION}" = "unknown" ]; then HOST_VERSION="$(lsb_release -rs 2>/dev/null)"; fi
-                        if [ "${HOST_ID}" = "unknown" ]; then HOST_ID="$(lsb_release -cs 2>/dev/null)"; fi
-                fi
         fi
 fi
 

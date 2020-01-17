@@ -35,9 +35,15 @@ docker run -d --name=netdata \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata
+```
+Note: most modern linux distos supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
+this is the case you can change the line above that mounts the file inside the container to:
+```
+  -v /etc/lsb-release:/host/etc/lsb-release:ro \
 ```
 
 The above can be converted to a `docker-compose.yml` file for ease of management:
