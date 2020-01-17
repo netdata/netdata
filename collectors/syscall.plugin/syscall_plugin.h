@@ -63,7 +63,6 @@ typedef struct netdata_publish_syscall {
 
 # define SYSCALL_IO_FILE_COUNT "File_IO_Count"
 # define SYSCALL_IO_FILE_BYTES "File_IO_Bytes"
-# define SYSCALL_DIR_COUNT "Filesystem_calls"
 
 # define NETDATA_MAX_PROCESSOR 128
 

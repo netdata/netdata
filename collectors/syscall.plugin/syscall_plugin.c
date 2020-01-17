@@ -102,7 +102,7 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish, netdata_s
             //This condition happens to avoid initial values with dimensions higher than normal values.
             if(publish->pcall) {
                 publish->ncall = (input->call - publish->pcall);
-                publish->nbyte = (input->bytes - publish->nbyte);
+                publish->nbyte = (input->bytes - publish->pbyte);
             } else {
                 publish->ncall = 0;
                 publish->nbyte = 0;
