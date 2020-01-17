@@ -94,6 +94,10 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
 
 // Set when we have connection up and running from the connection callback
 int aclk_connection_initialized = 0;
+// TODO modify previous comment if this stays this way
+// con_initialized means library is initialized and ready to be used
+// acklk_connected means there is actually an established connection
+int aclk_mqtt_connected = 0;
 
 static netdata_mutex_t aclk_mutex = NETDATA_MUTEX_INITIALIZER;
 static netdata_mutex_t query_mutex = NETDATA_MUTEX_INITIALIZER;
