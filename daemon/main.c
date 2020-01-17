@@ -731,6 +731,11 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
+// coverity[ +tainted_string_sanitize_content : arg-0 ]
+inline void coverity_remove_taint(char *s)
+{
+}
+
 int get_system_info(struct rrdhost_system_info *system_info) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
@@ -759,6 +764,8 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 char *end = value;
                 while (*end && *end != '\n') end++;
                 *end = '\0';    // Overwrite newline if present
+                coverity_remove_taint(line);    // I/O is controlled result of system_info.sh - not tainted
+                coverity_remove_taint(value);
 
                 if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
                     info("Unexpected environment variable %s=%s", line, value);
