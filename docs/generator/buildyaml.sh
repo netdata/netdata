@@ -73,8 +73,10 @@ theme:
       accent: "light green"
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
+    logo: custom/img/netdata_logo.svg
     language: '${language}'
 extra_css:
+  - "https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.css"
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css"
   - "custom/css/netdata.css"
 extra_javascript:
