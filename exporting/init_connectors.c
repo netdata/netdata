@@ -64,7 +64,8 @@ int init_connectors(struct engine *engine)
             }
 
             // dispatch the instance worker thread
-            uv_thread_create(&instance->thread, connector->worker, instance);
+            if (uv_thread_create(&instance->thread, connector->worker, instance))
+                return 1;
             char threadname[NETDATA_THREAD_NAME_MAX+1];
             snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "EXPORTING-%zu", instance->index);
             uv_thread_set_name_np(instance->thread, threadname);
