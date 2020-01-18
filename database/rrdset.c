@@ -331,7 +331,10 @@ void rrdset_free(RRDSET *st) {
     freez(st->exporting_flags);
 
     while(st->variables)  rrdsetvar_free(st->variables);
-    while(st->alarms)     rrdsetcalc_unlink(st->alarms);
+    struct rrdcalc_rrdset_alarm search;
+    search.st = st;
+    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
+    while(st->alarms)     rrdsetcalc_unlink(st->alarms, rra);
     while(st->dimensions) rrddim_free(st, st->dimensions);
 
     rrdfamily_free(host, st->rrdfamily);
@@ -366,6 +369,9 @@ void rrdset_free(RRDSET *st) {
     freez(st->config_section);
     freez(st->plugin_name);
     freez(st->module_name);
+
+    //Unlink chart
+    alarm_index_unlink_and_free(host, rra);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -583,7 +589,6 @@ RRDSET *rrdset_create_custom(
             memset(&st->avl, 0, sizeof(avl));
             memset(&st->avlname, 0, sizeof(avl));
             memset(&st->rrdvar_root_index, 0, sizeof(avl_tree_lock));
-            memset(&st->rrdvar_alarm_name_index, 0, sizeof(avl_tree_lock));
             memset(&st->dimensions_index, 0, sizeof(avl_tree_lock));
             memset(&st->rrdset_rwlock, 0, sizeof(netdata_rwlock_t));
 
@@ -727,7 +732,6 @@ RRDSET *rrdset_create_custom(
 
     avl_init_lock(&st->dimensions_index, rrddim_compare);
     avl_init_lock(&st->rrdvar_root_index, rrdvar_compare);
-    avl_init_lock(&st->rrdvar_alarm_name_index, rrdvar_compare);
 
     netdata_rwlock_init(&st->rrdset_rwlock);
 
@@ -756,6 +760,17 @@ RRDSET *rrdset_create_custom(
 
     if(unlikely(rrdset_index_add(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", st->id);
+
+    struct rrdcalc_rrdset_alarm *rra = callocz(sizeof(struct rrdcalc_rrdset_alarm ), 1);
+    memset(&rra->rrdvar_alarm_name_index, 0, sizeof(avl_tree_lock));
+    avl_init_lock(&rra->rrdvar_alarm_name_index, rrdvar_compare);
+    rra->st = st;
+
+    struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_insert_lock(&host->alarms_idx_health_name, (avl *)(rra));
+    if(rra != ret)
+        error("RRDSET: INTERNAL ERROR: Attempt to index duplicate chart '%s' on 'alarm_idx_health_name'", st->id);
+    else
+        alarm_index_link(host, rra);
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);

@@ -185,6 +185,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
     avl_init_lock(&(host->alarms_idx_health_log), alarm_compare_id);
     avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
+    avl_init_lock(&(host->alarms_idx_health_name), alarm_compare_chart);
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -1212,4 +1213,49 @@ int alarm_compare_name(void *a, void *b) {
     else if(in1->hash > in2->hash) return 1;
 
     return strcmp(in1->name,in2->name);
+}
+
+//Index to chart
+int alarm_compare_chart(void *a, void *b) {
+    struct rrdcalc_rrdset_alarm *in1 = (struct rrdcalc_rrdset_alarm *)a;
+    struct rrdcalc_rrdset_alarm *in2 = (struct rrdcalc_rrdset_alarm *)b;
+
+    if(in1->st->hash < in2->st->hash) return -1;
+    else if(in1->st->hash > in2->st->hash) return 1;
+
+    return strcmp(in1->st->name,in2->st->name);
+}
+
+inline int alarm_index_link(RRDHOST *host, struct rrdcalc_rrdset_alarm *rra)
+{
+    struct rrdcalc_rrdset_alarm *str = host->alarm_set;
+    if(!str)
+        host->alarm_set = rra;
+    else {
+        struct rrdcalc_rrdset_alarm *next;
+        for( ; str ; next = str, str = str->next);
+
+        next->next = rra;
+    }
+    return 0;
+}
+
+inline void alarm_index_unlink_and_free(RRDHOST *host, struct rrdcalc_rrdset_alarm *rra)
+{
+    if(unlikely(rra == host->alarm_set))
+        host->alarm_set = rra->next;
+    else {
+        struct rrdcalc_rrdset_alarm *move;
+        for(move = host->alarm_set; move && move->next != rra; move = move->next) ;
+        if(move) {
+            move->next = rra->next;
+            rra->next = NULL;
+        }
+    }
+
+    struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_remove_lock(&host->alarms_idx_health_name, (avl *)(rra));
+    if(rra != ret)
+        error("RRDSET: INTERNAL ERROR: Cannot remove the alarm index for %s", rra->st->name);
+
+    freez(rra);
 }

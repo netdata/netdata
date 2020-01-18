@@ -139,6 +139,15 @@ struct rrdcalc {
     struct rrdcalc *next;
 };
 
+struct rrdcalc_rrdset_alarm {
+    avl avl1;
+
+    RRDSET *st;
+    avl_tree_lock rrdvar_alarm_name_index;
+
+    struct rrdcalc_rrdset_alarm *next;
+};
+
 extern int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);
 extern int alarm_entry_isrepeating(RRDHOST *host, ALARM_ENTRY *ae);
 extern RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name, uint32_t hash);
@@ -146,7 +155,7 @@ extern RRDCALC *alarm_max_last_repeat(RRDHOST *host, char *alarm_name, uint32_t 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
 extern void rrdsetcalc_link_matching(RRDSET *st);
-extern void rrdsetcalc_unlink(RRDCALC *rc);
+extern void rrdsetcalc_unlink(RRDCALC *rc, struct rrdcalc_rrdset_alarm *rra);
 extern RRDCALC *rrdcalc_find(RRDSET *st, const char *name);
 
 extern const char *rrdcalc_status2string(RRDCALC_STATUS status);

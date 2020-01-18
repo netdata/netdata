@@ -66,7 +66,12 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         st->red = rc->red;
     }
 
-    rc->local  = rrdvar_create_and_index("local",  &st->rrdvar_alarm_name_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+    struct rrdcalc_rrdset_alarm search;
+    search.st = st;
+    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
+    if(rra) {
+        rc->local  = rrdvar_create_and_index("local",  &rra->rrdvar_alarm_name_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+    }
     rc->family = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
@@ -132,7 +137,7 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
 }
 
 // this has to be called while the RRDHOST is locked
-inline void rrdsetcalc_unlink(RRDCALC *rc) {
+inline void rrdsetcalc_unlink(RRDCALC *rc, struct rrdcalc_rrdset_alarm *rra) {
     RRDSET *st = rc->rrdset;
 
     if(!st) {
@@ -183,7 +188,9 @@ inline void rrdsetcalc_unlink(RRDCALC *rc) {
 
     rc->rrdset_prev = rc->rrdset_next = NULL;
 
-    rrdvar_free(host, &st->rrdvar_alarm_name_index, rc->local);
+    if(rra) {
+        rrdvar_free(host, &rra->rrdvar_alarm_name_index, rc->local);
+    }
     rc->local = NULL;
 
     rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rc->family);
@@ -570,7 +577,10 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     debug(D_HEALTH, "Health removing alarm '%s.%s' of host '%s'", rc->chart?rc->chart:"NOCHART", rc->name, host->hostname);
 
     // unlink it from RRDSET
-    if(rc->rrdset) rrdsetcalc_unlink(rc);
+    struct rrdcalc_rrdset_alarm search;
+    search.st = rc->rrdset;
+    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
+    if(rc->rrdset) rrdsetcalc_unlink(rc, rra);
 
     // unlink it from RRDHOST
     if(unlikely(rc == host->alarms))
