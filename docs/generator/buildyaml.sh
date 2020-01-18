@@ -37,7 +37,7 @@ navpart() {
 	if [ -z "$maxdepth" ]; then maxdepth=1; fi
 	if [[ -n $excludefirstlevel ]]; then mindepth=2; else mindepth=1; fi
 
-	for f in $(find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h\0%d\0%p\n' | sort -t '\0' -n | awk -F '\0' '{print $3}'); do
+	for f in $(find $dir -mindepth $mindepth -maxdepth $maxdepth -name "${file}.md" -printf '%h|%d|%p\n' | sort -t '|' -n | awk -F '|' '{print $3}'); do
 		# If I'm adding a section, I need the child links to be one level deeper than the requested level in "tabs"
 		if [ -z "$section" ]; then
 			echo "$spc- '$f'"
@@ -73,8 +73,10 @@ theme:
       accent: "light green"
     custom_dir: custom/themes/material
     favicon: custom/img/favicon.ico
+    logo: custom/img/netdata_logo.svg
     language: '${language}'
 extra_css:
+  - "https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.css"
   - "https://cdnjs.cloudflare.com/ajax/libs/cookieconsent2/3.1.0/cookieconsent.min.css"
   - "custom/css/netdata.css"
 extra_javascript:
@@ -150,6 +152,10 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'packaging/DISTRIBUTIONS.md'
     - 'packaging/installer/UNINSTALL.md'
 - 'docs/getting-started.md'
+"
+navpart 1 docs/step-by-step "" "Step-by-step tutorial" 1
+# navpart 1 health README "Alarms and notifications"
+echo -ne "
 - Running Netdata:
     - 'daemon/README.md'
     - 'docs/configuration-guide.md'
@@ -256,7 +262,11 @@ navpart 3 collectors/slabinfo.plugin
 echo -ne "    - 'docs/Third-Party-Plugins.md'
 "
 
-navpart 1 health README "Alarms and notifications"
+navpart 1 health README "Health monitoring and alerts"
+echo -ne "    - 'health/QUICKSTART.md'
+    - 'health/REFERENCE.md'
+"
+navpart 2 health/tutorials "" "Tutorials" 2
 navpart 2 health/notifications "" "" 1
 navpart 2 health/notifications "" "Supported notifications" 2 excludefirstlevel
 

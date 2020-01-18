@@ -481,6 +481,17 @@ paths:
               - prometheus_all_hosts
               - json
             default: shell
+        - name: variables
+          in: query
+          description: When enabled, netdata will expose various system
+            configuration metrics.
+          required: false
+          schema:
+            type: string
+            enum:
+              - yes
+              - no
+            default: no
         - name: help
           in: query
           description: Enable or disable HELP lines in prometheus output.
@@ -809,6 +820,14 @@ components:
           type: string
           description: Container technology detection method.
           example: dockerenv
+        labels:
+          type: object
+          description: List of host labels.
+          properties:
+            app:
+              type: string
+              description: Host label.
+              example: netdata
         collectors:
           type: array
           items:

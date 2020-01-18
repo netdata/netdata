@@ -23,10 +23,11 @@ def run_and_exit(func):
     def wrapper(*args, **kwargs):
         func(*args, **kwargs)
         exit(1)
+
     return wrapper
 
 
-def on_try_except_finally(on_except=(None, ), on_finally=(None, )):
+def on_try_except_finally(on_except=(None,), on_finally=(None,)):
     except_func = on_except[0]
     finally_func = on_finally[0]
 
@@ -40,7 +41,9 @@ def on_try_except_finally(on_except=(None, ), on_finally=(None, )):
             finally:
                 if finally_func:
                     finally_func(*on_finally[1:])
+
         return wrapper
+
     return decorator
 
 
@@ -49,6 +52,7 @@ def static_vars(**kwargs):
         for k in kwargs:
             setattr(func, k, kwargs[k])
         return func
+
     return decorate
 
 
@@ -82,3 +86,26 @@ def read_last_line(f):
                 break
         result = opened.readline()
     return result.decode()
+
+
+def unicode_str(arg):
+    """Return the argument as a unicode string.
+
+    The `unicode` function has been removed from Python3 and `str` takes its
+    place. This function is a helper which will try using Python 2's `unicode`
+    and if it doesn't exist, assume we're using Python 3 and use `str`.
+
+    :param arg:
+    :return: <str>
+    """
+    # TODO: fix
+    try:
+        # https://github.com/netdata/netdata/issues/7613
+        if isinstance(arg, unicode):
+            return arg
+        return unicode(arg, errors='ignore')
+    # https://github.com/netdata/netdata/issues/7642
+    except TypeError:
+        return unicode(arg)
+    except NameError:
+        return str(arg)

@@ -8,7 +8,8 @@
 #  --non-interactive        do not wait for input
 #  --dont-start-it          do not start netdata after install
 #  --stable-channel         Use the stable release channel, rather than the nightly to fetch sources
-#  --local-files Use a manually provided tarball for the installation
+#  --disable-telemetry      Opt-out of anonymous telemetry program
+#  --local-files            Use a manually provided tarball for the installation
 #
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -154,12 +155,12 @@ set_tarball_urls() {
 }
 
 safe_sha256sum() {
-	# Within the contexct of the installer, we only use -c option that is common between the two commands
-	# We will have to reconsider if we start non-common options
+	# Within the context of the installer, we only use -c option that is common between the two commands
+	# We will have to reconsider if we start using non-common options
 	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum $@
+		sha256sum "$@"
 	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 $@
+		shasum -a 256 "$@"
 	else
 		fatal "I could not find a suitable checksum binary to use"
 	fi
@@ -196,11 +197,18 @@ while [ -n "${1}" ]; do
 	elif [ "${1}" = "--no-updates" ]; then
 		NETDATA_UPDATES=""
 		shift 1
+	elif [ "${1}" = "--auto-update" ]; then
+		true # This is the default behaviour, so ignore it.
+		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
 		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
 		shift 1
+	elif [ "${1}" = "--disable-telemetry" ]; then
+		NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }${1}"
+		shift 1
 	elif [ "${1}" = "--local-files" ]; then
+		NETDATA_UPDATES="" # Disable autoupdates if using pre-downloaded files.
 		shift 1
 		if [ -z "${1}" ]; then
 			fatal "Option --local-files requires extra information. The desired tarball full filename is needed"

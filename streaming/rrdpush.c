@@ -25,7 +25,9 @@
  *
  */
 
+#define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
+#define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
 
 typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
@@ -57,12 +59,12 @@ char *netdata_ssl_ca_file = NULL;
 static void load_stream_conf() {
     errno = 0;
     char *filename = strdupz_path_subpath(netdata_configured_user_config_dir, "stream.conf");
-    if(!appconfig_load(&stream_config, filename, 0)) {
+    if(!appconfig_load(&stream_config, filename, 0, NULL)) {
         info("CONFIG: cannot load user config '%s'. Will try stock config.", filename);
         freez(filename);
 
         filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "stream.conf");
-        if(!appconfig_load(&stream_config, filename, 0))
+        if(!appconfig_load(&stream_config, filename, 0, NULL))
             info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
     }
     freez(filename);
@@ -149,6 +151,25 @@ static inline int should_send_chart_matching(RRDSET *st) {
     }
 
     return(rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_SEND));
+}
+
+int configured_as_master() {
+    struct section *section = NULL;
+    int is_master = 0;
+
+    appconfig_wrlock(&stream_config);
+    for (section = stream_config.sections; section; section = section->next) {
+        uuid_t uuid;
+
+        if (uuid_parse(section->name, uuid) != -1 &&
+            appconfig_get_boolean(&stream_config, section->name, "enabled", 0)) {
+            is_master = 1;
+            break;
+        }
+    }
+    appconfig_unlock(&stream_config);
+
+    return is_master;
 }
 
 // checks if the current chart definition has been sent
@@ -319,6 +340,36 @@ void rrdset_done_push(RRDSET *st) {
     rrdpush_buffer_unlock(host);
 }
 
+// labels
+void rrdpush_send_labels(RRDHOST *host) {
+    if (!host->labels || !(host->labels_flag & LABEL_FLAG_UPDATE_STREAM) || (host->labels_flag & LABEL_FLAG_STOP_STREAM))
+        return;
+
+    rrdpush_buffer_lock(host);
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+
+    struct label *labels = host->labels;
+    while(labels) {
+        buffer_sprintf(host->rrdpush_sender_buffer
+                , "LABEL \"%s\" = %d %s\n"
+                , labels->key
+                , (int)labels->label_source
+                , labels->value);
+
+        labels = labels->next;
+    }
+
+    buffer_sprintf(host->rrdpush_sender_buffer
+            , "OVERWRITE %s\n", "labels");
+
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
+        error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
+
+    rrdpush_buffer_unlock(host);
+    host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+}
 // ----------------------------------------------------------------------------
 // rrdpush sender thread
 
@@ -517,6 +568,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
                     "&NETDATA_SYSTEM_VIRT_DETECTION=%s"
                     "&NETDATA_SYSTEM_CONTAINER=%s"
                     "&NETDATA_SYSTEM_CONTAINER_DETECTION=%s"
+                    "&NETDATA_PROTOCOL_VERSION=%s"
                     " HTTP/1.1\r\n"
                     "User-Agent: %s/%s\r\n"
                     "Accept: */*\r\n\r\n"
@@ -541,6 +593,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , (host->system_info->virt_detection) ? host->system_info->virt_detection : ""
               , (host->system_info->container) ? host->system_info->container : ""
               , (host->system_info->container_detection) ? host->system_info->container_detection : ""
+              , STREAMING_PROTOCOL_VERSION
               , host->program_name
               , host->program_version
     );
@@ -594,7 +647,20 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         return 0;
     }
 
-    if(strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT)) != 0) {
+    int answer = strncmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+    if(!answer) {
+        host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+        host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+    } else {
+        answer = strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+        if(!answer) {
+            host->labels_flag |= LABEL_FLAG_STOP_STREAM;
+            host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+            info("STREAM %s [send to %s]: is using an old Netdata.", host->hostname,  connected_to);
+        }
+    }
+
+    if(answer != 0) {
         error("STREAM %s [send to %s]: server is not replying properly (is it a netdata?).", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
@@ -795,6 +861,8 @@ void *rrdpush_sender_thread(void *ptr) {
                 }
 
                 if (ofd->revents & POLLOUT) {
+                    rrdpush_send_labels(host);
+
                     if (begin < buffer_strlen(host->rrdpush_sender_buffer)) {
                         debug(D_STREAM, "STREAM: Sending data (current buffer length %zu bytes, begin = %zu)...", buffer_strlen(host->rrdpush_sender_buffer), begin);
 
@@ -962,6 +1030,7 @@ static int rrdpush_receive(int fd
                            , int update_every
                            , char *client_ip
                            , char *client_port
+                           , int stream_flags
 #ifdef ENABLE_HTTPS
                            , struct netdata_ssl *ssl
 #endif
@@ -1078,12 +1147,20 @@ static int rrdpush_receive(int fd
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", client_ip, client_port);
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
+    char *initial_response;
+    if (stream_flags & LABEL_FLAG_UPDATE_STREAM) {
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the newest stream protocol.", host->hostname, client_ip, client_port);
+        initial_response = START_STREAMING_PROMPT_V2;
+    } else {
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using an old protocol.", host->hostname, client_ip, client_port);
+        initial_response = START_STREAMING_PROMPT;
+    }
 #ifdef ENABLE_HTTPS
-    host->ssl.conn = ssl->conn;
-    host->ssl.flags = ssl->flags;
-    if(send_timeout(ssl,fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+    host->stream_ssl.conn = ssl->conn;
+    host->stream_ssl.flags = ssl->flags;
+    if(send_timeout(ssl, fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 #else
-    if(send_timeout(fd, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT), 0, 60) != strlen(START_STREAMING_PROMPT)) {
+    if(send_timeout(fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
 #endif
         log_stream_connection(client_ip, client_port, key, host->machine_guid, host->hostname, "FAILED - CANNOT REPLY");
         error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", host->hostname, client_ip, client_port);
@@ -1123,6 +1200,8 @@ static int rrdpush_receive(int fd
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     host->connected_senders++;
     host->senders_disconnected_time = 0;
+    host->labels_flag = stream_flags;
+
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             host->health_delay_up_to = now_realtime_sec() + alarms_delay;
@@ -1177,6 +1256,7 @@ struct rrdpush_thread {
     char *program_version;
     struct rrdhost_system_info *system_info;
     int update_every;
+    int stream_flags;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
@@ -1232,6 +1312,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
+	    , rpt->stream_flags
 #ifdef ENABLE_HTTPS
 	    , &rpt->ssl
 #endif
@@ -1281,6 +1362,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *tags = NULL;
     int update_every = default_rrd_update_every;
     char buf[GUID_LEN + 1];
+    int stream_flags = LABEL_FLAG_STOP_STREAM;
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
 
@@ -1308,10 +1390,15 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             timezone = value;
         else if(!strcmp(name, "tags"))
             tags = value;
-        else
-            if(unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
-                info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.", w->client_ip, w->client_port, key, value);
-            }
+        else {
+            if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
+                stream_flags = LABEL_FLAG_UPDATE_STREAM;
+            else
+                if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
+                    info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
+                     w->client_ip, w->client_port, key, value);
+                }
+        }
     }
 
     if(!key || !*key) {
@@ -1425,6 +1512,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
+    rpt->stream_flags      = stream_flags;
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
     rpt->ssl.flags         = w->ssl.flags;

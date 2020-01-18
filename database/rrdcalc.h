@@ -91,6 +91,11 @@ struct rrdcalc {
     uint32_t crit_repeat_every; // interval between repeating critical notifications
 
     // ------------------------------------------------------------------------
+    // Labels settings
+    char *labels;                   // the label read from an alarm file
+    SIMPLE_PATTERN *splabels;       // the simple pattern of labels
+
+    // ------------------------------------------------------------------------
     // runtime information
 
     RRDCALC_STATUS old_status; // the old status of the alarm
@@ -156,6 +161,9 @@ extern RRDCALC *rrdcalc_create_from_rrdcalc(RRDCALC *rc, RRDHOST *host, const ch
 extern void rrdcalc_add_to_host(RRDHOST *host, RRDCALC *rc);
 extern void dimension_remove_pipe_comma(char *str);
 extern char *alarm_name_with_dim(char *name, size_t namelen, const char *dim, size_t dimlen);
+
+extern void rrdcalc_labels_unlink();
+extern void rrdcalc_labels_unlink_alarm_from_host(RRDHOST *host);
 
 static inline int rrdcalc_isrepeating(RRDCALC *rc) {
     if (unlikely(rc->warn_repeat_every > 0 || rc->crit_repeat_every > 0)) {

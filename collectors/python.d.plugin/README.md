@@ -197,9 +197,14 @@ For additional security it uses python `subprocess.Popen` (without `shell=True` 
 
 _Examples: `apache`, `nginx`, `tomcat`_
 
+_Multiple Endpoints (urls) Examples: [`rabbitmq`](rabbitmq/README.md) (simpler) , [`elasticsearch`](elasticsearch/README.md) (threaded)_
+
+
 _Variables from config file_: `url`, `user`, `pass`.
 
 If data is grabbed by accessing service via HTTP protocol, this class can be used. It can handle HTTP Basic Auth when specified with `user` and `pass` credentials.
+
+Please note that the config file can use different variables according to the specification of each module.
 
 `_get_raw_data` returns list of utf-8 decoded strings (lines).
 

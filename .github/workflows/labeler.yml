@@ -1,0 +1,16 @@
+---
+# Handles labelling of PR's.
+name: Pull Request Labeler
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: paulfantom/periodic-labeler@master
+        if: github.repository == 'netdata/netdata'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LABEL_MAPPINGS_FILE: .github/labeler.yml

@@ -25,13 +25,32 @@ fi
 
 STARTIT=1
 AUTOUPDATE=0
-RELEASE_CHANNEL="nightly"
+REINSTALL_OPTIONS=""
+RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
 
 while [ "${1}" ]; do
 	case "${1}" in
-		"--dont-start-it") STARTIT=0;;
-		"--auto-update"|"-u") AUTOUPDATE=1;;
-		"--stable-channel") RELEASE_CHANNEL="stable";;
+		"--dont-start-it")
+			STARTIT=0
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--auto-update"|"-u")
+			AUTOUPDATE=1
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--stable-channel")
+			RELEASE_CHANNEL="stable"
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--nightly-channel")
+			RELEASE_CHANNEL="nightly"
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+		"--disable-telemetry")
+			DISABLE_TELEMETRY=1
+			REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+			;;
+
 		*) echo >&2 "Unknown option '${1}'. Ignoring it.";;
 	esac
 	shift 1
@@ -134,6 +153,15 @@ progress "Install logrotate configuration for netdata"
 
 install_netdata_logrotate || run_failed "Cannot install logrotate file for netdata."
 
+# -----------------------------------------------------------------------------
+progress "Telemetry configuration"
+
+# Opt-out from telemetry program
+if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
+  run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
+else
+  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+fi
 
 # -----------------------------------------------------------------------------
 progress "Install netdata at system init"
@@ -229,6 +257,11 @@ then
     run chmod 4750 bin/fping
 fi
 
+# -----------------------------------------------------------------------------
+
+echo "Save install options"
+grep -qv 'IS_NETDATA_STATIC_BINARY="yes"' "${NETDATA_PREFIX}/etc/netdata/.environment" || echo IS_NETDATA_STATIC_BINARY=\"yes\" >> "${NETDATA_PREFIX}/etc/netdata/.environment"
+sed -i "s/REINSTALL_OPTIONS=\".*\"/REINSTALL_OPTIONS=\"${REINSTALL_OPTIONS}\"/" "${NETDATA_PREFIX}/etc/netdata/.environment"
 
 # -----------------------------------------------------------------------------
 if [ ${STARTIT} -eq 0 ]; then

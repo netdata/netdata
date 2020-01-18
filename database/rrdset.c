@@ -328,6 +328,8 @@ void rrdset_free(RRDSET *st) {
     // ------------------------------------------------------------------------
     // free its children structures
 
+    freez(st->exporting_flags);
+
     while(st->variables)  rrdsetvar_free(st->variables);
     while(st->alarms)     rrdsetcalc_unlink(st->alarms);
     while(st->dimensions) rrddim_free(st, st->dimensions);
@@ -601,6 +603,7 @@ RRDSET *rrdset_create_custom(
             st->variables = NULL;
             st->alarms = NULL;
             st->flags = 0x00000000;
+            st->exporting_flags = NULL;
 
             if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(st, 0, size);

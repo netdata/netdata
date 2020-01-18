@@ -63,7 +63,7 @@ common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libnet
 common.run_command(container, [os.environ["REPO_TOOL"], "install", "-y", "libcups2-dev"])
 
 print ("3.1 Run install-required-packages scriptlet")
-common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-packages.sh" % build_path, "https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"])
+common.run_command(container, ["wget", "-T", "15", "-O", "%s/.install-required-packages.sh" % build_path, "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"])
 common.run_command(container, ["bash", "%s/.install-required-packages.sh" % build_path, "netdata", "--dont-wait", "--non-interactive"])
 
 print("3.2 Installing package dependencies within LXC container")
@@ -84,9 +84,6 @@ if str(os.environ["BUILD_STRING"]).count("debian/jessie") == 1:
     print("5.1 We are building for Jessie, adjusting control file")
     common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
     common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.jessie', 'contrib/debian/control'])
-if str(os.environ["BUILD_STRING"]).count("ubuntu/trusty") == 1:
-    common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
-    common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.trusty', 'contrib/debian/control'])
 if str(os.environ["BUILD_STRING"]).count("ubuntu/xenial") == 1:
     common.run_command_in_host(['sudo', 'rm', 'contrib/debian/control'])
     common.run_command_in_host(['sudo', 'cp', 'contrib/debian/control.xenial', 'contrib/debian/control'])
