@@ -1,32 +1,267 @@
-/* .md-nav__link {
-    white-space: nowrap;
-} */
+/* Fonts */
+@import url('https://fonts.googleapis.com/css?family=IBM+Plex+Sans:400,400i,500,700,700i&display=swap');
+
+body, input {
+    font-family: "IBM Plex Sans","Roboto","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
 
 .md-typeset {
-    font-size: .75rem
+    font-size: .85rem;
+    line-height: 1.5;
 }
 
-/* Underline text */
-
-.md-typeset a:not(.nav-button):not(.md-icon):not(.headerlink) {
-    border-bottom: 1px solid #272b30;
+/* Main structure */
+.md-container {
+    flex-flow: row wrap;
 }
 
-/*  Custom styling for the new documentation homepage.
-    In particular, the three buttons for install/getting started/configuration. */
+.md-grid {
+    max-width: 80rem;
+    display: flex;
+    position: relative;
+    overflow: visible;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.md-content {
+    margin-right: 0;
+    margin-bottom: 6rem;
+    margin-left: 0;
+    max-width: 45rem;
+    overflow: hidden;
+}
+
+.md-sidebar[data-md-state="lock"] {
+    position: sticky;
+}
+
+.md-sidebar {
+    position: sticky;
+    flex: 0 0 320px;
+}
+
+.md-sidebar--secondary {
+    right: 0;
+    margin-left: 0;
+    transform: none;
+    order: 3;
+}
+
+.md-content__inner {
+    margin-right: 2.5rem;
+    margin-left: 2.5rem;
+}
+
+@media screen and (max-width: 76.1875em) {
+    .md-sidebar--primary {
+        position: fixed;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    .md-content__inner {
+        margin-right: 1rem;
+        margin-left: 1rem;
+    }
+}
+
+/*
+   Navigation
+*/
+
+.md-header-nav {
+    padding: 0 0.6rem;
+}
+
+@media only screen and (max-width: 76.25em) {
+    .md-header-nav {
+        padding: 0 2.5rem;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    .md-header-nav {
+        padding: 0.3rem 1rem;
+    }
+
+    .md-header-nav__title {
+        display: none;
+    }
+}
+
+[data-md-color-primary="blue-grey"] .md-header {
+    background: #35414A;
+}
+
+html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
+    background-color: #35414A;
+}
+
+[data-md-color-primary="blue-grey"] .md-nav__source {
+    background-color: #546e7a
+}
+
+.md-flex__cell {
+    vertical-align: middle;
+}
+
+.md-header-nav__button {
+    margin: 0;
+    padding: 0;
+    top: 2px;
+}
+
+/* Change the language selector dropdown to match new color. */
+.md-header-nav select#sel {
+    background-color: rgba(0,0,0,.26) !important;
+    padding: 3px;
+    margin-left: 5px;
+    margin-right: 20px;
+}
+
+@media only screen and (max-width: 500px) {
+    img[src='/custom/img/geography-16.png'] {
+        display: none;
+    }
+
+    .md-header-nav select#sel {
+        margin: 0;
+    }
+}
+
+/* Algolia search */
+#search_algolia {
+    font-size: 0.7rem;
+    padding: 0.4rem;
+    border-radius: 3px;
+    min-width: 300px;
+}
+
+@media only screen and (max-width: 76.25em) {
+    #search_algolia {
+        min-width: 100px;
+    }
+}
+
+@media only screen and (max-width: 700px) {
+    #search_algolia {
+        width: 150px;
+    }
+}
+
+@media only screen and (max-width: 500px) {
+    #search_algolia {
+        width: 100px;
+    }
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--category-header {
+    font-size: 0.9rem !important;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--subcategory-column {
+    font-size: 0.7rem;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--title {
+    font-size: 0.8rem;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--text {
+    font-size: 0.7rem;
+    line-height: 1.5;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--category-header .algolia-docsearch-suggestion--category-header-lvl0 .algolia-docsearch-suggestion--highlight,
+.algolia-autocomplete .algolia-docsearch-suggestion--text .algolia-docsearch-suggestion--highlight {
+   box-shadow: inset 0 -1px 0 0 #00CB51;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--highlight {
+    color: #00AB44;
+    background: #F1F2F3;
+}
+
+@media only screen and (max-width: 768px) {
+    .algolia-autocomplete .algolia-docsearch-suggestion .algolia-docsearch-suggestion--subcategory-column {
+        font-size: 0.7rem;
+        font-weight: 400;
+    }
+
+    .algolia-autocomplete.algolia-autocomplete-right .ds-dropdown-menu {
+        right: -150px !important;
+    }
+
+    .algolia-autocomplete.algolia-autocomplete-right .ds-dropdown-menu::before {
+        right: 248px;
+    }
+}
+
+@media only screen and (max-width: 600px) {
+    .algolia-autocomplete .ds-dropdown-menu {
+        min-width: 400px;
+    }
+}
+
+/*
+   Left-hand navigation
+*/
+
+.md-nav {
+    font-size: 0.8rem;
+}
+
+/* Bold the first item on the docs sidebar: Netdata Documentation. */
+.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
+    font-weight: 700;
+}
+
+/* Hide the label at the top of the navigation menu. Does nothing. 
+   Well, it does do something on mobile, and this media query makes
+   sure it's hidden only on screens wide enough to not use the mobile sidebar. */
+@media only screen and (min-width:76.25em) {
+    .md-nav--primary .md-nav__title {
+        display: none;
+    }
+}
+
+/* Differentiate between main TOC items and sub-items. */
+
+.md-nav--primary > .md-nav__list > .md-nav__item > .md-nav__link {
+    font-weight: 500;
+}
+
+[data-md-color-primary="blue-grey"] .md-nav__link--active, [data-md-color-primary="blue-grey"] .md-nav__link:active {
+    color: #00AB44;
+}
+
+/*
+   Documentation homepage
+   In particular, the three buttons for install/getting started/configuration.
+*/
 .homepage-nav {
-    display: grid;
-    grid-template-columns: repeat(4,[col-start] 1fr);
-    grid-gap: 2rem;
-    margin-top: 1.4rem;
-    margin-bottom: 2rem;
+    display: flex;
+    flex-flow: row wrap;
+    margin: 1.4rem -1rem 2rem -1rem;
 }
 
 .nav-page {
-    grid-column: span 2;
-    border-radius: 3px;
-    border: 1px solid #EFEFEF;
-    box-shadow: 0 8px 48px 4px rgba(86,91,115,0.15);
+    display: flex;
+    flex: 1 1 calc(50% - 2rem);
+    flex-direction: column;
+    margin: 1rem;
+    border-radius: 2px;
+}
+
+.md-typeset .nav-page:hover {
+    border: 0;
+}
+
+@media only screen and (max-width:76.25em) {
+    .nav-page {
+        flex: 1 1 100%;
+    }
 }
 
 .button-header {
@@ -34,17 +269,18 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient( to right, #306BAC, #56B2FF 140%);
+    border: 2px solid #00AB44;
     border-radius: 3px 3px 0 0;
 }
 
 .button-header h3 {
-    color: white;
+    color: #35414A;
+    font-weight: 700;
     margin: 0;
 }
 
 .button-header svg {
-    color: white;
+    color: #35414A;
     position: relative;
     transition-property: left;
     transition-timing-function: ease-in-out;
@@ -56,8 +292,13 @@
 }
 
 .button-text {
+    flex: 1 1 auto;
     color: #35414A;
     padding: 1rem 1.4rem;
+    border-right: 1px solid #AEB3B7;
+    border-bottom: 1px solid #AEB3B7;
+    border-left: 1px solid #AEB3B7;
+    border-radius: 0 0 3px 3px;
 }
 
 .button-text p {
@@ -74,26 +315,17 @@
     text-align: center;
 }
 
-/* Hide the label at the top of the navigation menu. Does nothing. 
-   Well, it does do something on mobile, and this media query makes
-   sure it's hidden only on screens wide enough to not use the mobile sidebar. */
-@media only screen and (min-width:76.25em) {
-    .md-nav--primary .md-nav__title {
-        display: none;
-    }
-}
+/*
+   Markdown/body content
+*/
 
-/* Change the language selector dropdown to match new color. */
-.md-header-nav select#sel {
-    background-color: rgba(0,0,0,.26) !important;
-    padding: 3px;
-    margin-left: 5px;
-    margin-right: 20px;
-}
-
-/* Add some whitespace to the bottom of each doc. */
-.md-content {
-    margin-bottom: 6rem;
+/* Make header a bit bolder with new IBM Plex Sans font. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5 {
+    font-weight: 500;
 }
 
 /* Make sure inline code in tables don't break. */
@@ -123,7 +355,33 @@
     padding: 0;
 }
 
-/* Bold the first item on the docs sidebar: Netdata Documentation */
-.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
-    font-weight: 700;
+/* Underline links, but not badges/icons. */
+.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link) {
+    color: #00AB44;
+}
+
+.md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link):hover {
+    color: #35414A;
+    border-bottom: 1px solid #35414A;
+}
+
+/* Remove underlines on specific badges. */
+.md-typeset a[href='https://travis-ci.com/netdata/netdata'],
+.md-typeset a[href='https://bestpractices.coreinfrastructure.org/projects/2231'],
+.md-typeset a[href='https://www.gnu.org/licenses/gpl-3.0'],
+.md-typeset a[href='https://codeclimate.com/github/netdata/netdata'],
+.md-typeset a[href='https://www.codacy.com/app/netdata/netdata?utm_source=github.com&utm_medium=referral&utm_content=netdata/netdata&utm_campaign=Badge_Grade'],
+.md-typeset a[href='https://lgtm.com/projects/g/netdata/netdata/context:cpp'],
+.md-typeset a[href='https://lgtm.com/projects/g/netdata/netdata/context:javascript'],
+.md-typeset a[href='https://lgtm.com/projects/g/netdata/netdata/context:python'],
+.md-typeset a[href='https://hub.docker.com/r/netdata/netdata/'],
+.md-typeset a[href='https://hub.docker.com/r/firehol/netdata/'],
+.md-typeset a[href='https://hub.docker.com/r/titpetric/netdata/'],
+.md-typeset a[href='https://registry.my-netdata.io/#menu_netdata_submenu_registry'] {
+    border-bottom: 0 !important;
+}
+
+/* Fix the font size of admonition and details sections. */
+.md-typeset .admonition, .md-typeset details {
+    font-size: 0.75rem;
 }
