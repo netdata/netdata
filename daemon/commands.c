@@ -526,7 +526,7 @@ static void command_thread(void *arg)
     info("Shutting down command event loop.");
     uv_close((uv_handle_t *)&async, NULL);
     uv_close((uv_handle_t*)&server_pipe, NULL);
-    uv_run(loop, UV_RUN_DEFAULT);
+    uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
 
     info("Shutting down command loop complete.");
     assert(0 == uv_loop_close(loop));
@@ -540,6 +540,7 @@ error_after_pipe_bind:
 error_after_pipe_init:
     uv_close((uv_handle_t *)&async, NULL);
 error_after_async_init:
+    uv_run(loop, UV_RUN_DEFAULT); /* flush all libuv handles */
     assert(0 == uv_loop_close(loop));
 error_after_loop_init:
     freez(loop);
@@ -587,7 +588,7 @@ void commands_init(void)
     return;
 
 after_error:
-    error("Failed to initialize command server.");
+    error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
 }
 
 void commands_exit(void)
