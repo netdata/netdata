@@ -98,8 +98,10 @@ jobs:
       # Do code quality, syntax checking and other pre-build activities
     - stage: Code quality, linting, syntax, code style
 
-      name: Run shellchecking on BASH
-      script: shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
+      name: Run shellchecking on Shell Scripts
+      script:
+        - shellcheck --format=gcc $(find . -name '*.sh.in' -not -iwholename '*.git*')
+        - shellcheck --format=gcc $(find . -name '*.sh' -not -iwholename '*.git*')
 
       # Check if any of the C code deviates from our coding style
     - name: Check coding style
@@ -148,6 +150,10 @@ jobs:
       after_script: rm -rf /tmp/netdata-makedist-test
       after_failure: post_message "TRAVIS_MESSAGE" "'make dist' failed"
 
+
+    - name: Re-check Shell Scripts (after build) with shellcheck
+      script:
+        - shellcheck --format=gcc $(find . -name '*.sh' -not -iwholename '*.git*')
 
 
     - stage: Artifacts validation
