@@ -17,9 +17,8 @@
 # include <dlfcn.h>
 
 # define NETDATA_MAX_FILE_VECTOR 8
-# define NETDATA_IO_START_BYTE 4
-
-# define NETDATA_MAX_DIR_VECTOR 5
+# define NETDATA_IN_START_BYTE 3
+# define NETDATA_OUT_START_BYTE 5
 
 # include <fcntl.h>
 # include <ctype.h>
@@ -48,6 +47,7 @@ typedef struct netdata_syscall_stat {
     uint16_t sc_num;
     unsigned long bytes; //total bytes
     uint64_t call; //number of calls
+    uint64_t ecall; //number of calls with error
     struct netdata_syscall_stat  *next;
 }netdata_syscall_stat_t;
 
@@ -57,13 +57,30 @@ typedef struct netdata_publish_syscall {
     unsigned long pbyte;
     uint64_t ncall;
     uint64_t pcall;
+    uint64_t nerr;
+    uint64_t perr;
     struct netdata_publish_syscall *next;
 }netdata_publish_syscall_t;
 
+typedef struct netdata_publish_vfs_common {
+    long write;
+    long read;
+}netdata_publish_vfs_common_t;
+
 # define NETDATA_VFS_FAMILY "Virtual_File_System"
 
-# define NETDATA_VFS_FILE_OPEN_COUNT "Open_Files"
+# define NETDATA_VFS_FILE_OPEN_COUNT "Open_files"
+# define NETDATA_VFS_FILE_CLEAN_COUNT "Clean_files"
+# define NETDATA_VFS_FILE_WRITE_COUNT "Write2files"
+# define NETDATA_VFS_FILE_READ_COUNT "Read2files"
+# define NETDATA_VFS_FILE_ERR_COUNT "Error_call"
+
+# define NETDATA_VFS_IN_FILE_BYTES "File_In_Bytes"
+# define NETDATA_VFS_OUT_FILE_BYTES "File_Out_Bytes"
+
 # define NETDATA_VFS_IO_FILE_BYTES "File_IO_Bytes"
+# define NETDATA_VFS_DIM_IN_FILE_BYTES "Write"
+# define NETDATA_VFS_DIM_OUT_FILE_BYTES "Read"
 
 # define NETDATA_MAX_PROCESSOR 128
 

@@ -36,10 +36,10 @@ void netdata_cleanup_and_exit(int ret) {
 // ----------------------------------------------------------------------
 void *libnetdata = NULL;
 int (*load_bpf_file)(char *) = NULL;
-int (*test_bpf_perf_event)(int);
-int (*perf_event_mmap)(int);
-int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **);
-void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int));
+int (*test_bpf_perf_event)(int) = NULL;
+int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t) = NULL;
+int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int) = NULL;
+void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int) = NULL;
 
 static char *user_config_dir = NULL;
 static char *stock_config_dir = NULL;
@@ -51,18 +51,45 @@ static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
 
 //Global vectors
 netdata_syscall_stat_t *file_syscall = NULL;
-
 netdata_publish_syscall_t *publish_file = NULL;
 
 static int update_every = 1;
+static int thread_finished = 0;
+static int close_plugin = 0;
+static int page_cnt = 8;
+
+static int unmap_memory() {
+    int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+
+    if (nprocs > NETDATA_MAX_PROCESSOR) {
+        nprocs = NETDATA_MAX_PROCESSOR;
+    }
+
+    int i;
+    int size = sysconf(_SC_PAGESIZE)*(page_cnt + 1);
+    for (i = 0 ; i < nprocs ; i++) {
+        if (perf_event_unmap(headers[i], size) < 0) {
+            error("[VFS] Cannot unmap memory.");
+            return -1;
+        }
+
+        if (close(pmu_fd[i]) )
+            error("[VFS] Cannot close file descriptor.");
+    }
+
+    return 0;
+}
 
 static void int_exit(int sig)
 {
-    (void)sig;
+    close_plugin = 1;
 
-    if(libnetdata) {
-        dlclose(libnetdata);
+    //When both threads were not finished case I try to go in front this address, the collector will crash
+    if(!thread_finished) {
+        return;
     }
+
+    unmap_memory();
 
     if(file_syscall) {
         free(file_syscall);
@@ -72,10 +99,21 @@ static void int_exit(int sig)
         free(publish_file);
     }
 
+    if(libnetdata) {
+        dlclose(libnetdata);
+    }
+
     exit(sig);
 }
 
-static void netdata_create_chart(char *family, char *name, char *msg, char *axis, int order, netdata_publish_syscall_t *move) {
+static void netdata_create_chart(char *family
+                                , char *name
+                                , char *msg
+                                , char *axis
+                                , int order
+                                , netdata_publish_syscall_t *move
+                                , int end)
+                                {
     printf("CHART %s.%s '' '%s' '%s' 'syscall' '' line %d 1 ''\n"
             , family
             , name
@@ -83,50 +121,91 @@ static void netdata_create_chart(char *family, char *name, char *msg, char *axis
             , axis
             , order);
 
-    while (move) {
+    int i = 0;
+    while (move && i < end) {
         printf("DIMENSION %s '' absolute 1 1\n", move->dimension);
 
         move = move->next;
+        i++;
     }
 }
 
+static void netdata_create_io_chart(char *family, char *name, char *msg, char *axis, int order) {
+    printf("CHART %s.%s '' '%s' '%s' 'syscall' '' line %d 1 ''\n"
+            , family
+            , name
+            , msg
+            , axis
+            , order);
 
-static void netdata_create_charts() {
-    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_OPEN_COUNT, "Number of calls for file IO.", "Number of calls", 970, publish_file);
-    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_IO_FILE_BYTES, "Number of bytes transferred during file IO..", "bytes/s", 971, &publish_file[NETDATA_IO_START_BYTE]);
+    printf("DIMENSION %s '' absolute 1 1\n", NETDATA_VFS_DIM_IN_FILE_BYTES );
+    printf("DIMENSION %s '' absolute 1 1\n", NETDATA_VFS_DIM_OUT_FILE_BYTES );
 }
 
-static void netdata_update_publish(netdata_publish_syscall_t *publish, netdata_syscall_stat_t *input) {
-    while(publish) {
-        if(input->call != publish->pcall) {
-            //This condition happens to avoid initial values with dimensions higher than normal values.
-            if(publish->pcall) {
-                publish->ncall = (input->call - publish->pcall);
-                publish->nbyte = (input->bytes - publish->pbyte);
-            } else {
-                publish->ncall = 0;
-                publish->nbyte = 0;
-            }
-            publish->pcall = input->call;
+static void netdata_create_charts() {
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_OPEN_COUNT, "Number of calls for file IO.", "Number of calls", 970, publish_file, 1);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_CLEAN_COUNT, "Number of calls for file IO.", "Number of calls", 971, &publish_file[1], 2);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_WRITE_COUNT, "Number of calls for file IO.", "Number of calls", 972, &publish_file[3], 2);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_READ_COUNT, "Number of calls for file IO.", "Number of calls", 973, &publish_file[5], 2);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_ERR_COUNT, "Number of calls for file IO.", "Number of calls", 974, publish_file, 7);
 
-            publish->pbyte = input->bytes;
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_IN_FILE_BYTES, "Number of bytes written to file.", "bytes/s", 975, &publish_file[NETDATA_IN_START_BYTE], 2);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_OUT_FILE_BYTES, "Number of bytes read from file.", "bytes/s", 976, &publish_file[NETDATA_OUT_START_BYTE], 2);
+
+    netdata_create_io_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_IO_FILE_BYTES, "Number of bytes read and written.", "bytes/s", 977);
+}
+
+static void netdata_update_publish(netdata_publish_syscall_t *publish, netdata_publish_vfs_common_t *pvc, netdata_syscall_stat_t *input) {
+    netdata_publish_syscall_t *move = publish;
+    while(move) {
+        if(input->call != move->pcall) {
+            //This condition happens to avoid initial values with dimensions higher than normal values.
+            if(move->pcall) {
+                move->ncall = (input->call - move->pcall);
+                move->nbyte = (input->bytes - move->pbyte);
+            } else {
+                move->ncall = 0;
+                move->nbyte = 0;
+            }
+            move->pcall = input->call;
+
+            move->pbyte = input->bytes;
         } else {
-            publish->ncall = 0;
-            publish->nbyte = 0;
+            move->ncall = 0;
+            move->nbyte = 0;
         }
 
         input = input->next;
-        publish = publish->next;
+        move = move->next;
     }
+
+    pvc->write = -(publish[3].nbyte + publish[4].nbyte);
+    pvc->read = (publish[5].nbyte + publish[6].nbyte);
 }
 
-static void write_count_chart(char *name,netdata_publish_syscall_t *move) {
+static void write_count_chart(char *name,netdata_publish_syscall_t *move, int end) {
+    printf( "BEGIN %s.%s\n"
+            , NETDATA_VFS_FAMILY
+            , name);
+
+    int i = 0;
+    while (move && i < end) {
+        printf("SET %s = %lld\n", move->dimension, (long long) move->ncall);
+
+        move = move->next;
+        i++;
+    }
+
+    printf("END\n");
+}
+
+static void write_err_chart(char *name,netdata_publish_syscall_t *move) {
     printf( "BEGIN %s.%s\n"
             , NETDATA_VFS_FAMILY
             , name);
 
     while (move) {
-        printf("SET %s = %lld\n", move->dimension, (long long) move->ncall);
+        printf("SET %s = %lld\n", move->dimension, (long long) move->nerr);
 
         move = move->next;
     }
@@ -134,29 +213,50 @@ static void write_count_chart(char *name,netdata_publish_syscall_t *move) {
     printf("END\n");
 }
 
-static void write_bytes_chart(char *name,netdata_publish_syscall_t *move) {
+static void write_bytes_chart(char *name,netdata_publish_syscall_t *move, int end) {
     printf( "BEGIN %s.%s\n"
             , NETDATA_VFS_FAMILY
             , name);
 
+    int i = 0;
     while (move) {
         printf("SET %s = %lld\n", move->dimension, (long long) move->nbyte);
 
         move = move->next;
+        i++;
     }
+
+    printf("END\n");
+}
+
+static void write_io_chart(netdata_publish_vfs_common_t *pvc) {
+    printf( "BEGIN %s.%s\n"
+            , NETDATA_VFS_FAMILY
+            , NETDATA_VFS_IO_FILE_BYTES);
+
+    printf("SET %s = %lld\n", NETDATA_VFS_DIM_IN_FILE_BYTES , (long long) pvc->write);
+    printf("SET %s = %lld\n", NETDATA_VFS_DIM_OUT_FILE_BYTES , (long long) pvc->read);
 
     printf("END\n");
 }
 
 static void netdata_publish_data() {
-    netdata_update_publish(publish_file, file_syscall);
+    netdata_publish_vfs_common_t pvc;
+    netdata_update_publish(publish_file, &pvc, file_syscall);
 
-    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, publish_file);
+    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, publish_file, 1);
+    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, &publish_file[1], 2);
+    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, &publish_file[3], 2);
+    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, &publish_file[5], 2);
+    write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, publish_file);
 
-    write_bytes_chart(NETDATA_VFS_IO_FILE_BYTES, &publish_file[NETDATA_IO_START_BYTE]);
+    write_bytes_chart(NETDATA_VFS_IN_FILE_BYTES, &publish_file[NETDATA_IN_START_BYTE], 2);
+    write_bytes_chart(NETDATA_VFS_OUT_FILE_BYTES, &publish_file[NETDATA_OUT_START_BYTE], 2);
+
+    write_io_chart(&pvc);
 }
 
-void *syscall_publisher(void *ptr)
+void *vfs_publisher(void *ptr)
 {
     (void)ptr;
     netdata_create_charts();
@@ -164,7 +264,7 @@ void *syscall_publisher(void *ptr)
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!netdata_exit) {
+    while(!close_plugin) {
         usec_t dt = heartbeat_next(&hb, step);
         (void)dt;
 
@@ -177,8 +277,12 @@ void *syscall_publisher(void *ptr)
 }
 
 static inline void set_stat_value(netdata_syscall_stat_t *out, netdata_syscall_kern_stat_t *e) {
-    out->bytes += e->bytes;
-    out->call++;
+    if (!e->error) {
+        out->bytes += e->bytes;
+        out->call++;
+    } else {
+        out->ecall++;
+    }
 }
 
 static void set_file_vectors(netdata_syscall_kern_stat_t *e) {
@@ -187,13 +291,21 @@ static void set_file_vectors(netdata_syscall_kern_stat_t *e) {
 #ifdef __x86_64__
         case 2:
         case 87: {
-            file_syscall[e->idx].call++;
+            if (!e->error) {
+                file_syscall[e->idx].call++;
+            } else {
+                file_syscall[e->idx].ecall++;
+            }
             break;
         }
 #else
         case 5:
         case 10: {
-                file_syscall[e->idx].call++;
+                if (!e->error) {
+                    file_syscall[e->idx].call++;
+                } else {
+                    file_syscall[e->idx].ecall++;
+                }
                 break;
             }
 #endif
@@ -208,7 +320,7 @@ static void set_file_vectors(netdata_syscall_kern_stat_t *e) {
 static int netdata_store_bpf(void *data, int size) {
     (void)size;
 
-    if(netdata_exit)
+    if(close_plugin)
         return 0; //LIBBPF_PERF_EVENT_DONE
 
     netdata_syscall_kern_stat_t *e = data;
@@ -225,12 +337,12 @@ static int netdata_store_bpf(void *data, int size) {
     return -2; //LIBBPF_PERF_EVENT_CONT;
 }
 
-void *syscall_collector(void *ptr)
+void *vfs_collector(void *ptr)
 {
     (void)ptr;
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
 
-    netdata_perf_loop_multi(pmu_fd, headers, nprocs, (int *)&netdata_exit, netdata_store_bpf);
+    netdata_perf_loop_multi(pmu_fd, headers, nprocs, (int *)&close_plugin, netdata_store_bpf, page_cnt);
 
     return NULL;
 }
@@ -238,11 +350,11 @@ void *syscall_collector(void *ptr)
 void set_file_values() {
     int i;
 
-    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "truncate", "mknod", "write", "writev", "read", "readv" };
+    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "truncate", "write", "writev", "read", "readv" };
 #ifdef __x86_64__
-    static uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 2, 87, 76, 133, 1, 20, 0,  19 };
+    static uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 2, 87, 76, 1,  20, 0,  19 };
 #else
-    static uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 5, 10, 92,  14, 4, 146, 3, 145 };
+    static uint16_t sys_num[NETDATA_MAX_FILE_VECTOR] = { 5, 10, 92, 4, 146, 3, 145 };
 #endif
 
     netdata_syscall_stat_t *is = file_syscall;
@@ -250,7 +362,7 @@ void set_file_values() {
 
     netdata_publish_syscall_t *pio = publish_file;
     netdata_publish_syscall_t *publish_prev = NULL;
-    for (i =0 ; i < NETDATA_MAX_FILE_VECTOR; i++) {
+    for (i = 0; i < NETDATA_MAX_FILE_VECTOR; i++) {
         is[i].sc_num = sys_num[i];
 
         if(prev) {
@@ -283,23 +395,16 @@ int allocate_global_vectors() {
 static int map_memory() {
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
 
-    if ( nprocs >NETDATA_MAX_PROCESSOR ) {
-        nprocs =NETDATA_MAX_PROCESSOR;
+    if (nprocs > NETDATA_MAX_PROCESSOR) {
+        nprocs = NETDATA_MAX_PROCESSOR;
     }
 
     int i;
-    for ( i = 0 ; i < nprocs ; i++ ) {
+    for (i = 0 ; i < nprocs ; i++) {
         pmu_fd[i] = test_bpf_perf_event(i);
 
-        if (perf_event_mmap(pmu_fd[i]) < 0) {
-            error("[SYSCALL] Cannot map memory used to transfer data.");
-            return -1;
-        }
-    }
-
-    for ( i = 0 ; i < nprocs ; i++ ) {
-        if (perf_event_mmap_header(pmu_fd[i], &headers[i]) < 0) {
-            error("[SYSCALL] Cannot map header used to transfer data.");
+        if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0) {
+            error("[VFS] Cannot map header used to transfer data.");
             return -1;
         }
     }
@@ -315,48 +420,45 @@ static void build_complete_path(char *out, size_t length, char *filename) {
     }
 }
 
-int syscall_load_libraries()
+int vfs_load_libraries()
 {
     char *error = NULL;
     char lpath[4096];
 
     build_complete_path(lpath, 4096, "libnetdata_ebpf.so");
     libnetdata = dlopen(lpath, RTLD_LAZY);
-    if (!libnetdata)
-    {
-        error("[SYSCALL] Cannot load %s.", lpath);
+    if (!libnetdata) {
+        error("[VFS] Cannot load %s.", lpath);
         return -1;
-    }
-    else
-    {
+    } else {
         load_bpf_file = dlsym(libnetdata, "load_bpf_file");
         if ((error = dlerror()) != NULL) {
-            error("[SYSCALL] Cannot find load_bpf_file: %s", error);
+            error("[VFS] Cannot find load_bpf_file: %s", error);
             return -1;
         }
 
         test_bpf_perf_event = dlsym(libnetdata, "test_bpf_perf_event");
         if ((error = dlerror()) != NULL) {
-            error("[SYSCALL] Cannot find test_bpf_perf_event: %s", error);
+            error("[VFS] Cannot find test_bpf_perf_event: %s", error);
             return -1;
         }
 
         netdata_perf_loop_multi = dlsym(libnetdata, "my_perf_loop_multi");
         if ((error = dlerror()) != NULL) {
-            error("[SYSCALL] Cannot find netdata_perf_loop_multi: %s", error);
+            error("[VFS] Cannot find netdata_perf_loop_multi: %s", error);
             return -1;
         }
 
-        perf_event_mmap =  dlsym(libnetdata, "perf_event_mmap");
+        perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
         if ((error = dlerror()) != NULL) {
-            error("[SYSCALL] Cannot find perf_event_mmap: %s", error);
+            error("[VFS] Cannot find perf_event_mmap: %s", error);
             fputs(error, stderr);
             return -1;
         }
 
         perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
         if ((error = dlerror()) != NULL) {
-            error("[SYSCALL] Cannot find  perf_event_mmap_header: %s", error);
+            error("[VFS] Cannot find  perf_event_mmap_header: %s", error);
             fputs(error, stderr);
             return -1;
         }
@@ -365,12 +467,12 @@ int syscall_load_libraries()
     return 0;
 }
 
-int syscall_load_ebpf() {
+int vfs_load_ebpf() {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, "netdata_ebpf_syscall.o" );
+    build_complete_path(lpath, 4096, "netdata_ebpf_vfs.o" );
     if (load_bpf_file(lpath) ) {
-        error("[SYSCALL] Cannot load program: %s.", lpath);
+        error("[VFS] Cannot load program: %s.", lpath);
         return -1;
     }
 
@@ -383,7 +485,7 @@ int main(int argc, char **argv)
     (void)argv;
 
     //set name
-    program_name = "syscall.plugin";
+    program_name = "vfs.plugin";
 
     //disable syslog
     error_log_syslog = 0;
@@ -407,15 +509,15 @@ int main(int argc, char **argv)
     stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
 
-    if(syscall_load_libraries()) {
-        error("[SYSCALL] Cannot load library.");
+    if(vfs_load_libraries()) {
+        error("[VFS] Cannot load library.");
         int_exit(2);
     }
 
     signal(SIGINT, int_exit);
     signal(SIGTERM, int_exit);
 
-    if (syscall_load_ebpf()) {
+    if (vfs_load_ebpf()) {
         int_exit(3);
     }
 
@@ -424,7 +526,7 @@ int main(int argc, char **argv)
     }
 
     if(allocate_global_vectors()) {
-        error("[SYSCALL] Cannot allocate necessary vectors.");
+        error("[VFS] Cannot allocate necessary vectors.");
         int_exit(5);
     }
 
@@ -440,8 +542,8 @@ int main(int argc, char **argv)
     int end = 2;
 
     for ( i = 0; i < end ; i++ ) {
-        if ( ( pthread_create(&thread[i], &attr, (!i)?syscall_publisher:syscall_collector, NULL) ) ) {
-            perror("");
+        if ( ( pthread_create(&thread[i], &attr, (!i)?vfs_publisher:vfs_collector, NULL) ) ) {
+            error("[VFS] Cannot create threads.");
             int_exit(0);
             return 7;
         }
@@ -450,11 +552,13 @@ int main(int argc, char **argv)
 
     for ( i = 0; i < end ; i++ ) {
         if ( (pthread_join(thread[i], NULL) ) ) {
-            perror("");
+            error("[VFS] Cannot join threads.");
             int_exit(0);
             return 7;
         }
     }
+
+    int_exit(0);
 
     return 0;
 }
