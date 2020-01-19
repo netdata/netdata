@@ -254,7 +254,7 @@ PERF_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-SYSCALL_PLUGIN_FILES = \
+VFS_PLUGIN_FILES = \
     collectors/vfs.plugin/vfs_plugin.c \
     collectors/vfs.plugin/vfs_plugin.h \
     $(LIBNETDATA_FILES) \

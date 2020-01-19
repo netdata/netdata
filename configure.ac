@@ -372,10 +372,10 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 AC_CHECK_LIB(
     [dl],
     [dlopen],
-    [SYSCALL_LIBS="-ldl"]
+    [VFS_LIBS="-ldl"]
 )
 
-OPTIONAL_SYSCALL_LIBS="${SYSCALL_LIBS}"
+OPTIONAL_VFS_LIBS="${VFS_LIBS}"
 
 # -----------------------------------------------------------------------------
 # DB engine and HTTPS

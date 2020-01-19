@@ -66,7 +66,7 @@ slabinfo.plugin
 cgroup-network
 !cgroup-network/
 
-#vfs.plugin
+vfs.plugin
 
 # protoc generated files
 *.pb.cc
