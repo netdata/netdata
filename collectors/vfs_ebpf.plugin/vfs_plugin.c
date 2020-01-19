@@ -219,7 +219,7 @@ static void write_bytes_chart(char *name,netdata_publish_syscall_t *move, int en
             , name);
 
     int i = 0;
-    while (move) {
+    while (move && i < end) {
         printf("SET %s = %lld\n", move->dimension, (long long) move->nbyte);
 
         move = move->next;
