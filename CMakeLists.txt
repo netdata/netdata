@@ -406,8 +406,8 @@ set(SLABINFO_PLUGIN_FILES
         collectors/slabinfo.plugin/slabinfo.c
         )
 
-set(SYSCALL_PLUGIN_FILES
-        collectors/syscall.plugin/syscall_plugin.c
+set(VFS_PLUGIN_FILES
+        collectors/vfs.plugin/vfs_plugin.c
         )
 
 set(PROC_PLUGIN_FILES
@@ -774,7 +774,7 @@ IF(LINUX)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF True)
     SET(ENABLE_PLUGIN_SLABINFO True)
-    SET(ENABLE_PLUGIN_SYSCALL True)
+    SET(ENABLE_PLUGIN_VFS True)
 
 ELSEIF(FREEBSD)
     add_executable(netdata config.h ${NETDATA_FILES} ${FREEBSD_PLUGIN_FILES})
@@ -785,7 +785,7 @@ ELSEIF(FREEBSD)
     SET(ENABLE_PLUGIN_APPS True)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
-    SET(ENABLE_PLUGIN_SYSCALL False)
+    SET(ENABLE_PLUGIN_VFS False)
 
 ELSEIF(MACOS)
     add_executable(netdata config.h ${NETDATA_FILES} ${MACOS_PLUGIN_FILES})
@@ -796,7 +796,7 @@ ELSEIF(MACOS)
     SET(ENABLE_PLUGIN_APPS False)
     SET(ENABLE_PLUGIN_PERF False)
     SET(ENABLE_PLUGIN_SLABINFO False)
-    SET(ENABLE_PLUGIN_SYSCALL False)
+    SET(ENABLE_PLUGIN_VFS False)
 
 ENDIF()
 
@@ -904,16 +904,16 @@ ENDIF()
 
 
 # -----------------------------------------------------------------------------
-# syscall.plugin
+# vfs.plugin
 
-IF(ENABLE_PLUGIN_SLABINFO)
-    message(STATUS "syscall.plugin: enabled")
-    add_executable(syscall.plugin config.h ${SYSCALL_PLUGIN_FILES})
-    target_link_libraries (syscall.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
-    target_include_directories(syscall.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
-    target_compile_options(syscall.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
+IF(ENABLE_PLUGIN_VFS)
+    message(STATUS "vfs.plugin: enabled")
+    add_executable(vfs.plugin config.h ${VFS_PLUGIN_FILES})
+    target_link_libraries (vfs.plugin libnetdata ${NETDATA_COMMON_LIBRARIES})
+    target_include_directories(vfs.plugin PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+    target_compile_options(vfs.plugin PUBLIC ${NETDATA_COMMON_CFLAGS})
 ELSE()
-    message(STATUS "syscall.plugin: disabled")
+    message(STATUS "vfs.plugin: disabled")
 ENDIF()
 
 

@@ -777,9 +777,9 @@ if [ "${UID}" -eq 0 ]; then
 		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
 	fi
 
-	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/syscall.plugin" ]; then
-		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/syscall.plugin"
-		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/syscall.plugin"
+	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/vfs.plugin" ]; then
+		run chown root:${NETDATA_GROUP} "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/vfs.plugin"
+		run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/vfs.plugin"
 	fi
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ioping" ]; then

@@ -278,8 +278,8 @@ install -m 4750 -p apps.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p perf.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/perf.plugin"
 
 # ###########################################################
-# Install syscall.plugin
-install -m 4750 -p syscall.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/syscall.plugin"
+# Install vfs.plugin
+install -m 4750 -p vfs.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/vfs.plugin"
 
 # ###########################################################
 # Install cups.plugin

@@ -367,8 +367,7 @@ PKG_CHECK_MODULES([JSON],[json-c],AC_CHECK_LIB(
 OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
-# Syscall plugin libs
-
+# VFS plugin libs
 
 AC_CHECK_LIB(
     [dl],
@@ -816,16 +815,16 @@ AC_MSG_RESULT([${enable_plugin_perf}])
 AM_CONDITIONAL([ENABLE_PLUGIN_PERF], [test "${enable_plugin_perf}" = "yes"])
 
 # -----------------------------------------------------------------------------
-# syscall.plugin
+# vfs.plugin
 
-AC_MSG_CHECKING([if syscall.plugin should be enabled])
-if test "${build_target}" == "linux" -a "${SYSCALL_LIBS}"; then
-    enable_syscall="yes"
+AC_MSG_CHECKING([if vfs.plugin should be enabled])
+if test "${build_target}" == "linux" -a "${VFS_LIBS}"; then
+    enable_vfs="yes"
 else
-    enable_syscall="no"
+    enable_vfs="no"
 fi
-AC_MSG_RESULT([${enable_syscall}])
-AM_CONDITIONAL([ENABLE_PLUGIN_SYSCALL], [test "${enable_syscall}" = "yes"])
+AC_MSG_RESULT([${enable_vfs}])
+AM_CONDITIONAL([ENABLE_PLUGIN_VFS], [test "${enable_vfs}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # slabinfo.plugin
@@ -1162,7 +1161,7 @@ AC_SUBST([OPTIONAL_UV_LIBS])
 AC_SUBST([OPTIONAL_LZ4_LIBS])
 AC_SUBST([OPTIONAL_JUDY_LIBS])
 AC_SUBST([OPTIONAL_SSL_LIBS])
-AC_SUBST([OPTIONAL_SYSCALL_LIBS])
+AC_SUBST([OPTIONAL_VFS_LIBS])
 AC_SUBST([OPTIONAL_JSONC_LIBS])
 AC_SUBST([OPTIONAL_NFACCT_CFLAGS])
 AC_SUBST([OPTIONAL_NFACCT_LIBS])
@@ -1242,7 +1241,7 @@ AC_CONFIG_FILES([
     collectors/python.d.plugin/Makefile
     collectors/slabinfo.plugin/Makefile
     collectors/statsd.plugin/Makefile
-    collectors/syscall.plugin/Makefile
+    collectors/vfs.plugin/Makefile
     collectors/tc.plugin/Makefile
     collectors/xenstat.plugin/Makefile
     collectors/perf.plugin/Makefile

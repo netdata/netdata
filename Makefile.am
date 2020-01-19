@@ -255,8 +255,8 @@ PERF_PLUGIN_FILES = \
     $(NULL)
 
 SYSCALL_PLUGIN_FILES = \
-    collectors/syscall.plugin/syscall_plugin.c \
-    collectors/syscall.plugin/syscall_plugin.h \
+    collectors/vfs.plugin/vfs_plugin.c \
+    collectors/vfs.plugin/vfs_plugin.h \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
@@ -574,7 +574,7 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_JUDY_LIBS) \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
-    $(OPTIONAL_SYSCALL_LIBS) \
+    $(OPTIONAL_VFS_LIBS) \
     $(NULL)
 
 NETDATACLI_FILES = \
@@ -632,10 +632,10 @@ if ENABLE_PLUGIN_FREEIPMI
         $(NULL)
 endif
 
-if ENABLE_PLUGIN_SYSCALL
-    plugins_PROGRAMS += syscall.plugin
-    syscall_plugin_SOURCES = $(SYSCALL_PLUGIN_FILES)
-    syscall_plugin_LDADD = \
+if ENABLE_PLUGIN_VFS
+    plugins_PROGRAMS += vfs.plugin
+    vfs_plugin_SOURCES = $(VFS_PLUGIN_FILES)
+    vfs_plugin_LDADD = \
         $(NETDATA_COMMON_LIBS) \
         $(NULL)
 endif
