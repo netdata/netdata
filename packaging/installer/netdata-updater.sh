@@ -142,7 +142,6 @@ update() {
 			do_not_start="--dont-start-it"
 		fi
 
-		echo "${REINSTALL_OPTIONS}"
 		info "Re-installing netdata..."
 		eval "./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA"
 
