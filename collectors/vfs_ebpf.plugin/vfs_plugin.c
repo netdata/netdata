@@ -147,7 +147,7 @@ static void netdata_create_charts() {
     netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_CLEAN_COUNT, "Number of calls for file IO.", "Number of calls", 971, &publish_file[1], 2);
     netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_WRITE_COUNT, "Number of calls for file IO.", "Number of calls", 972, &publish_file[3], 2);
     netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_READ_COUNT, "Number of calls for file IO.", "Number of calls", 973, &publish_file[5], 2);
-    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_ERR_COUNT, "Number of calls for file IO.", "Number of calls", 974, publish_file, 7);
+    netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_FILE_ERR_COUNT, "Number of calls for file IO.", "Number of calls", 974, publish_file, NETDATA_MAX_FILE_VECTOR);
 
     netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_IN_FILE_BYTES, "Number of bytes written to file.", "bytes/s", 975, &publish_file[NETDATA_IN_START_BYTE], 2);
     netdata_create_chart(NETDATA_VFS_FAMILY, NETDATA_VFS_OUT_FILE_BYTES, "Number of bytes read from file.", "bytes/s", 976, &publish_file[NETDATA_OUT_START_BYTE], 2);
