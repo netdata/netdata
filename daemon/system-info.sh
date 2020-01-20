@@ -10,7 +10,7 @@ ARCHITECTURE="$(uname -m)"
 # -------------------------------------------------------------------------------------------------
 # detect the virtualization
 
-if [ -z ${VIRTUALIZATION} ]; then
+if [ -z "${VIRTUALIZATION}" ]; then
     VIRTUALIZATION="unknown"
     VIRT_DETECTION="none"
 
