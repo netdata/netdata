@@ -134,6 +134,12 @@ else
 fi
 
 # If Netdata is not running in a container then use the local detection as the host
+HOST_OS_DETECTION="unknown"
+HOST_NAME="unknown"
+HOST_VERSION="unknown"
+HOST_VERSION_ID="unknown"
+HOST_ID="unknown"
+HOST_ID_LIKE="unknown"
 if [ "${CONTAINER}" = "unknown" ]; then
         for v in NAME ID ID_LIKE VERSION VERSION_ID OS_DETECTION; do
                 eval "HOST_$v=\$CONTAINER_$v; unset CONTAINER_$v"
@@ -164,7 +170,6 @@ else
 fi
 
 
-# FIX THESE UP FOR BOTH CASES
 if [ "${CONTAINER}" != "unknown" ]; then
     echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
     echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
