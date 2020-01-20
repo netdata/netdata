@@ -55,7 +55,7 @@ void mqtt_message_callback(
         return;
     }
 
-    aclk_queue_query(msg->topic, msg->payload, 0, 0, 0);
+    aclk_queue_query(msg->topic, NULL, msg->payload, 0, 0, 0);
 }
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)

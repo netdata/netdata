@@ -64,6 +64,7 @@ struct aclk_query {
     int repeat_count;
     bool deleted;
     char *token;
+    char *data;
     char *query;
     struct aclk_query *next;
 };
@@ -85,6 +86,8 @@ void aclk_query_free(struct aclk_query *this_query)
 
     freez(this_query->token);
     freez(this_query->query);
+    if (this_query->data)
+        freez(this_query->data);
     freez(this_query);
     return;
 }
@@ -109,15 +112,17 @@ struct aclk_query *aclk_query_find_position(time_t time_to_run)
     return last_query;
 }
 
-struct aclk_query *aclk_query_find(char *token, char *query)
+struct aclk_query *aclk_query_find(char *token, char *data, char *query)
 {
     struct aclk_query *tmp_query;
 
     tmp_query = aclk_queue.aclk_query_head;
 
     while (tmp_query) {
-        if (!tmp_query->deleted && (strcmp(tmp_query->token, token) == 0) && (strcmp(tmp_query->query, query) == 0))
-            return tmp_query;
+        if (!tmp_query->deleted && (strcmp(tmp_query->token, token) == 0) && (strcmp(tmp_query->query, query) == 0)) {
+            if (data && strcmp(data, tmp_query->data) == 0)
+                return tmp_query;
+        }
 
         tmp_query = tmp_query->next;
     }
@@ -128,22 +133,22 @@ struct aclk_query *aclk_query_find(char *token, char *query)
  * Add a query to execute, the result will be send to the specified topic (token)
  */
 
-int aclk_queue_query(char *token, char *query, int run_after, int repeat_every, int repeat_count)
+int aclk_queue_query(char *token, char *data, char *query, int run_after, int repeat_every, int repeat_count)
 {
     struct aclk_query *new_query, *tmp_query, *last_query;
 
     run_after = now_realtime_sec() + run_after;
 
     QUERY_LOCK;
-    tmp_query = aclk_query_find(token, query);
+    tmp_query = aclk_query_find(token, data, query);
     if (unlikely(tmp_query)) {
         //tmp_query->run_after += run_after;
         if (tmp_query->run_after == run_after) {
-            info("Query %s:%s exists with same scheduled time", token, query);
+            //info("Query %s:%s exists with same scheduled time", token, query);
             QUERY_UNLOCK;
             return 0;
         }
-        info("Query %s:%s exists, deleting and schedule later", token, query);
+        //info("Query %s:%s exists, deleting and schedule later", token, query);
         tmp_query->deleted = 1;
         //QUERY_UNLOCK;
         //return 0;
@@ -152,6 +157,8 @@ int aclk_queue_query(char *token, char *query, int run_after, int repeat_every, 
     new_query = callocz(1, sizeof(struct aclk_query));
     new_query->token = strdupz(token);
     new_query->query = strdupz(query);
+    if (data)
+        new_query->data = strdupz(data);
     new_query->next = NULL;
     new_query->created = now_realtime_sec();
     new_query->run_after = run_after;
@@ -376,7 +383,7 @@ int aclk_process_query()
         w->acl = 0x1f;
 
         error_log_limit_unlimited();
-        web_client_api_request_v1_data(localhost, w, this_query->query + 5);
+        web_client_api_request_v1(localhost, w, this_query->query + 5);
         //info("RESP: (%d) %s", w->response.data->len, w->response.data->buffer);
         aclk_send_message("data", w->response.data->buffer);
         error_log_limit_reset();
@@ -388,13 +395,19 @@ int aclk_process_query()
     }
 
     if (strcmp((char *)this_query->token, "_chart") == 0) {
-        aclk_send_single_chart(this_query->query);
+        aclk_send_single_chart(this_query->data, this_query->query);
     }
 
     aclk_query_free(this_query);
 
     return 1;
 }
+
+// Launch a query processing thread
+
+
+
+
 
 /*
  * Process all pending queries
@@ -683,14 +696,54 @@ int aclk_heartbeat()
     return 0;
 }
 
+
+// Use this to disable encoding of quotes and newlines so that
+// MQTT subscriber can display more readable data on screen
+
+#define MQTT_FRIENDLY 1
+
 // encapsulate contents into metadata message as per ACLK documentation
 void aclk_create_metadata_message(BUFFER *dest, char *type, BUFFER *contents)
 {
+#ifndef MQTT_FRIENDLY
+    char    *tmp_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+#endif
+    char    *src, *dst;
+
+    //info("Size %ld", contents->len);
+
     buffer_sprintf(
         dest,
         "\t{\"type\": \"%s\",\n"
-        "\t\"contents\": %s\n\t}",
+        "\t\"payload\": %s\n\t}",
         type, contents->buffer);
+
+#ifndef MQTT_FRIENDLY
+    src = dest->buffer;
+    dst = tmp_buffer;
+    while (*src) {
+        switch (*src) {
+            case '\n':
+                *dst++ = '\\';
+                *dst++ = 'n';
+                break;
+            case '\"':
+                *dst++ = '\\';
+                *dst++ = '\"';
+                break;
+            default:
+                *dst++ = *src;
+        }
+        src++;
+    }
+    *dst = '\0';
+
+    buffer_flush(dest);
+    buffer_sprintf(dest,"%s",tmp_buffer);
+
+    freez(tmp_buffer);
+#endif
+    return;
 }
 
 // Send info metadata message to the cloud if the link is established
@@ -729,27 +782,34 @@ int aclk_send_metadata_info()
 
 //rrd_stats_api_v1_chart(RRDSET *st, BUFFER *buf)
 
-int aclk_send_single_chart(char *chart)
+int aclk_send_single_chart(char *hostname, char *chart)
 {
+    RRDHOST  *target_host;
     ACLK_LOCK;
 
     buffer_flush(aclk_buffer);
 
-    RRDSET *st = rrdset_find(localhost, chart);
-
-    if (!st)
-        st = rrdset_find_byname(localhost, chart);
-
-    if (!st)
+    target_host = rrdhost_find_by_hostname(hostname, 0);
+    if (!target_host)
         return 1;
+
+    RRDSET *st = rrdset_find(target_host, chart);
+
+    if (!st)
+        st = rrdset_find_byname(target_host, chart);
+
+    if (!st) {
+        info("FAILED to find chart %s", chart);
+        return 1;
+    }
 
     aclk_buffer->contenttype = CT_APPLICATION_JSON;
 
     BUFFER *info_json = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
 
-    rrdset2json(st, info_json, NULL, NULL);
+    aclk_rrdset2json(st, info_json, hostname, target_host==localhost?0:1);
 
-    aclk_create_metadata_message(aclk_buffer, "chart", info_json);
+    aclk_create_metadata_message(aclk_buffer, ACLK_MSG_TYPE_CHART, info_json);
 
     buffer_free(info_json);
 
@@ -781,7 +841,7 @@ int aclk_collect_active_charts()
 
             c++;
         }
-        aclk_send_single_chart(st->id);
+        aclk_send_single_chart("localhost",st->id);
     }
     info("Found %d charts", c);
 
@@ -841,4 +901,117 @@ int aclk_collect_active_charts()
     //    }
 
     return 0;
+}
+
+void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave) {
+    rrdset_rdlock(st);
+
+    time_t first_entry_t = rrdset_first_entry_t(st);
+    time_t last_entry_t  = rrdset_last_entry_t(st);
+
+    buffer_sprintf(wb,
+                   "\t\t{\n"
+                   "\t\t\t\"hostname\": \"%s\",\n"
+                   "\t\t\t\"is_slave\": \"%d\",\n"
+                   "\t\t\t\"id\": \"%s\",\n"
+                   "\t\t\t\"name\": \"%s\",\n"
+                   "\t\t\t\"type\": \"%s\",\n"
+                   "\t\t\t\"family\": \"%s\",\n"
+                   "\t\t\t\"context\": \"%s\",\n"
+                   "\t\t\t\"title\": \"%s (%s)\",\n"
+                   "\t\t\t\"priority\": %ld,\n"
+                   "\t\t\t\"plugin\": \"%s\",\n"
+                   "\t\t\t\"module\": \"%s\",\n"
+                   "\t\t\t\"enabled\": %s,\n"
+                   "\t\t\t\"units\": \"%s\",\n"
+                   "\t\t\t\"data_url\": \"/api/v1/data?chart=%s\",\n"
+                   "\t\t\t\"chart_type\": \"%s\",\n"
+                   "\t\t\t\"duration\": %ld,\n"
+                   "\t\t\t\"first_entry\": %ld,\n"
+                   "\t\t\t\"last_entry\": %ld,\n"
+                   "\t\t\t\"update_every\": %d,\n"
+                   "\t\t\t\"dimensions\": {\n"
+        , hostname
+        , is_slave
+        , st->id
+        , st->name
+        , st->type
+        , st->family
+        , st->context
+        , st->title, st->name
+        , st->priority
+        , st->plugin_name?st->plugin_name:""
+        , st->module_name?st->module_name:""
+        , rrdset_flag_check(st, RRDSET_FLAG_ENABLED)?"true":"false"
+        , st->units
+        , st->name
+        , rrdset_type_name(st->chart_type)
+        , last_entry_t - first_entry_t + st->update_every//st->entries * st->update_every
+        , first_entry_t//rrdset_first_entry_t(st)
+        , last_entry_t//rrdset_last_entry_t(st)
+        , st->update_every
+    );
+
+    unsigned long memory = st->memsize;
+
+    size_t dimensions = 0;
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        if(rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+
+        memory += rd->memsize;
+
+        buffer_sprintf(
+            wb
+            , "%s"
+              "\t\t\t\t\"%s\": { \"name\": \"%s\" }"
+            , dimensions ? ",\n" : ""
+            , rd->id
+            , rd->name
+        );
+
+        dimensions++;
+    }
+
+    //if(dimensions_count) *dimensions_count += dimensions;
+    //if(memory_used) *memory_used += memory;
+
+    buffer_sprintf(wb, "\n\t\t\t},\n\t\t\t\"chart_variables\": ");
+    health_api_v1_chart_custom_variables2json(st, wb);
+
+    buffer_strcat(wb, ",\n\t\t\t\"green\": ");
+    buffer_rrd_value(wb, st->green);
+    buffer_strcat(wb, ",\n\t\t\t\"red\": ");
+    buffer_rrd_value(wb, st->red);
+
+    buffer_strcat(wb, ",\n\t\t\t\"alarms\": {\n");
+    size_t alarms = 0;
+    RRDCALC *rc;
+    for(rc = st->alarms; rc ; rc = rc->rrdset_next) {
+
+        buffer_sprintf(
+            wb
+            , "%s"
+              "\t\t\t\t\"%s\": {\n"
+              "\t\t\t\t\t\"id\": %u,\n"
+              "\t\t\t\t\t\"status\": \"%s\",\n"
+              "\t\t\t\t\t\"units\": \"%s\",\n"
+              "\t\t\t\t\t\"update_every\": %d\n"
+              "\t\t\t\t}"
+            , (alarms) ? ",\n" : ""
+            , rc->name
+            , rc->id
+            , rrdcalc_status2string(rc->status)
+            , rc->units
+            , rc->update_every
+        );
+
+        alarms++;
+    }
+
+    buffer_sprintf(wb,
+                   "\n\t\t\t}\n\t\t}"
+    );
+
+    rrdset_unlock(st);
 }

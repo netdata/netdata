@@ -424,7 +424,7 @@ RRDDIM *rrddim_add_custom(RRDSET *st, const char *id, const char *name, collecte
         }
     }
     rrdset_unlock(st);
-    aclk_queue_query("_chart", st->id, 2, 0, 0);
+    //aclk_queue_query("_chart", host->hostname, st->id, 2, 0, 0);
     return(rd);
 }
 

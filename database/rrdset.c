@@ -761,8 +761,8 @@ RRDSET *rrdset_create_custom(
 
     rrdhost_unlock(host);
 
-    //info("Created CHART: %s", st->id);
-    aclk_queue_query("_chart", st->id, 2, 0, 0);
+    //info("Created CHART HOST=%s %s", host->hostname, st->id);
+    aclk_queue_query("_chart", host->hostname, st->id, 0, 0, 0);
     return(st);
 }
 

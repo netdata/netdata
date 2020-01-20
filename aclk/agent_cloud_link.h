@@ -5,6 +5,7 @@
 
 #include "mqtt.h"
 
+#define ACLK_MSG_TYPE_CHART "chart"
 #define ACLK_METADATA_TOPIC "meta"
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
@@ -73,9 +74,11 @@ int aclk_send_metadata_info();
 int aclk_wait_for_initialization();
 int aclk_sent_charts(RRDHOST *host, BUFFER *wb);
 int aclk_collect_active_charts();       // Find the active charts that we need to send to the cloud
-int aclk_send_single_chart(char *chart);
-int aclk_queue_query(char *token, char *query, int run_after, int repeat_every, int repeat_count);
-struct aclk_query  *aclk_query_find(char *token, char *query);
+int aclk_send_single_chart(char *host, char *chart);
+int aclk_queue_query(char *token, char *data, char *query, int run_after, int repeat_every, int repeat_count);
+struct aclk_query  *aclk_query_find(char *token, char *data, char *query);
+void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
+
 
 
 
