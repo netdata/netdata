@@ -642,15 +642,15 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
             cmd.opcode = RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
         } else {
-            if (0 == (unsigned long) ctx->stats.flushing_warnings) {
+            if (0 == (unsigned long) ctx->stats.pg_cache_over_half_dirty_events) {
                 /* only print the first time */
                 errno = 0;
                 error("Failed to flush dirty buffers quickly enough in dbengine instance \"%s\". "
                       "Metric data at risk of not being stored in the database, "
                       "please reduce disk load or use a faster disk.", ctx->dbfiles_path);
             }
-            rrd_stat_atomic_add(&ctx->stats.flushing_warnings, 1);
-            rrd_stat_atomic_add(&global_flushing_warnings, 1);
+            rrd_stat_atomic_add(&ctx->stats.pg_cache_over_half_dirty_events, 1);
+            rrd_stat_atomic_add(&global_pg_cache_over_half_dirty_events, 1);
         }
     }
 
@@ -738,10 +738,10 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[30] = (uint64_t)global_io_errors;
     array[31] = (uint64_t)global_fs_errors;
     array[32] = (uint64_t)rrdeng_reserved_file_descriptors;
-    array[33] = (uint64_t)ctx->stats.flushing_warnings;
-    array[34] = (uint64_t)global_flushing_warnings;
-    array[35] = (uint64_t)ctx->stats.flushing_errors;
-    array[36] = (uint64_t)global_flushing_errors;
+    array[33] = (uint64_t)ctx->stats.pg_cache_over_half_dirty_events;
+    array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
+    array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
+    array[36] = (uint64_t)global_flushing_pressure_page_deletions;
     assert(RRDENG_NR_STATS == 37);
 }
 

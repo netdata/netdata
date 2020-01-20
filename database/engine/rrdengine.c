@@ -6,8 +6,8 @@
 rrdeng_stats_t global_io_errors = 0;
 rrdeng_stats_t global_fs_errors = 0;
 rrdeng_stats_t rrdeng_reserved_file_descriptors = 0;
-rrdeng_stats_t global_flushing_warnings = 0;
-rrdeng_stats_t global_flushing_errors = 0;
+rrdeng_stats_t global_pg_cache_over_half_dirty_events = 0;
+rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
 static void sanity_check(void)
 {
@@ -253,13 +253,13 @@ static void after_invalidate_oldest_committed(struct rrdengine_worker_config* wc
 {
     int error;
 
-    error = uv_thread_join(wc->now_invalidating);
+    error = uv_thread_join(wc->now_invalidating_dirty_pages);
     if (error) {
         error("uv_thread_join(): %s", uv_strerror(error));
     }
-    freez(wc->now_invalidating);
-    wc->now_invalidating = NULL;
-    wc->cleanup_now_invalidating = 0;
+    freez(wc->now_invalidating_dirty_pages);
+    wc->now_invalidating_dirty_pages = NULL;
+    wc->cleanup_thread_invalidating_dirty_pages = 0;
 }
 
 static void invalidate_oldest_committed(void *arg)
@@ -309,9 +309,12 @@ static void invalidate_oldest_committed(void *arg)
         uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
         nr_committed_pages = --pg_cache->committed_page_index.nr_committed_pages;
         uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
+        rrd_stat_atomic_add(&ctx->stats.flushing_pressure_page_deletions, 1);
+        rrd_stat_atomic_add(&global_flushing_pressure_page_deletions, 1);
+
     } while (nr_committed_pages >= pg_cache_committed_hard_limit(ctx));
 out:
-    wc->cleanup_now_invalidating = 1;
+    wc->cleanup_thread_invalidating_dirty_pages = 1;
     /* wake up event loop */
     assert(0 == uv_async_send(&wc->async));
 }
@@ -329,24 +332,22 @@ void rrdeng_invalidate_oldest_committed(struct rrdengine_worker_config* wc)
 
     if (nr_committed_pages >= pg_cache_committed_hard_limit(ctx)) {
         /* delete the oldest page in memory */
-        if (wc->now_invalidating) {
+        if (wc->now_invalidating_dirty_pages) {
             /* already deleting a page */
             return;
         }
         errno = 0;
         error("Failed to flush dirty buffers quickly enough in dbengine instance \"%s\". "
               "Metric data are being deleted, please reduce disk load or use a faster disk.", ctx->dbfiles_path);
-        rrd_stat_atomic_add(&ctx->stats.flushing_errors, 1);
-        rrd_stat_atomic_add(&global_flushing_errors, 1);
 
-        wc->now_invalidating = mallocz(sizeof(*wc->now_invalidating));
-        wc->cleanup_now_invalidating = 0;
+        wc->now_invalidating_dirty_pages = mallocz(sizeof(*wc->now_invalidating_dirty_pages));
+        wc->cleanup_thread_invalidating_dirty_pages = 0;
 
-        error = uv_thread_create(wc->now_invalidating, invalidate_oldest_committed, ctx);
+        error = uv_thread_create(wc->now_invalidating_dirty_pages, invalidate_oldest_committed, ctx);
         if (error) {
             error("uv_thread_create(): %s", uv_strerror(error));
-            freez(wc->now_invalidating);
-            wc->now_invalidating = NULL;
+            freez(wc->now_invalidating_dirty_pages);
+            wc->now_invalidating_dirty_pages = NULL;
         }
     }
 }
@@ -607,15 +608,15 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     ctx->disk_space -= deleted_bytes;
     info("Reclaimed %u bytes of disk space.", deleted_bytes);
 
-    error = uv_thread_join(wc->now_deleting);
+    error = uv_thread_join(wc->now_deleting_files);
     if (error) {
         error("uv_thread_join(): %s", uv_strerror(error));
     }
-    freez(wc->now_deleting);
+    freez(wc->now_deleting_files);
     /* unfreeze command processing */
-    wc->now_deleting = NULL;
+    wc->now_deleting_files = NULL;
 
-    wc->cleanup_now_deleting = 0;
+    wc->cleanup_thread_deleting_files = 0;
 
     /* interrupt event loop */
     uv_stop(wc->loop);
@@ -642,7 +643,7 @@ static void delete_old_data(void *arg)
         next = extent->next;
         freez(extent);
     }
-    wc->cleanup_now_deleting = 1;
+    wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
     assert(0 == uv_async_send(&wc->async));
 }
@@ -675,7 +676,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     }
     if (unlikely(out_of_space)) {
         /* delete old data */
-        if (wc->now_deleting) {
+        if (wc->now_deleting_files) {
             /* already deleting data */
             return;
         }
@@ -687,21 +688,21 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
         info("Deleting data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".",
              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
-        wc->now_deleting = mallocz(sizeof(*wc->now_deleting));
-        wc->cleanup_now_deleting = 0;
+        wc->now_deleting_files = mallocz(sizeof(*wc->now_deleting_files));
+        wc->cleanup_thread_deleting_files = 0;
 
-        error = uv_thread_create(wc->now_deleting, delete_old_data, ctx);
+        error = uv_thread_create(wc->now_deleting_files, delete_old_data, ctx);
         if (error) {
             error("uv_thread_create(): %s", uv_strerror(error));
-            freez(wc->now_deleting);
-            wc->now_deleting = NULL;
+            freez(wc->now_deleting_files);
+            wc->now_deleting_files = NULL;
         }
     }
 }
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 {
-    if (wc->now_invalidating || wc->now_deleting) {
+    if (wc->now_invalidating_dirty_pages || wc->now_deleting_files) {
         return 1;
     }
     return 0;
@@ -709,10 +710,10 @@ static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 
 static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 {
-    if (unlikely(wc->cleanup_now_invalidating)) {
+    if (unlikely(wc->cleanup_thread_invalidating_dirty_pages)) {
         after_invalidate_oldest_committed(wc);
     }
-    if (unlikely(wc->cleanup_now_deleting)) {
+    if (unlikely(wc->cleanup_thread_deleting_files)) {
         after_delete_old_data(wc);
     }
 }
@@ -803,7 +804,7 @@ void timer_cb(uv_timer_t* handle)
     uv_update_time(handle->loop);
     rrdeng_test_quota(wc);
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
-    if (likely(!wc->now_deleting && !wc->now_invalidating)) {
+    if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
         struct rrdengine_instance *ctx = wc->ctx;
         struct page_cache *pg_cache = &ctx->pg_cache;
@@ -874,11 +875,11 @@ void rrdeng_worker(void* arg)
     }
     wc->async.data = wc;
 
-    wc->now_deleting = NULL;
-    wc->cleanup_now_deleting = 0;
+    wc->now_deleting_files = NULL;
+    wc->cleanup_thread_deleting_files = 0;
 
-    wc->now_invalidating = NULL;
-    wc->cleanup_now_invalidating = 0;
+    wc->now_invalidating_dirty_pages = NULL;
+    wc->cleanup_thread_invalidating_dirty_pages = 0;
     wc->inflight_dirty_pages = 0;
 
     /* dirty page flushing timer */
@@ -930,8 +931,8 @@ void rrdeng_worker(void* arg)
                 do_commit_transaction(wc, STORE_DATA, NULL);
                 break;
             case RRDENG_FLUSH_PAGES: {
-                if (wc->now_invalidating) {
-                    /* Do not flush if page cache if the disk cannot keep up */
+                if (wc->now_invalidating_dirty_pages) {
+                    /* Do not flush if the disk cannot keep up */
                     complete(cmd.completion);
                 } else {
                     (void)do_flush_pages(wc, 1, cmd.completion);
