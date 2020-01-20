@@ -453,6 +453,22 @@ paths:
           schema:
             type: number
             format: integer
+        - name: fixed_width_lbl
+          in: query
+          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's left side *(label/name)*. You must set this parameter together with `fixed_width_val` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
+        - name: fixed_width_val
+          in: query
+          description: This parameter overrides auto-sizing of badge and creates it with fixed width. This parameter determines the size of the label's right side *(value)*. You must set this parameter together with `fixed_width_lbl` otherwise it will be ignored. You should set the label/value widths wide enough to provide space for all the possible values/contents of the badge you're requesting. In case the text cannot fit the space given it will be clipped. The `scale` parameter still applies on the values you give to `fixed_width_lbl` and `fixed_width_val`.
+          required: false
+          allowEmptyValue: false
+          schema:
+            type: number
+            format: integer
       responses:
         "200":
           description: The call was successful. The response should be an SVG image.
