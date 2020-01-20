@@ -67,7 +67,8 @@ typedef struct netdata_publish_vfs_common {
     long read;
 }netdata_publish_vfs_common_t;
 
-# define NETDATA_VFS_FAMILY "Virtual_File_System"
+# define NETDATA_VFS_FAMILY "system"
+# define NETDATA_WEB_GROUP "vfs"
 
 # define NETDATA_VFS_FILE_OPEN_COUNT "Open_files"
 # define NETDATA_VFS_FILE_CLEAN_COUNT "Clean_files"
