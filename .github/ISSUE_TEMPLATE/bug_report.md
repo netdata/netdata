@@ -4,7 +4,7 @@ about: Create a bug report to help us improve
 labels: bug, needs triage
 ---
 
-<!---
+<!--
 When creating a bug report please:
 - Verify first that your issue is not already reported on GitHub.
 - Test if the latest release and master branch are affected too.
@@ -13,7 +13,7 @@ When creating a bug report please:
 ##### Bug report summary
 <!-- Provide a clear and concise description of what the bug. -->
 
-##### OS / Environment ()
+##### OS / Environment
 <!--
 Provide as much information about your environment (OS distribution, running in container, etc.)
 as possible to allow us reproduce this bug faster.
@@ -22,7 +22,7 @@ To get this information execute:
 - uname -a; grep -Hv "^#" /etc/*release  # linux/bsd
 - uname -a; sw_vers                      # macOS
 
-Place config in the code section.  
+Place output in the code section.  
  -->
 ```
 
