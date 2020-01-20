@@ -382,8 +382,17 @@ int aclk_process_query()
         w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
         w->acl = 0x1f;
 
+        char *mysep = strchr(this_query->query, '?');
+        if (mysep) {
+            strncpyz(w->decoded_query_string, mysep, NETDATA_WEB_REQUEST_URL_SIZE);
+            *mysep = '\0';
+        }
+        mysep = strrchr(this_query->query, '/');
+
+        web_client_api_request_v1(localhost, w, mysep?mysep+1:"noop");
+
         error_log_limit_unlimited();
-        web_client_api_request_v1(localhost, w, this_query->query + 5);
+        //web_client_api_request_v1(localhost, w, this_query->query + 5);
         //info("RESP: (%d) %s", w->response.data->len, w->response.data->buffer);
         aclk_send_message("data", w->response.data->buffer);
         error_log_limit_reset();
