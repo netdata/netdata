@@ -159,6 +159,8 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               "global_io_errors: %ld\n"
               "global_fs_errors: %ld\n"
               "rrdeng_reserved_file_descriptors: %ld\n"
+              "flushing_warnings: %ld\n"
+              "global_flushing_warnings: %ld\n"
               "flushing_errors: %ld\n"
               "global_flushing_errors: %ld\n",
               (long)ctx->stats.metric_API_producers,
@@ -194,6 +196,8 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               (long)global_io_errors,
               (long)global_fs_errors,
               (long)rrdeng_reserved_file_descriptors,
+              (long)ctx->stats.flushing_warnings,
+              (long)global_flushing_warnings,
               (long)ctx->stats.flushing_errors,
               (long)global_flushing_errors
     );
