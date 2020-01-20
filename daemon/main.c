@@ -734,6 +734,7 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
 // coverity[ +tainted_string_sanitize_content : arg-0 ]
 inline void coverity_remove_taint(char *s)
 {
+    (void)s;
 }
 
 int get_system_info(struct rrdhost_system_info *system_info) {

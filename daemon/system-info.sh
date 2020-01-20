@@ -93,9 +93,9 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
         set $(sw_vers) > /dev/null
         NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
         VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
-        ID="mac"
-        ID_LIKE="mac"
-        OS_DETECTION="sw_vers"
+        CONTAINER_ID="mac"
+        CONTAINER_ID_LIKE="mac"
+        CONTAINER_OS_DETECTION="sw_vers"
         IFS="$OIFS"
 elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
         CONTAINER_ID="FreeBSD"
