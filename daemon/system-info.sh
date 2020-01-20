@@ -87,16 +87,11 @@ CONTAINER_ID="unknown"
 CONTAINER_ID_LIKE="unknown"
 
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
-        # Mac OS
-        OIFS="$IFS"
-        IFS=$'\n'
-        set $(sw_vers) > /dev/null
-        NAME=$(echo $1 | tr "\n\t" '  ' | sed -e 's/ProductName:[ ]*//' -e 's/[ ]*$//')
-        VERSION=$(echo $2 | tr "\n\t" '  ' | sed -e 's/ProductVersion:[ ]*//' -e 's/[ ]*$//')
-        CONTAINER_ID="mac"
+        CONTAINER_ID=$(sw_vers -productName)
         CONTAINER_ID_LIKE="mac"
+        CONTAINER_NAME="mac"
+        CONTAINER_VERSION=$(sw_vers -productVersion)
         CONTAINER_OS_DETECTION="sw_vers"
-        IFS="$OIFS"
 elif [ "${KERNEL_NAME}" = "FreeBSD" ]; then
         CONTAINER_ID="FreeBSD"
         CONTAINER_ID_LIKE="FreeBSD"
