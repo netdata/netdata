@@ -136,7 +136,7 @@ find_file(HAVE_JSONC_H json/json.h PATHS ${OUR_INCLUDE_PATHS})
 
 Note: we may have cases where there is no `.pc` but we have access to a `.cmake` (e.g. AWS SDK, mongodb,cmocka) - these need to be checked / pulled inside the repo while building a prototype.
 
-### Compiler compatability checks
+### Compiler compatibility checks
 
 In CMakeLists.txt:
 
@@ -223,7 +223,7 @@ present. We might have an implicit way (like redirecting `cc`) but we should put
 
 ### Debugging problems in test compilations
 
-Test compilations attempt to feed a test-input into the targetted compiler and result
+Test compilations attempt to feed a test-input into the targeted compiler and result
 in a yes/no decision, this is similar to `AC_LANG_SOURCE(.... if test $ac_...` in .`m4`.
 We have two techniques to use in CMake:
 ```

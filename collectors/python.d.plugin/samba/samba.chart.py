@@ -21,7 +21,6 @@ import re
 from bases.collection import find_binary
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-
 disabled_by_default = True
 
 update_every = 5
@@ -96,6 +95,9 @@ CHARTS = {
     }
 }
 
+SUDO = 'sudo'
+SMBSTATUS = 'smbstatus'
+
 
 class Service(ExecutableService):
     def __init__(self, configuration=None, name=None):
@@ -105,20 +107,24 @@ class Service(ExecutableService):
         self.rgx_smb2 = re.compile(r'(smb2_[^:]+|syscall_.*file_bytes):\s+(\d+)')
 
     def check(self):
-        sudo_binary, smbstatus_binary = find_binary('sudo'), find_binary('smbstatus')
-
-        if not (sudo_binary and smbstatus_binary):
-            self.error("Can\'t locate 'sudo' or 'smbstatus' binary")
+        sudo_binary = find_binary(SUDO)
+        if not sudo_binary:
+            self.error("can't locate '{0}' binary".format(SUDO))
             return False
 
-        self.command = [sudo_binary, '-v']
-        err = self._get_raw_data(stderr=True)
-        if err:
-            self.error(''.join(err))
+        smbstatus_binary = find_binary(SMBSTATUS)
+        if not smbstatus_binary:
+            self.error("can't locate '{0}' binary".format(SMBSTATUS))
+            return False
+
+        command = [sudo_binary, '-n', '-l', smbstatus_binary, '-P']
+        smbstatus = '{0} -P'.format(smbstatus_binary)
+        allowed = self._get_raw_data(command=command)
+        if not (allowed and allowed[0].strip() == smbstatus):
+            self.error("not allowed to run sudo for command '{0}'".format(smbstatus))
             return False
 
         self.command = ' '.join([sudo_binary, '-n', smbstatus_binary, '-P'])
-
         return ExecutableService.check(self)
 
     def _get_data(self):

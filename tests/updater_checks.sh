@@ -68,7 +68,7 @@ esac
 # Download and run depednency scriptlet, before anything else
 #
 deps_tool="/tmp/deps_tool.$$.sh"
-curl -Ss -o ${deps_tool} https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh
+curl -Ss -o ${deps_tool} https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh
 if [ -f "${deps_tool}" ]; then
 	echo "Running dependency handling script.."
 	chmod +x "${deps_tool}"

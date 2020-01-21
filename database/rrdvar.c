@@ -296,10 +296,7 @@ void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf) {
     helper.counter = 0;
     avl_traverse_lock(&st->rrdfamily->rrdvar_root_index, single_variable2json, (void *)&helper);
 
-    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",", host->hostname);
-    buffer_strcat(buf, "\n\t\"labels\": {\n");
-    host_labels2json(st->rrdhost, buf, 2);
-    buffer_strcat(buf, "\t},\n\t\"host_variables\": {");
+    buffer_sprintf(buf, "\n\t},\n\t\"host\": \"%s\",\n\t\"host_variables\": {", host->hostname);
     helper.counter = 0;
     avl_traverse_lock(&host->rrdvar_root_index, single_variable2json, (void *)&helper);
 
