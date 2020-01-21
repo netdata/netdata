@@ -552,6 +552,9 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     }
 #endif
 
+    /* TODO: During the implementation of #7265 switch the set of variables to HOST_* and CONTAINER_* if the
+             version negotiation resulted in a high enough version.
+    */
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
@@ -581,12 +584,12 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->os
               , host->timezone
               , (host->tags) ? host->tags : ""
-              , (host->system_info->os_name) ? host->system_info->os_name : ""
-              , (host->system_info->os_id) ? host->system_info->os_id : ""
-              , (host->system_info->os_id_like) ? host->system_info->os_id_like : ""
-              , (host->system_info->os_version) ? host->system_info->os_version : ""
-              , (host->system_info->os_version_id) ? host->system_info->os_version_id : ""
-              , (host->system_info->os_detection) ? host->system_info->os_detection : ""
+              , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
+              , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
+              , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
+              , (host->system_info->host_os_version) ? host->system_info->host_os_version : ""
+              , (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : ""
+              , (host->system_info->host_os_detection) ? host->system_info->host_os_detection : ""
               , (host->system_info->kernel_name) ? host->system_info->kernel_name : ""
               , (host->system_info->kernel_version) ? host->system_info->kernel_version : ""
               , (host->system_info->architecture) ? host->system_info->architecture : ""
@@ -1394,11 +1397,25 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else {
             if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
                 stream_flags = LABEL_FLAG_UPDATE_STREAM;
-            else
+            else {
+                // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
+                if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
+                    name = "NETDATA_HOST_OS_NAME";
+                else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID"))
+                    name = "NETDATA_HOST_OS_ID";
+                else if (!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE"))
+                    name = "NETDATA_HOST_OS_ID_LIKE";
+                else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION"))
+                    name = "NETDATA_HOST_OS_VERSION";
+                else if (!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID"))
+                    name = "NETDATA_HOST_OS_VERSION_ID";
+                else if (!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION"))
+                    name = "NETDATA_HOST_OS_DETECTION";
                 if (unlikely(rrdhost_set_system_info_variable(system_info, name, value))) {
                     info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
                      w->client_ip, w->client_port, key, value);
                 }
+            }
         }
     }
 
