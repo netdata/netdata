@@ -1264,33 +1264,8 @@ int alarm_compare_chart(void *a, void *b) {
     return strcmp(in1->st->name,in2->st->name);
 }
 
-inline int alarm_index_link(RRDHOST *host, struct rrdcalc_rrdset_alarm *rra)
-{
-    struct rrdcalc_rrdset_alarm *str = host->alarm_set;
-    if(!str)
-        host->alarm_set = rra;
-    else {
-        struct rrdcalc_rrdset_alarm *next;
-        for( ; str ; next = str, str = str->next);
-
-        next->next = rra;
-    }
-    return 0;
-}
-
 inline void alarm_index_unlink_and_free(RRDHOST *host, struct rrdcalc_rrdset_alarm *rra)
 {
-    if(unlikely(rra == host->alarm_set))
-        host->alarm_set = rra->next;
-    else {
-        struct rrdcalc_rrdset_alarm *move;
-        for(move = host->alarm_set; move && move->next != rra; move = move->next) ;
-        if(move) {
-            move->next = rra->next;
-            rra->next = NULL;
-        }
-    }
-
     struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_remove_lock(&host->alarms_idx_health_name, (avl *)(rra));
     if(rra != ret)
         error("RRDSET: INTERNAL ERROR: Cannot remove the alarm index for %s", rra->st->name);

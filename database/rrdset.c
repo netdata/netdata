@@ -769,8 +769,6 @@ RRDSET *rrdset_create_custom(
     struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_insert_lock(&host->alarms_idx_health_name, (avl *)(rra));
     if(rra != ret)
         error("RRDSET: INTERNAL ERROR: Attempt to index duplicate chart '%s' on 'alarm_idx_health_name'", st->id);
-    else
-        alarm_index_link(host, rra);
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);
