@@ -563,12 +563,18 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     info("SYSTEM_INFO: free %p", system_info);
 
     if(likely(system_info)) {
-        freez(system_info->os_name);
-        freez(system_info->os_id);
-        freez(system_info->os_id_like);
-        freez(system_info->os_version);
-        freez(system_info->os_version_id);
-        freez(system_info->os_detection);
+        freez(system_info->host_os_name);
+        freez(system_info->host_os_id);
+        freez(system_info->host_os_id_like);
+        freez(system_info->host_os_version);
+        freez(system_info->host_os_version_id);
+        freez(system_info->host_os_detection);
+        freez(system_info->container_os_name);
+        freez(system_info->container_os_id);
+        freez(system_info->container_os_id_like);
+        freez(system_info->container_os_version);
+        freez(system_info->container_os_version_id);
+        freez(system_info->container_os_detection);
         freez(system_info->kernel_name);
         freez(system_info->kernel_version);
         freez(system_info->architecture);
@@ -762,13 +768,13 @@ struct label *load_auto_labels()
 {
     struct label *label_list = NULL;
 
-    if (localhost->system_info->os_name)
+    if (localhost->system_info->host_os_name)
         label_list =
-            add_label_to_list(label_list, "_os_name", localhost->system_info->os_name, LABEL_SOURCE_AUTO);
+            add_label_to_list(label_list, "_os_name", localhost->system_info->host_os_name, LABEL_SOURCE_AUTO);
 
-    if (localhost->system_info->os_version)
+    if (localhost->system_info->host_os_version)
         label_list =
-            add_label_to_list(label_list, "_os_version", localhost->system_info->os_version, LABEL_SOURCE_AUTO);
+            add_label_to_list(label_list, "_os_version", localhost->system_info->host_os_version, LABEL_SOURCE_AUTO);
 
     if (localhost->system_info->kernel_version)
         label_list =
@@ -782,9 +788,17 @@ struct label *load_auto_labels()
         label_list =
             add_label_to_list(label_list, "_virtualization", localhost->system_info->virtualization, LABEL_SOURCE_AUTO);
 
+    if (localhost->system_info->container)
+        label_list =
+            add_label_to_list(label_list, "_container", localhost->system_info->container, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->container_detection)
+        label_list =
+            add_label_to_list(label_list, "_container_detection", localhost->system_info->container_detection, LABEL_SOURCE_AUTO);
+
     if (localhost->system_info->virt_detection)
         label_list =
-            add_label_to_list(label_list, "_container", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
+            add_label_to_list(label_list, "_virt_detection", localhost->system_info->virt_detection, LABEL_SOURCE_AUTO);
 
     label_list = add_label_to_list(
         label_list, "_is_master", (localhost->next || configured_as_master()) ? "true" : "false", LABEL_SOURCE_AUTO);
@@ -1115,29 +1129,53 @@ restart_after_removal:
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value) {
     int res = 0;
 
-    if(!strcmp(name, "NETDATA_SYSTEM_OS_NAME")){
-        freez(system_info->os_name);
-        system_info->os_name = strdupz(value);
+    if(!strcmp(name, "NETDATA_CONTAINER_OS_NAME")){
+        freez(system_info->container_os_name);
+        system_info->container_os_name = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID")){
-        freez(system_info->os_id);
-        system_info->os_id = strdupz(value);
+    else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID")){
+        freez(system_info->container_os_id);
+        system_info->container_os_id = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_ID_LIKE")){
-        freez(system_info->os_id_like);
-        system_info->os_id_like = strdupz(value);
+    else if(!strcmp(name, "NETDATA_CONTAINER_OS_ID_LIKE")){
+        freez(system_info->container_os_id_like);
+        system_info->container_os_id_like = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION")){
-        freez(system_info->os_version);
-        system_info->os_version = strdupz(value);
+    else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION")){
+        freez(system_info->container_os_version);
+        system_info->container_os_version = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_VERSION_ID")){
-        freez(system_info->os_version_id);
-        system_info->os_version_id = strdupz(value);
+    else if(!strcmp(name, "NETDATA_CONTAINER_OS_VERSION_ID")){
+        freez(system_info->container_os_version_id);
+        system_info->container_os_version_id = strdupz(value);
     }
-    else if(!strcmp(name, "NETDATA_SYSTEM_OS_DETECTION")){
-        freez(system_info->os_detection);
-        system_info->os_detection = strdupz(value);
+    else if(!strcmp(name, "NETDATA_CONTAINER_OS_DETECTION")){
+        freez(system_info->host_os_detection);
+        system_info->host_os_detection = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_NAME")){
+        freez(system_info->host_os_name);
+        system_info->host_os_name = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_ID")){
+        freez(system_info->host_os_id);
+        system_info->host_os_id = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_ID_LIKE")){
+        freez(system_info->host_os_id_like);
+        system_info->host_os_id_like = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION")){
+        freez(system_info->host_os_version);
+        system_info->host_os_version = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_VERSION_ID")){
+        freez(system_info->host_os_version_id);
+        system_info->host_os_version_id = strdupz(value);
+    }
+    else if(!strcmp(name, "NETDATA_HOST_OS_DETECTION")){
+        freez(system_info->host_os_detection);
+        system_info->host_os_detection = strdupz(value);
     }
     else if(!strcmp(name, "NETDATA_SYSTEM_KERNEL_NAME")){
         freez(system_info->kernel_name);
