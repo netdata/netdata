@@ -19,8 +19,9 @@ Provide as much information about your environment (OS distribution, running in 
 as possible to allow us reproduce this bug faster.
 
 To get this information execute:
-- uname -a; grep -Hv "^#" /etc/*release  # linux/bsd
-- uname -a; sw_vers                      # macOS
+- uname -a; grep -Hv "^#" /etc/*release  # linux
+- uname -a; uname -K                     # bsd
+- sw_vers                                # macOS
 
 Place output in the code section.  
  -->
