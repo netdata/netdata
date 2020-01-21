@@ -491,6 +491,28 @@
             }
           },
           {
+            "name": "text_color_lbl",
+            "in": "query",
+            "description": "Font color for label part of the badge. Given as HTML hexadecimal color without `#` character. Formats allowed `RGB` or `RRGGBB`. If no value given default color will be used.",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string",
+              "format": "^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+            }
+          },
+          {
+            "name": "text_color_val",
+            "in": "query",
+            "description": "Font color for value part of the badge. Given as HTML hexadecimal color without `#` character. Formats allowed `RGB` or `RRGGBB`. If no value given default color will be used.",
+            "required": false,
+            "allowEmptyValue": true,
+            "schema": {
+              "type": "string",
+              "format": "^([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+            }
+          },
+          {
             "name": "multiply",
             "in": "query",
             "description": "Multiply the value with this number for rendering it at the image (integer value required).",

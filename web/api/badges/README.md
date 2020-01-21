@@ -192,6 +192,14 @@ These are options dedicated to badges:
 
     The supported operators are `<`, `>`, `<=`, `>=`, `=` (or `:`) and `!=` (or `<>`).
 
+-   `text_color_lbl=RGB` or `text_color_lbl=RRGGBB`
+
+    Specifies hexadecimal color *(like in HTML but without `#` prepended)* for the font of left/label side of the badge. If not given or given with empty value default color will be used.
+
+-   `text_color_val=RGB` or `text_color_val=RRGGBB`
+
+    Specifies hexadecimal color *(like in HTML but without `#` prepended)* for the font of right/value side of the badge. If not given or given with empty value default color will be used.
+
 -   `precision=NUMBER`
 
     The number of decimal digits of the value. By default Netdata will add:
