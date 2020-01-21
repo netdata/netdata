@@ -142,14 +142,8 @@ HOST_ID="unknown"
 HOST_ID_LIKE="unknown"
 if [ "${CONTAINER}" = "unknown" ]; then
         for v in NAME ID ID_LIKE VERSION VERSION_ID OS_DETECTION; do
-                eval "HOST_$v=\$CONTAINER_$v; unset CONTAINER_$v"
+                eval "HOST_$v=\$CONTAINER_$v; CONTAINER_$v=none"
         done
-        CONTAINER_OS_DETECTION="unknown"
-        CONTAINER_NAME="unknown"
-        CONTAINER_VERSION="unknown"
-        CONTAINER_VERSION_ID="unknown"
-        CONTAINER_ID="unknown"
-        CONTAINER_ID_LIKE="unknown"
 else
 # Otherwise try and use a user-supplied bind-mount into the container to resolve the host details
         if [ -e "/host/etc/os-release" ]; then
@@ -176,14 +170,12 @@ else
 fi
 
 
-if [ "${CONTAINER}" != "unknown" ]; then
-    echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
-    echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
-    echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
-    echo "NETDATA_CONTAINER_OS_VERSION=${CONTAINER_VERSION}"
-    echo "NETDATA_CONTAINER_OS_VERSION_ID=${CONTAINER_VERSION_ID}"
-    echo "NETDATA_CONTAINER_OS_DETECTION=${CONTAINER_OS_DETECTION}"
-fi
+echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
+echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
+echo "NETDATA_CONTAINER_OS_ID_LIKE=${CONTAINER_ID_LIKE}"
+echo "NETDATA_CONTAINER_OS_VERSION=${CONTAINER_VERSION}"
+echo "NETDATA_CONTAINER_OS_VERSION_ID=${CONTAINER_VERSION_ID}"
+echo "NETDATA_CONTAINER_OS_DETECTION=${CONTAINER_OS_DETECTION}"
 echo "NETDATA_HOST_OS_NAME=${HOST_NAME}"
 echo "NETDATA_HOST_OS_ID=${HOST_ID}"
 echo "NETDATA_HOST_OS_ID_LIKE=${HOST_ID_LIKE}"
