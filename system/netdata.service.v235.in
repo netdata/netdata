@@ -18,7 +18,7 @@ StateDirectoryMode=0750
 CacheDirectoryMode=0750
 LogsDirectoryMode=0750
 PIDFile=netdata/netdata.pid
-ExecStart=@sbindir_POST@/netdata -P $PIDFILE -D -W set global 'process scheduling policy' 'keep' -W set global 'OOM score' 'keep'
+ExecStart=@sbindir_POST@/netdata -P $PIDFILE -D
 
 # saving a big db on slow disks may need some time
 TimeoutStopSec=60
