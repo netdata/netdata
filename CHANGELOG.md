@@ -6,12 +6,15 @@
 
 **Merged pull requests:**
 
+- Fixes install on FreeBSD systems with non GNU sed \(do't use -i\) [\#7796](https://github.com/netdata/netdata/pull/7796) ([prologic](https://github.com/prologic))
+- Adds reviewdog/shellcheck to CI via Github Actions on changed shell scripts in PRs [\#7795](https://github.com/netdata/netdata/pull/7795) ([prologic](https://github.com/prologic))
 - Remove unnessecary `echo` call in updater. [\#7783](https://github.com/netdata/netdata/pull/7783) ([Ferroin](https://github.com/Ferroin))
 - Fix CSV -\> SSV in docs [\#7782](https://github.com/netdata/netdata/pull/7782) ([cosmix](https://github.com/cosmix))
 - Fix a Coverity issue [\#7780](https://github.com/netdata/netdata/pull/7780) ([vlvkobal](https://github.com/vlvkobal))
 - Fix libuv IPC pipe cleanup problem [\#7778](https://github.com/netdata/netdata/pull/7778) ([mfundul](https://github.com/mfundul))
 - Add a missing parameter to the allmetrics endpoint in Swagger Editor [\#7776](https://github.com/netdata/netdata/pull/7776) ([vlvkobal](https://github.com/vlvkobal))
 - Limit PR labeler runs to the main repo. [\#7768](https://github.com/netdata/netdata/pull/7768) ([Ferroin](https://github.com/Ferroin))
+- add swagger docu for `fixed\_width\_lbl` and `fixed\_width\_val` [\#7764](https://github.com/netdata/netdata/pull/7764) ([underhood](https://github.com/underhood))
 - Fix the formatting of the trailer line in the Debian changelog template. [\#7763](https://github.com/netdata/netdata/pull/7763) ([Ferroin](https://github.com/Ferroin))
 - Filter out lxc cgroups which are not useful [\#7760](https://github.com/netdata/netdata/pull/7760) ([vlvkobal](https://github.com/vlvkobal))
 - Improve styling of documentation site and use Algolia search [\#7753](https://github.com/netdata/netdata/pull/7753) ([joelhans](https://github.com/joelhans))
@@ -161,7 +164,6 @@
 - xenstat.plugin: check xenstat\_vbd\_error presence [\#7103](https://github.com/netdata/netdata/pull/7103) ([arkamar](https://github.com/arkamar))
 - Fix to docker-compose+Caddy installation [\#7088](https://github.com/netdata/netdata/pull/7088) ([joelhans](https://github.com/joelhans))
 - Second part of fix for \#7040 [\#7083](https://github.com/netdata/netdata/pull/7083) ([knatsakis](https://github.com/knatsakis))
-- kickstart-static64.sh passes --auto-update to netdata-latest.gz.run [\#7076](https://github.com/netdata/netdata/pull/7076) ([knatsakis](https://github.com/knatsakis))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
@@ -182,7 +184,6 @@
 - Clang warnings [\#7090](https://github.com/netdata/netdata/pull/7090) ([thiagoftsm](https://github.com/thiagoftsm))
 - SimpleService: change chart suppress msg level to info [\#7085](https://github.com/netdata/netdata/pull/7085) ([ilyam8](https://github.com/ilyam8))
 - 7040 enable stable channel option [\#7082](https://github.com/netdata/netdata/pull/7082) ([knatsakis](https://github.com/knatsakis))
-- fix\(freeipmi\): Update frequency config check [\#7078](https://github.com/netdata/netdata/pull/7078) ([stevenh](https://github.com/stevenh))
 
 ## [v1.18.0](https://github.com/netdata/netdata/tree/v1.18.0) (2019-10-10)
 
