@@ -1397,7 +1397,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else {
             if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
                 stream_flags = LABEL_FLAG_UPDATE_STREAM;
-            else
+            else {
                 // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
                 if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
                     name = "NETDATA_HOST_OS_NAME";
@@ -1415,6 +1415,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
                     info("STREAM [receive from [%s]:%s]: request has parameter '%s' = '%s', which is not used.",
                      w->client_ip, w->client_port, key, value);
                 }
+            }
         }
     }
 
