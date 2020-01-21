@@ -16,12 +16,13 @@
 # include <unistd.h>
 # include <dlfcn.h>
 
-# define NETDATA_MAX_FILE_VECTOR 8
-# define NETDATA_IN_START_BYTE 3
-# define NETDATA_OUT_START_BYTE 5
+# define NETDATA_MAX_FILE_VECTOR 4
+# define NETDATA_IN_START_BYTE 2
+# define NETDATA_OUT_START_BYTE 3
 
 # include <fcntl.h>
 # include <ctype.h>
+# include <dirent.h>
 
 //From libnetdata.h
 # include "../../libnetdata/threads/threads.h"
@@ -43,12 +44,28 @@ typedef struct netdata_syscall_kern_stat {
 }netdata_syscall_kern_stat_t;
 
 typedef struct netdata_syscall_stat {
-    uint16_t sc_num;
     unsigned long bytes; //total bytes
     uint64_t call; //number of calls
     uint64_t ecall; //number of calls with error
     struct netdata_syscall_stat  *next;
 }netdata_syscall_stat_t;
+
+struct netdata_pid_stat_t {
+    uint32_t pid;  //process id
+
+    uint64_t open_call;
+    uint64_t write_call;
+    uint64_t read_call;
+    uint64_t unlink_call;
+
+    uint64_t write_bytes;
+    uint64_t read_bytes;
+
+    uint32_t open_err;
+    uint32_t write_err;
+    uint32_t read_err;
+    uint32_t unlink_err;
+};
 
 typedef struct netdata_publish_syscall {
     char *dimension;
