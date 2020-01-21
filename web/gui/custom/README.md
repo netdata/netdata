@@ -84,7 +84,7 @@ Find and change the following line in `dash.html` to reflect your netdata URLs. 
 /*
 * TUTORIAL: Change this to the URL of your netdata host
 * If you use netdata behind a reverse proxy, add a second parameter for the reverse proxy url like so:
-* 		new Dash('http://localhost:19999', 'https://my-domain.com/stats');
+*         new Dash('http://localhost:19999', 'https://my-domain.com/stats');
 */
 var dash = new Dash('http://localhost:19999');
 ```
@@ -93,16 +93,16 @@ var dash = new Dash('http://localhost:19999');
 
 If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. Child divs will be generated to create your graph/chart:
 ```
-<div class="dash-graph"                     <---- 	Use class dash-graph for line graphs, etc
-	data-dash-netdata="system.cpu"          <---- 	REQUIRED: Use data-dash-netdata to set the data source
-	data-dygraph-valuerange="[0, 100]">     <---- 	OPTIONAL: This overrides the default config. Any other data-* attributes will
-</div>								                          be added to the generated div, so you can set any desired options here
+<div class="dash-graph"                     <----     Use class dash-graph for line graphs, etc
+    data-dash-netdata="system.cpu"          <----     REQUIRED: Use data-dash-netdata to set the data source
+    data-dygraph-valuerange="[0, 100]">     <----     OPTIONAL: This overrides the default config. Any other data-* attributes will
+</div>                                                          be added to the generated div, so you can set any desired options here
 
-<div class="dash-chart"                     <---- 	Use class dash-chart for pie charts, etc. CHARTS ARE SQUARE
-	data-dash-netdata="system.io"           <---- 	REQUIRED: Use data-dash-netdata to set the data source
-	data-dimensions="in"                    <---- 	Use this to override or append default options
-	data-title="Disk Read"                  <---- 	Use this to override or append default options
-	data-common-units="dash.io">			<---- 	Use this to override or append default options
+<div class="dash-chart"                     <----     Use class dash-chart for pie charts, etc. CHARTS ARE SQUARE
+    data-dash-netdata="system.io"           <----     REQUIRED: Use data-dash-netdata to set the data source
+    data-dimensions="in"                    <----     Use this to override or append default options
+    data-title="Disk Read"                  <----     Use this to override or append default options
+    data-common-units="dash.io">            <----     Use this to override or append default options
 </div>
 ```
 
@@ -110,7 +110,7 @@ To change the sizes of graphs and charts, find the `Dash.options` object in `das
 ```js
 /*
 * TUTORIAL: Change your graph/chart dimensions here. Host columns will automatically adjust.
-* 			Charts are square! Their width is the same as their height.
+*           Charts are square! Their width is the same as their height.
 */
 this.options = {
     graph_width: '40em',
