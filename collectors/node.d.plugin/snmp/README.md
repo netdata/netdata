@@ -33,7 +33,9 @@ In this example:
             "community": "public",
             "update_every": 10,
             "max_request_size": 50,
-            "options": { "timeout": 10000 },
+            "options": {
+                "timeout": 10000
+            },
             "charts": {
                 "snmp_switch.bandwidth_port1": {
                     "title": "Switch Bandwidth for port 1",
@@ -103,42 +105,47 @@ If you need to define many charts using incremental OIDs, you can use something 
 
 ```json
 {
-	"enable_autodetect": false,
-	"update_every": 10,
-	"servers": [{
-		"hostname": "10.11.12.8",
-		"community": "public",
-		"update_every": 10,
-		"options": {
-			"timeout": 20000
-		},
-		"charts": {
-			"snmp_switch.bandwidth_port": {
-				"title": "Switch Bandwidth for port ",
-				"units": "kilobits/s",
-				"type": "area",
-				"priority": 1,
-				"family": "ports",
-				"multiply_range": [1, 24],
-				"dimensions": {
-					"in": {
-						"oid": "1.3.6.1.2.1.2.2.1.10.",
-						"algorithm": "incremental",
-						"multiplier": 8,
-						"divisor": 1024,
-						"offset": 0
-					},
-					"out": {
-						"oid": "1.3.6.1.2.1.2.2.1.16.",
-						"algorithm": "incremental",
-						"multiplier": -8,
-						"divisor": 1024,
-						"offset": 0
-					}
-				}
-			}
-		}
-	}]
+    "enable_autodetect": false,
+    "update_every": 10,
+    "servers": [
+        {
+            "hostname": "10.11.12.8",
+            "community": "public",
+            "update_every": 10,
+            "options": {
+                "timeout": 20000
+            },
+            "charts": {
+                "snmp_switch.bandwidth_port": {
+                    "title": "Switch Bandwidth for port ",
+                    "units": "kilobits/s",
+                    "type": "area",
+                    "priority": 1,
+                    "family": "ports",
+                    "multiply_range": [
+                        1,
+                        24
+                    ],
+                    "dimensions": {
+                        "in": {
+                            "oid": "1.3.6.1.2.1.2.2.1.10.",
+                            "algorithm": "incremental",
+                            "multiplier": 8,
+                            "divisor": 1024,
+                            "offset": 0
+                        },
+                        "out": {
+                            "oid": "1.3.6.1.2.1.2.2.1.16.",
+                            "algorithm": "incremental",
+                            "multiplier": -8,
+                            "divisor": 1024,
+                            "offset": 0
+                        }
+                    }
+                }
+            }
+        }
+    ]
 }
 ```
 
@@ -173,14 +180,14 @@ User syntax:
 
 ```json
 {
-	"user": {
-		"name": "userName",
-		"level": 3,
-		"authProtocol": "3",
-		"authKey": "authKey",
-		"privProtocol": "2",
-		"privKey": "privKey"
-	}
+    "user": {
+        "name": "userName",
+        "level": 3,
+        "authProtocol": "3",
+        "authKey": "authKey",
+        "privProtocol": "2",
+        "privKey": "privKey"
+    }
 }
 ```
 
@@ -260,150 +267,155 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
 
 ```json
 {
-	"enable_autodetect": false,
-	"update_every": 5,
-	"servers": [{
-		"hostname": "10.11.12.8",
-		"community": "public",
-		"update_every": 15,
-		"options": {
-			"timeout": 20000,
-			"version": 1
-		},
-		"charts": {
-			"snmp_switch.power": {
-				"title": "Switch Power Supply",
-				"units": "watts",
-				"type": "line",
-				"priority": 10,
-				"family": "power",
-				"dimensions": {
-					"supply": {
-						"oid": ".1.3.6.1.2.1.105.1.3.1.1.2.1",
-						"algorithm": "absolute",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					},
-					"used": {
-						"oid": ".1.3.6.1.2.1.105.1.3.1.1.4.1",
-						"algorithm": "absolute",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					}
-				}
-			},
-			"snmp_switch.input": {
-				"title": "Switch Packets Input",
-				"units": "packets/s",
-				"type": "area",
-				"priority": 20,
-				"family": "IP",
-				"dimensions": {
-					"receives": {
-						"oid": ".1.3.6.1.2.1.4.3.0",
-						"algorithm": "incremental",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					},
-					"discards": {
-						"oid": ".1.3.6.1.2.1.4.8.0",
-						"algorithm": "incremental",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					}
-				}
-			},
-			"snmp_switch.input_errors": {
-				"title": "Switch Received Packets with Errors",
-				"units": "packets/s",
-				"type": "line",
-				"priority": 30,
-				"family": "IP",
-				"dimensions": {
-					"bad_header": {
-						"oid": ".1.3.6.1.2.1.4.4.0",
-						"algorithm": "incremental",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					},
-					"bad_address": {
-						"oid": ".1.3.6.1.2.1.4.5.0",
-						"algorithm": "incremental",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					},
-					"unknown_protocol": {
-						"oid": ".1.3.6.1.2.1.4.7.0",
-						"algorithm": "incremental",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					}
-				}
-			},
-			"snmp_switch.output": {
-				"title": "Switch Output Packets",
-				"units": "packets/s",
-				"type": "line",
-				"priority": 40,
-				"family": "IP",
-				"dimensions": {
-					"requests": {
-						"oid": ".1.3.6.1.2.1.4.10.0",
-						"algorithm": "incremental",
-						"multiplier": 1,
-						"divisor": 1,
-						"offset": 0
-					},
-					"discards": {
-						"oid": ".1.3.6.1.2.1.4.11.0",
-						"algorithm": "incremental",
-						"multiplier": -1,
-						"divisor": 1,
-						"offset": 0
-					},
-					"no_route": {
-						"oid": ".1.3.6.1.2.1.4.12.0",
-						"algorithm": "incremental",
-						"multiplier": -1,
-						"divisor": 1,
-						"offset": 0
-					}
-				}
-			},
-			"snmp_switch.bandwidth_port": {
-				"title": "Switch Bandwidth for port ",
-				"titleoid": ".1.3.6.1.2.1.31.1.1.1.18.",
-				"units": "kilobits/s",
-				"type": "area",
-				"priority": 100,
-				"family": "ports",
-				"multiply_range": [1, 24],
-				"dimensions": {
-					"in": {
-						"oid": ".1.3.6.1.2.1.2.2.1.10.",
-						"algorithm": "incremental",
-						"multiplier": 8,
-						"divisor": 1024,
-						"offset": 0
-					},
-					"out": {
-						"oid": ".1.3.6.1.2.1.2.2.1.16.",
-						"algorithm": "incremental",
-						"multiplier": -8,
-						"divisor": 1024,
-						"offset": 0
-					}
-				}
-			}
-		}
-	}]
+    "enable_autodetect": false,
+    "update_every": 5,
+    "servers": [
+        {
+            "hostname": "10.11.12.8",
+            "community": "public",
+            "update_every": 15,
+            "options": {
+                "timeout": 20000,
+                "version": 1
+            },
+            "charts": {
+                "snmp_switch.power": {
+                    "title": "Switch Power Supply",
+                    "units": "watts",
+                    "type": "line",
+                    "priority": 10,
+                    "family": "power",
+                    "dimensions": {
+                        "supply": {
+                            "oid": ".1.3.6.1.2.1.105.1.3.1.1.2.1",
+                            "algorithm": "absolute",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "used": {
+                            "oid": ".1.3.6.1.2.1.105.1.3.1.1.4.1",
+                            "algorithm": "absolute",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
+                    }
+                },
+                "snmp_switch.input": {
+                    "title": "Switch Packets Input",
+                    "units": "packets/s",
+                    "type": "area",
+                    "priority": 20,
+                    "family": "IP",
+                    "dimensions": {
+                        "receives": {
+                            "oid": ".1.3.6.1.2.1.4.3.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "discards": {
+                            "oid": ".1.3.6.1.2.1.4.8.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
+                    }
+                },
+                "snmp_switch.input_errors": {
+                    "title": "Switch Received Packets with Errors",
+                    "units": "packets/s",
+                    "type": "line",
+                    "priority": 30,
+                    "family": "IP",
+                    "dimensions": {
+                        "bad_header": {
+                            "oid": ".1.3.6.1.2.1.4.4.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "bad_address": {
+                            "oid": ".1.3.6.1.2.1.4.5.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "unknown_protocol": {
+                            "oid": ".1.3.6.1.2.1.4.7.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
+                    }
+                },
+                "snmp_switch.output": {
+                    "title": "Switch Output Packets",
+                    "units": "packets/s",
+                    "type": "line",
+                    "priority": 40,
+                    "family": "IP",
+                    "dimensions": {
+                        "requests": {
+                            "oid": ".1.3.6.1.2.1.4.10.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "discards": {
+                            "oid": ".1.3.6.1.2.1.4.11.0",
+                            "algorithm": "incremental",
+                            "multiplier": -1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "no_route": {
+                            "oid": ".1.3.6.1.2.1.4.12.0",
+                            "algorithm": "incremental",
+                            "multiplier": -1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
+                    }
+                },
+                "snmp_switch.bandwidth_port": {
+                    "title": "Switch Bandwidth for port ",
+                    "titleoid": ".1.3.6.1.2.1.31.1.1.1.18.",
+                    "units": "kilobits/s",
+                    "type": "area",
+                    "priority": 100,
+                    "family": "ports",
+                    "multiply_range": [
+                        1,
+                        24
+                    ],
+                    "dimensions": {
+                        "in": {
+                            "oid": ".1.3.6.1.2.1.2.2.1.10.",
+                            "algorithm": "incremental",
+                            "multiplier": 8,
+                            "divisor": 1024,
+                            "offset": 0
+                        },
+                        "out": {
+                            "oid": ".1.3.6.1.2.1.2.2.1.16.",
+                            "algorithm": "incremental",
+                            "multiplier": -8,
+                            "divisor": 1024,
+                            "offset": 0
+                        }
+                    }
+                }
+            }
+        }
+    ]
 }
 ```
 
