@@ -156,6 +156,9 @@ typedef enum label_source {
     LABEL_SOURCE_KUBERNETES       = 4
 } LABEL_SOURCE;
 
+#define LABEL_FLAG_UPDATE_STREAM 1
+#define LABEL_FLAG_STOP_STREAM 2
+
 struct label {
     char *key, *value;
     uint32_t key_hash;
@@ -166,6 +169,8 @@ struct label {
 char *translate_label_source(LABEL_SOURCE l);
 struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
 struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+extern void replace_label_list(RRDHOST *host, struct label *new_labels);
+extern void free_host_labels(struct label *labels);
 void reload_host_labels();
 
 // ----------------------------------------------------------------------------
@@ -613,12 +618,18 @@ typedef struct alarm_log {
 // RRD HOST
 
 struct rrdhost_system_info {
-    char *os_name;
-    char *os_id;
-    char *os_id_like;
-    char *os_version;
-    char *os_version_id;
-    char *os_detection;
+    char *host_os_name;
+    char *host_os_id;
+    char *host_os_id_like;
+    char *host_os_version;
+    char *host_os_version_id;
+    char *host_os_detection;
+    char *container_os_name;
+    char *container_os_id;
+    char *container_os_id_like;
+    char *container_os_version;
+    char *container_os_version_id;
+    char *container_os_detection;
     char *kernel_name;
     char *kernel_version;
     char *architecture;
@@ -749,6 +760,7 @@ struct rrdhost {
     // Support for host-level labels
     struct label *labels;
     netdata_rwlock_t labels_rwlock;         // lock for the label list
+    uint32_t labels_flag;                   //Flags for labels
 
     // ------------------------------------------------------------------------
     // indexes
@@ -800,7 +812,7 @@ extern netdata_rwlock_t rrd_rwlock;
 extern size_t rrd_hosts_available;
 extern time_t rrdhost_free_orphan_time;
 
-extern void rrd_init(char *hostname, struct rrdhost_system_info *system_info);
+extern int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
 extern RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash);
 extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);
