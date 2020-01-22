@@ -782,7 +782,7 @@ install_netdata_updater() {
         cat "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-updater.sh" >"${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
     fi
 
-    sed -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" -i "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
+    sed -i -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
 
     chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh
     echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh${TPUT_RESET}"
@@ -846,5 +846,5 @@ disable_netdata_updater() {
 }
 
 set_netdata_updater_channel() {
-    sed -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" -i "${NETDATA_USER_CONFIG_DIR}/.environment"
+    sed -i -e "s/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL=\"${RELEASE_CHANNEL}\"/" "${NETDATA_USER_CONFIG_DIR}/.environment"
 }
