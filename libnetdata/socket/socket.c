@@ -152,7 +152,7 @@ int is_unix_socket_valid(const char *path) {
 int is_valid_tcp_hostname(char *host) {
     int ret = 1;
     while (*host) {
-        if(!isalnum(*host) || *host != '.' || *host != '-') {
+        if(!isalnum(*host) && (*host != '.' && *host != '-')) {
             ret = 0;
             break;
         }
@@ -172,7 +172,7 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     debug(D_LISTENER, "LISTENER: UNIX creating new listening socket on path '%s'", path);
 
     if(!is_unix_socket_valid(path)) {
-        error("LISTENER: The path '%s' is bigger than allowed %ld or is invalid.",
+        error("LISTENER: The path '%s' is bigger than allowed %lu or is invalid.",
               path, sizeof(name.sun_path) -1);
         return -1;
     }
@@ -635,7 +635,7 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     struct sockaddr_un addr;
     if(!is_unix_socket_valid(path)) {
-        error("CONNECT TO UNIX: The path '%s' is bigger than allowed %ld or is invalid.",
+        error("CONNECT TO UNIX: The path '%s' is bigger than allowed %lu or is invalid.",
                path, sizeof(addr.sun_path) -1);
         return -1;
     }
