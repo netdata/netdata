@@ -10,12 +10,13 @@
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
 
-#define ACLK_INITIALIZATION_WAIT 60        // Wait for link to initialize in seconds (per msg)
-#define ACLK_INITIALIZATION_SLEEP_WAIT 1  // Wait time @ spin lock for MQTT initialization in seconds
+#define ACLK_STARTUP_WAIT 30             // Seconds to wait before establishing initialization process
+#define ACLK_INITIALIZATION_WAIT 60      // Wait for link to initialize in seconds (per msg)
+#define ACLK_INITIALIZATION_SLEEP_WAIT 1 // Wait time @ spin lock for MQTT initialization in seconds
 #define ACLK_QOS 1
 #define ACLK_PING_INTERVAL 60
-#define ACLK_LOOP_TIMEOUT  5           // seconds to wait for operations in the library loop
-#define ACLK_HEARTBEAT_INTERVAL 60      // Send heart beat interval (in seconds)
+#define ACLK_LOOP_TIMEOUT 5        // seconds to wait for operations in the library loop
+#define ACLK_HEARTBEAT_INTERVAL 60 // Send heart beat interval (in seconds)
 
 #define ACLK_MAX_TOPIC  255
 
@@ -78,6 +79,7 @@ int aclk_send_single_chart(char *host, char *chart);
 int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal);
 struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query);
 void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
+int    aclk_update_chart(char *hostname, char *chart_name);
 
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H

@@ -14,6 +14,7 @@ char *aclk_hostname = NULL; //default localhost
 int aclk_subscribed = 0;
 
 int aclk_metadata_submitted = 0;
+int waiting_init = 1;
 int cmdpause = 0; // Used to pause query processing
 
 BUFFER *aclk_buffer = NULL;
@@ -21,6 +22,7 @@ BUFFER *aclk_buffer = NULL;
 char *send_http_request(char *host, char *port, char *url, BUFFER *b)
 {
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
+
     buffer_flush(b);
     buffer_sprintf(
         b,
@@ -28,7 +30,7 @@ char *send_http_request(char *host, char *port, char *url, BUFFER *b)
         url, host);
     int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, "443", &timeout);
 
-    if (unlikely(!sock)) {
+    if (unlikely(sock == -1)) {
         error("Handshake failed");
         return NULL;
     }
@@ -148,6 +150,10 @@ struct aclk_query *aclk_query_find(char *topic, char *data, char *msg_id, char *
 int aclk_queue_query(char *topic, char *data, char *msg_id, char *query, int run_after, int internal)
 {
     struct aclk_query *new_query, *tmp_query, *last_query;
+
+    // Ignore all commands while we wait for the agent to initialize
+    if (unlikely(waiting_init))
+        return 0;
 
     run_after = now_realtime_sec() + run_after;
 
@@ -453,6 +459,9 @@ int aclk_process_queries()
         aclk_metadata_submitted = 1;
     }
 
+    if (unlikely(cmdpause))
+        return 0;
+
     // Return if no queries pending
     if (likely(!aclk_queue.count))
         return 0;
@@ -517,6 +526,8 @@ static void aclk_main_cleanup(void *ptr)
 
     info("cleaning up...");
 
+    QUERY_THREAD_WAKEUP;
+
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
@@ -546,6 +557,15 @@ void *aclk_main(void *ptr)
 
     //netdata_thread_cleanup_push(aclk_query_thread_cleanup, ptr);
     //netdata_thread_create(&query_thread.thread , "ACLKQ", NETDATA_THREAD_OPTION_DEFAULT, aclk_query_main_thread, &query_thread);
+    info("Waiting for netdata to be ready");
+    while (!netdata_ready) {
+        sleep_usec(USEC_PER_MS * 300);
+    }
+    info("Waiting %d seconds for the agent to initialize", ACLK_STARTUP_WAIT);
+    sleep_usec(USEC_PER_SEC * ACLK_STARTUP_WAIT);
+
+    // Ok mark we are ready to accept incoming requests
+    waiting_init = 0;
 
     while (!netdata_exit) {
         int rc;
@@ -567,7 +587,7 @@ void *aclk_main(void *ptr)
             }
             initializing=1;
             info("Initializing connection");
-            //send_http_request(aclk_hostname, "443", "/auth/challenge?id=blah", aclk_buffer);
+            send_http_request(aclk_hostname, "443", "/auth/challenge?id=blah", aclk_buffer);
             if (unlikely(aclk_init(ACLK_INIT))) {
                 // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
                 sleep_usec(USEC_PER_SEC * 60);
@@ -787,12 +807,12 @@ int aclk_heartbeat()
 // Use this to disable encoding of quotes and newlines so that
 // MQTT subscriber can display more readable data on screen
 
-#define MQTT_FRIENDLY 1
+#define EYE_FRIENDLY 1
 
 // encapsulate contents into metadata message as per ACLK documentation
 void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents)
 {
-#ifndef MQTT_FRIENDLY
+#ifndef EYE_FRIENDLY
     char *tmp_buffer = mallocz(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
     char *src, *dst;
 #endif
@@ -806,16 +826,28 @@ void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER
         "\t\"payload\": %s\n\t}",
         type, msg_id ? msg_id : "", contents->buffer);
 
-#ifndef MQTT_FRIENDLY
+//    Any " -> \"
+//    Any \´ -> \`
+//    Any newline (h0A) -> \n
+//    Any other control-byte (hXX < h20) -> \00XX
+
+//    '0x0a'
+
+#ifndef EYE_FRIENDLY
     src = dest->buffer;
     dst = tmp_buffer;
     while (*src) {
         switch (*src) {
+            case '0x0a':
             case '\n':
                 *dst++ = '\\';
                 *dst++ = 'n';
                 break;
             case '\"':
+                *dst++ = '\\';
+                *dst++ = '\"';
+                break;
+            case '\'':
                 *dst++ = '\\';
                 *dst++ = '\"';
                 break;
@@ -1085,4 +1117,10 @@ void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave)
     buffer_sprintf(wb, "\n\t\t\t}\n\t\t}");
 
     rrdset_unlock(st);
+}
+
+int    aclk_update_chart(char *hostname, char *chart_name)
+{
+    aclk_queue_query("_chart", hostname, NULL, chart_name, 6, 1);
+    return 0;
 }
