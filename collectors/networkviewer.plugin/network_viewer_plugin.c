@@ -40,10 +40,10 @@ void netdata_cleanup_and_exit(int ret) {
 
 void *libnetdatanv = NULL;
 int (*load_bpf_file)(char *) = NULL;
-int (*test_bpf_perf_event)(int);
-int (*perf_event_mmap)(int);
-int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **);
-void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int));
+int (*set_bpf_perf_event)(int);
+int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
+int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
+void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
 
 static int pmu_fd[NETDATA_MAX_PROCESSOR];
 static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
@@ -68,8 +68,32 @@ uint64_t *ebytes_tcp = NULL;
 static char *protocols[] = { "tcp", "udp" };
 
 static int update_every = 1;
+int thread_finished = 0;
+int page_cnt = 8;
 
 // ----------------------------------------------------------------------
+
+static int unmap_memory() {
+    int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+
+    if (nprocs > NETDATA_MAX_PROCESSOR ) {
+        nprocs = NETDATA_MAX_PROCESSOR;
+    }
+
+    int i;
+    int size = sysconf(_SC_PAGESIZE)*(page_cnt + 1);
+    for ( i = 0 ; i < nprocs ; i++ ) {
+        if (perf_event_unmap(headers[i], size) < 0) {
+            fprintf(stderr,"CANNOT unmap headers\n");
+            return -1;
+        }
+
+        if (close(pmu_fd[i]) )
+            fprintf(stderr,"CANNOT CLOSE pmu_fd\n");
+    }
+
+    return 0;
+}
 
 static int is_ip_inside_this_range(in_addr_t val, netdata_network_t *lnn) {
     while (lnn) {
@@ -481,7 +505,7 @@ void *network_viewer_collector(void *ptr) {
 
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
 
-    netdata_perf_loop_multi(pmu_fd, headers, nprocs, (int *)&netdata_exit, netdata_store_bpf);
+    netdata_perf_loop_multi(pmu_fd, headers, nprocs, (int *)&netdata_exit, netdata_store_bpf, page_cnt);
 
     return NULL;
 }
@@ -566,9 +590,11 @@ void clean_list_ports() {
 }
 
 static void int_exit(int sig) {
-    if(libnetdatanv) {
-        dlclose(libnetdatanv);
+    if(!thread_finished) {
+        return;
     }
+
+    unmap_memory();
 
     if(connection_controller.tree) {
         clean_connections();
@@ -625,6 +651,10 @@ static void int_exit(int sig) {
         freez(ebytes_tcp);
     }
 
+    if(libnetdatanv) {
+        dlclose(libnetdatanv);
+    }
+
     exit(sig);
 }
 
@@ -652,9 +682,9 @@ int network_viewer_load_libraries() {
             return -1;
         }
 
-        test_bpf_perf_event = dlsym(libnetdatanv, "test_bpf_perf_event");
+        set_bpf_perf_event = dlsym(libnetdatanv, "set_bpf_perf_event");
         if ((err = dlerror()) != NULL) {
-            error("[NETWORK VIEWER] Cannot find test_bpf_perf_event: %s", err);
+            error("[NETWORK VIEWER] Cannot find set_bpf_perf_event: %s", err);
             return -1;
         }
 
@@ -664,7 +694,7 @@ int network_viewer_load_libraries() {
             return -1;
         }
 
-        perf_event_mmap =  dlsym(libnetdatanv, "perf_event_mmap");
+        perf_event_unmap =  dlsym(libnetdatanv, "perf_event_unmap");
         if ((err = dlerror()) != NULL) {
             error("[NETWORK VIEWER] Cannot find perf_event_mmap: %s", err);
             return -1;
@@ -700,16 +730,9 @@ static int map_memory() {
 
     int i;
     for ( i = 0 ; i < nprocs ; i++ ) {
-        pmu_fd[i] = test_bpf_perf_event(i);
+        pmu_fd[i] = set_bpf_perf_event(i);
 
-        if (perf_event_mmap(pmu_fd[i]) < 0) {
-            error("[NETWORK VIEWER] Cannot map memory used to transfer data.");
-            return -1;
-        }
-    }
-
-    for ( i = 0 ; i < nprocs ; i++ ) {
-        if (perf_event_mmap_header(pmu_fd[i], &headers[i]) < 0) {
+        if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0) {
             error("[NETWORK VIEWER] Cannot map header used to transfer data.");
             return -1;
         }
@@ -1155,10 +1178,12 @@ void parse_config() {
     }
 
     if(!connection_controller.maxports) {
+        thread_finished++;
         int_exit(0);
     }
 
     if(allocate_publish_vectors()) {
+        thread_finished++;
         int_exit(8);
     }
 }
@@ -1183,6 +1208,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    page_cnt *= sysconf(_SC_NPROCESSORS_ONLN);
+
     if (argc > 1) {
         update_every = (int)strtol(argv[1], NULL, 10);
     }
@@ -1190,6 +1217,7 @@ int main(int argc, char **argv) {
     parse_config();
 
     if (network_viewer_load_libraries()) {
+        thread_finished++;
         int_exit(2);
     }
 
@@ -1198,10 +1226,12 @@ int main(int argc, char **argv) {
 
     if(network_viewer_load_ebpf()) {
         error("[NETWORK VIEWER] Cannot load eBPF program.");
+        thread_finished++;
         int_exit(3);
     }
 
     if (map_memory()) {
+        thread_finished++;
         int_exit(4);
     }
 
@@ -1209,6 +1239,7 @@ int main(int argc, char **argv) {
         outgoing_table = netdata_list_ips(NULL, 1);
         if(!outgoing_table) {
             error("[NETWORK VIEWER] Cannot load outgoing network range to monitor.");
+            thread_finished++;
             int_exit(5);
         }
     }
@@ -1217,6 +1248,7 @@ int main(int argc, char **argv) {
         ingoing_table = netdata_list_ips(NULL, 0);
         if(!ingoing_table) {
             error("[NETWORK VIEWER] Cannot load ingoing network range to monitor.");
+            thread_finished++;
             int_exit(6);
         }
     }
@@ -1225,6 +1257,7 @@ int main(int argc, char **argv) {
         port_list = netdata_list_ports(NULL);
         if(!port_list) {
             error("[NETWORK VIEWER] Cannot load network ports to monitor.");
+            thread_finished++;
             int_exit(7);
         }
     }
@@ -1239,6 +1272,7 @@ int main(int argc, char **argv) {
     for ( i = 0; i < end ; i++ ) {
         if ( ( pthread_create(&thread[i], &attr, (!i)?network_viewer_publisher:network_viewer_collector, NULL) ) ) {
             error("[NETWORK VIEWER] Cannot create the necessaries threads.");
+            thread_finished++;
             int_exit(8);
         }
     }
@@ -1246,9 +1280,13 @@ int main(int argc, char **argv) {
     for ( i = 0; i < end ; i++ ) {
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[NETWORK VIEWER] Cannot join the necessaries threads.");
+            thread_finished++;
             int_exit(9);
         }
     }
+
+    thread_finished++;
+    int_exit(0);
 
     return 0;
 }
