@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#shellcheck disable=SC2181
 #
 # This is the netdata uninstaller script
 #
@@ -97,16 +96,17 @@ setup_terminal() {
 setup_terminal || echo >/dev/null
 
 run_ok() {
-	printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+	printf >&2 "%s OK %s %s \n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
 }
 
 run_failed() {
-	printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+	printf >&2 "%s FAILED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
 }
 
 ESCAPED_PRINT_METHOD=
-printf "%q " test >/dev/null 2>&1
-[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
+if prnitf "%q " test >/dev/null 2>&1; then
+	ESCAPED_PRINT_METHOD="printfq"
+fi
 escaped_print() {
 	if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
 		printf "%q " "${@}"
@@ -128,22 +128,24 @@ run() {
 		info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
 	fi
 
-	printf >>"${run_logfile}" "${info}"
-	escaped_print >>"${run_logfile}" "${@}"
-	printf >>"${run_logfile}" " ... "
+	{
+		printf "%s" "${info}"
+		escaped_print "${@}"
+		printf "%s" " ... "
+	} >> "${run_logfile}"
 
-	printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+	printf "%s" >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
 	escaped_print >&2 "${@}"
-	printf >&2 "${TPUT_RESET}\n"
+	printf "%s" >&2 "${TPUT_RESET}\n"
 
 	"${@}"
 
 	local ret=$?
 	if [ ${ret} -ne 0 ]; then
-		run_failed
-		printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
+		run_failed "${*}"
+		printf >>"${run_logfile}" "FAILED with exit code %s\n" "${ret}"
 	else
-		run_ok
+		run_ok "${*}"
 		printf >>"${run_logfile}" "OK\n"
 	fi
 
@@ -159,10 +161,10 @@ portable_del_group() {
 	# Linux
 	if command -v groupdel 1>/dev/null 2>&1; then
 		if grep -q "${groupname}" /etc/group; then
-		  run groupdel "${groupname}" && return 0
+			run groupdel "${groupname}" && return 0
 		else
-		  echo >&2 "Group ${groupname} already removed in a previous step."
-		  run_ok
+			echo >&2 "Group ${groupname} already removed in a previous step."
+			run_ok "${*}"
 		fi
 	fi
 
@@ -259,7 +261,8 @@ rm_dir() {
 }
 
 safe_pidof() {
-	local pidof_cmd="$(command -v pidof 2>/dev/null)"
+	local pidof_cmd
+	pidof_cmd="$(command -v pidof 2>/dev/null)"
 	if [ -n "${pidof_cmd}" ]; then
 		${pidof_cmd} "${@}"
 		return $?
@@ -274,7 +277,9 @@ safe_pidof() {
 
 pidisnetdata() {
 	if [ -d /proc/self ]; then
-		[ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+		if [ -z "$1" ] || [ ! -f "/proc/$1/stat" ] ; then
+			return 1
+		fi
 		[ "$(cut -d '(' -f 2 "/proc/$1/stat" | cut -d ')' -f 1)" = "netdata" ] && return 0
 		return 1
 	fi
@@ -342,7 +347,7 @@ netdata_pids() {
 stop_all_netdata() {
 	local p
 
-	if [ -n "$(netdata_pids)" -a -n "$(builtin type -P netdatacli)" ] ; then
+	if [ -n "$(netdata_pids)" ] &&  [ -n "$(builtin type -P netdatacli)" ] ; then
 		netdatacli shutdown-agent
 		sleep 20
 	fi
