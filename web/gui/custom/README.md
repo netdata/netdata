@@ -78,7 +78,7 @@ First, rename the file so it doesn't get overwritten. For instance, with a webro
 cp /usr/share/netdata/web/dash-example.html /usr/share/netdata/web/dash.html
 ```
 
-Find and change the following line in `dash.html` to reflect your netdata URLs. The second URL is only used if you access your netdata dashboard through a reverse proxy. The reverse proxy URL is optional; if it is not set then both will use the netdata host URL.
+Find and change the following line in `dash.html` to reflect your Netdata URLs. The second URL is only used if you access your Netdata dashboard through a reverse proxy. The reverse proxy URL is optional; if it is not set then both will use the Netdata host URL.
 
 ```js
 /*
