@@ -341,11 +341,23 @@ netdata.processors.snmp = {
             // no SNMP session has been created for this service
             // the SNMP session is just the initialization of NET-SNMP
 
-            if(__DEBUG === true)
-                netdata.debug(service.module.name + ': ' + service.name + ': opening ' + this.name + ' session on ' + service.request.hostname + ' community ' + service.request.community + ' options ' + netdata.stringify(service.request.options));
+            var snmp_version = (service.request.options && service.request.options.version)
+                ? service.request.options.version
+                : net_snmp.Version1;
 
-            // create the SNMP session
-            service.snmp_session = net_snmp.createSession (service.request.hostname, service.request.community, service.request.options);
+            if(snmp_version === net_snmp.Version3) {
+                if(__DEBUG === true)
+                    netdata.debug(service.module.name + ': ' + service.name + ': opening ' + this.name + ' session on ' + service.request.hostname + ' user ' + service.request.user + ' options ' + netdata.stringify(service.request.options));
+
+                // create the SNMP session
+                service.snmp_session = net_snmp.createV3Session (service.request.hostname, service.request.user, service.request.options);
+            } else {
+                if(__DEBUG === true)
+                    netdata.debug(service.module.name + ': ' + service.name + ': opening ' + this.name + ' session on ' + service.request.hostname + ' community ' + service.request.community + ' options ' + netdata.stringify(service.request.options));
+
+                // create the SNMP session
+                service.snmp_session = net_snmp.createSession (service.request.hostname, service.request.community, service.request.options);
+            }
 
             if(__DEBUG === true)
                 netdata.debug(service.module.name + ': ' + service.name + ': got ' + this.name + ' session: ' + netdata.stringify(service.snmp_session));
