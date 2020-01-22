@@ -69,7 +69,7 @@ header:
 
 __**Dash will only work if you have implemented netdata streaming using `stream.conf`**__
 
-`dash-example.html` was created as an experiment to demonstrate the capabilities of netdata in a multi-host environment. If you desire more features, submit a pull request or check out netdata cloud!
+`dash-example.html` was created as an experiment to demonstrate the capabilities of netdata in a multi-host environment. If you desire more features, submit a pull request or check out Netdata Cloud!
 
 ### Configure Dash
 
