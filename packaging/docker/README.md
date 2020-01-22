@@ -35,6 +35,7 @@ docker run -d --name=netdata \
   -v /etc/group:/host/etc/group:ro \
   -v /proc:/host/proc:ro \
   -v /sys:/host/sys:ro \
+  -v /etc/os-release:/host/etc/os-release:ro \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
   netdata/netdata
@@ -61,8 +62,26 @@ services:
       - /sys:/host/sys:ro
 ```
 
-If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
-(they are used to get proper user and group names for the monitored host) to get slightly better security.
+Some of the bind-mounts are optional depending on how you use Netdata:
+
+* If you don't want to use the apps.plugin functionality, you can remove the mounts of `/etc/passwd` and `/etc/group`
+  (they are used to get proper user and group names for the monitored host) to get slightly better security.
+
+* Most modern linux distos supply `/etc/os-release` although some older distros only supply `/etc/lsb-release`. If
+  this is the case you can change the line above that mounts the file inside the container to
+  `-v /etc/lsb-release:/host/etc/lsb-release:ro`.
+
+* If your host is virtualized then Netdata cannot detect it from inside the container and will output the wrong
+  metadata (e.g. on `/api/v1/info` queries). You can fix this by setting a variable that overrides the detection
+  using, e.g. `--env VIRTUALIZATION=$(systemd-detect-virt -v)`. If you are using a `docker-compose.yml` then add:
+```
+    environment:
+      - VIRTUALIZATION=${VIRTUALIZATION}
+```
+This allows the information to be passed into `docker-compose` using:
+```
+VIRTUALIZATION=$(systemd-detect-virt -v) docker-compose up
+```
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)

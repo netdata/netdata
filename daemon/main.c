@@ -731,6 +731,12 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     return ret;
 }
 
+// coverity[ +tainted_string_sanitize_content : arg-0 ]
+inline void coverity_remove_taint(char *s)
+{
+    (void)s;
+}
+
 int get_system_info(struct rrdhost_system_info *system_info) {
     char *script;
     script = mallocz(sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("system-info.sh") + 2));
@@ -747,27 +753,27 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     FILE *fp = mypopen(script, &command_pid);
     if(fp) {
-        char buffer[200 + 1];
-        while (fgets(buffer, 200, fp) != NULL) {
-            char *name=buffer;
-            char *value=buffer;
+        char line[200 + 1];
+        // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
+        // One time init code, but I'm curious about the warning...
+        while (fgets(line, 200, fp) != NULL) {
+            char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
                 *value='\0';
                 value++;
-                if (strlen(value)>1) {
-                    char *newline = value + strlen(value) - 1;
-                    (*newline) = '\0';
-                }
-                char n[51], v[101];
-                snprintfz(n, 50,"%s",name);
-                snprintfz(v, 100,"%s",value);
-                if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
-                    info("Unexpected environment variable %s=%s", n, v);
+                char *end = value;
+                while (*end && *end != '\n') end++;
+                *end = '\0';    // Overwrite newline if present
+                coverity_remove_taint(line);    // I/O is controlled result of system_info.sh - not tainted
+                coverity_remove_taint(value);
+
+                if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
+                    info("Unexpected environment variable %s=%s", line, value);
                 }
                 else {
-                    info("%s=%s", n, v);
-                    setenv(n, v, 1);
+                    info("%s=%s", line, value);
+                    setenv(line, value, 1);
                 }
             }
         }
