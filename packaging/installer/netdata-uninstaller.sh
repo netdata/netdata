@@ -406,17 +406,25 @@ stop_all_netdata() {
 
 	if [ "${UID}" -eq 0 ] ; then
 		uname="$(uname 2>/dev/null)"
+
+		# Any of these may fail, but we need to not bail if they do.
 		if issystemd; then
-			systemctl stop netdata
+			if systemctl stop netdata ; then
+				sleep 20
+			fi
 		elif [ "${uname}" = "Darwin" ]; then
-			launchctl stop netdata
+			if launchctl stop netdata ; then
+				sleep 20
+			fi
 		elif [ "${uname}" = "FreeBSD" ]; then
-			# This may return failure if Netdata is not enabled.
-			/etc/rc.d/netdata stop || true
+			if /etc/rc.d/netdata stop ; then
+				sleep 20
+			fi
 		else
-			service netdata stop
+			if service netdata stop ; then
+				sleep 20
+			fi
 		fi
-		sleep 20
 	fi
 
 	if [ -n "$(netdata_pids)" ] &&  [ -n "$(builtin type -P netdatacli)" ] ; then
