@@ -2,7 +2,7 @@
 
 Using this collector, Netdata can collect data from any SNMP device. This collector uses [net-snmp](https://github.com/markabrahams/node-net-snmp) module.
 
-This collector supports:
+It supports:
 
 -   all SNMP versions: SNMPv1, SNMPv2c and SNMPv3
 -   any number of SNMP devices
@@ -10,6 +10,10 @@ This collector supports:
 -   each chart may have any number of dimensions
 -   each SNMP device may have a different update frequency
 -   each SNMP device will accept one or more batches to report values (you can set `max_request_size` per SNMP server, to control the size of batches).
+
+## Requirements
+
+-   `nodejs` minimal required version 4
 
 ## Configuration
 
