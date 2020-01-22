@@ -252,6 +252,20 @@ elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ] ; then
     CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq) Hz"
 fi
 
+# -------------------------------------------------------------------------------------------------
+# Detect the total system RAM
+
+TOTAL_RAM="unknown"
+RAM_DETECTION="none"
+
+if [ "${KERNEL_NAME}" = FreeBSD ] ; then
+        RAM_DETECTION="sysctl"
+        TOTAL_RAM="$(sysctl -n hw.physmem) B"
+elif [ -r /proc/meminfo ] ; then
+        RAM_DETECTION="procfs"
+        TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+fi
+
 
 echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
 echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
@@ -277,4 +291,6 @@ echo "NETDATA_CPU_VENDOR=\"${CPU_VENDOR}\""
 echo "NETDATA_CPU_MODEL=\"${CPU_MODEL}\""
 echo "NETDATA_CPU_FREQ=\"${CPU_FREQ}\""
 echo "NETDATA_CPU_DETECTION=\"${CPU_INFO_SOURCE}\""
+echo "NETDATA_TOTAL_RAM=\"${TOTAL_RAM}\""
+echo "NETDATA_RAM_DETECTION=${RAM_DETECTION}"
 
