@@ -467,7 +467,22 @@ netdata_pids() {
 }
 
 stop_all_netdata() {
-    local p
+    local p uname
+
+    if [ "${UID}" -eq 0 ] ; then
+        uname="$(uname 2>/dev/null)"
+        if issystemd; then
+            systemctl stop netdata
+        elif [ "${uname}" = "Darwin" ]; then
+            launchctl stop netdata
+        elif [ "${uname}" = "FreeBSD" ]; then
+            # This may return failure if Netdata is not enabled.
+            /etc/rc.d/netdata stop || true
+        else
+            service netdata stop
+        fi
+        sleep 20
+    fi
 
     if [ -n "$(netdata_pids)" ] || [ -n "$(builtin type -P netdatacli)" ]; then
         netdatacli shutdown-agent

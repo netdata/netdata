@@ -65,6 +65,29 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # -----------------------------------------------------------------------------
+# portable service command
+
+service_cmd="$(command -v service 2>/dev/null)"
+rcservice_cmd="$(command -v rc-service 2>/dev/null)"
+systemctl_cmd="$(command -v systemctl 2>/dev/null)"
+service() {
+
+    local cmd="${1}" action="${2}"
+
+    if [ -n "${systemctl_cmd}" ]; then
+        run "${systemctl_cmd}" "${action}" "${cmd}"
+        return $?
+    elif [ -n "${service_cmd}" ]; then
+        run "${service_cmd}" "${cmd}" "${action}"
+        return $?
+    elif [ -n "${rcservice_cmd}" ]; then
+        run "${rcservice_cmd}" "${cmd}" "${action}"
+        return $?
+    fi
+    return 1
+}
+
+# -----------------------------------------------------------------------------
 
 setup_terminal() {
 	TPUT_RESET=""
@@ -178,6 +201,40 @@ portable_del_group() {
 	fi
 
 	echo >&2 "Group ${groupname} was not automatically removed, you might have to remove it manually"
+	return 1
+}
+
+issystemd() {
+	local pids p myns ns systemctl
+
+	# if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
+	if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ] ; then
+		return 1
+	fi
+
+	# if there is no systemctl command, it is not systemd
+	systemctl=$(command -v systemctl 2>/dev/null)
+	if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ] ; then
+		return 1
+	fi
+
+	# if pid 1 is systemd, it is systemd
+	[ "$(basename "$(readlink /proc/1/exe)" 2>/dev/null)" = "systemd" ] && return 0
+
+	# if systemd is not running, it is not systemd
+	pids=$(safe_pidof systemd 2>/dev/null)
+	[ -z "${pids}" ] && return 1
+
+	# check if the running systemd processes are not in our namespace
+	myns="$(readlink /proc/self/ns/pid 2>/dev/null)"
+	for p in ${pids}; do
+		ns="$(readlink "/proc/${p}/ns/pid" 2>/dev/null)"
+
+		# if pid of systemd is in our namespace, it is systemd
+		[ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
+	done
+
+	# else, it is not systemd
 	return 1
 }
 
@@ -346,6 +403,21 @@ netdata_pids() {
 
 stop_all_netdata() {
 	local p
+
+	if [ "${UID}" -eq 0 ] ; then
+		uname="$(uname 2>/dev/null)"
+		if issystemd; then
+			systemctl stop netdata
+		elif [ "${uname}" = "Darwin" ]; then
+			launchctl stop netdata
+		elif [ "${uname}" = "FreeBSD" ]; then
+			# This may return failure if Netdata is not enabled.
+			/etc/rc.d/netdata stop || true
+		else
+			service netdata stop
+		fi
+		sleep 20
+	fi
 
 	if [ -n "$(netdata_pids)" ] &&  [ -n "$(builtin type -P netdatacli)" ] ; then
 		netdatacli shutdown-agent
