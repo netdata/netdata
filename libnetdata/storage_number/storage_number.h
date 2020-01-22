@@ -87,4 +87,8 @@ int print_calculated_number(char *str, calculated_number value);
 #define ACCURACY_LOSS_ACCEPTED_PERCENT 0.0001
 #define accuracy_loss(t1, t2) (((t1) == (t2) || (t1) == 0.0 || (t2) == 0.0) ? 0.0 : (100.0 - (((t1) > (t2)) ? ((t2) * 100.0 / (t1) ) : ((t1) * 100.0 / (t2)))))
 
+// Maximum acceptable rate of increase for counters. With a rate of 10% netdata can safely detect overflows with a
+// period of at least every other 10 samples.
+#define MAX_INCREMENTAL_PERCENT_RATE 10
+
 #endif /* NETDATA_STORAGE_NUMBER_H */

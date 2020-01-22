@@ -148,6 +148,30 @@ typedef enum rrddim_flags {
 #define rrddim_flag_clear(rd, flag) (rd)->flags &= ~(flag)
 #endif
 
+typedef enum label_source {
+    LABEL_SOURCE_AUTO             = 0,
+    LABEL_SOURCE_NETDATA_CONF     = 1,
+    LABEL_SOURCE_DOCKER           = 2,
+    LABEL_SOURCE_ENVIRONMENT      = 3,
+    LABEL_SOURCE_KUBERNETES       = 4
+} LABEL_SOURCE;
+
+#define LABEL_FLAG_UPDATE_STREAM 1
+#define LABEL_FLAG_STOP_STREAM 2
+
+struct label {
+    char *key, *value;
+    uint32_t key_hash;
+    LABEL_SOURCE label_source;
+    struct label *next;
+};
+
+char *translate_label_source(LABEL_SOURCE l);
+struct label *create_label(char *key, char *value, LABEL_SOURCE label_source);
+struct label *add_label_to_list(struct label *l, char *key, char *value, LABEL_SOURCE label_source);
+extern void replace_label_list(RRDHOST *host, struct label *new_labels);
+extern void free_host_labels(struct label *labels);
+void reload_host_labels();
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION - this is a metric
@@ -408,6 +432,7 @@ struct rrdset {
                                                     // it goes around in a round-robin fashion
 
     RRDSET_FLAGS flags;                             // configuration flags
+    RRDSET_FLAGS *exporting_flags;                  // array of flags for exporting connector instances
 
     int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
                                                     // netdata will interpolate values for gaps lower than this
@@ -593,12 +618,18 @@ typedef struct alarm_log {
 // RRD HOST
 
 struct rrdhost_system_info {
-    char *os_name;
-    char *os_id;
-    char *os_id_like;
-    char *os_version;
-    char *os_version_id;
-    char *os_detection;
+    char *host_os_name;
+    char *host_os_id;
+    char *host_os_id_like;
+    char *host_os_version;
+    char *host_os_version_id;
+    char *host_os_detection;
+    char *container_os_name;
+    char *container_os_id;
+    char *container_os_id_like;
+    char *container_os_version;
+    char *container_os_version_id;
+    char *container_os_detection;
     char *kernel_name;
     char *kernel_version;
     char *architecture;
@@ -627,6 +658,7 @@ struct rrdhost {
     const char *timezone;                           // the timezone of the host
 
     RRDHOST_FLAGS flags;                            // flags about this RRDHOST
+    RRDHOST_FLAGS *exporting_flags;                 // array of flags for exporting connector instances
 
     int rrd_update_every;                           // the update frequency of the host
     long rrd_history_entries;                       // the number of history entries for the host's charts
@@ -725,6 +757,12 @@ struct rrdhost {
     netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
 
     // ------------------------------------------------------------------------
+    // Support for host-level labels
+    struct label *labels;
+    netdata_rwlock_t labels_rwlock;         // lock for the label list
+    uint32_t labels_flag;                   //Flags for labels
+
+    // ------------------------------------------------------------------------
     // indexes
 
     avl_tree_lock rrdset_root_index;                // the host's charts index (by id)
@@ -739,6 +777,7 @@ struct rrdhost {
 
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;                         //Structure used to encrypt the connection
+    struct netdata_ssl stream_ssl;                         //Structure used to encrypt the stream
 #endif
 
     struct rrdhost *next;
@@ -773,7 +812,7 @@ extern netdata_rwlock_t rrd_rwlock;
 extern size_t rrd_hosts_available;
 extern time_t rrdhost_free_orphan_time;
 
-extern void rrd_init(char *hostname, struct rrdhost_system_info *system_info);
+extern int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
 
 extern RRDHOST *rrdhost_find_by_hostname(const char *hostname, uint32_t hash);
 extern RRDHOST *rrdhost_find_by_guid(const char *guid, uint32_t hash);

@@ -32,11 +32,16 @@ dist_userpythonconfig_DATA = \
     .keep \
     $(NULL)
 
+# Explicitly install directories to avoid permission issues due to umask
+install-exec-local:
+	$(INSTALL) -d $(DESTDIR)$(userpythonconfigdir)
+
 pythonconfigdir=$(libconfigdir)/python.d
 dist_pythonconfig_DATA = \
     $(NULL)
 
 include adaptec_raid/Makefile.inc
+include am2320/Makefile.inc
 include apache/Makefile.inc
 include beanstalk/Makefile.inc
 include bind_rndc/Makefile.inc
@@ -59,6 +64,7 @@ include go_expvar/Makefile.inc
 include haproxy/Makefile.inc
 include hddtemp/Makefile.inc
 include httpcheck/Makefile.inc
+include hpssa/Makefile.inc
 include icecast/Makefile.inc
 include ipfs/Makefile.inc
 include isc_dhcpd/Makefile.inc

@@ -7,14 +7,11 @@
 #define _GNU_SOURCE
 #endif
 #include <fcntl.h>
-#include <aio.h>
-#include <uv.h>
-#include <assert.h>
 #include <lz4.h>
 #include <Judy.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>
-#include <stdint.h>
+#include "../../daemon/common.h"
 #include "../rrd.h"
 #include "rrddiskprotocol.h"
 #include "rrdenginelib.h"
@@ -148,6 +145,7 @@ struct rrdengine_statistics {
     rrdeng_stats_t page_cache_descriptors;
     rrdeng_stats_t io_errors;
     rrdeng_stats_t fs_errors;
+    rrdeng_stats_t flushing_errors;
 };
 
 /* I/O errors global counter */
@@ -156,6 +154,8 @@ extern rrdeng_stats_t global_io_errors;
 extern rrdeng_stats_t global_fs_errors;
 /* number of File-Descriptors that have been reserved by dbengine */
 extern rrdeng_stats_t rrdeng_reserved_file_descriptors;
+/* inability to flush global counter */
+extern rrdeng_stats_t global_flushing_errors;
 
 struct rrdengine_instance {
     struct rrdengine_worker_config worker_config;
@@ -174,7 +174,6 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-extern void sanity_check(void);
 extern int init_rrd_files(struct rrdengine_instance *ctx);
 extern void finalize_rrd_files(struct rrdengine_instance *ctx);
 extern void rrdeng_test_quota(struct rrdengine_worker_config* wc);

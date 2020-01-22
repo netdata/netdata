@@ -588,28 +588,28 @@ struct test test4 = {
 // test5 - 32 bit overflows
 
 struct feed_values test5_feed[] = {
-        { 0,       0x00000000FFFFFFFFULL / 3 * 0 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 1 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 2 },
-        { 1000000, 0x00000000FFFFFFFFULL / 3 * 0 },
+        { 0,       0x00000000FFFFFFFFULL / 15 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 7 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 14 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 7 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 14 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 7 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 14 },
+        { 1000000, 0x00000000FFFFFFFFULL / 15 * 0 },
 };
 
 calculated_number test5_results[] = {
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
-        0x00000000FFFFFFFFULL / 3,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15 * 7,
+        0x00000000FFFFFFFFULL / 15,
 };
 
 struct test test5 = {
@@ -628,36 +628,36 @@ struct test test5 = {
 };
 
 // --------------------------------------------------------------------------------------------------------------------
-// test5b - 16 bit overflows
+// test5b - 64 bit overflows
 
 struct feed_values test5b_feed[] = {
-        { 0,       0x000000000000FFFFULL / 3 * 0 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 1 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 2 },
-        { 1000000, 0x000000000000FFFFULL / 3 * 0 },
+        { 0,       0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 7 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 14 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 7 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 14 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 7 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 14 },
+        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 15 * 0 },
 };
 
 calculated_number test5b_results[] = {
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
-        0x000000000000FFFFULL / 3,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15 * 7,
+        0xFFFFFFFFFFFFFFFFULL / 15,
 };
 
 struct test test5b = {
         "test5b",            // name
-        "test 16-bit incremental values overflow",
+        "test 64-bit incremental values overflow",
         1,                  // update_every
         1,                  // multiplier
         1,                  // divisor
@@ -666,92 +666,6 @@ struct test test5b = {
         9,                  // result entries
         test5b_feed,        // feed
         test5b_results,     // results
-        NULL,               // feed2
-        NULL                // results2
-};
-
-// --------------------------------------------------------------------------------------------------------------------
-// test5c - 8 bit overflows
-
-struct feed_values test5c_feed[] = {
-        { 0,       0x00000000000000FFULL / 3 * 0 },
-        { 1000000, 0x00000000000000FFULL / 3 * 1 },
-        { 1000000, 0x00000000000000FFULL / 3 * 2 },
-        { 1000000, 0x00000000000000FFULL / 3 * 0 },
-        { 1000000, 0x00000000000000FFULL / 3 * 1 },
-        { 1000000, 0x00000000000000FFULL / 3 * 2 },
-        { 1000000, 0x00000000000000FFULL / 3 * 0 },
-        { 1000000, 0x00000000000000FFULL / 3 * 1 },
-        { 1000000, 0x00000000000000FFULL / 3 * 2 },
-        { 1000000, 0x00000000000000FFULL / 3 * 0 },
-};
-
-calculated_number test5c_results[] = {
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-        0x00000000000000FFULL / 3,
-};
-
-struct test test5c = {
-        "test5c",            // name
-        "test 8-bit incremental values overflow",
-        1,                  // update_every
-        1,                  // multiplier
-        1,                  // divisor
-        RRD_ALGORITHM_INCREMENTAL, // algorithm
-        10,                 // feed entries
-        9,                  // result entries
-        test5c_feed,        // feed
-        test5c_results,     // results
-        NULL,               // feed2
-        NULL                // results2
-};
-
-// --------------------------------------------------------------------------------------------------------------------
-// test5d - 64 bit overflows
-
-struct feed_values test5d_feed[] = {
-        { 0,       0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 1 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 2 },
-        { 1000000, 0xFFFFFFFFFFFFFFFFULL / 3 * 0 },
-};
-
-calculated_number test5d_results[] = {
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-        0xFFFFFFFFFFFFFFFFULL / 3,
-};
-
-struct test test5d = {
-        "test5d",            // name
-        "test 64-bit incremental values overflow",
-        1,                  // update_every
-        1,                  // multiplier
-        1,                  // divisor
-        RRD_ALGORITHM_INCREMENTAL, // algorithm
-        10,                 // feed entries
-        9,                  // result entries
-        test5d_feed,        // feed
-        test5d_results,     // results
         NULL,               // feed2
         NULL                // results2
 };
@@ -1417,12 +1331,6 @@ int run_all_mockup_tests(void)
     if(run_test(&test5b))
         return 1;
 
-    if(run_test(&test5c))
-        return 1;
-
-    if(run_test(&test5d))
-        return 1;
-
     if(run_test(&test6))
         return 1;
 
@@ -1815,7 +1723,7 @@ int test_dbengine(void)
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
 
-    debug(D_RRDHOST, "Initializing localhost with hostname 'unittest-dbengine'");
+    fprintf(stderr, "Initializing localhost with hostname 'unittest-dbengine'");
     host = dbengine_rrdhost_find_or_create("unittest-dbengine");
     if (NULL == host)
         return 1;
@@ -2007,6 +1915,9 @@ static void generate_dbengine_chart(void *arg)
         rrdset_done(st);
         thread_info->time_max = time_current;
     }
+    for (j = 0; j < DSET_DIMS; ++j) {
+        rrdeng_store_metric_finalize(rd[j]);
+    }
 }
 
 void generate_dbengine_dataset(unsigned history_seconds)
@@ -2027,7 +1938,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
 
     error_log_limit_unlimited();
-    debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-dataset'");
+    fprintf(stderr, "Initializing localhost with hostname 'dbengine-dataset'");
 
     host = dbengine_rrdhost_find_or_create("dbengine-dataset");
     if (NULL == host)
@@ -2078,6 +1989,7 @@ struct dbengine_query_thread {
     unsigned history_seconds; /* how far back in the past to go */
     volatile long done; /* initialize to 0, set to 1 to stop thread */
     unsigned long errors, queries_nr, queried_metrics_nr; /* statistics */
+    uint8_t delete_old_data; /* if non zero then data are deleted when disk space is exhausted */
 
     struct dbengine_chart_thread *chart_threads[]; /* dset_charts elements */
 };
@@ -2087,7 +1999,7 @@ static void query_dbengine_chart(void *arg)
     struct dbengine_query_thread *thread_info = (struct dbengine_query_thread *)arg;
     const int DSET_CHARTS = thread_info->dset_charts;
     const int DSET_DIMS = thread_info->dset_dims;
-    time_t time_after, time_before, time_min, time_max, duration;
+    time_t time_after, time_before, time_min, time_approx_min, time_max, duration;
     int i, j, update_every = 1;
     RRDSET *st;
     RRDDIM *rd;
@@ -2107,6 +2019,13 @@ static void query_dbengine_chart(void *arg)
 
         time_min = thread_info->time_present - thread_info->history_seconds + 1;
         time_max = thread_info->chart_threads[i]->time_max;
+
+        if (thread_info->delete_old_data) {
+            /* A time window of twice the disk space is sufficient for compression space savings of up to 50% */
+            time_approx_min = time_max - (default_rrdeng_disk_quota_mb * 2 * 1024 * 1024) /
+                                         (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number));
+            time_min = MAX(time_min, time_approx_min);
+        }
         if (!time_max) {
             time_before = time_after = time_min;
         } else {
@@ -2122,18 +2041,22 @@ static void query_dbengine_chart(void *arg)
             expected = unpack_storage_number(pack_storage_number((calculated_number) generatedv, SN_EXISTS));
 
             if (unlikely(rd->state->query_ops.is_finished(&handle))) {
-                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
-                        st->name, rd->name, (unsigned long) time_now, expected);
-                ++thread_info->errors;
+                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
+                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
+                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
+                            st->name, rd->name, (unsigned long) time_now, expected);
+                    ++thread_info->errors;
+                }
                 break;
             }
             n = rd->state->query_ops.next_metric(&handle, &time_retrieved);
             if (SN_EMPTY_SLOT == n) {
-                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
-                        st->name, rd->name, (unsigned long) time_now, expected);
-                ++thread_info->errors;
+                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
+                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
+                                    CALCULATED_NUMBER_FORMAT ", found data gap, ### E R R O R ###\n",
+                            st->name, rd->name, (unsigned long) time_now, expected);
+                    ++thread_info->errors;
+                }
                 break;
             }
             ++thread_info->queried_metrics_nr;
@@ -2141,15 +2064,21 @@ static void query_dbengine_chart(void *arg)
 
             same = (calculated_number_round(value) == calculated_number_round(expected)) ? 1 : 0;
             if (!same) {
-                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
-                                CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT ", ### E R R O R ###\n",
-                        st->name, rd->name, (unsigned long) time_now, expected, value);
-                ++thread_info->errors;
+                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
+                    fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, expecting value "
+                                    CALCULATED_NUMBER_FORMAT ", found " CALCULATED_NUMBER_FORMAT
+                                    ", ### E R R O R ###\n",
+                            st->name, rd->name, (unsigned long) time_now, expected, value);
+                    ++thread_info->errors;
+                }
             }
             if (time_retrieved != time_now) {
-                fprintf(stderr, "    DB-engine stresstest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
-                        st->name, rd->name, (unsigned long) time_now, (unsigned long) time_retrieved);
-                ++thread_info->errors;
+                if (!thread_info->delete_old_data) { /* data validation only when we don't delete */
+                    fprintf(stderr,
+                            "    DB-engine stresstest %s/%s: at %lu secs, found timestamp %lu ### E R R O R ###\n",
+                            st->name, rd->name, (unsigned long) time_now, (unsigned long) time_retrieved);
+                    ++thread_info->errors;
+                }
             }
         }
         rd->state->query_ops.finalize(&handle);
@@ -2157,16 +2086,18 @@ static void query_dbengine_chart(void *arg)
 }
 
 void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsigned QUERY_THREADS,
-                          unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB)
+                          unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB, unsigned DISK_SPACE_MB)
 {
     const unsigned DSET_DIMS = 128;
     const uint64_t EXPECTED_COMPRESSION_RATIO = 20;
-    const unsigned HISTORY_SECONDS = 3600 * 24 * 365; /* 1 year of history */
+    const unsigned HISTORY_SECONDS = 3600 * 24 * 365 * 50; /* 50 year of history */
     RRDHOST *host = NULL;
     struct dbengine_chart_thread **chart_threads;
     struct dbengine_query_thread **query_threads;
     unsigned i, j;
     time_t time_start, time_end;
+
+    error_log_limit_unlimited();
 
     if (!TEST_DURATION_SEC)
         TEST_DURATION_SEC = 10;
@@ -2179,13 +2110,18 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
     default_rrd_memory_mode = RRD_MEMORY_MODE_DBENGINE;
     default_rrdeng_page_cache_mb = PAGE_CACHE_MB;
-    // Worst case for uncompressible data
-    default_rrdeng_disk_quota_mb = (((uint64_t)DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * HISTORY_SECONDS) /
-                                   (1024 * 1024);
-    default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+    if (DISK_SPACE_MB) {
+        fprintf(stderr, "By setting disk space limit data are allowed to be deleted. "
+                        "Data validation is turned off for this run.\n");
+        default_rrdeng_disk_quota_mb = DISK_SPACE_MB;
+    } else {
+        // Worst case for uncompressible data
+        default_rrdeng_disk_quota_mb =
+                (((uint64_t) DSET_DIMS * DSET_CHARTS) * sizeof(storage_number) * HISTORY_SECONDS) / (1024 * 1024);
+        default_rrdeng_disk_quota_mb -= default_rrdeng_disk_quota_mb * EXPECTED_COMPRESSION_RATIO / 100;
+    }
 
-    error_log_limit_unlimited();
-    debug(D_RRDHOST, "Initializing localhost with hostname 'dbengine-stress-test'");
+    fprintf(stderr, "Initializing localhost with hostname 'dbengine-stress-test'\n");
 
     host = dbengine_rrdhost_find_or_create("dbengine-stress-test");
     if (NULL == host)
@@ -2204,7 +2140,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
                     "%u MiB of page cache.\n",
                     RAMP_UP_SECONDS, TEST_DURATION_SEC, DSET_CHARTS, QUERY_THREADS, PAGE_CACHE_MB);
 
-    time_start = now_realtime_sec();
+    time_start = now_realtime_sec() + HISTORY_SECONDS; /* move history to the future */
     for (i = 0 ; i < DSET_CHARTS ; ++i) {
         chart_threads[i]->host = host;
         chart_threads[i]->chartname = "random";
@@ -2238,6 +2174,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
         for (j = 0 ; j < DSET_CHARTS ; ++j) {
             query_threads[i]->chart_threads[j] = chart_threads[j];
         }
+        query_threads[i]->delete_old_data = DISK_SPACE_MB ? 1 : 0;
         assert(0 == uv_thread_create(&query_threads[i]->thread, query_dbengine_chart, query_threads[i]));
     }
     sleep(TEST_DURATION_SEC);

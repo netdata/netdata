@@ -75,6 +75,9 @@ struct netdata_static_thread static_threads[] = {
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
+#ifdef ENABLE_EXPORTING
+    {"EXPORTING",            NULL,                    NULL,         1, NULL, NULL, exporting_main},
+#endif
     {"WEB_SERVER[static1]",  NULL,                    NULL,         0, NULL, NULL, socket_listen_main_static_threaded},
     {"STREAM",               NULL,                    NULL,         0, NULL, NULL, rrdpush_sender_thread},
 
@@ -96,22 +99,69 @@ void web_server_threading_selection(void) {
     }
 }
 
-void web_server_config_options(void) {
-    web_client_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
-    web_client_first_request_timeout = (int) config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
-    web_client_streaming_rate_t = config_get_number(CONFIG_SECTION_WEB, "accept a streaming request every seconds", web_client_streaming_rate_t);
+int make_dns_decision(const char *section_name, const char *config_name, const char *default_value, SIMPLE_PATTERN *p)
+{
+    char *value = config_get(section_name,config_name,default_value);
+    if(!strcmp("yes",value))
+        return 1;
+    if(!strcmp("no",value))
+        return 0;
+    if(strcmp("heuristic",value))
+        error("Invalid configuration option '%s' for '%s'/'%s'. Valid options are 'yes', 'no' and 'heuristic'. Proceeding with 'heuristic'",
+              value, section_name, config_name);
+    return simple_pattern_is_potential_name(p);
+}
 
-    respect_web_browser_do_not_track_policy = config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
+void web_server_config_options(void)
+{
+    web_client_timeout =
+        (int)config_get_number(CONFIG_SECTION_WEB, "disconnect idle clients after seconds", web_client_timeout);
+    web_client_first_request_timeout =
+        (int)config_get_number(CONFIG_SECTION_WEB, "timeout for first request", web_client_first_request_timeout);
+    web_client_streaming_rate_t =
+        config_get_number(CONFIG_SECTION_WEB, "accept a streaming request every seconds", web_client_streaming_rate_t);
+
+    respect_web_browser_do_not_track_policy =
+        config_get_boolean(CONFIG_SECTION_WEB, "respect do not track policy", respect_web_browser_do_not_track_policy);
     web_x_frame_options = config_get(CONFIG_SECTION_WEB, "x-frame-options response header", "");
-    if(!*web_x_frame_options) web_x_frame_options = NULL;
+    if(!*web_x_frame_options)
+        web_x_frame_options = NULL;
 
-    web_allow_connections_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_dashboard_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_badges_from      = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_registry_from    = simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from", "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.* 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.* 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.* 172.31.*"), NULL, SIMPLE_PATTERN_EXACT);
-    web_allow_mgmt_from        = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_connections_from =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow connections from", "localhost *"),
+                              NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_connections_dns  =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow connections by dns", "heuristic", web_allow_connections_from);
+    web_allow_dashboard_from   =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow dashboard from", "localhost *"),
+                              NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_dashboard_dns    =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow dashboard by dns", "heuristic", web_allow_dashboard_from);
+    web_allow_badges_from      =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow badges from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_badges_dns       =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow badges by dns", "heuristic", web_allow_badges_from);
+    web_allow_registry_from    =
+        simple_pattern_create(config_get(CONFIG_SECTION_REGISTRY, "allow from", "*"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_registry_dns     = make_dns_decision(CONFIG_SECTION_REGISTRY, "allow by dns", "heuristic",
+                                                   web_allow_registry_from);
+    web_allow_streaming_from   = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow streaming from", "*"),
+                                                       NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_streaming_dns    = make_dns_decision(CONFIG_SECTION_WEB, "allow streaming by dns", "heuristic",
+                                                   web_allow_streaming_from);
+    // Note the default is not heuristic, the wildcards could match DNS but the intent is ip-addresses.
+    web_allow_netdataconf_from = simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow netdata.conf from",
+                                                       "localhost fd* 10.* 192.168.* 172.16.* 172.17.* 172.18.*"
+                                                       " 172.19.* 172.20.* 172.21.* 172.22.* 172.23.* 172.24.*"
+                                                       " 172.25.* 172.26.* 172.27.* 172.28.* 172.29.* 172.30.*"
+                                                       " 172.31.*"), NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_netdataconf_dns  =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow netdata.conf by dns", "no", web_allow_mgmt_from);
+    web_allow_mgmt_from        =
+        simple_pattern_create(config_get(CONFIG_SECTION_WEB, "allow management from", "localhost"),
+                              NULL, SIMPLE_PATTERN_EXACT);
+    web_allow_mgmt_dns         =
+        make_dns_decision(CONFIG_SECTION_WEB, "allow management by dns","heuristic",web_allow_mgmt_from);
 
 
 #ifdef NETDATA_WITH_ZLIB
@@ -146,44 +196,26 @@ void web_server_config_options(void) {
 }
 
 
-int killpid(pid_t pid, int signal)
-{
-    int ret = -1;
+// killpid kills pid with SIGTERM.
+int killpid(pid_t pid) {
+    int ret;
     debug(D_EXIT, "Request to kill pid %d", pid);
 
     errno = 0;
-    if(kill(pid, 0) == -1) {
+    ret = kill(pid, SIGTERM);
+    if (ret == -1) {
         switch(errno) {
             case ESRCH:
-                error("Request to kill pid %d, but it is not running.", pid);
-                break;
+                // We wanted the process to exit so just let the caller handle.
+                return ret;
 
             case EPERM:
-                error("Request to kill pid %d, but I do not have enough permissions.", pid);
+                error("Cannot kill pid %d, but I do not have enough permissions.", pid);
                 break;
 
             default:
-                error("Request to kill pid %d, but I received an error.", pid);
+                error("Cannot kill pid %d, but I received an error.", pid);
                 break;
-        }
-    }
-    else {
-        errno = 0;
-        ret = kill(pid, signal);
-        if(ret == -1) {
-            switch(errno) {
-                case ESRCH:
-                    error("Cannot kill pid %d, but it is not running.", pid);
-                    break;
-
-                case EPERM:
-                    error("Cannot kill pid %d, but I do not have enough permissions.", pid);
-                    break;
-
-                default:
-                    error("Cannot kill pid %d, but I received an error.", pid);
-                    break;
-            }
         }
     }
 
@@ -308,15 +340,19 @@ int help(int exitcode) {
             "  -W unittest              Run internal unittests and exit.\n\n"
 #ifdef ENABLE_DBENGINE
             "  -W createdataset=N       Create a DB engine dataset of N seconds and exit.\n\n"
-            "  -W stresstest=A,B,C,D,E  Run a DB engine stress test for A seconds,\n"
+            "  -W stresstest=A,B,C,D,E,F\n"
+            "                           Run a DB engine stress test for A seconds,\n"
             "                           with B writers and C readers, with a ramp up\n"
             "                           time of D seconds for writers, a page cache\n"
-            "                           size of E MiB, and exit.\n\n"
+            "                           size of E MiB, an optional disk space limit"
+            "                           of F MiB and exit.\n\n"
 #endif
             "  -W set section option value\n"
             "                           set netdata.conf option from the command line.\n\n"
             "  -W simple-pattern pattern string\n"
             "                           Check if string matches pattern and exit.\n\n"
+            "  -W \"claim -token=TOKEN -rooms=ROOM1,ROOM2\"\n"
+            "                           Claim the agent to the workspace rooms pointed to by TOKEN and ROOM*.\n\n"
     );
 
     fprintf(stream, "\n Signals netdata handles:\n\n"
@@ -671,20 +707,20 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     int ret = 0;
 
     if(filename && *filename) {
-        ret = config_load(filename, overwrite_used);
+        ret = config_load(filename, overwrite_used, NULL);
         if(!ret)
             error("CONFIG: cannot load config file '%s'.", filename);
     }
     else {
         filename = strdupz_path_subpath(netdata_configured_user_config_dir, "netdata.conf");
 
-        ret = config_load(filename, overwrite_used);
+        ret = config_load(filename, overwrite_used, NULL);
         if(!ret) {
             info("CONFIG: cannot load user config '%s'. Will try the stock version.", filename);
             freez(filename);
 
             filename = strdupz_path_subpath(netdata_configured_stock_config_dir, "netdata.conf");
-            ret = config_load(filename, overwrite_used);
+            ret = config_load(filename, overwrite_used, NULL);
             if(!ret)
                 info("CONFIG: cannot load stock config '%s'. Running with internal defaults.", filename);
         }
@@ -693,6 +729,12 @@ static int load_netdata_conf(char *filename, char overwrite_used) {
     }
 
     return ret;
+}
+
+// coverity[ +tainted_string_sanitize_content : arg-0 ]
+inline void coverity_remove_taint(char *s)
+{
+    (void)s;
 }
 
 int get_system_info(struct rrdhost_system_info *system_info) {
@@ -711,27 +753,27 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     FILE *fp = mypopen(script, &command_pid);
     if(fp) {
-        char buffer[200 + 1];
-        while (fgets(buffer, 200, fp) != NULL) {
-            char *name=buffer;
-            char *value=buffer;
+        char line[200 + 1];
+        // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
+        // One time init code, but I'm curious about the warning...
+        while (fgets(line, 200, fp) != NULL) {
+            char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
                 *value='\0';
                 value++;
-                if (strlen(value)>1) {
-                    char *newline = value + strlen(value) - 1;
-                    (*newline) = '\0';
-                }
-                char n[51], v[101];
-                snprintfz(n, 50,"%s",name);
-                snprintfz(v, 100,"%s",value);
-                if(unlikely(rrdhost_set_system_info_variable(system_info, n, v))) {
-                    info("Unexpected environment variable %s=%s", n, v);
+                char *end = value;
+                while (*end && *end != '\n') end++;
+                *end = '\0';    // Overwrite newline if present
+                coverity_remove_taint(line);    // I/O is controlled result of system_info.sh - not tainted
+                coverity_remove_taint(value);
+
+                if(unlikely(rrdhost_set_system_info_variable(system_info, line, value))) {
+                    info("Unexpected environment variable %s=%s", line, value);
                 }
                 else {
-                    info("%s=%s", n, v);
-                    setenv(n, v, 1);
+                    info("%s=%s", line, value);
+                    setenv(line, value, 1);
                 }
             }
         }
@@ -892,8 +934,11 @@ int main(int argc, char **argv) {
                     {
                         char* stacksize_string = "stacksize=";
                         char* debug_flags_string = "debug_flags=";
+                        char* claim_string = "claim";
+#ifdef ENABLE_DBENGINE
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
+#endif
 
                         if(strcmp(optarg, "unittest") == 0) {
                             if(unit_test_buffer()) return 1;
@@ -902,7 +947,10 @@ int main(int argc, char **argv) {
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
-                            rrd_init("unittest", NULL);
+                            if(rrd_init("unittest", NULL)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
                             default_rrdpush_enabled = 0;
                             if(run_all_mockup_tests()) return 1;
                             if(unit_test_storage()) return 1;
@@ -922,7 +970,7 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, stresstest_string, strlen(stresstest_string)) == 0) {
                             char *endptr;
                             unsigned test_duration_sec = 0, dset_charts = 0, query_threads = 0, ramp_up_seconds = 0,
-                            page_cache_mb = 0;
+                            page_cache_mb = 0, disk_space_mb = 0;
 
                             optarg += strlen(stresstest_string);
                             test_duration_sec = (unsigned)strtoul(optarg, &endptr, 0);
@@ -934,8 +982,11 @@ int main(int argc, char **argv) {
                                 ramp_up_seconds = (unsigned)strtoul(endptr + 1, &endptr, 0);
                             if (',' == *endptr)
                                 page_cache_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+                            if (',' == *endptr)
+                                disk_space_mb = (unsigned)strtoul(endptr + 1, &endptr, 0);
+
                             dbengine_stress_test(test_duration_sec, dset_charts, query_threads, ramp_up_seconds,
-                                                 page_cache_mb);
+                                                 page_cache_mb, disk_space_mb);
                             return 0;
                         }
 #endif
@@ -1047,6 +1098,10 @@ int main(int argc, char **argv) {
                             printf("%s\n", value);
                             return 0;
                         }
+                        else if(strncmp(optarg, claim_string, strlen(claim_string)) == 0) {
+                            /* will trigger a claiming attempt when the agent is initialized */
+                            claiming_pending_arguments = optarg + strlen(claim_string);
+                        }
                         else {
                             fprintf(stderr, "Unknown -W parameter '%s'\n", optarg);
                             return help(1);
@@ -1073,6 +1128,7 @@ int main(int argc, char **argv) {
 
     if(!config_loaded)
         load_netdata_conf(NULL, 0);
+
 
     // ------------------------------------------------------------------------
     // initialize netdata
@@ -1230,11 +1286,23 @@ int main(int argc, char **argv) {
     struct rrdhost_system_info *system_info = calloc(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
 
-    rrd_init(netdata_configured_hostname, system_info);
+    if(rrd_init(netdata_configured_hostname, system_info))
+        fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+
+    // ------------------------------------------------------------------------
+    // Claim netdata agent to a cloud endpoint
+
+    if (claiming_pending_arguments)
+         claim_agent(claiming_pending_arguments);
+    load_claiming_state();
+
     // ------------------------------------------------------------------------
     // enable log flood protection
 
     error_log_limit_reset();
+
+    // Load host labels
+    reload_host_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads
@@ -1253,6 +1321,11 @@ int main(int argc, char **argv) {
         }
         else debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
+
+    // ------------------------------------------------------------------------
+    // Initialize netdata agent command serving from cli and signals
+
+    commands_init();
 
     info("netdata initialization completed. Enjoy real-time performance monitoring!");
     netdata_ready = 1;

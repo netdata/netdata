@@ -31,6 +31,7 @@ IF("${CMAKE_BUILD_TYPE}" MATCHES "Debug")
     set(CXX_FORMAT_SECURITY "-Werror=format-security")
     set(CXX_STACK_PROTECTOR "-fstack-protector-all")
     set(CXX_FLAGS_DEBUG "-O0")
+    set(CMAKE_C_STANDARD 99)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O1 -ggdb -Wall -Wextra -DNETDATA_INTERNAL_CHECKS=1 -DNETDATA_VERIFY_LOCKS=1 ${CXX_FORMAT_SIGNEDNESS} ${CXX_FORMAT_SECURITY} ${CXX_STACK_PROTECTOR} ${CXX_FLAGS_DEBUG}")
 ELSE()
     message(STATUS "building for: release")
@@ -255,7 +256,7 @@ find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
 # -----------------------------------------------------------------------------
 # Detect libprotobuf
 
-pkg_check_modules(PROTOBUF protobuf)
+pkg_check_modules(PROTOBUF protobuf>=3)
 # later we use:
 # ${PROTOBUF_LIBRARIES}
 # ${PROTOBUF_CFLAGS_OTHER}
@@ -302,6 +303,7 @@ set(LIBNETDATA_FILES
         libnetdata/inlined.h
         libnetdata/libnetdata.c
         libnetdata/libnetdata.h
+        libnetdata/required_dummies.h
         libnetdata/locks/locks.c
         libnetdata/locks/locks.h
         libnetdata/log/log.c
@@ -414,6 +416,7 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/proc_softirqs.c
         collectors/proc.plugin/proc_loadavg.c
         collectors/proc.plugin/proc_meminfo.c
+        collectors/proc.plugin/proc_pagetypeinfo.c
         collectors/proc.plugin/proc_net_dev.c
         collectors/proc.plugin/proc_net_ip_vs_stats.c
         collectors/proc.plugin/proc_net_netstat.c
@@ -436,6 +439,8 @@ set(PROC_PLUGIN_FILES
         collectors/proc.plugin/proc_sys_kernel_random_entropy_avail.c
         collectors/proc.plugin/proc_vmstat.c
         collectors/proc.plugin/proc_uptime.c
+        collectors/proc.plugin/proc_pressure.c
+        collectors/proc.plugin/proc_pressure.h
         collectors/proc.plugin/sys_kernel_mm_ksm.c
         collectors/proc.plugin/sys_block_zram.c
         collectors/proc.plugin/sys_devices_system_edac_mc.c
@@ -596,6 +601,28 @@ set(BACKENDS_PLUGIN_FILES
         backends/prometheus/backend_prometheus.h
         )
 
+set(CLAIM_PLUGIN_FILES
+        claim/claim.c
+        claim/claim.h
+        )
+
+set(EXPORTING_ENGINE_FILES
+        exporting/exporting_engine.c
+        exporting/exporting_engine.h
+        exporting/graphite/graphite.c
+        exporting/graphite/graphite.h
+        exporting/json/json.c
+        exporting/json/json.h
+        exporting/opentsdb/opentsdb.c
+        exporting/opentsdb/opentsdb.h
+        exporting/read_config.c
+        exporting/init_connectors.c
+        exporting/process_data.c
+        exporting/check_filters.c
+        exporting/send_data.c
+        exporting/send_internal_metrics.c
+        )
+
 set(KINESIS_BACKEND_FILES
         backends/aws_kinesis/aws_kinesis.c
         backends/aws_kinesis/aws_kinesis.h
@@ -624,6 +651,8 @@ set(DAEMON_FILES
         daemon/main.h
         daemon/signals.c
         daemon/signals.h
+        daemon/commands.c
+        daemon/commands.h
         daemon/unit_test.c
         daemon/unit_test.h
         )
@@ -633,6 +662,7 @@ set(NETDATA_FILES
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${BACKENDS_PLUGIN_FILES}
+        ${EXPORTING_ENGINE_FILES}
         ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
@@ -642,6 +672,13 @@ set(NETDATA_FILES
         ${STATSD_PLUGIN_FILES}
         ${STREAMING_PLUGIN_FILES}
         ${WEB_PLUGIN_FILES}
+        ${CLAIM_PLUGIN_FILES}
+        )
+
+set(NETDATACLI_FILES
+        daemon/commands.h
+        cli/cli.c
+        cli/cli.h
         )
 
 include_directories(AFTER .)
@@ -781,6 +818,15 @@ ENDIF()
 
 
 # -----------------------------------------------------------------------------
+# netdatacli
+
+add_executable(netdatacli config.h ${NETDATACLI_FILES})
+target_link_libraries (netdatacli libnetdata ${NETDATA_COMMON_LIBRARIES})
+target_include_directories(netdatacli PUBLIC ${NETDATA_COMMON_INCLUDE_DIRS})
+target_compile_options(netdatacli PUBLIC ${NETDATA_COMMON_CFLAGS})
+
+
+# -----------------------------------------------------------------------------
 # apps.plugin
 
 IF(ENABLE_PLUGIN_APPS)
@@ -876,3 +922,125 @@ IF(ENABLE_PLUGIN_CGROUP_NETWORK)
 ELSE()
     message(STATUS "cgroup-network: disabled (requires Linux)")
 ENDIF()
+
+
+# -----------------------------------------------------------------------------
+# Unit tests
+
+if(UNIT_TESTING)
+    message(STATUS "Looking for CMocka which is required for unit testing")
+    find_package(CMocka REQUIRED)
+    include(CTest)
+
+if(BUILD_TESTING)
+    add_executable(str2ld_testdriver libnetdata/tests/test_str2ld.c)
+    target_link_libraries(str2ld_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_str2ld COMMAND str2ld_testdriver)
+
+    add_executable(storage_number_testdriver libnetdata/storage_number/tests/test_storage_number.c)
+    target_link_libraries(storage_number_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_storage_number COMMAND storage_number_testdriver)
+
+    set(EXPORTING_ENGINE_TEST_FILES
+        exporting/tests/test_exporting_engine.c
+        exporting/tests/test_exporting_engine.h
+        exporting/tests/exporting_fixtures.c
+        exporting/tests/exporting_doubles.c
+        exporting/tests/netdata_doubles.c
+        exporting/tests/system_doubles.c
+        )
+    set(TEST_NAME exporting_engine)
+    add_executable(${TEST_NAME}_testdriver ${EXPORTING_ENGINE_TEST_FILES} ${EXPORTING_ENGINE_FILES})
+    target_compile_options(
+        ${TEST_NAME}_testdriver
+        PRIVATE
+        -DUNIT_TESTING
+    )
+    target_link_options(
+        ${TEST_NAME}_testdriver
+        PRIVATE
+        -Wl,--wrap=read_exporting_config
+        -Wl,--wrap=init_connectors
+        -Wl,--wrap=mark_scheduled_instances
+        -Wl,--wrap=rrdhost_is_exportable
+        -Wl,--wrap=rrdset_is_exportable
+        -Wl,--wrap=exporting_calculate_value_from_stored_data
+        -Wl,--wrap=prepare_buffers
+        -Wl,--wrap=notify_workers
+        -Wl,--wrap=send_internal_metrics
+        -Wl,--wrap=now_realtime_sec
+        -Wl,--wrap=uv_thread_create
+        -Wl,--wrap=uv_mutex_lock
+        -Wl,--wrap=uv_mutex_unlock
+        -Wl,--wrap=uv_cond_signal
+        -Wl,--wrap=uv_cond_wait
+        -Wl,--wrap=strdupz
+        -Wl,--wrap=info_int
+        -Wl,--wrap=recv
+        -Wl,--wrap=send
+        -Wl,--wrap=connect_to_one_of
+    )
+    target_link_libraries(${TEST_NAME}_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_${TEST_NAME} COMMAND ${TEST_NAME}_testdriver)
+
+    set(WEB_API_TEST_FILES
+        web/api/tests/web_api.c
+        web/server/web_client.c
+        )
+    add_executable(web_api_testdriver ${WEB_API_TEST_FILES})
+    target_link_options(
+        web_api_testdriver
+        PRIVATE
+        -Wl,--wrap=rrdhost_find_by_hostname
+        -Wl,--wrap=finished_web_request_statistics
+        -Wl,--wrap=config_get
+        -Wl,--wrap=web_client_api_request_v1
+        -Wl,--wrap=rrdhost_find_by_guid
+        -Wl,--wrap=rrdset_find_byname
+        -Wl,--wrap=rrdset_find
+        -Wl,--wrap=rrdpush_receiver_thread_spawn
+        -Wl,--wrap=debug_int
+        -Wl,--wrap=error_int
+        -Wl,--wrap=info_int
+        -Wl,--wrap=fatal_int
+    )
+    target_link_libraries(web_api_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_web_api COMMAND web_api_testdriver)
+
+    set(VALID_URLS_TEST_FILES
+        web/api/tests/valid_urls.c
+        web/server/web_client.c
+        )
+    add_executable(valid_urls_testdriver ${VALID_URLS_TEST_FILES})
+    target_link_options(
+        valid_urls_testdriver
+        PRIVATE
+        -Wl,--wrap=rrdhost_find_by_hostname
+        -Wl,--wrap=finished_web_request_statistics
+        -Wl,--wrap=config_get
+        -Wl,--wrap=web_client_api_request_v1
+        -Wl,--wrap=rrdhost_find_by_guid
+        -Wl,--wrap=rrdset_find_byname
+        -Wl,--wrap=rrdset_find
+        -Wl,--wrap=rrdpush_receiver_thread_spawn
+        -Wl,--wrap=debug_int
+        -Wl,--wrap=error_int
+        -Wl,--wrap=info_int
+        -Wl,--wrap=fatal_int
+        -Wl,--wrap=mysendfile
+        -DREMOVE_MYSENDFILE
+    )
+    target_link_libraries(valid_urls_testdriver libnetdata ${NETDATA_COMMON_LIBRARIES} ${CMOCKA_LIBRARIES})
+    add_test(NAME test_valid_urls COMMAND valid_urls_testdriver)
+
+    set_target_properties(
+        str2ld_testdriver
+        storage_number_testdriver
+        exporting_engine_testdriver
+        web_api_testdriver
+        valid_urls_testdriver
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY tests
+    )
+
+endif()
+endif()

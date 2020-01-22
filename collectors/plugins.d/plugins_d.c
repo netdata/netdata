@@ -234,9 +234,12 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
     uint32_t DIMENSION_HASH = simple_hash(PLUGINSD_KEYWORD_DIMENSION);
     uint32_t DISABLE_HASH = simple_hash(PLUGINSD_KEYWORD_DISABLE);
     uint32_t VARIABLE_HASH = simple_hash(PLUGINSD_KEYWORD_VARIABLE);
+    uint32_t LABEL_HASH = simple_hash(PLUGINSD_KEYWORD_LABEL);
+    uint32_t OVERWRITE_HASH = simple_hash(PLUGINSD_KEYWORD_OVERWRITE);
 
     RRDSET *st = NULL;
     uint32_t hash;
+    struct label *new_labels = NULL;
 
     errno = 0;
     clearerr(fp);
@@ -258,17 +261,17 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 #ifdef ENABLE_HTTPS
         int normalread = 1;
         if(netdata_srv_ctx) {
-            if(host->ssl.conn && !host->ssl.flags) {
+            if(host->stream_ssl.conn && !host->stream_ssl.flags) {
                 if(!bytesleft) {
                     r = line;
                     readfrom = tmpbuffer;
-                    bytesleft = pluginsd_update_buffer(readfrom, host->ssl.conn);
+                    bytesleft = pluginsd_update_buffer(readfrom, host->stream_ssl.conn);
                     if(bytesleft <= 0) {
                         break;
                     }
                 }
 
-                readfrom =  pluginsd_get_from_buffer(line, &bytesleft, readfrom, host->ssl.conn, tmpbuffer);
+                readfrom =  pluginsd_get_from_buffer(line, &bytesleft, readfrom, host->stream_ssl.conn, tmpbuffer);
                 if(!readfrom) {
                     r = NULL;
                 }
@@ -283,6 +286,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 #else
         r = fgets(line, PLUGINSD_LINE_MAX, fp);
 #endif
+
         if(unlikely(!r)) {
             if(feof(fp))
                 error("read failed: end of file");
@@ -616,6 +620,39 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
             enabled = 0;
             break;
         }
+        else if(likely(hash == LABEL_HASH && !strcmp(s, PLUGINSD_KEYWORD_LABEL))) {
+            debug(D_PLUGINSD, "requested a LABEL CHANGE");
+            char *store;
+            if(!words[4])
+                store = words[3];
+            else {
+                store = callocz(PLUGINSD_LINE_MAX + 1, sizeof(char));
+                char *move = store;
+                int i = 3;
+                while (i < w) {
+                    size_t length = strlen(words[i]);
+                    memcpy(move, words[i], length);
+                    move += length;
+                    *move++ = ' ';
+
+                    i++;
+                    if(!words[i])
+                        break;
+                }
+            }
+
+            new_labels = add_label_to_list(new_labels, words[1], store, strtol(words[2], NULL, 10));
+        }
+        else if(likely(hash == OVERWRITE_HASH && !strcmp(s, PLUGINSD_KEYWORD_OVERWRITE))) {
+            debug(D_PLUGINSD, "requested a OVERWITE a variable");
+            if(!host->labels) {
+                host->labels = new_labels;
+            } else {
+                replace_label_list(host, new_labels);
+            }
+
+            new_labels = NULL;
+        }
         else {
             error("sent command '%s' which is not known by netdata, for host '%s'. Disabling it.", s, host->hostname);
             enabled = 0;
@@ -625,6 +662,9 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp, int 
 
 cleanup:
     cd->enabled = enabled;
+
+    if(new_labels)
+        free_host_labels(new_labels);
 
     if(likely(count)) {
         cd->successful_collections += count;
@@ -647,7 +687,7 @@ static void pluginsd_worker_thread_cleanup(void *arg) {
         if (cd->pid) {
             siginfo_t info;
             info("killing child process pid %d", cd->pid);
-            if (killpid(cd->pid, SIGTERM) != -1) {
+            if (killpid(cd->pid) != -1) {
                 info("waiting for child process pid %d to exit...", cd->pid);
                 waitid(P_PID, (id_t) cd->pid, &info, WEXITED);
             }
@@ -738,7 +778,7 @@ void *pluginsd_worker_thread(void *arg) {
         info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
         count = pluginsd_process(localhost, cd, fp, 0);
         error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
-        killpid(cd->pid, SIGTERM);
+        killpid(cd->pid);
 
         int worker_ret_code = mypclose(fp, cd->pid);
 
@@ -778,6 +818,9 @@ void *pluginsd_main(void *ptr) {
     int automatic_run = config_get_boolean(CONFIG_SECTION_PLUGINS, "enable running new plugins", 1);
     int scan_frequency = (int) config_get_number(CONFIG_SECTION_PLUGINS, "check for new plugins every", 60);
     if(scan_frequency < 1) scan_frequency = 1;
+
+    // disable some plugins by default
+    config_get_boolean(CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop

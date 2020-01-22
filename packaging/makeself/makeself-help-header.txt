@@ -42,3 +42,6 @@
   netdata re-distributes a lot of open source software components.
   Check its full license at:
   https://github.com/netdata/netdata/blob/master/LICENSE.md
+
+  Anonymous stat collection and reporting to Google Analytics is enabled
+  by default. To disable, pass --disable-telemetry option to the installer.

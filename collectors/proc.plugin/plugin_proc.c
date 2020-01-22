@@ -21,6 +21,9 @@ static struct proc_module {
         { .name = "/proc/loadavg", .dim = "loadavg", .func = do_proc_loadavg },
         { .name = "/proc/sys/kernel/random/entropy_avail", .dim = "entropy", .func = do_proc_sys_kernel_random_entropy_avail },
 
+        // pressure metrics
+        { .name = "/proc/pressure", .dim = "pressure", .func = do_proc_pressure },
+
         // CPU metrics
         { .name = "/proc/interrupts", .dim = "interrupts", .func = do_proc_interrupts },
         { .name = "/proc/softirqs", .dim = "softirqs", .func = do_proc_softirqs },
@@ -32,6 +35,7 @@ static struct proc_module {
         { .name = "/sys/block/zram", .dim = "zram", .func = do_sys_block_zram },
         { .name = "/sys/devices/system/edac/mc", .dim = "ecc", .func = do_proc_sys_devices_system_edac_mc },
         { .name = "/sys/devices/system/node", .dim = "numa", .func = do_proc_sys_devices_system_node },
+        { .name = "/proc/pagetypeinfo", .dim = "pagetypeinfo", .func = do_proc_pagetypeinfo },
 
         // network metrics
         { .name = "/proc/net/dev", .dim = "netdev", .func = do_proc_net_dev },
@@ -84,14 +88,16 @@ static void proc_main_cleanup(void *ptr) {
 void *proc_main(void *ptr) {
     netdata_thread_cleanup_push(proc_main_cleanup, ptr);
 
-    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", 1);
+    int vdo_cpu_netdata = config_get_boolean("plugin:proc", "netdata server resources", CONFIG_BOOLEAN_YES);
+
+    config_get_boolean("plugin:proc", "/proc/pagetypeinfo", CONFIG_BOOLEAN_NO);
 
     // check the enabled status for each module
     int i;
     for(i = 0 ; proc_modules[i].name ;i++) {
         struct proc_module *pm = &proc_modules[i];
 
-        pm->enabled = config_get_boolean("plugin:proc", pm->name, 1);
+        pm->enabled = config_get_boolean("plugin:proc", pm->name, CONFIG_BOOLEAN_YES);
         pm->duration = 0ULL;
         pm->rd = NULL;
     }

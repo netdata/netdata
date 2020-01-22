@@ -43,10 +43,11 @@ Depends: adduser,
          libjson-c3,
          libnetfilter-acct1,
          libprotobuf-c1,
-         libsnappy1v5,
-         libprotoc10,
+         libsnappy1,
+         libprotoc9,
          ${misc:Depends},
          ${shlibs:Depends}
+Pre-Depends: dpkg (>= 1.17.14)
 Description: real-time charts for system monitoring
  Netdata is a daemon that collects data in realtime (per second)
  and presents a web site to view and analyze them. The presentation

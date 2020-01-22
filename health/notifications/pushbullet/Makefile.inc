@@ -6,7 +6,7 @@
 
 # install these files
 dist_noinst_DATA += \
-	pushbullet/README.md \
-	pushbullet/Makefile.inc \
-	$(NULL)
+    pushbullet/README.md \
+    pushbullet/Makefile.inc \
+    $(NULL)
 

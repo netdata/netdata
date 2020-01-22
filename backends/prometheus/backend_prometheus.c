@@ -697,7 +697,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                             prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
 
-                            add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            add_metric(name, chart, family, dimension, hostname, value, last_t * MSEC_PER_SEC);
                             (*count_dims)++;
                         }
                     }
@@ -780,7 +780,7 @@ int process_prometheus_remote_write_response(BUFFER *b) {
     const char *s = buffer_tostring(b);
     int len = buffer_strlen(b);
 
-    // do nothing with HTTP response 200
+    // do nothing with HTTP responses 200 or 204
 
     while(!isspace(*s) && len) {
         s++;
@@ -789,7 +789,7 @@ int process_prometheus_remote_write_response(BUFFER *b) {
     s++;
     len--;
 
-    if(likely(len > 4 && !strncmp(s, "200 ", 4)))
+    if(likely(len > 4 && (!strncmp(s, "200 ", 4) || !strncmp(s, "204 ", 4))))
         return 0;
     else
         return discard_response(b, "prometheus remote write");

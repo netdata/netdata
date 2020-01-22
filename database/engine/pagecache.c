@@ -101,6 +101,13 @@ void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr)
         uv_cond_broadcast(&pg_cache_descr->cond);
 }
 
+void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+{
+    rrdeng_page_descr_mutex_lock(ctx, descr);
+    pg_cache_wake_up_waiters_unsafe(descr);
+    rrdeng_page_descr_mutex_unlock(ctx, descr);
+}
+
 /*
  * The caller must hold page descriptor lock.
  * The lock will be released and re-acquired. The descriptor is not guaranteed
@@ -135,27 +142,6 @@ unsigned long pg_cache_wait_event(struct rrdengine_instance *ctx, struct rrdeng_
 
 /*
  * The caller must hold page descriptor lock.
- * Gets a reference to the page descriptor.
- * Returns 1 on success and 0 on failure.
- */
-int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access)
-{
-    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
-
-    if ((pg_cache_descr->flags & (RRD_PAGE_LOCKED | RRD_PAGE_READ_PENDING)) ||
-        (exclusive_access && pg_cache_descr->refcnt)) {
-        return 0;
-    }
-    if (exclusive_access)
-        pg_cache_descr->flags |= RRD_PAGE_LOCKED;
-    ++pg_cache_descr->refcnt;
-
-    return 1;
-}
-
-/*
- * The caller must hold page descriptor lock.
- * Same return values as pg_cache_try_get_unsafe() without doing anything.
  */
 int pg_cache_can_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access)
 {
@@ -165,6 +151,25 @@ int pg_cache_can_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_acces
         (exclusive_access && pg_cache_descr->refcnt)) {
         return 0;
     }
+
+    return 1;
+}
+
+/*
+ * The caller must hold page descriptor lock.
+ * Gets a reference to the page descriptor.
+ * Returns 1 on success and 0 on failure.
+ */
+int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access)
+{
+    struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+
+    if (!pg_cache_can_get_unsafe(descr, exclusive_access))
+        return 0;
+
+    if (exclusive_access)
+        pg_cache_descr->flags |= RRD_PAGE_LOCKED;
+    ++pg_cache_descr->refcnt;
 
     return 1;
 }
@@ -214,7 +219,7 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
  * This function returns the maximum number of pages allowed in the page cache.
  * The caller must hold the page cache lock.
  */
-static inline unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
+unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
 {
     /* it's twice the number of producers since we pin 2 pages per producer */
     return ctx->max_cache_pages + 2 * (unsigned long)ctx->stats.metric_API_producers;
@@ -225,7 +230,7 @@ static inline unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx)
  * number of pages below that number.
  * The caller must hold the page cache lock.
  */
-static inline unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
+unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx)
 {
     /* it's twice the number of producers since we pin 2 pages per producer */
     return ctx->cache_pages_low_watermark + 2 * (unsigned long)ctx->stats.metric_API_producers;
@@ -409,7 +414,9 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
             print_page_cache_descr(descr);
         pg_cache_wait_event_unsafe(descr);
     }
-    if (!remove_dirty) {
+    if (remove_dirty) {
+        pg_cache_descr->flags &= ~RRD_PAGE_DIRTY;
+    } else {
         /* even a locked page could be dirty */
         while (unlikely(pg_cache_descr->flags & RRD_PAGE_DIRTY)) {
             debug(D_RRDENGINE, "%s: Found dirty page, waiting for it to be flushed:", __func__);
@@ -429,8 +436,11 @@ void pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_desc
         uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
     }
     pg_cache_put(ctx, descr);
-
-    rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
+    rrdeng_try_deallocate_pg_cache_descr(ctx, descr);
+    while (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED) {
+        rrdeng_try_deallocate_pg_cache_descr(ctx, descr); /* spin */
+        (void)sleep_usec(1000); /* 1 msec */
+    }
 destroy:
     freez(descr);
     pg_cache_update_metric_times(page_index);
@@ -1029,14 +1039,14 @@ static void init_replaceQ(struct rrdengine_instance *ctx)
     assert(0 == uv_rwlock_init(&pg_cache->replaceQ.lock));
 }
 
-static void init_commited_page_index(struct rrdengine_instance *ctx)
+static void init_committed_page_index(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
-    pg_cache->commited_page_index.JudyL_array = (Pvoid_t) NULL;
-    assert(0 == uv_rwlock_init(&pg_cache->commited_page_index.lock));
-    pg_cache->commited_page_index.latest_corr_id = 0;
-    pg_cache->commited_page_index.nr_commited_pages = 0;
+    pg_cache->committed_page_index.JudyL_array = (Pvoid_t) NULL;
+    assert(0 == uv_rwlock_init(&pg_cache->committed_page_index.lock));
+    pg_cache->committed_page_index.latest_corr_id = 0;
+    pg_cache->committed_page_index.nr_committed_pages = 0;
 }
 
 void init_page_cache(struct rrdengine_instance *ctx)
@@ -1049,7 +1059,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
 
     init_metrics_index(ctx);
     init_replaceQ(ctx);
-    init_commited_page_index(ctx);
+    init_committed_page_index(ctx);
 }
 
 void free_page_cache(struct rrdengine_instance *ctx)
@@ -1062,9 +1072,9 @@ void free_page_cache(struct rrdengine_instance *ctx)
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
 
-    /* Free commited page index */
-    ret_Judy = JudyLFreeArray(&pg_cache->commited_page_index.JudyL_array, PJE0);
-    assert(NULL == pg_cache->commited_page_index.JudyL_array);
+    /* Free committed page index */
+    ret_Judy = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
+    assert(NULL == pg_cache->committed_page_index.JudyL_array);
     bytes_freed += ret_Judy;
 
     for (page_index = pg_cache->metrics_index.last_page_index ;

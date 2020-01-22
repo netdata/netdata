@@ -67,6 +67,37 @@ inline void health_log_rotate(RRDHOST *host) {
     }
 }
 
+inline void health_label_log_save(RRDHOST *host) {
+    health_log_rotate(host);
+
+    if(likely(host->health_log_fp)) {
+        BUFFER *wb = buffer_create(1024);
+        netdata_rwlock_rdlock(&host->labels_rwlock);
+        struct label *l=localhost->labels;
+        while (l != NULL) {
+            buffer_sprintf(wb,"%s=%s\t ", l->key, l->value);
+            l = l->next;
+        }
+        netdata_rwlock_unlock(&host->labels_rwlock);
+
+        char *write = (char *) buffer_tostring(wb) ;
+
+        write[wb->len-2] = '\n';
+        write[wb->len-1] = '\0';
+
+        if (unlikely(fprintf(host->health_log_fp, "L\t%s"
+                , write
+        ) < 0))
+            error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.",
+                  host->hostname, host->health_log_filename);
+        else {
+            host->health_log_entries_written++;
+        }
+
+        buffer_free(wb);
+    }
+}
+
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
 
@@ -151,6 +182,9 @@ inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char *filena
             }
             else s++;
         }
+
+        if(likely(*pointers[0] == 'L'))
+            continue;
 
         if(likely(*pointers[0] == 'U' || *pointers[0] == 'A')) {
             ALARM_ENTRY *ae = NULL;

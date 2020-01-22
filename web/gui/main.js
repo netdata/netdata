@@ -707,10 +707,9 @@ function clearMyNetdataMenu() {
 }
 
 function errorMyNetdataMenu() {
-    setMyNetdataMenu(`<div class="agent-item" style="white-space: nowrap">
+    setMyNetdataMenu(`<div class="agent-item" style="padding: 0 8px">
         <i class="fas fa-exclamation-triangle" style="color: red"></i>
-        Cannot load known netdata agents from netdata.cloud!
-        <div></div>
+        Cannot load known Netdata agents from Netdata Cloud! Please make sure you have the latest version of Netdata.
     </div>`);
 }
 
@@ -965,7 +964,7 @@ function gotoServerModalHandler(guid) {
 
     if (!isSignedIn()) {
         // When the registry is enabled, if the user's known URLs are not working
-        // we consult the registry to get additional URLs.  
+        // we consult the registry to get additional URLs.
         setTimeout(function () {
             if (gotoServerStop === false) {
                 document.getElementById('gotoServerResponse').innerHTML = '<b>Added all the known URLs for this machine.</b>';
@@ -1818,7 +1817,7 @@ function renderPage(menus, data) {
 
     if (!isMemoryModeDbEngine) {
         sidebar += '<br />&nbsp;<br />Get more history by ' +
-          '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <strong>history</strong></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>'
+          '<a href="https://docs.netdata.cloud/docs/configuration-guide/#increase-the-metrics-retention-period" target=_blank>configuring Netdata\'s <strong>history</strong></a> or using the <a href="https://docs.netdata.cloud/database/engine/" target=_blank>DB engine.</a>';
     }
 
     sidebar += '<br/>&nbsp;<br/><strong>netdata</strong><br/>' + data.version.toString() + '</small></li>';
@@ -4956,7 +4955,8 @@ function handleSignInMessage(e) {
 
     netdataRegistryCallback(registryAgents);
     if (e.data.redirectURI && !window.location.href.includes(e.data.redirectURI)) {
-        window.location.replace(e.data.redirectURI);
+        // lgtm false-positive - redirectURI does not come from user input, but from iframe callback
+        window.location.replace(e.data.redirectURI); // lgtm[js/client-side-unvalidated-url-redirection]
     }
 }
 
@@ -5128,7 +5128,7 @@ function netdataRegistryCallback(machinesArray) {
     registryAgents = machinesArray;
 
     if (isSignedIn()) {
-        // We call getCloudAccountAgents() here because it requires that 
+        // We call getCloudAccountAgents() here because it requires that
         // NETDATA.registry is initialized.
         clearMyNetdataMenu();
         getCloudAccountAgents().then((agents) => {
@@ -5154,8 +5154,8 @@ function netdataRegistryCallback(machinesArray) {
     }
 };
 
-// If we know the cloudBaseURL and agentID from local storage render (eagerly) 
-// the account ui before receiving the definitive response from the web server. 
+// If we know the cloudBaseURL and agentID from local storage render (eagerly)
+// the account ui before receiving the definitive response from the web server.
 // This improves the perceived performance.
 function tryFastInitCloud() {
     const baseURL = localStorage.getItem("cloud.baseURL");
@@ -5183,5 +5183,5 @@ if (document.readyState === "complete") {
         if (document.readyState === "complete") {
             initializeApp();
         }
-    })
+    });
 }

@@ -761,10 +761,37 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     rrd_unlock();
 }
 
+inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
+    char tabs[11];
+
+    if (indentation > 10)
+        indentation = 10;
+
+    tabs[0] = '\0';
+    while (indentation) {
+        strcat(tabs, "\t");
+        indentation--;
+    }
+
+    int count = 0;
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if(count > 0) buffer_strcat(wb, ",\n");
+        buffer_strcat(wb, tabs);
+
+        char value[CONFIG_MAX_VALUE * 2 + 1];
+        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE * 2);
+        buffer_sprintf(wb, "\"%s\": \"%s\"", label->key, value);
+
+        count++;
+    }
+    buffer_strcat(wb, "\n");
+    netdata_rwlock_unlock(&host->labels_rwlock);
+}
+
 inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, char *url) {
     (void)url;
     if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
-
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->contenttype = CT_APPLICATION_JSON;
@@ -781,12 +808,26 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
     buffer_strcat(wb, "\t},\n");
 
-    buffer_sprintf(wb, "\t\"os_name\": %s,\n", (host->system_info->os_name) ? host->system_info->os_name : "\"\"");
-    buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", (host->system_info->os_id) ? host->system_info->os_id : "");
-    buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", (host->system_info->os_id_like) ? host->system_info->os_id_like : "");
-    buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->os_version) ? host->system_info->os_version : "");
-    buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", (host->system_info->os_version_id) ? host->system_info->os_version_id : "");
-    buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", (host->system_info->os_detection) ? host->system_info->os_detection : "");
+    buffer_sprintf(wb, "\t\"os_name\": \"%s\",\n", (host->system_info->host_os_name) ? host->system_info->host_os_name : "");
+    buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", (host->system_info->host_os_id) ? host->system_info->host_os_id : "");
+    buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : "");
+    buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->host_os_version) ? host->system_info->host_os_version : "");
+    buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : "");
+    buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", (host->system_info->host_os_detection) ? host->system_info->host_os_detection : "");
+
+    if (host->system_info->container_os_name)
+        buffer_sprintf(wb, "\t\"container_os_name\": \"%s\",\n", host->system_info->container_os_name);
+    if (host->system_info->container_os_id)
+        buffer_sprintf(wb, "\t\"container_os_id\": \"%s\",\n", host->system_info->container_os_id);
+    if (host->system_info->container_os_id_like)
+        buffer_sprintf(wb, "\t\"container_os_id_like\": \"%s\",\n", host->system_info->container_os_id_like);
+    if (host->system_info->container_os_version)
+        buffer_sprintf(wb, "\t\"container_os_version\": \"%s\",\n", host->system_info->container_os_version);
+    if (host->system_info->container_os_version_id)
+        buffer_sprintf(wb, "\t\"container_os_version_id\": \"%s\",\n", host->system_info->container_os_version_id);
+    if (host->system_info->container_os_detection)
+        buffer_sprintf(wb, "\t\"container_os_detection\": \"%s\",\n", host->system_info->container_os_detection);
+
     buffer_sprintf(wb, "\t\"kernel_name\": \"%s\",\n", (host->system_info->kernel_name) ? host->system_info->kernel_name : "");
     buffer_sprintf(wb, "\t\"kernel_version\": \"%s\",\n", (host->system_info->kernel_version) ? host->system_info->kernel_version : "");
     buffer_sprintf(wb, "\t\"architecture\": \"%s\",\n", (host->system_info->architecture) ? host->system_info->architecture : "");
@@ -794,6 +835,10 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"virt_detection\": \"%s\",\n", (host->system_info->virt_detection) ? host->system_info->virt_detection : "");
     buffer_sprintf(wb, "\t\"container\": \"%s\",\n", (host->system_info->container) ? host->system_info->container : "");
     buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", (host->system_info->container_detection) ? host->system_info->container_detection : "");
+
+    buffer_strcat(wb, "\t\"host_labels\": {\n");
+    host_labels2json(host, wb, 2);
+    buffer_strcat(wb, "\t},\n");
 
     buffer_strcat(wb, "\t\"collectors\": [");
     chartcollectors2json(host, wb);

@@ -70,7 +70,7 @@ void health_silencers_init(void) {
         }
         fclose(fd);
     } else {
-        error("Cannot open the file %s",silencers_filename);
+        info("Cannot open the file %s, so Netdata will work with the default health configuration.",silencers_filename);
     }
 }
 
@@ -151,6 +151,9 @@ void health_reload_host(RRDHOST *host) {
     // load the new alarms
     rrdhost_wrlock(host);
     health_readdir(host, user_path, stock_path, NULL);
+
+    //Discard alarms with labels that do not apply to host
+    rrdcalc_labels_unlink_alarm_from_host(host);
 
     // link the loaded alarms to their charts
     RRDDIM *rd;
@@ -576,6 +579,8 @@ void *health_main(void *ptr) {
 
     time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
+
+    rrdcalc_labels_unlink();
 
     unsigned int loop = 0;
     while(!netdata_exit) {

@@ -18,7 +18,7 @@ printhelp () {
 	-f Just check the passed md file
 	General Options:
 	 -x Execute commands. By default the script runs in test mode with no files changed by the script (results and fixes are just shown). Use -x to have it apply the changes.
-	 -u trys to follow URLs using curl
+	 -u Tries to follow URLs using curl
 	 -v Outputs debugging messages
 	By default, nothing is actually checked. The following options tell it what to check:
 	 -a Check all link types
@@ -55,7 +55,7 @@ testinternal () {
 	ilnk=${3}
 	header=${ilnk//-/}
 	dbg "   - Searching for \"$header\" in $ifile"
-	tr -d '[],_.:? `'< "$ifile" | sed 's/-//g' | grep -i "^\\#*$header\$" >/dev/null
+	tr -d '[],_.:? `'< "$ifile" | sed -e 's/-//g' -e "s/'//g" | grep -i "^\\#*$header\$" >/dev/null
 	if [ $? -eq 0 ] ; then
 		dbg "   - $ilnk found in $ifile"
 		return 0

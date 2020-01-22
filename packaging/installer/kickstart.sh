@@ -27,7 +27,7 @@
 # shellcheck disable=SC2039,SC2059,SC2086
 
 # External files
-PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh"
+PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 
 # ---------------------------------------------------------------------------------------------------------------------
 # library functions copied from packaging/installer/functions.sh
@@ -307,6 +307,7 @@ while [ -n "${1}" ]; do
 		shift 1
 	elif [ "${1}" = "--stable-channel" ]; then
 		RELEASE_CHANNEL="stable"
+		NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --stable-channel"
 		shift 1
 	elif [ "${1}" = "--local-files" ]; then
 		shift 1
@@ -351,7 +352,7 @@ done
 
 if [ "${INTERACTIVE}" = "0" ]; then
 	PACKAGES_INSTALLER_OPTIONS="--dont-wait --non-interactive ${PACKAGES_INSTALLER_OPTIONS}"
-	NETDATA_INSTALLER_OPTIONS="--dont-wait"
+	NETDATA_INSTALLER_OPTIONS="$NETDATA_INSTALLER_OPTIONS --dont-wait"
 fi
 
 TMPDIR=$(create_tmp_directory)

@@ -269,9 +269,9 @@ void backend_set_kinesis_variables(int *default_port,
 #if HAVE_KINESIS
     *brc = process_json_response;
     if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_json_plaintext;
+        *brf = backends_format_dimension_collected_json_plaintext;
     else
-        *brf = format_dimension_stored_json_plaintext;
+        *brf = backends_format_dimension_stored_json_plaintext;
 #endif
 }
 
@@ -321,9 +321,9 @@ void backend_set_mongodb_variables(int *default_port,
 #if HAVE_MONGOC
     *brc = process_json_response;
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_json_plaintext;
+        *brf = backends_format_dimension_collected_json_plaintext;
     else
-        *brf = format_dimension_stored_json_plaintext;
+        *brf = backends_format_dimension_stored_json_plaintext;
 #endif
 }
 
@@ -344,9 +344,9 @@ void backend_set_json_variables(int *default_port,
     *brc = process_json_response;
 
     if (BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_json_plaintext;
+        *brf = backends_format_dimension_collected_json_plaintext;
     else
-        *brf = format_dimension_stored_json_plaintext;
+        *brf = backends_format_dimension_stored_json_plaintext;
 }
 
 /**
@@ -366,9 +366,9 @@ void backend_set_opentsdb_http_variables(int *default_port,
     *brc = process_opentsdb_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_opentsdb_http;
+        *brf = backends_format_dimension_collected_opentsdb_http;
     else
-        *brf = format_dimension_stored_opentsdb_http;
+        *brf = backends_format_dimension_stored_opentsdb_http;
 
 }
 
@@ -389,9 +389,9 @@ void backend_set_opentsdb_telnet_variables(int *default_port,
     *brc = process_opentsdb_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_opentsdb_telnet;
+        *brf = backends_format_dimension_collected_opentsdb_telnet;
     else
-        *brf = format_dimension_stored_opentsdb_telnet;
+        *brf = backends_format_dimension_stored_opentsdb_telnet;
 }
 
 /**
@@ -411,9 +411,9 @@ void backend_set_graphite_variables(int *default_port,
     *brc = process_graphite_response;
 
     if(BACKEND_OPTIONS_DATA_SOURCE(global_backend_options) == BACKEND_SOURCE_DATA_AS_COLLECTED)
-        *brf = format_dimension_collected_graphite_plaintext;
+        *brf = backends_format_dimension_collected_graphite_plaintext;
     else
-        *brf = format_dimension_stored_graphite_plaintext;
+        *brf = backends_format_dimension_stored_graphite_plaintext;
 }
 
 /**
@@ -439,7 +439,7 @@ BACKEND_TYPE backend_select_type(const char *type) {
         return BACKEND_TYPE_JSON;
     }
     else if (!strcmp(type, "prometheus_remote_write")) {
-        return  BACKEND_TYPE_PROMETEUS;
+        return  BACKEND_TYPE_PROMETHEUS;
     }
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
@@ -557,7 +557,7 @@ void *backends_main(void *ptr) {
             backend_set_opentsdb_http_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
-        case BACKEND_TYPE_PROMETEUS: {
+        case BACKEND_TYPE_PROMETHEUS: {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
             do_prometheus_remote_write = 1;
 
@@ -622,6 +622,9 @@ void *backends_main(void *ptr) {
             break;
         }
         case BACKEND_TYPE_UNKNOWN: {
+            break;
+        }
+        default: {
             break;
         }
     }

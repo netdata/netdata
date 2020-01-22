@@ -36,6 +36,7 @@ m4_ifdef([AM_SILENT_RULES], [
     ])
 AC_CANONICAL_HOST
 AC_PROG_CC
+AC_PROG_CC_C99
 AM_PROG_CC_C_O
 AC_PROG_CXX
 AC_PROG_INSTALL
@@ -279,6 +280,10 @@ AC_CHECK_LIB(
     [uv_fs_scandir_next],
     [UV_LIBS="-luv"]
 )
+test -z "${UV_LIBS}" && \
+    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
+OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+OPTIONAL_UV_LIBS="${UV_LIBS}"
 
 
 # -----------------------------------------------------------------------------
@@ -363,9 +368,6 @@ OPTIONAL_JSONC_LIBS="${JSONC_LIBS}"
 
 # -----------------------------------------------------------------------------
 # DB engine and HTTPS
-test "${enable_dbengine}" = "yes" -a -z "${UV_LIBS}" && \
-    AC_MSG_ERROR([libuv required but not found. Try installing 'libuv1-dev' or 'libuv-devel'.])
-
 test "${enable_dbengine}" = "yes" -a -z "${LZ4_LIBS}" && \
     AC_MSG_ERROR([liblz4 required but not found. Try installing 'liblz4-dev' or 'lz4-devel'.])
 
@@ -382,8 +384,6 @@ AC_MSG_CHECKING([if netdata dbengine should be used])
 if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${JUDY_LIBS}" -a "${SSL_LIBS}"; then
     enable_dbengine="yes"
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
-    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
-    OPTIONAL_UV_LIBS="${UV_LIBS}"
     OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
     OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
     OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
@@ -407,6 +407,20 @@ else
 fi
 AC_MSG_RESULT([${enable_https}])
 AM_CONDITIONAL([ENABLE_HTTPS], [test "${enable_https}" = "yes"])
+
+# -----------------------------------------------------------------------------
+# Exporting engine
+AC_MSG_CHECKING([if netdata exporting engine should be used])
+if test "${UV_LIBS}"; then
+    enable_exporting_engine="yes"
+    AC_DEFINE([ENABLE_EXPORTING], [1], [netdata exporting engine usability])
+    OPTIONAL_UV_CFLAGS="${UV_CFLAGS}"
+    OPTIONAL_UV_LIBS="${UV_LIBS}"
+else
+    enable_exporting_engine="no"
+fi
+AC_MSG_RESULT([${enable_exporting_engine}])
+AM_CONDITIONAL([ENABLE_EXPORTING], [test "${enable_exporting_engine}" = "yes"])
 
 # -----------------------------------------------------------------------------
 # JSON-C
@@ -673,6 +687,7 @@ if test "${enable_plugin_nfacct}" != "no" -a "${have_libnetfilter_acct}" = "yes"
     enable_plugin_nfacct="yes"
     AC_DEFINE([HAVE_LIBMNL], [1], [libmnl usability])
     AC_DEFINE([HAVE_LIBNETFILTER_ACCT], [1], [libnetfilter_acct usability])
+    AC_DEFINE([HAVE_LINUX_NETFILTER_NFNETLINK_CONNTRACK_H], [1], [libnetfilter_nfnetlink_conntrack header usability])
     OPTIONAL_NFACCT_CFLAGS="${NFACCT_CFLAGS} ${LIBMNL_CFLAGS}"
     OPTIONAL_NFACCT_LIBS="${NFACCT_LIBS} ${LIBMNL_LIBS}"
 else
@@ -748,6 +763,22 @@ fi
 AC_MSG_RESULT([${enable_plugin_xenstat}])
 AM_CONDITIONAL([ENABLE_PLUGIN_XENSTAT], [test "${enable_plugin_xenstat}" = "yes"])
 
+if test "${enable_plugin_xenstat}" == "yes"; then
+    AC_MSG_CHECKING([for xenstat_vbd_error in -lxenstat])
+    AC_TRY_LINK(
+        [ #include <xenstat.h> ],
+        [
+            xenstat_vbd * vbd;
+            int out = xenstat_vbd_error(vbd);
+        ],
+        [
+            have_xenstat_vbd_error=yes
+            AC_DEFINE([HAVE_XENSTAT_VBD_ERROR], [1], [xenstat_vbd_error usability])
+        ],
+        [ have_xenstat_vbd_error=no ]
+    )
+    AC_MSG_RESULT([${have_xenstat_vbd_error}])
+fi
 
 # -----------------------------------------------------------------------------
 # perf.plugin
@@ -969,7 +1000,7 @@ test "${enable_backend_prometheus_remote_write}" = "yes" -a "${have_CXX_compiler
     AC_MSG_ERROR([C++ compiler required but not found. try installing g++])
 
 AC_MSG_CHECKING([if prometheus remote write backend should be enabled])
-if test "${enable_backend_prometeus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
+if test "${enable_backend_prometheus_remote_write}" != "no" -a "${have_libprotobuf}" = "yes" -a "${have_libsnappy}" = "yes" \
                                                            -a "${have_protoc}" = "yes" -a "${have_CXX_compiler}" = "yes"; then
     enable_backend_prometheus_remote_write="yes"
     AC_DEFINE([ENABLE_PROMETHEUS_REMOTE_WRITE], [1], [Prometheus remote write API usability])
@@ -1130,6 +1161,31 @@ AC_SUBST([OPTIONAL_PROMETHEUS_REMOTE_WRITE_LIBS])
 AC_SUBST([OPTIONAL_MONGOC_CFLAGS])
 AC_SUBST([OPTIONAL_MONGOC_LIBS])
 
+# -----------------------------------------------------------------------------
+# Check if cmocka is available - needed for unit testing
+
+AC_ARG_ENABLE(
+     [unit-tests],
+     [AS_HELP_STRING([--disable-unit-tests],
+                     [Disables building and running the unit tests suite])],
+     [],
+     [enable_unit_tests="yes"]
+)
+
+PKG_CHECK_MODULES(
+    [CMOCKA],
+    [cmocka],
+    [have_cmocka="yes"],
+    [AC_MSG_NOTICE([CMocka not found on the system. Unit tests disabled])]
+)
+AM_CONDITIONAL([ENABLE_UNITTESTS], [test "${enable_unit_tests}" = "yes" -a "${have_cmocka}" = "yes" ])
+AC_SUBST([ENABLE_UNITTESTS])
+
+TEST_CFLAGS="${CFLAGS} ${CMOCKA_CFLAGS}"
+TEST_LIBS="${CMOCKA_LIBS}"
+
+AC_SUBST([TEST_CFLAGS])
+AC_SUBST([TEST_LIBS])
 
 AC_CONFIG_FILES([
     Makefile
@@ -1169,9 +1225,15 @@ AC_CONFIG_FILES([
     database/Makefile
     database/engine/Makefile
     diagrams/Makefile
+    exporting/Makefile
+    exporting/graphite/Makefile
+    exporting/json/Makefile
+    exporting/opentsdb/Makefile
+    exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
     libnetdata/Makefile
+    libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
@@ -1187,6 +1249,7 @@ AC_CONFIG_FILES([
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile
     libnetdata/storage_number/Makefile
+    libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile
     libnetdata/url/Makefile
     libnetdata/json/Makefile
@@ -1220,6 +1283,7 @@ AC_CONFIG_FILES([
     web/gui/Makefile
     web/server/Makefile
     web/server/static/Makefile
+    claim/Makefile
 ])
 AC_OUTPUT
 

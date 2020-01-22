@@ -340,6 +340,8 @@ static inline int access_to_file_is_not_permitted(struct web_client *w, const ch
     return HTTP_RESP_FORBIDDEN;
 }
 
+// Work around a bug in the CMocka library by removing this function during testing.
+#ifndef REMOVE_MYSENDFILE
 int mysendfile(struct web_client *w, char *filename) {
     debug(D_WEB_CLIENT, "%llu: Looking for file '%s/%s'", w->id, netdata_configured_web_dir, filename);
 
@@ -448,11 +450,13 @@ int mysendfile(struct web_client *w, char *filename) {
     w->response.data->date = statbuf.st_mtimespec.tv_sec;
 #else
     w->response.data->date = statbuf.st_mtim.tv_sec;
-#endif /* __APPLE__ */
+#endif 
     buffer_cacheable(w->response.data);
 
     return HTTP_RESP_OK;
 }
+#endif
+
 
 
 #ifdef NETDATA_WITH_ZLIB
@@ -1266,7 +1270,7 @@ static inline void web_client_send_http_header(struct web_client *w) {
                 while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
                     count++;
                     if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                        error("Cannot send HTTP headers to web client.");
+                        error("Cannot send HTTPS headers to web client.");
                         break;
                     }
                 }
@@ -1335,8 +1339,16 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
     if(tok && *tok) {
         debug(D_WEB_CLIENT, "%llu: Searching for host with name '%s'.", w->id, tok);
 
+        if(!url) { //no delim found
+            debug(D_WEB_CLIENT, "%llu: URL doesn't end with / generating redirect.", w->id);
+            buffer_sprintf(w->response.header, "Location: http://%s%s/\r\n", w->server_host, w->last_url);
+            buffer_strcat(w->response.data, "Permanent redirect");
+            return HTTP_RESP_REDIR_PERM;
+        }
+
         // copy the URL, we need it to serve files
         w->last_url[0] = '/';
+
         if(url && *url) strncpyz(&w->last_url[1], url, NETDATA_WEB_REQUEST_URL_SIZE - 1);
         else w->last_url[1] = '\0';
 

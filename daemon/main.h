@@ -41,7 +41,7 @@ struct netdata_static_thread {
 };
 
 extern void cancel_main_threads(void);
-extern int killpid(pid_t pid, int signal);
+extern int killpid(pid_t pid);
 extern void netdata_cleanup_and_exit(int ret) NORETURN;
 extern void send_statistics(const char *action, const char *action_result, const char *action_data);
 
