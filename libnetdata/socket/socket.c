@@ -106,12 +106,76 @@ char *strdup_client_description(int family, const char *protocol, const char *ip
 }
 
 // --------------------------------------------------------------------------------------------------------------------
+// Validating socket address
+
+/**
+ *  Is Unix socket valid?
+ *
+ *  We are considering valid unix sockets, the sockets that follow all `pathname sockets` specification
+ *  http://man7.org/linux/man-pages/man7/unix.7.html
+ *
+ *  @param path is the file that will be used as socket.
+ *
+ *  @return 1 case it is valid socket path and 0 otherwise
+ */
+int is_unix_socket_valid(const char *path) {
+    struct sockaddr_un tester;
+    size_t length = strlen(path);
+    int ret;
+    if (length >= (sizeof(tester.sun_path)-1))
+        ret =  0;
+    else { //We also check whether there is only ascii text and do not have space
+        ret = 1;
+        while (*path) {
+            if(!isascii(*path) || *path == ' ') {
+                ret = 0 ;
+                break;
+            }
+
+            path++;
+        }
+    }
+
+    return ret;
+}
+
+/**
+ * Is valid tcp hostname
+ *
+ * We are considering valid hostname, addresses that follow the specifications of `hostname` manual
+ * http://man7.org/linux/man-pages/man7/hostname.7.html
+ *
+ * @param host the host that will be used to connect
+ *
+ * @return 1 case it is a valid hostname and 0 otherwise.
+ */
+int is_valid_tcp_hostname(char *host) {
+    int ret = 1;
+    while (*host) {
+        if(!isalnum(*host) || *host != '.' || *host != '-') {
+            ret = 0;
+            break;
+        }
+        host++;
+    }
+
+    return ret;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
 // listening sockets
 
 int create_listen_socket_unix(const char *path, int listen_backlog) {
     int sock;
+    struct sockaddr_un name;
 
     debug(D_LISTENER, "LISTENER: UNIX creating new listening socket on path '%s'", path);
+
+    if(!is_unix_socket_valid(path)) {
+        error("LISTENER: The path '%s' is bigger than allowed %ld or is invalid.",
+              path, sizeof(name.sun_path) -1);
+        return -1;
+    }
 
     sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if(sock < 0) {
@@ -122,7 +186,6 @@ int create_listen_socket_unix(const char *path, int listen_backlog) {
     sock_setnonblock(sock);
     sock_enlarge_in(sock);
 
-    struct sockaddr_un name;
     memset(&name, 0, sizeof(struct sockaddr_un));
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, path, sizeof(name.sun_path)-1);
@@ -570,6 +633,13 @@ int listen_sockets_setup(LISTEN_SOCKETS *sockets) {
 // timeout     the timeout for establishing a connection
 
 static inline int connect_to_unix(const char *path, struct timeval *timeout) {
+    struct sockaddr_un addr;
+    if(!is_unix_socket_valid(path)) {
+        error("CONNECT TO UNIX: The path '%s' is bigger than allowed %ld or is invalid.",
+               path, sizeof(addr.sun_path) -1);
+        return -1;
+    }
+
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if(fd == -1) {
         error("Failed to create UNIX socket() for '%s'", path);
@@ -581,7 +651,6 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
             error("Failed to set timeout on UNIX socket '%s'", path);
     }
 
-    struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
@@ -810,6 +879,12 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
 
     if(!*host) {
         error("Definition '%s' does not specify a host.", definition);
+        return -1;
+    }
+
+    if(!is_valid_tcp_hostname(host)) {
+        error("One of the values specified is not valid host = '%s', service = '%s', interface = '%s', protocol = %d",
+                host, service, interface, protocol);
         return -1;
     }
 
