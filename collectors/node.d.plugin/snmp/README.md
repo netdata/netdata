@@ -13,7 +13,7 @@ It supports:
 
 ## Requirements
 
--   `nodejs` minimal required version 4
+-   `nodejs` minimum required version 4
 
 ## Configuration
 
