@@ -521,19 +521,19 @@ stop_all_netdata() {
         # Any of these may fail, but we need to not bail if they do.
         if issystemd; then
             if systemctl stop netdata ; then
-                sleep 20
+                sleep 5
             fi
         elif [ "${uname}" = "Darwin" ]; then
             if launchctl stop netdata ; then
-                sleep 20
+                sleep 5
             fi
         elif [ "${uname}" = "FreeBSD" ]; then
             if /etc/rc.d/netdata stop ; then
-                sleep 20
+                sleep 5
             fi
         else
             if service netdata stop ; then
-                sleep 20
+                sleep 5
             fi
         fi
     fi
