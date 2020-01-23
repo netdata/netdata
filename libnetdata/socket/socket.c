@@ -149,15 +149,19 @@ int is_unix_socket_valid(const char *path) {
  *
  * @return 1 case it is a valid hostname and 0 otherwise.
  */
-int is_valid_tcp_hostname(char *host) {
+int test_tcp_hostname(char *host) {
+    if(!*host) {
+        return -2;
+    }
+
     while (*host) {
         if(!isalnum(*host) && (*host != '.' && *host != '-')) {
-            return 0;
+            return -1;
         }
         host++;
     }
 
-    return 1;
+    return 0;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -875,15 +879,17 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
 
     debug(D_CONNECT_TO, "Attempting connection to host = '%s', service = '%s', interface = '%s', protocol = %d (tcp = %d, udp = %d)", host, service, interface, protocol, IPPROTO_TCP, IPPROTO_UDP);
 
-    if(!*host) {
-        error("Definition '%s' does not specify a host.", definition);
-        return -1;
-    }
-
-    if(!is_valid_tcp_hostname(host)) {
-        error("One of the values specified is not valid host = '%s', service = '%s', interface = '%s', protocol = %d",
-                host, service, interface, protocol);
-        return -1;
+    int test = test_tcp_hostname(host);
+    switch (test) {
+        case -1 :
+            error("One of the values specified is not valid host = '%s', service = '%s', interface = '%s', protocol = %d",
+                  host, service, interface, protocol);
+            return -1;
+        case -2:
+            error("Definition '%s' does not specify a host.", definition);
+            return -1;
+        default:
+            break;
     }
 
     if(*interface) {
