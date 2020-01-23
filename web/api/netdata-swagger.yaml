@@ -627,6 +627,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/alarms"
+  /alarms:
+    get:
+      summary: Get a list of active or raised alarms on the server
+      description: The alarms_values endpoint returns the list of all raised or enabled alarms on
+        the netdata server. Called without any parameters, all the enabled alarms are returned.
+        By passing "?active" the raised alarms in state WARNING or CRITICAL are returned.
+      parameters:
+        - name: all
+          in: query
+          description: If passed, all enabled alarms are returned.
+          required: false
+          allowEmptyValue: true
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: An object containing general info and a linked list of alarms.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/alarms_values"
   /alarm_log:
     get:
       summary: Retrieves the entries of the alarm log
