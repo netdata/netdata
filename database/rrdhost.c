@@ -849,7 +849,7 @@ static inline void strip_last_symbol(char *str, char symbol)
 
     while (*end && *end != symbol)
         end++;
-    if (*end && *end == symbol)
+    if (*end == symbol)
         *end = '\0';
 }
 
