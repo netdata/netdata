@@ -5,13 +5,13 @@
 
 try:
     import beanstalkc
+
     BEANSTALKC = True
 except ImportError:
     BEANSTALKC = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
 from bases.loaders import load_yaml
-
 
 ORDER = [
     'cpu_usage',
@@ -109,7 +109,7 @@ CHARTS = {
         'options': [None, 'Uptime', 'seconds', 'server statistics', 'beanstalk.uptime', 'line'],
         'lines': [
             ['uptime'],
-            ]
+        ]
     }
 }
 
