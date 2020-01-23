@@ -47,7 +47,8 @@ sh /tmp/kickstart-static64.sh
 
 ## Optional parameters to alter your installation
 
-The `kickstart-static64.sh` script passes all its parameters to `netdata-installer.sh`, which you can use to customize your installation. Here are a few important parameters:
+The `kickstart-static64.sh` script passes all its parameters to `netdata-installer.sh`, which you can use to customize
+your installation. Here are a few important parameters:
 
 -   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
