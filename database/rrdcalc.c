@@ -82,7 +82,6 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rc->name);
     rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_hostid, (avl *)&search);
     if (rra) {
-        error("KILLME CALC %s", fullname);
         rc->hostid   = rrdvar_create_and_index("host", &rra->rrdvar_alarm_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR, &rc->value);
 
         snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rc->name);
