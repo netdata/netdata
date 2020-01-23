@@ -6,9 +6,7 @@
 import socket
 
 from bases.FrameworkServices.SimpleService import SimpleService
-
 from third_party import boinc_client
-
 
 ORDER = [
     'tasks',
