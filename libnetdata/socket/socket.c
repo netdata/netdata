@@ -150,16 +150,14 @@ int is_unix_socket_valid(const char *path) {
  * @return 1 case it is a valid hostname and 0 otherwise.
  */
 int is_valid_tcp_hostname(char *host) {
-    int ret = 1;
     while (*host) {
         if(!isalnum(*host) && (*host != '.' && *host != '-')) {
-            ret = 0;
-            break;
+            return 0;
         }
         host++;
     }
 
-    return ret;
+    return 1;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
