@@ -6,19 +6,19 @@ IoT/edge devices. Netdata runs on Linux, FreeBSD, macOS, Kubernetes, Docker, and
 The best way to install Netdata is with our [**automatic one-line installation
 script**](#automatic-one-line-installation-script), which works with all Linux distributions. 
 
-If you want to install Netdata with Docker, on a Kubernetes cluster, or on a different operating system, see [Have a
+If you want to install Netdata with Docker, on a Kubernetes cluster, or a different operating system, see [Have a
 different operating system, or want to try another
 method?](#have-a-different-operating-system-or-want-to-try-another-method)
 
 Some third parties, such as the packaging teams at various Linux distributions, distribute old, broken, or altered
-packages. We recommend you install Netdata using one of the above methods to guarantee you get the latest and
+packages. We recommend you install Netdata using one of the methods listed below to guarantee you get the latest
 checksum-verified packages.
 
 Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
 about the information collected, and learn how to-opt, on our [anonymous statistics](../../docs/anonymous-statistics.md)
 page.
 
-The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
 _actively_ contributing to Netdata's future.
 
 ## Automatic one-line installation script
@@ -39,9 +39,11 @@ stable releases, or disable anonymous statistics, see the [`kickstart.sh` method
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
 
-Now that Netdata is installed, be sure to visit our [getting started guide](../../docs/getting-started.md) for a quick
-overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. Or, get the full guided tour of
-Netdata's capabilities with our [step-by-step tutorial](../../docs/step-by-step/step-00.md)!
+When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../docs/step-by-step/step-00.md)
+for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
+
+Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
+guide](../../docs/getting-started.md) for a quick overview.
 
 ## Have a different operating system, or want to try another method?
 
@@ -55,13 +57,13 @@ operating systems.
 
 <div class="installer-grid">
   <div class="grid-item">
-    <h3><img src="" alt="Install with .deb or .rpm packages" />Packages</h3>
+    <h3><img src="https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png" alt="Install with .deb or .rpm packages" />Packages</h3>
     <ul>
       <li><a href="methods/packages/">Install with <code>.deb</code> or <code>.rpm</code> packages</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="" alt="Install with a pre-built static binary for 64-bit systems" />Static binary</h3>
+    <h3><img src="https://user-images.githubusercontent.com/1153921/73030303-94727680-3df6-11ea-963e-6f2cb0ce762c.png" alt="Install with a pre-built static binary for 64-bit systems" />Static binary</h3>
     <ul>
       <li><a href="methods/kickstart-64/">Install with a pre-built static binary for 64-bit systems</a></li>
     </ul>
@@ -69,8 +71,8 @@ operating systems.
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71905478-e36ea980-3170-11ea-94f7-950328ad1bdf.png" alt="Install Netdata on Docker" />Docker</h3>
     <ul>
-      <li><a href="docker/#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
-      <li><a href="docker/#run-netdata-with-the-docker-command">Using a `docker-compose.yml` file</a></li>
+      <li><a href="../docker/#run-netdata-with-the-docker-command">Using the <code>docker</code> command</a></li>
+      <li><a href="../docker/#run-netdata-with-the-docker-command">Using a `docker-compose.yml` file</a></li>
     </ul>
   </div>
   <div class="grid-item">
@@ -89,17 +91,17 @@ operating systems.
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71961245-a3a2d300-31ff-11ea-89bf-b90e7242d9a5.png" alt="Install Netdata on FreeBSD" />FreeBSD</h3>
     <ul>
-      <li><a href="methods/pfsense.md">Installation on FreeBSD</a></li>
+      <li><a href="methods/freebsd/">Installation on FreeBSD</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="" alt="Install manually from source" />Manual</h3>
+    <h3><img src="https://user-images.githubusercontent.com/1153921/73032280-f1246000-3dfb-11ea-870d-7fbddd9a6f76.png" alt="Install manually from source" />Manual</h3>
     <ul>
       <li><a href="methods/manual/">Install manually from source</a></li>
     </ul>
   </div>
   <div class="grid-item">
-    <h3><img src="" alt="Install on offline/air-gapped systems" />Offline</h3>
+    <h3><img src="https://user-images.githubusercontent.com/1153921/73032239-c89c6600-3dfb-11ea-8224-c8a9f7a50c53.png" alt="Install on offline/air-gapped systems" />Offline</h3>
     <ul>
       <li><a href="methods/offline/">Install on offline/air-gapped systems</a></li>
     </ul>
@@ -107,25 +109,25 @@ operating systems.
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71961918-13fe2400-3201-11ea-9a91-fe6f5b27df0c.png" alt="Install Netdata on PFSense" />PFSense</h3>
     <ul>
-      <li><a href="methods/pfsense.md">Installation on PFSense</a></li>
+      <li><a href="methods/pfsense/">Installation on PFSense</a></li>
     </ul>
   </div>
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71962148-853dd700-3201-11ea-9a09-16fdb39e9ee4.png" alt="Install Netdata on Synology" />Synology</h3>
     <ul>
-      <li><a href="methods/synology.md">Installation on Synology</a></li>
+      <li><a href="methods/synology/">Installation on Synology</a></li>
     </ul>
   </div>
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/72070923-543dcf00-32f3-11ea-8053-d61bc96529b5.png" alt="Install Netdata on Alpine FreeNAS" />FreeNAS</h3>
     <ul>
-      <li><a href="methods/freenas.md">Manual installation on FreeNAS</a></li>
+      <li><a href="methods/freenas/">Manual installation on FreeNAS</a></li>
     </ul>
   </div>
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/72070921-53a53880-32f3-11ea-80f1-7d00cd8a7906.png" alt="Install Netdata on Alpine Linux" />Alpine</h3>
     <ul>
-      <li><a href="methods/alpine.md">Manual installation on Alpine</a></li>
+      <li><a href="methods/alpine/">Manual installation on Alpine</a></li>
     </ul>
   </div>
 </div>
@@ -134,7 +136,7 @@ operating systems.
 
 By default, Netdata's installation scripts enable automatic updates for both nightly and stable release channels.
 
-If you would prefer to manually update your Netdata agent, you can disable automatic updates by using the `--no-updates`
+If you would prefer to update your Netdata agent manually, you can disable automatic updates by using the `--no-updates`
 option when you install or update Netdata using the [automatic one-line installation
 script](#automatic-one-line-installation-script).
 

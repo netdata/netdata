@@ -22,8 +22,8 @@ bash <(curl -Ss https://my-netdata.io/kickstart-static64.sh)
 
 The `kickstart.sh` script does the following after being downloaded and run:
 
--   Detects the Linux distro and **installs the required system packages** for building Netdata. Unless you added the
-    `--dont-wait` option, it will ask for your permission first.
+-   Detects the Linux distribution and **installs the required system packages** for building Netdata. Unless you added
+    the `--dont-wait` option, it will ask for your permission first.
 -   Downloads the latest Netdata binary from the [binary-packages](https://github.com/netdata/binary-packages)
     repository. You can also run any of these `.run` files with [makeself](https://github.com/megastep/makeself).
 -   Installs Netdata by running `./netdata-installer.sh` from the source tree, including any options you might have
@@ -47,8 +47,7 @@ sh /tmp/kickstart-static64.sh
 
 ## Optional parameters to alter your installation
 
-The `kickstart-static64.sh` script passes all its parameters to `netdata-installer.sh`, so you can add more parameters
-to customize your installation. Here are a few important parameters:
+The `kickstart-static64.sh` script passes all its parameters to `netdata-installer.sh`, which you can use to customize your installation. Here are a few important parameters:
 
 -   `--dont-wait`: Enable automated installs by not prompting for permission to install any required packages.
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
@@ -75,8 +74,8 @@ If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-Now that Netdata is installed, be sure to visit our [getting started guide](../../../docs/getting-started.md) for a
-quick overview of configuring Netdata, enabling plugins, and controlling Netdata's daemon. 
+When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../../docs/step-by-step/step-00.md)
+for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs. 
 
-Or, get the full guided tour of Netdata's capabilities with our [step-by-step
-tutorial](../../../docs/step-by-step/step-00.md)!
+Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
+guide](../../../docs/getting-started.md) for a quick overview.

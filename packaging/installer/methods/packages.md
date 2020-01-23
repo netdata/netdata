@@ -23,3 +23,11 @@ We provide two separate repositories, one for our stable releases and one for ou
     [netdata/netdata-edge](https://packagecloud.io/netdata/netdata-edge) repository of package cloud
 
 Visit the repository pages and follow the quick set-up instructions to get started.
+
+## What's next?
+
+When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../../docs/step-by-step/step-00.md)
+for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs.
+
+Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
+guide](../../../docs/getting-started.md) for a quick overview.

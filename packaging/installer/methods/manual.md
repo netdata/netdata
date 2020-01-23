@@ -142,3 +142,11 @@ Once the installer completes, the file `/etc/netdata/netdata.conf` will be creat
 You can edit this file to set options. One common option to tweak is `history`, which controls the size of the memory database Netdata will use. By default is `3600` seconds (an hour of data at the charts) which makes Netdata use about 10-15MB of RAM (depending on the number of charts detected on your system). Check **\[[Memory Requirements]]**.
 
 To apply the changes you made, you have to restart Netdata.
+
+## What's next?
+
+When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../../docs/step-by-step/step-00.md)
+for a fully-guided tour into Netdata's capabilities and how to configure it according to your needs.
+
+Or, if you're a monitoring and system administration pro, skip ahead to our [getting started
+guide](../../../docs/getting-started.md) for a quick overview.
