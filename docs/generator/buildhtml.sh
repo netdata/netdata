@@ -23,7 +23,7 @@ git clone https://github.com/netdata/go.d.plugin.git ${GO_D_DIR}
 echo "Copying files"
 rm -rf ${SRC_DIR}
 mkdir ${SRC_DIR}
-find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -exec cp -prv --parents '{}' ./${SRC_DIR}/ ';'
+find . -type d \( -path ./${GENERATOR_DIR} -o -path ./node_modules \) -prune -o -name "*.md" -exec cp -pr --parents '{}' ./${SRC_DIR}/ ';'
 
 # Copy Netdata html resources
 cp -a ./${GENERATOR_DIR}/custom ./${SRC_DIR}/
@@ -91,7 +91,7 @@ prep_html() {
 
 }
 
-for d in "en" $(find ${LOC_DIR} -mindepth 1 -maxdepth 1 -name .git -prune -o -type d -printf '%f ') ; do
+for d in "en" "kr" "zh" "pt" ; do
 	echo "Preparing source for $d"
 	cp -r ${SRC_DIR} ${DOCS_DIR}
 	if [ "${d}" != "en" ] ; then

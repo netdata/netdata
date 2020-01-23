@@ -23,7 +23,7 @@ Our main areas of concern are:
    That means a lot of testing, a lot of consistency checks, a lot of validations
 
 3) Generated artifacts consistency. We should not allow broken software to reach the public.
-   When this happens, it's embarassing and we struggle to eliminate it.
+   When this happens, it's embarrassing and we struggle to eliminate it.
 
 4) We are an innovative company, so we love to automate :)
 

@@ -80,6 +80,7 @@ umask 002
 renice 19 $$ >/dev/null 2>/dev/null
 
 # you can set CFLAGS before running installer
+LDFLAGS="${LDFLAGS}"
 CFLAGS="${CFLAGS--O2}"
 [ "z${CFLAGS}" = "z-O3" ] && CFLAGS="-O2"
 
@@ -88,19 +89,16 @@ CFLAGS="${CFLAGS--O2}"
 printf "\\n# " >>netdata-installer.log
 date >>netdata-installer.log
 printf 'CFLAGS="%s" ' "${CFLAGS}" >>netdata-installer.log
+printf 'LDFLAGS="%s" ' "${LDFLAGS}" >>netdata-installer.log
 printf "%q " "${PROGRAM}" "${@}" >>netdata-installer.log
 printf "\\n" >>netdata-installer.log
 
-REINSTALL_COMMAND="$(
-	printf "%q " "${PROGRAM}" "${@}"
+REINSTALL_OPTIONS="$(
+	printf "%s" "${*}"
 	printf "\\n"
 )"
 # remove options that shown not be inherited by netdata-updater.sh
-REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-wait/}"
-REINSTALL_COMMAND="${REINSTALL_COMMAND// --dont-start-it/}"
-if [ "${REINSTALL_COMMAND:0:1}" != "." ] && [ "${REINSTALL_COMMAND:0:1}" != "/" ] && [ -f "./${PROGRAM}" ]; then
-	REINSTALL_COMMAND="./${REINSTALL_COMMAND}"
-fi
+REINSTALL_OPTIONS="$(echo "${REINSTALL_OPTIONS}" | sed 's/--dont-wait//g' | sed 's/--dont-start-it//g')"
 
 banner_nonroot_install() {
 	cat <<NONROOTNOPREFIX
@@ -186,6 +184,14 @@ Netdata will by default be compiled with gcc optimization -O2
 If you need to pass different CFLAGS, use something like this:
 
   CFLAGS="<gcc options>" ${PROGRAM} [options]
+
+If you also need to provide different LDFLAGS, use something like this:
+
+  LDFLAGS="<extra ldflag options>" ${PROGRAM} [options]
+
+or use the following if both LDFLAGS and CFLAGS need to be overriden:
+
+  CFLAGS="<gcc options>" LDFLAGS="<extra ld options>" ${PROGRAM} [options]
 
 For the installer to complete successfully, you will need these packages installed:
 
@@ -422,7 +428,7 @@ run ./configure \
 	--with-math \
 	--with-user=netdata \
 	${NETDATA_CONFIGURE_OPTIONS} \
-	CFLAGS="${CFLAGS}" || exit 1
+	CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" || exit 1
 
 # remove the build_error hook
 trap - EXIT
@@ -1083,12 +1089,13 @@ cat <<EOF > "${NETDATA_USER_CONFIG_DIR}/.environment"
 # Created by installer
 PATH="${PATH}"
 CFLAGS="${CFLAGS}"
+LDFLAGS="${LDFLAGS}"
 NETDATA_PREFIX="${NETDATA_PREFIX}"
 NETDATA_CONFIGURE_OPTIONS="${NETDATA_CONFIGURE_OPTIONS}"
 NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS}"
 INSTALL_UID="${UID}"
 NETDATA_GROUP="${NETDATA_GROUP}"
-REINSTALL_COMMAND="${REINSTALL_COMMAND}"
+REINSTALL_OPTIONS="${REINSTALL_OPTIONS}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL}"
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY}"
 NETDATA_LIB_DIR="${NETDATA_LIB_DIR}"
