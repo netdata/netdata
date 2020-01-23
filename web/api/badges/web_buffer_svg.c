@@ -507,23 +507,23 @@ static struct badge_color {
         // colors from:
         // https://github.com/badges/shields/blob/master/colorscheme.json
 
-        { "brightgreen", 0, "#4c1"    },
-        { "green",       0, "#97CA00" },
-        { "yellow",      0, "#dfb317" },
-        { "yellowgreen", 0, "#a4a61d" },
-        { "orange",      0, "#fe7d37" },
-        { "red",         0, "#e05d44" },
-        { "blue",        0, "#007ec6" },
-        { "grey",        0, "#555"    },
-        { "gray",        0, "#555"    },
-        { "lightgrey",   0, "#9f9f9f" },
-        { "lightgray",   0, "#9f9f9f" },
+        { "brightgreen", 0, "4c1"    },
+        { "green",       0, "97CA00" },
+        { "yellow",      0, "dfb317" },
+        { "yellowgreen", 0, "a4a61d" },
+        { "orange",      0, "fe7d37" },
+        { "red",         0, "e05d44" },
+        { "blue",        0, "007ec6" },
+        { "grey",        0, "555"    },
+        { "gray",        0, "555"    },
+        { "lightgrey",   0, "9f9f9f" },
+        { "lightgray",   0, "9f9f9f" },
 
         // terminator
         { NULL,          0, NULL      }
 };
 
-static inline const char *color_map(const char *color) {
+static inline const char *color_map(const char *color, const char *def) {
     static int max = -1;
     int i;
 
@@ -543,7 +543,7 @@ static inline const char *color_map(const char *color) {
             return ptr->color;
     }
 
-    return color;
+    return def;
 }
 
 typedef enum color_comparison {
@@ -688,24 +688,66 @@ static inline void calc_colorz(const char *color, char *final, size_t len, calcu
 // colors
 #define COLOR_STRING_SIZE 100
 
+static inline int allowed_hexa_char(char x) {
+    return ( (x >= '0' && x <= '9') ||
+             (x >= 'a' && x <= 'f') ||
+             (x >= 'A' && x <= 'F')
+           );
+}
+
+static int html_color_check(const char *str) {
+    int i = 0;
+    while(str[i]) {
+        if(!allowed_hexa_char(str[i]))
+            return 0;
+        if(unlikely(i >= 6))
+            return 0;
+        i++;
+    }
+    // want to allow either RGB or RRGGBB
+    return ( i == 6 || i == 3 );
+}
+
+// Will parse color arg as #RRGGBB or #RGB or one of the colors
+// from color_map hash table
+// if parsing fails (argument error) it will return default color
+// given as default parameter (def)
+// in any case it will return either color in "RRGGBB" or "RGB" format as string
+// or whatever is given as def (without checking - caller responsible to give sensible
+// safely escaped default) as default if it fails
+// in any case this function must always return something we can put directly in XML
+// so no escaping is necessary anymore (with excpetion of default where caller is responsible)
+// to give sensible default
+#define BADGE_SVG_COLOR_ARG_MAXLEN 20
+
+static const char *parse_color_argument(const char *arg, const char *def)
+{
+    if( !arg )
+        return def;
+    size_t len = strnlen(arg, BADGE_SVG_COLOR_ARG_MAXLEN);
+    if( len < 2 || len >= BADGE_SVG_COLOR_ARG_MAXLEN )
+        return def;
+    if( html_color_check(arg) )
+        return arg;
+    return color_map(arg, def);
+}
+
 void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const char *units, const char *label_color, const char *value_color, int precision, int scale, uint32_t options, int fixed_width_lbl, int fixed_width_val, const char* text_color_lbl, const char* text_color_val) {
     char    value_color_buffer[COLOR_STRING_SIZE + 1]
             , value_string[VALUE_STRING_SIZE + 1]
             , label_escaped[LABEL_STRING_SIZE + 1]
-            , value_escaped[VALUE_STRING_SIZE + 1]
-            , label_color_escaped[COLOR_STRING_SIZE + 1]
-            , value_color_escaped[COLOR_STRING_SIZE + 1];
+            , value_escaped[VALUE_STRING_SIZE + 1];
+
+    const char *label_color_parsed;
+    const char *value_color_parsed;
 
     double label_width = (double)fixed_width_lbl, value_width = (double)fixed_width_val, total_width;
     double height = 20.0, font_size = 11.0, text_offset = 5.8, round_corner = 3.0;
 
     if(scale < 100) scale = 100;
 
-    if(unlikely(!label_color || !*label_color))
-        label_color = "#555";
-
     if(unlikely(!value_color || !*value_color))
-        value_color = (isnan(value) || isinf(value))?"#999":"#4c1";
+        value_color = (isnan(value) || isinf(value))?"999":"4c1";
 
     calc_colorz(value_color, value_color_buffer, COLOR_STRING_SIZE, value);
     format_value_and_unit(value_string, VALUE_STRING_SIZE, (options & RRDR_OPTION_DISPLAY_ABS)?calculated_number_fabs(value):value, units, precision);
@@ -718,8 +760,9 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
 
     escape_xmlz(label_escaped, label, LABEL_STRING_SIZE);
     escape_xmlz(value_escaped, value_string, VALUE_STRING_SIZE);
-    escape_xmlz(label_color_escaped, color_map(label_color), COLOR_STRING_SIZE);
-    escape_xmlz(value_color_escaped, color_map(value_color_buffer), COLOR_STRING_SIZE);
+
+    label_color_parsed = parse_color_argument(label_color, "555");
+    value_color_parsed = parse_color_argument(value_color_buffer, "555");
 
     wb->contenttype = CT_IMAGE_SVG_XML;
 
@@ -743,10 +786,10 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
                 "<rect class=\"bdge-ttl-width\" width=\"%0.2f\" height=\"%0.2f\" rx=\"%0.2f\" fill=\"#fff\"/>"
             "</mask>"
             "<g mask=\"url(#round)\">"
-                "<rect class=\"bdge-rect-lbl\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>",
+                "<rect class=\"bdge-rect-lbl\" width=\"%0.2f\" height=\"%0.2f\" fill=\"#%s\"/>",
         total_width, height,
         total_width, height, round_corner,
-        label_width, height, label_color_escaped); //<rect class="bdge-rect-lbl"
+        label_width, height, label_color_parsed); //<rect class="bdge-rect-lbl"
 
     if(fixed_width_lbl > 0 && fixed_width_val > 0) {
         buffer_sprintf(wb,
@@ -757,8 +800,8 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     }
 
     buffer_sprintf(wb,
-                "<rect class=\"bdge-rect-val\" x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"%s\"/>",
-        label_width, value_width, height, value_color_escaped);
+                "<rect class=\"bdge-rect-val\" x=\"%0.2f\" width=\"%0.2f\" height=\"%0.2f\" fill=\"#%s\"/>",
+        label_width, value_width, height, value_color_parsed);
     
     if(fixed_width_lbl > 0 && fixed_width_val > 0) {
         buffer_sprintf(wb,
@@ -780,9 +823,9 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
         total_width, height,
         font_size,
         label_width / 2, ceil(height - text_offset), label_escaped,
-        label_width / 2, ceil(height - text_offset - 1.0), (text_color_lbl ? text_color_lbl : "fff"), label_escaped,
+        label_width / 2, ceil(height - text_offset - 1.0), parse_color_argument(text_color_lbl, "fff"), label_escaped,
         label_width + value_width / 2 -1, ceil(height - text_offset), value_escaped,
-        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), (text_color_val ? text_color_val : "fff"), value_escaped);
+        label_width + value_width / 2 -1, ceil(height - text_offset - 1.0), parse_color_argument(text_color_val, "fff"), value_escaped);
 
     if(fixed_width_lbl <= 0 || fixed_width_val <= 0){
         buffer_sprintf(wb,
@@ -814,34 +857,6 @@ void buffer_svg(BUFFER *wb, const char *label, calculated_number value, const ch
     }
     buffer_sprintf(wb, "</svg>");
 }
-
-static inline int allowed_hexa_char(char x) {
-    return ( (x >= '0' && x <= '9') ||
-             (x >= 'a' && x <= 'f') ||
-             (x >= 'A' && x <= 'F')
-           );
-}
-
-static int html_color_check(const char *str) {
-    int i = 0;
-    while(str[i]) {
-        if(!allowed_hexa_char(str[i]))
-            return 0;
-        if(unlikely(i >= 6))
-            return 0;
-        i++;
-    }
-    // want to allow either RGB or RRGGBB
-    return ( i == 6 || i == 3 );
-}
-
-#define CHECK_COLOR_ATTR_OK(x, log) { \
-            if(x && !html_color_check(x)) { \
-                buffer_no_cacheable(w->response.data); \
-                buffer_sprintf(w->response.data, "Attribute given as \"%s\" is not an valid HTML color.", log); \
-                goto cleanup; \
-            }\
-        }
 
 #define BADGE_URL_ARG_LBL_COLOR "text_color_lbl"
 #define BADGE_URL_ARG_VAL_COLOR "text_color_val"
@@ -928,9 +943,6 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         fixed_width_lbl = str2i(fixed_width_lbl_str);
         fixed_width_val = str2i(fixed_width_val_str);
     }
-
-    CHECK_COLOR_ATTR_OK(text_color_lbl_str, BADGE_URL_ARG_LBL_COLOR);
-    CHECK_COLOR_ATTR_OK(text_color_val_str, BADGE_URL_ARG_VAL_COLOR);
 
     if(!chart || !*chart) {
         buffer_no_cacheable(w->response.data);

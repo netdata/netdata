@@ -180,7 +180,21 @@ These are options dedicated to badges:
 
 -   `label_color=COLOR`
 
-    The color of the label (the left part). You can use any HTML color, include `#NNN` and `#NNNNNN`. The following colors are defined in Netdata (and you can use them by name): `green`, `brightgreen`, `yellow`, `yellowgreen`, `orange`, `red`, `blue`, `grey`, `gray`, `lightgrey`, `lightgray`. These are taken from <https://github.com/badges/shields> so they are compatible with standard badges.
+    The color of the label (the left part). You can use any HTML color in `RGB` or `RRGGBB` hex notation (without `#` character in beginning). Additionally you can use one of the following predefined colors (and you can use them by their name):
+    
+    - `green`
+    - `brightgreen`
+    - `yellow`
+    - `yellowgreen`
+    - `orange`
+    - `red`
+    - `blue`
+    - `grey`
+    - `gray`
+    - `lightgrey`
+    - `lightgray`
+    
+    These are taken from <https://github.com/badges/shields> so they are compatible with standard badges.
 
 -   `value_color=COLOR:null|COLOR<VALUE|COLOR>VALUE|COLOR>=VALUE|COLOR<=VALUE|...`
 
@@ -192,13 +206,15 @@ These are options dedicated to badges:
 
     The supported operators are `<`, `>`, `<=`, `>=`, `=` (or `:`) and `!=` (or `<>`).
 
--   `text_color_lbl=RGB` or `text_color_lbl=RRGGBB`
+    For each color you can use same syntax for `label_color` parameter (predefined color by name or custom color in `RGB` or `RRGGBB` hex notation).
 
-    Specifies hexadecimal color *(like in HTML but without `#` prepended)* for the font of left/label side of the badge. If not given or given with empty value default color will be used.
+-   `text_color_lbl=RGB` or `text_color_lbl=RRGGBB` or `text_color_lbl=color_by_name`
 
--   `text_color_val=RGB` or `text_color_val=RRGGBB`
+    Specifies font color for the font of left/label side of the badge. Syntax is the same as for `label_color` parameter. If not given or given with empty value default color will be used.
 
-    Specifies hexadecimal color *(like in HTML but without `#` prepended)* for the font of right/value side of the badge. If not given or given with empty value default color will be used.
+-   `text_color_val=RGB` or `text_color_val=RRGGBB` or `text_color_lbl=color_by_name`
+
+    Specifies font color for the font of right/value side of the badge. Syntax is the same as for `label_color` parameter. If not given or given with empty value default color will be used.
 
 -   `precision=NUMBER`
 
