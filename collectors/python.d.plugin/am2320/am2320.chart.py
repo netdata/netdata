@@ -7,13 +7,12 @@ try:
     import board
     import busio
     import adafruit_am2320
+
     HAS_AM2320 = True
 except ImportError:
     HAS_AM2320 = False
 
-
 from bases.FrameworkServices.SimpleService import SimpleService
-
 
 ORDER = [
     'temperature',
@@ -60,9 +59,9 @@ class Service(SimpleService):
     def get_data(self):
         try:
             return {
-            'temperature': self.am.temperature,
-            'humidity': self.am.relative_humidity,
-           }
+                'temperature': self.am.temperature,
+                'humidity': self.am.relative_humidity,
+            }
 
         except (OSError, RuntimeError) as error:
             self.error(error)
