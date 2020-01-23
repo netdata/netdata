@@ -29,7 +29,6 @@ dist_python_DATA = \
 
 userpythonconfigdir=$(configdir)/python.d
 dist_userpythonconfig_DATA = \
-    .keep \
     $(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask

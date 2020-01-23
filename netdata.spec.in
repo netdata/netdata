@@ -255,8 +255,6 @@ autoreconf -ivf
 rm -rf "${RPM_BUILD_ROOT}"
 %{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
 
-find "${RPM_BUILD_ROOT}%{_localstatedir}" -name .keep -delete -print
-
 install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 
 # ###########################################################

@@ -16,7 +16,6 @@ dist_noinst_DATA = \
 
 userhealthconfigdir=$(configdir)/health.d
 dist_userhealthconfig_DATA = \
-    .keep \
     $(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask

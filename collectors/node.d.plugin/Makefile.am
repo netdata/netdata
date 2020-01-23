@@ -23,7 +23,6 @@ dist_noinst_DATA = \
 
 usernodeconfigdir=$(configdir)/node.d
 dist_usernodeconfig_DATA = \
-    .keep \
     $(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask

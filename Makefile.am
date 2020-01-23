@@ -115,10 +115,6 @@ AM_CFLAGS = \
     $(NULL)
 
 sbin_PROGRAMS =
-dist_cache_DATA = packaging/installer/.keep
-dist_varlib_DATA = packaging/installer/.keep
-dist_registry_DATA = packaging/installer/.keep
-dist_log_DATA = packaging/installer/.keep
 plugins_PROGRAMS =
 
 LIBNETDATA_FILES = \

@@ -31,7 +31,6 @@ dist_charts_DATA = \
 
 userchartsconfigdir=$(configdir)/charts.d
 dist_userchartsconfig_DATA = \
-    .keep \
     $(NULL)
 
 # Explicitly install directories to avoid permission issues due to umask
