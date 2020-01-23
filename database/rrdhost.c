@@ -843,21 +843,27 @@ struct label *load_config_labels()
     return l;
 }
 
-static inline void strip_last_symbol(char *str, char symbol)
+static inline void strip_last_symbol(char *str, char symbol, int skip_escaped_characters)
 {
     char *end = str;
 
-    while (*end && *end != symbol)
+    while (*end && *end != symbol) {
+        if (unlikely(skip_escaped_characters && *end == '\\')) {
+            end++;
+            if (unlikely(!*end))
+                break;
+        }
         end++;
-    if (*end == symbol)
+    }
+    if (likely(*end == symbol))
         *end = '\0';
 }
 
-static inline char *strip_double_quotes(char *str)
+static inline char *strip_double_quotes(char *str, int skip_escaped_characters)
 {
     if (*str == '"') {
         str++;
-        strip_last_symbol(str, '"');
+        strip_last_symbol(str, '"', skip_escaped_characters);
     }
 
     return str;
@@ -869,7 +875,8 @@ struct label *parse_simple_tags(
     char key_value_separator,
     char label_separator,
     int strip_quotes_from_key,
-    int strip_quotes_from_value)
+    int strip_quotes_from_value,
+    int skip_escaped_characters)
 {
     const char *end = tags;
 
@@ -890,8 +897,8 @@ struct label *parse_simple_tags(
 
         label_list = add_label_to_list(
             label_list,
-            strip_quotes_from_key ? strip_double_quotes(trim(key)) : trim(key),
-            strip_quotes_from_value ? strip_double_quotes(trim(value)) : trim(value),
+            strip_quotes_from_key ? strip_double_quotes(trim(key), skip_escaped_characters) : trim(key),
+            strip_quotes_from_value ? strip_double_quotes(trim(value), skip_escaped_characters) : trim(value),
             LABEL_SOURCE_NETDATA_CONF);
 
         if (*end)
@@ -910,22 +917,21 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
     switch (*str) {
     case '{':
         str++;
-        strip_last_symbol(str, '}');
+        strip_last_symbol(str, '}', 1);
 
-        // TODO: skip escaped quotes in quoted words and parse labels
-        label_list = parse_simple_tags(label_list, str, ':', ',', 1, 1);
+        label_list = parse_simple_tags(label_list, str, ':', ',', 1, 1, 1);
 
         break;
     case '[':
         str++;
-        strip_last_symbol(str, ']');
+        strip_last_symbol(str, ']', 1);
 
         // TODO: skip escaped quotes quoted words, create consecutive label keys, and parse values
         label_list = add_label_to_list(label_list, "host_tag", str, LABEL_SOURCE_NETDATA_CONF);
 
         break;
     case '"':
-        label_list = add_label_to_list(label_list, "host_tag", strip_double_quotes(str), LABEL_SOURCE_NETDATA_CONF);
+        label_list = add_label_to_list(label_list, "host_tag", strip_double_quotes(str, 1), LABEL_SOURCE_NETDATA_CONF);
         break;
     default:
         label_list = add_label_to_list(label_list, "host_tag", str, LABEL_SOURCE_NETDATA_CONF);
@@ -954,19 +960,19 @@ struct label *load_labels_from_tags()
 
     switch (type) {
         case BACKEND_TYPE_GRAPHITE:
-            label_list = parse_simple_tags(label_list, localhost->tags, '=', ';', 0, 0);
+            label_list = parse_simple_tags(label_list, localhost->tags, '=', ';', 0, 0, 0);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_TELNET:
-            label_list = parse_simple_tags(label_list, localhost->tags, '=', ' ', 0, 0);
+            label_list = parse_simple_tags(label_list, localhost->tags, '=', ' ', 0, 0, 0);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_HTTP:
-            label_list = parse_simple_tags(label_list, localhost->tags, ':', ',', 1, 1);
+            label_list = parse_simple_tags(label_list, localhost->tags, ':', ',', 1, 1, 0);
             break;
         case BACKEND_TYPE_JSON:
             label_list = parse_json_tags(label_list, localhost->tags);
             break;
         default:
-            label_list = parse_simple_tags(label_list, localhost->tags, '=', ',', 0, 1);
+            label_list = parse_simple_tags(label_list, localhost->tags, '=', ',', 0, 1, 0);
             break;
     }
 
