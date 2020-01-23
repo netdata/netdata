@@ -47,16 +47,16 @@ stages:
   - name: Build process
   - name: Artifacts validation
   - name: Artifacts validation on bare OS, stable to current lifecycle checks
-    if: branch = master AND (type = pull_request OR type = cron)
+    if: branch = master AND (type = pull_request OR (type = cron AND env(RUN_NIGHTLY) = yes))
 
     # Nightly operations
   - name: Nightly operations
-    if: branch = master AND type = cron
+    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
 
   - name: Nightly release
-    if: branch = master AND type = cron
+    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
   - name: Trigger deb and rpm package build (nightly release)
-    if: branch = master AND type = cron
+    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
 
     # Scheduled releases
   - name: Support activities on main branch

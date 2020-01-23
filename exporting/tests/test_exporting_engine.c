@@ -25,6 +25,8 @@ void init_connectors_in_tests(struct engine *engine)
     expect_value(__wrap_uv_thread_create, worker, simple_connector_worker);
     expect_value(__wrap_uv_thread_create, arg, engine->connector_root->instance_root);
 
+    expect_function_call(__wrap_uv_thread_set_name_np);
+
     assert_int_equal(__real_init_connectors(engine), 0);
 
     assert_int_equal(engine->now, 2);
