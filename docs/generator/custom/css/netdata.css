@@ -398,7 +398,6 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     color: #546e7a;
 }
 
-<<<<<<< HEAD
 /* Underline links, but not badges/icons. */
 .md-typeset a:not(.nav-button):not(.md-icon):not(.nav-page):not(.headerlink):not(.md-footer-social__link) {
     color: #00AB44;
@@ -428,11 +427,11 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 /* Fix the font size of admonition and details sections. */
 .md-typeset .admonition, .md-typeset details {
     font-size: 0.75rem;
-=======
-/* Bold the first item on the docs sidebar: Netdata Documentation */
-.md-nav--primary > .md-nav__list > .md-nav__item:first-of-type {
-    font-weight: 700;
 }
+
+/*
+   Installer grid
+*/
 
 /* Installation / OS and method grid */
 .installer-grid {
@@ -473,5 +472,4 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     border-bottom: 0px !important;
     text-decoration: none;
     display: inline;
->>>>>>> Lots of new pages, lots of improvements
 }
