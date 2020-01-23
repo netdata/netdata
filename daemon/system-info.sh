@@ -282,7 +282,7 @@ if [ "${KERNEL_NAME}" = FreeBSD ] ; then
         TOTAL_RAM="$(sysctl -n hw.physmem)"
 elif [ -r /proc/meminfo ] ; then
         RAM_DETECTION="procfs"
-        TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ' ')"
         TOTAL_RAM="$((TOTAL_RAM*1024))"
 fi
 
