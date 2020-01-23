@@ -1,10 +1,16 @@
-name: 'Auto Assign'
-on: pull_request
+---
+# Handles Assigning PR(s) to theit Author.
+name: Pull Request Auto Assign
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
 
 jobs:
   auto-assign:
     runs-on: ubuntu-latest
     steps:
       - uses: kentaro-m/auto-assign-action@v1.0.1
+        if: github.repository == 'netdata/netdata'
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
