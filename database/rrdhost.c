@@ -926,8 +926,24 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
         str++;
         strip_last_symbol(str, ']', 1);
 
-        // TODO: skip escaped quotes quoted words, create consecutive label keys, and parse values
-        label_list = add_label_to_list(label_list, "host_tag", str, LABEL_SOURCE_NETDATA_CONF);
+        char *end = str + strlen(str);
+        size_t i = 0;
+
+        while (str < end) {
+            char key[CONFIG_MAX_VALUE + 1];
+            snprintfz(key, CONFIG_MAX_VALUE, "tag%zu", i);
+
+            str = strip_double_quotes(trim(str), 1);
+
+            label_list = add_label_to_list(label_list, key, str, LABEL_SOURCE_NETDATA_CONF);
+
+            // skip to the next element in the array
+            str += strlen(str) + 1;
+            while (*str && *str != ',')
+                str++;
+            str++;
+            i++;
+        }
 
         break;
     case '"':
