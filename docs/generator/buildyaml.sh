@@ -149,6 +149,7 @@ echo -ne "    - 'docs/what-is-netdata.md'
     - 'packaging/installer/README.md'
     - Other methods:
         - 'packaging/installer/methods/packages.md'
+        - 'packaging/installer/methods/kickstart.md'
         - 'packaging/installer/methods/kickstart-64.md'
         - 'packaging/docker/README.md'
         - 'packaging/installer/methods/macos.md'

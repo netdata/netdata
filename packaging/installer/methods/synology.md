@@ -1,4 +1,4 @@
-# Install Netadta on Synology
+# Install Netdata on Synology
 
 The documentation previously recommended installing the Debian Chroot package from the Synology community package
 sources and then running Netdata from within the chroot. This does not work, as the chroot environment does not have
