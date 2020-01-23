@@ -979,8 +979,6 @@ struct label *load_labels_from_tags()
     struct label *label_list = NULL;
     BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
 
-    label_list = add_label_to_list(label_list, "tags", (char *)localhost->tags, LABEL_SOURCE_NETDATA_CONF);
-
     if (config_exists(CONFIG_SECTION_BACKEND, "enabled")) {
         if (config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", CONFIG_BOOLEAN_NO) != CONFIG_BOOLEAN_NO) {
             const char *type_name = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
