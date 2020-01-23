@@ -333,8 +333,7 @@ void rrdset_free(RRDSET *st) {
     while(st->variables)  rrdsetvar_free(st->variables);
     struct rrdcalc_rrdset_alarm search;
     search.st = st;
-    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
-    while(st->alarms)     rrdsetcalc_unlink(st->alarms, rra);
+    while(st->alarms)     rrdsetcalc_unlink(st->alarms, &search);
     while(st->dimensions) rrddim_free(st, st->dimensions);
 
     rrdfamily_free(host, st->rrdfamily);
@@ -371,7 +370,9 @@ void rrdset_free(RRDSET *st) {
     freez(st->module_name);
 
     //Unlink chart
-    alarm_index_unlink_and_free(&host->alarms_idx_health_name, rra);
+    alarm_index_unlink_and_free(&host->alarms_idx_health_name, &search);
+    alarm_index_unlink_and_free(&host->alarms_idx_health_family, &search);
+    alarm_index_unlink_and_free(&host->alarms_idx_health_hostid, &search);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -778,6 +779,7 @@ RRDSET *rrdset_create_custom(
 
     rrdset_create_health_alarm_value(&host->alarms_idx_health_name, st);
     rrdset_create_health_alarm_value(&host->alarms_idx_health_family, st);
+    rrdset_create_health_alarm_value(&host->alarms_idx_health_hostid, st);
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);

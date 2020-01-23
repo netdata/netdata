@@ -747,6 +747,7 @@ struct rrdhost {
     //Indexes used with health
     avl_tree_lock alarms_idx_health_name;
     avl_tree_lock alarms_idx_health_family;
+    avl_tree_lock alarms_idx_health_hostid;
 
     // ------------------------------------------------------------------------
     // the charts of the host
@@ -1080,7 +1081,7 @@ extern long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 extern int alarm_compare_id(void *a, void *b);
 extern int alarm_compare_name(void *a, void *b);
 extern int alarm_compare_chart(void *a, void *b);
-extern void alarm_index_unlink_and_free(avl_tree_lock *idx, struct rrdcalc_rrdset_alarm *ptr);
+extern void alarm_index_unlink_and_free(avl_tree_lock *idx, struct rrdcalc_rrdset_alarm *search);
 
 // ----------------------------------------------------------------------------
 // RRD internal functions

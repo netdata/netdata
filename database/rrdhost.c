@@ -187,6 +187,7 @@ RRDHOST *rrdhost_create(const char *hostname,
     avl_init_lock(&(host->alarms_idx_name), alarm_compare_name);
     avl_init_lock(&(host->alarms_idx_health_name), alarm_compare_chart);
     avl_init_lock(&(host->alarms_idx_health_family), alarm_compare_chart);
+    avl_init_lock(&(host->alarms_idx_health_hostid), alarm_compare_chart);
 
     // ------------------------------------------------------------------------
     // initialize health variables
@@ -1265,11 +1266,14 @@ int alarm_compare_chart(void *a, void *b) {
     return strcmp(in1->st->name,in2->st->name);
 }
 
-inline void alarm_index_unlink_and_free(avl_tree_lock *idx, struct rrdcalc_rrdset_alarm *rra)
+inline void alarm_index_unlink_and_free(avl_tree_lock *idx, struct rrdcalc_rrdset_alarm *search)
 {
-    struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_remove_lock(idx, (avl *)(rra));
-    if(rra != ret)
-        error("RRDSET: INTERNAL ERROR: Cannot remove the alarm index for %s", rra->st->name);
+    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(idx, (avl *)search);
+    if (rra) {
+        struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_remove_lock(idx, (avl *)(rra));
+        if(rra != ret)
+            error("RRDSET: INTERNAL ERROR: Cannot remove the alarm index for %s", rra->st->name);
+    }
 
     freez(rra);
 }

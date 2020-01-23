@@ -73,22 +73,21 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
         rc->local  = rrdvar_create_and_index("local",  &rra->rrdvar_alarm_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
     }
 
-    char *dim = strchr(rc->chart, '.');
-    if(!dim)
-        dim = rc->chart;
-    else
-        dim++;
     rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)&search);
     if (rra) {
-        rc->family = rrdvar_create_and_index("family", &rra->rrdvar_alarm_index, dim, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
+        rc->family = rrdvar_create_and_index("family", &rra->rrdvar_alarm_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
     }
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rc->name);
-    rc->hostid   = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR, &rc->value);
+    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_hostid, (avl *)&search);
+    if (rra) {
+        error("KILLME CALC %s", fullname);
+        rc->hostid   = rrdvar_create_and_index("host", &rra->rrdvar_alarm_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTID_VAR, &rc->value);
 
-    snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rc->name);
-    rc->hostname = rrdvar_create_and_index("host", &host->rrdvar_root_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR, &rc->value);
+        snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->name, rc->name);
+        rc->hostname = rrdvar_create_and_index("host", &rra->rrdvar_alarm_index, fullname, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR, &rc->value);
+    }
 
     if(rc->hostid && !rc->hostname)
         rc->hostid->options |= RRDVAR_OPTION_RRDCALC_HOST_CHARTNAME_VAR;
@@ -146,7 +145,7 @@ inline void rrdsetcalc_link_matching(RRDSET *st) {
 }
 
 // this has to be called while the RRDHOST is locked
-inline void rrdsetcalc_unlink(RRDCALC *rc, struct rrdcalc_rrdset_alarm *rra) {
+inline void rrdsetcalc_unlink(RRDCALC *rc, struct rrdcalc_rrdset_alarm *search) {
     RRDSET *st = rc->rrdset;
 
     if(!st) {
@@ -197,18 +196,24 @@ inline void rrdsetcalc_unlink(RRDCALC *rc, struct rrdcalc_rrdset_alarm *rra) {
 
     rc->rrdset_prev = rc->rrdset_next = NULL;
 
+    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)search);
     if(rra) {
         rrdvar_free(host, &rra->rrdvar_alarm_index, rc->local);
     }
     rc->local = NULL;
 
-    rrdvar_free(host, &st->rrdfamily->rrdvar_root_index, rc->family);
+    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)search);
+    if(rra) {
+        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->local);
+    }
     rc->family = NULL;
 
-    rrdvar_free(host, &host->rrdvar_root_index, rc->hostid);
+    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_hostid, (avl *)search);
+    if(rra) {
+        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->local);
+        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->hostname);
+    }
     rc->hostid = NULL;
-
-    rrdvar_free(host, &host->rrdvar_root_index, rc->hostname);
     rc->hostname = NULL;
 
     rc->rrdset = NULL;
@@ -588,11 +593,7 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     // unlink it from RRDSET
     struct rrdcalc_rrdset_alarm search;
     search.st = rc->rrdset;
-    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
-    if(rra) rrdsetcalc_unlink(rc, rra);
-
-    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)&search);
-    if(rra) rrdsetcalc_unlink(rc, rra);
+    rrdsetcalc_unlink(rc, &search);
 
     // unlink it from RRDHOST
     if(unlikely(rc == host->alarms))
