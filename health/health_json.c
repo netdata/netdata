@@ -113,7 +113,8 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after) {
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
 }
 
-static inline void health_rrdcalc_values2json_nolock(BUFFER *wb, RRDCALC *rc) {
+static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
+    (void)host;
     char value_string[100 + 1];
     format_value_and_unit(value_string, 100, rc->value, rc->units, -1);
 
@@ -291,9 +292,23 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     rrdhost_unlock(host);
 }
 
-void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
+void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, void (*fp)(RRDHOST *, BUFFER *, RRDCALC *))) {
+    RRDCALC *rc;
     int i;
+    for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
 
+        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
+            continue;
+
+        if(likely(i)) buffer_strcat(wb, ",\n");
+        fp(host, wb, rc);
+        i++;
+    }
+}
+
+void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     rrdhost_rdlock(host);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                     "\n\t\"latest_alarm_log_unique_id\": %u,"
@@ -305,18 +320,7 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
             host->health_enabled?"true":"false",
             (unsigned long)now_realtime_sec());
 
-    RRDCALC *rc;
-    for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-            continue;
-
-        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
-            continue;
-
-        if(likely(i)) buffer_strcat(wb, ",\n");
-        health_rrdcalc2json_nolock(host, wb, rc);
-        i++;
-    }
+    health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc2json_nolock);
 
 //    buffer_strcat(wb, "\n\t},\n\t\"templates\": {");
 //    RRDCALCTEMPLATE *rt;
@@ -328,25 +332,12 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
 }
 
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
-    int i;
-
     rrdhost_rdlock(host);
     buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
                        "\n\t\"alarms\": {\n",
                    host->hostname);
 
-    RRDCALC *rc;
-    for(i = 0, rc = host->alarms; rc ; rc = rc->next) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
-            continue;
-
-        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL)))
-            continue;
-
-        if(likely(i)) buffer_strcat(wb, ",\n");
-        health_rrdcalc_values2json_nolock(wb, rc);
-        i++;
-    }
+    health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc_values2json_nolock);
 
     buffer_strcat(wb, "\n\t}\n}\n");
     rrdhost_unlock(host);
