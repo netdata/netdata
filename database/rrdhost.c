@@ -944,7 +944,7 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
 
         while (str < end) {
             char key[CONFIG_MAX_VALUE + 1];
-            snprintfz(key, CONFIG_MAX_VALUE, "tag%zu", i);
+            snprintfz(key, CONFIG_MAX_VALUE, "host_tag%zu", i);
 
             str = strip_double_quotes(trim(str), SKIP_ESCAPED_CHARACTERS);
 
