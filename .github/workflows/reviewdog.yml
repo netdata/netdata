@@ -1,6 +1,18 @@
 name: reviewdog
 on: [pull_request]
 jobs:
+  eslint:
+    name: runner / eslint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: eslint
+        uses: reviewdog/action-eslint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
+          eslint_flags: '.'
+
   shellcheck:
     name: runner / shellcheck
     runs-on: ubuntu-latest
