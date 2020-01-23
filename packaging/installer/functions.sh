@@ -144,7 +144,7 @@ run_failed() {
 }
 
 ESCAPED_PRINT_METHOD=
-if prnitf "%q " test >/dev/null 2>&1; then
+if printf "%q " test >/dev/null 2>&1; then
 	ESCAPED_PRINT_METHOD="printfq"
 fi
 escaped_print() {
