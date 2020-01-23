@@ -371,7 +371,7 @@ void rrdset_free(RRDSET *st) {
     freez(st->module_name);
 
     //Unlink chart
-    alarm_index_unlink_and_free(host, rra);
+    alarm_index_unlink_and_free(&host->alarms_idx_health_name, rra);
 
     switch(st->rrd_memory_mode) {
         case RRD_MEMORY_MODE_SAVE:
@@ -447,6 +447,21 @@ void rrdset_delete_obsolete_dimensions(RRDSET *st) {
                     error("Cannot delete dimension file '%s'", rd->cache_filename);
             }
         }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// RRDSET - create health alarm index values
+
+void rrdset_create_health_alarm_value(avl_tree_lock *idx, RRDSET *st) {
+    struct rrdcalc_rrdset_alarm *rra = callocz(sizeof(struct rrdcalc_rrdset_alarm ), 1);
+    memset(&rra->rrdvar_alarm_index, 0, sizeof(avl_tree_lock));
+    avl_init_lock(&rra->rrdvar_alarm_index, rrdvar_compare);
+    rra->st = st;
+
+    struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_insert_lock(idx, (avl *)(rra));
+    if(rra != ret) {
+        error("RRDSET: INTERNAL ERROR: Attempt to index duplicate chart '%s' on 'alarm_idx_health_name'", st->id);
     }
 }
 
@@ -761,14 +776,8 @@ RRDSET *rrdset_create_custom(
     if(unlikely(rrdset_index_add(host, st) != st))
         error("RRDSET: INTERNAL ERROR: attempt to index duplicate chart '%s'", st->id);
 
-    struct rrdcalc_rrdset_alarm *rra = callocz(sizeof(struct rrdcalc_rrdset_alarm ), 1);
-    memset(&rra->rrdvar_alarm_name_index, 0, sizeof(avl_tree_lock));
-    avl_init_lock(&rra->rrdvar_alarm_name_index, rrdvar_compare);
-    rra->st = st;
-
-    struct rrdcalc_rrdset_alarm *ret = (struct rrdcalc_rrdset_alarm *)avl_insert_lock(&host->alarms_idx_health_name, (avl *)(rra));
-    if(rra != ret)
-        error("RRDSET: INTERNAL ERROR: Attempt to index duplicate chart '%s' on 'alarm_idx_health_name'", st->id);
+    rrdset_create_health_alarm_value(&host->alarms_idx_health_name, st);
+    rrdset_create_health_alarm_value(&host->alarms_idx_health_family, st);
 
     rrdsetcalc_link_matching(st);
     rrdcalctemplate_link_matching(st);

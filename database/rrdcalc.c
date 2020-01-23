@@ -69,10 +69,19 @@ static void rrdsetcalc_link(RRDSET *st, RRDCALC *rc) {
     struct rrdcalc_rrdset_alarm search;
     search.st = st;
     struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
-    if(rra) {
-        rc->local  = rrdvar_create_and_index("local",  &rra->rrdvar_alarm_name_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
+    if (rra) {
+        rc->local  = rrdvar_create_and_index("local",  &rra->rrdvar_alarm_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_LOCAL_VAR, &rc->value);
     }
-    rc->family = rrdvar_create_and_index("family", &st->rrdfamily->rrdvar_root_index, rc->name, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
+
+    char *dim = strchr(rc->chart, '.');
+    if(!dim)
+        dim = rc->chart;
+    else
+        dim++;
+    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)&search);
+    if (rra) {
+        rc->family = rrdvar_create_and_index("family", &rra->rrdvar_alarm_index, dim, RRDVAR_TYPE_CALCULATED, RRDVAR_OPTION_RRDCALC_FAMILY_VAR, &rc->value);
+    }
 
     char fullname[RRDVAR_MAX_LENGTH + 1];
     snprintfz(fullname, RRDVAR_MAX_LENGTH, "%s.%s", st->id, rc->name);
@@ -189,7 +198,7 @@ inline void rrdsetcalc_unlink(RRDCALC *rc, struct rrdcalc_rrdset_alarm *rra) {
     rc->rrdset_prev = rc->rrdset_next = NULL;
 
     if(rra) {
-        rrdvar_free(host, &rra->rrdvar_alarm_name_index, rc->local);
+        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->local);
     }
     rc->local = NULL;
 
@@ -580,7 +589,10 @@ void rrdcalc_unlink_and_free(RRDHOST *host, RRDCALC *rc) {
     struct rrdcalc_rrdset_alarm search;
     search.st = rc->rrdset;
     struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
-    if(rc->rrdset) rrdsetcalc_unlink(rc, rra);
+    if(rra) rrdsetcalc_unlink(rc, rra);
+
+    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)&search);
+    if(rra) rrdsetcalc_unlink(rc, rra);
 
     // unlink it from RRDHOST
     if(unlikely(rc == host->alarms))

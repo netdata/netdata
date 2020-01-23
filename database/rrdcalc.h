@@ -140,10 +140,10 @@ struct rrdcalc {
 };
 
 struct rrdcalc_rrdset_alarm {
-    avl avl1;
+    avl avl;
 
     RRDSET *st;
-    avl_tree_lock rrdvar_alarm_name_index;
+    avl_tree_lock rrdvar_alarm_index;
 };
 
 extern int alarm_isrepeating(RRDHOST *host, uint32_t alarm_id);

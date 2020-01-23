@@ -216,6 +216,8 @@ calculated_number rrdvar2number(RRDVAR *rv) {
 
 int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
     RRDSET *st = rc->rrdset;
+    int ret = 0;
+    calculated_number results[4];
     if(!st) return 0;
 
     RRDHOST *host = st->rrdhost;
@@ -223,34 +225,82 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
 
     rv = rrdvar_index_find(&st->rrdvar_root_index, variable, hash);
     if(rv) {
+        results[0] = rrdvar2number(rv);
+        error("KILLME FIRST LINK %s "CALCULATED_NUMBER_FORMAT, st->name, results[0]);
+        ret = 1;
+        /*
         *result = rrdvar2number(rv);
         return 1;
+         */
+    } else {
+        results[0] = NAN;
     }
 
     struct rrdcalc_rrdset_alarm search;
     search.st = st;
     struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
     if(rra) {
-        rv = rrdvar_index_find(&rra->rrdvar_alarm_name_index, variable, hash);
+        error("KILLME SECOND LINK %s", st->name);
+        rv = rrdvar_index_find(&rra->rrdvar_alarm_index, variable, hash);
         if(rv) {
+            results[1] = rrdvar2number(rv);
+            error("KILLME THIRD LINK %s "CALCULATED_NUMBER_FORMAT, st->name, results[1]);
+            ret = 1;
+
+            if(isnan(results[0])) {
+                rv = rrdvar_index_find(&st->rrdvar_root_index, rv->name, simple_hash(rv->name));
+                if(rv) {
+                    results[0] = rrdvar2number(rv);
+                    error("KILLME FOURTH LINK %s "CALCULATED_NUMBER_FORMAT, st->name, results[0]);
+                }
+            }
+            /*
             *result = rrdvar2number(rv);
             return 1;
+             */
         }
     }
 
-    rv = rrdvar_index_find(&st->rrdfamily->rrdvar_root_index, variable, hash);
-    if(rv) {
-        *result = rrdvar2number(rv);
-        return 1;
+    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)&search);
+    if(rra) {
+        error("KILLME FIFTH LINK %s", st->name);
+        rv = rrdvar_index_find(&rra->rrdvar_alarm_index, variable, hash);
+        if(rv) {
+            results[2] = rrdvar2number(rv);
+            error("KILLME SIXTH LINK %s "CALCULATED_NUMBER_FORMAT, st->name, results[2]);
+            ret = 1;
+            /*
+            *result = rrdvar2number(rv);
+            return 1;
+             */
+        }
     }
 
     rv = rrdvar_index_find(&host->rrdvar_root_index, variable, hash);
     if(rv) {
+        results[3] = rrdvar2number(rv);
+        error("KILLME SEVENTH LINK %s "CALCULATED_NUMBER_FORMAT, st->name, results[3]);
+        ret = 1;
+        /*
         *result = rrdvar2number(rv);
         return 1;
+         */
     }
 
-    return 0;
+    *result = NAN;
+    if (ret) {
+        int i, end;
+        end = 4;
+        for (i = 0 ; i < end; i++) {
+            if(!isnan(results[i])) {
+                *result = results[i];
+                break;
+            }
+        }
+    }
+
+    //return 0;
+    return ret;
 }
 
 // ----------------------------------------------------------------------------
