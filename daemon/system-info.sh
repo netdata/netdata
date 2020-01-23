@@ -241,7 +241,7 @@ if [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ] ; then
         CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
     fi
 
-    CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency) Hz"
+    CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency)"
 elif [ -n "${possible_cpu_freq}" ] ; then
     CPU_FREQ="${possible_cpu_freq}"
 elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ] ; then
@@ -249,8 +249,27 @@ elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ] ; then
         CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
     fi
 
-    CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq) Hz"
+    CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
 fi
+
+freq_units="$(echo "${CPU_FREQ}" | cut -f 2 -d ' ')"
+
+case "${freq_units}" in
+    GHz)
+        value="$(echo "${CPU_FREQ}" | cut -f 1 -d ' ')"
+        CPU_FREQ="$((value*1000*1000*1000))"
+        ;;
+    MHz)
+        value="$(echo "${CPU_FREQ}" | cut -f 1 -d ' ')"
+        CPU_FREQ="$((value*1000*1000))"
+        ;;
+    KHz)
+        value="$(echo "${CPU_FREQ}" | cut -f 1 -d ' ')"
+        CPU_FREQ="$((value*1000))"
+        ;;
+    *)
+        ;;
+esac
 
 # -------------------------------------------------------------------------------------------------
 # Detect the total system RAM
@@ -260,10 +279,11 @@ RAM_DETECTION="none"
 
 if [ "${KERNEL_NAME}" = FreeBSD ] ; then
         RAM_DETECTION="sysctl"
-        TOTAL_RAM="$(sysctl -n hw.physmem) B"
+        TOTAL_RAM="$(sysctl -n hw.physmem)"
 elif [ -r /proc/meminfo ] ; then
         RAM_DETECTION="procfs"
         TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        TOTAL_RAM="$((TOTAL_RAM*1024))"
 fi
 
 
