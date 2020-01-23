@@ -1,14 +1,19 @@
 # SNMP Data Collector
 
-Using this collector, Netdata can collect data from any SNMP device.
+Using this collector, Netdata can collect data from any SNMP device. This collector uses [net-snmp](https://github.com/markabrahams/node-net-snmp) module.
 
-This collector supports:
+It supports:
 
+-   all SNMP versions: SNMPv1, SNMPv2c and SNMPv3
 -   any number of SNMP devices
 -   each SNMP device can be used to collect data for any number of charts
 -   each chart may have any number of dimensions
 -   each SNMP device may have a different update frequency
 -   each SNMP device will accept one or more batches to report values (you can set `max_request_size` per SNMP server, to control the size of batches).
+
+## Requirements
+
+-   `nodejs` minimum required version 4
 
 ## Configuration
 
@@ -32,7 +37,9 @@ In this example:
             "community": "public",
             "update_every": 10,
             "max_request_size": 50,
-            "options": { "timeout": 10000 },
+            "options": {
+                "timeout": 10000
+            },
             "charts": {
                 "snmp_switch.bandwidth_port1": {
                     "title": "Switch Bandwidth for port 1",
@@ -109,7 +116,9 @@ If you need to define many charts using incremental OIDs, you can use something 
             "hostname": "10.11.12.8",
             "community": "public",
             "update_every": 10,
-            "options": { "timeout": 20000 },
+            "options": {
+                "timeout": 20000
+            },
             "charts": {
                 "snmp_switch.bandwidth_port": {
                     "title": "Switch Bandwidth for port ",
@@ -117,7 +126,10 @@ If you need to define many charts using incremental OIDs, you can use something 
                     "type": "area",
                     "priority": 1,
                     "family": "ports",
-                    "multiply_range": [ 1, 24 ],
+                    "multiply_range": [
+                        1,
+                        24
+                    ],
                     "dimensions": {
                         "in": {
                             "oid": "1.3.6.1.2.1.2.2.1.10.",
@@ -152,11 +164,55 @@ Each of the 24 new charts will have its id (1-24) appended at:
 
 The `options` given for each server, are:
 
--   `timeout`, the time to wait for the SNMP device to respond. The default is 5000 ms.
--   `version`, the SNMP version to use. `0` is Version 1, `1` is Version 2c. The default is Version 1 (`0`).
--   `transport`, the default is `udp4`.
--   `port`, the port of the SNMP device to connect to. The default is `161`.
--   `retries`, the number of attempts to make to fetch the data. The default is `1`.
+-   `port` - UDP port to send requests too. Defaults to `161`.
+-   `retries` - number of times to re-send a request. Defaults to `1`.
+-   `sourceAddress` - IP address from which SNMP requests should originate, there is no default for this option, the operating system will select an appropriate source address when the SNMP request is sent.
+-   `sourcePort` - UDP port from which SNMP requests should originate, defaults to an ephemeral port selected by the operation system.
+-   `timeout` - number of milliseconds to wait for a response before re-trying or failing. Defaults to `5000`.
+-   `transport` - specify the transport to use, can be either `udp4` or `udp6`. Defaults to `udp4`.
+-   `version` - either `0` (v1) or  `1` (v2) or `3` (v3). Defaults to `0`.
+-   `idBitsSize` - either `16` or `32`. Defaults to `32`. Used to reduce the size of the generated id for compatibility with some older devices.
+
+## SNMPv3
+
+To use SNMPv3:
+
+-   set `version` to 3
+-   use `user` instead of `community`
+
+User syntax:
+
+```json
+{
+    "user": {
+        "name": "userName",
+        "level": 3,
+        "authProtocol": "3",
+        "authKey": "authKey",
+        "privProtocol": "2",
+        "privKey": "privKey"
+    }
+}
+```
+
+Security levels:
+
+-   1 is `noAuthNoPriv`
+-   2 is `authNoPriv`
+-   3 is `authPriv`
+
+Authentication protocols:
+
+-   "1" is `none`
+-   "2" is `md5`
+-   "3" is `sha`
+
+Privacy protocols:
+
+-   "1" is `none`
+-   "2" is `des`
+
+For additional details please see [net-snmp module readme](https://github.com/markabrahams/node-net-snmp#snmpcreatev3session-target-user-options).
 
 ## Retrieving names from snmp
 
@@ -218,145 +274,152 @@ This switch has a very slow SNMP processors. To respond, it needs about 8 second
     "enable_autodetect": false,
     "update_every": 5,
     "servers": [
-    {
-        "hostname": "10.11.12.8",
-        "community": "public",
-        "update_every": 15,
-        "options": { "timeout": 20000, "version": 1 },
-        "charts": {
-            "snmp_switch.power": {
-                "title": "Switch Power Supply",
-                "units": "watts",
-                "type": "line",
-                "priority": 10,
-                "family": "power",
-                "dimensions": {
-                    "supply": {
-                        "oid": ".1.3.6.1.2.1.105.1.3.1.1.2.1",
-                        "algorithm": "absolute",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
-                    },
-                    "used": {
-                        "oid": ".1.3.6.1.2.1.105.1.3.1.1.4.1",
-                        "algorithm": "absolute",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
+        {
+            "hostname": "10.11.12.8",
+            "community": "public",
+            "update_every": 15,
+            "options": {
+                "timeout": 20000,
+                "version": 1
+            },
+            "charts": {
+                "snmp_switch.power": {
+                    "title": "Switch Power Supply",
+                    "units": "watts",
+                    "type": "line",
+                    "priority": 10,
+                    "family": "power",
+                    "dimensions": {
+                        "supply": {
+                            "oid": ".1.3.6.1.2.1.105.1.3.1.1.2.1",
+                            "algorithm": "absolute",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "used": {
+                            "oid": ".1.3.6.1.2.1.105.1.3.1.1.4.1",
+                            "algorithm": "absolute",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
                     }
-                }
-            }
-            , "snmp_switch.input": {
-                "title": "Switch Packets Input",
-                "units": "packets/s",
-                "type": "area",
-                "priority": 20,
-                "family": "IP",
-                "dimensions": {
-                    "receives": {
-                        "oid": ".1.3.6.1.2.1.4.3.0",
-                        "algorithm": "incremental",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
+                },
+                "snmp_switch.input": {
+                    "title": "Switch Packets Input",
+                    "units": "packets/s",
+                    "type": "area",
+                    "priority": 20,
+                    "family": "IP",
+                    "dimensions": {
+                        "receives": {
+                            "oid": ".1.3.6.1.2.1.4.3.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "discards": {
+                            "oid": ".1.3.6.1.2.1.4.8.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
                     }
-                    , "discards": {
-                        "oid": ".1.3.6.1.2.1.4.8.0",
-                        "algorithm": "incremental",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
+                },
+                "snmp_switch.input_errors": {
+                    "title": "Switch Received Packets with Errors",
+                    "units": "packets/s",
+                    "type": "line",
+                    "priority": 30,
+                    "family": "IP",
+                    "dimensions": {
+                        "bad_header": {
+                            "oid": ".1.3.6.1.2.1.4.4.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "bad_address": {
+                            "oid": ".1.3.6.1.2.1.4.5.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "unknown_protocol": {
+                            "oid": ".1.3.6.1.2.1.4.7.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
                     }
-                }
-            }
-            , "snmp_switch.input_errors": {
-                "title": "Switch Received Packets with Errors",
-                "units": "packets/s",
-                "type": "line",
-                "priority": 30,
-                "family": "IP",
-                "dimensions": {
-                    "bad_header": {
-                        "oid": ".1.3.6.1.2.1.4.4.0",
-                        "algorithm": "incremental",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
+                },
+                "snmp_switch.output": {
+                    "title": "Switch Output Packets",
+                    "units": "packets/s",
+                    "type": "line",
+                    "priority": 40,
+                    "family": "IP",
+                    "dimensions": {
+                        "requests": {
+                            "oid": ".1.3.6.1.2.1.4.10.0",
+                            "algorithm": "incremental",
+                            "multiplier": 1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "discards": {
+                            "oid": ".1.3.6.1.2.1.4.11.0",
+                            "algorithm": "incremental",
+                            "multiplier": -1,
+                            "divisor": 1,
+                            "offset": 0
+                        },
+                        "no_route": {
+                            "oid": ".1.3.6.1.2.1.4.12.0",
+                            "algorithm": "incremental",
+                            "multiplier": -1,
+                            "divisor": 1,
+                            "offset": 0
+                        }
                     }
-                    , "bad_address": {
-                        "oid": ".1.3.6.1.2.1.4.5.0",
-                        "algorithm": "incremental",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
-                    }
-                    , "unknown_protocol": {
-                        "oid": ".1.3.6.1.2.1.4.7.0",
-                        "algorithm": "incremental",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
-                    }
-                }
-            }
-            , "snmp_switch.output": {
-                "title": "Switch Output Packets",
-                "units": "packets/s",
-                "type": "line",
-                "priority": 40,
-                "family": "IP",
-                "dimensions": {
-                    "requests": {
-                        "oid": ".1.3.6.1.2.1.4.10.0",
-                        "algorithm": "incremental",
-                        "multiplier": 1,
-                        "divisor": 1,
-                        "offset": 0
-                    }
-                    , "discards": {
-                        "oid": ".1.3.6.1.2.1.4.11.0",
-                        "algorithm": "incremental",
-                        "multiplier": -1,
-                        "divisor": 1,
-                        "offset": 0
-                    }
-                    , "no_route": {
-                        "oid": ".1.3.6.1.2.1.4.12.0",
-                        "algorithm": "incremental",
-                        "multiplier": -1,
-                        "divisor": 1,
-                        "offset": 0
-                    }
-                }
-            }
-            , "snmp_switch.bandwidth_port": {
-                "title": "Switch Bandwidth for port ",
-                "titleoid": ".1.3.6.1.2.1.31.1.1.1.18.",
-                "units": "kilobits/s",
-                "type": "area",
-                "priority": 100,
-                "family": "ports",
-                "multiply_range": [ 1, 24 ],
-                "dimensions": {
-                    "in": {
-                        "oid": ".1.3.6.1.2.1.2.2.1.10.",
-                        "algorithm": "incremental",
-                        "multiplier": 8,
-                        "divisor": 1024,
-                        "offset": 0
-                    }
-                    , "out": {
-                        "oid": ".1.3.6.1.2.1.2.2.1.16.",
-                        "algorithm": "incremental",
-                        "multiplier": -8,
-                        "divisor": 1024,
-                        "offset": 0
+                },
+                "snmp_switch.bandwidth_port": {
+                    "title": "Switch Bandwidth for port ",
+                    "titleoid": ".1.3.6.1.2.1.31.1.1.1.18.",
+                    "units": "kilobits/s",
+                    "type": "area",
+                    "priority": 100,
+                    "family": "ports",
+                    "multiply_range": [
+                        1,
+                        24
+                    ],
+                    "dimensions": {
+                        "in": {
+                            "oid": ".1.3.6.1.2.1.2.2.1.10.",
+                            "algorithm": "incremental",
+                            "multiplier": 8,
+                            "divisor": 1024,
+                            "offset": 0
+                        },
+                        "out": {
+                            "oid": ".1.3.6.1.2.1.2.2.1.16.",
+                            "algorithm": "incremental",
+                            "multiplier": -8,
+                            "divisor": 1024,
+                            "offset": 0
+                        }
                     }
                 }
             }
         }
-    }],
+    ]
 }
 ```
 
