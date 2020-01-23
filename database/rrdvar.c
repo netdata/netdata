@@ -214,6 +214,20 @@ calculated_number rrdvar2number(RRDVAR *rv) {
     }
 }
 
+int health_variable_lookup_test(calculated_number *result, struct rrdcalc_rrdset_alarm *search, const char *variable, uint32_t hash, avl_tree_lock *idx)
+{
+    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(idx, (avl *)search);
+    if(rra) {
+        RRDVAR *rv = rrdvar_index_find(&rra->rrdvar_alarm_index, variable, hash);
+        if(rv) {
+            *result = rrdvar2number(rv);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, calculated_number *result) {
     RRDSET *st = rc->rrdset;
     if(!st) return 0;
@@ -229,32 +243,17 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
 
     struct rrdcalc_rrdset_alarm search;
     search.st = st;
-    struct rrdcalc_rrdset_alarm *rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_name, (avl *)&search);
-    if(rra) {
-        rv = rrdvar_index_find(&rra->rrdvar_alarm_index, variable, hash);
-        if(rv) {
-            *result = rrdvar2number(rv);
-            return 1;
-        }
-    }
+    int ret = health_variable_lookup_test(result, &search, variable, hash, &host->alarms_idx_health_name);
+    if(ret)
+        return 1;
 
-    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)&search);
-    if(rra) {
-        rv = rrdvar_index_find(&rra->rrdvar_alarm_index, variable, hash);
-        if(rv) {
-            *result = rrdvar2number(rv);
-            return 1;
-        }
-    }
+    ret = health_variable_lookup_test(result, &search, variable, hash, &host->alarms_idx_health_family);
+    if(ret)
+        return 1;
 
-    rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_hostid, (avl *)&search);
-    if(rra) {
-        rv = rrdvar_index_find(&host->rrdvar_root_index, variable, hash);
-        if(rv) {
-            *result = rrdvar2number(rv);
-            return 1;
-        }
-    }
+    ret = health_variable_lookup_test(result, &search, variable, hash, &host->alarms_idx_health_hostid);
+    if(ret)
+        return 1;
 
     return 0;
 }
