@@ -5,7 +5,6 @@
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
 ORDER = [
     'requests',
     'connections',
