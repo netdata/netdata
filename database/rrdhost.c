@@ -843,7 +843,20 @@ struct label *load_config_labels()
     return l;
 }
 
-static inline void strip_last_symbol(char *str, char symbol, int skip_escaped_characters)
+typedef enum strip_quotes {
+    DO_NOT_STRIP_QUOTES,
+    STRIP_QUOTES
+} STRIP_QUOTES_OPTION;
+
+typedef enum skip_escaped_characters {
+    DO_NOT_SKIP_ESCAPED_CHARACTERS,
+    SKIP_ESCAPED_CHARACTERS
+} SKIP_ESCAPED_CHARACTERS_OPTION;
+
+static inline void strip_last_symbol(
+    char *str,
+    char symbol,
+    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
 {
     char *end = str;
 
@@ -859,7 +872,7 @@ static inline void strip_last_symbol(char *str, char symbol, int skip_escaped_ch
         *end = '\0';
 }
 
-static inline char *strip_double_quotes(char *str, int skip_escaped_characters)
+static inline char *strip_double_quotes(char *str, SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
 {
     if (*str == '"') {
         str++;
@@ -874,9 +887,9 @@ struct label *parse_simple_tags(
     const char *tags,
     char key_value_separator,
     char label_separator,
-    int strip_quotes_from_key,
-    int strip_quotes_from_value,
-    int skip_escaped_characters)
+    STRIP_QUOTES_OPTION strip_quotes_from_key,
+    STRIP_QUOTES_OPTION strip_quotes_from_value,
+    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
 {
     const char *end = tags;
 
@@ -917,14 +930,14 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
     switch (*str) {
     case '{':
         str++;
-        strip_last_symbol(str, '}', 1);
+        strip_last_symbol(str, '}', SKIP_ESCAPED_CHARACTERS);
 
-        label_list = parse_simple_tags(label_list, str, ':', ',', 1, 1, 1);
+        label_list = parse_simple_tags(label_list, str, ':', ',', STRIP_QUOTES, STRIP_QUOTES, SKIP_ESCAPED_CHARACTERS);
 
         break;
     case '[':
         str++;
-        strip_last_symbol(str, ']', 1);
+        strip_last_symbol(str, ']', SKIP_ESCAPED_CHARACTERS);
 
         char *end = str + strlen(str);
         size_t i = 0;
@@ -933,7 +946,7 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
             char key[CONFIG_MAX_VALUE + 1];
             snprintfz(key, CONFIG_MAX_VALUE, "tag%zu", i);
 
-            str = strip_double_quotes(trim(str), 1);
+            str = strip_double_quotes(trim(str), SKIP_ESCAPED_CHARACTERS);
 
             label_list = add_label_to_list(label_list, key, str, LABEL_SOURCE_NETDATA_CONF);
 
@@ -947,7 +960,8 @@ struct label *parse_json_tags(struct label *label_list, const char *tags)
 
         break;
     case '"':
-        label_list = add_label_to_list(label_list, "host_tag", strip_double_quotes(str, 1), LABEL_SOURCE_NETDATA_CONF);
+        label_list = add_label_to_list(
+            label_list, "host_tag", strip_double_quotes(str, SKIP_ESCAPED_CHARACTERS), LABEL_SOURCE_NETDATA_CONF);
         break;
     default:
         label_list = add_label_to_list(label_list, "host_tag", str, LABEL_SOURCE_NETDATA_CONF);
@@ -976,19 +990,27 @@ struct label *load_labels_from_tags()
 
     switch (type) {
         case BACKEND_TYPE_GRAPHITE:
-            label_list = parse_simple_tags(label_list, localhost->tags, '=', ';', 0, 0, 0);
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, '=', ';', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_TELNET:
-            label_list = parse_simple_tags(label_list, localhost->tags, '=', ' ', 0, 0, 0);
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, '=', ' ', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
         case BACKEND_TYPE_OPENTSDB_USING_HTTP:
-            label_list = parse_simple_tags(label_list, localhost->tags, ':', ',', 1, 1, 0);
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, ':', ',', STRIP_QUOTES, STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
         case BACKEND_TYPE_JSON:
             label_list = parse_json_tags(label_list, localhost->tags);
             break;
         default:
-            label_list = parse_simple_tags(label_list, localhost->tags, '=', ',', 0, 1, 0);
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, '=', ',', DO_NOT_STRIP_QUOTES, STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
             break;
     }
 
