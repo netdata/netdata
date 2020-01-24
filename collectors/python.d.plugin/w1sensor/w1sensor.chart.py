@@ -5,6 +5,7 @@
 
 import os
 import re
+
 from bases.FrameworkServices.SimpleService import SimpleService
 
 # default module values (can be overridden per job in `config`)
@@ -40,6 +41,7 @@ THERM_FAMILY = {
 
 class Service(SimpleService):
     """Provide netdata service for 1-Wire sensors"""
+
     def __init__(self, configuration=None, name=None):
         SimpleService.__init__(self, configuration=configuration, name=name)
         self.order = ORDER

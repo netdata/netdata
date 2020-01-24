@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 from collections import defaultdict
-
 from json import loads
 
 from bases.FrameworkServices.UrlService import UrlService
-
 
 ORDER = [
     'response_statuses',
