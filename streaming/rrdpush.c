@@ -1057,6 +1057,7 @@ static int rrdpush_receive(int fd
                            , char *client_ip
                            , char *client_port
                            , int stream_flags
+                           , uint32_t stream_version
 #ifdef ENABLE_HTTPS
                            , struct netdata_ssl *ssl
 #endif
@@ -1174,10 +1175,10 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
     char initial_response[HTTP_HEADER_SIZE];
-    if (stream_flags & STREAM_HAS_INTEGER_VERSION) {
+    if (stream_version > 2) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the newest stream protocol.", host->hostname, client_ip, client_port);
-        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, STREAMING_PROTOCOL_CURRENT_VERSION);
-    } else if (stream_flags & LABEL_FLAG_UPDATE_STREAM) {
+        sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, stream_version);
+    } else if (stream_version > 0) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the second version of stream protocol.", host->hostname, client_ip, client_port);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
     } else {
@@ -1285,7 +1286,6 @@ struct rrdpush_thread {
     char *program_version;
     struct rrdhost_system_info *system_info;
     int update_every;
-    int stream_flags;
     uint32_t stream_version;
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
@@ -1343,6 +1343,7 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->client_ip
 	    , rpt->client_port
 	    , rpt->stream_flags
+	    , rpt->stream_version
 #ifdef ENABLE_HTTPS
 	    , &rpt->ssl
 #endif
@@ -1393,7 +1394,6 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     int update_every = default_rrd_update_every;
     uint32_t stream_version = 0;
     char buf[GUID_LEN + 1];
-    int stream_flags = LABEL_FLAG_STOP_STREAM;
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
 
@@ -1422,11 +1422,10 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
         else if(!strcmp(name, "tags"))
             tags = value;
         else if(!strcmp(name, "ver")) {
-            stream_flags = STREAM_HAS_INTEGER_VERSION;
-            stream_version = (uint32_t) strtoul(value, NULL, 0);
+            stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
         } else {
             if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
-                stream_flags = (stream_version)?LABEL_FLAG_UPDATE_STREAM | STREAM_HAS_INTEGER_VERSION:LABEL_FLAG_UPDATE_STREAM;
+                stream_version = 2;
             else {
                 // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
                 if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))
@@ -1560,7 +1559,6 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
     rpt->client_port       = strdupz(w->client_port);
     rpt->update_every      = update_every;
     rpt->system_info       = system_info;
-    rpt->stream_flags      = stream_flags;
     rpt->stream_version    = stream_version;
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
