@@ -54,7 +54,7 @@ extern char *strdup_client_description(int family, const char *protocol, const c
 extern int listen_sockets_setup(LISTEN_SOCKETS *sockets);
 extern void listen_sockets_close(LISTEN_SOCKETS *sockets);
 
-extern int connect_to_this(const char *definition, int default_port, struct timeval *timeout);
+extern int connect_to_this(const char *definition, const char *next, int default_port, struct timeval *timeout);
 extern int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size);
 
 #ifdef ENABLE_HTTPS

@@ -825,7 +825,7 @@ static inline int connect_to_this_ip46(int protocol, int socktype, const char *h
 // INTERFACE = for IPv6 only, the network interface to use
 // PORT      = port number or service name
 
-int connect_to_this(const char *definition, int default_port, struct timeval *timeout) {
+int connect_to_this(const char *definition, const char *next, int default_port, struct timeval *timeout) {
     char buffer[strlen(definition) + 1];
     strcpy(buffer, definition);
 
@@ -886,7 +886,7 @@ int connect_to_this(const char *definition, int default_port, struct timeval *ti
                   host, service, interface, protocol);
             return -1;
         case -2:
-            error("Definition '%s' does not specify a host.", definition);
+            error("The first definition '%s' of the list does not specify a host.", next);
             return -1;
         default:
             break;
@@ -928,7 +928,7 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
         char buf[e - s + 1];
         strncpyz(buf, s, e - s);
         if(reconnects_counter) *reconnects_counter += 1;
-        sock = connect_to_this(buf, default_port, timeout);
+        sock = connect_to_this(buf, s, default_port, timeout);
         if(sock != -1) {
             if(connected_to && connected_to_size) {
                 strncpy(connected_to, buf, connected_to_size);
