@@ -160,7 +160,6 @@ typedef enum label_source {
 
 #define LABEL_FLAG_UPDATE_STREAM 1
 #define LABEL_FLAG_STOP_STREAM 2
-#define STREAM_HAS_INTEGER_VERSION 4
 
 struct label {
     char *key, *value;

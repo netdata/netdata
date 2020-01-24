@@ -1056,7 +1056,6 @@ static int rrdpush_receive(int fd
                            , int update_every
                            , char *client_ip
                            , char *client_port
-                           , int stream_flags
                            , uint32_t stream_version
 #ifdef ENABLE_HTTPS
                            , struct netdata_ssl *ssl
@@ -1230,7 +1229,7 @@ static int rrdpush_receive(int fd
     rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
     host->connected_senders++;
     host->senders_disconnected_time = 0;
-    host->labels_flag = stream_flags;
+    host->labels_flag = (stream_version > 0)?LABEL_FLAG_UPDATE_STREAM:LABEL_FLAG_STOP_STREAM;
 
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
@@ -1342,7 +1341,6 @@ static void *rrdpush_receiver_thread(void *ptr) {
 	    , rpt->update_every
 	    , rpt->client_ip
 	    , rpt->client_port
-	    , rpt->stream_flags
 	    , rpt->stream_version
 #ifdef ENABLE_HTTPS
 	    , &rpt->ssl
