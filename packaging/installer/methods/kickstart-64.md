@@ -54,7 +54,7 @@ your installation. Here are a few important parameters:
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable telemetry`: Opt-out of [anonymous statistics](../../../docs/anonymous-statistics.md) we use to make
+-   `--disable-telemetry`: Opt-out of [anonymous statistics](../../../docs/anonymous-statistics.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
