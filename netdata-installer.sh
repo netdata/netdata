@@ -513,7 +513,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
   }
 
   # clean up stock config files from the user configuration directory
-  for x in $(find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \)); do
+  while IFS= read -r -d '' x; do
     if [ -f "${x}" ]; then
       # find it relative filename
       f="${x/${NETDATA_PREFIX}\/etc\/netdata\//}"
@@ -526,7 +526,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
 
       if [ -z "${md5sum}" -o ! -x "${md5sum}" ]; then
         # we don't have md5sum - keep it
-        echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RET}is not known to distribution${TPUT_RESET}. Keeping it."
+        echo >&2 "File '${TPUT_CYAN}${x}${TPUT_RESET}' ${TPUT_RED}is not known to distribution${TPUT_RESET}. Keeping it."
       else
         # find its checksum
         md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
@@ -542,7 +542,7 @@ if [ ! -f "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-don
         fi
       fi
     fi
-  done
+  done < <(find -L "${NETDATA_PREFIX}/etc/netdata" -type f -not -path '*/\.*' -not -path "${NETDATA_PREFIX}/etc/netdata/orig/*" \( -name '*.conf.old' -o -name '*.conf' -o -name '*.conf.orig' -o -name '*.conf.installer_backup.*' \))
 fi
 touch "${NETDATA_PREFIX}/etc/netdata/.installer-cleanup-of-stock-configs-done"
 
@@ -676,7 +676,7 @@ fi
 helplink="000.-.USE.THE.orig.LINK.TO.COPY.AND.EDIT.STOCK.CONFIG.FILES"
 [ ${deleted_stock_configs} -eq 0 ] && helplink=""
 for link in "orig" "${helplink}"; do
-  if [ ! -z "${link}" ]; then
+  if [ -n "${link}" ]; then
     [ -L "${NETDATA_USER_CONFIG_DIR}/${link}" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/${link}"
     run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
   fi
@@ -889,7 +889,7 @@ progress "Telemetry configuration"
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
   run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 else
-  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file %s \n\n" "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 fi
 
 # -----------------------------------------------------------------------------
@@ -903,7 +903,7 @@ if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
   if command -v pidof > /dev/null 2>&1; then
     is_systemd_running="$(pidof /usr/sbin/init || pidof systemd || echo "NO")"
   else
-    is_systemd_running="$( (ps -p 1 | grep -q systemd && echo "1") || echo "NO")"
+    is_systemd_running="$( (pgrep -q -f systemd && echo "1") || echo "NO")"
   fi
 
   if [ "${is_systemd_running}" == "1" ]; then

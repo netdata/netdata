@@ -2,7 +2,8 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-. $(dirname "${0}")/functions.sh
+# shellcheck source=./packaging/makeself/functions.sh
+. "$(dirname "${0}")"/functions.sh
 
 export LC_ALL=C
 umask 002
@@ -48,7 +49,6 @@ while [ "${1}" ]; do
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
     "--disable-telemetry")
-      DISABLE_TELEMETRY=1
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
 
@@ -70,8 +70,8 @@ if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
     run mkdir -p etc/netdata
   fi
 
-  md5sum="$(which md5sum 2> /dev/null || command -v md5sum 2> /dev/null || command -v md5 2> /dev/null)"
-  for x in $(find etc -type f); do
+  md5sum="$(command -v md5sum 2> /dev/null || command -v md5 2> /dev/null)"
+  while IFS= read -r -d '' x; do
     # find it relative filename
     f="${x/etc\/netdata\//}"
 
@@ -79,7 +79,7 @@ if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
     t="${f/.conf.old/.conf}"
     t="${t/.conf.orig/.conf}"
 
-    if [ ! -z "${md5sum}" ]; then
+    if [ -n "${md5sum}" ]; then
       # find the checksum of the existing file
       md5="$(${md5sum} < "${x}" | cut -d ' ' -f 1)"
       #echo >&2 "md5: ${md5}"
@@ -91,7 +91,7 @@ if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
         deleted_stock_configs=$((deleted_stock_configs + 1))
       fi
     fi
-  done
+  done < <(find etc -type f)
 
   touch "etc/netdata/.installer-cleanup-of-stock-configs-done"
 fi
@@ -110,7 +110,11 @@ if portable_add_group netdata; then
     progress "Add user netdata to required user groups"
     for g in ${NETDATA_WANTED_GROUPS}; do
       # shellcheck disable=SC2086
-      portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}" || run_failed "Failed to add netdata user to secondary groups"
+      if portable_add_user_to_group ${g} netdata; then
+        NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+      else
+        run_failed "Failed to add netdata user to secondary groups"
+      fi
     done
     NETDATA_USER="netdata"
     NETDATA_GROUP="netdata"
@@ -131,7 +135,7 @@ if [ ! -f "/etc/ssl/certs/ca-certificates.crt" ]; then
     # CentOS
     [ -f "/etc/ssl/certs/ca-bundle.crt" ] && cacert="/etc/ssl/certs/ca-bundle.crt"
 
-    if [ ! -z "${cacert}" ]; then
+    if [ -n "${cacert}" ]; then
       echo "Creating /opt/netdata/.curlrc with cacert=${cacert}"
       echo > /opt/netdata/.curlrc "cacert=${cacert}"
     else
@@ -152,7 +156,7 @@ progress "Telemetry configuration"
 if [ -n "${NETDATA_DISABLE_TELEMETRY+x}" ]; then
   run touch "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 else
-  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file ${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics \n\n"
+  printf "You can opt out from anonymous statistics via the --disable-telemetry option, or by creating an empty file %s \n\n" "${NETDATA_USER_CONFIG_DIR}/.opt-out-from-anonymous-statistics"
 fi
 
 # -----------------------------------------------------------------------------
