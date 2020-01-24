@@ -405,7 +405,7 @@ int aclk_process_query()
         //info("HEADER 1: %s", w->response.header->buffer);
         //info("HEADER 2: %s", w->response.header_output->buffer);
 
-        if (rc == HTTP_RESP_OK) {
+        if (rc == HTTP_RESP_OK || 1) {
             buffer_flush(aclk_buffer);
 
             //BUFFER *info_json = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
@@ -422,12 +422,14 @@ int aclk_process_query()
 
             aclk_send_message(this_query->topic, aclk_buffer->buffer);
 
-        }
+        } else
+            error("Query RESP: %s", w->response.data->buffer);
+
         //aclk_send_message(this_query->topic, w->response.data->buffer);
 
         buffer_free(w->response.data);
-        buffer_free(w->response.header);
-        buffer_free(w->response.header_output);
+        //buffer_free(w->response.header);
+        //buffer_free(w->response.header_output);
         free(w);
         aclk_query_free(this_query);
         return 1;

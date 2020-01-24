@@ -107,6 +107,9 @@ void mqtt_message_callback(
         return;
     }
 
+    if (unlikely(!cloud_to_agent.url || !cloud_to_agent.topic))
+        return;
+
     aclk_submit_request(&cloud_to_agent);
 
     info("Received type=[%s], msg-id=[%s], topic=[%s], url=[%s]",cloud_to_agent.type_id, cloud_to_agent.msg_id, cloud_to_agent.topic, cloud_to_agent.url);
