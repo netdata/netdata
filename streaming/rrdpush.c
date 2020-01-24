@@ -1174,10 +1174,10 @@ static int rrdpush_receive(int fd
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
     char initial_response[HTTP_HEADER_SIZE];
-    if (stream_version > 2) {
+    if (stream_version > 1) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
         sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, stream_version);
-    } else if (stream_version > 0) {
+    } else if (stream_version == 1) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
     } else {
@@ -1423,7 +1423,7 @@ int rrdpush_receiver_thread_spawn(RRDHOST *host, struct web_client *w, char *url
             stream_version = MIN((uint32_t) strtoul(value, NULL, 0), STREAMING_PROTOCOL_CURRENT_VERSION);
         } else {
             if(!strcmp(name, "NETDATA_PROTOCOL_VERSION"))
-                stream_version = 2;
+                stream_version = 1;
             else {
                 // An old Netdata slave does not have a compatible streaming protocol, map to something sane.
                 if (!strcmp(name, "NETDATA_SYSTEM_OS_NAME"))

@@ -46,7 +46,7 @@ extern time_t rrdset_free_obsolete_time;
 #define RRDSET_MAGIC        "NETDATA RRD SET FILE V019"
 #define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V019"
 
-#define STREAMING_PROTOCOL_CURRENT_VERSION (unsigned int)3
+#define STREAMING_PROTOCOL_CURRENT_VERSION (unsigned int)2
 
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
