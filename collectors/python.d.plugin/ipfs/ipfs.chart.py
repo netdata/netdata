@@ -7,7 +7,6 @@ import json
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
 ORDER = [
     'bandwidth',
     'peers',
@@ -89,7 +88,7 @@ class Service(UrlService):
             if store_max.endswith('b'):
                 val, units = store_max[:-2], store_max[-2]
                 if units in SI_zeroes:
-                    val += '0'*SI_zeroes[units]
+                    val += '0' * SI_zeroes[units]
                 store_max = val
             try:
                 store_max = int(store_max)
@@ -117,10 +116,10 @@ class Service(UrlService):
                 [('size', 'RepoSize', int), ('objects', 'NumObjects', int), ('avail', 'StorageMax', self._storagemax)],
         }
         if self.do_pinapi:
-                cfg.update({
-                    '/api/v0/pin/ls':
-                        [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
-                })
+            cfg.update({
+                '/api/v0/pin/ls':
+                    [('pinned', 'Keys', len), ('recursive_pins', 'Keys', self._recursive_pins)]
+            })
         r = dict()
         for suburl in cfg:
             in_json = self._get_json(suburl)

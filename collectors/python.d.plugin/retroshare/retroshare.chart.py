@@ -7,7 +7,6 @@ import json
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
 ORDER = [
     'bandwidth',
     'peers',

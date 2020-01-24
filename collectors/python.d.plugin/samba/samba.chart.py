@@ -18,8 +18,8 @@
 
 import re
 
-from bases.collection import find_binary
 from bases.FrameworkServices.ExecutableService import ExecutableService
+from bases.collection import find_binary
 
 disabled_by_default = True
 

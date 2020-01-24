@@ -4,14 +4,14 @@
 
 try:
     import docker
+
     HAS_DOCKER = True
 except ImportError:
     HAS_DOCKER = False
 
-from bases.FrameworkServices.SimpleService import SimpleService
-
 from distutils.version import StrictVersion
 
+from bases.FrameworkServices.SimpleService import SimpleService
 
 # charts order (can be overridden if you want less charts, or different order)
 ORDER = [
@@ -43,7 +43,6 @@ CHARTS = {
         ]
     }
 }
-
 
 MIN_REQUIRED_VERSION = '3.2.0'
 

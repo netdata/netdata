@@ -6,7 +6,6 @@
 
 from bases.FrameworkServices.MySQLService import MySQLService
 
-
 # query executed on MySQL server
 QUERY_GLOBAL = 'SHOW GLOBAL STATUS;'
 QUERY_SLAVE = 'SHOW SLAVE STATUS;'
