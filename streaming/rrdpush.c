@@ -672,7 +672,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
             host->stream_version = (uint32_t)strtol(version_start, NULL, 10);
         }
     } else {
-        int answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+        answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
         if(!answer) {
             rrdpush_set_flags_to_newest_stream(host);
         }
