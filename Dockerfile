@@ -3,7 +3,7 @@ ARG DISTRO=debian
 ARG DISTRO_VERSION=buster
 ARG VERSION=0.1
 
-FROM netdata/builder:${DISTRO}_${DISTRO_VERSION} AS build
+FROM netdata/package-builders:${DISTRO}${DISTRO_VERSION} AS build
 
 ARG ARCH
 ARG DISTRO
