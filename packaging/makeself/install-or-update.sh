@@ -57,6 +57,10 @@ while [ "${1}" ]; do
   shift 1
 done
 
+if [ x"$DO_NOT_TRACK" = x"1" ]; then
+  REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemtry"
+fi
+
 deleted_stock_configs=0
 if [ ! -f "etc/netdata/.installer-cleanup-of-stock-configs-done" ]; then
 
