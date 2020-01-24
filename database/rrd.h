@@ -46,6 +46,8 @@ extern time_t rrdset_free_obsolete_time;
 #define RRDSET_MAGIC        "NETDATA RRD SET FILE V019"
 #define RRDDIMENSION_MAGIC  "NETDATA RRD DIMENSION FILE V019"
 
+#define STREAMING_PROTOCOL_CURRENT_VERSION (unsigned int)3
+
 typedef long long total_number;
 #define TOTAL_NUMBER_FORMAT "%lld"
 
@@ -702,6 +704,7 @@ struct rrdhost {
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
     BUFFER *rrdpush_sender_buffer;                  // collector fills it, sender sends it
 
+    uint32_t stream_version;                             //Set the current version of the stream.
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush

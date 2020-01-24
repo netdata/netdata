@@ -28,6 +28,7 @@
 #define STREAMING_PROTOCOL_VERSION "1.1"
 #define START_STREAMING_PROMPT "Hit me baby, push them over..."
 #define START_STREAMING_PROMPT_V2  "Hit me baby, push them over and bring the host labels..."
+#define START_STREAMING_PROMPT_VN "Hit me baby, push them over with the version="
 
 typedef enum {
     RRDPUSH_MULTIPLE_CONNECTIONS_ALLOW,
@@ -494,6 +495,11 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     }
 }
 
+static inline void rrdpush_set_flags_to_newest_stream(RRDHOST *host) {
+    host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
+    host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
+}
+
 //called from client side
 static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_port, int timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     struct timeval tv = {
@@ -558,7 +564,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     #define HTTP_HEADER_SIZE 8192
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
-            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s"
+            "STREAM key=%s&hostname=%s&registry_hostname=%s&machine_guid=%s&update_every=%d&os=%s&timezone=%s&tags=%s&ver=%u"
                     "&NETDATA_SYSTEM_OS_NAME=%s"
                     "&NETDATA_SYSTEM_OS_ID=%s"
                     "&NETDATA_SYSTEM_OS_ID_LIKE=%s"
@@ -584,6 +590,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
               , host->os
               , host->timezone
               , (host->tags) ? host->tags : ""
+              , STREAMING_PROTOCOL_CURRENT_VERSION
               , (host->system_info->host_os_name) ? host->system_info->host_os_name : ""
               , (host->system_info->host_os_id) ? host->system_info->host_os_id : ""
               , (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : ""
@@ -641,26 +648,41 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     info("STREAM %s [send to %s]: waiting response from remote netdata...", host->hostname, connected_to);
 
+    ssize_t received;
 #ifdef ENABLE_HTTPS
-    if(recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    received = recv_timeout(&host->ssl,host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
 #else
-    if(recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout) == -1) {
+    received = recv_timeout(host->rrdpush_sender_socket, http, HTTP_HEADER_SIZE, 0, timeout);
+    if(received == -1) {
 #endif
         error("STREAM %s [send to %s]: remote netdata does not respond.", host->hostname, connected_to);
         rrdpush_sender_thread_close_socket(host);
         return 0;
     }
 
-    int answer = strncmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
-    if(!answer) {
-        host->labels_flag |= LABEL_FLAG_UPDATE_STREAM;
-        host->labels_flag &= ~LABEL_FLAG_STOP_STREAM;
-    } else {
-        answer = strncmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+    http[received] = '\0';
+    int answer = -1;
+    char *version_start = strchr(http, '=');
+    if(version_start) {
+        version_start++;
+        answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
         if(!answer) {
-            host->labels_flag |= LABEL_FLAG_STOP_STREAM;
-            host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
-            info("STREAM %s [send to %s]: is using an old Netdata.", host->hostname,  connected_to);
+            rrdpush_set_flags_to_newest_stream(host);
+            host->stream_version = (uint32_t)strtol(version_start, NULL, 10);
+        }
+    } else {
+        int answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
+        if(!answer) {
+            rrdpush_set_flags_to_newest_stream(host);
+        }
+        else {
+            answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
+            if(!answer) {
+                host->labels_flag |= LABEL_FLAG_STOP_STREAM;
+                host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
+                info("STREAM %s [send to %s]: is using an old Netdata.", host->hostname,  connected_to);
+            }
         }
     }
 
@@ -1151,15 +1173,19 @@ static int rrdpush_receive(int fd
     snprintfz(cd.cmd,          PLUGINSD_CMD_MAX, "%s:%s", client_ip, client_port);
 
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
-    char *initial_response;
+    char initial_response[HTTP_HEADER_SIZE];
     if (stream_flags & LABEL_FLAG_UPDATE_STREAM) {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using the newest stream protocol.", host->hostname, client_ip, client_port);
-        initial_response = START_STREAMING_PROMPT_V2;
+        if (!host->stream_version)
+            sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
+        else {
+            sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, STREAMING_PROTOCOL_CURRENT_VERSION);
+        }
     } else {
         info("STREAM %s [receive from [%s]:%s]: Netdata is using an old protocol.", host->hostname, client_ip, client_port);
-        initial_response = START_STREAMING_PROMPT;
+        sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
-#ifdef ENABLE_HTTPS
+    #ifdef ENABLE_HTTPS
     host->stream_ssl.conn = ssl->conn;
     host->stream_ssl.flags = ssl->flags;
     if(send_timeout(ssl, fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
