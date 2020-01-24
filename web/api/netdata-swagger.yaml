@@ -627,7 +627,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/alarms"
-  /alarms:
+  /alarms_values:
     get:
       summary: Get a list of active or raised alarms on the server
       description: The alarms_values endpoint returns the list of all raised or enabled alarms on
