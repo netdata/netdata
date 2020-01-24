@@ -169,6 +169,123 @@ else
         fi
 fi
 
+# -------------------------------------------------------------------------------------------------
+# Detect information about the CPU
+
+LCPU_COUNT="unknown"
+CPU_MODEL="unknown"
+CPU_VENDOR="unknown"
+CPU_FREQ="unknown"
+CPU_INFO_SOURCE="none"
+
+possible_cpu_freq=""
+nproc="$(command -v nproc)"
+lscpu="$(command -v lscpu)"
+lscpu_output=""
+dmidecode="$(command -v dmidecode)"
+dmidecode_output=""
+
+if [ -n "${lscpu}" ] && lscpu >/dev/null 2>&1 ; then
+        lscpu_output="$(LC_NUMERIC=C ${lscpu} 2>/dev/null)"
+        CPU_INFO_SOURCE="lscpu"
+        LCPU_COUNT="$(echo "${lscpu_output}" | grep "^CPU(s):" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        CPU_MODEL="$(echo "${lscpu_output}" | grep "^Model name:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU max MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*') MHz"
+elif [ -n "${dmidecode}" ] && dmidecode -t processor >/dev/null 2>&1 ; then
+        dmidecode_output="$(${dmidecode} -t processor 2>/dev/null)"
+        CPU_INFO_SOURCE="dmidecode"
+        LCPU_COUNT="$(echo "${dmidecode_output}" | grep -F "Thread Count:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        CPU_VENDOR="$(echo "${dmidecode_output}" | grep -F "Manufacturer:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        CPU_MODEL="$(echo "${dmidecode_output}" | grep -F "Version:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        possible_cpu_freq="$(echo "${dmidecode_output}" | grep -F "Current Speed:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+else
+        if [ -n "${nproc}" ] ; then
+                CPU_INFO_SOURCE="nproc"
+                LCPU_COUNT="$(${nproc})"
+        elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
+                CPU_INFO_SOURCE="sysctl"
+                LCPU_COUNT="$(sysctl -n kern.smp.cpus)"
+        elif [ -d /sys/devices/system/cpu ] ; then
+                CPU_INFO_SOURCE="sysfs"
+                # This is potentially more accurate than checking `/proc/cpuinfo`.
+                LCPU_COUNT="$(find /sys/devices/system/cpu -mindepth 1 -maxdepth 1 -type d -name 'cpu*' | grep -cEv 'idle|freq')"
+        elif [ -r /proc/cpuinfo ] ; then
+                CPU_INFO_SOURCE="procfs"
+                LCPU_COUNT="$(grep -c ^processor /proc/cpuinfo)"
+        fi
+
+        # If we have GNU uname, we can use that to get CPU info (probably).
+        if unmae --version 2>/dev/null | grep -qF 'GNU coreutils' ; then
+                CPU_INFO_SOURCE="${CPU_INFO_SOURCE} uname"
+                CPU_MODEL="$(uname -p)"
+                CPU_VENDOR="$(uname -i)"
+        elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
+                if ( echo "${CPU_INFO_SOURCE}" | grep -qv sysctl ) ; then
+                    CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysctl"
+                fi
+
+                CPU_MODEL="$(sysctl -n hw.model)"
+        elif [ -r /proc/cpuinfo ] ; then
+                if ( echo "${CPU_INFO_SOURCE}" | grep -qv procfs ) ; then
+                    CPU_INFO_SOURCE="${CPU_INFO_SOURCE} procfs"
+                fi
+
+                CPU_MODEL="$(grep -F "model name" /proc/cpuinfo | head -n 1 | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+                CPU_VENDOR="$(grep -F "vendor_id" /proc/cpuinfo | head -n 1 | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        fi
+fi
+
+if [ -r /sys/devices/system/cpu/cpu0/cpufreq/base_frequency ] ; then
+    if ( echo "${CPU_INFO_SOURCE}" | grep -qv sysfs ) ; then
+        CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
+    fi
+
+    CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency)"
+elif [ -n "${possible_cpu_freq}" ] ; then
+    CPU_FREQ="${possible_cpu_freq}"
+elif [ -r /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq ] ; then
+    if ( echo "${CPU_INFO_SOURCE}" | grep -qv sysfs ) ; then
+        CPU_INFO_SOURCE="${CPU_INFO_SOURCE} sysfs"
+    fi
+
+    CPU_FREQ="$(cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq)"
+fi
+
+freq_units="$(echo "${CPU_FREQ}" | cut -f 2 -d ' ')"
+
+case "${freq_units}" in
+    GHz)
+        value="$(echo "${CPU_FREQ}" | cut -f 1 -d ' ')"
+        CPU_FREQ="$((value*1000*1000*1000))"
+        ;;
+    MHz)
+        value="$(echo "${CPU_FREQ}" | cut -f 1 -d ' ')"
+        CPU_FREQ="$((value*1000*1000))"
+        ;;
+    KHz)
+        value="$(echo "${CPU_FREQ}" | cut -f 1 -d ' ')"
+        CPU_FREQ="$((value*1000))"
+        ;;
+    *)
+        ;;
+esac
+
+# -------------------------------------------------------------------------------------------------
+# Detect the total system RAM
+
+TOTAL_RAM="unknown"
+RAM_DETECTION="none"
+
+if [ "${KERNEL_NAME}" = FreeBSD ] ; then
+        RAM_DETECTION="sysctl"
+        TOTAL_RAM="$(sysctl -n hw.physmem)"
+elif [ -r /proc/meminfo ] ; then
+        RAM_DETECTION="procfs"
+        TOTAL_RAM="$(grep -F MemTotal /proc/meminfo | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | cut -f 1 -d ' ')"
+        TOTAL_RAM="$((TOTAL_RAM*1024))"
+fi
+
 
 echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
 echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
@@ -189,4 +306,11 @@ echo "NETDATA_SYSTEM_VIRTUALIZATION=${VIRTUALIZATION}"
 echo "NETDATA_SYSTEM_VIRT_DETECTION=${VIRT_DETECTION}"
 echo "NETDATA_SYSTEM_CONTAINER=${CONTAINER}"
 echo "NETDATA_SYSTEM_CONTAINER_DETECTION=${CONT_DETECTION}"
+echo "NETDATA_CPU_LOGICAL_CPU_COUNT=${LCPU_COUNT}"
+echo "NETDATA_CPU_VENDOR=${CPU_VENDOR}"
+echo "NETDATA_CPU_MODEL=${CPU_MODEL}"
+echo "NETDATA_CPU_FREQ=${CPU_FREQ}"
+echo "NETDATA_CPU_DETECTION=${CPU_INFO_SOURCE}"
+echo "NETDATA_TOTAL_RAM=${TOTAL_RAM}"
+echo "NETDATA_RAM_DETECTION=${RAM_DETECTION}"
 
