@@ -79,7 +79,7 @@ operating systems.
   <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71960868-c1236d00-31fe-11ea-859e-902d36233e38.png" alt="Install Netdata on Kubernetes" />Kubernetes</h3>
     <ul>
-      <li><a href="https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments">Using a Kubernetes Helm</a></li>
+      <li><a href="https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments">Using a Helm chart</a></li>
     </ul>
   </div>
   <div class="grid-item">
