@@ -19,7 +19,13 @@ struct lws_wss_packet_buffer {
 	struct lws_wss_packet_buffer *next;
 };
 
-struct lws_wss_packet_buffer *lws_write_buffer_head = NULL;
+// buffer used for outgoing packets
+// we store them here when we wait for lws_writable callback
+// notifying us that we can write to socket
+struct lws_wss_packet_buffer *aclk_lws_wss_write_buffer_head = NULL;
+
+#define ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES 128*1024
+struct lws_ring *aclk_lws_wss_read_ringbuffer = NULL;
 
 static inline struct lws_wss_packet_buffer *lws_wss_packet_buffer_new(void* data, size_t size)
 {
@@ -60,13 +66,6 @@ static inline void lws_wss_packet_buffer_free(struct lws_wss_packet_buffer *item
 	free(item);
 }
 
-//TODO clean me up - make normal buffering
-#define LWS_DATA_BUFFER_IN_SIZE 1024*1024
-char lws_data_buffer_in[LWS_DATA_BUFFER_IN_SIZE];
-char* lws_data_buffer_in_rd = NULL;
-char* lws_data_buffer_in_wr = NULL;
-int lws_in_count = 0;
-
 static const struct lws_protocols protocols[] = {
 	{
 		"aclk-wss",
@@ -90,6 +89,8 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (void (*connection
 	struct lws_context_creation_info info;
 	struct aclk_lws_wss_engine_instance *inst;
 	inst = callocz(1, sizeof(struct aclk_lws_wss_engine_instance));
+	if(!inst)
+		return NULL;
 
 	memset(&info, 0, sizeof(struct lws_context_creation_info));
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
@@ -101,7 +102,16 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (void (*connection
 	inst->connection_established_callback = connection_established_callback;
 	lws_context = inst->lws_context;
 
+	aclk_lws_wss_read_ringbuffer = lws_ring_create(1, ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES, NULL);
+	if(!aclk_lws_wss_read_ringbuffer)
+		goto failure_cleanup;
+
 	return inst;
+
+failure_cleanup:
+	lws_context_destroy(inst->lws_context);
+	free(inst);
+	return NULL;
 }
 
 void _aclk_wss_connect(){
@@ -126,6 +136,14 @@ void _aclk_wss_connect(){
 	lws_client_connect_via_info(&i);
 }
 
+static inline int received_data_to_ringbuff(void* data, size_t len) {
+	if( lws_ring_insert(aclk_lws_wss_read_ringbuffer, data, len) != len ) {
+		error("ACLK_LWS_WSS_CLIENT: receive buffer full. Closing connection to prevent flooding.");
+		return 0;
+	}
+	return 1;
+}
+
 static int
 aclk_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
@@ -137,22 +155,17 @@ aclk_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 
 	switch (reason) {
 	case LWS_CALLBACK_CLIENT_WRITEABLE:
-		data = lws_wss_packet_buffer_pop(&lws_write_buffer_head);
+		data = lws_wss_packet_buffer_pop(&aclk_lws_wss_write_buffer_head);
 		if(likely(data)) {
 			lws_write(wsi, data->data + LWS_PRE, data->data_size, LWS_WRITE_BINARY);
 			lws_wss_packet_buffer_free(data);
-			if(lws_write_buffer_head)
+			if(aclk_lws_wss_write_buffer_head)
 				lws_callback_on_writable(inst->lws_wsi);
 		}
 		break;
 	case LWS_CALLBACK_CLIENT_RECEIVE:
-		if(!lws_data_buffer_in_rd) {
-			lws_data_buffer_in_rd = lws_data_buffer_in;
-			lws_data_buffer_in_wr = lws_data_buffer_in;
-		}
-		memcpy(lws_data_buffer_in_wr, in, len);
-		lws_data_buffer_in_wr += len;
-		lws_in_count += len;
+		if(!received_data_to_ringbuff(in, len))
+			return 1;
 		inst->data_to_read = 1; //to inform logic above there is reason to call mosquitto_loop_read
 		break;
 	case LWS_CALLBACK_PROTOCOL_INIT:
@@ -201,7 +214,7 @@ int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *b
 {
 	if(inst && inst->lws_wsi && inst->websocket_connection_up)
 	{
-		lws_wss_packet_buffer_push(&lws_write_buffer_head, lws_wss_packet_buffer_new(buf, count));
+		lws_wss_packet_buffer_push(&aclk_lws_wss_write_buffer_head, lws_wss_packet_buffer_new(buf, count));
 		lws_callback_on_writable(inst->lws_wsi);
 		return count;
 	}
@@ -210,20 +223,21 @@ int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *b
 
 int aclk_lws_wss_client_read(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count)
 {
-	int rdsize = lws_in_count;
-	
-	if(lws_in_count > 0) {
-		if(rdsize > count)
-			rdsize = count;
-		if(lws_data_buffer_in_rd + rdsize > lws_data_buffer_in_wr)
-			rdsize = lws_data_buffer_in_wr - lws_data_buffer_in_rd;
-		memcpy(buf, lws_data_buffer_in_rd, rdsize);
-		lws_data_buffer_in_rd += rdsize;
-		lws_in_count -= rdsize;
-		if(lws_in_count <= 0)
-			inst->data_to_read = 0;
+	size_t data_to_be_read = count;
+	size_t readable_byte_count = lws_ring_get_count_waiting_elements(aclk_lws_wss_read_ringbuffer, NULL);
+	if(unlikely(readable_byte_count <= 0)) {
+		errno = EAGAIN;
+		return -1;
 	}
-	return rdsize;
+
+	if( readable_byte_count < data_to_be_read )
+		data_to_be_read = readable_byte_count;
+
+	data_to_be_read = lws_ring_consume(aclk_lws_wss_read_ringbuffer, NULL, buf, data_to_be_read);
+	if(data_to_be_read == readable_byte_count)
+		inst->data_to_read = 0;
+
+	return data_to_be_read;
 }
 
 int aclk_lws_wss_service_loop(struct aclk_lws_wss_engine_instance *inst)
