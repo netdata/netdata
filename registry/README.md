@@ -162,9 +162,8 @@ pattern matching can be controlled with the following setting:
 
 The settings are:
 -   `yes` allows the pattern to match DNS names.
--    `no` disables DNS matching for the patterns (they only match IP addresses).
--    `heuristic` will estimate if the patterns should match FQDNs by the presence or absence of `:`s or
-     alpha-characters.
+-   `no` disables DNS matching for the patterns (they only match IP addresses).
+-   `heuristic` will estimate if the patterns should match FQDNs by the presence or absence of `:`s or alpha-characters.
 
 ### Where is the registry database stored?
 
