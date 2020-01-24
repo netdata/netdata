@@ -67,14 +67,16 @@ ORDER = [
 CHARTS = {
     # Throughput metrics
     "kv.node_operations": {
-        "options": [None, "Reads & writes coordinated by this node", "operations/s", "throughput", "riak.kv.throughput", "line"],
+        "options": [None, "Reads & writes coordinated by this node", "operations/s", "throughput", "riak.kv.throughput",
+                    "line"],
         "lines": [
             ["node_gets_total", "gets", "incremental"],
             ["node_puts_total", "puts", "incremental"]
         ]
     },
     "dt.vnode_updates": {
-        "options": [None, "Update operations coordinated by local vnodes by data type", "operations/s", "throughput", "riak.dt.vnode_updates", "line"],
+        "options": [None, "Update operations coordinated by local vnodes by data type", "operations/s", "throughput",
+                    "riak.dt.vnode_updates", "line"],
         "lines": [
             ["vnode_counter_update_total", "counters", "incremental"],
             ["vnode_set_update_total", "sets", "incremental"],
@@ -94,7 +96,8 @@ CHARTS = {
         ]
     },
     "consistent.operations": {
-        "options": [None, "Consistent node operations", "operations/s", "throughput", "riak.consistent.operations", "line"],
+        "options": [None, "Consistent node operations", "operations/s", "throughput", "riak.consistent.operations",
+                    "line"],
         "lines": [
             ["consistent_gets_total", "gets", "incremental"],
             ["consistent_puts_total", "puts", "incremental"],
@@ -103,7 +106,8 @@ CHARTS = {
 
     # Latency metrics
     "kv.latency.get": {
-        "options": [None, "Time between reception of a client GET request and subsequent response to client", "ms", "latency", "riak.kv.latency.get", "line"],
+        "options": [None, "Time between reception of a client GET request and subsequent response to client", "ms",
+                    "latency", "riak.kv.latency.get", "line"],
         "lines": [
             ["node_get_fsm_time_mean", "mean", "absolute", 1, 1000],
             ["node_get_fsm_time_median", "median", "absolute", 1, 1000],
@@ -113,7 +117,8 @@ CHARTS = {
         ]
     },
     "kv.latency.put": {
-        "options": [None, "Time between reception of a client PUT request and subsequent response to client", "ms", "latency", "riak.kv.latency.put", "line"],
+        "options": [None, "Time between reception of a client PUT request and subsequent response to client", "ms",
+                    "latency", "riak.kv.latency.put", "line"],
         "lines": [
             ["node_put_fsm_time_mean", "mean", "absolute", 1, 1000],
             ["node_put_fsm_time_median", "median", "absolute", 1, 1000],
@@ -123,7 +128,8 @@ CHARTS = {
         ]
     },
     "dt.latency.counter": {
-        "options": [None, "Time it takes to perform an Update Counter operation", "ms", "latency", "riak.dt.latency.counter_merge", "line"],
+        "options": [None, "Time it takes to perform an Update Counter operation", "ms", "latency",
+                    "riak.dt.latency.counter_merge", "line"],
         "lines": [
             ["object_counter_merge_time_mean", "mean", "absolute", 1, 1000],
             ["object_counter_merge_time_median", "median", "absolute", 1, 1000],
@@ -133,7 +139,8 @@ CHARTS = {
         ]
     },
     "dt.latency.set": {
-        "options": [None, "Time it takes to perform an Update Set operation", "ms", "latency", "riak.dt.latency.set_merge", "line"],
+        "options": [None, "Time it takes to perform an Update Set operation", "ms", "latency",
+                    "riak.dt.latency.set_merge", "line"],
         "lines": [
             ["object_set_merge_time_mean", "mean", "absolute", 1, 1000],
             ["object_set_merge_time_median", "median", "absolute", 1, 1000],
@@ -143,7 +150,8 @@ CHARTS = {
         ]
     },
     "dt.latency.map": {
-        "options": [None, "Time it takes to perform an Update Map operation", "ms", "latency", "riak.dt.latency.map_merge", "line"],
+        "options": [None, "Time it takes to perform an Update Map operation", "ms", "latency",
+                    "riak.dt.latency.map_merge", "line"],
         "lines": [
             ["object_map_merge_time_mean", "mean", "absolute", 1, 1000],
             ["object_map_merge_time_median", "median", "absolute", 1, 1000],
@@ -164,7 +172,8 @@ CHARTS = {
         ]
     },
     "search.latency.index": {
-        "options": [None, "Time it takes Search to index a new document", "ms", "latency", "riak.search.latency.index", "line"],
+        "options": [None, "Time it takes Search to index a new document", "ms", "latency", "riak.search.latency.index",
+                    "line"],
         "lines": [
             ["search_index_latency_median", "median", "absolute", 1, 1000],
             ["search_index_latency_min", "min", "absolute", 1, 1000],
@@ -205,7 +214,8 @@ CHARTS = {
         ]
     },
     "vm.memory.processes": {
-        "options": [None, "Memory allocated & used by Erlang processes", "MB", "vm", "riak.vm.memory.processes", "line"],
+        "options": [None, "Memory allocated & used by Erlang processes", "MB", "vm", "riak.vm.memory.processes",
+                    "line"],
         "lines": [
             ["memory_processes", "allocated", "absolute", 1, 1024 * 1024],
             ["memory_processes_used", "used", "absolute", 1, 1024 * 1024]
@@ -214,7 +224,8 @@ CHARTS = {
 
     # General Riak Load/Health metrics
     "kv.siblings_encountered.get": {
-        "options": [None, "Number of siblings encountered during GET operations by this node during the past minute", "siblings", "load", "riak.kv.siblings_encountered.get", "line"],
+        "options": [None, "Number of siblings encountered during GET operations by this node during the past minute",
+                    "siblings", "load", "riak.kv.siblings_encountered.get", "line"],
         "lines": [
             ["node_get_fsm_siblings_mean", "mean", "absolute"],
             ["node_get_fsm_siblings_median", "median", "absolute"],
@@ -224,7 +235,8 @@ CHARTS = {
         ]
     },
     "kv.objsize.get": {
-        "options": [None, "Object size encountered by this node during the past minute", "KB", "load", "riak.kv.objsize.get", "line"],
+        "options": [None, "Object size encountered by this node during the past minute", "KB", "load",
+                    "riak.kv.objsize.get", "line"],
         "lines": [
             ["node_get_fsm_objsize_mean", "mean", "absolute", 1, 1024],
             ["node_get_fsm_objsize_median", "median", "absolute", 1, 1024],
@@ -234,7 +246,9 @@ CHARTS = {
         ]
     },
     "search.vnodeq_size": {
-        "options": [None, "Number of unprocessed messages in the vnode message queues of Search on this node in the past minute", "messages", "load", "riak.search.vnodeq_size", "line"],
+        "options": [None,
+                    "Number of unprocessed messages in the vnode message queues of Search on this node in the past minute",
+                    "messages", "load", "riak.search.vnodeq_size", "line"],
         "lines": [
             ["riak_search_vnodeq_mean", "mean", "absolute"],
             ["riak_search_vnodeq_median", "median", "absolute"],
@@ -244,20 +258,23 @@ CHARTS = {
         ]
     },
     "search.index_errors": {
-        "options": [None, "Number of document index errors encountered by Search", "errors", "load", "riak.search.index", "line"],
+        "options": [None, "Number of document index errors encountered by Search", "errors", "load",
+                    "riak.search.index", "line"],
         "lines": [
             ["search_index_fail_count", "errors", "absolute"]
         ]
     },
     "core.pbc": {
-        "options": [None, "Protocol buffer connections by status", "connections", "load", "riak.core.protobuf_connections", "line"],
+        "options": [None, "Protocol buffer connections by status", "connections", "load",
+                    "riak.core.protobuf_connections", "line"],
         "lines": [
             ["pbc_active", "active", "absolute"],
             # ["pbc_connects", "established_pastmin", "absolute"]
         ]
     },
     "core.repairs": {
-        "options": [None, "Number of repair operations this node has coordinated", "repairs", "load", "riak.core.repairs", "line"],
+        "options": [None, "Number of repair operations this node has coordinated", "repairs", "load",
+                    "riak.core.repairs", "line"],
         "lines": [
             ["read_repairs", "read", "absolute"]
         ]
@@ -275,7 +292,8 @@ CHARTS = {
         # Writing "Sidejob's" here seems to cause some weird issues: it results in this chart being rendered in
         # its own context and additionally, moves the entire Riak graph all the way up to the top of the Netdata
         # dashboard for some reason.
-        "options": [None, "Finite state machines being rejected by Sidejobs overload protection", "fsms", "load", "riak.core.fsm_rejected", "line"],
+        "options": [None, "Finite state machines being rejected by Sidejobs overload protection", "fsms", "load",
+                    "riak.core.fsm_rejected", "line"],
         "lines": [
             ["node_get_fsm_rejected", "get", "absolute"],
             ["node_put_fsm_rejected", "put", "absolute"]
@@ -284,7 +302,8 @@ CHARTS = {
 
     # General Riak Search Load / Health metrics
     "search.errors": {
-        "options": [None, "Number of writes to Search failed due to bad data format by reason", "writes", "load", "riak.search.index", "line"],
+        "options": [None, "Number of writes to Search failed due to bad data format by reason", "writes", "load",
+                    "riak.search.index", "line"],
         "lines": [
             ["search_index_bad_entry_count", "bad_entry", "absolute"],
             ["search_index_extract_fail_count", "extract_fail", "absolute"],

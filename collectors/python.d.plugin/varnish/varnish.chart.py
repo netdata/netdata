@@ -281,15 +281,15 @@ class Service(ExecutableService):
 
             chart = {
                 chart_name:
-                {
-                    'options': [None, title, 'kilobits/s', 'backend response statistics',
-                                'varnish.backend', 'area'],
-                    'lines': [
-                        [hdr_bytes, 'header', 'incremental', 8, 1000],
-                        [body_bytes, 'body', 'incremental', -8, 1000]
+                    {
+                        'options': [None, title, 'kilobits/s', 'backend response statistics',
+                                    'varnish.backend', 'area'],
+                        'lines': [
+                            [hdr_bytes, 'header', 'incremental', 8, 1000],
+                            [body_bytes, 'body', 'incremental', -8, 1000]
                         ]
                     }
-                }
+            }
 
             self.order.insert(0, chart_name)
             self.definitions.update(chart)

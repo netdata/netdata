@@ -12,12 +12,12 @@ from sys import exc_info
 try:
     from pymongo import MongoClient, ASCENDING, DESCENDING
     from pymongo.errors import PyMongoError
+
     PYMONGO = True
 except ImportError:
     PYMONGO = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
-
 
 REPL_SET_STATES = [
     ('1', 'primary'),
