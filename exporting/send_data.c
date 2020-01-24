@@ -168,6 +168,7 @@ void simple_connector_worker(void *instance_p)
 
             sock = connect_to_one_of(
                 instance->config.destination,
+                &instance->config.do_not_reconnect,
                 connector_specific_config->default_port,
                 &timeout,
                 &reconnects,

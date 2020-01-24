@@ -508,6 +508,7 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
 
     host->rrdpush_sender_socket = connect_to_one_of(
             host->rrdpush_send_destination
+            , &host->do_not_reconnect
             , default_port
             , &tv
             , reconnects_counter

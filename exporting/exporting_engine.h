@@ -74,6 +74,7 @@ struct engine;
 struct instance_config {
     const char *name;
     const char *destination;
+    uint32_t do_not_reconnect;
 
     int update_every;
     int buffer_on_failures;

@@ -468,6 +468,7 @@ void *backends_main(void *ptr) {
     BUFFER *b = buffer_create(1), *response = buffer_create(1);
     int (*backend_request_formatter)(BUFFER *, const char *, RRDHOST *, const char *, RRDSET *, RRDDIM *, time_t, time_t, BACKEND_OPTIONS) = NULL;
     int (*backend_response_checker)(BUFFER *) = NULL;
+    uint32_t do_not_reconnect = 0;
 
 #if HAVE_KINESIS
     int do_kinesis = 0;
@@ -997,7 +998,7 @@ void *backends_main(void *ptr) {
                 // usec_t start_ut = now_monotonic_usec();
                 size_t reconnects = 0;
 
-                sock = connect_to_one_of(destination, default_port, &timeout, &reconnects, NULL, 0);
+                sock = connect_to_one_of(destination, &do_not_reconnect, default_port, &timeout, &reconnects, NULL, 0);
 #ifdef ENABLE_HTTPS
                 if(sock != -1) {
                     if(netdata_opentsdb_ctx) {

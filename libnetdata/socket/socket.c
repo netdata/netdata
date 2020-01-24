@@ -887,7 +887,7 @@ int connect_to_this(const char *definition, const char *next, int default_port, 
             return -1;
         case -2:
             error("The first definition '%s' of the list does not specify a host.", next);
-            return -1;
+            return -2;
         default:
             break;
     }
@@ -905,10 +905,12 @@ int connect_to_this(const char *definition, const char *next, int default_port, 
     return connect_to_this_ip46(protocol, socktype, host, scope_id, service, timeout);
 }
 
-int connect_to_one_of(const char *destination, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
+int connect_to_one_of(const char *destination, uint32_t *do_not_connect, int default_port, struct timeval *timeout, size_t *reconnects_counter, char *connected_to, size_t connected_to_size) {
     int sock = -1;
 
     const char *s = destination;
+    uint32_t i = 0;
+    uint32_t connect ;
     while(*s) {
         const char *e = s;
 
@@ -925,18 +927,28 @@ int connect_to_one_of(const char *destination, int default_port, struct timeval 
         // is there anything?
         if(!*s || s == e) break;
 
-        char buf[e - s + 1];
-        strncpyz(buf, s, e - s);
-        if(reconnects_counter) *reconnects_counter += 1;
-        sock = connect_to_this(buf, s, default_port, timeout);
-        if(sock != -1) {
-            if(connected_to && connected_to_size) {
-                strncpy(connected_to, buf, connected_to_size);
-                connected_to[connected_to_size - 1] = '\0';
+        if (i < 32)
+            connect = !(*do_not_connect & (1U<<i));
+        else
+            connect = 1;
+
+        if(connect) {
+            char buf[e - s + 1];
+            strncpyz(buf, s, e - s);
+            if(reconnects_counter) *reconnects_counter += 1;
+            sock = connect_to_this(buf, s, default_port, timeout);
+            if(sock == -2)
+                *do_not_connect |=  (1U<<i);
+            else if(sock != -1) {
+                if(connected_to && connected_to_size) {
+                    strncpy(connected_to, buf, connected_to_size);
+                    connected_to[connected_to_size - 1] = '\0';
+                }
+                break;
             }
-            break;
         }
         s = e;
+        i++;
     }
 
     return sock;

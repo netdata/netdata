@@ -681,6 +681,7 @@ struct rrdhost {
 
     unsigned int rrdpush_send_enabled:1;            // 1 when this host sends metrics to another netdata
     char *rrdpush_send_destination;                 // where to send metrics to
+    uint32_t do_not_reconnect;                      //variable used to avoid reconnect with a wrong destination
     char *rrdpush_send_api_key;                     // the api key at the receiving netdata
 
     // the following are state information for the threading
