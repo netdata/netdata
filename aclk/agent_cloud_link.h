@@ -6,6 +6,7 @@
 #include "mqtt.h"
 
 #define ACLK_MSG_TYPE_CHART "chart"
+#define ACLK_ALARMS_TOPIC "alarms"
 #define ACLK_METADATA_TOPIC "meta"
 #define ACLK_COMMAND_TOPIC "cmd"
 #define ACLK_TOPIC_STRUCTURE "/agent/%s"
@@ -71,15 +72,17 @@ void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
 int aclk_heartbeat();
 void aclk_create_metadata_message(BUFFER *dest, char *type, char *msg_id, BUFFER *contents);
-int aclk_send_metadata_info();
+int aclk_send_metadata();
 int aclk_wait_for_initialization();
-int aclk_sent_charts(RRDHOST *host, BUFFER *wb);
-int aclk_collect_active_charts();       // Find the active charts that we need to send to the cloud
+int aclk_send_charts(RRDHOST *host, BUFFER *wb);
 int aclk_send_single_chart(char *host, char *chart);
 int aclk_queue_query(char *token, char *data, char *msg_type, char *query, int run_after, int internal);
 struct aclk_query  *aclk_query_find(char *token, char *data, char *msg_id, char *query);
 void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
-int    aclk_update_chart(char *hostname, char *chart_name);
+int aclk_update_chart(RRDHOST *host, char *chart_name);
+void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
+
+extern const char* get_release_channel();
 
 
 #endif //NETDATA_AGENT_CLOUD_LINK_H

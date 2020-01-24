@@ -26,7 +26,6 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
 {
     struct aclk_request *data = e->callback_data;
 
-    //char txt[50];
     switch(e->type) {
         case JSON_OBJECT:
             e->callback_function = cloud_to_agent_parse;
@@ -36,7 +35,6 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
             //sprintf(txt,"ARRAY[%lu]", e->data.items);
             //buffer_strcat(wb, txt);
             break;
-
         case JSON_STRING:
             if (!strcmp(e->name, ACLK_JSON_IN_MSGID)) {
                 data->msg_id = strdupz(e->data.string);
@@ -98,9 +96,7 @@ void mqtt_message_callback(
     }
 
     if (strcmp((char *)msg->payload, "info") == 0) {
-        error_log_limit_unlimited();
-        aclk_send_metadata_info();
-        error_log_limit_reset();
+        aclk_send_metadata();
         return;
     }
 
