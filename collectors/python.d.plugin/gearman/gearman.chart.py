@@ -4,9 +4,9 @@
 
 # Gearman Netdata Plugin
 
-from bases.FrameworkServices.SocketService import SocketService
 from copy import deepcopy
 
+from bases.FrameworkServices.SocketService import SocketService
 
 CHARTS = {
     'total_workers': {
@@ -29,6 +29,7 @@ def job_chart_template(job_name):
         ]
     }
 
+
 def build_result_dict(job):
     """
     Get the status for each job
@@ -45,6 +46,7 @@ def build_result_dict(job):
         '{0}_idle'.format(job['job_name']): idle,
         '{0}_running'.format(job['job_name']): running,
     }
+
 
 def parse_worker_data(job):
     job_name = job[0]

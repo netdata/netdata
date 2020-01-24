@@ -5,7 +5,6 @@
 
 import os
 import sys
-
 from copy import deepcopy
 
 from bases.FrameworkServices.SocketService import SocketService

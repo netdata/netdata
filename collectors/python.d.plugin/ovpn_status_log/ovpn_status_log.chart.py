@@ -7,7 +7,6 @@ import re
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-
 update_every = 10
 
 ORDER = [

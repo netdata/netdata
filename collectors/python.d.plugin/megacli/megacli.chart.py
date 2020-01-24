@@ -9,7 +9,6 @@ import re
 from bases.FrameworkServices.ExecutableService import ExecutableService
 from bases.collection import find_binary
 
-
 disabled_by_default = True
 
 update_every = 5
@@ -27,7 +26,7 @@ def adapter_charts(ads):
         'adapter_degraded': {
             'options': [None, 'Adapter State', 'is degraded', 'adapter', 'megacli.adapter_degraded', 'line'],
             'lines': dims(ads)
-            },
+        },
     }
 
     return order, charts
@@ -111,7 +110,7 @@ def find_adapters(d):
 
 
 def find_pds(d):
-    keys = ('Slot Number',  'Media Error Count', 'Predictive Failure Count')
+    keys = ('Slot Number', 'Media Error Count', 'Predictive Failure Count')
     d = ' '.join(v.strip() for v in d if v.startswith(keys))
     return [PD(*v) for v in RE_VD.findall(d)]
 
