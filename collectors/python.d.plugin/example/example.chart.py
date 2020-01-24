@@ -7,7 +7,6 @@ from random import SystemRandom
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-
 priority = 90000
 
 ORDER = [

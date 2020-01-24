@@ -394,7 +394,7 @@ install_go() {
 	return 0
 }
 install_go
-install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+install -m 0750 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
 %pre
 
@@ -421,21 +421,21 @@ rm -rf "${RPM_BUILD_ROOT}"
 %doc README.md
 %{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
-
-%defattr(-,root,netdata)
-%dir %{_libdir}/%{name}
-
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
-
+%dir %{_libdir}/%{name}
+%dir %{_datadir}/%{name}
 %{_libdir}/%{name}
-
-%defattr(0755,netdata,netdata,0755)
+%{_libdir}/%{name}/conf.d/
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
-
-%defattr(0755,root,root,0755)
 %{_sbindir}/netdatacli
 %{_sbindir}/netdata-claim.sh
+
+%if %{with systemd}
+%{_unitdir}/netdata.service
+%else
+%{_sysconfdir}/rc.d/init.d/netdata
+%endif
 
 %defattr(4750,root,netdata,0750)
 
@@ -444,34 +444,28 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libexecdir}/%{name}/plugins.d
 %dir %{_libexecdir}/%{name}/node.d
 
-%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%{_libexecdir}/%{name}/python.d
+%{_libexecdir}/%{name}/plugins.d
+%{_libexecdir}/%{name}/node.d
+
+%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
 %if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
-%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
-%attr(0550,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
+%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
+%attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
 # perf plugin
 %caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
 # perf plugin
-%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
 # freeipmi files
 %caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
-%dir %{_datadir}/%{name}
-
-%defattr(0750,netdata,netdata,0755)
-%{_libdir}/%{name}/conf.d/
-
-%if %{with systemd}
-%{_unitdir}/netdata.service
-%else
-%{_sysconfdir}/rc.d/init.d/netdata
-%endif
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
@@ -522,6 +516,8 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Thu Dec 19 2019 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-11
+- Fix remaining ownership and permissions issues.
 * Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10
 - Fix /etc/netdata permissions
 * Mon Sep 23 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-9

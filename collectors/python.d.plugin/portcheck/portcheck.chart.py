@@ -12,7 +12,6 @@ except ImportError:
 
 from bases.FrameworkServices.SimpleService import SimpleService
 
-
 PORT_LATENCY = 'connect'
 
 PORT_SUCCESS = 'success'

@@ -6,8 +6,8 @@
 
 from collections import namedtuple, defaultdict
 from json import loads
-from threading import Thread
 from socket import gethostbyname, gaierror
+from threading import Thread
 
 try:
     from queue import Queue
@@ -16,9 +16,7 @@ except ImportError:
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
 update_every = 1
-
 
 METHODS = namedtuple('METHODS', ['get_data', 'url', 'stats'])
 
@@ -127,7 +125,7 @@ CHARTS = {
             ['couchdb_httpd_request_methods_GET', 'GET', 'incremental'],
             ['couchdb_httpd_request_methods_HEAD', 'HEAD', 'incremental'],
             ['couchdb_httpd_request_methods_OPTIONS', 'OPTIONS',
-                'incremental'],
+             'incremental'],
             ['couchdb_httpd_request_methods_POST', 'POST', 'incremental'],
             ['couchdb_httpd_request_methods_PUT', 'PUT', 'incremental']
         ]
@@ -141,13 +139,13 @@ CHARTS = {
             ['couchdb_httpd_status_codes_201', '201 Created', 'incremental'],
             ['couchdb_httpd_status_codes_202', '202 Accepted', 'incremental'],
             ['couchdb_httpd_status_codes_2xx', 'Other 2xx Success',
-                'incremental'],
+             'incremental'],
             ['couchdb_httpd_status_codes_3xx', '3xx Redirection',
-                'incremental'],
+             'incremental'],
             ['couchdb_httpd_status_codes_4xx', '4xx Client error',
-                'incremental'],
+             'incremental'],
             ['couchdb_httpd_status_codes_5xx', '5xx Server error',
-                'incremental']
+             'incremental']
         ]
     },
     'open_files': {
@@ -280,19 +278,19 @@ class Service(UrlService):
                     if self._get_raw_data(self.url + '/' + db)]
         for db in self.dbs:
             self.definitions['db_sizes_file']['lines'].append(
-                ['db_'+db+'_sizes_file', db, 'absolute', 1, 1000]
+                ['db_' + db + '_sizes_file', db, 'absolute', 1, 1000]
             )
             self.definitions['db_sizes_external']['lines'].append(
-                ['db_'+db+'_sizes_external', db, 'absolute', 1, 1000]
+                ['db_' + db + '_sizes_external', db, 'absolute', 1, 1000]
             )
             self.definitions['db_sizes_active']['lines'].append(
-                ['db_'+db+'_sizes_active', db, 'absolute', 1, 1000]
+                ['db_' + db + '_sizes_active', db, 'absolute', 1, 1000]
             )
             self.definitions['db_doc_counts']['lines'].append(
-                ['db_'+db+'_doc_count', db, 'absolute']
+                ['db_' + db + '_doc_count', db, 'absolute']
             )
             self.definitions['db_doc_del_counts']['lines'].append(
-                ['db_'+db+'_doc_del_count', db, 'absolute']
+                ['db_' + db + '_doc_del_count', db, 'absolute']
             )
         return UrlService.check(self)
 
