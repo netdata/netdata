@@ -4,7 +4,7 @@ Execute these commands to install Netdata in Alpine Linux 3.x:
 
 ```sh
 # install required packages
-apk add alpine-sdk bash curl zlib-dev util-linux-dev libmnl-dev gcc make git autoconf automake pkgconfig python logrotate
+apk add alpine-sdk bash curl libuv-dev zlib-dev util-linux-dev libmnl-dev gcc make git autoconf automake pkgconfig python logrotate
 
 # if you plan to run node.js Netdata plugins
 apk add nodejs
