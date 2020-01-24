@@ -1175,13 +1175,13 @@ static int rrdpush_receive(int fd
     info("STREAM %s [receive from [%s]:%s]: initializing communication...", host->hostname, client_ip, client_port);
     char initial_response[HTTP_HEADER_SIZE];
     if (stream_version > 2) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the newest stream protocol.", host->hostname, client_ip, client_port);
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
         sprintf(initial_response, "%s%u", START_STREAMING_PROMPT_VN, stream_version);
     } else if (stream_version > 0) {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using the second version of stream protocol.", host->hostname, client_ip, client_port);
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using the stream version %u.", host->hostname, client_ip, client_port, stream_version);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
     } else {
-        info("STREAM %s [receive from [%s]:%s]: Netdata is using an old protocol.", host->hostname, client_ip, client_port);
+        info("STREAM %s [receive from [%s]:%s]: Netdata is using first stream protocol.", host->hostname, client_ip, client_port);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT);
     }
     #ifdef ENABLE_HTTPS
