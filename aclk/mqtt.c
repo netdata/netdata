@@ -284,10 +284,9 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
     }
 }
 
-int _link_event_loop(int timeout)
+static inline int _link_event_loop_wss()
 {
     int rc = MOSQ_ERR_SUCCESS;
-
     if(lws_engine_instance->websocket_connection_up) { //this is where we send connect to mosquitto
         //mosquitto_loop is not working with our patch
         //which allows custom send/recv functions
@@ -305,10 +304,7 @@ int _link_event_loop(int timeout)
         if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
             errno = 0;
             error("Loop error code %d (%s)", rc, mosquitto_strerror(rc));
-/*            rc = mosquitto_reconnect(mosq);
-            if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
-                error("Reconnect loop error code %d (%s)", rc, mosquitto_strerror(rc));
-            }*/
+            //TODO TODO !!!!!!
             // TBD: Using delay
             sleep_usec(USEC_PER_SEC * 10);
         }
@@ -316,6 +312,33 @@ int _link_event_loop(int timeout)
 
     aclk_lws_wss_service_loop(lws_engine_instance);
     return rc;
+}
+
+static inline int _link_event_loop_plain_mqtt(int timeout)
+{
+    int rc;
+
+    rc = mosquitto_loop(mosq, timeout, 1);
+
+    if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
+        errno = 0;
+        error("Loop error code %d (%s)", rc, mosquitto_strerror(rc));
+        rc = mosquitto_reconnect(mosq);
+        if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
+            error("Reconnect loop error code %d (%s)", rc, mosquitto_strerror(rc));
+        }
+        // TBD: Using delay
+        sleep_usec(USEC_PER_SEC * 10);
+    }
+    return rc;
+}
+
+int _link_event_loop(int timeout)
+{
+    if(mqtt_over_websockets)
+        return _link_event_loop_wss();
+    
+    return _link_event_loop_plain_mqtt(timeout);
 }
 
 void _link_shutdown()

@@ -2,7 +2,7 @@
 
 #include "libnetdata/libnetdata.h"
 
-static int aclk_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
+static int aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len);
 
 struct aclk_lws_wss_perconnect_data {
     int todo;
@@ -69,7 +69,7 @@ static inline void lws_wss_packet_buffer_free(struct lws_wss_packet_buffer *item
 static const struct lws_protocols protocols[] = {
 	{
 		"aclk-wss",
-		aclk_wss_callback,
+		aclk_lws_wss_callback,
 		sizeof(struct aclk_lws_wss_perconnect_data),
 		0,
 	},
@@ -145,13 +145,11 @@ static inline int received_data_to_ringbuff(void* data, size_t len) {
 }
 
 static int
-aclk_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
+aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 			void *user, void *in, size_t len)
 {
 	struct aclk_lws_wss_engine_instance *inst = lws_context_user(lws_get_context(wsi));
 	struct lws_wss_packet_buffer *data;
-
-	char buffer[4096];
 
 	switch (reason) {
 	case LWS_CALLBACK_CLIENT_WRITEABLE:
