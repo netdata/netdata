@@ -18,11 +18,13 @@ install_fedora_like() {
   # Using a glob pattern here because I can't reliably determine what the
   # resulting package name will be (TODO: There must be a better way!)
 
+  PKGMGR="$( (command -v dnf > /dev/null && echo "dnf") || echo "yum")"
+
   # Install NetData
-  dnf install -y /artifacts/netdata-"${VERSION}"-*.rpm
+  "$PKGMGR" install -y /artifacts/netdata-"${VERSION}"-*.rpm
 
   # Install testing tools
-  dnf install -y curl nc jq
+  "$PKGMGR" install -y curl nc jq
 }
 
 install_suse_like() {
