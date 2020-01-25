@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 # shellcheck disable=SC2046,SC2086,SC2166
