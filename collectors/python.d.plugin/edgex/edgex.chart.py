@@ -2,7 +2,8 @@
 # Description: EdgeX Platform netdata python.d module
 # Author: Odysseas Lamtzidis (OdysLam)
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Module Version: 0.2
+# Edgex-API-Version: 1
+# Edgex-Version: Fuji
 
 import json
 import threading
@@ -32,32 +33,32 @@ ORDER = [
 update_every = 5
 
 CHARTS = {
-    'events_throughput':{
+    'events_throughput': {
         'options': [None, 'Events Throughput', 'events/s',
-                    'events throughput','edgex.events_readings_incr', 'line'],
+                    'events', 'edgex.events_readings_incr', 'line'],
         'lines': [
             ['events', None, 'incremental'],
             ['readings', None, 'incremental']
         ]
     },
-    'events_count':{
-        'options': [None, 'Absolute Count', 'events', 'events count', 'edgex.events_readings_abs',
-                    'line'],
+    'events_count': {
+        'options': [None, 'Absolute Count', 'events', 'events',
+                    'edgex.events_readings_abs', 'line'],
         'lines': [
             ['readings', None, 'absolute'],
             ['events', None, 'absolute']
         ]
     },
-    'devices_number':{
-        'options': [None, 'devices count', 'devices', 'devices count', 'edgex.devices_number',
-                    'line'],
+    'devices_number': {
+        'options': [None, 'devices count', 'devices', 'devices',
+                    'edgex.devices_number', 'line'],
         'lines': [
             ['registered_devices', None, 'absolute'],
         ]
     },
-    'memory_alloc':{
+    'memory_alloc': {
         'options': [None, 'Alloc',
-                    'bytes', 'memory metrics', 'edgex.memory_alloc', 'line'],
+                    'bytes', 'memory', 'edgex.memory_alloc', 'line'],
         'lines': [
             ['core_data_alloc', 'core_data', 'absolute'],
             ['core_metadata_alloc', 'core_metadata', 'absolute'],
@@ -65,19 +66,19 @@ CHARTS = {
             ['support_logging_alloc', 'support_logging', 'absolute']
         ]
     },
-    'memory_malloc':{
+    'memory_malloc': {
         'options': [None, 'Mallocs', 'heap objects',
-                    'memory metrics','edgex.memory_malloc', 'line'],
+                    'memory', 'edgex.memory_malloc', 'line'],
         'lines': [
-            ['core_data_malloc', 'core_data', 'absolute'],
-            ['core_metadata_malloc', 'core_metadata', 'absolute'],
-            ['core_command_malloc', 'core_command', 'absolute'],
-            ['support_logging_malloc', 'support_logging', 'absolute']
+            ['core_data_malloc', 'core_data', 'incremental'],
+            ['core_metadata_malloc', 'core_metadata', 'incremental'],
+            ['core_command_malloc', 'core_command', 'incremental'],
+            ['support_logging_malloc', 'support_logging', 'incremental']
         ]
     },
-    'memory_frees':{
+    'memory_frees': {
         'options': [None, 'Frees', 'heap objects',
-                    'memory metrics', 'edgex.memory_frees', 'line'],
+                    'memory', 'edgex.memory_frees', 'line'],
         'lines': [
             ['core_data_frees', 'core_data', 'absolute'],
             ['core_metadata_frees', 'core_metadata', 'absolute'],
@@ -85,9 +86,9 @@ CHARTS = {
             ['support_logging_frees', 'support_logging', 'absolute']
         ]
     },
-    'memory_liveObjects':{
+    'memory_liveObjects': {
         'options': [None, 'LiveObjects', 'heap objects',
-                    'memory metrics', 'edgex.memory_liveObjects', 'line'],
+                    'memory', 'edgex.memory_liveObjects', 'line'],
         'lines': [
             ['core_data_live_objects', 'core_data', 'absolute'],
             ['core_metadata_live_objects', 'core_metadata', 'absolute'],
@@ -95,7 +96,8 @@ CHARTS = {
             ['support_logging_live_objects', 'support_logging', 'absolute']
         ]
     }
- }
+}
+
 
 def get_survive_any(method):
     def w(*args):
@@ -108,6 +110,7 @@ def get_survive_any(method):
 
     return w
 
+
 class Service(UrlService):
     def __init__(self, configuration=None, name=None):
         UrlService.__init__(self, configuration=configuration, name=name)
@@ -119,30 +122,32 @@ class Service(UrlService):
         )
         self.edgex_ports = {
             'support_logging': self.configuration.get('port_logging', '48061'),
-#            'sys_mgmt': self.configuration.get('port_sys_mgmt', '48090'),
             'core_data': self.configuration.get('port_data', '48080'),
             'core_metadata': self.configuration.get('port_metadata', '48081'),
             'core_command': self.configuration.get('port_command', '48082')
         }
+        self.init_urls()
+        self.init_methods()
+
+    def init_urls(self):
         self.url_core_data = '{url}:{port}/api/v1/'.format(
-            url = self.url,
-            port = self.edgex_ports['core_data']
+            url=self.url,
+            port=self.edgex_ports['core_data']
         )
         self.url_core_metadata = '{url}:{port}/api/v1/'.format(
-            url = self.url,
-            port = self.edgex_ports['core_metadata']
+            url=self.url,
+            port=self.edgex_ports['core_metadata']
         )
         self.url_core_command = '{url}:{port}/api/v1/'.format(
-            url = self.url,
-            port = self.edgex_ports['core_command']
+            url=self.url,
+            port=self.edgex_ports['core_command']
         )
         self.url_support_logging = '{url}:{port}/api/v1/'.format(
-            url = self.url,
-            port = self.edgex_ports['support_logging']
+            url=self.url,
+            port=self.edgex_ports['support_logging']
         )
 
-
-    def check(self):
+    def init_methods(self):
         self.methods = [
             METHODS(
                 get_data=self._get_core_throughput_events,
@@ -179,7 +184,7 @@ class Service(UrlService):
                 url=self.url_support_logging,
                 run=self.configuration.get('metrics', True)
             )
-         ]
+        ]
         return UrlService.check(self)
 
     def _get_data(self):
@@ -205,45 +210,46 @@ class Service(UrlService):
 
     @get_survive_any
     def _get_core_throughput_readings(self, queue, url):
-            data = {}
-            readings_count_url = url + 'reading/count'
-            raw = self._get_raw_data(readings_count_url)
-            if not raw:
-                return queue.put({})
-            raw = int(raw)
-            data['readings'] = raw
-            if 'event' in url:
-                data['events'] = raw
-            return queue.put(data)
-
-    def _get_core_throughput_events(self, queue, url):
-            data = {}
-            events_count_url = url + 'event/count'
-            raw = self._get_raw_data(events_count_url)
-            if not raw:
-                return queue.put({})
-            raw = int(raw)
+        data = {}
+        readings_count_url = url + 'reading/count'
+        raw = self._get_raw_data(readings_count_url)
+        if not raw:
+            return queue.put({})
+        raw = int(raw)
+        data['readings'] = raw
+        if 'event' in url:
             data['events'] = raw
-            return queue.put(data)
+        return queue.put(data)
+
+    @get_survive_any
+    def _get_core_throughput_events(self, queue, url):
+        data = {}
+        events_count_url = url + 'event/count'
+        raw = self._get_raw_data(events_count_url)
+        if not raw:
+            return queue.put({})
+        raw = int(raw)
+        data['events'] = raw
+        return queue.put(data)
 
     @get_survive_any
     def _get_device_info(self, queue, url):
-            data = {}
-            device_count_url = url + 'device'
-            raw = self._get_raw_data(device_count_url) #json string
-            if not raw:
-                return queue.put({ })
-            parsed = json.loads(raw) #python object
-            data['registered_devices'] = len(parsed) #int
-            return queue.put(data)
+        data = {}
+        device_count_url = url + 'device'
+        raw = self._get_raw_data(device_count_url)  # json string
+        if not raw:
+            return queue.put({})
+        parsed = json.loads(raw)  # python object
+        data['registered_devices'] = len(parsed)  # int
+        return queue.put(data)
 
-
+    @get_survive_any
     def _get_metrics_data(self, queue, url):
         data = {}
         metrics_url = url + 'metrics'
         raw = self._get_raw_data(metrics_url)
         if not raw:
-            return queue.put({ })
+            return queue.put({})
         parsed = json.loads(raw)
         if self.edgex_ports['core_data'] in url:
             data['core_data_alloc'] = parsed["Memory"]["Alloc"]
@@ -263,5 +269,5 @@ class Service(UrlService):
             data['support_logging_alloc'] = parsed["Memory"]["Alloc"]
             data['support_logging_malloc'] = parsed["Memory"]["Mallocs"]
             data['support_logging_frees'] = parsed["Memory"]["Frees"]
-            data['support_logging_live_objects'] =  parsed["Memory"]["LiveObjects"]
+            data['support_logging_live_objects'] = parsed["Memory"]["LiveObjects"]
         return queue.put(data)
