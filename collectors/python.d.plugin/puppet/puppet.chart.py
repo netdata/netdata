@@ -12,13 +12,11 @@
 #
 
 import socket
-
 from json import loads
 
 from bases.FrameworkServices.UrlService import UrlService
 
 update_every = 5
-
 
 MiB = 1 << 20
 CPU_SCALE = 1000
@@ -108,8 +106,8 @@ class Service(UrlService):
             non_heap_mem = jvm_metrics['non-heap-memory']
 
             for k in ['max', 'committed', 'used', 'init']:
-                data['jvm_heap_'+k] = heap_mem[k]
-                data['jvm_nonheap_'+k] = non_heap_mem[k]
+                data['jvm_heap_' + k] = heap_mem[k]
+                data['jvm_nonheap_' + k] = non_heap_mem[k]
 
             fd_open = jvm_metrics['file-descriptors']
             data['fd_max'] = fd_open['max']

@@ -5,12 +5,12 @@
 
 try:
     import ldap
+
     HAS_LDAP = True
 except ImportError:
     HAS_LDAP = False
 
 from bases.FrameworkServices.SimpleService import SimpleService
-
 
 DEFAULT_SERVER = 'localhost'
 DEFAULT_PORT = '389'
@@ -110,7 +110,7 @@ SEARCH_LIST = {
     'add_operations': (
         'cn=Add,cn=Operations,cn=Monitor', 'monitorOpInitiated',
     ),
-    'delete_operations':  (
+    'delete_operations': (
         'cn=Delete,cn=Operations,cn=Monitor', 'monitorOpCompleted',
     ),
     'modify_operations': (
@@ -193,7 +193,7 @@ class Service(SimpleService):
                 num = self.conn.search(dn, ldap.SCOPE_BASE, 'objectClass=*', [attr, ])
                 result_type, result_data = self.conn.result(num, 1)
             except ldap.LDAPError as error:
-                self.error("Empty result. Check bind username/password. Message: ",error)
+                self.error("Empty result. Check bind username/password. Message: ", error)
                 self.alive = False
                 return None
 

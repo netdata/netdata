@@ -5,7 +5,6 @@ from json import loads
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
 ORDER = [
     'queries',
     'queries_dropped',
@@ -20,7 +19,6 @@ ORDER = [
     'query_latency',
     'query_latency_avg'
 ]
-
 
 CHARTS = {
     'queries': {

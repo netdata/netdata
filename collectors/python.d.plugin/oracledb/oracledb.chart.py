@@ -9,10 +9,10 @@ from bases.FrameworkServices.SimpleService import SimpleService
 
 try:
     import cx_Oracle
+
     HAS_ORACLE = True
 except ImportError:
     HAS_ORACLE = False
-
 
 ORDER = [
     'session_count',
@@ -171,7 +171,6 @@ CHARTS = {
         'lines': [],
     },
 }
-
 
 CX_CONNECT_STRING = "{0}/{1}@//{2}/{3}"
 

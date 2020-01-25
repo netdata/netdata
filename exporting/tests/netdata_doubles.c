@@ -17,6 +17,14 @@ time_t __wrap_now_realtime_sec(void)
     return mock_type(time_t);
 }
 
+void __wrap_uv_thread_set_name_np(uv_thread_t ut, const char* name)
+{
+    (void)ut;
+    (void)name;
+
+    function_called();
+}
+
 void __wrap_info_int(const char *file, const char *function, const unsigned long line, const char *fmt, ...)
 {
     (void)file;

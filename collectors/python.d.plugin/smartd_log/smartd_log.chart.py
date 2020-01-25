@@ -5,13 +5,11 @@
 
 import os
 import re
-
 from copy import deepcopy
 from time import time
 
-from bases.collection import read_last_line
 from bases.FrameworkServices.SimpleService import SimpleService
-
+from bases.collection import read_last_line
 
 INCREMENTAL = 'incremental'
 ABSOLUTE = 'absolute'
@@ -58,7 +56,6 @@ ATTR_WRITE_ERR_UNC = 'write-total-unc-errors'
 ATTR_VERIFY_ERR_COR = 'verify-total-err-corrected'
 ATTR_VERIFY_ERR_UNC = 'verify-total-unc-errors'
 ATTR_TEMPERATURE = 'temperature'
-
 
 RE_ATA = re.compile(
     '(\d+);'  # attribute
@@ -533,7 +530,9 @@ def handle_error(*errors):
                 return method(*args)
             except errors:
                 return None
+
         return on_call
+
     return on_method
 
 
@@ -653,10 +652,10 @@ class Service(SimpleService):
         current_time = time()
         for disk in self.disks[:]:
             if any(
-                [
-                    not disk.alive,
-                    not disk.log_file.is_active(current_time, self.age),
-                ]
+                    [
+                        not disk.alive,
+                        not disk.log_file.is_active(current_time, self.age),
+                    ]
             ):
                 self.disks.remove(disk.raw_name)
                 self.remove_disk_from_charts(disk)
@@ -673,7 +672,7 @@ class Service(SimpleService):
 
         return len(self.disks)
 
-    def create_disk_from_file(self, full_name,  current_time):
+    def create_disk_from_file(self, full_name, current_time):
         if not full_name.endswith(CSV):
             self.debug('skipping {0}: not a csv file'.format(full_name))
             return None

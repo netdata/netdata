@@ -5,6 +5,7 @@
 
 try:
     import rados
+
     CEPH = True
 except ImportError:
     CEPH = False
@@ -161,7 +162,7 @@ class Service(SimpleService):
         :return: None
         """
         # Pool lines
-        for pool in sorted(self._get_df()['pools'], key=lambda x:sorted(x.keys())):
+        for pool in sorted(self._get_df()['pools'], key=lambda x: sorted(x.keys())):
             self.definitions['pool_usage']['lines'].append([pool['name'],
                                                             pool['name'],
                                                             'absolute'])
@@ -169,20 +170,20 @@ class Service(SimpleService):
                                                               pool['name'],
                                                               'absolute'])
             self.definitions['pool_read_bytes']['lines'].append(['read_{0}'.format(pool['name']),
-                                                                pool['name'],
-                                                                'absolute', 1, 1024])
-            self.definitions['pool_write_bytes']['lines'].append(['write_{0}'.format(pool['name']),
                                                                  pool['name'],
                                                                  'absolute', 1, 1024])
+            self.definitions['pool_write_bytes']['lines'].append(['write_{0}'.format(pool['name']),
+                                                                  pool['name'],
+                                                                  'absolute', 1, 1024])
             self.definitions['pool_read_operations']['lines'].append(['read_operations_{0}'.format(pool['name']),
-                                                                     pool['name'],
-                                                                     'absolute'])
-            self.definitions['pool_write_operations']['lines'].append(['write_operations_{0}'.format(pool['name']),
                                                                       pool['name'],
                                                                       'absolute'])
+            self.definitions['pool_write_operations']['lines'].append(['write_operations_{0}'.format(pool['name']),
+                                                                       pool['name'],
+                                                                       'absolute'])
 
         # OSD lines
-        for osd in sorted(self._get_osd_df()['nodes'], key=lambda x:sorted(x.keys())):
+        for osd in sorted(self._get_osd_df()['nodes'], key=lambda x: sorted(x.keys())):
             self.definitions['osd_usage']['lines'].append([osd['name'],
                                                            osd['name'],
                                                            'absolute'])

@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # SPDX-License-Identifier: GPL-3.0-or-later
-# shellcheck disable=SC1091,SC1117,SC2002,SC2004,SC2034,SC2046,SC2059,SC2086,SC2129,SC2148,SC2154,SC2155,SC2162,SC2166,SC2181,SC2193
 
 # make sure we have a UID
 [ -z "${UID}" ] && UID="$(id -u)"
@@ -42,29 +41,45 @@ setup_terminal() {
         if [ $(($(tput colors 2>/dev/null))) -ge 8 ]; then
             # Enable colors
             TPUT_RESET="$(tput sgr 0)"
+            # shellcheck disable=SC2034
             TPUT_BLACK="$(tput setaf 0)"
             TPUT_RED="$(tput setaf 1)"
             TPUT_GREEN="$(tput setaf 2)"
+            # shellcheck disable=SC2034
             TPUT_YELLOW="$(tput setaf 3)"
+            # shellcheck disable=SC2034
             TPUT_BLUE="$(tput setaf 4)"
+            # shellcheck disable=SC2034
             TPUT_PURPLE="$(tput setaf 5)"
             TPUT_CYAN="$(tput setaf 6)"
             TPUT_WHITE="$(tput setaf 7)"
+            # shellcheck disable=SC2034
             TPUT_BGBLACK="$(tput setab 0)"
             TPUT_BGRED="$(tput setab 1)"
             TPUT_BGGREEN="$(tput setab 2)"
+            # shellcheck disable=SC2034
             TPUT_BGYELLOW="$(tput setab 3)"
+            # shellcheck disable=SC2034
             TPUT_BGBLUE="$(tput setab 4)"
+            # shellcheck disable=SC2034
             TPUT_BGPURPLE="$(tput setab 5)"
+            # shellcheck disable=SC2034
             TPUT_BGCYAN="$(tput setab 6)"
+            # shellcheck disable=SC2034
             TPUT_BGWHITE="$(tput setab 7)"
             TPUT_BOLD="$(tput bold)"
             TPUT_DIM="$(tput dim)"
+            # shellcheck disable=SC2034
             TPUT_UNDERLINED="$(tput smul)"
+            # shellcheck disable=SC2034
             TPUT_BLINK="$(tput blink)"
+            # shellcheck disable=SC2034
             TPUT_INVERTED="$(tput rev)"
+            # shellcheck disable=SC2034
             TPUT_STANDOUT="$(tput smso)"
+            # shellcheck disable=SC2034
             TPUT_BELL="$(tput bel)"
+            # shellcheck disable=SC2034
             TPUT_CLEAR="$(tput clear)"
         fi
     fi
@@ -129,7 +144,8 @@ service() {
 # portable pidof
 
 safe_pidof() {
-    local pidof_cmd="$(command -v pidof 2>/dev/null)"
+    local pidof_cmd
+    pidof_cmd="$(command -v pidof 2>/dev/null)"
     if [ -n "${pidof_cmd}" ]; then
         ${pidof_cmd} "${@}"
         return $?
@@ -161,21 +177,22 @@ find_processors() {
 
 # -----------------------------------------------------------------------------
 fatal() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} ABORTED ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "%s ABORTED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
     exit 1
 }
 
 run_ok() {
-    printf >&2 "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "%s OK %s %s \n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
 }
 
 run_failed() {
-    printf >&2 "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET} ${*} \n\n"
+    printf >&2 "%s FAILED %s %s \n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}" "${*}"
 }
 
 ESCAPED_PRINT_METHOD=
-printf "%q " test >/dev/null 2>&1
-[ $? -eq 0 ] && ESCAPED_PRINT_METHOD="printfq"
+if printf "%q " test >/dev/null 2>&1; then
+	ESCAPED_PRINT_METHOD="printfq"
+fi
 escaped_print() {
     if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
         printf "%q " "${@}"
@@ -197,20 +214,22 @@ run() {
         info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
     fi
 
-    printf >>"${run_logfile}" "${info}"
-    escaped_print >>"${run_logfile}" "${@}"
-    printf >>"${run_logfile}" " ... "
+    {
+        printf "%s" "${info}"
+        escaped_print "${@}"
+        printf "%s" " ... "
+    } >> "${run_logfile}"
 
-    printf >&2 "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
+    printf >&2 "%s" "${info_console}${TPUT_BOLD}${TPUT_YELLOW}"
     escaped_print >&2 "${@}"
-    printf >&2 "${TPUT_RESET}\n"
+    printf >&2 "%s" "${TPUT_RESET}\n"
 
     "${@}"
 
     local ret=$?
     if [ ${ret} -ne 0 ]; then
         run_failed
-        printf >>"${run_logfile}" "FAILED with exit code ${ret}\n"
+        printf >>"${run_logfile}" "FAILED with exit code %s\n" "${ret}"
     else
         run_ok
         printf >>"${run_logfile}" "OK\n"
@@ -221,15 +240,18 @@ run() {
 
 iscontainer() {
     # man systemd-detect-virt
-    local cmd=$(command -v systemd-detect-virt 2>/dev/null)
+    local cmd
+    cmd=$(command -v systemd-detect-virt 2>/dev/null)
     if [ -n "${cmd}" ] && [ -x "${cmd}" ]; then
         "${cmd}" --container >/dev/null 2>&1 && return 0
     fi
 
     # /proc/1/sched exposes the host's pid of our init !
     # http://stackoverflow.com/a/37016302
-    local pid=$(cat /proc/1/sched 2>/dev/null | head -n 1 | {
-        IFS='(),#:' read name pid th threads
+    local pid
+    pid=$(head -n 1 /proc/1/sched 2>/dev/null | {
+        # shellcheck disable=SC2034
+        IFS='(),#:' read -r name pid th threads
         echo "$pid"
     })
     if [ -n "${pid}" ]; then
@@ -238,6 +260,7 @@ iscontainer() {
     fi
 
     # lxc sets environment variable 'container'
+    # shellcheck disable=SC2154
     [ -n "${container}" ] && return 0
 
     # docker creates /.dockerenv
@@ -257,15 +280,18 @@ issystemd() {
     local pids p myns ns systemctl
 
     # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
-    [ ! -d /lib/systemd/system -a ! -d /usr/lib/systemd/system ] && return 1
+    if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ] ; then
+        return 1
+    fi
 
     # if there is no systemctl command, it is not systemd
-    # shellcheck disable=SC2230
     systemctl=$(command -v systemctl 2>/dev/null)
-    [ -z "${systemctl}" -o ! -x "${systemctl}" ] && return 1
+    if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ] ; then
+        return 1
+    fi
 
     # if pid 1 is systemd, it is systemd
-    [ "$(basename $(readlink /proc/1/exe) 2>/dev/null)" = "systemd" ] && return 0
+    [ "$(basename "$(readlink /proc/1/exe)" 2>/dev/null)" = "systemd" ] && return 0
 
     # if systemd is not running, it is not systemd
     pids=$(safe_pidof systemd 2>/dev/null)
@@ -289,6 +315,7 @@ install_non_systemd_init() {
 
     local key="unknown"
     if [ -f /etc/os-release ]; then
+        # shellcheck disable=SC1091
         source /etc/os-release || return 1
         key="${ID}-${VERSION_ID}"
 
@@ -332,12 +359,11 @@ install_non_systemd_init() {
 }
 
 NETDATA_START_CMD="netdata"
-NETDATA_STOP_CMD="killall netdata"
 NETDATA_INSTALLER_START_CMD=""
-NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
 install_netdata_service() {
-    local uname="$(uname 2>/dev/null)"
+    local uname
+    uname="$(uname 2>/dev/null)"
 
     if [ "${UID}" -eq 0 ]; then
         if [ "${uname}" = "Darwin" ]; then
@@ -355,9 +381,7 @@ install_netdata_service() {
         elif [ "${uname}" = "FreeBSD" ]; then
 
             run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
-                NETDATA_STOP_CMD="service netdata stop" &&
                 NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
-                NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
             myret=$?
 
             echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
@@ -368,9 +392,7 @@ install_netdata_service() {
         elif issystemd; then
             # systemd is running on this system
             NETDATA_START_CMD="systemctl start netdata"
-            NETDATA_STOP_CMD="systemctl stop netdata"
             NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
-            NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
 
             SYSTEMD_DIRECTORY=""
 
@@ -379,7 +401,7 @@ install_netdata_service() {
             elif [ -w "/usr/lib/systemd/system" ]; then
                 SYSTEMD_DIRECTORY="/usr/lib/systemd/system"
             elif [ -w "/etc/systemd/system" ]; then
-                SYSTEM_DIRECTORY="/etc/systemd/system"
+                SYSTEMD_DIRECTORY="/etc/systemd/system"
             fi
 
             if [ "${SYSTEMD_DIRECTORY}x" != "x" ]; then
@@ -405,13 +427,10 @@ install_netdata_service() {
             if [ ${ret} -eq 0 ]; then
                 if [ -n "${service_cmd}" ]; then
                     NETDATA_START_CMD="service netdata start"
-                    NETDATA_STOP_CMD="service netdata stop"
                 elif [ -n "${rcservice_cmd}" ]; then
                     NETDATA_START_CMD="rc-service netdata start"
-                    NETDATA_STOP_CMD="rc-service netdata stop"
                 fi
                 NETDATA_INSTALLER_START_CMD="${NETDATA_START_CMD}"
-                NETDATA_INSTALLER_STOP_CMD="${NETDATA_STOP_CMD}"
             fi
 
             return ${ret}
@@ -426,7 +445,9 @@ install_netdata_service() {
 
 pidisnetdata() {
     if [ -d /proc/self ]; then
-        [ -z "$1" -o ! -f "/proc/$1/stat" ] && return 1
+        if [ -z "$1" ] || [ ! -f "/proc/$1/stat" ] ; then
+            return 1
+        fi
         [ "$(cut -d '(' -f 2 "/proc/$1/stat" | cut -d ')' -f 1)" = "netdata" ] && return 0
         return 1
     fi
@@ -492,9 +513,32 @@ netdata_pids() {
 }
 
 stop_all_netdata() {
-    local p
+    local p uname
 
-    if [ -n "$(netdata_pids)" -a -n "$(builtin type -P netdatacli)" ]; then
+    if [ "${UID}" -eq 0 ] ; then
+        uname="$(uname 2>/dev/null)"
+
+        # Any of these may fail, but we need to not bail if they do.
+        if issystemd; then
+            if systemctl stop netdata ; then
+                sleep 5
+            fi
+        elif [ "${uname}" = "Darwin" ]; then
+            if launchctl stop netdata ; then
+                sleep 5
+            fi
+        elif [ "${uname}" = "FreeBSD" ]; then
+            if /etc/rc.d/netdata stop ; then
+                sleep 5
+            fi
+        else
+            if service netdata stop ; then
+                sleep 5
+            fi
+        fi
+    fi
+
+    if [ -n "$(netdata_pids)" ] || [ -n "$(builtin type -P netdatacli)" ]; then
         netdatacli shutdown-agent
         sleep 20
     fi
@@ -526,6 +570,7 @@ restart_netdata() {
         run stop_all_netdata
 
         echo >&2 "Starting netdata using command '${NETDATA_INSTALLER_START_CMD}'"
+        # shellcheck disable=SC2086
         run ${NETDATA_INSTALLER_START_CMD} && started=1
 
         if [ ${started} -eq 1 ] && [ -z "$(netdata_pids)" ]; then
@@ -535,6 +580,7 @@ restart_netdata() {
 
         if [ ${started} -eq 0 ]; then
             echo >&2 "Attempting another netdata start using command '${NETDATA_INSTALLER_START_CMD}'"
+            # shellcheck disable=SC2086
             run ${NETDATA_INSTALLER_START_CMD} && started=1
         fi
     fi
@@ -633,8 +679,8 @@ portable_add_user() {
 
     echo >&2 "Adding ${username} user account with home ${homedir} ..."
 
-    # shellcheck disable=SC2230
-    local nologin="$(command -v nologin || echo '/bin/false')"
+    local nologin
+    nologin="$(command -v nologin || echo '/bin/false')"
 
     # Linux
     if command -v useradd 1>/dev/null 2>&1; then
@@ -653,7 +699,7 @@ portable_add_user() {
 
     # mac OS
     if command -v sysadminctl 1>/dev/null 2>&1; then
-        run sysadminctl -addUser ${username} && return 0
+        run sysadminctl -addUser "${username}" && return 0
     fi
 
     echo >&2 "Failed to add ${username} user account !"
@@ -784,7 +830,7 @@ install_netdata_updater() {
 
     sed -i -e "s|THIS_SHOULD_BE_REPLACED_BY_INSTALLER_SCRIPT|${NETDATA_USER_CONFIG_DIR}/.environment|" "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh" || return 1
 
-    chmod 0755 ${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh
+    chmod 0755 "${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
     echo >&2 "Update script is located at ${TPUT_GREEN}${TPUT_BOLD}${NETDATA_PREFIX}/usr/libexec/netdata/netdata-updater.sh${TPUT_RESET}"
     echo >&2
 

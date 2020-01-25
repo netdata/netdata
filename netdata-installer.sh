@@ -681,9 +681,6 @@ for link in "orig" "${helplink}"; do
 		run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/${link}"
 	fi
 done
-run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
-run find "${NETDATA_STOCK_CONFIG_DIR}" -type f -exec chmod 0640 {} \;
-run find "${NETDATA_STOCK_CONFIG_DIR}" -type d -exec chmod 0755 {} \;
 
 # --- web dir ----
 
@@ -729,7 +726,7 @@ if [ "${UID}" -eq 0 ]; then
 	test -z "${admin_group}" && admin_group="${NETDATA_GROUP}"
 
 	run chown "${NETDATA_USER}:${admin_group}" "${NETDATA_LOG_DIR}"
-	run chown -R "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata"
+	run chown -R "root:${admin_group}" "${NETDATA_PREFIX}/usr/libexec/netdata"
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type d -exec chmod 0755 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -exec chmod 0644 {} \;
 	run find "${NETDATA_PREFIX}/usr/libexec/netdata" -type f -a -name \*.plugin -exec chmod 0750 {} \;
@@ -789,7 +786,7 @@ if [ "${UID}" -eq 0 ]; then
 
 	if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh" ]; then
 		run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
-		run chmod 0550 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
+		run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
 	fi
 
 else
@@ -871,7 +868,7 @@ install_go() {
 		run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d"
 		run rm -rf "${NETDATA_STOCK_CONFIG_DIR}/go.d.conf"
 		run tar -xf "${tmp}/config.tar.gz" -C "${NETDATA_STOCK_CONFIG_DIR}/"
-		run chown -R "${ROOT_USER}:${NETDATA_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
+		run chown -R "${ROOT_USER}:${ROOT_GROUP}" "${NETDATA_STOCK_CONFIG_DIR}"
 
 		run tar xf "${tmp}/${GO_PACKAGE_BASENAME}"
 		run mv "${GO_PACKAGE_BASENAME/\.tar\.gz/}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/go.d.plugin"

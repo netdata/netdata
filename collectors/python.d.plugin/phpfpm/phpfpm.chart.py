@@ -9,7 +9,6 @@ import re
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
 REGEX = re.compile(r'([a-z][a-z ]+): ([\d.]+)')
 
 POOL_INFO = [

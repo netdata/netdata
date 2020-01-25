@@ -7,9 +7,9 @@ import os
 import re
 import time
 
-
 try:
     import ipaddress
+
     HAVE_IP_ADDRESS = True
 except ImportError:
     HAVE_IP_ADDRESS = False
@@ -18,7 +18,6 @@ from collections import defaultdict
 from copy import deepcopy
 
 from bases.FrameworkServices.SimpleService import SimpleService
-
 
 ORDER = [
     'pools_utilization',

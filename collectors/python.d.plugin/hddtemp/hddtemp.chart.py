@@ -6,11 +6,9 @@
 
 
 import re
-
 from copy import deepcopy
 
 from bases.FrameworkServices.SocketService import SocketService
-
 
 ORDER = [
     'temperatures',
