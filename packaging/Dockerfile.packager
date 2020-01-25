@@ -32,8 +32,8 @@ ENV DISTRO=$DISTRO
 ENV DISTRO_VERSION=$DISTRO_VERSION
 ENV VERSION=$VERSION
 
-COPY scripts/install.sh /install.sh
-COPY scripts/test.sh /test.sh
+COPY ./packaging/scripts/install.sh /install.sh
+COPY ./packaging/scripts/test.sh /test.sh
 
 COPY --from=build /netdata/artifacts /artifacts
 
