@@ -173,12 +173,12 @@ static void netdata_create_charts() {
                          , 2);
 
     netdata_create_chart(NETDATA_VFS_FAMILY
-                         , NETDATA_VFS_OUT_FILE_BYTES
-                         , "Number of bytes read from file."
+                         , NETDATA_PROCESS_SYSCALL
+                         , "Number of calls to start process."
                          , "bytes/s"
                          , NETDATA_WEB_GROUP
                          , 976
-                         , &publish_file[NETDATA_OUT_START_BYTE]
+                         , &publish_file[6]
                          , 1);
 
     netdata_create_io_chart(NETDATA_VFS_FAMILY
@@ -253,6 +253,7 @@ static void write_err_chart(char *name,netdata_publish_syscall_t *move) {
     printf("END\n");
 }
 
+/*
 static void write_bytes_chart(char *name,netdata_publish_syscall_t *move, int end) {
     printf( "BEGIN %s.%s\n"
             , NETDATA_VFS_FAMILY
@@ -268,6 +269,7 @@ static void write_bytes_chart(char *name,netdata_publish_syscall_t *move, int en
 
     printf("END\n");
 }
+*/
 
 static void write_io_chart(netdata_publish_vfs_common_t *pvc) {
     printf( "BEGIN %s.%s\n"
@@ -289,10 +291,10 @@ static void netdata_publish_data() {
     write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, &publish_file[NETDATA_IN_START_BYTE], 1);
     write_count_chart(NETDATA_VFS_FILE_READ_COUNT, &publish_file[NETDATA_OUT_START_BYTE], 1);
     write_count_chart(NETDATA_EXIT_SYSCALL, &publish_file[4], 2);
+    write_count_chart(NETDATA_PROCESS_SYSCALL, &publish_file[6], 1);
     write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, publish_file);
 
-    //write_bytes_chart(NETDATA_VFS_IN_FILE_BYTES, &publish_file[NETDATA_IN_START_BYTE], 1);
-    write_bytes_chart(NETDATA_VFS_OUT_FILE_BYTES, &publish_file[NETDATA_OUT_START_BYTE], 1);
+ //   write_bytes_chart(NETDATA_VFS_OUT_FILE_BYTES, &publish_file[NETDATA_OUT_START_BYTE], 1);
 
     write_io_chart(&pvc);
 }
@@ -336,6 +338,7 @@ static void move_from_kernel2user() {
     file_syscall[3].call = res[5];
     file_syscall[4].call = res[10];
     file_syscall[5].call = res[11];
+    file_syscall[6].call = res[12];
 
     file_syscall[0].ecall = res[1];
     file_syscall[1].ecall = res[3];
@@ -413,7 +416,7 @@ void *vfs_collector(void *ptr)
 {
     (void)ptr;
 
-    usec_t step = 400000ULL;
+    usec_t step = 431729ULL;
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!close_plugin) {
@@ -433,7 +436,7 @@ void *vfs_collector(void *ptr)
 void set_file_values() {
     int i;
 
-    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "write", "read", "exit", "release_task" };
+    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "write", "read", "exit", "release_task", "fork" };
 
     netdata_syscall_stat_t *is = file_syscall;
     netdata_syscall_stat_t *prev = NULL;

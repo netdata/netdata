@@ -16,8 +16,8 @@
 # include <unistd.h>
 # include <dlfcn.h>
 
-# define NETDATA_GLOBAL_VECTOR 12
-# define NETDATA_MAX_FILE_VECTOR 6
+# define NETDATA_GLOBAL_VECTOR 13
+# define NETDATA_MAX_FILE_VECTOR 7
 # define NETDATA_IN_START_BYTE 2
 # define NETDATA_OUT_START_BYTE 3
 
@@ -60,6 +60,7 @@ struct netdata_pid_stat_t {
     uint32_t unlink_call;
     uint32_t exit_call;
     uint32_t release_call;
+    uint32_t fork_call;
 
     uint64_t write_bytes;
     uint64_t read_bytes;
@@ -96,7 +97,7 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_VFS_FILE_ERR_COUNT "Error_call"
 
 # define NETDATA_EXIT_SYSCALL "Exit_process"
-# define NETDATA_VFS_OUT_FILE_BYTES "File_Out_Bytes"
+# define NETDATA_PROCESS_SYSCALL "Start_process"
 
 # define NETDATA_VFS_IO_FILE_BYTES "File_IO_Bytes"
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "Write"
