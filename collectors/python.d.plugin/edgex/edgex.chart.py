@@ -67,7 +67,7 @@ CHARTS = {
         ]
     },
     'memory_malloc': {
-        'options': [None, 'Mallocs', 'heap objects',
+        'options': [None, 'Mallocs', 'heap-objects/s',
                     'memory', 'edgex.memory_malloc', 'line'],
         'lines': [
             ['core_data_malloc', 'core_data', 'incremental'],

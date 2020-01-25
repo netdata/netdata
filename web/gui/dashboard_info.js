@@ -2722,7 +2722,7 @@ netdataDashboard.context = {
         info: 'Alloc: currently allocated number of bytes on the heap of each EdgeX service. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
     },
     'edgex.memory_malloc':{
-        info: 'Mallocs: it is the cumulative count of heap objects allocated. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
+        info: 'Mallocs per second: it is the cumulative count of heap objects allocated. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
     },
     'edgex.memory_frees':{
         info: 'Frees: it is the cumulative count of heap objects freed. Provided by the Golang runtime Package. API resources: <code>http://localhost:<edgex_service_port>/api/v1/metrics</code>'
