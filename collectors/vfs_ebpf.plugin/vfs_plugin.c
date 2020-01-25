@@ -164,13 +164,13 @@ static void netdata_create_charts() {
                         , NETDATA_MAX_FILE_VECTOR);
 
     netdata_create_chart(NETDATA_VFS_FAMILY
-                         , NETDATA_VFS_IN_FILE_BYTES
-                         , "Number of bytes written to file."
+                         , NETDATA_EXIT_SYSCALL
+                         , "Number of calls to exit."
                          , "bytes/s"
                          , NETDATA_WEB_GROUP
                          , 975
-                         , &publish_file[NETDATA_IN_START_BYTE]
-                         , 1);
+                         , &publish_file[4]
+                         , 2);
 
     netdata_create_chart(NETDATA_VFS_FAMILY
                          , NETDATA_VFS_OUT_FILE_BYTES
@@ -197,9 +197,9 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish
         if(input->call != move->pcall) {
             //This condition happens to avoid initial values with dimensions higher than normal values.
             if(move->pcall) {
-                move->ncall = (input->call - move->pcall);
-                move->nbyte = (input->bytes - move->pbyte);
-                move->nerr = (input->ecall - move->nerr);
+                move->ncall = (input->call > move->pcall)?input->call - move->pcall: move->pcall - input->call;
+                move->nbyte = (input->bytes > move->pbyte)?input->bytes - move->pbyte: move->pbyte - input->bytes;
+                move->nerr = (input->ecall > move->nerr)?input->ecall - move->nerr: move->nerr - input->ecall;
             } else {
                 move->ncall = 0;
                 move->nbyte = 0;
@@ -286,11 +286,12 @@ static void netdata_publish_data() {
 
     write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, publish_file, 1);
     write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, &publish_file[1], 1);
-    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, &publish_file[2], 1);
-    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, &publish_file[3], 1);
+    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, &publish_file[NETDATA_IN_START_BYTE], 1);
+    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, &publish_file[NETDATA_OUT_START_BYTE], 1);
+    write_count_chart(NETDATA_EXIT_SYSCALL, &publish_file[4], 2);
     write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, publish_file);
 
-    write_bytes_chart(NETDATA_VFS_IN_FILE_BYTES, &publish_file[NETDATA_IN_START_BYTE], 1);
+    //write_bytes_chart(NETDATA_VFS_IN_FILE_BYTES, &publish_file[NETDATA_IN_START_BYTE], 1);
     write_bytes_chart(NETDATA_VFS_OUT_FILE_BYTES, &publish_file[NETDATA_OUT_START_BYTE], 1);
 
     write_io_chart(&pvc);
@@ -319,10 +320,35 @@ void *vfs_publisher(void *ptr)
 }
 
 static void move_from_kernel2user() {
+    uint32_t idx;
+    uint32_t val;
+    uint32_t res[NETDATA_GLOBAL_VECTOR];
+
+    for (idx = 0; idx < NETDATA_GLOBAL_VECTOR; idx++) {
+        if(!bpf_map_lookup_elem(map_fd[1], &idx, &val)) {
+            res[idx] = val;
+        }
+    }
+
+    file_syscall[0].call = res[0];
+    file_syscall[1].call = res[8];
+    file_syscall[2].call = res[2];
+    file_syscall[3].call = res[5];
+    file_syscall[4].call = res[10];
+    file_syscall[5].call = res[11];
+
+    file_syscall[0].ecall = res[1];
+    file_syscall[1].ecall = res[3];
+    file_syscall[2].ecall = res[9];
+    file_syscall[3].ecall = res[6];
+
+    file_syscall[2].bytes = (uint64_t)res[4];
+    file_syscall[3].bytes = (uint64_t)res[7];
+    /*
     struct netdata_pid_stat_t nps;
 
-    uint64_t call[4], bytes[2];
-    uint32_t ecall[4];
+    uint64_t call[NETDATA_MAX_FILE_VECTOR], bytes[2];
+    uint32_t ecall[NETDATA_MAX_FILE_VECTOR];
 
     memset(call, 0, sizeof(call));
     memset(bytes, 0, sizeof(bytes));
@@ -342,21 +368,26 @@ static void move_from_kernel2user() {
             || (!isdigit(de->d_name[0])))
             continue;
 
-        uint32_t tid = (uint32_t )strtol(de->d_name, NULL, 10);
-        if(!bpf_map_lookup_elem(map_fd[0], &tid, &nps)) {
-            call[0] += nps.open_call;
-            ecall[0] += nps.open_err;
+        long int val = strtol(de->d_name, NULL, 10);
+        if (val != LONG_MIN && val != LONG_MAX) {
+            uint32_t tid = (uint32_t )val;
+            if(!bpf_map_lookup_elem(map_fd[0], &tid, &nps)) {
+                call[0] += nps.open_call;
+                ecall[0] += nps.open_err;
 
-            call[1] += nps.unlink_call;
-            ecall[1] += nps.unlink_err;
+                call[1] += nps.unlink_call;
+                ecall[1] += nps.unlink_err;
 
-            call[2] += nps.write_call;
-            ecall[2] += nps.write_err;
-            bytes[0] += nps.write_bytes;
+                call[2] += nps.write_call;
+                ecall[2] += nps.write_err;
+                bytes[0] += nps.write_bytes;
 
-            call[3] += nps.read_call;
-            ecall[3] += nps.read_err;
-            bytes[1] += nps.read_bytes;
+                call[3] += nps.read_call;
+                ecall[3] += nps.read_err;
+                bytes[1] += nps.read_bytes;
+
+                call[4] += nps.exit_call;
+            }
         }
     }
 
@@ -366,6 +397,7 @@ static void move_from_kernel2user() {
     file_syscall[1].call = call[1];
     file_syscall[2].call = call[2];
     file_syscall[3].call = call[3];
+    file_syscall[4].call = call[4];
 
     file_syscall[0].ecall = ecall[0];
     file_syscall[1].ecall = ecall[1];
@@ -374,6 +406,7 @@ static void move_from_kernel2user() {
 
     file_syscall[2].bytes = bytes[0];
     file_syscall[3].bytes = bytes[1];
+     */
 }
 
 void *vfs_collector(void *ptr)
@@ -400,7 +433,7 @@ void *vfs_collector(void *ptr)
 void set_file_values() {
     int i;
 
-    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "write", "read" };
+    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "write", "read", "exit", "release_task" };
 
     netdata_syscall_stat_t *is = file_syscall;
     netdata_syscall_stat_t *prev = NULL;
