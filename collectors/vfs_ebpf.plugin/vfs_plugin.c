@@ -166,7 +166,7 @@ static void netdata_create_charts() {
     netdata_create_chart(NETDATA_VFS_FAMILY
                          , NETDATA_EXIT_SYSCALL
                          , "Number of calls to exit."
-                         , "bytes/s"
+                         , "Number of calls"
                          , NETDATA_WEB_GROUP
                          , 975
                          , &publish_file[4]
@@ -175,7 +175,7 @@ static void netdata_create_charts() {
     netdata_create_chart(NETDATA_VFS_FAMILY
                          , NETDATA_PROCESS_SYSCALL
                          , "Number of calls to start process."
-                         , "bytes/s"
+                         , "Number of calls"
                          , NETDATA_WEB_GROUP
                          , 976
                          , &publish_file[6]
@@ -416,7 +416,7 @@ void *vfs_collector(void *ptr)
 {
     (void)ptr;
 
-    usec_t step = 431729ULL;
+    usec_t step = 778879ULL;
     heartbeat_t hb;
     heartbeat_init(&hb);
     while(!close_plugin) {
@@ -426,8 +426,6 @@ void *vfs_collector(void *ptr)
         pthread_mutex_lock(&lock);
         move_from_kernel2user();
         pthread_mutex_unlock(&lock);
-
-        fflush(stdout);
     }
 
     return NULL;
