@@ -72,6 +72,8 @@ struct netdata_pid_stat_t {
 };
 
 typedef struct netdata_publish_syscall {
+    int reset;
+
     char *dimension;
     unsigned long nbyte;
     unsigned long pbyte;
@@ -88,6 +90,7 @@ typedef struct netdata_publish_vfs_common {
 }netdata_publish_vfs_common_t;
 
 # define NETDATA_VFS_FAMILY "system"
+# define NETDATA_APPS_FAMILY "apps"
 # define NETDATA_WEB_GROUP "vfs"
 
 # define NETDATA_VFS_FILE_OPEN_COUNT "Open_files"

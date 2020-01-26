@@ -40,10 +40,11 @@ void netdata_cleanup_and_exit(int ret) {
 #define MAX_NAME 100
 
 static int apps_dimension = 0;
-
-static int apps_charts = 1;
+avl_tree_lock process_tree;
 
 struct target {
+    avl avl;
+
     int idx;
 
     char compare[MAX_COMPARE_NAME + 1];
@@ -141,6 +142,10 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     if(last) last->next = w;
     else apps_groups_root_target = w;
 
+    target = (struct target *)avl_insert_lock(&process_tree, (avl *)w);
+    if (target != w)
+        error("VFS: Internal error, cannot insert %s inside the avl tree.", w->name);
+
     return w;
 }
 
@@ -195,6 +200,17 @@ static int read_apps_groups_conf(const char *path, const char *file) {
 
     return 0;
 }
+
+static int compare_process_name(void *a, void *b) {
+    struct target *v1 = a;
+    struct target *v2 = b;
+
+    if(v1->comparehash > v2->comparehash) return 1;
+    if(v1->comparehash < v2->comparehash) return -1;
+
+    return 0;
+}
+
 
 // ----------------------------------------------------------------------
 //Netdata eBPF library
@@ -380,15 +396,75 @@ static void netdata_global_charts_create() {
 }
 
 static void netdata_apps_charts() {
+    netdata_create_chart(NETDATA_APPS_FAMILY
+            ,NETDATA_VFS_FILE_OPEN_COUNT
+            , "Count the total of calls made to the operate system per period to open a file descriptor."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 140004
+            , publish_apps
+            , 20);
+
+    netdata_create_chart(NETDATA_APPS_FAMILY
+            , NETDATA_VFS_FILE_CLEAN_COUNT
+            , "Count the total of calls made to the operate system per period to delete a file from the operate system."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 140005
+            , publish_apps
+            , 20);
+
+    netdata_create_chart(NETDATA_APPS_FAMILY
+            , NETDATA_VFS_FILE_WRITE_COUNT
+            , "Count the total of calls made to the operate system per period to write inside a file descriptor."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 140006
+            , publish_apps
+            , 20);
+
+    netdata_create_chart(NETDATA_APPS_FAMILY
+            , NETDATA_VFS_FILE_READ_COUNT
+            , "Count the total of calls made to the operate system per period to read from a file descriptor."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 140007
+            , publish_apps
+            , 20);
+
+    netdata_create_chart(NETDATA_APPS_FAMILY
+            , NETDATA_PROCESS_SYSCALL
+            , "Count the total of calls made to the operate system per period to start a process."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 140008
+            , publish_apps
+            , 20);
+
+    netdata_create_chart(NETDATA_APPS_FAMILY
+            , NETDATA_EXIT_SYSCALL
+            , "Count the total of calls made to the operate system per period to finish a process."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 140009
+            , publish_apps
+            , 20);
+
+    netdata_create_chart(NETDATA_APPS_FAMILY
+            , NETDATA_VFS_FILE_ERR_COUNT
+            , "Count the total of errors"
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 140010
+            , publish_apps
+            , NETDATA_MAX_FILE_VECTOR);
 }
 
 static void netdata_create_charts() {
     netdata_global_charts_create();
 
-    if (apps_charts && apps_groups_root_target) {
+    if (apps_groups_root_target) {
         netdata_apps_charts();
-    } else {
-        apps_charts = 0;
     }
 }
 
@@ -427,9 +503,9 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish
     pvc->read = publish[3].nbyte;
 }
 
-static void write_count_chart(char *name,netdata_publish_syscall_t *move, int end) {
+static void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     printf( "BEGIN %s.%s\n"
-            , NETDATA_VFS_FAMILY
+            , family
             , name);
 
     int i = 0;
@@ -443,15 +519,17 @@ static void write_count_chart(char *name,netdata_publish_syscall_t *move, int en
     printf("END\n");
 }
 
-static void write_err_chart(char *name,netdata_publish_syscall_t *move) {
+static void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
     printf( "BEGIN %s.%s\n"
-            , NETDATA_VFS_FAMILY
+            , family
             , name);
 
-    while (move) {
+    int i = 0;
+    while (move && i < end) {
         printf("SET %s = %lld\n", move->dimension, (long long) move->nerr);
 
         move = move->next;
+        i++;
     }
 
     printf("END\n");
@@ -475,9 +553,9 @@ static void write_bytes_chart(char *name,netdata_publish_syscall_t *move, int en
 }
 */
 
-static void write_io_chart(netdata_publish_vfs_common_t *pvc) {
+static void write_io_chart(char *family, netdata_publish_vfs_common_t *pvc) {
     printf( "BEGIN %s.%s\n"
-            , NETDATA_VFS_FAMILY
+            , family
             , NETDATA_VFS_IO_FILE_BYTES);
 
     printf("SET %s = %lld\n", NETDATA_VFS_DIM_IN_FILE_BYTES , (long long) pvc->write);
@@ -490,19 +568,25 @@ static void netdata_publish_data() {
     netdata_publish_vfs_common_t pvc;
     netdata_update_publish(publish_aggregated, &pvc, aggregated_data);
 
-    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, publish_aggregated, 1);
-    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, &publish_aggregated[1], 1);
-    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, &publish_aggregated[NETDATA_IN_START_BYTE], 1);
-    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, &publish_aggregated[NETDATA_OUT_START_BYTE], 1);
-    write_count_chart(NETDATA_EXIT_SYSCALL, &publish_aggregated[4], 2);
-    write_count_chart(NETDATA_PROCESS_SYSCALL, &publish_aggregated[6], 1);
-    write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, publish_aggregated);
+    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, 1);
+    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[1], 1);
+    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 1);
+    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_OUT_START_BYTE], 1);
+    write_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[4], 2);
+    write_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[6], 1);
+    write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, NETDATA_MAX_FILE_VECTOR );
 
-    if (apps_charts) {
+    write_io_chart(NETDATA_VFS_FAMILY, &pvc);
 
+    if(apps_groups_root_target ) {
+        write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
+        write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
+        write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
+        write_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
+        write_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_APPS_FAMILY, publish_apps, 20);
+        write_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_APPS_FAMILY, publish_apps, 20);
+        write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
     }
-
-    write_io_chart(&pvc);
 }
 
 void *vfs_publisher(void *ptr)
@@ -527,7 +611,7 @@ void *vfs_publisher(void *ptr)
     return NULL;
 }
 
-static void move_from_kernel2user() {
+static void move_from_kernel2user_global() {
     uint32_t idx;
     uint32_t val;
     uint32_t res[NETDATA_GLOBAL_VECTOR];
@@ -538,21 +622,30 @@ static void move_from_kernel2user() {
         }
     }
 
-    aggregated_data[0].call = res[0];
-    aggregated_data[1].call = res[8];
-    aggregated_data[2].call = res[2];
-    aggregated_data[3].call = res[5];
-    aggregated_data[4].call = res[10];
-    aggregated_data[5].call = res[11];
-    aggregated_data[6].call = res[12];
+    aggregated_data[0].call = res[0]; //open
+    aggregated_data[1].call = res[8]; //unlink
+    aggregated_data[2].call = res[2]; //write
+    aggregated_data[3].call = res[5]; //read
+    aggregated_data[4].call = res[10]; //exit
+    aggregated_data[5].call = res[11]; //release
+    aggregated_data[6].call = res[12]; //fork
 
-    aggregated_data[0].ecall = res[1];
-    aggregated_data[1].ecall = res[3];
-    aggregated_data[2].ecall = res[9];
-    aggregated_data[3].ecall = res[6];
+    aggregated_data[0].ecall = res[1]; //open
+    aggregated_data[1].ecall = res[9]; //unlink
+    aggregated_data[2].ecall = res[3]; //write
+    aggregated_data[3].ecall = res[6]; //read
 
-    aggregated_data[2].bytes = (uint64_t)res[4];
-    aggregated_data[3].bytes = (uint64_t)res[7];
+    aggregated_data[2].bytes = (uint64_t)res[4]; //write
+    aggregated_data[3].bytes = (uint64_t)res[7]; //read
+}
+
+static void move_from_kernel2user_apps() {
+}
+
+static void move_from_kernel2user() {
+    move_from_kernel2user_global();
+
+    move_from_kernel2user_apps();
 
     /*
     struct netdata_pid_stat_t nps;
@@ -654,6 +747,7 @@ void set_global_labels() {
         }
         prev = &is[i];
 
+        pio[i].reset = 1;
         pio[i].dimension = file_names[i];
         if(publish_prev) {
             publish_prev->next = &pio[i];
@@ -677,6 +771,7 @@ void set_apps_labels() {
         }
         prev = &is[i];
 
+        pio[i].reset = 1;
         pio[i].dimension = w->name;
         if(publish_prev) {
             publish_prev->next = &pio[i];
@@ -817,12 +912,13 @@ int main(int argc, char **argv)
         int_exit(3);
     }
 
+    avl_init_lock(&process_tree, compare_process_name);
+
     if(read_apps_groups_conf(user_config_dir, "groups")) {
         info("[VFS] Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
 
         if(read_apps_groups_conf(stock_config_dir, "groups")) {
             error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. we will collect only global data.", stock_config_dir);
-            apps_charts = 0;
         }
     }
 
