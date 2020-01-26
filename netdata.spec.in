@@ -188,7 +188,6 @@ Requires: libnetfilter_acct1
 
 # freeipmi plugin dependencies
 BuildRequires:  freeipmi-devel
-Requires: freeipmi
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
@@ -462,7 +461,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
 # freeipmi files
-%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 %dir %{_datadir}/%{name}
 
 %defattr(0750,netdata,netdata,0755)
@@ -487,6 +486,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
 
+# Free IPMI belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
@@ -504,6 +506,20 @@ Use this plugin to enable metrics collection from cupsd, the daemon running when
 %files plugin-cups
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
+
+%package plugin-freeipmi
+Summary: FreeIPMI - The Intelligent Platform Management System
+Group: Applications/System
+Requires: freeipmi
+Requires: netdata = %{version}
+
+%description plugin-freeipmi
+ The IPMI specification defines a set of interfaces for platform management.
+It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in 
+are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+
+%files plugin-freeipmi
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
 * Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10
