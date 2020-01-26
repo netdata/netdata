@@ -33,6 +33,164 @@ char *netdata_configured_host_prefix = "";
 void netdata_cleanup_and_exit(int ret) {
     exit(ret);
 }
+
+// ----------------------------------------------------------------------
+//From apps.plug
+#define MAX_COMPARE_NAME 100
+#define MAX_NAME 100
+
+// ----------------------------------------------------------------------------
+// internal flags
+// handled in code (automatically set)
+
+static int apps_charts = 1;
+static int proc_pid_cmdline_is_needed = 0; // 1 when we need to read /proc/cmdline
+
+struct target {
+    char compare[MAX_COMPARE_NAME + 1];
+    uint32_t comparehash;
+    size_t comparelen;
+
+    char id[MAX_NAME + 1];
+    uint32_t idhash;
+
+    char name[MAX_NAME + 1];
+
+    int hidden;             // if set, we set the hidden flag on the dimension
+    int ends_with;
+    int starts_with;        // if set, the compare string matches only the
+    // beginning of the command
+
+    struct target *target;  // the one that will be reported to netdata
+    struct target *next;
+};
+
+struct target *apps_groups_root_target = NULL;
+
+static struct target *get_apps_groups_target(const char *id, struct target *target, const char *name) {
+    int tdebug = 0, thidden = target?target->hidden:0, ends_with = 0;
+    const char *nid = id;
+
+    // extract the options
+    while(nid[0] == '-' || nid[0] == '+' || nid[0] == '*') {
+        if(nid[0] == '-') thidden = 1;
+        if(nid[0] == '+') tdebug = 1;
+        if(nid[0] == '*') ends_with = 1;
+        nid++;
+    }
+
+    uint32_t hash = simple_hash(id);
+
+    // find if it already exists
+    struct target *w, *last = apps_groups_root_target;
+    for(w = apps_groups_root_target ; w ; w = w->next) {
+        if(w->idhash == hash && memcmp(nid, w->id, MAX_NAME) == 0)
+            return w;
+
+        last = w;
+    }
+
+    if(unlikely(!target)) {
+        while(*name == '-') {
+            if(*name == '-') thidden = 1;
+            name++;
+        }
+
+        for(target = apps_groups_root_target ; target != NULL ; target = target->next) {
+            if(!target->target && strcmp(name, target->name) == 0)
+                break;
+        }
+    }
+
+    if(target && target->target)
+        fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id, target->id, target->target->id);
+
+    w = callocz(sizeof(struct target), 1);
+    strncpyz(w->id, nid, MAX_NAME);
+    w->idhash = simple_hash(w->id);
+
+    if(unlikely(!target))
+        // copy the name
+        strncpyz(w->name, name, MAX_NAME);
+    else
+        // copy the id
+        strncpyz(w->name, nid, MAX_NAME);
+
+    strncpyz(w->compare, nid, MAX_COMPARE_NAME);
+    size_t len = strlen(w->compare);
+    if(w->compare[len - 1] == '*') {
+        w->compare[len - 1] = '\0';
+        w->starts_with = 1;
+    }
+    w->ends_with = ends_with;
+
+    if(w->starts_with && w->ends_with)
+        proc_pid_cmdline_is_needed = 1;
+
+    w->comparehash = simple_hash(w->compare);
+    w->comparelen = strlen(w->compare);
+
+    w->hidden = thidden;
+
+    w->target = target;
+
+    // append it, to maintain the order in apps_groups.conf
+    if(last) last->next = w;
+    else apps_groups_root_target = w;
+
+    return w;
+}
+
+static int read_apps_groups_conf(const char *path, const char *file) {
+    char filename[FILENAME_MAX + 1];
+
+    snprintfz(filename, FILENAME_MAX, "%s/apps_%s.conf", path, file);
+
+    procfile *ff = procfile_open(filename, " :\t", PROCFILE_FLAG_DEFAULT);
+    if(!ff) return 1;
+
+    procfile_set_quotes(ff, "'\"");
+
+    ff = procfile_readall(ff);
+    if(!ff)
+        return 1;
+
+    size_t line, lines = procfile_lines(ff);
+
+    for(line = 0; line < lines ;line++) {
+        size_t word, words = procfile_linewords(ff, line);
+        if(!words) continue;
+
+        char *name = procfile_lineword(ff, line, 0);
+        if(!name || !*name) continue;
+
+        // find a possibly existing target
+        struct target *w = NULL;
+
+        // loop through all words, skipping the first one (the name)
+        for(word = 0; word < words ;word++) {
+            char *s = procfile_lineword(ff, line, word);
+            if(!s || !*s) continue;
+            if(*s == '#') break;
+
+            // is this the first word? skip it
+            if(s == name) continue;
+
+            struct target *n = get_apps_groups_target(s, w, name);
+            if(!n) {
+                error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
+                continue;
+            }
+
+            // just some optimization
+            // to avoid searching for a target for each process
+            if(!w) w = n->target?n->target:n;
+        }
+    }
+
+    return 0;
+}
+
 // ----------------------------------------------------------------------
 //Netdata eBPF library
 void *libnetdata = NULL;
@@ -43,6 +201,8 @@ int *map_fd = NULL;
 int (*bpf_map_lookup_elem)(int, const void *, void *);
 
 static char *plugin_dir = NULL;
+static char *user_config_dir = NULL;
+static char *stock_config_dir = NULL;
 
 //Global vectors
 netdata_syscall_stat_t *file_syscall = NULL;
@@ -53,6 +213,15 @@ static int thread_finished = 0;
 static int close_plugin = 0;
 
 pthread_mutex_t lock;
+
+void clean_apps_groups() {
+    struct target *w = apps_groups_root_target, *next;
+    while (w) {
+        next = w->next;
+        free(w);
+        w = next;
+    }
+}
 
 static void int_exit(int sig)
 {
@@ -73,6 +242,10 @@ static void int_exit(int sig)
 
     if(libnetdata) {
         dlclose(libnetdata);
+    }
+
+    if(apps_groups_root_target) {
+        clean_apps_groups();
     }
 
     exit(sig);
@@ -550,6 +723,13 @@ int main(int argc, char **argv)
 
     //Get environment variables
     plugin_dir = getenv("NETDATA_PLUGINS_DIR");
+    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(!user_config_dir)
+        user_config_dir = CONFIG_DIR;
+
+    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(!stock_config_dir)
+        stock_config_dir = LIBCONFIG_DIR;
 
     if(vfs_load_libraries()) {
         error("[VFS] Cannot load library.");
@@ -582,6 +762,15 @@ int main(int argc, char **argv)
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     pthread_t thread[2];
+
+    if(read_apps_groups_conf(user_config_dir, "groups")) {
+        info("[VFS] Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+
+        if(read_apps_groups_conf(stock_config_dir, "groups")) {
+            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. we will collect only global data.", stock_config_dir);
+            apps_charts = 0;
+        }
+    }
 
     int i;
     int end = 2;
