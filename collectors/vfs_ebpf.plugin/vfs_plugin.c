@@ -39,14 +39,13 @@ void netdata_cleanup_and_exit(int ret) {
 #define MAX_COMPARE_NAME 100
 #define MAX_NAME 100
 
-// ----------------------------------------------------------------------------
-// internal flags
-// handled in code (automatically set)
+static int apps_dimension = 0;
 
 static int apps_charts = 1;
-static int proc_pid_cmdline_is_needed = 0; // 1 when we need to read /proc/cmdline
 
 struct target {
+    int idx;
+
     char compare[MAX_COMPARE_NAME + 1];
     uint32_t comparehash;
     size_t comparelen;
@@ -56,6 +55,7 @@ struct target {
 
     char name[MAX_NAME + 1];
 
+    int debug_enabled;
     int hidden;             // if set, we set the hidden flag on the dimension
     int ends_with;
     int starts_with;        // if set, the compare string matches only the
@@ -106,6 +106,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
         fatal("Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id, target->id, target->target->id);
 
     w = callocz(sizeof(struct target), 1);
+    w->idx = apps_dimension++;
     strncpyz(w->id, nid, MAX_NAME);
     w->idhash = simple_hash(w->id);
 
@@ -124,14 +125,16 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
     }
     w->ends_with = ends_with;
 
-    if(w->starts_with && w->ends_with)
-        proc_pid_cmdline_is_needed = 1;
-
     w->comparehash = simple_hash(w->compare);
     w->comparelen = strlen(w->compare);
 
     w->hidden = thidden;
-
+#ifdef NETDATA_INTERNAL_CHECKS
+    w->debug_enabled = tdebug;
+#else
+    if(tdebug)
+        fprintf(stderr, "apps.plugin has been compiled without debugging\n");
+#endif
     w->target = target;
 
     // append it, to maintain the order in apps_groups.conf
@@ -188,6 +191,8 @@ static int read_apps_groups_conf(const char *path, const char *file) {
         }
     }
 
+    procfile_close(ff);
+
     return 0;
 }
 
@@ -205,8 +210,12 @@ static char *user_config_dir = NULL;
 static char *stock_config_dir = NULL;
 
 //Global vectors
-netdata_syscall_stat_t *file_syscall = NULL;
-netdata_publish_syscall_t *publish_file = NULL;
+netdata_syscall_stat_t *aggregated_data = NULL;
+netdata_publish_syscall_t *publish_aggregated = NULL;
+
+//Apps vectors
+netdata_syscall_stat_t *apps_data = NULL;
+netdata_publish_syscall_t *publish_apps = NULL;
 
 static int update_every = 1;
 static int thread_finished = 0;
@@ -232,12 +241,20 @@ static void int_exit(int sig)
         return;
     }
 
-    if(file_syscall) {
-        free(file_syscall);
+    if(aggregated_data) {
+        free(aggregated_data);
     }
 
-    if(publish_file) {
-        free(publish_file);
+    if(publish_aggregated) {
+        free(publish_aggregated);
+    }
+
+    if(apps_data) {
+        free(apps_data);
+    }
+
+    if(publish_apps) {
+        free(publish_apps);
     }
 
     if(libnetdata) {
@@ -290,81 +307,95 @@ static void netdata_create_io_chart(char *family, char *name, char *msg, char *a
     printf("DIMENSION %s '' absolute 1 1\n", NETDATA_VFS_DIM_OUT_FILE_BYTES );
 }
 
-static void netdata_create_charts() {
+static void netdata_global_charts_create() {
     netdata_create_chart(NETDATA_VFS_FAMILY
-                         ,NETDATA_VFS_FILE_OPEN_COUNT
-                         , "Number of calls for file IO."
-                         , "Number of calls"
-                         , NETDATA_WEB_GROUP
-                         , 970
-                         , publish_file
-                         , 1);
+            ,NETDATA_VFS_FILE_OPEN_COUNT
+            , "Count the total of calls made to the operate system per period to open a file descriptor."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 970
+            , publish_aggregated
+            , 1);
 
     netdata_create_chart(NETDATA_VFS_FAMILY
-                         , NETDATA_VFS_FILE_CLEAN_COUNT
-                         , "Number of calls for file IO."
-                         , "Number of calls"
-                         , NETDATA_WEB_GROUP
-                         , 971
-                         , &publish_file[1]
-                         , 1);
+            , NETDATA_VFS_FILE_CLEAN_COUNT
+            , "Count the total of calls made to the operate system per period to delete a file from the operate system."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 971
+            , &publish_aggregated[1]
+            , 1);
 
     netdata_create_chart(NETDATA_VFS_FAMILY
-                        , NETDATA_VFS_FILE_WRITE_COUNT
-                        , "Number of calls for file IO."
-                        , "Number of calls"
-                        , NETDATA_WEB_GROUP
-                        , 972
-                        , &publish_file[NETDATA_IN_START_BYTE]
-                        , 1);
+            , NETDATA_VFS_FILE_WRITE_COUNT
+            , "Count the total of calls made to the operate system per period to write inside a file descriptor."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 972
+            , &publish_aggregated[NETDATA_IN_START_BYTE]
+            , 1);
 
     netdata_create_chart(NETDATA_VFS_FAMILY
-                         , NETDATA_VFS_FILE_READ_COUNT
-                         , "Number of calls for file IO."
-                         , "Number of calls"
-                         , NETDATA_WEB_GROUP
-                         , 973
-                         , &publish_file[NETDATA_OUT_START_BYTE]
-                         , 1);
-
-    netdata_create_chart(NETDATA_VFS_FAMILY
-                        , NETDATA_VFS_FILE_ERR_COUNT
-                        , "Number of calls for file IO."
-                        , "Number of calls"
-                        , NETDATA_WEB_GROUP
-                        , 974
-                        , publish_file
-                        , NETDATA_MAX_FILE_VECTOR);
-
-    netdata_create_chart(NETDATA_VFS_FAMILY
-                         , NETDATA_EXIT_SYSCALL
-                         , "Number of calls to exit."
-                         , "Number of calls"
-                         , NETDATA_WEB_GROUP
-                         , 975
-                         , &publish_file[4]
-                         , 2);
-
-    netdata_create_chart(NETDATA_VFS_FAMILY
-                         , NETDATA_PROCESS_SYSCALL
-                         , "Number of calls to start process."
-                         , "Number of calls"
-                         , NETDATA_WEB_GROUP
-                         , 976
-                         , &publish_file[6]
-                         , 1);
+            , NETDATA_VFS_FILE_READ_COUNT
+            , "Count the total of calls made to the operate system per period to read from a file descriptor."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 973
+            , &publish_aggregated[NETDATA_OUT_START_BYTE]
+            , 1);
 
     netdata_create_io_chart(NETDATA_VFS_FAMILY
-                            , NETDATA_VFS_IO_FILE_BYTES
-                            , "Number of bytes read and written."
-                            , "bytes/s"
-                            , NETDATA_WEB_GROUP
-                            , 977);
+            , NETDATA_VFS_IO_FILE_BYTES
+            , "Total of bytes read or written with success per period."
+            , "bytes/s"
+            , NETDATA_WEB_GROUP
+            , 974);
+
+    netdata_create_chart(NETDATA_VFS_FAMILY
+            , NETDATA_PROCESS_SYSCALL
+            , "Count the total of calls made to the operate system per period to start a process."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 975
+            , &publish_aggregated[6]
+            , 1);
+
+    netdata_create_chart(NETDATA_VFS_FAMILY
+            , NETDATA_EXIT_SYSCALL
+            , "Count the total of calls made to the operate system per period to finish a process."
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 976
+            , &publish_aggregated[4]
+            , 2);
+
+    netdata_create_chart(NETDATA_VFS_FAMILY
+            , NETDATA_VFS_FILE_ERR_COUNT
+            , "Count the total of errors"
+            , "Number of calls"
+            , NETDATA_WEB_GROUP
+            , 977
+            , publish_aggregated
+            , NETDATA_MAX_FILE_VECTOR);
+}
+
+static void netdata_apps_charts() {
+}
+
+static void netdata_create_charts() {
+    netdata_global_charts_create();
+
+    if (apps_charts && apps_groups_root_target) {
+        netdata_apps_charts();
+    } else {
+        apps_charts = 0;
+    }
 }
 
 static void netdata_update_publish(netdata_publish_syscall_t *publish
-                                  , netdata_publish_vfs_common_t *pvc
-                                  , netdata_syscall_stat_t *input) {
+        , netdata_publish_vfs_common_t *pvc
+        , netdata_syscall_stat_t *input) {
+
     netdata_publish_syscall_t *move = publish;
     while(move) {
         if(input->call != move->pcall) {
@@ -372,7 +403,7 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish
             if(move->pcall) {
                 move->ncall = (input->call > move->pcall)?input->call - move->pcall: move->pcall - input->call;
                 move->nbyte = (input->bytes > move->pbyte)?input->bytes - move->pbyte: move->pbyte - input->bytes;
-                move->nerr = (input->ecall > move->nerr)?input->ecall - move->nerr: move->nerr - input->ecall;
+                move->nerr = (input->ecall > move->nerr)?input->ecall - move->perr: move->perr - input->ecall;
             } else {
                 move->ncall = 0;
                 move->nbyte = 0;
@@ -392,8 +423,8 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish
         move = move->next;
     }
 
-    pvc->write = publish[2].nbyte;
-    pvc->read = -publish[3].nbyte;
+    pvc->write = -publish[2].nbyte;
+    pvc->read = publish[3].nbyte;
 }
 
 static void write_count_chart(char *name,netdata_publish_syscall_t *move, int end) {
@@ -457,17 +488,19 @@ static void write_io_chart(netdata_publish_vfs_common_t *pvc) {
 
 static void netdata_publish_data() {
     netdata_publish_vfs_common_t pvc;
-    netdata_update_publish(publish_file, &pvc, file_syscall);
+    netdata_update_publish(publish_aggregated, &pvc, aggregated_data);
 
-    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, publish_file, 1);
-    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, &publish_file[1], 1);
-    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, &publish_file[NETDATA_IN_START_BYTE], 1);
-    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, &publish_file[NETDATA_OUT_START_BYTE], 1);
-    write_count_chart(NETDATA_EXIT_SYSCALL, &publish_file[4], 2);
-    write_count_chart(NETDATA_PROCESS_SYSCALL, &publish_file[6], 1);
-    write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, publish_file);
+    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, publish_aggregated, 1);
+    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, &publish_aggregated[1], 1);
+    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, &publish_aggregated[NETDATA_IN_START_BYTE], 1);
+    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, &publish_aggregated[NETDATA_OUT_START_BYTE], 1);
+    write_count_chart(NETDATA_EXIT_SYSCALL, &publish_aggregated[4], 2);
+    write_count_chart(NETDATA_PROCESS_SYSCALL, &publish_aggregated[6], 1);
+    write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, publish_aggregated);
 
- //   write_bytes_chart(NETDATA_VFS_OUT_FILE_BYTES, &publish_file[NETDATA_OUT_START_BYTE], 1);
+    if (apps_charts) {
+
+    }
 
     write_io_chart(&pvc);
 }
@@ -505,21 +538,22 @@ static void move_from_kernel2user() {
         }
     }
 
-    file_syscall[0].call = res[0];
-    file_syscall[1].call = res[8];
-    file_syscall[2].call = res[2];
-    file_syscall[3].call = res[5];
-    file_syscall[4].call = res[10];
-    file_syscall[5].call = res[11];
-    file_syscall[6].call = res[12];
+    aggregated_data[0].call = res[0];
+    aggregated_data[1].call = res[8];
+    aggregated_data[2].call = res[2];
+    aggregated_data[3].call = res[5];
+    aggregated_data[4].call = res[10];
+    aggregated_data[5].call = res[11];
+    aggregated_data[6].call = res[12];
 
-    file_syscall[0].ecall = res[1];
-    file_syscall[1].ecall = res[3];
-    file_syscall[2].ecall = res[9];
-    file_syscall[3].ecall = res[6];
+    aggregated_data[0].ecall = res[1];
+    aggregated_data[1].ecall = res[3];
+    aggregated_data[2].ecall = res[9];
+    aggregated_data[3].ecall = res[6];
 
-    file_syscall[2].bytes = (uint64_t)res[4];
-    file_syscall[3].bytes = (uint64_t)res[7];
+    aggregated_data[2].bytes = (uint64_t)res[4];
+    aggregated_data[3].bytes = (uint64_t)res[7];
+
     /*
     struct netdata_pid_stat_t nps;
 
@@ -569,19 +603,19 @@ static void move_from_kernel2user() {
 
     closedir(dir);
 
-    file_syscall[0].call = call[0];
-    file_syscall[1].call = call[1];
-    file_syscall[2].call = call[2];
-    file_syscall[3].call = call[3];
-    file_syscall[4].call = call[4];
+    aggregated_data[0].call = call[0];
+    aggregated_data[1].call = call[1];
+    aggregated_data[2].call = call[2];
+    aggregated_data[3].call = call[3];
+    aggregated_data[4].call = call[4];
 
-    file_syscall[0].ecall = ecall[0];
-    file_syscall[1].ecall = ecall[1];
-    file_syscall[2].ecall = ecall[2];
-    file_syscall[3].ecall = ecall[3];
+    aggregated_data[0].ecall = ecall[0];
+    aggregated_data[1].ecall = ecall[1];
+    aggregated_data[2].ecall = ecall[2];
+    aggregated_data[3].ecall = ecall[3];
 
-    file_syscall[2].bytes = bytes[0];
-    file_syscall[3].bytes = bytes[1];
+    aggregated_data[2].bytes = bytes[0];
+    aggregated_data[3].bytes = bytes[1];
      */
 }
 
@@ -604,15 +638,15 @@ void *vfs_collector(void *ptr)
     return NULL;
 }
 
-void set_file_values() {
+void set_global_labels() {
     int i;
 
     static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "write", "read", "exit", "release_task", "fork" };
 
-    netdata_syscall_stat_t *is = file_syscall;
+    netdata_syscall_stat_t *is = aggregated_data;
     netdata_syscall_stat_t *prev = NULL;
 
-    netdata_publish_syscall_t *pio = publish_file;
+    netdata_publish_syscall_t *pio = publish_aggregated;
     netdata_publish_syscall_t *publish_prev = NULL;
     for (i = 0; i < NETDATA_MAX_FILE_VECTOR; i++) {
         if(prev) {
@@ -628,15 +662,53 @@ void set_file_values() {
     }
 }
 
+void set_apps_labels() {
+    netdata_syscall_stat_t *is = apps_data;
+    netdata_syscall_stat_t *prev = NULL;
+
+    netdata_publish_syscall_t *pio = publish_apps;
+    netdata_publish_syscall_t *publish_prev = NULL;
+
+    struct target *w = apps_groups_root_target;
+    int i = 0;
+    while (w) {
+        if(prev) {
+            prev->next = &is[i];
+        }
+        prev = &is[i];
+
+        pio[i].dimension = w->name;
+        if(publish_prev) {
+            publish_prev->next = &pio[i];
+        }
+        publish_prev = &pio[i];
+
+        w = w->next;
+        i++;
+    }
+}
+
 int allocate_global_vectors() {
-    file_syscall = callocz(NETDATA_MAX_FILE_VECTOR, sizeof(netdata_syscall_stat_t));
-    if(!file_syscall) {
+    aggregated_data = callocz(NETDATA_MAX_FILE_VECTOR, sizeof(netdata_syscall_stat_t));
+    if(!aggregated_data) {
         return -1;
     }
 
-    publish_file = callocz(NETDATA_MAX_FILE_VECTOR, sizeof(netdata_publish_syscall_t));
-    if(!publish_file) {
+    publish_aggregated = callocz(NETDATA_MAX_FILE_VECTOR, sizeof(netdata_publish_syscall_t));
+    if(!publish_aggregated) {
         return -1;
+    }
+
+    if(apps_dimension) {
+        apps_data = callocz(apps_dimension, sizeof(netdata_syscall_stat_t));
+        if(!apps_data) {
+            return -1;
+        }
+
+        publish_apps = callocz(apps_dimension, sizeof(netdata_publish_syscall_t));
+        if(!publish_apps) {
+            return -1;
+        }
     }
 
     return 0;
@@ -745,13 +817,23 @@ int main(int argc, char **argv)
         int_exit(3);
     }
 
+    if(read_apps_groups_conf(user_config_dir, "groups")) {
+        info("[VFS] Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
+
+        if(read_apps_groups_conf(stock_config_dir, "groups")) {
+            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. we will collect only global data.", stock_config_dir);
+            apps_charts = 0;
+        }
+    }
+
     if(allocate_global_vectors()) {
         thread_finished++;
         error("[VFS] Cannot allocate necessary vectors.");
         int_exit(4);
     }
 
-    set_file_values();
+    set_global_labels();
+    set_apps_labels();
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
@@ -762,15 +844,6 @@ int main(int argc, char **argv)
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     pthread_t thread[2];
-
-    if(read_apps_groups_conf(user_config_dir, "groups")) {
-        info("[VFS] Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
-
-        if(read_apps_groups_conf(stock_config_dir, "groups")) {
-            error("Cannot read process groups '%s/apps_groups.conf'. There are no internal defaults. we will collect only global data.", stock_config_dir);
-            apps_charts = 0;
-        }
-    }
 
     int i;
     int end = 2;

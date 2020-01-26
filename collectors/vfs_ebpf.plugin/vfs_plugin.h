@@ -91,7 +91,7 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_WEB_GROUP "vfs"
 
 # define NETDATA_VFS_FILE_OPEN_COUNT "Open_files"
-# define NETDATA_VFS_FILE_CLEAN_COUNT "Clean_files"
+# define NETDATA_VFS_FILE_CLEAN_COUNT "Delete_files"
 # define NETDATA_VFS_FILE_WRITE_COUNT "Write2files"
 # define NETDATA_VFS_FILE_READ_COUNT "Read2files"
 # define NETDATA_VFS_FILE_ERR_COUNT "Error_call"
