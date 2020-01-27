@@ -511,4 +511,100 @@ metrics, following the same pattern of the receiving side.
 
 For a practical example see [Monitoring ephemeral nodes](#monitoring-ephemeral-nodes).
 
+## Troubleshooting streaming connections
+
+This section describes the most common issues you might encounter when connecting slave and master Netdata agents.
+
+### Slow connections between slave and master
+
+When you have a slow connection between master and slave, Netdata raises a few different errors. Most of the errors will
+appear in the slave's `error.log`.
+
+```
+netdata ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER IP:MASTER PORT]: too many data pending - buffer is X bytes long,
+Y unsent - we have sent Z bytes in total, W on this connection. Closing connection to flush the data.
+```
+
+On the master side, you may see various error messages, most commonly the following:
+
+```
+netdata ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : read failed: end of file
+```
+
+Another common problem in slow connections is the slave sending a partial message to the master. In this case, the
+master will write the following in its `error.log`:
+
+```
+ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : sent command 'B' which is not known by netdata, for host 'HOSTNAME'. Disabling it.
+```
+
+In this example, `B` was part of a `BEGIN` message that was cut due to connection problems.
+
+Slow connections can also cause problems when the master misses a message and then recieves a command related to the
+missed message. For example, a master might miss a message containing the slave's charts, and then doesn't know what to
+do with the `SET` message that follows. When that happens, the master will show a message like this:
+
+```
+ERROR : STREAM_RECEIVER[SLAVE HOSTNAME,[SLAVE IP]:SLAVE PORT] : requested a SET on chart 'CHART NAME' of host 'HOSTNAME', without a dimension. Disabling it.
+```
+
+### Slave cannot connect to master
+
+When the slave can't connect to a master for any reason (misconfiguration, networking, firewalls, master down), you will
+see the following in the slave's `error.log`.
+
+```
+ERROR : STREAM_SENDER[HOSTNAME] : Failed to connect to 'MASTER IP', port 'MASTER PORT' (errno 113, No route to host)
+```
+
+### 'Is this a Netdata?'
+
+This question can appear when Netdata starts the stream and receives an unexpected response. This error can appear when
+the master is using SSL and the slave tries to connect using plain text. You will also see this message when Netdata
+connects to another server that isn't Netdata. The complete error message will look like this:
+
+```
+ERROR : STREAM_SENDER[SLAVE HOSTNAME] : STREAM SLAVE HOSTNAME [send to MASTER HOSTNAME:MASTER PORT]: server is not replying properly (is it a netdata?).
+```
+
+### Stream charts wrong
+
+Chart data needs to be consistent between slave and master agents. If there are differences between chart data on a
+master and a slave, such as gaps in metrics collection, it most often means your slave's `memory mode` does not match
+the master's. To learn more about the different ways Netdata can store metrics, and thus keep chart data consistent,
+read our [memory mode documentation](../database).
+
+### Forbidding access
+
+You may see errors about "forbidding access" for a number of reasons. It could be because of a slow connection between
+the master and slave nodes, but it could also be due to other failures. Look in your master's `error.log` for errors
+that look like this: 
+
+```
+STREAM [receive from [SLAVE HOSTNAME]:SLAVE IP]: `MESSAGE`. Forbidding access."
+```
+
+`MESSAGE` will have one of the following patterns:
+
+-   `request without KEY` : The message received is incomplete and the KEY value can be API, hostname, machine GUID.
+-   `API key 'VALUE' is not valid GUID`: The UUID received from slave does not have the format defined in [RFC 4122]
+    (https://tools.ietf.org/html/rfc4122)
+-   `machine GUID 'VALUE' is not GUID.`: This error with machine GUID is like the previous one.
+-   `API key 'VALUE' is not allowed`: This stream has a wrong API key.
+-   `API key 'VALUE' is not permitted from this IP`: The IP is not allowed to use STREAM with this master.
+-   `machine GUID 'VALUE' is not allowed.`: The GUID that is trying to send stream is not allowed.
+-   `Machine GUID 'VALUE' is not permitted from this IP. `: The IP does not match the pattern or IP allowed to connect 
+    to use stream.
+
+### Netdata could not create a stream
+
+The connection between master and slave is a stream. When the master can't convert the initial connection into a stream,
+it will write the following message inside `error.log`:
+
+```
+file descriptor given is not a valid stream
+```
+
+After logging this error, Netdata will close the stream.
+
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fstreaming%2FREADME&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)
