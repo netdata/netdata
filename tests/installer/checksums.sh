@@ -20,7 +20,7 @@ if [ -n "$CWD" ] || [ "${TOP_LEVEL}" != "netdata" ]; then
 fi
 
 check_file() {
-	README_MD5=$(grep "$1" "$2" | grep md5sum | cut -d '"' -f2)
+	README_MD5=$(grep "$1" "$2" | grep md5sum | grep curl | cut -d '"' -f2)
 	KICKSTART_URL="https://my-netdata.io/$1"
 	KICKSTART="packaging/installer/$1"
 	KICKSTART_MD5="$(md5sum "${KICKSTART}" | cut -d' ' -f1)"
