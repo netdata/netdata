@@ -603,6 +603,7 @@ RRDSET *rrdset_create_custom(
             st->variables = NULL;
             st->alarms = NULL;
             st->flags = 0x00000000;
+            st->exporting_flags = NULL;
 
             if(memory_mode == RRD_MEMORY_MODE_RAM) {
                 memset(st, 0, size);

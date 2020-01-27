@@ -8,7 +8,6 @@ from json import loads
 
 from bases.FrameworkServices.UrlService import UrlService
 
-
 ORDER = [
     'questions',
     'cache_usage',

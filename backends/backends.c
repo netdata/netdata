@@ -439,7 +439,7 @@ BACKEND_TYPE backend_select_type(const char *type) {
         return BACKEND_TYPE_JSON;
     }
     else if (!strcmp(type, "prometheus_remote_write")) {
-        return  BACKEND_TYPE_PROMETEUS;
+        return  BACKEND_TYPE_PROMETHEUS;
     }
     else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
@@ -557,7 +557,7 @@ void *backends_main(void *ptr) {
             backend_set_opentsdb_http_variables(&default_port,&backend_response_checker,&backend_request_formatter);
             break;
         }
-        case BACKEND_TYPE_PROMETEUS: {
+        case BACKEND_TYPE_PROMETHEUS: {
 #if ENABLE_PROMETHEUS_REMOTE_WRITE
             do_prometheus_remote_write = 1;
 

@@ -4,8 +4,8 @@
 # Author: Wei He (Wing924)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import xml.etree.ElementTree as ET
 import re
+import xml.etree.ElementTree as ET
 
 from bases.FrameworkServices.UrlService import UrlService
 

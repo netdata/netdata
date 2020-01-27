@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/bin/sh
+
 #
 # Mechanism to validate kickstart files integrity status
 #
@@ -9,16 +10,15 @@
 set -e
 
 # If we are not in netdata git repo, at the top level directory, fail
-TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel 2> /dev/null || echo "")")
-CWD="$(git rev-parse --show-cdup 2> /dev/null || echo "")"
-if [ -n "$CWD" ] || [ ! "${TOP_LEVEL}" == "netdata" ]; then
-    echo "Run as ./tests/installer/$(basename "$0") from top level directory of netdata git repository"
-    echo "Kickstart validation process aborted"
-    exit 1
+TOP_LEVEL=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || echo "")")
+CWD="$(git rev-parse --show-cdup 2>/dev/null || echo "")"
+if [ -n "$CWD" ] || [ "${TOP_LEVEL}" != "netdata" ]; then
+	echo "Run as ./tests/installer/$(basename "$0") from top level directory of netdata git repository"
+	echo "Kickstart validation process aborted"
+	exit 1
 fi
 
 README_DOC="packaging/installer/README.md"
-source ./tests/installer/slack.sh
 
 for file in kickstart.sh kickstart-static64.sh; do
 	README_MD5=$(grep "$file" $README_DOC | grep md5sum | cut -d '"' -f2)
@@ -30,10 +30,11 @@ for file in kickstart.sh kickstart-static64.sh; do
 	# Conditionally run the website validation
 	if [ -z "${LOCAL_ONLY}" ]; then
 		echo "Validating ${KICKSTART_URL} against local file ${KICKSTART} with MD5 ${KICKSTART_MD5}.."
-		if [ "$KICKSTART_MD5" == "$CALCULATED_MD5" ]; then
+		if [ "$KICKSTART_MD5" = "$CALCULATED_MD5" ]; then
 			echo "${KICKSTART_URL} looks fine"
 		else
-			post_message "TRAVIS_MESSAGE" "Attention <!here> , ${KICKSTART_URL} md5sum does not match local file, it needs to be updated"
+			echo "${KICKSTART_URL} md5sum does not match local file, it needs to be updated"
+			exit 2
 		fi
 	fi
 

@@ -40,8 +40,7 @@ Depends: adduser,
          libjudydebian1,
          openssl,
          libmnl0,
-         libjson-c2,
-         freeipmi,
+         libjson-c3,
          libnetfilter-acct1,
          libprotobuf-c1,
          libsnappy1,
@@ -60,3 +59,12 @@ Architecture: any
 Depends: cups,
          netdata (>= ${source:Version})
 Description: The Common Unix Printing System plugin for metrics collection from cupsd
+
+Package: netdata-plugin-freeipmi
+Architecture: any
+Depends: freeipmi,
+         netdata (= ${source:Version})
+Description: FreeIPMI - The Intelligent Platform Management System.
+ The IPMI specification defines a set of interfaces for platform management.
+ It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in 
+ are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).

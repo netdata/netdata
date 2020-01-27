@@ -188,7 +188,6 @@ Requires: libnetfilter_acct1
 
 # freeipmi plugin dependencies
 BuildRequires:  freeipmi-devel
-Requires: freeipmi
 # end - freeipmi plugin dependencies
 
 # CUPS plugin dependencies
@@ -255,8 +254,6 @@ autoreconf -ivf
 # Clear the directory, if already exists and install
 rm -rf "${RPM_BUILD_ROOT}"
 %{__make} %{?_smp_mflags} DESTDIR="${RPM_BUILD_ROOT}" install
-
-find "${RPM_BUILD_ROOT}%{_localstatedir}" -name .keep -delete -print
 
 install -m 644 -p system/netdata.conf "${RPM_BUILD_ROOT}%{_sysconfdir}/%{name}"
 
@@ -395,7 +392,7 @@ install_go() {
 	return 0
 }
 install_go
-install -m 0640 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
+install -m 0750 -p go.d.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/go.d.plugin"
 
 %pre
 
@@ -422,21 +419,21 @@ rm -rf "${RPM_BUILD_ROOT}"
 %doc README.md
 %{_sysconfdir}/%{name}
 %config(noreplace) %{_sysconfdir}/%{name}/netdata.conf
-
-%defattr(-,root,netdata)
-%dir %{_libdir}/%{name}
-
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
-
+%dir %{_libdir}/%{name}
+%dir %{_datadir}/%{name}
 %{_libdir}/%{name}
-
-%defattr(0755,netdata,netdata,0755)
+%{_libdir}/%{name}/conf.d/
 %{_libexecdir}/%{name}
 %{_sbindir}/%{name}
-
-%defattr(0755,root,root,0755)
 %{_sbindir}/netdatacli
 %{_sbindir}/netdata-claim.sh
+
+%if %{with systemd}
+%{_unitdir}/netdata.service
+%else
+%{_sysconfdir}/rc.d/init.d/netdata
+%endif
 
 %defattr(4750,root,netdata,0750)
 
@@ -445,34 +442,28 @@ rm -rf "${RPM_BUILD_ROOT}"
 %dir %{_libexecdir}/%{name}/plugins.d
 %dir %{_libexecdir}/%{name}/node.d
 
-%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0550,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
+%{_libexecdir}/%{name}/python.d
+%{_libexecdir}/%{name}/plugins.d
+%{_libexecdir}/%{name}/node.d
+
+%caps(cap_dac_read_search,cap_sys_ptrace=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/apps.plugin
 
 %if %{with netns}
 # cgroup-network detects the network interfaces of CGROUPs
 # it must be able to use setns() and run cgroup-network-helper.sh as root
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
-%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
-%attr(0550,root,root) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
+%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
+%attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
 # perf plugin
 %caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
 
 # perf plugin
-%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
+%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/slabinfo.plugin
 
 # freeipmi files
-%caps(cap_setuid=ep) %attr(4550,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
-%dir %{_datadir}/%{name}
-
-%defattr(0750,netdata,netdata,0755)
-%{_libdir}/%{name}/conf.d/
-
-%if %{with systemd}
-%{_unitdir}/netdata.service
-%else
-%{_sysconfdir}/rc.d/init.d/netdata
-%endif
+%caps(cap_setuid=ep) %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory
@@ -486,6 +477,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0755,netdata,root) %dir %{_localstatedir}/log/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}
 %attr(0770,netdata,netdata) %dir %{_localstatedir}/lib/%{name}/registry
+
+# Free IPMI belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 # CUPS belongs to a different sub package
 %if 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7
@@ -505,7 +499,23 @@ Use this plugin to enable metrics collection from cupsd, the daemon running when
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
 %endif
 
+%package plugin-freeipmi
+Summary: FreeIPMI - The Intelligent Platform Management System
+Group: Applications/System
+Requires: freeipmi
+Requires: netdata = %{version}
+
+%description plugin-freeipmi
+ The IPMI specification defines a set of interfaces for platform management.
+It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in 
+are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
+
+%files plugin-freeipmi
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
+
 %changelog
+* Thu Dec 19 2019 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-11
+- Fix remaining ownership and permissions issues.
 * Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10
 - Fix /etc/netdata permissions
 * Mon Sep 23 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-9

@@ -7,7 +7,6 @@ import re
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-
 update_every = 30
 
 NSD_CONTROL_COMMAND = 'nsd-control stats_noreset'

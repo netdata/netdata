@@ -107,6 +107,8 @@ extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
 extern void *health_cmdapi_thread(void *ptr);
 
+extern void health_label_log_save(RRDHOST *host);
+
 extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
 
 #endif //NETDATA_HEALTH_H

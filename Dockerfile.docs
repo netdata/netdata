@@ -1,0 +1,26 @@
+ARG PYVER=3.8
+
+FROM python:${PYVER}-alpine
+
+WORKDIR /netdata
+
+# These scripts use Bash(ism) so install Bash
+# TODO: Maybe rewrite the link checker in something more sane
+RUN apk add --no-cache -U bash
+
+# The scripts also clone the netdata/netdata repo using git
+# TODO: Maybe also optionally support bind-mounted sources
+RUN apk add --no-cache -U git
+
+# The scripts also use GNU find options
+RUN apk add --no-cache -U findutils
+
+# Copy and Install build dependencies first to cache them so we don't have to
+# do this every single time we want to rebuild the docs. The cache is busted
+# when/if the SHA of the requirements.txt is changed.
+COPY docs/generator /netdata/docs/generator
+RUN pip install -r /netdata/docs/generator/requirements.txt
+
+COPY . .
+
+CMD ["/netdata/docs/generator/buildhtml.sh"]

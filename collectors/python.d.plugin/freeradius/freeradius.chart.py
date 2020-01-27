@@ -6,8 +6,8 @@
 import re
 from subprocess import Popen, PIPE
 
-from bases.collection import find_binary
 from bases.FrameworkServices.SimpleService import SimpleService
+from bases.collection import find_binary
 
 update_every = 15
 

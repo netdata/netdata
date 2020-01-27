@@ -28,7 +28,7 @@ int init_graphite_connector(struct connector *connector)
 int init_graphite_instance(struct instance *instance)
 {
     instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = NULL;
+    instance->start_host_formatting = format_host_labels_graphite_plaintext;
     instance->start_chart_formatting = NULL;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
@@ -37,7 +37,7 @@ int init_graphite_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_graphite_plaintext;
 
     instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = NULL;
+    instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
     instance->buffer = (void *)buffer_create(0);
@@ -47,6 +47,60 @@ int init_graphite_instance(struct instance *instance)
     }
     uv_mutex_init(&instance->mutex);
     uv_cond_init(&instance->cond_var);
+
+    return 0;
+}
+
+/**
+ * Copy a label value and substitute underscores in place of charachters which can't be used in Graphite output
+ *
+ * @param dst a destination string.
+ * @param src a source string.
+ * @param len the maximum number of characters copied.
+ */
+
+void sanitize_graphite_label_value(char *dst, char *src, size_t len)
+{
+    while (*src != '\0' && len) {
+        if (isspace(*src) || *src == ';' || *src == '~')
+            *dst++ = '_';
+        else
+            *dst++ = *src;
+        src++;
+        len--;
+    }
+    *dst = '\0';
+}
+
+/**
+ * Format host labels for JSON connector
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @return Always returns 0.
+ */
+int format_host_labels_graphite_plaintext(struct instance *instance, RRDHOST *host)
+{
+    if (!instance->labels)
+        instance->labels = buffer_create(1024);
+
+    if (unlikely(!sending_labels_configured(instance)))
+        return 0;
+
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if (!should_send_label(instance, label))
+            continue;
+
+        char value[CONFIG_MAX_VALUE + 1];
+        sanitize_graphite_label_value(value, label->value, CONFIG_MAX_VALUE);
+
+        if (*value) {
+            buffer_strcat(instance->labels, ";");
+            buffer_sprintf(instance->labels, "%s=%s", label->key, value);
+        }
+    }
+    netdata_rwlock_unlock(&host->labels_rwlock);
 
     return 0;
 }
@@ -78,13 +132,14 @@ int format_dimension_collected_graphite_plaintext(struct instance *instance, RRD
 
     buffer_sprintf(
         instance->buffer,
-        "%s.%s.%s.%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
+        "%s.%s.%s.%s%s%s%s " COLLECTED_NUMBER_FORMAT " %llu\n",
         engine->config.prefix,
         engine->config.hostname,
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
         (host->tags) ? host->tags : "",
+        (instance->labels) ? buffer_tostring(instance->labels) : "",
         rd->last_collected_value,
         (unsigned long long)rd->last_collected_time.tv_sec);
 
@@ -124,13 +179,14 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
 
     buffer_sprintf(
         instance->buffer,
-        "%s.%s.%s.%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
+        "%s.%s.%s.%s%s%s%s " CALCULATED_NUMBER_FORMAT " %llu\n",
         engine->config.prefix,
         engine->config.hostname,
         chart_name,
         dimension_name,
         (host->tags) ? ";" : "",
         (host->tags) ? host->tags : "",
+        (instance->labels) ? buffer_tostring(instance->labels) : "",
         value,
         (unsigned long long)last_t);
 

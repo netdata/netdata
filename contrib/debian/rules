@@ -34,6 +34,12 @@ override_dh_install: debian/netdata.postinst
 	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/cups.plugin \
 	$(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
 
+	# Add free IPMI plugin install rules
+	#
+	mkdir -p $(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d
+	mv -f $(TEMPTOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin \
+	$(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
+
 	# Set the rest of the software in the main package
 	#
 	cp -rp $(TEMPTOP)/usr $(TOP)
@@ -86,13 +92,15 @@ override_dh_fixperms:
 	# given extra capabilities in the postinst script.
 	#
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/apps.plugin
-	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/freeipmi.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/perf.plugin
 	chmod 0754 $(TOP)/usr/libexec/netdata/plugins.d/slabinfo.plugin
 	chmod 0750 $(TOP)/usr/libexec/netdata/plugins.d/go.d.plugin
 
 	# CUPS plugin package
 	chmod 0750 $(TOP)-plugin-cups/usr/libexec/netdata/plugins.d/cups.plugin
+
+	# freeIPMI plugin package
+	chmod 0754 $(TOP)-plugin-freeipmi/usr/libexec/netdata/plugins.d/freeipmi.plugin
 
 override_dh_installlogrotate:
 	cp system/netdata.logrotate debian/netdata.logrotate

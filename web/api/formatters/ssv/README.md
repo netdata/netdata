@@ -11,7 +11,7 @@ It supports the following formats:
 | `ssvcomma` | text/plain       | a comma separated list of values |
 | `array`    | application/json | a JSON array                     |
 
-The CSV formatter respects the following API `&options=`:
+The SSV formatter respects the following API `&options=`:
 
 | option    | supported | description                                                                         |
 | :----:|:-------:|:----------|

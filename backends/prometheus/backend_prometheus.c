@@ -697,7 +697,7 @@ void rrd_stats_remote_write_allmetrics_prometheus(
                             prometheus_label_copy(dimension, (backend_options & BACKEND_OPTION_SEND_NAMES && rd->name) ? rd->name : rd->id, PROMETHEUS_ELEMENT_MAX);
                             snprintf(name, PROMETHEUS_LABELS_MAX, "%s_%s%s%s", prefix, context, units, suffix);
 
-                            add_metric(name, chart, family, dimension, hostname, rd->last_collected_value, timeval_msec(&rd->last_collected_time));
+                            add_metric(name, chart, family, dimension, hostname, value, last_t * MSEC_PER_SEC);
                             (*count_dims)++;
                         }
                     }
