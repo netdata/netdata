@@ -138,9 +138,9 @@ The above command will:
 -   Install any required packages on your system (it will ask you to confirm before doing so)
 -   Compile it, install it, and start it.
 
-More installation methods and additional options can be found at the [installation page](packaging/installer/README.md).
+More installation methods and additional options can be found at the [installation page](packaging/installer/).
 
-To try Netdata in a docker container, run this:
+To try Netdata in a Docker container, run this:
 
 ```sh
 docker run -d --name=netdata \
@@ -155,7 +155,7 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-For more information about running Netdata with Docker, check the [docker installation page](packaging/docker/).
+For more information about running Netdata in Docker, check the [docker installation page](packaging/docker/).
 
 ![image](https://user-images.githubusercontent.com/2662304/48304090-fd384080-e51b-11e8-80ae-eecb03118dda.png)
 
