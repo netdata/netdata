@@ -105,6 +105,10 @@ void mqtt_message_callback(
 
 }
 
+int lws_wss_client_initialized = 0;
+int mqtt_over_websockets = 1; //TODO read this from config in future??
+struct aclk_lws_wss_engine_instance *lws_engine_instance = NULL;
+
 void connect_callback(struct mosquitto *mosq, void *obj, int rc)
 {
     (void) obj;
@@ -131,6 +135,10 @@ void disconnect_callback(struct mosquitto *mosq, void *obj, int rc)
     //mqtt_connection_initialized = 0;
     aclk_mqtt_connected = 0;
     _on_disconnect((void *) mosq);
+
+    if(mqtt_over_websockets && lws_engine_instance)
+        aclk_lws_wss_mqtt_layer_disconect_notif(lws_engine_instance);
+
     //sleep_usec(USEC_PER_SEC * 5);
     return;
 }
@@ -143,10 +151,6 @@ void _show_mqtt_info()
 
     info("Detected libmosquitto library version %d, %d.%d.%d",libmosq_version, libmosq_major, libmosq_minor, libmosq_revision);
 }
-
-int lws_wss_client_initialized = 0;
-int mqtt_over_websockets = 1; //TODO read this from config in future??
-struct aclk_lws_wss_engine_instance *lws_engine_instance = NULL;
 
 size_t _mqtt_external_write_hook(void *buf, size_t count)
 {
