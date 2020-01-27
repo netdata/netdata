@@ -292,11 +292,6 @@ fi
 DISK_SIZE="unknown"
 DISK_DETECTION="none"
 
-# List of device majors we actually count towards total disk space.
-# The meanings of these can be found in `Documentation/admin-guide/devices.txt` in the Linux sources.
-# The ':' surrounding each number are important for matching.
-dev_major_whitelist=':3:8:9:21:22:28:31:33:34:44:45:47:48:49:50:51:52:53:54:55:56:57:65:66:67:68:69:70:71:72:73:74:75:76:77:78:79:88:89:90:91:93:94:96:98:101:104:105:106:107:108:109:110:111:112:114:116:128:129:130:131:132:134:135:136:137:138:139:140:141:142:143:153:160:161:179:180:202:254:256:257:'
-
 if [ "${KERNEL_NAME}" = "Darwin" ]; then
         types='hfs'
 
@@ -323,6 +318,16 @@ elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         DISK_SIZE="$((total * 1024))"
 else
         if [ -d /sys/block ] ; then
+                # List of device majors we actually count towards total disk space.
+                # The meanings of these can be found in `Documentation/admin-guide/devices.txt` in the Linux sources.
+                # The ':' surrounding each number are important for matching.
+                dev_major_whitelist=':3:8:9:21:22:28:31:33:34:44:45:47:48:49:50:51:52:53:54:55:56:57:65:66:67:68:69:70:71:72:73:74:75:76:77:78:79:88:89:90:91:93:94:96:98:101:104:105:106:107:108:109:110:111:112:114:116:128:129:130:131:132:134:135:136:137:138:139:140:141:142:143:153:160:161:179:180:202:256:257:'
+
+                if [ "${VIRTUALIZATION}" != "unknown" ] ; then
+                    # We're running virtualized, add the local range of device major numbers so that we catch paravirtualized block devices.
+                    dev_major_whitelist="${dev_major_whitelist}240:241:242:243:244:245:246:247:248:249:250:251:252:253:254:"
+                fi
+
                 DISK_DETECTION="sysfs"
                 DISK_SIZE="0"
                 for disk in /sys/block/* ; do
