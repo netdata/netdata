@@ -71,9 +71,51 @@ struct netdata_pid_stat_t {
     uint32_t unlink_err;
 };
 
-typedef struct netdata_publish_syscall {
-    int reset;
+typedef struct netdata_publish_process_syscall {
+    uint32_t reset;  //process id
 
+    char *dimension;
+
+    uint64_t nopen_call;
+    uint64_t popen_call;
+    uint64_t nwrite_call;
+    uint64_t pwrite_call;
+    uint64_t nread_call;
+    uint64_t pread_call;
+    uint64_t nunlink_call;
+    uint64_t punlink_call;
+    uint64_t nexit_call;
+    uint64_t pexit_call;
+    uint64_t nrelease_call;
+    uint64_t prelease_call;
+    uint64_t nfork_call;
+    uint64_t pfork_call;
+
+    uint64_t nwrite_bytes;
+    uint64_t pwrite_bytes;
+    uint64_t nread_bytes;
+    uint64_t pread_bytes;
+
+    uint64_t nopen_err;
+    uint64_t popen_err;
+    uint64_t nwrite_err;
+    uint64_t pwrite_err;
+    uint64_t nread_err;
+    uint64_t pread_err;
+    uint64_t nunlink_err;
+    uint64_t punlink_err;
+
+    long long wopen;
+    long long wwrite;
+    long long wread;
+    long long wunlink;
+    long long wfork;
+    long long wzombie;
+
+    struct netdata_publish_process_syscall *next;
+}netdata_publish_process_syscall_t ;
+
+typedef struct netdata_publish_syscall {
     char *dimension;
     unsigned long nbyte;
     unsigned long pbyte;

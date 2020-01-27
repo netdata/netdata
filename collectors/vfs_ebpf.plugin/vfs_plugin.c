@@ -144,7 +144,7 @@ static struct target *get_apps_groups_target(const char *id, struct target *targ
 
     target = (struct target *)avl_insert_lock(&process_tree, (avl *)w);
     if (target != w)
-        error("VFS: Internal error, cannot insert %s inside the avl tree.", w->name);
+        error("VFS: Internal error, cannot insert %s inside the avl tree.", w->compare);
 
     return w;
 }
@@ -205,10 +205,7 @@ static int compare_process_name(void *a, void *b) {
     struct target *v1 = a;
     struct target *v2 = b;
 
-    if(v1->comparehash > v2->comparehash) return 1;
-    if(v1->comparehash < v2->comparehash) return -1;
-
-    return 0;
+    return strcmp(v1->compare, v2->compare);
 }
 
 
@@ -231,7 +228,7 @@ netdata_publish_syscall_t *publish_aggregated = NULL;
 
 //Apps vectors
 netdata_syscall_stat_t *apps_data = NULL;
-netdata_publish_syscall_t *publish_apps = NULL;
+netdata_publish_process_syscall_t *publish_apps = NULL;
 
 static int update_every = 1;
 static int thread_finished = 0;
@@ -284,15 +281,13 @@ static void int_exit(int sig)
     exit(sig);
 }
 
-static void netdata_create_chart(char *family
-                                , char *name
-                                , char *msg
-                                , char *axis
-                                , char *web
-                                , int order
-                                , netdata_publish_syscall_t *move
-                                , int end)
-                                {
+static inline void netdata_write_chart_cmd(char *family
+                                    , char *name
+                                    , char *msg
+                                    , char *axis
+                                    , char *web
+                                    , int order)
+{
     printf("CHART %s.%s '' '%s' '%s' '%s' '' line %d 1 ''\n"
             , family
             , name
@@ -300,14 +295,53 @@ static void netdata_create_chart(char *family
             , axis
             , web
             , order);
+}
+
+static void netdata_write_global_dimension(char *dim)
+{
+    printf("DIMENSION %s '' absolute 1 1\n", dim);
+}
+
+static void netdata_create_global_dimension(void *ptr, int end)
+{
+    netdata_publish_syscall_t *move = ptr;
 
     int i = 0;
     while (move && i < end) {
-        printf("DIMENSION %s '' absolute 1 1\n", move->dimension);
+        netdata_write_global_dimension(move->dimension);
 
         move = move->next;
         i++;
     }
+}
+
+static void netdata_create_process_dimension(void *ptr, int end)
+{
+    netdata_publish_process_syscall_t *move = ptr;
+
+    int i = 0;
+    while (move && i < end) {
+        netdata_write_global_dimension(move->dimension);
+
+        move = move->next;
+        i++;
+    }
+}
+
+static inline void netdata_create_chart(char *family
+                                , char *name
+                                , char *msg
+                                , char *axis
+                                , char *web
+                                , int order
+                                , void (*ncd)(void *, int)
+                                , void *move
+                                , int end)
+{
+
+    netdata_write_chart_cmd(family, name, msg, axis, web, order);
+
+    ncd(move, end);
 }
 
 static void netdata_create_io_chart(char *family, char *name, char *msg, char *axis, char *web, int order) {
@@ -330,6 +364,7 @@ static void netdata_global_charts_create() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 970
+            , netdata_create_global_dimension
             , publish_aggregated
             , 1);
 
@@ -339,6 +374,7 @@ static void netdata_global_charts_create() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 971
+            , netdata_create_global_dimension
             , &publish_aggregated[1]
             , 1);
 
@@ -348,6 +384,7 @@ static void netdata_global_charts_create() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 972
+            , netdata_create_global_dimension
             , &publish_aggregated[NETDATA_IN_START_BYTE]
             , 1);
 
@@ -357,6 +394,7 @@ static void netdata_global_charts_create() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 973
+            , netdata_create_global_dimension
             , &publish_aggregated[NETDATA_OUT_START_BYTE]
             , 1);
 
@@ -373,6 +411,7 @@ static void netdata_global_charts_create() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 975
+            , netdata_create_global_dimension
             , &publish_aggregated[6]
             , 1);
 
@@ -382,6 +421,7 @@ static void netdata_global_charts_create() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 976
+            , netdata_create_global_dimension
             , &publish_aggregated[4]
             , 2);
 
@@ -391,6 +431,7 @@ static void netdata_global_charts_create() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 977
+            , netdata_create_global_dimension
             , publish_aggregated
             , NETDATA_MAX_FILE_VECTOR);
 }
@@ -402,8 +443,9 @@ static void netdata_apps_charts() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 140004
+            , netdata_create_process_dimension
             , publish_apps
-            , 20);
+            , apps_dimension);
 
     netdata_create_chart(NETDATA_APPS_FAMILY
             , NETDATA_VFS_FILE_CLEAN_COUNT
@@ -411,8 +453,9 @@ static void netdata_apps_charts() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 140005
+            , netdata_create_process_dimension
             , publish_apps
-            , 20);
+            , apps_dimension);
 
     netdata_create_chart(NETDATA_APPS_FAMILY
             , NETDATA_VFS_FILE_WRITE_COUNT
@@ -420,8 +463,9 @@ static void netdata_apps_charts() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 140006
+            , netdata_create_process_dimension
             , publish_apps
-            , 20);
+            , apps_dimension);
 
     netdata_create_chart(NETDATA_APPS_FAMILY
             , NETDATA_VFS_FILE_READ_COUNT
@@ -429,8 +473,9 @@ static void netdata_apps_charts() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 140007
+            , netdata_create_process_dimension
             , publish_apps
-            , 20);
+            , apps_dimension);
 
     netdata_create_chart(NETDATA_APPS_FAMILY
             , NETDATA_PROCESS_SYSCALL
@@ -438,17 +483,19 @@ static void netdata_apps_charts() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 140008
+            , netdata_create_process_dimension
             , publish_apps
-            , 20);
+            , apps_dimension);
 
     netdata_create_chart(NETDATA_APPS_FAMILY
             , NETDATA_EXIT_SYSCALL
-            , "Count the total of calls made to the operate system per period to finish a process."
+            , "Count the total of zombie process created on the operate system."
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 140009
+            , netdata_create_process_dimension
             , publish_apps
-            , 20);
+            , apps_dimension);
 
     netdata_create_chart(NETDATA_APPS_FAMILY
             , NETDATA_VFS_FILE_ERR_COUNT
@@ -456,8 +503,9 @@ static void netdata_apps_charts() {
             , "Number of calls"
             , NETDATA_WEB_GROUP
             , 140010
+            , netdata_create_process_dimension
             , publish_apps
-            , NETDATA_MAX_FILE_VECTOR);
+            , apps_dimension);
 }
 
 static void netdata_create_charts() {
@@ -499,18 +547,31 @@ static void netdata_update_publish(netdata_publish_syscall_t *publish
         move = move->next;
     }
 
-    pvc->write = -publish[2].nbyte;
-    pvc->read = publish[3].nbyte;
+    pvc->write = -((long)publish[2].nbyte);
+    pvc->read = (long)publish[3].nbyte;
 }
 
-static void write_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
-    printf( "BEGIN %s.%s\n"
+static inline void write_begin_chart(char *family, char *name)
+{
+    int ret = printf( "BEGIN %s.%s\n"
             , family
             , name);
 
+    (void)ret;
+}
+
+static inline void write_chart_dimension(char *dim, long long value)
+{
+    int ret = printf("SET %s = %lld\n", dim, value);
+    (void)ret;
+}
+
+static void write_global_count_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+    write_begin_chart(family, name);
+
     int i = 0;
     while (move && i < end) {
-        printf("SET %s = %lld\n", move->dimension, (long long) move->ncall);
+        write_chart_dimension(move->dimension, move->ncall);
 
         move = move->next;
         i++;
@@ -519,14 +580,71 @@ static void write_count_chart(char *name, char *family, netdata_publish_syscall_
     printf("END\n");
 }
 
-static void write_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
-    printf( "BEGIN %s.%s\n"
-            , family
-            , name);
+static void write_global_err_chart(char *name, char *family, netdata_publish_syscall_t *move, int end) {
+    write_begin_chart(family, name);
 
     int i = 0;
     while (move && i < end) {
-        printf("SET %s = %lld\n", move->dimension, (long long) move->nerr);
+        write_chart_dimension(move->dimension, move->nerr);
+
+        move = move->next;
+        i++;
+    }
+
+    printf("END\n");
+}
+
+static void write_process_err_chart(char *name, char *family, netdata_publish_process_syscall_t *move, int end) {
+    write_begin_chart(family, name);
+
+    int i = 0;
+    while (move && i < end) {
+        uint64_t err = (move->nopen_err + move->nwrite_err + move->nunlink_err + move->nread_err) -  (move->popen_err + move->pwrite_err + move->punlink_err + move->pread_err);
+        write_chart_dimension(move->dimension, llabs((long long)err) );
+
+        move->reset = 1;
+        move = move->next;
+        i++;
+    }
+
+    printf("END\n");
+}
+
+static inline void write_chart_dimension_open(netdata_publish_process_syscall_t *v) {
+    write_chart_dimension(v->dimension, llabs(v->wopen));
+}
+
+static inline void write_chart_dimension_write(netdata_publish_process_syscall_t *v) {
+    write_chart_dimension(v->dimension, llabs(v->wwrite));
+}
+
+static inline void write_chart_dimension_unlink(netdata_publish_process_syscall_t *v) {
+    write_chart_dimension(v->dimension, llabs(v->wunlink));
+}
+
+static inline void write_chart_dimension_read(netdata_publish_process_syscall_t *v) {
+    write_chart_dimension(v->dimension, llabs(v->wread));
+}
+
+static inline void write_chart_dimension_fork(netdata_publish_process_syscall_t *v) {
+    write_chart_dimension(v->dimension, llabs(v->wfork));
+}
+
+static inline void write_chart_dimension_exit(netdata_publish_process_syscall_t *v) {
+    write_chart_dimension(v->dimension, llabs(v->wzombie));
+}
+
+static void write_process_count_chart(char *name
+                                      , char *family
+                                      , netdata_publish_process_syscall_t *move
+                                      , void (*wcd)(netdata_publish_process_syscall_t *)
+                                      , int end)
+{
+    write_begin_chart(family, name);
+
+    int i = 0;
+    while (move && i < end) {
+        wcd(move);
 
         move = move->next;
         i++;
@@ -568,24 +686,24 @@ static void netdata_publish_data() {
     netdata_publish_vfs_common_t pvc;
     netdata_update_publish(publish_aggregated, &pvc, aggregated_data);
 
-    write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, 1);
-    write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[1], 1);
-    write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 1);
-    write_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_OUT_START_BYTE], 1);
-    write_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[4], 2);
-    write_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[6], 1);
-    write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, NETDATA_MAX_FILE_VECTOR );
+    write_global_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, 1);
+    write_global_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[1], 1);
+    write_global_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 1);
+    write_global_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_OUT_START_BYTE], 1);
+    write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[4], 2);
+    write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[6], 1);
+    write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, 4);
 
     write_io_chart(NETDATA_VFS_FAMILY, &pvc);
 
     if(apps_groups_root_target ) {
-        write_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
-        write_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
-        write_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
-        write_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
-        write_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_APPS_FAMILY, publish_apps, 20);
-        write_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_APPS_FAMILY, publish_apps, 20);
-        write_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_APPS_FAMILY, publish_apps, 20);
+        write_process_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_APPS_FAMILY, publish_apps, write_chart_dimension_open, apps_dimension);
+        write_process_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_APPS_FAMILY, publish_apps, write_chart_dimension_unlink, apps_dimension);
+        write_process_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_APPS_FAMILY, publish_apps, write_chart_dimension_write, apps_dimension);
+        write_process_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_APPS_FAMILY, publish_apps, write_chart_dimension_read, apps_dimension);
+        write_process_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_APPS_FAMILY, publish_apps, write_chart_dimension_fork, apps_dimension);
+        write_process_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_APPS_FAMILY, publish_apps, write_chart_dimension_exit, apps_dimension);
+        write_process_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_APPS_FAMILY, publish_apps, apps_dimension);
     }
 }
 
@@ -639,24 +757,104 @@ static void move_from_kernel2user_global() {
     aggregated_data[3].bytes = (uint64_t)res[7]; //read
 }
 
-static void move_from_kernel2user_apps() {
+static void netdata_update_publish_apps(uint32_t pid, struct netdata_pid_stat_t *in)
+{
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/%u/cmdline", netdata_configured_host_prefix, pid);
+
+    int fd = open(filename, O_RDONLY, 0666);
+    if (fd > 0) {
+        ssize_t length = read(fd, filename, 256);
+        if(length > 0) {
+            filename[length] = '\0';
+            char *end = strchr(filename, ' ');
+            if(!end) {
+                end = &filename[length];
+            }
+            *end = '\0';
+
+            char *begin = strrchr(filename, '/');
+            if(!begin)
+                begin = filename;
+            else
+                begin++;
+
+            length = (ssize_t)strlen(begin);
+            struct target t;
+            void *test = memcpy(&t.compare, begin, length);
+            t.compare[length] = '\0';
+            (void)test;
+
+            struct target *ret = (struct target *)avl_search_lock(&process_tree, (avl *)&t);
+            if(ret) {
+                netdata_publish_process_syscall_t *pa = &publish_apps[ret->idx];
+                if(pa->reset) {
+                    pa->reset = 0;
+
+                    pa->popen_call = pa->nopen_call;
+                    pa->nopen_call = 0;
+
+                    pa->pwrite_call = pa->nwrite_call;
+                    pa->nwrite_call = 0;
+
+                    pa->pread_call = pa->nread_call;
+                    pa->nread_call = 0;
+
+                    pa->punlink_call = pa->nunlink_call;
+                    pa->nunlink_call = 0;
+
+                    pa->pexit_call = pa->nexit_call;
+                    pa->nexit_call = 0;
+
+                    pa->prelease_call = pa->nrelease_call;
+                    pa->nrelease_call = 0;
+
+                    pa->pfork_call = pa->nfork_call;
+                    pa->nfork_call = 0;
+
+                    pa->pwrite_bytes =  pa->nwrite_bytes;
+                    pa->nwrite_bytes = 0;
+
+                    pa->pread_bytes =  pa->nread_bytes;
+                    pa->nread_bytes = 0;
+
+                    pa->popen_err = pa->popen_err;
+                    pa->nopen_err = 0;
+
+                    pa->pwrite_err = pa->pwrite_err;
+                    pa->nwrite_err = 0;
+
+                    pa->pread_err = pa->pread_err;
+                    pa->nread_err = 0;
+
+                    pa->punlink_err = pa->punlink_err;
+                    pa->nunlink_err = 0;
+                }
+
+                pa->nopen_call += in->open_call;
+                pa->nwrite_call += in->write_call;
+                pa->nread_call += in->read_call;
+                pa->nunlink_call += in->unlink_call;
+                pa->nexit_call += in->exit_call;
+                pa->nrelease_call += in->release_call;
+                pa->nfork_call += in->fork_call;
+
+                pa->nwrite_bytes += in->write_bytes;
+                pa->nread_bytes += in->read_bytes;
+
+                pa->nopen_err += in->open_err;
+                pa->nwrite_err += in->write_err;
+                pa->nread_err += in->read_err;
+                pa->nunlink_err += in->unlink_err;
+            }
+        }
+
+        close(fd);
+    }
 }
 
-static void move_from_kernel2user() {
-    move_from_kernel2user_global();
-
-    move_from_kernel2user_apps();
-
-    /*
-    struct netdata_pid_stat_t nps;
-
-    uint64_t call[NETDATA_MAX_FILE_VECTOR], bytes[2];
-    uint32_t ecall[NETDATA_MAX_FILE_VECTOR];
-
-    memset(call, 0, sizeof(call));
-    memset(bytes, 0, sizeof(bytes));
-    memset(ecall, 0, sizeof(ecall));
-
+static void move_from_kernel2user_apps()
+{
     DIR *dir = opendir("/proc");
     if (!dir)
         return;
@@ -674,42 +872,32 @@ static void move_from_kernel2user() {
         long int val = strtol(de->d_name, NULL, 10);
         if (val != LONG_MIN && val != LONG_MAX) {
             uint32_t tid = (uint32_t )val;
+            struct netdata_pid_stat_t nps;
             if(!bpf_map_lookup_elem(map_fd[0], &tid, &nps)) {
-                call[0] += nps.open_call;
-                ecall[0] += nps.open_err;
-
-                call[1] += nps.unlink_call;
-                ecall[1] += nps.unlink_err;
-
-                call[2] += nps.write_call;
-                ecall[2] += nps.write_err;
-                bytes[0] += nps.write_bytes;
-
-                call[3] += nps.read_call;
-                ecall[3] += nps.read_err;
-                bytes[1] += nps.read_bytes;
-
-                call[4] += nps.exit_call;
+                netdata_update_publish_apps(tid, &nps);
             }
         }
     }
-
     closedir(dir);
 
-    aggregated_data[0].call = call[0];
-    aggregated_data[1].call = call[1];
-    aggregated_data[2].call = call[2];
-    aggregated_data[3].call = call[3];
-    aggregated_data[4].call = call[4];
+    netdata_publish_process_syscall_t *pa = publish_apps;
+    while(pa) {
+        pa->wopen = (long long) (pa->nopen_call - pa->popen_call);
+        pa->wwrite = (long long) (pa->nwrite_call - pa->pwrite_call);
+        pa->wread = (long long) (pa->nread_call - pa->pread_call);
+        pa->wunlink = (long long) (pa->nunlink_call - pa->punlink_call);
+        pa->wfork = (long long) (pa->nfork_call - pa->pfork_call);
+        pa->wzombie = (long long) (pa->nexit_call - pa->prelease_call);
 
-    aggregated_data[0].ecall = ecall[0];
-    aggregated_data[1].ecall = ecall[1];
-    aggregated_data[2].ecall = ecall[2];
-    aggregated_data[3].ecall = ecall[3];
+        pa = pa->next;
+    }
+}
 
-    aggregated_data[2].bytes = bytes[0];
-    aggregated_data[3].bytes = bytes[1];
-     */
+static void move_from_kernel2user()
+{
+    move_from_kernel2user_global();
+
+    move_from_kernel2user_apps();
 }
 
 void *vfs_collector(void *ptr)
@@ -747,7 +935,6 @@ void set_global_labels() {
         }
         prev = &is[i];
 
-        pio[i].reset = 1;
         pio[i].dimension = file_names[i];
         if(publish_prev) {
             publish_prev->next = &pio[i];
@@ -760,9 +947,8 @@ void set_apps_labels() {
     netdata_syscall_stat_t *is = apps_data;
     netdata_syscall_stat_t *prev = NULL;
 
-    netdata_publish_syscall_t *pio = publish_apps;
-    netdata_publish_syscall_t *publish_prev = NULL;
-
+    netdata_publish_process_syscall_t *pio = publish_apps;
+    netdata_publish_process_syscall_t *publish_prev = NULL;
     struct target *w = apps_groups_root_target;
     int i = 0;
     while (w) {
@@ -800,7 +986,7 @@ int allocate_global_vectors() {
             return -1;
         }
 
-        publish_apps = callocz(apps_dimension, sizeof(netdata_publish_syscall_t));
+        publish_apps = callocz(apps_dimension, sizeof(netdata_publish_process_syscall_t));
         if(!publish_apps) {
             return -1;
         }
