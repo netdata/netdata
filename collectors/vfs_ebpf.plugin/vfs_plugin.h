@@ -135,18 +135,18 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_APPS_FAMILY "apps"
 # define NETDATA_WEB_GROUP "vfs"
 
-# define NETDATA_VFS_FILE_OPEN_COUNT "Open_files"
-# define NETDATA_VFS_FILE_CLEAN_COUNT "Delete_files"
-# define NETDATA_VFS_FILE_WRITE_COUNT "Write2files"
-# define NETDATA_VFS_FILE_READ_COUNT "Read2files"
-# define NETDATA_VFS_FILE_ERR_COUNT "Error_call"
+# define NETDATA_VFS_FILE_OPEN_COUNT "open_files"
+# define NETDATA_VFS_FILE_CLEAN_COUNT "delete_files"
+# define NETDATA_VFS_FILE_WRITE_COUNT "write2files"
+# define NETDATA_VFS_FILE_READ_COUNT "read2files"
+# define NETDATA_VFS_FILE_ERR_COUNT "error_call"
 
-# define NETDATA_EXIT_SYSCALL "Exit_process"
-# define NETDATA_PROCESS_SYSCALL "Start_process"
+# define NETDATA_EXIT_SYSCALL "exit_process"
+# define NETDATA_PROCESS_SYSCALL "start_process"
 
-# define NETDATA_VFS_IO_FILE_BYTES "File_IO_Bytes"
-# define NETDATA_VFS_DIM_IN_FILE_BYTES "Write"
-# define NETDATA_VFS_DIM_OUT_FILE_BYTES "Read"
+# define NETDATA_VFS_IO_FILE_BYTES "file_IO_Bytes"
+# define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
+# define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
 
 # define NETDATA_MAX_PROCESSOR 128
 
