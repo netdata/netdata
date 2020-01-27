@@ -740,6 +740,7 @@ static void move_from_kernel2user_global() {
         }
     }
 
+    error("KILLME TOTAL: (%u, %u)", res[0], res[1]);
     aggregated_data[0].call = res[0]; //open
     aggregated_data[1].call = res[8]; //unlink
     aggregated_data[2].call = res[2]; //write
@@ -831,21 +832,22 @@ static void netdata_update_publish_apps(uint32_t pid, struct netdata_pid_stat_t 
                     pa->nunlink_err = 0;
                 }
 
-                pa->nopen_call += in->open_call;
-                pa->nwrite_call += in->write_call;
-                pa->nread_call += in->read_call;
-                pa->nunlink_call += in->unlink_call;
-                pa->nexit_call += in->exit_call;
-                pa->nrelease_call += in->release_call;
-                pa->nfork_call += in->fork_call;
+                pa->nopen_call = in->open_call;
+                error("KILLME APPS %s %d: (%lu, %lu) %ld", ret->name, ret->idx, pa->popen_call, pa->nopen_call, (long)in->open_call);
+                pa->nwrite_call = in->write_call;
+                pa->nread_call = in->read_call;
+                pa->nunlink_call = in->unlink_call;
+                pa->nexit_call = in->exit_call;
+                pa->nrelease_call = in->release_call;
+                pa->nfork_call = in->fork_call;
 
-                pa->nwrite_bytes += in->write_bytes;
-                pa->nread_bytes += in->read_bytes;
+                pa->nwrite_bytes = in->write_bytes;
+                pa->nread_bytes = in->read_bytes;
 
-                pa->nopen_err += in->open_err;
-                pa->nwrite_err += in->write_err;
-                pa->nread_err += in->read_err;
-                pa->nunlink_err += in->unlink_err;
+                pa->nopen_err = in->open_err;
+                pa->nwrite_err = in->write_err;
+                pa->nread_err = in->read_err;
+                pa->nunlink_err = in->unlink_err;
             }
         }
 
@@ -887,7 +889,7 @@ static void move_from_kernel2user_apps()
         pa->wread = (long long) (pa->nread_call - pa->pread_call);
         pa->wunlink = (long long) (pa->nunlink_call - pa->punlink_call);
         pa->wfork = (long long) (pa->nfork_call - pa->pfork_call);
-        pa->wzombie = (long long) (pa->nexit_call - pa->prelease_call);
+        pa->wzombie = (long long) (pa->nexit_call - pa->nrelease_call);
 
         pa = pa->next;
     }
@@ -895,9 +897,9 @@ static void move_from_kernel2user_apps()
 
 static void move_from_kernel2user()
 {
-    move_from_kernel2user_global();
-
     move_from_kernel2user_apps();
+
+    move_from_kernel2user_global();
 }
 
 void *vfs_collector(void *ptr)
