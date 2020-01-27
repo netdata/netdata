@@ -178,6 +178,15 @@ These are options dedicated to badges:
 
     Divide the value with this number. The default is `1`.
 
+-   Color Customisation Prameters Overview
+
+    Following parameters specify collors of each individual part of the badge. Each parameter is documented in detail below.
+
+    | Area of Badge | Backgroud Color Parameter | Text Color Parameter |
+    | ---: | :---: | :---: |
+    | Label (left) part | `label_color` | `text_color_lbl` |
+    | Value (right) part | `value_color` | `text_color_val` |
+
 -   `label_color=COLOR`
 
     The color of the label (the left part). You can use any HTML color in `RGB` or `RRGGBB` hex notation (without `#` character in beginning). Additionally you can use one of the following predefined colors (and you can use them by their name):
