@@ -66,6 +66,27 @@ static inline void lws_wss_packet_buffer_free(struct lws_wss_packet_buffer *item
 	free(item);
 }
 
+static inline void _aclk_lws_wss_read_buffer_clear()
+{
+	size_t elems = lws_ring_get_count_waiting_elements(aclk_lws_wss_read_ringbuffer, NULL);
+	lws_ring_consume(aclk_lws_wss_read_ringbuffer, NULL, NULL, elems);
+}
+
+static inline void _aclk_lws_wss_write_buffer_clear()
+{
+	struct lws_wss_packet_buffer *i;
+	while(i = lws_wss_packet_buffer_pop(&aclk_lws_wss_write_buffer_head)) {
+		lws_wss_packet_buffer_free(i);
+	}
+	aclk_lws_wss_write_buffer_head = NULL;
+}
+
+static inline void aclk_lws_wss_clear_io_buffers()
+{
+	_aclk_lws_wss_read_buffer_clear();
+	_aclk_lws_wss_write_buffer_clear();
+}
+
 static const struct lws_protocols protocols[] = {
 	{
 		"aclk-wss",
@@ -196,6 +217,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		}
 		//no break here on purpose we want to continue with LWS_CALLBACK_WSI_DESTROY
 	case LWS_CALLBACK_WSI_DESTROY:
+		aclk_lws_wss_clear_io_buffers();
 		inst->lws_wsi = NULL;
 		inst->websocket_connection_up = 0;
 		break;
