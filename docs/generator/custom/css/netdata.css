@@ -305,12 +305,68 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     margin: 0;
 }
 
+/*  Custom styling for the installation page. */
+
+.install-nav-buttons {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-around;
+    margin-top: 1.4rem;
+}
+
+.install-nav-buttons div {
+    flex: 1;
+    min-width: 300px;
+}
+
+.install-nav-buttons div:first-of-type {
+    flex: 1 100%;
+}
+
+.install-nav-buttons div:first-of-type .inner {
+    max-width: 400px;
+    margin: 0 auto;
+    margin-bottom: 1rem;
+}
+
+.install-nav-buttons > div:last-of-type {
+    margin-left: 2rem;
+}
+
+/*  Custom styling for the installation page. */
+
+.install-nav-buttons {
+    display: flex;
+    flex-flow: row wrap;
+    justify-content: space-around;
+    margin-top: 1.4rem;
+}
+
+.install-nav-buttons div {
+    flex: 1;
+    min-width: 300px;
+}
+
+.install-nav-buttons div:first-of-type {
+    flex: 1 100%;
+}
+
+.install-nav-buttons div:first-of-type .inner {
+    max-width: 400px;
+    margin: 0 auto;
+    margin-bottom: 1rem;
+}
+
+.install-nav-buttons > div:last-of-type {
+    margin-left: 2rem;
+}
+
 .nav-button {
     border: 2px solid black;
     border-radius: 4px;
     display: block;
     font-weight: 700;
-    margin: 0 auto;
+    margin: 0 auto -0.4rem auto;
     padding: 0.6rem 0;
     text-align: center;
 }
@@ -333,26 +389,13 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     word-break: normal;
 }
 
-/* Give code blocks a little more line height */
-.md-typeset pre {
-    line-height: 1.6;
+/* Make the clipboard button a little darker. */
+.md-clipboard::before {
+    color: #546e7a;
 }
 
-/* Show line numbers. */
-[data-linenos]:before {
-    border-right: .0625rem solid #ddd;
-    color: #999;
-    content: attr(data-linenos);
-    display: inline-block;
-    margin-left: -1.2rem;
-    margin-right: .7rem;
-    padding-left: 1.2rem;
-}
-
-.md-typeset .highlight .hll {
-    display: inline;
-    margin: 0;
-    padding: 0;
+.md-clipboard:focus::before {
+    color: #546e7a;
 }
 
 /* Underline links, but not badges/icons. */
@@ -384,4 +427,55 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
 /* Fix the font size of admonition and details sections. */
 .md-typeset .admonition, .md-typeset details {
     font-size: 0.75rem;
+}
+
+/*
+   Installer grid
+*/
+
+/* Installation / OS and method grid */
+.installer-grid {
+    display: grid;
+    grid-template-columns: repeat(4, [col-start] 1fr);
+    grid-gap: 2rem;
+}
+
+.grid-item {
+    grid-column: span 2;
+    border-radius: 2px;
+    border: 1px solid black;
+    padding: 1rem;
+}
+
+@media only screen and (max-width:76.25em) {
+    .grid-item {
+        grid-column: span 4;
+    }
+}
+
+.md-typeset .grid-item img {
+    border: 0;
+    display: inline;
+    margin: 0 1rem 0 0;
+    max-height: 52px;
+    vertical-align: middle;
+}
+
+.grid-item h3 {
+    margin-top: 0;
+}
+
+.grid-item ul {
+    margin-bottom: 0;
+}
+
+.grid-item ul li {
+    list-style-type: disclosure-closed;
+    margin: 0;
+}
+
+.md-typeset .grid-item li a {
+    border-bottom: 0px !important;
+    text-decoration: none;
+    display: inline;
 }

@@ -53,10 +53,9 @@ modal](https://user-images.githubusercontent.com/12263278/64876743-be957a00-d647
 
 If an update is available, you'll see a modal similar to the one above.
 
-When you use the [automatic one-line installer script](../../packaging/installer/README.md#one-line-installation),
-Netdata will automatically attempt to update every day. If you choose to update it manually, there are [several
-well-documented methods](../../packaging/installer/UPDATE.md) to achieve that. However, it is best practice for you to
-first go over the [changelog](../../CHANGELOG.md).
+When you use the [automatic one-line installer script](../../packaging/installer/README.md) attempt to update every day.
+If you choose to update it manually, there are [several well-documented methods](../../packaging/installer/UPDATE.md) to
+achieve that. However, it is best practice for you to first go over the [changelog](../../CHANGELOG.md).
 
 ## Export and import a snapshot
 

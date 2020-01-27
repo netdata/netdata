@@ -16,7 +16,7 @@ source](../demo.html)**.
 
 You should also look at the [custom dashboard
 template](https://my-netdata.io/dashboard.html), which contains samples of all
-supported charts. The code is [here](../dashboard.html). 
+supported charts. The code is [here](../dashboard.html).
 
 If you plan to put the dashboard on TV, check out [tv.html](../tv.html). Here's
 is a screenshot of it, monitoring two servers on the same page:
@@ -65,7 +65,11 @@ header:
 
 ## Dash (Multi-Host Dashboard)
 
-`dash-example.html` is an all-in-one page that automatically fetches graphs from all your hosts. Just add your graphs and charts (or use the defaults) one time using the `dash-*` syntax and it will be automatically replicated for all of your hosts; showing alarms and graphs for all your hosts on **one page!**
+`dash-example.html` is an all-in-one page that automatically fetches graphs from all your hosts. Just add your graphs and charts (or use the defaults) one time using the `dash-*` syntax, and your selections will be automatically replicated for all of your hosts; showing alarms and graphs for all your hosts on **one page!**
+
+__**Dash will only work if you have implemented netdata streaming using `stream.conf`**__
+
+`dash-example.html` was created as an experiment to demonstrate the capabilities of netdata in a multi-host environment. If you desire more features, submit a pull request or check out Netdata Cloud!
 
 ### Configure Dash
 
@@ -74,29 +78,31 @@ First, rename the file so it doesn't get overwritten. For instance, with a webro
 cp /usr/share/netdata/web/dash-example.html /usr/share/netdata/web/dash.html
 ```
 
-Change the following line in `dash.html` to reflect your URLs. The second URL is used if you access your netdata dashboard from a reverse proxy. The reverse proxy URL is optional, if it is not set then both will use the netdata host URL.
+Find and change the following line in `dash.html` to reflect your Netdata URLs. The second URL is only used if you access your Netdata dashboard through a reverse proxy. The reverse proxy URL is optional; if it is not set then both will use the Netdata host URL.
 
 ```js
 /*
 * TUTORIAL: Change this to the URL of your netdata host
 * If you use netdata behind a reverse proxy, add a second parameter for the reverse proxy url like so:
-* 		new Dash('http://localhost:19999', 'https://my-domain.com/stats');
+*         new Dash('http://localhost:19999', 'https://my-domain.com/stats');
 */
 var dash = new Dash('http://localhost:19999');
 ```
 
-If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. child divs will be generated to create your graph/chart:
-```
-<div class="dash-graph"                     <---- 	Use class dash-graph for line graphs, etc
-	data-dash-netdata="system.cpu"          <---- 	REQUIRED: Use data-dash-netdata to set the data source
-	data-dygraph-valuerange="[0, 100]">     <---- 	OPTIONAL: This overrides the default config. Any other data-* attributes will
-</div>								                          be added to the generated div, so you can set any desired options here
+### The `dash-*` Syntax
 
-<div class="dash-chart"                     <---- 	Use class dash-chart for pie charts, etc. CHARTS ARE SQUARE
-	data-dash-netdata="system.io"           <---- 	REQUIRED: Use data-dash-netdata to set the data source
-	data-dimensions="in"                    <---- 	Use this to override or append default options
-	data-title="Disk Read"                  <---- 	Use this to override or append default options
-	data-common-units="dash.io">			<---- 	Use this to override or append default options
+If you want to change the graphs or styling to fit your needs, just add an element to the page as shown. Child divs will be generated to create your graph/chart:
+```
+<div class="dash-graph"                     <----     Use class dash-graph for line graphs, etc
+    data-dash-netdata="system.cpu"          <----     REQUIRED: Use data-dash-netdata to set the data source
+    data-dygraph-valuerange="[0, 100]">     <----     OPTIONAL: This overrides the default config. Any other data-* attributes will
+</div>                                                          be added to the generated div, so you can set any desired options here
+
+<div class="dash-chart"                     <----     Use class dash-chart for pie charts, etc. CHARTS ARE SQUARE
+    data-dash-netdata="system.io"           <----     REQUIRED: Use data-dash-netdata to set the data source
+    data-dimensions="in"                    <----     Use this to override or append default options
+    data-title="Disk Read"                  <----     Use this to override or append default options
+    data-common-units="dash.io">            <----     Use this to override or append default options
 </div>
 ```
 
@@ -104,7 +110,7 @@ To change the sizes of graphs and charts, find the `Dash.options` object in `das
 ```js
 /*
 * TUTORIAL: Change your graph/chart dimensions here. Host columns will automatically adjust.
-* 			Charts are square! Their width is the same as their height.
+*           Charts are square! Their width is the same as their height.
 */
 this.options = {
     graph_width: '40em',
@@ -114,6 +120,10 @@ this.options = {
 ```
 
 To change the display order of your hosts, which is saved in localStorage, click the settings gear in the lower right corner
+
+We hope you like it!
+
+---
 
 
 ## dashboard.js
