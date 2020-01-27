@@ -255,6 +255,18 @@ int health_variable_lookup(const char *variable, uint32_t hash, RRDCALC *rc, cal
     if(ret)
         return 1;
 
+    rv = rrdvar_index_find(&st->rrdfamily->rrdvar_root_index, variable, hash);
+    if(rv) {
+        *result = rrdvar2number(rv);
+        return 1;
+    }
+
+    rv = rrdvar_index_find(&host->rrdvar_root_index, variable, hash);
+    if(rv) {
+        *result = rrdvar2number(rv);
+        return 1;
+    }
+
     return 0;
 }
 
