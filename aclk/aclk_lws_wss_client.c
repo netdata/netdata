@@ -171,6 +171,20 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 {
 	struct aclk_lws_wss_engine_instance *inst = lws_context_user(lws_get_context(wsi));
 	struct lws_wss_packet_buffer *data;
+	int retval = 0;
+
+	if( !inst ) {
+		error("Callback received without any aclk_lws_wss_engine_instance!");
+		return -1;
+	}
+
+	if( inst->upstream_reconnect_request ) {
+		error("Closing lws connectino due to libmosquitto error.");
+		char *upstream_connection_error = "MQTT protocol error. Closing underlying wss connection.";
+		lws_close_reason(wsi, LWS_CLOSE_STATUS_PROTOCOL_ERR, upstream_connection_error, strlen(upstream_connection_error));
+		retval = -1;
+		inst->upstream_reconnect_request = 0;
+	}
 
 	switch (reason) {
 	case LWS_CALLBACK_CLIENT_WRITEABLE:
@@ -184,7 +198,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		break;
 	case LWS_CALLBACK_CLIENT_RECEIVE:
 		if(!received_data_to_ringbuff(in, len))
-			return 1;
+			retval = 1;
 		inst->data_to_read = 1; //to inform logic above there is reason to call mosquitto_loop_read
 		break;
 	case LWS_CALLBACK_PROTOCOL_INIT:
@@ -196,10 +210,6 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 	case LWS_CALLBACK_SERVER_NEW_CLIENT_INSTANTIATED:
 		//TODO if already active make some error noise
 		//currently we expect only one connection per netdata
-		if(!inst) {
-			//TODO Error
-			return 1;
-		}
 		inst->lws_wsi = wsi;
 		break;
 	case LWS_CALLBACK_USER:
@@ -227,7 +237,7 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 			inst->connection_established_callback();
 		break;
 	}
-	return 0; //0-OK, other connection should be closed!
+	return retval; //0-OK, other connection should be closed!
 }
 
 int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count)
@@ -263,4 +273,15 @@ int aclk_lws_wss_client_read(struct aclk_lws_wss_engine_instance *inst, void *bu
 int aclk_lws_wss_service_loop(struct aclk_lws_wss_engine_instance *inst)
 {
 	return lws_service(inst->lws_context, 0);
+}
+
+// in case the MQTT connection disconnect while lws transport is still operational
+// we should drop connection and reconnect
+// this function should be called when that happens to notify lws of that situation
+int aclk_lws_wss_mqtt_layer_disconect_notif(struct aclk_lws_wss_engine_instance *inst)
+{
+	if(inst->lws_wsi && inst->websocket_connection_up) {
+		inst->upstream_reconnect_request = 1;
+		lws_callback_on_writable(inst->lws_wsi); //here we just do it to ensure we get callback called from lws, we don't need any actual data to be written.
+	}
 }

@@ -12,6 +12,7 @@ struct aclk_lws_wss_engine_instance {
 	int websocket_connection_up;
 	int reconnect_timeout_running;
 	int data_to_read;
+	int upstream_reconnect_request;
 };
 
 struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (void (*connection_established_callback)());
@@ -19,5 +20,7 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (void (*connection
 int aclk_lws_wss_client_write(struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);
 int aclk_lws_wss_client_read (struct aclk_lws_wss_engine_instance *inst, void *buf, size_t count);
 int aclk_lws_wss_service_loop(struct aclk_lws_wss_engine_instance *inst);
+
+int aclk_lws_wss_mqtt_layer_disconect_notif(struct aclk_lws_wss_engine_instance *inst);
 
 #endif
