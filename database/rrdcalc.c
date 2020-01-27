@@ -203,13 +203,13 @@ inline void rrdsetcalc_unlink(RRDCALC *rc, struct rrdcalc_rrdset_alarm *search) 
 
     rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_family, (avl *)search);
     if(rra) {
-        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->local);
+        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->family);
     }
     rc->family = NULL;
 
     rra = (struct rrdcalc_rrdset_alarm *)avl_search_lock(&host->alarms_idx_health_hostid, (avl *)search);
     if(rra) {
-        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->local);
+        rrdvar_free(host, &rra->rrdvar_alarm_index, rc->hostid);
         rrdvar_free(host, &rra->rrdvar_alarm_index, rc->hostname);
     }
     rc->hostid = NULL;
