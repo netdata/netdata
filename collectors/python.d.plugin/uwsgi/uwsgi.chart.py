@@ -5,8 +5,8 @@
 
 import json
 from copy import deepcopy
-from bases.FrameworkServices.SocketService import SocketService
 
+from bases.FrameworkServices.SocketService import SocketService
 
 ORDER = [
     'requests',

@@ -6,11 +6,21 @@
 
 **Merged pull requests:**
 
+- python.d/retroshare: add readme [\#7849](https://github.com/netdata/netdata/pull/7849) ([ilyam8](https://github.com/ilyam8))
+- Fixed typo in README [\#7843](https://github.com/netdata/netdata/pull/7843) ([Jiab77](https://github.com/Jiab77))
+- Update collect-apache-nginx-web-logs.md to deprecated [\#7835](https://github.com/netdata/netdata/pull/7835) ([joelhans](https://github.com/joelhans))
+- collectors/python.d: format modules code [\#7832](https://github.com/netdata/netdata/pull/7832) ([ilyam8](https://github.com/ilyam8))
+- Remove all refernces to .keep files [\#7829](https://github.com/netdata/netdata/pull/7829) ([prologic](https://github.com/prologic))
+- Adds ReviewDog CI checks for JavaScript [\#7828](https://github.com/netdata/netdata/pull/7828) ([prologic](https://github.com/prologic))
+- Don't remove groups/users in Debian postrm [\#7817](https://github.com/netdata/netdata/pull/7817) ([prologic](https://github.com/prologic))
 - node.d/snmp.node.js: format code [\#7816](https://github.com/netdata/netdata/pull/7816) ([ilyam8](https://github.com/ilyam8))
+- Improve the system-info.sh script to report CPU and RAM meta-data. [\#7815](https://github.com/netdata/netdata/pull/7815) ([Ferroin](https://github.com/Ferroin))
+- Attempt to use system service manager to shut down Netdata. [\#7814](https://github.com/netdata/netdata/pull/7814) ([Ferroin](https://github.com/Ferroin))
 - bug\_report improvements [\#7805](https://github.com/netdata/netdata/pull/7805) ([ilyam8](https://github.com/ilyam8))
 - node.d/snmp: snmpv3 support [\#7802](https://github.com/netdata/netdata/pull/7802) ([ilyam8](https://github.com/ilyam8))
 - Fixes install on FreeBSD systems with non GNU sed \(do't use -i\) [\#7796](https://github.com/netdata/netdata/pull/7796) ([prologic](https://github.com/prologic))
 - Adds reviewdog/shellcheck to CI via Github Actions on changed shell scripts in PRs [\#7795](https://github.com/netdata/netdata/pull/7795) ([prologic](https://github.com/prologic))
+- Fix unit tests for the exporting engine [\#7784](https://github.com/netdata/netdata/pull/7784) ([vlvkobal](https://github.com/vlvkobal))
 - Remove unnessecary `echo` call in updater. [\#7783](https://github.com/netdata/netdata/pull/7783) ([Ferroin](https://github.com/Ferroin))
 - Fix CSV -\> SSV in docs [\#7782](https://github.com/netdata/netdata/pull/7782) ([cosmix](https://github.com/cosmix))
 - Fix a Coverity issue [\#7780](https://github.com/netdata/netdata/pull/7780) ([vlvkobal](https://github.com/vlvkobal))
@@ -18,6 +28,7 @@
 - Add a missing parameter to the allmetrics endpoint in Swagger Editor [\#7776](https://github.com/netdata/netdata/pull/7776) ([vlvkobal](https://github.com/vlvkobal))
 - Issue 7488 docker labels [\#7770](https://github.com/netdata/netdata/pull/7770) ([amoss](https://github.com/amoss))
 - Limit PR labeler runs to the main repo. [\#7768](https://github.com/netdata/netdata/pull/7768) ([Ferroin](https://github.com/Ferroin))
+- Add an environment variable check to Travis configuration to allow disabling nightlies. [\#7765](https://github.com/netdata/netdata/pull/7765) ([Ferroin](https://github.com/Ferroin))
 - add swagger docu for `fixed\_width\_lbl` and `fixed\_width\_val` [\#7764](https://github.com/netdata/netdata/pull/7764) ([underhood](https://github.com/underhood))
 - Fix the formatting of the trailer line in the Debian changelog template. [\#7763](https://github.com/netdata/netdata/pull/7763) ([Ferroin](https://github.com/Ferroin))
 - Filter out lxc cgroups which are not useful [\#7760](https://github.com/netdata/netdata/pull/7760) ([vlvkobal](https://github.com/vlvkobal))
@@ -58,6 +69,7 @@
 - redis: populate `keys\_redis` chart in runtime [\#7639](https://github.com/netdata/netdata/pull/7639) ([ilyam8](https://github.com/ilyam8))
 - Minor: Documentation Typo alamrs -\> alarms [\#7637](https://github.com/netdata/netdata/pull/7637) ([underhood](https://github.com/underhood))
 - Update the distribution support matrix to represent reality. [\#7636](https://github.com/netdata/netdata/pull/7636) ([Ferroin](https://github.com/Ferroin))
+- Fix install permissions [\#7632](https://github.com/netdata/netdata/pull/7632) ([Ferroin](https://github.com/Ferroin))
 - Switch PR labeling to use GitHub Actions. [\#7630](https://github.com/netdata/netdata/pull/7630) ([Ferroin](https://github.com/Ferroin))
 - Add Ubuntu 19.10 to packaging and lifecycle checks. [\#7629](https://github.com/netdata/netdata/pull/7629) ([Ferroin](https://github.com/Ferroin))
 - Remove EOL distros from CI jobs. [\#7628](https://github.com/netdata/netdata/pull/7628) ([Ferroin](https://github.com/Ferroin))
@@ -91,15 +103,11 @@
 - Limit 'support activities on main branch' to main repo. [\#7543](https://github.com/netdata/netdata/pull/7543) ([Ferroin](https://github.com/Ferroin))
 - Fix backend config [\#7538](https://github.com/netdata/netdata/pull/7538) ([vlvkobal](https://github.com/vlvkobal))
 - Fix race condition in dbengine [\#7533](https://github.com/netdata/netdata/pull/7533) ([mfundul](https://github.com/mfundul))
-- Fix valgrind errors [\#7532](https://github.com/netdata/netdata/pull/7532) ([mfundul](https://github.com/mfundul))
 - Update codeowners [\#7530](https://github.com/netdata/netdata/pull/7530) ([knatsakis](https://github.com/knatsakis))
 - Docs: Linter fixes for main README [\#7526](https://github.com/netdata/netdata/pull/7526) ([joelhans](https://github.com/joelhans))
 - Agent claiming [\#7525](https://github.com/netdata/netdata/pull/7525) ([mfundul](https://github.com/mfundul))
 - Add Fedora 31 CI integrations. [\#7524](https://github.com/netdata/netdata/pull/7524) ([Ferroin](https://github.com/Ferroin))
 - Labels issues [\#7515](https://github.com/netdata/netdata/pull/7515) ([amoss](https://github.com/amoss))
-- Update Netdata RPM spec file to package netdatacli. [\#7513](https://github.com/netdata/netdata/pull/7513) ([Ferroin](https://github.com/Ferroin))
-- Remove `-f` option from `groupdel` in uninstaller. [\#7507](https://github.com/netdata/netdata/pull/7507) ([Ferroin](https://github.com/Ferroin))
-- Force the repo name to be lowercase in the tag for docker builds. [\#7506](https://github.com/netdata/netdata/pull/7506) ([Ferroin](https://github.com/Ferroin))
 - The step-by-step Netdata tutorial [\#7489](https://github.com/netdata/netdata/pull/7489) ([joelhans](https://github.com/joelhans))
 - silencers\_info: Change error to info [\#7479](https://github.com/netdata/netdata/pull/7479) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add anon tracking notice for installers [\#7437](https://github.com/netdata/netdata/pull/7437) ([ncmans](https://github.com/ncmans))
@@ -158,24 +166,10 @@
 - contrib/debian: Fix typo in Description [\#7154](https://github.com/netdata/netdata/pull/7154) ([arkamar](https://github.com/arkamar))
 - Update alarm-notify.sh to enable IRC notifications [\#7148](https://github.com/netdata/netdata/pull/7148) ([Strykar](https://github.com/Strykar))
 - detect if the disk cannot keep up with data collection [\#7139](https://github.com/netdata/netdata/pull/7139) ([mfundul](https://github.com/mfundul))
-- Fixing DNS-lookup performance issue on FreeBSD. [\#7132](https://github.com/netdata/netdata/pull/7132) ([amoss](https://github.com/amoss))
-- Add user information to MySQL Python module documentation [\#7128](https://github.com/netdata/netdata/pull/7128) ([prhomhyse](https://github.com/prhomhyse))
-- Results of the spike investigation into CMake. [\#7114](https://github.com/netdata/netdata/pull/7114) ([amoss](https://github.com/amoss))
 
 ## [v1.18.1](https://github.com/netdata/netdata/tree/v1.18.1) (2019-10-18)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.18.0...v1.18.1)
-
-**Merged pull requests:**
-
-- Fix build when CMocka isn't installed [\#7129](https://github.com/netdata/netdata/pull/7129) ([vlvkobal](https://github.com/vlvkobal))
-- Fixing broken links in docs [\#7123](https://github.com/netdata/netdata/pull/7123) ([joelhans](https://github.com/joelhans))
-- Convert recursion timings to miliseconds. [\#7121](https://github.com/netdata/netdata/pull/7121) ([Ferroin](https://github.com/Ferroin))
-- Fix upgrade path from v1.17.1 to v1.18.x for deb packages [\#7118](https://github.com/netdata/netdata/pull/7118) ([knatsakis](https://github.com/knatsakis))
-- Fix CPU charts in apps plugin on FreeBSD [\#7115](https://github.com/netdata/netdata/pull/7115) ([vlvkobal](https://github.com/vlvkobal))
-- unbound: fix init [\#7112](https://github.com/netdata/netdata/pull/7112) ([ilyam8](https://github.com/ilyam8))
-- Add VMware VMXNET3 driver to the default interafaces list [\#7109](https://github.com/netdata/netdata/pull/7109) ([samm-git](https://github.com/samm-git))
-- megacli: search binary and sudo check fix [\#7108](https://github.com/netdata/netdata/pull/7108) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.18.0](https://github.com/netdata/netdata/tree/v1.18.0) (2019-10-10)
 
