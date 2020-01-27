@@ -1179,3 +1179,12 @@ int    aclk_update_chart(RRDHOST *host, char *chart_name)
     aclk_queue_query("_chart", host->hostname, NULL, chart_name, 2, 1);
     return 0;
 }
+
+int    aclk_update_alarm(RRDHOST *host, char *alarm_name)
+{
+    if (host != localhost)
+        return 0;
+
+    aclk_queue_query("_alarm", host->hostname, NULL, alarm_name, 2, 1);
+    return 0;
+}
