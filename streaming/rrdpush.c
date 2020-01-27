@@ -664,8 +664,10 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     http[received] = '\0';
     int answer = -1;
     char *version_start = strchr(http, '=');
+    uint32_t version;
     if(version_start) {
         version_start++;
+        version = (uint32_t)strtol(version_start, NULL, 10);
         answer = memcmp(http, START_STREAMING_PROMPT_VN, (size_t)(version_start - http));
         if(!answer) {
             rrdpush_set_flags_to_newest_stream(host);
@@ -674,14 +676,15 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
     } else {
         answer = memcmp(http, START_STREAMING_PROMPT_V2, strlen(START_STREAMING_PROMPT_V2));
         if(!answer) {
+            version = 1;
             rrdpush_set_flags_to_newest_stream(host);
         }
         else {
             answer = memcmp(http, START_STREAMING_PROMPT, strlen(START_STREAMING_PROMPT));
             if(!answer) {
+                version = 0;
                 host->labels_flag |= LABEL_FLAG_STOP_STREAM;
                 host->labels_flag &= ~LABEL_FLAG_UPDATE_STREAM;
-                info("STREAM %s [send to %s]: is using an old Netdata.", host->hostname,  connected_to);
             }
         }
     }
@@ -692,7 +695,10 @@ static int rrdpush_sender_thread_connect_to_master(RRDHOST *host, int default_po
         return 0;
     }
 
-    info("STREAM %s [send to %s]: established communication - ready to send metrics...", host->hostname, connected_to);
+    info("STREAM %s [send to %s]: established communication with a master using protocol version %u - ready to send metrics..."
+         , host->hostname
+         , connected_to
+         , version);
 
     if(sock_setnonblock(host->rrdpush_sender_socket) < 0)
         error("STREAM %s [send to %s]: cannot set non-blocking mode for socket.", host->hostname, connected_to);
