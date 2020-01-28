@@ -304,7 +304,7 @@ if [ "${KERNEL_NAME}" = "Darwin" ]; then
         fi
 
         DISK_DETECTION="df"
-        total="$(df -t ${types} -k | tail -n +1 | awk '{s+=$2} END {print s}')"
+        total="$(/bin/df -k -t ${types} | tail -n +1 | awk '{s+=$2} END {print s}')"
         DISK_SIZE="$((total * 1024))"
 elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         types='ufs'
