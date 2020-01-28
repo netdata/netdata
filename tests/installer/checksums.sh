@@ -7,6 +7,7 @@
 #
 # Author  : Pawel Krupa (pawel@netdata.cloud)
 # Author  : Pavlos Emm. Katsoulakis (paul@netdata.cloud)
+# Author  : Austin S. Hemmelgarn (austin@netdata.cloud)
 set -e
 
 # If we are not in netdata git repo, at the top level directory, fail
@@ -18,14 +19,12 @@ if [ -n "$CWD" ] || [ "${TOP_LEVEL}" != "netdata" ]; then
 	exit 1
 fi
 
-README_DOC="packaging/installer/README.md"
-
-for file in kickstart.sh kickstart-static64.sh; do
-	README_MD5=$(grep "$file" $README_DOC | grep md5sum | cut -d '"' -f2)
-	KICKSTART_URL="https://my-netdata.io/$file"
-	KICKSTART="packaging/installer/$file"
+check_file() {
+	README_MD5=$(grep "$1" "$2" | grep md5sum | grep curl | cut -d '"' -f2)
+	KICKSTART_URL="https://my-netdata.io/$1"
+	KICKSTART="packaging/installer/$1"
 	KICKSTART_MD5="$(md5sum "${KICKSTART}" | cut -d' ' -f1)"
-	CALCULATED_MD5="$(curl -Ss ${KICKSTART_URL} | md5sum | cut -d ' ' -f 1)"
+	CALCULATED_MD5="$(curl -Ss "${KICKSTART_URL}" | md5sum | cut -d ' ' -f 1)"
 
 	# Conditionally run the website validation
 	if [ -z "${LOCAL_ONLY}" ]; then
@@ -38,15 +37,18 @@ for file in kickstart.sh kickstart-static64.sh; do
 		fi
 	fi
 
-	echo "Validating documentation for $file"
+	echo "Validating documentation for $1"
 	if [ "$KICKSTART_MD5" != "$README_MD5" ]; then
-		echo "Invalid checksum for $file in $README_DOC."
+		echo "Invalid checksum for $1 in $2."
 		echo "checksum in docs: $README_MD5"
 		echo "current checksum: $KICKSTART_MD5"
 		exit 2
 	else
-		echo "$file MD5Sum is well documented"
+		echo "$1 MD5Sum is well documented"
 	fi
+}
 
-done
+check_file kickstart.sh packaging/installer/methods/kickstart.md
+check_file kickstart-static64.sh packaging/installer/methods/kickstart-64.md
+
 echo "No problems found, exiting succesfully!"

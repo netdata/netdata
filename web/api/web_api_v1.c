@@ -2,6 +2,8 @@
 
 #include "web_api_v1.h"
 
+char *api_secret;
+
 static struct {
     const char *name;
     uint32_t hash;

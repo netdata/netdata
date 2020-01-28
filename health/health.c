@@ -9,6 +9,7 @@ struct health_cmdapi_thread_status {
 };
 
 unsigned int default_health_enabled = 1;
+char *silencers_filename;
 
 // ----------------------------------------------------------------------------
 // health initialization
