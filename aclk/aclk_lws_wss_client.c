@@ -106,9 +106,13 @@ static const struct lws_protocols protocols[] = {
  *
  * @return always NULL
  */
-struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (void (*connection_established_callback)()) {
+struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (const struct aclk_lws_wss_engine_callbacks *callbacks) {
 	struct lws_context_creation_info info;
 	struct aclk_lws_wss_engine_instance *inst;
+
+	if(!callbacks)
+		return NULL;
+
 	inst = callocz(1, sizeof(struct aclk_lws_wss_engine_instance));
 	if(!inst)
 		return NULL;
@@ -120,7 +124,7 @@ struct aclk_lws_wss_engine_instance* aclk_lws_wss_client_init (void (*connection
 	info.user = inst;
 	
 	inst->lws_context = lws_create_context(&info);
-	inst->connection_established_callback = connection_established_callback;
+	inst->callbacks = *callbacks;
 	lws_context = inst->lws_context;
 
 	aclk_lws_wss_read_ringbuffer = lws_ring_create(1, ACLK_LWS_WSS_RECV_BUFF_SIZE_BYTES, NULL);
@@ -233,8 +237,8 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 		break;
 	case LWS_CALLBACK_CLIENT_ESTABLISHED:
 		inst->websocket_connection_up = 1;
-		if(inst->connection_established_callback)
-			inst->connection_established_callback();
+		if(inst->callbacks.connection_established_callback)
+			inst->callbacks.connection_established_callback();
 		break;
 	}
 	return retval; //0-OK, other connection should be closed!

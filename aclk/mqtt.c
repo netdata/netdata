@@ -260,6 +260,12 @@ void aclk_lws_connect_notif_callback(){
     _link_mqtt_connect("doesntmatter", 12345);
 }
 
+static const struct aclk_lws_wss_engine_callbacks aclk_lws_engine_callbacks = {
+    .connection_established_callback = aclk_lws_connect_notif_callback,
+    .data_rcvd_callback = NULL,
+    .data_writable_callback = NULL
+};
+
 int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
 {
     int rc;
@@ -268,7 +274,7 @@ int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *
         // we will connect when WebSocket connection is up
         // based on callback
         if(!lws_wss_client_initialized) {
-            lws_engine_instance = aclk_lws_wss_client_init(aclk_lws_connect_notif_callback);
+            lws_engine_instance = aclk_lws_wss_client_init(&aclk_lws_engine_callbacks);
             aclk_lws_wss_service_loop(lws_engine_instance);
             lws_wss_client_initialized = 1;
         }
