@@ -1,41 +1,33 @@
 # phpfpm
 
-This module will monitor one or more php-fpm instances depending on configuration.
+This module will monitor one or more [`PHP-FPM`](https://php-fpm.org/) instances, depending on your configuration.
 
-**Requirements:**
+## Requirements
 
--   php-fpm with enabled `status` page
+-   `PHP-FPM` with [enabled `status` page](https://easyengine.io/tutorials/php/fpm-status-page/)
 -   access to `status` page via web server
+
+## Charts
 
 It produces following charts:
 
-1.  **Active Connections**
+-   Active Connections in `connections`
+-   Requests in `requests/s`
+-   Performance in `status`
+-   Requests Duration Among All Idle Processes in `milliseconds`
+-   Last Request CPU Usage Among All Idle Processes in `percentage`
+-   Last Request Memory Usage Among All Idle Processes in `KB`
 
-    -   active
-    -   maxActive
-    -   idle
+## Configuration
 
-2.  **Requests** in requests/s
-
-    -   requests
-
-3.  **Performance**
-
-    -   reached
-    -   slow
-
-## configuration
-
-Needs only `url` to server's `status`
-
-Here is an example for local instance:
+Needs only `url` to server's `status`. Here is an example for local and remote instances:
 
 ```yaml
-update_every : 3
-priority     : 90100
-
 local:
-  url     : 'http://localhost/status'
+  url     : 'http://localhost/status?full&json'
+
+remote:
+  url     : 'http://203.0.113.10/status?full&json'
 ```
 
 Without configuration, module attempts to connect to `http://localhost/status`
