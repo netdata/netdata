@@ -817,6 +817,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : "");
     buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", (host->system_info->host_os_detection) ? host->system_info->host_os_detection : "");
     buffer_sprintf(wb, "\t\"cores_total\": \"%s\",\n", (host->system_info->host_cores) ? host->system_info->host_cores : "");
+    buffer_sprintf(wb, "\t\"disk_space\": \"%s\",\n", (host->system_info->host_disk_space) ? host->system_info->host_disk_space : "");
     buffer_sprintf(wb, "\t\"cpu_freq\": \"%s\",\n", (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : "");
     buffer_sprintf(wb, "\t\"ram_total\": \"%s\",\n", (host->system_info->host_ram_total) ? host->system_info->host_ram_total : "");
 
