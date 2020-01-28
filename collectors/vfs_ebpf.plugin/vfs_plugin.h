@@ -45,30 +45,31 @@ typedef struct netdata_syscall_kern_stat {
 }netdata_syscall_kern_stat_t;
 
 typedef struct netdata_syscall_stat {
-    unsigned long bytes; //total bytes
-    uint64_t call; //number of calls
-    uint64_t ecall; //number of calls with error
-    struct netdata_syscall_stat  *next;
+    unsigned long bytes;                //total number of bytes
+    uint64_t call;                      //total number of calls
+    uint64_t ecall;                     //number of calls that returned error
+    struct netdata_syscall_stat  *next; //Link list
 }netdata_syscall_stat_t;
 
 struct netdata_pid_stat_t {
-    uint32_t pid;  //process id
+    uint64_t pid_tgid;                  //Kernel unique identifier
+    uint32_t pid;                       //process id
 
-    uint32_t open_call;
-    uint32_t write_call;
-    uint32_t read_call;
-    uint32_t unlink_call;
-    uint32_t exit_call;
-    uint32_t release_call;
-    uint32_t fork_call;
+    uint32_t open_call;                 //Number of calls to do_sys_open
+    uint32_t write_call;                //Number of calls to vfs_write
+    uint32_t read_call;                 //Number of calls to vfs_read
+    uint32_t unlink_call;               //Number of calls to unlink
+    uint32_t exit_call;                 //Number of calls to do_exit
+    uint32_t release_call;              //Number of calls to release_task
+    uint32_t fork_call;                 //Number of calls to do_fork
 
-    uint64_t write_bytes;
-    uint64_t read_bytes;
+    uint64_t write_bytes;               //Total of bytes successfully written to disk
+    uint64_t read_bytes;                //Total of bytes successfully read from disk
 
-    uint32_t open_err;
-    uint32_t write_err;
-    uint32_t read_err;
-    uint32_t unlink_err;
+    uint32_t open_err;                  //Number of times there was error with do_sys_open
+    uint32_t write_err;                 //Number of times there was error with vfs_write
+    uint32_t read_err;                  //Number of times there was error with vfs_read
+    uint32_t unlink_err;                //Number of times there was error with unlink
 };
 
 typedef struct netdata_publish_process_syscall {
@@ -147,6 +148,8 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_VFS_IO_FILE_BYTES "file_IO_Bytes"
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
 # define NETDATA_VFS_DIM_OUT_FILE_BYTES "read"
+
+# define NETDATA_DEVELOPER_LOG_FILE "developer.log"
 
 # define NETDATA_MAX_PROCESSOR 128
 

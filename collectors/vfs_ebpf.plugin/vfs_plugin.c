@@ -218,9 +218,12 @@ int *map_fd = NULL;
 //Libbpf (It is necessary to have at least kernel 4.10)
 int (*bpf_map_lookup_elem)(int, const void *, void *);
 
-static char *plugin_dir = NULL;
-static char *user_config_dir = NULL;
-static char *stock_config_dir = NULL;
+static char *plugin_dir = PLUGINS_DIR;
+static char *user_config_dir = CONFIG_DIR;
+static char *stock_config_dir = LIBCONFIG_DIR;
+static char *netdata_configured_log_dir = LOG_DIR;
+
+FILE *developer_log = NULL;
 
 //Global vectors
 netdata_syscall_stat_t *aggregated_data = NULL;
@@ -250,32 +253,36 @@ static void int_exit(int sig)
     close_plugin = 1;
 
     //When both threads were not finished case I try to go in front this address, the collector will crash
-    if(!thread_finished) {
+    if (!thread_finished) {
         return;
     }
 
-    if(aggregated_data) {
+    if (aggregated_data) {
         free(aggregated_data);
     }
 
-    if(publish_aggregated) {
+    if (publish_aggregated) {
         free(publish_aggregated);
     }
 
-    if(apps_data) {
+    if (apps_data) {
         free(apps_data);
     }
 
-    if(publish_apps) {
+    if (publish_apps) {
         free(publish_apps);
     }
 
-    if(libnetdata) {
+    if (libnetdata) {
         dlclose(libnetdata);
     }
 
-    if(apps_groups_root_target) {
+    if (apps_groups_root_target) {
         clean_apps_groups();
+    }
+
+    if (developer_log) {
+        fclose(developer_log);
     }
 
     exit(sig);
@@ -740,7 +747,6 @@ static void move_from_kernel2user_global() {
         }
     }
 
-    error("KILLME TOTAL: (%u, %u)", res[0], res[1]);
     aggregated_data[0].call = res[0]; //open
     aggregated_data[1].call = res[8]; //unlink
     aggregated_data[2].call = res[2]; //write
@@ -833,7 +839,6 @@ static void netdata_update_publish_apps(uint32_t pid, struct netdata_pid_stat_t 
                 }
 
                 pa->nopen_call = in->open_call;
-                error("KILLME APPS %s %d: (%lu, %lu) %ld", ret->name, ret->idx, pa->popen_call, pa->nopen_call, (long)in->open_call);
                 pa->nwrite_call = in->write_call;
                 pa->nread_call = in->read_call;
                 pa->nunlink_call = in->unlink_call;
@@ -1051,6 +1056,33 @@ int vfs_load_ebpf()
     return 0;
 }
 
+void set_global_variables() {
+    //Get environment variables
+    plugin_dir = getenv("NETDATA_PLUGINS_DIR");
+    if(!plugin_dir)
+        plugin_dir = PLUGINS_DIR;
+
+    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
+    if(!user_config_dir)
+        user_config_dir = CONFIG_DIR;
+
+    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
+    if(!stock_config_dir)
+        stock_config_dir = LIBCONFIG_DIR;
+
+    netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
+    if(!netdata_configured_log_dir)
+        netdata_configured_log_dir = LOG_DIR;
+}
+
+void open_developer_log() {
+    char filename[FILENAME_MAX+1];
+    int tot = sprintf(filename, "%s/%s",  netdata_configured_log_dir, NETDATA_DEVELOPER_LOG_FILE);
+
+    if(tot > 0)
+        developer_log = fopen(filename, "a");
+}
+
 int main(int argc, char **argv)
 {
     (void)argc;
@@ -1076,15 +1108,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    //Get environment variables
-    plugin_dir = getenv("NETDATA_PLUGINS_DIR");
-    user_config_dir = getenv("NETDATA_USER_CONFIG_DIR");
-    if(!user_config_dir)
-        user_config_dir = CONFIG_DIR;
-
-    stock_config_dir = getenv("NETDATA_STOCK_CONFIG_DIR");
-    if(!stock_config_dir)
-        stock_config_dir = LIBCONFIG_DIR;
+    set_global_variables();
 
     if(vfs_load_libraries()) {
         error("[VFS] Cannot load library.");
@@ -1118,6 +1142,7 @@ int main(int argc, char **argv)
 
     set_global_labels();
     set_apps_labels();
+    open_developer_log();
 
     if (pthread_mutex_init(&lock, NULL)) {
         thread_finished++;
