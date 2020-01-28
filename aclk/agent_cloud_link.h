@@ -23,6 +23,7 @@
 
 #define ACLK_RECONNECT_DELAY 1          // reconnect delay -- with backoff stragegy fow now
 #define ACLK_MAX_RECONNECT_DELAY 120
+#define ACLK_VERSION "1"
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
 
@@ -41,7 +42,6 @@ typedef enum aclk_init_action {
 #define GET_PUBLISH_BASE_TOPIC get_publish_base_topic(0)
 #define FREE_PUBLISH_BASE_TOPIC get_publish_base_topic(1)
 #define REBUILD_PUBLISH_BASE_TOPIC get_publish_base_topic(2)
-
 
 void *aclk_main(void *ptr);
 
@@ -68,6 +68,7 @@ int aclk_subscribe(char  *topic, int qos);
 void aclk_shutdown();
 void aclk_message_callback(struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg);
 
+int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect(void *conn);
 void aclk_connect(void *conn);
 int aclk_heartbeat();
@@ -82,6 +83,7 @@ void aclk_rrdset2json(RRDSET *st, BUFFER *wb, char *hostname, int is_slave);
 int aclk_update_chart(RRDHOST *host, char *chart_name);
 int aclk_update_alarm(RRDHOST *host, char *alarm_name);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
+int aclk_handle_cloud_request(char *payload);
 
 extern const char* get_release_channel();
 

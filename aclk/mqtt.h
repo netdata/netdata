@@ -6,14 +6,16 @@
 
 #define ACLK_JSON_IN_MSGID "msg-id"
 #define ACLK_JSON_IN_TYPE "type"
-#define ACLK_JSON_IN_TOPIC "topic"
-#define ACLK_JSON_IN_URL "url"
+#define ACLK_JSON_IN_VERSION "version"
+#define ACLK_JSON_IN_TOPIC "callback-topic"
+#define ACLK_JSON_IN_URL "payload"
 
 struct aclk_request {
     char    *type_id;
     char    *msg_id;
     char    *topic;
     char    *url;
+    int     version;
 };
 
 void _show_mqtt_info();

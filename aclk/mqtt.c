@@ -22,58 +22,13 @@ inline const char *_link_strerror(int rc)
     return mosquitto_strerror(rc);
 }
 
-int cloud_to_agent_parse(JSON_ENTRY *e)
-{
-    struct aclk_request *data = e->callback_data;
 
-    switch(e->type) {
-        case JSON_OBJECT:
-            e->callback_function = cloud_to_agent_parse;
-            break;
-        case JSON_ARRAY:
-            e->callback_function = cloud_to_agent_parse;
-            //sprintf(txt,"ARRAY[%lu]", e->data.items);
-            //buffer_strcat(wb, txt);
-            break;
-        case JSON_STRING:
-            if (!strcmp(e->name, ACLK_JSON_IN_MSGID)) {
-                data->msg_id = strdupz(e->data.string);
-                break;
-            }
-            if (!strcmp(e->name, ACLK_JSON_IN_TYPE)) {
-                data->type_id = strdupz(e->data.string);
-                break;
-            }
-            if (!strcmp(e->name, ACLK_JSON_IN_TOPIC)) {
-                data->topic = strdupz(e->data.string);
-                break;
-            }
-            if (!strcmp(e->name, ACLK_JSON_IN_URL)) {
-                data->url = strdupz(e->data.string);
-                break;
-            }
-            break;
-        case JSON_NUMBER:
-            //sprintf(txt,"%Lf", e->data.number);
-            break;
-
-        case JSON_BOOLEAN:
-            //buffer_strcat(wb, e->data.boolean?"TRUE":"FALSE");
-            break;
-
-        case JSON_NULL:
-            //buffer_strcat(wb,"NULL");
-            break;
-    }
-    return 0;
-}
 
 extern int cmdpause;
 
 void mqtt_message_callback(
     struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg)
 {
-    struct aclk_request cloud_to_agent = { .msg_id = NULL, .topic = NULL, .url = NULL };
 
     // TODO: handle commands in a more efficient way, if we have many
 
@@ -100,19 +55,10 @@ void mqtt_message_callback(
         return;
     }
 
-    int rc = json_parse(msg->payload, &cloud_to_agent, cloud_to_agent_parse);
 
-    if (unlikely(JSON_OK != rc)) {
-        error("Malformed json request (%s)", msg->payload);
-        return;
-    }
+    aclk_handle_cloud_request(msg->payload);
 
-    if (unlikely(!cloud_to_agent.url || !cloud_to_agent.topic))
-        return;
-
-    aclk_submit_request(&cloud_to_agent);
-
-    info("Received type=[%s], msg-id=[%s], topic=[%s], url=[%s]",cloud_to_agent.type_id, cloud_to_agent.msg_id, cloud_to_agent.topic, cloud_to_agent.url);
+    //info("Received type=[%s], msg-id=[%s], topic=[%s], url=[%s]",cloud_to_agent.type_id, cloud_to_agent.msg_id, cloud_to_agent.topic, cloud_to_agent.url);
 
     //'aclk_queue_query(cloud_to_agent.topic, NULL, cloud_to_agent.msg_id, cloud_to_agent.url, 0, 0);
     //freez(cloud_to_agent.topic);

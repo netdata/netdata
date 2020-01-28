@@ -19,6 +19,56 @@ int cmdpause = 0; // Used to pause query processing
 
 BUFFER *aclk_buffer = NULL;
 
+int cloud_to_agent_parse(JSON_ENTRY *e)
+{
+    struct aclk_request *data = e->callback_data;
+
+    switch(e->type) {
+        case JSON_OBJECT:
+            e->callback_function = cloud_to_agent_parse;
+            break;
+        case JSON_ARRAY:
+            e->callback_function = cloud_to_agent_parse;
+            //sprintf(txt,"ARRAY[%lu]", e->data.items);
+            //buffer_strcat(wb, txt);
+            break;
+        case JSON_STRING:
+            if (!strcmp(e->name, ACLK_JSON_IN_MSGID)) {
+                data->msg_id = strdupz(e->data.string);
+                break;
+            }
+            if (!strcmp(e->name, ACLK_JSON_IN_TYPE)) {
+                data->type_id = strdupz(e->data.string);
+                break;
+            }
+            if (!strcmp(e->name, ACLK_JSON_IN_TOPIC)) {
+                data->topic = strdupz(e->data.string);
+                break;
+            }
+            if (!strcmp(e->name, ACLK_JSON_IN_URL)) {
+                data->url = strdupz(e->data.string);
+                break;
+            }
+            break;
+        case JSON_NUMBER:
+            if (!strcmp(e->name, ACLK_JSON_IN_VERSION)) {
+                data->version = atol(e->data.string);
+                break;
+            }
+            //sprintf(txt,"%Lf", e->data.number);
+            break;
+
+        case JSON_BOOLEAN:
+            //buffer_strcat(wb, e->data.boolean?"TRUE":"FALSE");
+            break;
+
+        case JSON_NULL:
+            //buffer_strcat(wb,"NULL");
+            break;
+    }
+    return 0;
+}
+
 char *send_http_request(char *host, char *port, char *url, BUFFER *b)
 {
     struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
@@ -819,6 +869,7 @@ void aclk_create_header(BUFFER *dest, char *type, char *msg_id)
         dest,
         "\t{\"type\": \"%s\",\n"
         "\t\"msg-id\": \"%s\",\n"
+        "\t\"version\": \" ACLK_VERSION \",\n"
         "\t\"payload\": ",
         type, msg_id);
 }
@@ -1186,5 +1237,25 @@ int    aclk_update_alarm(RRDHOST *host, char *alarm_name)
         return 0;
 
     aclk_queue_query("_alarm", host->hostname, NULL, alarm_name, 2, 1);
+    return 0;
+}
+
+
+int aclk_handle_cloud_request(char *payload)
+{
+    struct aclk_request cloud_to_agent = { .msg_id = NULL, .topic = NULL, .url = NULL, .version = 1};
+
+    int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
+
+    if (unlikely(JSON_OK != rc)) {
+        error("Malformed json request (%s)", payload);
+        return 1;
+    }
+
+    if (unlikely(!cloud_to_agent.url || !cloud_to_agent.topic))
+        return 1;
+
+    aclk_submit_request(&cloud_to_agent);
+
     return 0;
 }

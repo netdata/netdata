@@ -74,7 +74,9 @@ struct netdata_static_thread static_threads[] = {
     NETDATA_PLUGIN_HOOK_IDLEJITTER
     NETDATA_PLUGIN_HOOK_STATSD
 
+#ifdef ACLK_ENABLE
     NETDATA_ACLK_HOOK
+#endif
 
         // common plugins for all systems
     {"BACKENDS",             NULL,                    NULL,         1, NULL, NULL, backends_main},
