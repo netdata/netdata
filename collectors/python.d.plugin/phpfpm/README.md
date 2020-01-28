@@ -24,10 +24,10 @@ Needs only `url` to server's `status`. Here is an example for local and remote i
 
 ```yaml
 local:
-  url     : 'http://localhost/status'
+  url     : 'http://localhost/status?full&json'
 
 remote:
-  url     : 'http://203.0.113.10/status'
+  url     : 'http://203.0.113.10/status?full&json'
 ```
 
 Without configuration, module attempts to connect to `http://localhost/status`
