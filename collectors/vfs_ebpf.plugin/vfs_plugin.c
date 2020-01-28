@@ -216,7 +216,11 @@ int (*load_bpf_file)(char *) = NULL;
 int *map_fd = NULL;
 
 //Libbpf (It is necessary to have at least kernel 4.10)
+int (*set_bpf_perf_event)(int);
+int (*perf_event_mmap_header)(int, struct perf_event_mmap_page **, int);
 int (*bpf_map_lookup_elem)(int, const void *, void *);
+int (*perf_event_unmap)(struct perf_event_mmap_page *, size_t);
+void (*netdata_perf_loop_multi)(int *, struct perf_event_mmap_page **, int, int *, int (*nsb)(void *, int), int);
 
 static char *plugin_dir = PLUGINS_DIR;
 static char *user_config_dir = CONFIG_DIR;
@@ -236,6 +240,10 @@ netdata_publish_process_syscall_t *publish_apps = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
+static int page_cnt = 8;
+
+static int pmu_fd[NETDATA_MAX_PROCESSOR];
+static struct perf_event_mmap_page *headers[NETDATA_MAX_PROCESSOR];
 
 pthread_mutex_t lock;
 
@@ -247,6 +255,32 @@ void clean_apps_groups() {
         w = next;
     }
 }
+
+/*
+static int unmap_memory() {
+    int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+
+    if ( nprocs >NETDATA_MAX_PROCESSOR ) {
+        nprocs =NETDATA_MAX_PROCESSOR;
+    }
+
+    int i;
+    int size = sysconf(_SC_PAGESIZE)*(page_cnt + 1);
+    for ( i = 0 ; i < nprocs ; i++ )
+    {
+        if (perf_event_unmap(headers[i], size) < 0)
+        {
+            fprintf(stderr,"CANNOT unmap headers\n");
+            return -1;
+        }
+
+        if (close(pmu_fd[i]) )
+            fprintf(stderr,"CANNOT CLOSE pmu_fd\n");
+    }
+
+    return 0;
+}
+*/
 
 static void int_exit(int sig)
 {
@@ -273,16 +307,18 @@ static void int_exit(int sig)
         free(publish_apps);
     }
 
-    if (libnetdata) {
-        dlclose(libnetdata);
-    }
-
     if (apps_groups_root_target) {
         clean_apps_groups();
     }
 
     if (developer_log) {
         fclose(developer_log);
+    }
+
+    //unmap_memory();
+
+    if (libnetdata) {
+        dlclose(libnetdata);
     }
 
     exit(sig);
@@ -926,6 +962,35 @@ void *vfs_collector(void *ptr)
     return NULL;
 }
 
+/*
+static int netdata_store_log(void *data, int size) {
+    (void) size;
+
+    static char *action[] = { "open"};
+
+    netdata_error_report_t *ptr = data;
+
+    if(close_plugin)
+        return 0;//LIBBPF_PERF_EVENT_DONE
+
+ //   fprintf(developer_log, "%u %s: %s %d ", ptr->pid, ptr->name, action[ptr->type], ptr->error);
+ // fflush(developer_log,);
+    error("KILLME %u %s: %s %d ", ptr->pid, ptr->name, action[ptr->type], ptr->error);
+    return  -2;//LIBBPF_PERF_EVENT_COUNT
+}
+ */
+
+void *vfs_log(void *ptr) {
+    (void)ptr;
+
+    /*
+    long nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+    netdata_perf_loop_multi(pmu_fd, headers, (int)nprocs, &close_plugin, netdata_store_log, page_cnt);
+     */
+
+    return NULL;
+}
+
 void set_global_labels() {
     int i;
 
@@ -1010,7 +1075,30 @@ static void build_complete_path(char *out, size_t length, char *filename) {
     }
 }
 
-static int vfs_load_libraries()
+/*
+static int map_memory() {
+    int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+
+    if ( nprocs >NETDATA_MAX_PROCESSOR ) {
+        nprocs = NETDATA_MAX_PROCESSOR;
+    }
+
+    int i;
+    for ( i = 0 ; i < nprocs ; i++ )
+    {
+        pmu_fd[i] = set_bpf_perf_event(i);
+
+        if (perf_event_mmap_header(pmu_fd[i], &headers[i], page_cnt) < 0)
+        {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+ */
+
+static int ebpf_load_libraries()
 {
     char *error = NULL;
     char lpath[4096];
@@ -1024,6 +1112,33 @@ static int vfs_load_libraries()
         load_bpf_file = dlsym(libnetdata, "load_bpf_file");
         if ((error = dlerror()) != NULL) {
             error("[VFS] Cannot find load_bpf_file: %s", error);
+            return -1;
+        }
+
+        set_bpf_perf_event = dlsym(libnetdata, "set_bpf_perf_event");
+        if ((error = dlerror()) != NULL)
+        {
+            error("[VFS] Cannot find set_bpf_perf_event: %s", error);
+            return -1;
+        }
+
+        perf_event_mmap_header =  dlsym(libnetdata, "perf_event_mmap_header");
+        if ((error = dlerror()) != NULL)
+        {
+            error("[VFS] Cannot find perf_event_mmap_header: %s", error);
+            return -1;
+        }
+
+        perf_event_unmap =  dlsym(libnetdata, "perf_event_unmap");
+        if ((error = dlerror()) != NULL) {
+            error("[VFS] Cannot find perf_event_unmap: %s", error);
+            return -1;
+        }
+
+        netdata_perf_loop_multi = dlsym(libnetdata, "my_perf_loop_multi");
+        if ((error = dlerror()) != NULL)
+        {
+            fputs(error, stderr);
             return -1;
         }
 
@@ -1110,7 +1225,7 @@ int main(int argc, char **argv)
 
     set_global_variables();
 
-    if(vfs_load_libraries()) {
+    if(ebpf_load_libraries()) {
         error("[VFS] Cannot load library.");
         thread_finished++;
         int_exit(2);
@@ -1149,20 +1264,28 @@ int main(int argc, char **argv)
         int_exit(5);
     }
 
+    /*
+    if (map_memory()) {
+        thread_finished++;
+        int_exit(6);
+    }
+     */
+
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_t thread[2];
+    pthread_t thread[NETDATA_VFS_THREAD];
 
     int i;
-    int end = 2;
+    int end = NETDATA_VFS_THREAD;
+
+    void * (*function_pointer[])(void *) = {vfs_publisher, vfs_collector, vfs_log };
 
     for ( i = 0; i < end ; i++ ) {
-        if ( ( pthread_create(&thread[i], &attr, (!i)?vfs_publisher:vfs_collector, NULL) ) ) {
+        if ( ( pthread_create(&thread[i], &attr, function_pointer[i], NULL) ) ) {
             error("[VFS] Cannot create threads.");
             thread_finished++;
-            int_exit(0);
-            return 7;
+            int_exit(7);
         }
 
     }
@@ -1171,8 +1294,7 @@ int main(int argc, char **argv)
         if ( (pthread_join(thread[i], NULL) ) ) {
             error("[VFS] Cannot join threads.");
             thread_finished++;
-            int_exit(0);
-            return 7;
+            int_exit(8);
         }
     }
 

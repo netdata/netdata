@@ -35,6 +35,16 @@ enum netdata_map_syscall {
     FILE_SYSCALL = 0
 };
 
+typedef struct netdata_error_report {
+    uint32_t pid;
+
+    int type;
+    int error;
+    int fd;
+
+    char name[24];
+} netdata_error_report_t;
+
 typedef struct netdata_syscall_kern_stat {
     uint32_t pid;
     uint16_t sc_num;
@@ -152,5 +162,7 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_DEVELOPER_LOG_FILE "developer.log"
 
 # define NETDATA_MAX_PROCESSOR 128
+
+# define NETDATA_VFS_THREAD (uint32_t)3
 
 #endif
