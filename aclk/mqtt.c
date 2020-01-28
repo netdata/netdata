@@ -260,9 +260,13 @@ void aclk_lws_connect_notif_callback(){
     _link_mqtt_connect("doesntmatter", 12345);
 }
 
+void aclk_lws_data_received_callback(){
+    mosquitto_loop_read(mosq, 1);
+}
+
 static const struct aclk_lws_wss_engine_callbacks aclk_lws_engine_callbacks = {
     .connection_established_callback = aclk_lws_connect_notif_callback,
-    .data_rcvd_callback = NULL,
+    .data_rcvd_callback = aclk_lws_data_received_callback,
     .data_writable_callback = NULL
 };
 
@@ -308,8 +312,6 @@ static inline int _link_event_loop_wss()
         mosquitto_loop_misc(mosq);
         if(mosquitto_want_write(mosq))
             rc = mosquitto_loop_write(mosq, 1);
-        if(lws_engine_instance->data_to_read)
-            mosquitto_loop_read(mosq, 1);
 
         if (unlikely(rc != MOSQ_ERR_SUCCESS)) {
             errno = 0;
