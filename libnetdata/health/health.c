@@ -1,5 +1,7 @@
 #include "health.h"
 
+SILENCERS *silencers;
+
 /**
  * Create Silencer
  *

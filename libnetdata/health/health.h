@@ -44,7 +44,7 @@ typedef struct silencers {
     SILENCER *silencers;
 } SILENCERS;
 
-SILENCERS *silencers;
+extern SILENCERS *silencers;
 
 extern SILENCER *create_silencer(void);
 extern int health_silencers_json_read_callback(JSON_ENTRY *e);
