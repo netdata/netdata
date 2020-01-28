@@ -57,7 +57,7 @@ while [ "${1}" ]; do
   shift 1
 done
 
-if [ x"$DO_NOT_TRACK" = x"1" ]; then
+if [ ! "$DO_NOT_TRACK" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   REINSTALL_OPTIONS="${REINSTALL_OPTIONS} --disable-telemtry"
 fi
 

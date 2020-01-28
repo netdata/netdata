@@ -305,7 +305,8 @@ if [ -z "$NETDATA_DISABLE_TELEMETRY" ]; then
   ${TPUT_YELLOW}${TPUT_BOLD}NOTE${TPUT_RESET}:
   Anonymous usage stats will be collected and sent to Google Analytics.
   To opt-out, pass --disable-telemetry option to the installer or export
-  the enviornment variable DO_NOT_TRACK=1
+  the enviornment variable DO_NOT_TRACK to a non-zero or non-empty value
+  (e.g: export DO_NOT_TRACK=1).
 
 BANNER4
 fi
@@ -886,7 +887,7 @@ install_go
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
 
-if [ x"$DO_NOT_TRACK" = x"1" ]; then
+if [ ! "$DO_NOT_TRACK" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_DISABLE_TELEMETRY+x=1
 fi
 

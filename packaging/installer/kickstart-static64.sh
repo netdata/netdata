@@ -231,7 +231,7 @@ while [ -n "${1}" ]; do
   fi
 done
 
-if [ x"$DO_NOT_TRACK" = x"1" ]; then
+if [ ! "$DO_NOT_TRACK" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }--disable-telemtry"
 fi
 
