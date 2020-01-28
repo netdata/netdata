@@ -70,7 +70,7 @@ CHARTS = {
         ]
     },
     'request_duration': {
-        'options': [None, 'PHP-FPM Requests Duration Among All Processes', 'milliseconds', 'request duration',
+        'options': [None, 'PHP-FPM Requests Duration Among All Idle Processes', 'milliseconds', 'request duration',
                     'phpfpm.request_duration',
                     'line'],
         'lines': [
@@ -80,7 +80,7 @@ CHARTS = {
         ]
     },
     'request_cpu': {
-        'options': [None, 'PHP-FPM Last Request CPU Usage Among All Processes', 'percentage', 'request CPU',
+        'options': [None, 'PHP-FPM Last Request CPU Usage Among All Idle Processes', 'percentage', 'request CPU',
                     'phpfpm.request_cpu', 'line'],
         'lines': [
             ['minReqCpu', 'min'],
@@ -89,7 +89,7 @@ CHARTS = {
         ]
     },
     'request_mem': {
-        'options': [None, 'PHP-FPM Last Request Memory Usage Among All Processes', 'KB', 'request memory',
+        'options': [None, 'PHP-FPM Last Request Memory Usage Among All Idle Processes', 'KB', 'request memory',
                     'phpfpm.request_mem', 'line'],
         'lines': [
             ['minReqMem', 'min', 'absolute', 1, 1024],
