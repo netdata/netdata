@@ -29,6 +29,6 @@ extern void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation);
 extern void web_client_api_v1_init(void);
 extern void web_client_api_v1_management_init(void);
 
-char *api_secret;
+extern char *api_secret;
 
 #endif //NETDATA_WEB_API_V1_H
