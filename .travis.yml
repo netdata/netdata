@@ -121,7 +121,7 @@ jobs:
 
       name: Standard netdata build
       script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
-      env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
+      env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -fno-common   -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
 
     - name: Docker container build process (alpine installation)
