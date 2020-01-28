@@ -2949,7 +2949,7 @@ netdataDashboard.context = {
     },
 
     'cockroachdb.ranges': {
-        info: 'CockroachDB stores all user data (tables, indexes, etc.) and almost all system data in a giant sorted map of key-value pairs.' +
+        info: 'CockroachDB stores all user data (tables, indexes, etc.) and almost all system data in a giant sorted map of key-value pairs. ' +
             'This keyspace is divided into "ranges", contiguous chunks of the keyspace, so that every key can always be found in a single range.'
     },
 
