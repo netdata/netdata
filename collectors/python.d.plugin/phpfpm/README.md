@@ -20,7 +20,7 @@ It produces following charts:
 
 ## Configuration
 
-Needs only `url` to server's `status`. Here is an example for local and remote instance:
+Needs only `url` to server's `status`. Here is an example for local and remote instances:
 
 ```yaml
 local:
