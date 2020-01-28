@@ -203,7 +203,10 @@ aclk_lws_wss_callback(struct lws *wsi, enum lws_callback_reasons reason,
 	case LWS_CALLBACK_CLIENT_RECEIVE:
 		if(!received_data_to_ringbuff(in, len))
 			retval = 1;
-		inst->data_to_read = 1; //to inform logic above there is reason to call mosquitto_loop_read
+		if(likely(inst->callbacks.data_rcvd_callback))
+			inst->callbacks.data_rcvd_callback();
+		else
+			inst->data_to_read = 1; //to inform logic above there is reason to call mosquitto_loop_read
 		break;
 	case LWS_CALLBACK_PROTOCOL_INIT:
 		//initial connection here
