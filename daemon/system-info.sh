@@ -326,9 +326,9 @@ else
                 # The ':' surrounding each number are important for matching.
                 dev_major_whitelist=':3:8:9:21:22:28:31:33:34:44:45:47:48:49:50:51:52:53:54:55:56:57:65:66:67:68:69:70:71:72:73:74:75:76:77:78:79:88:89:90:91:93:94:96:98:101:104:105:106:107:108:109:110:111:112:114:116:128:129:130:131:132:134:135:136:137:138:139:140:141:142:143:153:160:161:179:180:202:256:257:'
 
-                if [ "${VIRTUALIZATION}" != "unknown" ] ; then
-                    # We're running virtualized, add the local range of device major numbers so that we catch paravirtualized block devices.
-                    dev_major_whitelist="${dev_major_whitelist}240:241:242:243:244:245:246:247:248:249:250:251:252:253:254:"
+                if grep -qE ' vbd$' /proc/devices ; then
+                    # VirtIO Block devices are in use, add their device major number to the list of ones we check.
+                    dev_major_whitelist="${dev_major_whitelist}:$(grep -E 'vbd$' /proc/devices | cut -f 1 -d ' ' | sed -e 's/^[[:space:]]*//'):"
                 fi
 
                 DISK_DETECTION="sysfs"
