@@ -5,6 +5,13 @@
 
 #include "mqtt.h"
 
+#define ACLK_JSON_IN_MSGID "msg-id"
+#define ACLK_JSON_IN_TYPE "type"
+#define ACLK_JSON_IN_VERSION "version"
+#define ACLK_JSON_IN_TOPIC "callback-topic"
+#define ACLK_JSON_IN_URL "payload"
+
+
 #define ACLK_MSG_TYPE_CHART "chart"
 #define ACLK_ALARMS_TOPIC "alarms"
 #define ACLK_METADATA_TOPIC "meta"
@@ -26,6 +33,15 @@
 #define ACLK_VERSION "1"
 
 #define CONFIG_SECTION_ACLK "agent_cloud_link"
+
+struct aclk_request {
+    char    *type_id;
+    char    *msg_id;
+    char    *topic;
+    char    *url;
+    int     version;
+};
+
 
 typedef enum publish_topic_action {
     PUBLICH_TOPIC_GET,
@@ -66,7 +82,7 @@ extern char *is_agent_claimed(void);
 // callbacks for agent cloud link
 int aclk_subscribe(char  *topic, int qos);
 void aclk_shutdown();
-void aclk_message_callback(struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg);
+//void aclk_message_callback(struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg);
 
 int cloud_to_agent_parse(JSON_ENTRY *e);
 void aclk_disconnect(void *conn);
@@ -84,6 +100,9 @@ int aclk_update_chart(RRDHOST *host, char *chart_name);
 int aclk_update_alarm(RRDHOST *host, char *alarm_name);
 void aclk_create_header(BUFFER *dest, char *type, char *msg_id);
 int aclk_handle_cloud_request(char *payload);
+int aclk_submit_request(struct aclk_request *);
+
+
 
 extern const char* get_release_channel();
 

@@ -591,7 +591,7 @@ NETDATACLI_FILES = \
 sbin_PROGRAMS += netdata
 netdata_SOURCES = $(NETDATA_FILES)
 netdata_LDADD = \
-    mosquitto/lib/libmosquitto.a \
+    #mosquitto/lib/libmosquitto.a \
     $(NETDATA_COMMON_LIBS) \
     $(NULL)
 if ENABLE_CXX_LINKER

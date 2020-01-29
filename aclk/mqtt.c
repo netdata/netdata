@@ -6,8 +6,42 @@
 
 void (*_on_connect)(void *ptr) = NULL;
 void (*_on_disconnect)(void *ptr) = NULL;
+extern int cmdpause;
 
 
+#ifndef ACLK_ENABLE
+
+inline const char *_link_strerror(int rc)
+{
+    return "no error";
+}
+
+int _link_event_loop(int timeout)
+{
+    return 0;
+}
+
+int _link_send_message(char *topic, char *message)
+{
+    return 0;
+}
+
+int _link_subscribe(char  *topic, int qos)
+{
+    return 0;
+}
+
+void _link_shutdown()
+{
+    return;
+}
+
+int _link_lib_init(char *aclk_hostname, int aclk_port, void (*on_connect)(void *), void (*on_disconnect)(void *))
+{
+    return 0;
+}
+
+#else
 /*
  * Just report the library info in the logfile for reference when issues arise
  *
@@ -22,9 +56,6 @@ inline const char *_link_strerror(int rc)
     return mosquitto_strerror(rc);
 }
 
-
-
-extern int cmdpause;
 
 void mqtt_message_callback(
     struct mosquitto *moqs, void *obj, const struct mosquitto_message *msg)
@@ -55,14 +86,10 @@ void mqtt_message_callback(
         return;
     }
 
-
     aclk_handle_cloud_request(msg->payload);
 
     //info("Received type=[%s], msg-id=[%s], topic=[%s], url=[%s]",cloud_to_agent.type_id, cloud_to_agent.msg_id, cloud_to_agent.topic, cloud_to_agent.url);
 
-    //'aclk_queue_query(cloud_to_agent.topic, NULL, cloud_to_agent.msg_id, cloud_to_agent.url, 0, 0);
-    //freez(cloud_to_agent.topic);
-    //freez(cloud_to_agent.msg_id);
 }
 
 void connect_callback(struct mosquitto *mosq, void *obj, int rc, int flags)
@@ -241,6 +268,7 @@ int _link_subscribe(char  *topic, int qos)
  * Send a message to the cloud to specific topic
  *
  */
+
 int _link_send_message(char *topic, char *message)
 {
     int rc;
@@ -266,14 +294,4 @@ int _link_send_message(char *topic, char *message)
 
     return rc;
 }
-
-//TODO: placeholder for password check if we need it
-//int password_callback(char *buf, int size, int rwflag, void *userdata)
-//{
-//    strcpy(buf,"1234678");
-//    return 8;
-//}
-
-//ibmosq_EXPORT int mosquitto_username_pw_set(	struct 	mosquitto 	*	mosq,
-//                                                const 	char 	*	username,
-//                                                const 	char 	*	password	)
+#endif
