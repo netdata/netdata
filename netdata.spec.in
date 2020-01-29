@@ -87,7 +87,7 @@ Version:	%{version}
 Release:	1%{?dist}
 License:	GPLv3+
 Group:		Applications/System
-Source0:	https://github.com/netdata/%{name}/releases/download/%{version}/%{name}-%{version}.tar.gz
+Source0:	https://github.com/netdata/%{name}/releases/download/v%{version}/%{name}-v%{version}.tar.gz
 URL:		http://my-netdata.io
 
 # #####################################################################
