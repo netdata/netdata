@@ -401,78 +401,78 @@ static void netdata_create_io_chart(char *family, char *name, char *msg, char *a
 }
 
 static void netdata_global_charts_create() {
-    netdata_create_chart(NETDATA_VFS_FAMILY
+    netdata_create_chart(NETDATA_GLOBAL_FAMILY
             ,NETDATA_VFS_FILE_OPEN_COUNT
             , "Count the total of calls made to the operate system per period to open a file descriptor."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 970
             , netdata_create_global_dimension
             , publish_aggregated
             , 1);
 
-    netdata_create_chart(NETDATA_VFS_FAMILY
+    netdata_create_chart(NETDATA_GLOBAL_FAMILY
             , NETDATA_VFS_FILE_CLEAN_COUNT
             , "Count the total of calls made to the operate system per period to delete a file from the operate system."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 971
             , netdata_create_global_dimension
             , &publish_aggregated[1]
             , 1);
 
-    netdata_create_chart(NETDATA_VFS_FAMILY
+    netdata_create_chart(NETDATA_GLOBAL_FAMILY
             , NETDATA_VFS_FILE_WRITE_COUNT
             , "Count the total of calls made to the operate system per period to write inside a file descriptor."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 972
             , netdata_create_global_dimension
             , &publish_aggregated[NETDATA_IN_START_BYTE]
             , 1);
 
-    netdata_create_chart(NETDATA_VFS_FAMILY
+    netdata_create_chart(NETDATA_GLOBAL_FAMILY
             , NETDATA_VFS_FILE_READ_COUNT
             , "Count the total of calls made to the operate system per period to read from a file descriptor."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 973
             , netdata_create_global_dimension
             , &publish_aggregated[NETDATA_OUT_START_BYTE]
             , 1);
 
-    netdata_create_io_chart(NETDATA_VFS_FAMILY
+    netdata_create_io_chart(NETDATA_GLOBAL_FAMILY
             , NETDATA_VFS_IO_FILE_BYTES
             , "Total of bytes read or written with success per period."
             , "bytes/s"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 974);
 
-    netdata_create_chart(NETDATA_VFS_FAMILY
+    netdata_create_chart(NETDATA_GLOBAL_FAMILY
             , NETDATA_PROCESS_SYSCALL
             , "Count the total of calls made to the operate system per period to start a process."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_PROCESS_GROUP
             , 975
             , netdata_create_global_dimension
             , &publish_aggregated[6]
             , 1);
 
-    netdata_create_chart(NETDATA_VFS_FAMILY
+    netdata_create_chart(NETDATA_GLOBAL_FAMILY
             , NETDATA_EXIT_SYSCALL
             , "Count the total of calls made to the operate system per period to finish a process."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_PROCESS_GROUP
             , 976
             , netdata_create_global_dimension
             , &publish_aggregated[4]
             , 2);
 
-    netdata_create_chart(NETDATA_VFS_FAMILY
+    netdata_create_chart(NETDATA_GLOBAL_FAMILY
             , NETDATA_VFS_FILE_ERR_COUNT
             , "Count the total of errors"
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 977
             , netdata_create_global_dimension
             , publish_aggregated
@@ -484,7 +484,7 @@ static void netdata_apps_charts() {
             ,NETDATA_VFS_FILE_OPEN_COUNT
             , "Count the total of calls made to the operate system per period to open a file descriptor."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 140004
             , netdata_create_process_dimension
             , publish_apps
@@ -494,7 +494,7 @@ static void netdata_apps_charts() {
             , NETDATA_VFS_FILE_CLEAN_COUNT
             , "Count the total of calls made to the operate system per period to delete a file from the operate system."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 140005
             , netdata_create_process_dimension
             , publish_apps
@@ -504,7 +504,7 @@ static void netdata_apps_charts() {
             , NETDATA_VFS_FILE_WRITE_COUNT
             , "Count the total of calls made to the operate system per period to write inside a file descriptor."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 140006
             , netdata_create_process_dimension
             , publish_apps
@@ -514,7 +514,7 @@ static void netdata_apps_charts() {
             , NETDATA_VFS_FILE_READ_COUNT
             , "Count the total of calls made to the operate system per period to read from a file descriptor."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 140007
             , netdata_create_process_dimension
             , publish_apps
@@ -524,7 +524,7 @@ static void netdata_apps_charts() {
             , NETDATA_PROCESS_SYSCALL
             , "Count the total of calls made to the operate system per period to start a process."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_PROCESS_GROUP
             , 140008
             , netdata_create_process_dimension
             , publish_apps
@@ -534,7 +534,7 @@ static void netdata_apps_charts() {
             , NETDATA_EXIT_SYSCALL
             , "Count the total of zombie process created on the operate system."
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_PROCESS_GROUP
             , 140009
             , netdata_create_process_dimension
             , publish_apps
@@ -544,7 +544,7 @@ static void netdata_apps_charts() {
             , NETDATA_VFS_FILE_ERR_COUNT
             , "Count the total of errors"
             , "Number of calls"
-            , NETDATA_WEB_GROUP
+            , NETDATA_FILE_GROUP
             , 140010
             , netdata_create_process_dimension
             , publish_apps
@@ -699,7 +699,7 @@ static void write_process_count_chart(char *name
 /*
 static void write_bytes_chart(char *name,netdata_publish_syscall_t *move, int end) {
     printf( "BEGIN %s.%s\n"
-            , NETDATA_VFS_FAMILY
+            , NETDATA_GLOBAL_FAMILY
             , name);
 
     int i = 0;
@@ -729,15 +729,15 @@ static void netdata_publish_data() {
     netdata_publish_vfs_common_t pvc;
     netdata_update_publish(publish_aggregated, &pvc, aggregated_data);
 
-    write_global_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, 1);
-    write_global_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[1], 1);
-    write_global_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 1);
-    write_global_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_VFS_FAMILY, &publish_aggregated[NETDATA_OUT_START_BYTE], 1);
-    write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[4], 2);
-    write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_VFS_FAMILY, &publish_aggregated[6], 1);
-    write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_VFS_FAMILY, publish_aggregated, 4);
+    write_global_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_GLOBAL_FAMILY, publish_aggregated, 1);
+    write_global_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_GLOBAL_FAMILY, &publish_aggregated[1], 1);
+    write_global_count_chart(NETDATA_VFS_FILE_WRITE_COUNT, NETDATA_GLOBAL_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 1);
+    write_global_count_chart(NETDATA_VFS_FILE_READ_COUNT, NETDATA_GLOBAL_FAMILY, &publish_aggregated[NETDATA_OUT_START_BYTE], 1);
+    write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_GLOBAL_FAMILY, &publish_aggregated[4], 2);
+    write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_GLOBAL_FAMILY, &publish_aggregated[6], 1);
+    write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_GLOBAL_FAMILY, publish_aggregated, 4);
 
-    write_io_chart(NETDATA_VFS_FAMILY, &pvc);
+    write_io_chart(NETDATA_GLOBAL_FAMILY, &pvc);
 
     if(apps_groups_root_target ) {
         write_process_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_APPS_FAMILY, publish_apps, write_chart_dimension_open, apps_dimension);
