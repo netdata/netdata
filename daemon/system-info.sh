@@ -121,9 +121,9 @@ else
                         if [ "${ID}" = "unknown" ]; then CONTAINER_ID="${DISTRIB_CODENAME}"; fi
                 fi
                 if [ -n "$(command -v lsb_release 2>/dev/null)" ]; then
-                        if [ "${OS_DETECTION}" = "unknown" ]; then 
+                        if [ "${OS_DETECTION}" = "unknown" ]; then
                                 CONTAINER_OS_DETECTION="lsb_release"
-                        else 
+                        else
                                 CONTAINER_OS_DETECTION="Mixed"
                         fi
                         if [ "${NAME}" = "unknown" ]; then CONTAINER_NAME="$(lsb_release -is 2>/dev/null)"; fi
