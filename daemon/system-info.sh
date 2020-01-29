@@ -321,7 +321,7 @@ elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         total="$(df -t ${types} -c -k | tail -n 1 | awk '{print $2}')"
         DISK_SIZE="$((total * 1024))"
 else
-        if [ -d /sys/block ] ; then
+        if [ -d /sys/block ] && [ -r /proc/devices ] ; then
                 dev_major_whitelist=''
 
                 # This is a list of device names used for block storage devices.
