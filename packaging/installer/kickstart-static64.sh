@@ -8,7 +8,7 @@
 #  --non-interactive        do not wait for input
 #  --dont-start-it          do not start netdata after install
 #  --stable-channel         Use the stable release channel, rather than the nightly to fetch sources
-#  --disable-telemetry      Opt-out of anonymous telemetry program
+#  --disable-telemetry      Opt-out of anonymous telemetry program (DO_NOT_TRACK=1)
 #  --local-files            Use a manually provided tarball for the installation
 #
 # ---------------------------------------------------------------------------------------------------------------------
@@ -230,6 +230,10 @@ while [ -n "${1}" ]; do
     exit 1
   fi
 done
+
+if [ ! "$DO_NOT_TRACK" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+  NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:+${NETDATA_INSTALLER_OPTIONS} }--disable-telemtry"
+fi
 
 # ---------------------------------------------------------------------------------------------------------------------
 TMPDIR=$(create_tmp_directory)

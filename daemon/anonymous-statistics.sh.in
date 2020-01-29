@@ -7,8 +7,8 @@
 #      ACTION_DATA    -- fmt, args passed to fatal
 # - START       - netdata started
 #      ACTION_DATA     -- nan
-# - EXIT     - installation action
-#      ACTION_DATA    -- ret value of
+# - EXIT        - installation action
+#      ACTION_DATA     -- ret value of
 
 ACTION="${1}"
 ACTION_RESULT="${2}"
@@ -18,8 +18,8 @@ ACTION_DATA=$(echo "${ACTION_DATA}" | tr '"' "'")
 # -------------------------------------------------------------------------------------------------
 # check opt-out
 
-if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ]; then
-	exit 0
+if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] || [ ! "$DO_NOT_TRACK" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+  exit 0
 fi
 
 # Shorten version for easier reporting
@@ -29,43 +29,43 @@ NETDATA_VERSION=$(echo "${NETDATA_VERSION}" | sed 's/-.*//g' | tr -d 'v')
 # send the anonymous statistics to GA
 # https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters
 # The maximum index for a cd parameter is 20 so we have effectively run out.
-if [ -n "$(command -v curl 2>/dev/null)" ]; then
-	curl -X POST -Ss --max-time 2 \
-		--data "v=1" \
-		--data "tid=UA-64295674-3" \
-		--data "aip=1" \
-		--data "ds=shell" \
-		--data-urlencode "cid=${NETDATA_REGISTRY_UNIQUE_ID}" \
-		--data-urlencode "cs=${NETDATA_REGISTRY_UNIQUE_ID}" \
-		--data "t=event" \
-		--data "ni=1" \
-		--data "an=anonymous-statistics" \
-		--data-urlencode "av=${NETDATA_VERSION}" \
-		--data-urlencode "ec=${ACTION}" \
-		--data-urlencode "ea=${ACTION_RESULT}" \
-		--data-urlencode "el=${ACTION_DATA}" \
-		--data-urlencode "cd1=${NETDATA_HOST_OS_NAME}" \
-		--data-urlencode "cd2=${NETDATA_HOST_OS_ID}" \
-		--data-urlencode "cd3=${NETDATA_HOST_OS_ID_LIKE}" \
-		--data-urlencode "cd4=${NETDATA_HOST_OS_VERSION}" \
-		--data-urlencode "cd5=${NETDATA_HOST_OS_VERSION_ID}" \
-		--data-urlencode "cd6=${NETDATA_HOST_OS_DETECTION}" \
-		--data-urlencode "cd7=${NETDATA_SYSTEM_KERNEL_NAME}" \
-		--data-urlencode "cd8=${NETDATA_SYSTEM_KERNEL_VERSION}" \
-		--data-urlencode "cd9=${NETDATA_SYSTEM_ARCHITECTURE}" \
-		--data-urlencode "cd10=${NETDATA_SYSTEM_VIRTUALIZATION}" \
-		--data-urlencode "cd11=${NETDATA_SYSTEM_VIRT_DETECTION}" \
-		--data-urlencode "cd12=${NETDATA_SYSTEM_CONTAINER}" \
-		--data-urlencode "cd13=${NETDATA_SYSTEM_CONTAINER_DETECTION}" \
-		--data-urlencode "cd14=${NETDATA_CONTAINER_OS_NAME}" \
-		--data-urlencode "cd15=${NETDATA_CONTAINER_OS_ID}" \
-		--data-urlencode "cd16=${NETDATA_CONTAINER_OS_ID_LIKE}" \
-		--data-urlencode "cd17=${NETDATA_CONTAINER_OS_VERSION}" \
-		--data-urlencode "cd18=${NETDATA_CONTAINER_OS_VERSION_ID}" \
-		--data-urlencode "cd19=${NETDATA_CONTAINER_OS_DETECTION}" \
-		"https://www.google-analytics.com/collect" >/dev/null 2>&1
+if [ -n "$(command -v curl 2> /dev/null)" ]; then
+  curl -X POST -Ss --max-time 2 \
+    --data "v=1" \
+    --data "tid=UA-64295674-3" \
+    --data "aip=1" \
+    --data "ds=shell" \
+    --data-urlencode "cid=${NETDATA_REGISTRY_UNIQUE_ID}" \
+    --data-urlencode "cs=${NETDATA_REGISTRY_UNIQUE_ID}" \
+    --data "t=event" \
+    --data "ni=1" \
+    --data "an=anonymous-statistics" \
+    --data-urlencode "av=${NETDATA_VERSION}" \
+    --data-urlencode "ec=${ACTION}" \
+    --data-urlencode "ea=${ACTION_RESULT}" \
+    --data-urlencode "el=${ACTION_DATA}" \
+    --data-urlencode "cd1=${NETDATA_HOST_OS_NAME}" \
+    --data-urlencode "cd2=${NETDATA_HOST_OS_ID}" \
+    --data-urlencode "cd3=${NETDATA_HOST_OS_ID_LIKE}" \
+    --data-urlencode "cd4=${NETDATA_HOST_OS_VERSION}" \
+    --data-urlencode "cd5=${NETDATA_HOST_OS_VERSION_ID}" \
+    --data-urlencode "cd6=${NETDATA_HOST_OS_DETECTION}" \
+    --data-urlencode "cd7=${NETDATA_SYSTEM_KERNEL_NAME}" \
+    --data-urlencode "cd8=${NETDATA_SYSTEM_KERNEL_VERSION}" \
+    --data-urlencode "cd9=${NETDATA_SYSTEM_ARCHITECTURE}" \
+    --data-urlencode "cd10=${NETDATA_SYSTEM_VIRTUALIZATION}" \
+    --data-urlencode "cd11=${NETDATA_SYSTEM_VIRT_DETECTION}" \
+    --data-urlencode "cd12=${NETDATA_SYSTEM_CONTAINER}" \
+    --data-urlencode "cd13=${NETDATA_SYSTEM_CONTAINER_DETECTION}" \
+    --data-urlencode "cd14=${NETDATA_CONTAINER_OS_NAME}" \
+    --data-urlencode "cd15=${NETDATA_CONTAINER_OS_ID}" \
+    --data-urlencode "cd16=${NETDATA_CONTAINER_OS_ID_LIKE}" \
+    --data-urlencode "cd17=${NETDATA_CONTAINER_OS_VERSION}" \
+    --data-urlencode "cd18=${NETDATA_CONTAINER_OS_VERSION_ID}" \
+    --data-urlencode "cd19=${NETDATA_CONTAINER_OS_DETECTION}" \
+    "https://www.google-analytics.com/collect" > /dev/null 2>&1
 else
-	wget -q -O - --timeout=1 "https://www.google-analytics.com/collect?\
+  wget -q -O - --timeout=1 "https://www.google-analytics.com/collect?\
 &v=1\
 &tid=UA-64295674-3\
 &aip=1\
