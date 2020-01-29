@@ -60,7 +60,7 @@ publish_docker() {
 	fi
 
 	echo "Building Docker images.."
-	packaging/docker/build.sh
+	RELEASE_CHANNEL=nightly packaging/docker/build.sh
 
 	echo "Publishing Docker images.."
 	packaging/docker/publish.sh
