@@ -332,7 +332,7 @@ else
 
                 for name in ${device_names} ; do
                         if grep -qE " ${name}\$" /proc/devices ; then
-                                dev_major_whitelist="${dev_major_whitelist}:$(grep -E "${name}\$" /proc/devices | cut -f 1 -d ' ' | sed -e 's/^[[:space:]]*//' | tr '\n' ':'):"
+                                dev_major_whitelist="${dev_major_whitelist}:$(grep -E "${name}\$" /proc/devices | sed -e 's/^[[:space:]]*//' | cut -f 1 -d ' ' | tr '\n' ':'):"
                         fi
                 done
 
