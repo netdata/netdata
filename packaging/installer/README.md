@@ -83,6 +83,13 @@ operating systems.
     </ul>
   </div>
   <div class="grid-item">
+    <h3><img src="https://user-images.githubusercontent.com/1153921/73030393-c5eb4200-3df6-11ea-9942-436caa3ed100.png" alt="Install Netdata on cloud providers (GCP/AWS/Azure)" />Cloud providers (GCP/AWS/Azure)</h3>
+    <ul>
+      <li><a href="methods/cloud-providers/#recommended-installation-method-for-cloud-providers">Recommended installation methods for cloud providers</a></li>
+      <li><a href="methods/cloud-providers/#post-installation-configuration">Post-installation configuration</a></li>
+    </ul>
+  </div>
+  <div class="grid-item">
     <h3><img src="https://user-images.githubusercontent.com/1153921/71961672-8cb0b080-3200-11ea-84f8-9139c7434110.png" alt="Install Netdata on macOS" />macOS</h3>
     <ul>
       <li><a href="methods/macos/#with-homebrew">Homebrew</a></li>

@@ -7,15 +7,16 @@ multiple instances in a [master/slave streaming](../../../streaming/README.md) c
 In some cases, using Netdata on these cloud providers requires unique installation or configuration steps. This page
 aims to document some of those steps for popular cloud providers.
 
-If you find new issues specific to a cloud provider, or would like to help clarify the correct workaround, please
-[create an
-issue](https://github.com/netdata/netdata/issues/new?labels=feature+request%2C+needs+triage&template=feature_request.md)
-with your process and instructions on using the provider's interface to complete the workaround.
+> This document is a work-in-progress! If you find new issues specific to a cloud provider, or would like to help
+> clarify the correct workaround, please [create an
+> issue](https://github.com/netdata/netdata/issues/new?labels=feature+request%2C+needs+triage&template=feature_request.md)
+> with your process and instructions on using the provider's interface to complete the workaround.
 
--   [Recommended installation method](#recommended-installation-method-for-cloud-providers)
--   [Add a firewall rule to access Netdata's dashboard](#add-a-firewall-rule-to-access-netdatas-dashboard)
+-   [Recommended installation methods for cloud providers](#recommended-installation-methods-for-cloud-providers)
+-   [Post-installation configuration](#post-installation-configuration)
+    -   [Add a firewall rule to access Netdata's dashboard](#add-a-firewall-rule-to-access-netdatas-dashboard)
 
-## Recommended installation method for cloud providers
+## Recommended installation methods for cloud providers
 
 The best installation method depends on the instance's operating system, distribution, and version. For Linux instances,
 we recommend either the [`kickstart.sh` automatic installation script](kickstart.md) or [.deb/.rpm
@@ -24,10 +25,15 @@ packages](packages.md).
 To see the full list of approved methods for each operating system/version we support, see our [distribution
 matrix](../../DISTRIBUTIONS.md). That table will guide you to the various supported methods for your cloud instance.
 
-If you have issues with Netdata after installation, look to the sections below to find any post-installation
-configuration steps for your cloud provider.
+If you have issues with Netdata after installation, look to the sections below to find the issue you're experiencing,
+followed by the solution for your provider.
 
-## Add a firewall rule to access Netdata's dashboard
+## Post-installation configuration
+
+Some cloud providers require you take additional steps to properly configure your instance or its networking to access
+all of Netdata's features.
+
+### Add a firewall rule to access Netdata's dashboard
 
 If you cannot access Netdata's dashboard on your cloud instance via `http://HOST:19999`, and instead get an error page
 from your browser that says, "This site can't be reached" (Chrome) or "Unable to connect" (Firefox), you may need to
@@ -40,9 +46,9 @@ it's easy to overlook them when trying to configure and access Netdata's dashboa
 
 You can often confirm a firewall issue by querying the dashboard while connected to the instance via SSH: `curl
 http://localhost:19999/api/v1/info`. If you see JSON output, Netdata is running properly. If you try the same `curl`
-command from a remote IP, and it fails, it's likely that a firewall is blocking your requests.
+command from a remote system, and it fails, it's likely that a firewall is blocking your requests.
 
-### Google Cloud Platform (GCP)
+#### Google Cloud Platform (GCP)
 
 To add a firewall rule, go to the [Firewall rules page](https://console.cloud.google.com/networking/firewalls/list) and
 click **Create firewall rule**. Read GCP's [firewall documentation](https://cloud.google.com/vpc/docs/using-firewalls)
