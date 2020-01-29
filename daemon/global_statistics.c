@@ -685,8 +685,8 @@ void global_statistics_charts(void) {
                 rd_dirty = rrddim_add(st_pg_cache_pages, "dirty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 rd_backfills = rrddim_add(st_pg_cache_pages, "backfills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 rd_evictions = rrddim_add(st_pg_cache_pages, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                rd_used_by_collectors = rrddim_add(st_pg_cache_pages, "used_by_collectors", NULL, -1, 1,
-                                                   RRD_ALGORITHM_INCREMENTAL);
+                rd_used_by_collectors = rrddim_add(st_pg_cache_pages, "used_by_collectors", NULL, 1, 1,
+                                                   RRD_ALGORITHM_ABSOLUTE);
             }
             else
                 rrdset_next(st_pg_cache_pages);
