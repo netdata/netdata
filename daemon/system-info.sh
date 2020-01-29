@@ -105,6 +105,7 @@ else
                 CONTAINER_OS_DETECTION="/etc/os-release"
         fi
 
+        # shellcheck disable=SC2153
         if [ "${NAME}" = "unknown" ] || [ "${VERSION}" = "unknown" ] || [ "${ID}" = "unknown" ]; then
                 if [ -f "/etc/lsb-release" ]; then
                         if [ "${OS_DETECTION}" = "unknown" ]; then
@@ -321,17 +322,17 @@ elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
         DISK_SIZE="$((total * 1024))"
 else
         if [ -d /sys/block ] ; then
-                # List of device majors we actually count towards total disk space.
-                # The meanings of these can be found in `Documentation/admin-guide/devices.txt` in the Linux sources.
-                # The ':' surrounding each number are important for matching.
-                dev_major_whitelist=':3:8:9:21:22:28:31:33:34:44:45:47:48:49:50:51:52:53:54:55:56:57:65:66:67:68:69:70:71:72:73:74:75:76:77:78:79:88:89:90:91:93:94:96:98:101:104:105:106:107:108:109:110:111:112:114:116:128:129:130:131:132:134:135:136:137:138:139:140:141:142:143:153:160:161:179:180:202:256:257:'
+                dev_major_whitelist=''
 
-                # These device types use dynamic device majors, so we have to hunt for them in `/proc/devices`
-                dynamic_device_names='vbd nvme'
+                # This is a list of device names used for block storage devices.
+                # These translate to the prefixs of files in `/dev` indicating the device type.
+                # They are sorted by lowest used device major number, with dynamically assigned ones at the end.
+                # We use this to look up device major numbers in `/proc/devices`
+                device_names='hd sd mfm ad ftl pd nftl dasd intfl mmcblk ub xvd rfd vbd nvme'
 
-                for name in ${dynamic_device_names} ; do
+                for name in ${device_names} ; do
                         if grep -qE " ${name}\$" /proc/devices ; then
-                                dev_major_whitelist="${dev_major_whitelist}:$(grep -E "${name}\$" /proc/devices | cut -f 1 -d ' ' | sed -e 's/^[[:space:]]*//'):"
+                                dev_major_whitelist="${dev_major_whitelist}:$(grep -E "${name}\$" /proc/devices | cut -f 1 -d ' ' | sed -e 's/^[[:space:]]*//' | tr '\n' ':'):"
                         fi
                 done
 
