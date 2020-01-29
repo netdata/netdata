@@ -5,6 +5,10 @@ addons:
   apt:
     packages: ['moreutils']
 
+env:
+  global:
+    - RELEASE_CHANNEL=nightly
+
 before_install:
   - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
@@ -462,6 +466,8 @@ jobs:
     # We only publish if a TAG has been set during packaging
     - stage: Publish for release
       _template: &RELEASE_TEMPLATE
+        env:
+          - RELEASE_CHANNEL: stable
         git:
           depth: false
         script:
