@@ -1,0 +1,42 @@
+FROM centos:8
+
+#
+# Install Build Dependencies
+#
+
+# Enable config-manager (NEW)
+RUN yum install -y 'dnf-command(config-manager)'
+
+# Enable PowerTools (NEW)
+RUN yum config-manager --set-enabled PowerTools
+
+# Update yum (copied from docs)
+RUN yum update -y
+
+# Enable EPEL (copied from docs)
+RUN yum install -y epel-release
+
+# Install Devel Packages (copied from docs)
+RUN yum install -y autoconf automake curl gcc git libmnl-devel libuuid-devel \
+	               openssl-devel make nc pkgconfig zlib-devel
+
+# Install Judy-Devel directly (NEW)
+# XXX: dnf --enablerepo=PowerTools install Judy-devel (FAILS)
+# See: https://centos.pkgs.org/8/centos-powertools-x86_64/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm.html
+RUN yum install -y http://mirror.centos.org/centos/8/PowerTools/x86_64/os/Packages/Judy-devel-1.0.5-18.module_el8.1.0+217+4d875839.x86_64.rpm
+
+# Install Repo for libuv-devl (NEW)
+RUN yum install -y https://extras.getpagespeed.com/release-el8-latest.rpm
+
+# Install libuv-devel (NEW)
+RUN yum install -y libuv-devel
+
+# Install python3 (NEW)
+RUN yum install -y python3
+
+# Copy Sources (TESTING)
+WORKDIR /netdata
+COPY . .
+
+# Build it (TESTING)
+CMD ["./netdata-installer.sh"]
