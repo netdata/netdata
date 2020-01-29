@@ -88,9 +88,9 @@ lookup: average -1m percentage of used
 Let's look into each of the lines to see how they create a working health entity.
 
 -   `alarm`: The name for your new entity. The name needs to follow these requirements:
-     - Any alphabet letter or number.
-     - The symbols `.` and `_`.
-     - Cannot be `chart name`, `dimension name`, `family name`, or `chart variable names`.  
+     -   Any alphabet letter or number.
+     -   The symbols `.` and `_`.
+     -   Cannot be `chart name`, `dimension name`, `family name`, or `chart variable names`.  
 -   `on`: Which chart the entity listens to.
 -   `lookup`: Which metrics the alarm monitors, the duration of time to monitor, and how to process the metrics into a
     usable format.
