@@ -349,12 +349,11 @@ else
                 done
         elif df --version 2>/dev/null | grep -qF "GNU coreutils" ; then
                 DISK_DETECTION="df"
-                DISK_SIZE="$(df -x tmpfs -x devtmpfs -x squashfs -l --total -B1 --output=size | tail -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+                DISK_SIZE=$(($(df -x tmpfs -x devtmpfs -x squashfs -l -B1 --output=source,size | tail -n +2 | sort -u -k 1 | awk '{print $2}' | tr '\n' '+' | head -c -1)))
         else
                 DISK_DETECTION="df"
                 include_fs_types="ext*|btrfs|xfs|jfs|reiser*|zfs"
-                total="$(df -T -P | grep "${include_fs_types}" | awk '{s+=$3} END {print s}')"
-                DISK_SIZE="$((total * 1024))"
+                DISK_SIZE=$(($(df -T -P | tail -n +2 | sort -u -k 1 | grep "${include_fs_types}" | awk '{print $3}' | tr '\n' '+' | head -c -1) * 1024))
         fi
 fi
 
