@@ -24,6 +24,25 @@ We provide two separate repositories, one for our stable releases and one for ou
 
 Visit the repository pages and follow the quick set-up instructions to get started.
 
+## Using caching proxies with PackageCloud repositories
+
+PackageCloud only provides HTTPS access to repositories they host, which
+means in turn that Netdata's package repositories are only accessible
+via HTTPS. This is known to cause issues with some setups that use a
+caching proxy for package downloads.
+
+If you are using such a setup, there are a couple of ways you can work around this:
+
+* Configure your proxy to automatically pass through HTTPS connections
+  without caching them. This is the simplest solution, but means that
+  downloads of Netdata pacakges will not be cached.
+* Mirror the respository locally on your proxy system, and use that mirror
+  when installing on other systems. This requires more setup and more disk
+  space on the caching host, but it lets you cache the packages locally.
+* Some specific caching proxies may have alternative configuration
+  options to deal with these issues. You can find such options in their
+  documentation.
+
 ## What's next?
 
 When you finish installing Netdata, be sure to visit our [step-by-step tutorial](../../../docs/step-by-step/step-00.md)
