@@ -784,6 +784,22 @@ struct label *load_auto_labels()
         label_list =
             add_label_to_list(label_list, "_kernel_version", localhost->system_info->kernel_version, LABEL_SOURCE_AUTO);
 
+    if (localhost->system_info->host_cores)
+        label_list =
+                add_label_to_list(label_list, "_system_cores", localhost->system_info->host_cores, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->host_cpu_freq)
+        label_list =
+                add_label_to_list(label_list, "_system_cpu_freq", localhost->system_info->host_cpu_freq, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->host_ram_total)
+        label_list =
+                add_label_to_list(label_list, "_system_ram_total", localhost->system_info->host_ram_total, LABEL_SOURCE_AUTO);
+
+    if (localhost->system_info->host_disk_space)
+        label_list =
+                add_label_to_list(label_list, "_system_disk_space", localhost->system_info->host_disk_space, LABEL_SOURCE_AUTO);
+
     if (localhost->system_info->architecture)
         label_list =
             add_label_to_list(label_list, "_architecture", localhost->system_info->architecture, LABEL_SOURCE_AUTO);
