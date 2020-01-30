@@ -116,12 +116,10 @@ BuildRequires: openssl-devel
 %if 0%{?suse_version}
 BuildRequires: judy-devel
 BuildRequires: liblz4-devel
-BuildRequires: netcat-openbsd
 BuildRequires: json-glib-devel
 %else
 BuildRequires: Judy-devel
 BuildRequires: lz4-devel
-BuildRequires: nc
 BuildRequires: json-c-devel
 %endif
 
