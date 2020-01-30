@@ -16,10 +16,14 @@
 # include <unistd.h>
 # include <dlfcn.h>
 
-# define NETDATA_GLOBAL_VECTOR 14
-# define NETDATA_MAX_FILE_VECTOR 7
-# define NETDATA_IN_START_BYTE 2
-# define NETDATA_OUT_START_BYTE 3
+# define NETDATA_GLOBAL_VECTOR 18
+# define NETDATA_MAX_FILE_VECTOR 9
+# define NETDATA_FILE_ERRORS 5
+
+# define NETDATA_DEL_START 2
+# define NETDATA_IN_START_BYTE 3
+# define NETDATA_EXIT_START 5
+# define NETDATA_PROCESS_START 7
 
 # define NETDATA_VFS_THREAD (uint32_t)2
 
@@ -60,7 +64,7 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_FILE_GROUP "file"
 # define NETDATA_PROCESS_GROUP "process"
 
-# define NETDATA_VFS_FILE_OPEN_COUNT "open_files"
+# define NETDATA_FILE_OPEN_CLOSE_COUNT "file_descriptor"
 # define NETDATA_VFS_FILE_CLEAN_COUNT "delete_files"
 # define NETDATA_VFS_FILE_IO_COUNT "io"
 # define NETDATA_VFS_FILE_ERR_COUNT "error_call"

@@ -60,7 +60,7 @@ netdata_syscall_stat_t *apps_data = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
-static int kretprobe = 0;
+static int kretprobe = 1;
 
 pthread_mutex_t lock;
 
@@ -160,14 +160,14 @@ static void netdata_create_io_chart(char *family, char *name, char *msg, char *a
 
 static void netdata_global_charts_create() {
     netdata_create_chart(NETDATA_EBPF_FAMILY
-            ,NETDATA_VFS_FILE_OPEN_COUNT
+            ,NETDATA_FILE_OPEN_CLOSE_COUNT
             , "Count the total of calls made to the operate system per period to open a file descriptor."
             , "Number of calls"
             , NETDATA_FILE_GROUP
             , 970
             , netdata_create_global_dimension
             , publish_aggregated
-            , 1);
+            , 2);
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_VFS_FILE_CLEAN_COUNT
@@ -176,7 +176,7 @@ static void netdata_global_charts_create() {
             , NETDATA_FILE_GROUP
             , 971
             , netdata_create_global_dimension
-            , &publish_aggregated[1]
+            , &publish_aggregated[NETDATA_DEL_START]
             , 1);
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
@@ -203,18 +203,21 @@ static void netdata_global_charts_create() {
             , NETDATA_PROCESS_GROUP
             , 975
             , netdata_create_global_dimension
-            , &publish_aggregated[6]
-            , 1);
+            , &publish_aggregated[NETDATA_PROCESS_START]
+            , 2);
 
-    netdata_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_VFS_FILE_ERR_COUNT
-            , "Count the total of errors"
-            , "Number of calls"
-            , NETDATA_FILE_GROUP
-            , 977
-            , netdata_create_global_dimension
-            , publish_aggregated
-            , NETDATA_MAX_FILE_VECTOR);
+    if(kretprobe) {
+        netdata_create_chart(NETDATA_EBPF_FAMILY
+                , NETDATA_VFS_FILE_ERR_COUNT
+                , "Count the total of errors"
+                , "Number of calls"
+                , NETDATA_FILE_GROUP
+                , 977
+                , netdata_create_global_dimension
+                , publish_aggregated
+                , NETDATA_FILE_ERRORS);
+
+    }
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_EXIT_SYSCALL
@@ -223,7 +226,7 @@ static void netdata_global_charts_create() {
             , NETDATA_PROCESS_GROUP
             , 977
             , netdata_create_global_dimension
-            , &publish_aggregated[4]
+            , &publish_aggregated[NETDATA_EXIT_START]
             , 2);
 }
 
@@ -325,12 +328,14 @@ static void netdata_publish_data() {
     netdata_publish_vfs_common_t pvc;
     netdata_update_publish(publish_aggregated, &pvc, aggregated_data);
 
-    write_global_count_chart(NETDATA_VFS_FILE_OPEN_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 1);
-    write_global_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[1], 1);
+    write_global_count_chart(NETDATA_FILE_OPEN_CLOSE_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 2);
+    write_global_count_chart(NETDATA_VFS_FILE_CLEAN_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_DEL_START], 1);
     write_global_count_chart(NETDATA_VFS_FILE_IO_COUNT, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_IN_START_BYTE], 2);
-    write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[4], 2);
-    write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[6], 1);
-    write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, 3);
+    write_global_count_chart(NETDATA_EXIT_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], 2);
+    write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
+    if(kretprobe) {
+        write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, NETDATA_FILE_ERRORS);
+    }
 
     write_io_chart(NETDATA_EBPF_FAMILY, &pvc);
 }
@@ -369,17 +374,22 @@ static void move_from_kernel2user_global() {
     }
 
     aggregated_data[0].call = res[0]; //open
-    aggregated_data[1].call = res[8]; //unlink
-    aggregated_data[2].call = res[2]; //write
-    aggregated_data[3].call = res[5]; //read
-    aggregated_data[4].call = res[10]; //exit
-    aggregated_data[5].call = res[11]; //release
-    aggregated_data[6].call = res[12]; //fork
+    aggregated_data[1].call = res[14]; //close
+    aggregated_data[2].call = res[8]; //unlink
+    aggregated_data[3].call = res[2]; //write
+    aggregated_data[4].call = res[5]; //read
+    aggregated_data[5].call = res[10]; //exit
+    aggregated_data[6].call = res[11]; //release
+    aggregated_data[7].call = res[12]; //fork
+    aggregated_data[8].call = res[16]; //thread
 
     aggregated_data[0].ecall = res[1]; //open
-    aggregated_data[1].ecall = res[9]; //unlink
-    aggregated_data[2].ecall = res[3]; //write
-    aggregated_data[3].ecall = res[6]; //read
+    aggregated_data[1].ecall = res[15]; //close
+    aggregated_data[2].ecall = res[9]; //unlink
+    aggregated_data[3].ecall = res[3]; //write
+    aggregated_data[6].ecall = res[6]; //read
+    aggregated_data[7].ecall = res[13]; //fork
+    aggregated_data[8].ecall = res[17]; //thread
 
     aggregated_data[2].bytes = (uint64_t)res[4]; //write
     aggregated_data[3].bytes = (uint64_t)res[7]; //read
@@ -412,7 +422,7 @@ void *process_collector(void *ptr)
 void set_global_labels() {
     int i;
 
-    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "unlink", "write", "read", "exit", "release_task", "fork" };
+    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "close", "unlink", "write", "read", "exit", "release_task", "process", "thread" };
 
     netdata_syscall_stat_t *is = aggregated_data;
     netdata_syscall_stat_t *prev = NULL;
@@ -492,7 +502,7 @@ int process_load_ebpf()
 {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, (!kretprobe)?"pnetdata_ebpf_process.o":"knetdata_ebpf_process.o" );
+    build_complete_path(lpath, 4096, (!kretprobe)?"pnetdata_ebpf_process.o":"rnetdata_ebpf_process.o" );
     if (load_bpf_file(lpath) ) {
         error("[EBPF_PROCESS] Cannot load program: %s.", lpath);
         return -1;
