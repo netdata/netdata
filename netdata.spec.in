@@ -517,6 +517,9 @@ are sensor monitoring, system event monitoring, power control, and serial-over-L
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
+* Thu Jan 01 2020 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-12
+- Add explicit installation of log and cache directories
+- Clean up build dependencies.
 * Thu Dec 19 2019 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-11
 - Fix remaining ownership and permissions issues.
 * Mon Nov 04 2019 Konstantinos Natsakis <konstantinos.natsakis@gmail.com> 0.0.0-10
