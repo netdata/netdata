@@ -100,7 +100,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
-	aclk \
+    aclk \
     $(NULL)
 
 
@@ -109,7 +109,7 @@ AM_CFLAGS = \
     $(OPTIONAL_NFACCT_CFLAGS) \
     $(OPTIONAL_ZLIB_CFLAGS) \
     $(OPTIONAL_UUID_CFLAGS) \
-	$(OPTIONAL_MQTT_CFLAGS) \
+    $(OPTIONAL_MQTT_CFLAGS) \
     $(OPTIONAL_LIBCAP_LIBS) \
     $(OPTIONAL_IPMIMONITORING_CFLAGS) \
     $(OPTIONAL_CUPS_CFLAGS) \
@@ -463,7 +463,7 @@ ACLK_PLUGIN_FILES = \
     aclk/agent_cloud_link.h \
     aclk/mqtt.c \
     aclk/mqtt.h \
-	$(NULL)
+    $(NULL)
 
 EXPORTING_ENGINE_FILES = \
     exporting/exporting_engine.c \
