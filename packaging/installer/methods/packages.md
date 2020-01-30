@@ -8,9 +8,8 @@ For certain Linux distributions (see our [distribution matrix](../../DISTRIBUTIO
 architectures), these packages integrate tightly with your system's package manager, making them easier to maintain,
 update, and uninstall.
 
-We currently use [packagecloud](https://packagecloud.io/netdata/) to supply repositories and packages.
-
-We provide two separate repositories, one for nightly releases and another for stable releases.
+We currently use [packagecloud](https://packagecloud.io/netdata/) to supply repositories and packages. We provide two
+separate repositories, one for nightly releases, and another for stable releases.
 
 -   Nightly releases: [netdata/netdata-edge](https://packagecloud.io/netdata/netdata-edge)
 -   Stable releases: [netdata/netdata](https://packagecloud.io/netdata/netdata)
@@ -20,26 +19,46 @@ differences between the two.
 
 ## Quickstart
 
-packagecloud offers two helper installation scripts for `.deb` and `.rpm` distributions. Use one of the two scripts
-below to install Netdata get _automatic nightly updates_ via your package manager.
+packagecloud offers helper installation scripts to add their repositories to your package manager. Jump to your
+distribution and use the commands to install Netdata get _automatic nightly updates_ via your distribution's package
+manager. You can also manually add the repositories on [`.deb`
+systems](https://packagecloud.io/netdata/netdata-edge/install#manual-deb) or [`.rpm`
+systems](https://packagecloud.io/netdata/netdata-edge/install#manual-rpm).
 
-For `.deb` systems (Ubuntu, Debian)
+-   [Ubuntu and Debian (`.deb`)](#ubuntu-and-debian-deb)
+-   [Fedora (`.rpm`)](#fedora-rpm)
+
+### Ubuntu and Debian (`.deb`)
+
+Use the helper script to add the packagecloud repository, then use `apt` to install Netdata.
 
 ```bash
 curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.deb.sh | sudo bash
-```
-
-For `.rpm` systems (Fedora, CentOS, RHEL, OpenSuSE)
-
-```bash
-curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.rpm.sh | sudo bash
+sudo apt-get update
+sudo apt-get install netdata
 ```
 
 Skip ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
 
-If you prefer to add the packagecloud repositories to your package manager's repository list manually, see the
-instructions for [`.deb` systems](https://packagecloud.io/netdata/netdata-edge/install#manual-deb) or [`.rpm`
-systems](https://packagecloud.io/netdata/netdata-edge/install#manual-rpm).
+### Fedora (`.rpm`)
+
+Use the helper script to add the packagecloud repository, then use `dnf` to install Netdata.
+
+For `.rpm` systems using YUM (Fedora, CentOS, RHEL, OpenSuSE):
+
+```bash
+curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.rpm.sh | sudo bash
+sudo dnf update
+sudo dnf install netdata
+```
+
+Skip ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
+
+### Other operating systems
+
+While RHEL, CentOS, and Open SuSE all support `.rpm` packages, full support via these packages is still a
+work-in-progress. See our [distribution matrix](../../DISTRIBUTIONS.md) to understand whether you can install Netdata
+via `.rpm` packages, and then use your package manager to add the packagecloud repository and install Netdata.
 
 ## Using caching proxies with packagecloud repositories
 
