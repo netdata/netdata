@@ -48,6 +48,17 @@ You can often confirm a firewall issue by querying the dashboard while connected
 http://localhost:19999/api/v1/info`. If you see JSON output, Netdata is running properly. If you try the same `curl`
 command from a remote system, and it fails, it's likely that a firewall is blocking your requests.
 
+Another option is to put Netdata behind web server, which will proxy requests through standard HTTP/HTTPS ports
+(80/443), which are likely already open on your instance. We have a number of guides available:
+
+-   [Apache](../../../docs/Running-behind-apache.md)
+-   [Nginx](../../../docs/Running-behind-nginx.md)
+-   [Caddy](../../../docs/Running-behind-caddy.md)
+-   [HAProxy](../../../docs/Running-behind-haproxy.md)
+-   [lighttpd](../../../docs/Running-behind-lighttpd.md)
+
+The next few sections outline how to add firewall rules to GCP, AWS, and Azure instances.
+
 #### Google Cloud Platform (GCP)
 
 To add a firewall rule, go to the [Firewall rules page](https://console.cloud.google.com/networking/firewalls/list) and
