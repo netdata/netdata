@@ -156,6 +156,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);
+    netdata_rwlock_init(&host->labels_rwlock);
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
@@ -681,6 +682,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
+    netdata_rwlock_destroy(&host->labels_rwlock);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host);
@@ -1104,6 +1106,7 @@ void free_host_labels(struct label *labels)
 
 void replace_label_list(RRDHOST *host, struct label *new_labels)
 {
+    rrdhost_check_rdlock(host);
     netdata_rwlock_wrlock(&host->labels_rwlock);
     struct label *old_labels = host->labels;
     host->labels = new_labels;
@@ -1161,9 +1164,11 @@ void reload_host_labels()
     new_labels = merge_label_lists(new_labels, from_tags);
     new_labels = merge_label_lists(new_labels, from_config);
 
+    rrdhost_rdlock(localhost);
     replace_label_list(localhost, new_labels);
 
     health_label_log_save(localhost);
+    rrdhost_unlock(localhost);
 
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
         localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;

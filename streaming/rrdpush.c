@@ -347,6 +347,7 @@ void rrdpush_send_labels(RRDHOST *host) {
         return;
 
     rrdpush_buffer_lock(host);
+    rrdhost_check_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
 
     struct label *labels = host->labels;
