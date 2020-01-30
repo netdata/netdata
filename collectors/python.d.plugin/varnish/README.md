@@ -10,7 +10,7 @@ It uses the `varnishstat` command to provide Varnish Cache statistics.
 
 ## Charts
 
-It produces following charts:
+This module produces the following charts:
 
 -   Connections Statistics in `connections/s`
 -   Client Requests in `requests/s`
