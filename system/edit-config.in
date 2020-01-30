@@ -4,18 +4,17 @@
 
 file="${1}"
 
-if [ "$(command -v editor)" ] ; then
-    EDITOR="${EDITOR-editor}"
+if [ "$(command -v editor)" ]; then
+  EDITOR="${EDITOR-editor}"
 else
-    EDITOR="${EDITOR-vi}"
+  EDITOR="${EDITOR-vi}"
 fi
 
-[ -z "${NETDATA_USER_CONFIG_DIR}"  ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
+[ -z "${NETDATA_USER_CONFIG_DIR}" ] && NETDATA_USER_CONFIG_DIR="@configdir_POST@"
 [ -z "${NETDATA_STOCK_CONFIG_DIR}" ] && NETDATA_STOCK_CONFIG_DIR="@libconfigdir_POST@"
 
-if [ -z "${file}" ]
-then
-	cat <<USAGE
+if [ -z "${file}" ]; then
+  cat << EOF
 
 USAGE:
   ${0} FILENAME
@@ -30,71 +29,67 @@ USAGE:
 
   Available files in '${NETDATA_STOCK_CONFIG_DIR}' to copy and edit:
 
-USAGE
+EOF
 
-	cd "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
-	ls >&2 -R *.conf */*.conf
-	exit 1
+  cd "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
+  ls >&2 -R *.conf */*.conf
+  exit 1
 
 fi
 
 file_is_in_path() {
-	local file path real
-	file="${1}"
-	path="${2}"
-	
-	real="$(readlink -f "${file}")"
+  local file path real
+  file="${1}"
+  path="${2}"
 
-	# we don't have working readlink
-	[ -z "${real}" ] && return 0
+  real="$(readlink -f "${file}")"
 
-	if [ ! -z "${real}" ] && [ -z "$(echo "${real}" | grep -E "^${path}.*$")" ]
-	then
-		echo >&2 "File '${file}' is physically at '${real}', which is not in '${path}'. Aborting."
-		exit 1
-	fi
+  # we don't have working readlink
+  [ -z "${real}" ] && return 0
 
-	return 0
+  if [ ! -z "${real}" ] && [ -z "$(echo "${real}" | grep -E "^${path}.*$")" ]; then
+    echo >&2 "File '${file}' is physically at '${real}', which is not in '${path}'. Aborting."
+    exit 1
+  fi
+
+  return 0
 }
 
 edit() {
-	echo >&2 "Editing '${1}' ..."
+  echo >&2 "Editing '${1}' ..."
 
-	# check we can edit
-	file_is_in_path "${1}" "${NETDATA_USER_CONFIG_DIR}" || exit 1
+  # check we can edit
+  file_is_in_path "${1}" "${NETDATA_USER_CONFIG_DIR}" || exit 1
 
-	"${EDITOR}" "${1}"
-	exit $?
+  "${EDITOR}" "${1}"
+  exit $?
 }
 
 copy_and_edit() {
-	# check we can copy
-	file_is_in_path "${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
+  # check we can copy
+  file_is_in_path "${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
 
-	if [ ! -f "${NETDATA_USER_CONFIG_DIR}/${1}" ]
-	then
-		echo >&2 "Copying '${NETDATA_STOCK_CONFIG_DIR}/${1}' to '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
-		cp -p "${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_USER_CONFIG_DIR}/${1}" || exit 1
-	fi
+  if [ ! -f "${NETDATA_USER_CONFIG_DIR}/${1}" ]; then
+    echo >&2 "Copying '${NETDATA_STOCK_CONFIG_DIR}/${1}' to '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
+    cp -p "${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_USER_CONFIG_DIR}/${1}" || exit 1
+  fi
 
-	edit "${NETDATA_USER_CONFIG_DIR}/${1}"
+  edit "${NETDATA_USER_CONFIG_DIR}/${1}"
 }
 
 # make sure it is not absolute filename
 c1="$(echo "${file}" | cut -b 1)"
-if [ "${c1}" = "/" ] || [ "${c1}" = "." ]
-then
-	echo >&2 "Please don't use filenames starting with '/' or '.'"
-	exit 1
+if [ "${c1}" = "/" ] || [ "${c1}" = "." ]; then
+  echo >&2 "Please don't use filenames starting with '/' or '.'"
+  exit 1
 fi
 
 # already exists
-if [ -f "${NETDATA_USER_CONFIG_DIR}/${file}" ]
-then
-	edit "${NETDATA_USER_CONFIG_DIR}/${file}"
+if [ -f "${NETDATA_USER_CONFIG_DIR}/${file}" ]; then
+  edit "${NETDATA_USER_CONFIG_DIR}/${file}"
 fi
 
-[ -f "${NETDATA_USER_CONFIG_DIR}/${file}"  ] && edit "${NETDATA_USER_CONFIG_DIR}/${file}"
+[ -f "${NETDATA_USER_CONFIG_DIR}/${file}" ] && edit "${NETDATA_USER_CONFIG_DIR}/${file}"
 [ -f "${NETDATA_STOCK_CONFIG_DIR}/${file}" ] && copy_and_edit "${file}"
 
 echo >&2 "File '${file}' is not found in '${NETDATA_STOCK_CONFIG_DIR}'"
