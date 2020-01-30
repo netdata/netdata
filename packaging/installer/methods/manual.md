@@ -117,7 +117,7 @@ Netdata DB engine can be enabled when these are installed (they are optional):
 
 ### CentOS / RHEL 8.x
 
-For CentOS / RHEL 8.x a lot of development packages have moved out into thwi
+For CentOS / RHEL 8.x a lot of development packages have moved out into their
 own separate repositories. Some other dependeicies are either missing completely
 or have to be sourced by 3rd-parties.
 
