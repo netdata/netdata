@@ -51,9 +51,10 @@ command from a remote system, and it fails, it's likely that a firewall is block
 #### Google Cloud Platform (GCP)
 
 To add a firewall rule, go to the [Firewall rules page](https://console.cloud.google.com/networking/firewalls/list) and
-click **Create firewall rule**. Read GCP's [firewall documentation](https://cloud.google.com/vpc/docs/using-firewalls)
-for specific instructions on how to create a new firewall rule. The following configuration has previously worked for
-Netdata running on GCP instances ([#7786](https://github.com/netdata/netdata/issues/7786)):
+click **Create firewall rule**.
+
+The following configuration has previously worked for Netdata running on GCP instances
+([see #7786](https://github.com/netdata/netdata/issues/7786)):
 
 ```conf
 Name: <name>
@@ -64,3 +65,47 @@ Protocols/ports: 19999
 Action: allow
 Priority: 1000
 ```
+
+Read GCP's [firewall documentation](https://cloud.google.com/vpc/docs/using-firewalls) for specific instructions on how
+to create a new firewall rule.
+
+#### Amazon Web Services (AWS) / EC2
+
+Sign in to the [AWS console](https://console.aws.amazon.com/) and navigate to the EC2 dashboard. Click on the **Security
+Groups** link in the naviagtion, beneath the **Network & Security** heading. Find the Security Group your instance
+belongs to, and either right-click on it or click the **Actions** button above to see a dropdown menu with **Edit
+inbound rules**.
+
+Add a new rule with the following options:
+
+```conf
+Type: Custom TCP
+Protocol: TCP
+Port Range: 19999
+Source: Anywhere
+Description: Netdata
+```
+
+You can also choose **My IP** as the source if you prefer.
+
+Click **Save** to apply your new inbound firewall rule.
+
+#### Azure
+
+Sign in to the [Azure portal](https://portal.azure.com) and open the virtual machine running Netdata. Click on the
+**Networking** link beneath the **Settings** header, then click on the **Add inbound security rule** button.
+
+Add a new rule with the following options:
+
+```conf
+Source: Any
+Source port ranges: 19999
+Destination: Any
+Destination port randes: 19999
+Protocol: TCP
+Action: Allow
+Priority: 310
+Name: Netdata
+```
+
+Click **Add** to apply your new inbound security rule.
