@@ -33,25 +33,24 @@ Skip on ahead to the [What's next?](#whats-next) section to find links to helpfu
 
 ## Install Netdata from source
 
-We don't recommend installing Netdata from source on macOS, as it can be difficult and time-consuming to install
-dependencies manually. However, the 
+We don't recommend installing Netdata from source on macOS, as it can be difficult to configure and install dependencies
+manually.
 
-To install Netdata from source, first open your terminal of choice and install the Xcode
-development packages.
+First open your terminal of choice and install the Xcode development packages.
 
 ```bash
 xcode-select --install
 ```
 
-Click **Install** on the Software Update popup window that appears. Then, use the same terminal session to Homebrew to
-install Netdata's prerequisites.
+Click **Install** on the Software Update popup window that appears. Then, use the same terminal session to use Homebrew
+to install some of Netdata's prerequisites.
 
 ```bash
 brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1
 ```
 
 If you want to use the [database engine](../../../database/engine/README.md) to store your metrics, you need to download
-and install the [Judy library](https://sourceforge.net/projects/judy/) before proceeding further.
+and install the [Judy library](https://sourceforge.net/projects/judy/) before proceeding compiling Netdata.
 
 Next, download Netdata from our GitHub repository:
 
