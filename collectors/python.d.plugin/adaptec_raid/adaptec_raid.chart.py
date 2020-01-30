@@ -5,12 +5,10 @@
 
 
 import re
-
 from copy import deepcopy
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 from bases.collection import find_binary
-
 
 disabled_by_default = True
 

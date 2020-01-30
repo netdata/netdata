@@ -3,12 +3,11 @@
 # Author: Austin S. Hemmelgarn (Ferroin)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import socket
 import platform
 import re
+import socket
 
 from bases.FrameworkServices.SimpleService import SimpleService
-
 from third_party import mcrcon
 
 # Update only every 5 seconds because collection takes in excess of
@@ -43,9 +42,8 @@ CHARTS = {
     }
 }
 
-
 _TPS_REGEX = re.compile(
-    r'^.*: .*?'            # Message lead-in
+    r'^.*: .*?'  # Message lead-in
     r'(\d{1,2}.\d+), .*?'  # 1-minute TPS value
     r'(\d{1,2}.\d+), .*?'  # 5-minute TPS value
     r'(\d{1,2}\.\d+).*$',  # 15-minute TPS value
@@ -107,10 +105,10 @@ class Service(SimpleService):
 
     def is_alive(self):
         if any(
-            [
-                not self.alive,
-                self.console.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1
-            ]
+                [
+                    not self.alive,
+                    self.console.socket.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 0) != 1
+                ]
         ):
             return self.reconnect()
         return True
@@ -131,7 +129,8 @@ class Service(SimpleService):
             else:
                 self.error('Unable to process TPS values.')
                 if not raw:
-                    self.error("'{0}' command returned no value, make sure you set correct password".format(COMMAND_TPS))
+                    self.error(
+                        "'{0}' command returned no value, make sure you set correct password".format(COMMAND_TPS))
         except mcrcon.MCRconException:
             self.error('Unable to fetch TPS values.')
         except socket.error:

@@ -150,7 +150,7 @@ BACKEND_TYPE exporting_select_type(const char *type)
     } else if (!strcmp(type, "json") || !strcmp(type, "json:plaintext")) {
         return BACKEND_TYPE_JSON;
     } else if (!strcmp(type, "prometheus_remote_write")) {
-        return BACKEND_TYPE_PROMETEUS;
+        return BACKEND_TYPE_PROMETHEUS;
     } else if (!strcmp(type, "kinesis") || !strcmp(type, "kinesis:plaintext")) {
         return BACKEND_TYPE_KINESIS;
     } else if (!strcmp(type, "mongodb") || !strcmp(type, "mongodb:plaintext"))
@@ -317,6 +317,18 @@ struct engine *read_exporting_config()
                     exporter_get(instance_name, EXPORTER_DATA_SOURCE, EXPORTER_DATA_SOURCE_DEFAULT);
 
                 tmp_instance->config.options = exporting_parse_data_source(data_source, tmp_instance->config.options);
+
+                if (exporter_get_boolean(
+                        instance_name, EXPORTER_SEND_CONFIGURED_LABELS, EXPORTER_SEND_CONFIGURED_LABELS_DEFAULT))
+                    tmp_instance->config.options |= EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+                else
+                    tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_CONFIGURED_LABELS;
+
+                if (exporter_get_boolean(
+                        instance_name, EXPORTER_SEND_AUTOMATIC_LABELS, EXPORTER_SEND_AUTOMATIC_LABELS_DEFAULT))
+                    tmp_instance->config.options |= EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
+                else
+                    tmp_instance->config.options &= ~EXPORTING_OPTION_SEND_AUTOMATIC_LABELS;
 
                 if (exporter_get_boolean(instance_name, EXPORTER_SEND_NAMES, EXPORTER_SEND_NAMES_DEFAULT))
                     tmp_instance->config.options |= EXPORTING_OPTION_SEND_NAMES;

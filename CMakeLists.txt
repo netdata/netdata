@@ -256,7 +256,7 @@ find_library(HAVE_KINESIS aws-cpp-sdk-kinesis)
 # -----------------------------------------------------------------------------
 # Detect libprotobuf
 
-pkg_check_modules(PROTOBUF protobuf>=3.1)
+pkg_check_modules(PROTOBUF protobuf>=3)
 # later we use:
 # ${PROTOBUF_LIBRARIES}
 # ${PROTOBUF_CFLAGS_OTHER}
@@ -975,6 +975,7 @@ if(BUILD_TESTING)
         -Wl,--wrap=notify_workers
         -Wl,--wrap=send_internal_metrics
         -Wl,--wrap=now_realtime_sec
+        -Wl,--wrap=uv_thread_set_name_np
         -Wl,--wrap=uv_thread_create
         -Wl,--wrap=uv_mutex_lock
         -Wl,--wrap=uv_mutex_unlock

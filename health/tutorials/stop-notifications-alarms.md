@@ -1,6 +1,6 @@
 # Stop notifications for individual alarms
 
-In this short tutorial, you'll learn how to how to stop notifications for individual alarms in Netdata's health
+In this short tutorial, you'll learn how to stop notifications for individual alarms in Netdata's health
 monitoring system. We also refer to this process as _silencing_ the alarm.
 
 Why silence alarms? We designed Netdata's pre-configured alarms  for production systems, so they might not be 

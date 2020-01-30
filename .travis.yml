@@ -5,6 +5,10 @@ addons:
   apt:
     packages: ['moreutils']
 
+env:
+  global:
+    - RELEASE_CHANNEL=nightly
+
 before_install:
   - exec > >(ts -s '%H:%M:%.S ') 2>&1
   - source .travis/utils.sh
@@ -47,16 +51,16 @@ stages:
   - name: Build process
   - name: Artifacts validation
   - name: Artifacts validation on bare OS, stable to current lifecycle checks
-    if: branch = master AND (type = pull_request OR type = cron)
+    if: branch = master AND (type = pull_request OR (type = cron AND env(RUN_NIGHTLY) = yes))
 
     # Nightly operations
   - name: Nightly operations
-    if: branch = master AND type = cron
+    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
 
   - name: Nightly release
-    if: branch = master AND type = cron
+    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
   - name: Trigger deb and rpm package build (nightly release)
-    if: branch = master AND type = cron
+    if: branch = master AND type = cron AND env(RUN_NIGHTLY) = yes
 
     # Scheduled releases
   - name: Support activities on main branch
@@ -121,7 +125,7 @@ jobs:
 
       name: Standard netdata build
       script: fakeroot ./netdata-installer.sh --install $HOME --dont-wait --dont-start-it --enable-plugin-nfacct --enable-plugin-freeipmi --disable-lto
-      env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
+      env: CFLAGS='-O1 -Wall -Wextra -Wformat-signedness -fstack-protector-all -fno-common   -DNETDATA_INTERNAL_CHECKS=1 -D_FORTIFY_SOURCE=2 -DNETDATA_VERIFY_LOCKS=1'
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> standard netdata build is failing (Still dont know which one, will improve soon)"
 
     - name: Docker container build process (alpine installation)
@@ -250,10 +254,7 @@ jobs:
 
 
     - stage: Support activities on main branch
-      name: Run labeler on github issues
-      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
-
-    - name: Generate changelog for release (only on special and tagged commit msg)
+      name: Generate changelog for release (only on special and tagged commit msg)
       before_script: post_message "TRAVIS_MESSAGE" "Support activities on main branch initiated" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
@@ -283,7 +284,6 @@ jobs:
           - sudo apt-get install -y wget lxc python3-lxc python-lxc lxc-templates dh-make git-buildpackage build-essential libdistro-info-perl
           - source tests/installer/slack.sh
         before_script:
-          - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
           - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
         script:
           - echo "GIT Branch:" && git branch
@@ -381,7 +381,6 @@ jobs:
           - sudo apt-get install -y wget lxc lxc-templates python3-lxc python-lxc
           - source tests/installer/slack.sh
         before_script:
-          - post_message "TRAVIS_MESSAGE" "Starting package preparation and publishing for ${BUILD_STRING}.${BUILD_ARCH}" "${NOTIF_CHANNEL}"
           - export PACKAGES_DIRECTORY="$(mktemp -d -t netdata-packaging-contents-dir-XXXXXX)" && echo "Created packaging directory ${PACKAGES_DIRECTORY}"
         script:
           - echo "GIT Branch:" && git branch
@@ -467,9 +466,10 @@ jobs:
     # We only publish if a TAG has been set during packaging
     - stage: Publish for release
       _template: &RELEASE_TEMPLATE
+        env:
+          - RELEASE_CHANNEL: stable
         git:
           depth: false
-        before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images" "${NOTIF_CHANNEL}"
         script:
           - echo "GIT Branch:" && git branch
           - echo "Last commit:" && git log -1
@@ -532,8 +532,7 @@ jobs:
 
       name: Run coverity scan
       before_script:
-        - post_message "TRAVIS_MESSAGE" "Starting nightly operations" "${NOTIF_CHANNEL}"
-        - bash <(curl -sS https://raw.githubusercontent.com/netdata/netdata-demo-site/master/install-required-packages.sh) --dont-wait --non-interactive netdata
+        - bash <(curl -sS https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) --dont-wait --non-interactive netdata
         - sudo apt-get install -y libjson-c-dev libipmimonitoring-dev libcups2-dev libsnappy-dev libprotobuf-dev libprotoc-dev libssl-dev protobuf-compiler
       script: ./coverity-scan.sh --with-install
       after_failure: post_message "TRAVIS_MESSAGE" "<!here> Coverity nightly run has failed" "${NOTIF_CHANNEL}"
@@ -543,12 +542,8 @@ jobs:
     - name: Kickstart files integrity testing (extended)
       script: ./tests/installer/checksums.sh
 
-    - name: Run labeler on github issues
-      script: .travis/labeler.sh  # labeler should be replaced with GitHub Actions when they hit GA
-
       # This is generating the changelog for nightly release and publish it
     - name: Generate nightly changelog
-      before_script: post_message "TRAVIS_MESSAGE" "Starting changelog generation for nightlies" "${NOTIF_CHANNEL}"
       script:
         - ".travis/nightlies.sh"
         - ".travis/check_changelog_last_modification.sh"
@@ -557,7 +552,6 @@ jobs:
         depth: false
 
     - name: Clean up package cloud nightly repository from old versions
-      before_script: post_message "TRAVIS_MESSAGE" "Starting package cloud repository clean up" "${NOTIF_CHANNEL}"
       script:
         - DEPLOY_REPO="netdata-edge" .travis/package_management/old_package_purging.sh
         - DEPLOY_REPO="netdata-devel" .travis/package_management/old_package_purging.sh
@@ -568,7 +562,6 @@ jobs:
       _template: &NIGHTLY_TEMPLATE
         git:
           depth: false
-        before_script: post_message "TRAVIS_MESSAGE" "Publishing docker images for nightlies" "${NOTIF_CHANNEL}"
         script:
           - echo "GIT Branch:" && git branch
           - echo "Last commit:" && git log -1
@@ -604,7 +597,6 @@ jobs:
         - ARCHS=aarch64
 
     - name: Create nightly release artifacts, publish to GCS
-      before_script: post_message "TRAVIS_MESSAGE" "Starting artifacts generation for nightlies" "${NOTIF_CHANNEL}"
       script:
         - echo "GIT Branch:" && git branch
         - echo "Last commit:" && git log -1

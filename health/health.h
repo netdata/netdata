@@ -53,7 +53,7 @@ extern unsigned int default_health_enabled;
 
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
-char *silencers_filename;
+extern char *silencers_filename;
 
 extern void health_init(void);
 extern void *health_main(void *ptr);
@@ -107,6 +107,8 @@ extern void health_alarm_log_free(RRDHOST *host);
 extern void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
 extern void *health_cmdapi_thread(void *ptr);
+
+extern void health_label_log_save(RRDHOST *host);
 
 extern SIMPLE_PATTERN *health_pattern_from_foreach(char *s);
 

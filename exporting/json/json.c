@@ -28,7 +28,7 @@ int init_json_connector(struct connector *connector)
 int init_json_instance(struct instance *instance)
 {
     instance->start_batch_formatting = NULL;
-    instance->start_host_formatting = NULL;
+    instance->start_host_formatting = format_host_labels_json_plaintext;
     instance->start_chart_formatting = NULL;
 
     if (EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED)
@@ -37,7 +37,7 @@ int init_json_instance(struct instance *instance)
         instance->metric_formatting = format_dimension_stored_json_plaintext;
 
     instance->end_chart_formatting = NULL;
-    instance->end_host_formatting = NULL;
+    instance->end_host_formatting = flush_host_labels;
     instance->end_batch_formatting = NULL;
 
     instance->buffer = (void *)buffer_create(0);
@@ -47,6 +47,44 @@ int init_json_instance(struct instance *instance)
     }
     uv_mutex_init(&instance->mutex);
     uv_cond_init(&instance->cond_var);
+
+    return 0;
+}
+
+/**
+ * Format host labels for JSON connector
+ *
+ * @param instance an instance data structure.
+ * @param host a data collecting host.
+ * @return Always returns 0.
+ */
+int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
+{
+    if (!instance->labels)
+        instance->labels = buffer_create(1024);
+
+    if (unlikely(!sending_labels_configured(instance)))
+        return 0;
+
+    buffer_strcat(instance->labels, "\"labels\":{");
+
+    int count = 0;
+    netdata_rwlock_rdlock(&host->labels_rwlock);
+    for (struct label *label = host->labels; label; label = label->next) {
+        if (!should_send_label(instance, label))
+            continue;
+
+        char value[CONFIG_MAX_VALUE * 2 + 1];
+        sanitize_json_string(value, label->value, CONFIG_MAX_VALUE);
+        if (count > 0)
+            buffer_strcat(instance->labels, ",");
+        buffer_sprintf(instance->labels, "\"%s\":\"%s\"", label->key, value);
+
+        count++;
+    }
+    netdata_rwlock_unlock(&host->labels_rwlock);
+
+    buffer_strcat(instance->labels, "},");
 
     return 0;
 }
@@ -80,28 +118,32 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
 
     buffer_sprintf(
         instance->buffer,
+
         "{"
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
         "%s%s%s"
+        "%s"
 
         "\"chart_id\":\"%s\","
         "\"chart_name\":\"%s\","
         "\"chart_family\":\"%s\","
-        "\"chart_context\": \"%s\","
+        "\"chart_context\":\"%s\","
         "\"chart_type\":\"%s\","
-        "\"units\": \"%s\","
+        "\"units\":\"%s\","
 
         "\"id\":\"%s\","
         "\"name\":\"%s\","
         "\"value\":" COLLECTED_NUMBER_FORMAT ","
 
-        "\"timestamp\": %llu}\n",
+        "\"timestamp\":%llu}\n",
+
         engine->config.prefix,
         engine->config.hostname,
         tags_pre,
         tags,
         tags_post,
+        instance->labels ? buffer_tostring(instance->labels) : "",
 
         st->id,
         st->name,
@@ -158,6 +200,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"prefix\":\"%s\","
         "\"hostname\":\"%s\","
         "%s%s%s"
+        "%s"
 
         "\"chart_id\":\"%s\","
         "\"chart_name\":\"%s\","
@@ -171,11 +214,13 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         "\"value\":" CALCULATED_NUMBER_FORMAT ","
 
         "\"timestamp\": %llu}\n",
+
         engine->config.prefix,
         engine->config.hostname,
         tags_pre,
         tags,
         tags_post,
+        instance->labels ? buffer_tostring(instance->labels) : "",
 
         st->id,
         st->name,

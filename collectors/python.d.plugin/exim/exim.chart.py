@@ -5,7 +5,6 @@
 
 from bases.FrameworkServices.ExecutableService import ExecutableService
 
-
 EXIM_COMMAND = 'exim -bpc'
 
 ORDER = [

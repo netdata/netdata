@@ -196,15 +196,13 @@ The default configuration uses a public registry under registry.my-netdata.io (m
 
 If sending this information to the central Netdata registry violates your security policies, you can configure Netdat to [run your own registry](../registry/#run-your-own-registry).
 
-### Opt out of anonymous statistics
+### Opt-out of anonymous statistics
 
-Starting with v1.12 Netdata also collects [anonymous statistics](anonymous-statistics.md) on certain events for: 
+Starting with v1.12, Netdata collects anonymous usage information by default and sends it to Google Analytics. Read
+about the information collected, and learn how to-opt, on our [anonymous statistics](anonymous-statistics.md) page.
 
-1.  **Quality assurance**, to help us understand if Netdata behaves as expected and help us identify repeating issues for certain distributions or environments.
-
-2.  **Usage statistics**, to help us focus on the parts of Netdata that are used the most, or help us identify the extent our development decisions influence the community.
-
-To opt-out from sending anonymous statistics, you can create a file called `.opt-out-from-anonymous-statistics` under the user configuration directory (usually `/etc/netdata`). 
+The usage statistics are _vital_ for us, as we use them to discover bugs and priortize new features. We thank you for
+_actively_ contributing to Netdata's future.
 
 ## Netdata directories
 

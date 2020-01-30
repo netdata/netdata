@@ -98,7 +98,11 @@ void add_metric(const char *name, const char *chart, const char *family, const c
 }
 
 size_t get_write_request_size(){
+#if GOOGLE_PROTOBUF_VERSION < 3001000
+    size_t size = (size_t)snappy::MaxCompressedLength(write_request->ByteSize());
+#else
     size_t size = (size_t)snappy::MaxCompressedLength(write_request->ByteSizeLong());
+#endif
 
     return (size < INT_MAX)?size:0;
 }
