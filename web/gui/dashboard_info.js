@@ -2844,23 +2844,23 @@ netdataDashboard.context = {
     },
 
     'cockroachdb.host_disk_bandwidth': {
-        info: 'Summary statistics across all system host disks.'
+        info: 'Summary disk bandwidth statistics across all system host disks.'
     },
 
     'cockroachdb.host_disk_operations': {
-        info: 'Summary statistics across all system host disks.'
+        info: 'Summary disk operations statistics across all system host disks.'
     },
 
     'cockroachdb.host_disk_iops_in_progress': {
-        info: 'Summary statistics across all system host disks.'
+        info: 'Summary disk iops in progress statistics across all system host disks.'
     },
 
     'cockroachdb.host_network_bandwidth': {
-        info: 'Summary statistics across all system host network interfaces.'
+        info: 'Summary network bandwidth statistics across all system host network interfaces.'
     },
 
     'cockroachdb.host_network_packets': {
-        info: 'Summary statistics across all system host network interfaces.'
+        info: 'Summary network packets statistics across all system host network interfaces.'
     },
 
     'cockroachdb.live_nodes': {
