@@ -32,34 +32,19 @@ USAGE:
 EOF
 
   cd "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
-  ls >&2 -R *.conf */*.conf
+  ls >&2 -R ./*.conf ./*/*.conf
   exit 1
 
 fi
-
-file_is_in_path() {
-  local file path real
-  file="${1}"
-  path="${2}"
-
-  real="$(readlink -f "${file}")"
-
-  # we don't have working readlink
-  [ -z "${real}" ] && return 0
-
-  if [ ! -z "${real}" ] && [ -z "$(echo "${real}" | grep -E "^${path}.*$")" ]; then
-    echo >&2 "File '${file}' is physically at '${real}', which is not in '${path}'. Aborting."
-    exit 1
-  fi
-
-  return 0
-}
 
 edit() {
   echo >&2 "Editing '${1}' ..."
 
   # check we can edit
-  file_is_in_path "${1}" "${NETDATA_USER_CONFIG_DIR}" || exit 1
+  if [ ! -w "${1}" ]; then
+    echo >&2 "Cannot write to ${1}! Aborting ..."
+    exit 1
+  fi
 
   "${EDITOR}" "${1}"
   exit $?
@@ -67,7 +52,10 @@ edit() {
 
 copy_and_edit() {
   # check we can copy
-  file_is_in_path "${NETDATA_STOCK_CONFIG_DIR}/${1}" "${NETDATA_STOCK_CONFIG_DIR}" || exit 1
+  if [ ! -w "${NETDATA_USER_CONFIG_DIR}" ]; then
+    echo >&2 "Cannot write to ${NETDATA_USER_CONFIG_DIR}! Aborting ..."
+    exit 1
+  fi
 
   if [ ! -f "${NETDATA_USER_CONFIG_DIR}/${1}" ]; then
     echo >&2 "Copying '${NETDATA_STOCK_CONFIG_DIR}/${1}' to '${NETDATA_USER_CONFIG_DIR}/${1}' ... "
@@ -85,12 +73,11 @@ if [ "${c1}" = "/" ] || [ "${c1}" = "." ]; then
 fi
 
 # already exists
-if [ -f "${NETDATA_USER_CONFIG_DIR}/${file}" ]; then
-  edit "${NETDATA_USER_CONFIG_DIR}/${file}"
-fi
-
 [ -f "${NETDATA_USER_CONFIG_DIR}/${file}" ] && edit "${NETDATA_USER_CONFIG_DIR}/${file}"
+
+# stock config is valid, copy and edit
 [ -f "${NETDATA_STOCK_CONFIG_DIR}/${file}" ] && copy_and_edit "${file}"
 
+# no such config found
 echo >&2 "File '${file}' is not found in '${NETDATA_STOCK_CONFIG_DIR}'"
 exit 1
