@@ -1,6 +1,6 @@
 # varnish
 
-This module will monitor `Varnish Cache` performance metrics.
+This module will monitor [`Varnish Cache`](https://varnish-cache.org/) performance metrics.
 
 It uses the `varnishstat` command to provide varnish cache statistics.
 
