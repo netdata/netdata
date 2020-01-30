@@ -10,15 +10,15 @@ Type=simple
 User=netdata
 Group=netdata
 RuntimeDirectory=netdata
+CacheDirectory=netdata
+StateDirectory=netdata
+LogsDirectory=netdata
 RuntimeDirectoryMode=0775
-PIDFile=@localstatedir_POST@/run/netdata/netdata.pid
-ExecStart=@sbindir_POST@/netdata -P @localstatedir_POST@/run/netdata/netdata.pid -D
-ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
-ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/cache/netdata
-ExecStartPre=/bin/mkdir -p @localstatedir_POST@/run/netdata
-ExecStartPre=/bin/chown -R netdata:netdata @localstatedir_POST@/run/netdata
-#ExecStopPost=/bin/rm @localstatedir_POST@/run/netdata/netdata.pid
-PermissionsStartOnly=true
+StateDirectoryMode=0750
+CacheDirectoryMode=0750
+LogsDirectoryMode=0750
+PIDFile=netdata/netdata.pid
+ExecStart=@sbindir_POST@/netdata -P $PIDFILE -D
 
 # saving a big db on slow disks may need some time
 TimeoutStopSec=60
