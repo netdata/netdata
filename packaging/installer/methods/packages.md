@@ -2,46 +2,59 @@
 
 ![](https://raw.githubusercontent.com/netdata/netdata/master/web/gui/images/packaging-beta-tag.svg?sanitize=true)
 
-We provide our own flavour of binary packages for the most common operating systems that comply with .RPM and .DEB
-packaging formats.
+This page covers detailed instructions on using `.deb` or `.rpm` packages to install Netdata. 
 
-We have currently released packages following the .RPM format with version
-[1.16.0](https://github.com/netdata/netdata/releases/tag/v1.16.0). We have planned to release packages following the
-.DEB format with version [1.17.0](https://github.com/netdata/netdata/releases/tag/v1.17.0). Early adopters may
-experiment with our .DEB formatted packages using our nightly releases. Our current packaging infrastructure provider is
-[Package Cloud](https://packagecloud.io).
+For certain Linux distributions (see our [distribution matrix](../../DISTRIBUTIONS.md) for supported versions and
+architectures), these packages integrate tightly with your system's package manager, making them easier to maintain,
+update, and uninstall.
 
-Netdata is committed to support installation of our solution to all operating systems. This is a constant battle for
-Netdata, as we strive to automate and make things easier for our users. For the operating system support matrix, please
-visit our [distributions](../../DISTRIBUTIONS.md) support page.
+We currently use [packagecloud](https://packagecloud.io/netdata/) to supply repositories and packages.
 
-We provide two separate repositories, one for our stable releases and one for our nightly releases.
+We provide two separate repositories, one for nightly releases and another for stable releases.
 
-1.  Stable releases: Our stable production releases are hosted in
-    [netdata/netdata](https://packagecloud.io/netdata/netdata) repository of package cloud
-2.  Nightly releases: Our latest releases are hosted in
-    [netdata/netdata-edge](https://packagecloud.io/netdata/netdata-edge) repository of package cloud
+-   Nightly releases: [netdata/netdata-edge](https://packagecloud.io/netdata/netdata-edge)
+-   Stable releases: [netdata/netdata](https://packagecloud.io/netdata/netdata)
 
-Visit the repository pages and follow the quick set-up instructions to get started.
+Read our notice about [nightly vs. stable releases](../README.md#nightly-vs-stable-releases) to understand the
+differences between the two.
 
-## Using caching proxies with PackageCloud repositories
+## Quickstart
 
-PackageCloud only provides HTTPS access to repositories they host, which
-means in turn that Netdata's package repositories are only accessible
-via HTTPS. This is known to cause issues with some setups that use a
-caching proxy for package downloads.
+packagecloud offers two helper installation scripts for `.deb` and `.rpm` distributions. Use one of the two scripts
+below to install Netdata get _automatic nightly updates_ via your package manager.
+
+For `.deb` systems (Ubuntu, Debian)
+
+```bash
+curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.deb.sh | sudo bash
+```
+
+For `.rpm` systems (Fedora, CentOS, RHEL, OpenSuSE)
+
+```bash
+curl -s https://packagecloud.io/install/repositories/netdata/netdata-edge/script.rpm.sh | sudo bash
+```
+
+Skip ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
+
+If you prefer to add the packagecloud repositories to your package manager's repository list manually, see the
+instructions for [`.deb` systems](https://packagecloud.io/netdata/netdata-edge/install#manual-deb) or [`.rpm`
+systems](https://packagecloud.io/netdata/netdata-edge/install#manual-rpm).
+
+## Using caching proxies with packagecloud repositories
+
+packagecloud only provides HTTPS access to repositories they host, which means in turn that Netdata's package
+repositories are only accessible via HTTPS. This is known to cause issues with some setups that use a caching proxy for
+package downloads.
 
 If you are using such a setup, there are a couple of ways you can work around this:
 
-* Configure your proxy to automatically pass through HTTPS connections
-  without caching them. This is the simplest solution, but means that
-  downloads of Netdata pacakges will not be cached.
-* Mirror the respository locally on your proxy system, and use that mirror
-  when installing on other systems. This requires more setup and more disk
-  space on the caching host, but it lets you cache the packages locally.
-* Some specific caching proxies may have alternative configuration
-  options to deal with these issues. You can find such options in their
-  documentation.
+-   Configure your proxy to automatically pass through HTTPS connections without caching them. This is the simplest
+    solution, but means that downloads of Netdata pacakges will not be cached.
+-   Mirror the respository locally on your proxy system, and use that mirror when installing on other systems. This
+    requires more setup and more disk space on the caching host, but it lets you cache the packages locally.
+-   Some specific caching proxies may have alternative configuration options to deal with these issues. You can find
+    such options in their documentation.
 
 ## What's next?
 
