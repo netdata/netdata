@@ -5,40 +5,39 @@ can use any of Netdata's [external plugins](../../../collectors/plugins.d/README
 have installed on your macOS system. You could also use a macOS system as the master node in a [streaming
 configuration](../../../streaming/README.md).
 
-We support two methods of installing Netdata on macOS, although both involve [Homebrew](https://brew.sh/). Install that
-first, then proceed to either install Netdata via a Homebrew package, or directly from source.
+We recommend installing Netdata with the community-created and -maintained [**Homebrew
+package**](#install-netdata-with-the-homebrew-package). 
 
-The Homebrew package will be easier to install, although it only updates with [major
-releases](../README.md#nightly-vs-stable-releases), not nightly updates. 
-
--   [Install Homebrew on macOS](#install-homebrew-on-macos)
 -   [Install Netdata via the Homebrew package](#install-netdata-with-the-homebrew-package)
 -   [Install Netdata from source](#install-netdata-from-source)
 
-## Install Homebrew on macOS
+## Install Netdata with the Homebrew package
 
-The first step, for either method, is to install Homebrew on your macOS system. Use their installation script:
+If you don't have [Homebrew](https://brew.sh/) installed already, begin with their installation script:
 
 ```bash
 /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 ```
 
-Now that you have Homebrew installed, you can move on to either of the two following installation methods.
-
-## Install Netdata with the Homebrew package
-
-Homebrew's community maintains a package that helps you install Netdata and its dependencies in one step:
+Next, you can use Homebrew's package, which installs Netdata all its dependencies in a single step:
 
 ```sh
 brew install netdata
 ```
 
-> Your Netdata configuration directory will be at `/usr/local/etc/netdata/`, and your stock configuration directory will
-> be at `/usr/local/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
+> Homebrew will place your Netdata configuration directory at `/usr/local/etc/netdata/`. Use the `edit-config` script
+> and the files in this directory to configure Netdata. For reference, you can find stock configuration files at
+> `/usr/local/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
+
+Skip on ahead to the [What's next?](#whats-next) section to find links to helpful post-installation guides.
 
 ## Install Netdata from source
 
-To install Netdata from source, first open your terminal of choice and install Xcode development packages.
+We don't recommend installing Netdata from source on macOS, as it can be difficult and time-consuming to install
+dependencies manually. However, the 
+
+To install Netdata from source, first open your terminal of choice and install the Xcode
+development packages.
 
 ```bash
 xcode-select --install
@@ -48,8 +47,11 @@ Click **Install** on the Software Update popup window that appears. Then, use th
 install Netdata's prerequisites.
 
 ```bash
-brew install ossp-uuid autoconf automake pkg-config
+brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl@1.1
 ```
+
+If you want to use the [database engine](../../../database/engine/README.md) to store your metrics, you need to download
+and install the [Judy library](https://sourceforge.net/projects/judy/) before proceeding further.
 
 Next, download Netdata from our GitHub repository:
 
@@ -64,8 +66,8 @@ cd netdata/
 sudo ./netdata-installer.sh --install /usr/local
 ```
 
-> Your Netdata configuration directory will be at `/usr/local/etc/netdata/`, and your stock configuration directory will
-> be at `/usr/local/Cellar/netdata/{NETDATA_VERSION}/lib/netdata/conf.d/`.
+> Your Netdata configuration directory will be at `/usr/local/netdata/`, and your stock configuration directory will
+> be at **`/usr/local/lib/netdata/conf.d/`.**
 >
 > The installer will also install a startup plist to start Netdata when your Mac boots.
 
