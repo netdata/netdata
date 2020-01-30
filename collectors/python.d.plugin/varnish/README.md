@@ -6,7 +6,7 @@ It uses the `varnishstat` command to provide varnish cache statistics.
 
 ## Requirements
 
--   `netdata` user must be a member of `varnish` group 
+-   `netdata` user must be a member of the `varnish` group 
 
 ## Charts
 
