@@ -64,33 +64,33 @@ int cloud_to_agent_parse(JSON_ENTRY *e)
     return 0;
 }
 
-char *send_http_request(char *host, char *port, char *url, BUFFER *b)
-{
-    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
-
-    buffer_flush(b);
-    buffer_sprintf(
-        b,
-        "GET %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
-        url, host);
-    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, "443", &timeout);
-
-    if (unlikely(sock == -1)) {
-        error("Handshake failed");
-        return NULL;
-    }
-
-    SSL_CTX *ctx = security_initialize_openssl_client();
-    // Certificate chain: not updating the stores - do we need private CA roots?
-    // Calls to SSL_CTX_load_verify_locations would go here.
-    SSL *ssl = SSL_new(ctx);
-    SSL_set_fd(ssl, sock);
-    int err = SSL_connect(ssl);
-    SSL_write(ssl, b->buffer, b->len); // Timeout options?
-    int bytes_read = SSL_read(ssl, b->buffer, b->len);
-    SSL_shutdown(ssl);
-    close(sock);
-}
+//char *send_http_request(char *host, char *port, char *url, BUFFER *b)
+//{
+//    struct timeval timeout = { .tv_sec = 30, .tv_usec = 0 };
+//
+//    buffer_flush(b);
+//    buffer_sprintf(
+//        b,
+//        "GET %s HTTP/1.1\r\nHost: %s\r\nAccept: plain/text\r\nAccept-Language: en-us\r\nUser-Agent: Netdata/rocks\r\n\r\n",
+//        url, host);
+//    int sock = connect_to_this_ip46(IPPROTO_TCP, SOCK_STREAM, host, 0, "443", &timeout);
+//
+//    if (unlikely(sock == -1)) {
+//        error("Handshake failed");
+//        return NULL;
+//    }
+//
+//    SSL_CTX *ctx = security_initialize_openssl_client();
+//    // Certificate chain: not updating the stores - do we need private CA roots?
+//    // Calls to SSL_CTX_load_verify_locations would go here.
+//    SSL *ssl = SSL_new(ctx);
+//    SSL_set_fd(ssl, sock);
+//    int err = SSL_connect(ssl);
+//    SSL_write(ssl, b->buffer, b->len); // Timeout options?
+//    int bytes_read = SSL_read(ssl, b->buffer, b->len);
+//    SSL_shutdown(ssl);
+//    close(sock);
+//}
 
 // Set when we have connection up and running from the connection callback
 int aclk_connection_initialized = 0;
@@ -606,7 +606,7 @@ void *aclk_main(void *ptr)
             }
             initializing=1;
             info("Initializing connection");
-            send_http_request(aclk_hostname, "443", "/auth/challenge?id=blah", aclk_buffer);
+            //send_http_request(aclk_hostname, "443", "/auth/challenge?id=blah", aclk_buffer);
             if (unlikely(aclk_init(ACLK_INIT))) {
                 // TODO: TBD how to handle. We are claimed and we cant init the connection. For now keep trying.
                 sleep_usec(USEC_PER_SEC * 60);
