@@ -99,7 +99,7 @@ URL:		http://my-netdata.io
 BuildRequires: gcc
 BuildRequires: gcc-c++
 BuildRequires: make
-BuildRequires: git
+BuildRequires: git-core
 BuildRequires: autoconf
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 BuildRequires: autoconf-archive
