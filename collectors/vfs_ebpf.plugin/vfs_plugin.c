@@ -60,6 +60,7 @@ netdata_syscall_stat_t *apps_data = NULL;
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
+static int kretprobe = 0;
 
 pthread_mutex_t lock;
 
@@ -491,7 +492,7 @@ int process_load_ebpf()
 {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, "netdata_ebpf_process.o" );
+    build_complete_path(lpath, 4096, (!kretprobe)?"pnetdata_ebpf_process.o":"knetdata_ebpf_process.o" );
     if (load_bpf_file(lpath) ) {
         error("[EBPF_PROCESS] Cannot load program: %s.", lpath);
         return -1;

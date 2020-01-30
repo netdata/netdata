@@ -16,7 +16,7 @@
 # include <unistd.h>
 # include <dlfcn.h>
 
-# define NETDATA_GLOBAL_VECTOR 13
+# define NETDATA_GLOBAL_VECTOR 14
 # define NETDATA_MAX_FILE_VECTOR 7
 # define NETDATA_IN_START_BYTE 2
 # define NETDATA_OUT_START_BYTE 3
