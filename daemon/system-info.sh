@@ -286,6 +286,70 @@ elif [ -r /proc/meminfo ] ; then
         TOTAL_RAM="$((TOTAL_RAM*1024))"
 fi
 
+# -------------------------------------------------------------------------------------------------
+# Detect the total system disk space
+
+DISK_SIZE="unknown"
+DISK_DETECTION="none"
+
+if [ "${KERNEL_NAME}" = "Darwin" ]; then
+        types='hfs'
+
+        if (lsvfs | grep -q apfs) ; then
+            types="${types},apfs"
+        fi
+
+        if (lsvfs | grep -q ufs) ; then
+            types="${types},ufs"
+        fi
+
+        DISK_DETECTION="df"
+        total="$(/bin/df -k -t ${types} | tail -n +1 | awk '{s+=$2} END {print s}')"
+        DISK_SIZE="$((total * 1024))"
+elif [ "${KERNEL_NAME}" = FreeBSD ] ; then
+        types='ufs'
+
+        if (lsvfs | grep -q zfs) ; then
+            types="${types},zfs"
+        fi
+
+        DISK_DETECTION="df"
+        total="$(df -t ${types} -c -k | tail -n 1 | awk '{print $2}')"
+        DISK_SIZE="$((total * 1024))"
+else
+        if [ -d /sys/block ] ; then
+                # List of device majors we actually count towards total disk space.
+                # The meanings of these can be found in `Documentation/admin-guide/devices.txt` in the Linux sources.
+                # The ':' surrounding each number are important for matching.
+                dev_major_whitelist=':3:8:9:21:22:28:31:33:34:44:45:47:48:49:50:51:52:53:54:55:56:57:65:66:67:68:69:70:71:72:73:74:75:76:77:78:79:88:89:90:91:93:94:96:98:101:104:105:106:107:108:109:110:111:112:114:116:128:129:130:131:132:134:135:136:137:138:139:140:141:142:143:153:160:161:179:180:202:256:257:'
+
+                if [ "${VIRTUALIZATION}" != "unknown" ] ; then
+                    # We're running virtualized, add the local range of device major numbers so that we catch paravirtualized block devices.
+                    dev_major_whitelist="${dev_major_whitelist}240:241:242:243:244:245:246:247:248:249:250:251:252:253:254:"
+                fi
+
+                DISK_DETECTION="sysfs"
+                DISK_SIZE="0"
+                for disk in /sys/block/* ; do
+                        if [ -r "${disk}/size" ] && \
+                           (echo "${dev_major_whitelist}" | grep -q ":$(cut -f 1 -d ':' "${disk}/dev"):") && \
+                           grep -qv 1 "${disk}/removable"
+                        then
+                            size="$(cat "${disk}/size")"
+                            DISK_SIZE="$((DISK_SIZE + size))"
+                        fi
+                done
+        elif df --version 2>/dev/null | grep -qF "GNU coreutils" ; then
+                DISK_DETECTION="df"
+                DISK_SIZE="$(df -x tmpfs -x devtmpfs -x squashfs -l --total -B1 --output=size | tail -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        else
+                DISK_DETECTION="df"
+                include_fs_types="ext*|btrfs|xfs|jfs|reiser*|zfs"
+                total="$(df -T -P | grep "${include_fs_types}" | awk '{s+=$3} END {print s}')"
+                DISK_SIZE="$((total * 1024))"
+        fi
+fi
+
 
 echo "NETDATA_CONTAINER_OS_NAME=${CONTAINER_NAME}"
 echo "NETDATA_CONTAINER_OS_ID=${CONTAINER_ID}"
@@ -313,4 +377,6 @@ echo "NETDATA_CPU_FREQ=${CPU_FREQ}"
 echo "NETDATA_CPU_DETECTION=${CPU_INFO_SOURCE}"
 echo "NETDATA_TOTAL_RAM=${TOTAL_RAM}"
 echo "NETDATA_RAM_DETECTION=${RAM_DETECTION}"
+echo "NETDATA_TOTAL_DISK_SIZE=${DISK_SIZE}"
+echo "NETDATA_DISK_DETECTION=${DISK_DETECTION}"
 

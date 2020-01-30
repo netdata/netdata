@@ -552,7 +552,6 @@ Python, Node.js, Ruby, Java, Bash, Perl, and more!
     queries, updates, failures and several per view metrics. All versions of bind after 9.9.10 are supported.
 -   **[NSD](collectors/python.d.plugin/nsd/)** - queries, zones, protocols, query types, transfers, etc.
 -   **[PowerDNS](collectors/python.d.plugin/powerdns/)** - queries, answers, cache, latency, etc.
--   **[unbound](collectors/python.d.plugin/unbound/)** - performance and resource usage metrics.
 -   **[dns_query_time](collectors/python.d.plugin/dns_query_time/)** - DNS query time statistics.
 
 ### Time Servers
