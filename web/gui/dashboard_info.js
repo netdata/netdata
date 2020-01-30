@@ -2868,7 +2868,7 @@ netdataDashboard.context = {
     },
 
     'cockroachdb.total_storage_capacity': {
-        info: 'Entire disk capacity. It includes non-CR data, CR data and empty space.'
+        info: 'Entire disk capacity. It includes non-CR data, CR data, and empty space.'
     },
 
     'cockroachdb.storage_capacity_usability': {
