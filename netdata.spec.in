@@ -285,6 +285,11 @@ install -m 0750 -p cups.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.
 install -m 4750 -p slabinfo.plugin "${RPM_BUILD_ROOT}%{_libexecdir}/%{name}/plugins.d/slabinfo.plugin"
 
 # ###########################################################
+# Install cache and log directories
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/cache/%{name}"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/log/%{name}"
+
+# ###########################################################
 # Install registry directory
 install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 
