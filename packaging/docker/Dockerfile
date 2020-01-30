@@ -68,7 +68,7 @@ ARG NETDATA_GID=201
 ENV DOCKER_GRP netdata
 ENV DOCKER_USR netdata
 # If DO_NOT_TRACK is set, it will disable anonymous stats collection and reporting
-#ENV DO_NOT_TRACK
+#ENV DO_NOT_TRACK=1
 RUN \
     # fping from alpine apk is on a different location. Moving it.
     mv /usr/sbin/fping /usr/local/bin/fping && \
