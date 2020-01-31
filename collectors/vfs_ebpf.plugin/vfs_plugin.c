@@ -61,6 +61,7 @@ static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
 static int kretprobe = 1;
+struct config collector_config;
 
 pthread_mutex_t lock;
 
@@ -470,9 +471,9 @@ int allocate_global_vectors() {
     return 0;
 }
 
-static void build_complete_path(char *out, size_t length, char *filename) {
-    if(plugin_dir){
-        snprintf(out, length, "%s/%s", plugin_dir, filename);
+static void build_complete_path(char *out, size_t length,char *path, char *filename) {
+    if(path){
+        snprintf(out, length, "%s/%s", path, filename);
     } else {
         snprintf(out, length, "%s", filename);
     }
@@ -483,7 +484,7 @@ static int ebpf_load_libraries()
     char *error = NULL;
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, "libnetdata_ebpf.so");
+    build_complete_path(lpath, 4096, plugin_dir, "libnetdata_ebpf.so");
     libnetdata = dlopen(lpath, RTLD_LAZY);
     if (!libnetdata) {
         error("[EBPF_PROCESS] Cannot load %s.", lpath);
@@ -515,10 +516,14 @@ int process_load_ebpf()
 {
     char lpath[4096];
 
-    build_complete_path(lpath, 4096, (!kretprobe)?"pnetdata_ebpf_process.o":"rnetdata_ebpf_process.o" );
+    char *name = (!kretprobe)?"pnetdata_ebpf_process.o":"rnetdata_ebpf_process.o";
+
+    build_complete_path(lpath, 4096, plugin_dir,  name);
     if (load_bpf_file(lpath) ) {
         error("[EBPF_PROCESS] Cannot load program: %s.", lpath);
         return -1;
+    } else {
+        info("[EBPF PROCESS]: The eBPF program %s was loaded with success.", name);
     }
 
     return 0;
@@ -541,6 +546,21 @@ void set_global_variables() {
     netdata_configured_log_dir = getenv("NETDATA_LOG_DIR");
     if(!netdata_configured_log_dir)
         netdata_configured_log_dir = LOG_DIR;
+}
+
+static int load_collector_file(char *path) {
+    char lpath[4096];
+
+    build_complete_path(lpath, 4096, path, "ebpf_process.conf" );
+
+    if (!appconfig_load(&collector_config, lpath, 0, NULL))
+        return 1;
+
+    char *def = { "entry" };
+    char *s = appconfig_get(&collector_config, CONFIG_SECTION_GLOBAL, "load", def);
+    if (s)
+
+    return 0;
 }
 
 void open_developer_log() {
@@ -572,11 +592,15 @@ int main(int argc, char **argv)
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
-        error("[NETWORK VIEWER] setrlimit(RLIMIT_MEMLOCK)");
+        error("[EBPF PROCESS] setrlimit(RLIMIT_MEMLOCK)");
         return 1;
     }
 
     set_global_variables();
+
+    if (load_collector_file(user_config_dir)) {
+        info("[EBPF PROCESS] does not have a configuration file. It is starting with default options.");
+    }
 
     if(ebpf_load_libraries()) {
         error("[EBPF_PROCESS] Cannot load library.");

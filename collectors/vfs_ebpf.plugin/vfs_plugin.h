@@ -38,6 +38,7 @@
 # include "../../libnetdata/locks/locks.h"
 # include "../../libnetdata/avl/avl.h"
 # include "../../libnetdata/clocks/clocks.h"
+# include "../../libnetdata/config/appconfig.h"
 
 typedef struct netdata_syscall_stat {
     unsigned long bytes;                //total number of bytes
