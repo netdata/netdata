@@ -888,7 +888,7 @@ install_go
 # -----------------------------------------------------------------------------
 progress "Telemetry configuration"
 
-if [ ! "$DO_NOT_TRACK" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+if [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   NETDATA_DISABLE_TELEMETRY=1
 fi
 
