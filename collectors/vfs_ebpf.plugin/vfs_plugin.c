@@ -54,9 +54,6 @@ FILE *developer_log = NULL;
 netdata_syscall_stat_t *aggregated_data = NULL;
 netdata_publish_syscall_t *publish_aggregated = NULL;
 
-//Apps vectors
-netdata_syscall_stat_t *apps_data = NULL;
-
 static int update_every = 1;
 static int thread_finished = 0;
 static int close_plugin = 0;
@@ -80,10 +77,6 @@ static void int_exit(int sig)
 
     if (publish_aggregated) {
         free(publish_aggregated);
-    }
-
-    if (apps_data) {
-        free(apps_data);
     }
 
     if (developer_log) {
@@ -548,6 +541,12 @@ void set_global_variables() {
         netdata_configured_log_dir = LOG_DIR;
 }
 
+static void set_global_values(char *ptr) {
+    if(!strcmp(ptr, "entry"))
+        kretprobe = 0;
+
+}
+
 static int load_collector_file(char *path) {
     char lpath[4096];
 
@@ -556,9 +555,26 @@ static int load_collector_file(char *path) {
     if (!appconfig_load(&collector_config, lpath, 0, NULL))
         return 1;
 
+    struct section *sec = collector_config.sections;
+    while(sec) {
+        error("KILLME SEC %s\n", sec->name);
+        if(sec) {
+            struct config_option *values = sec->values;
+            while(values) {
+                error("KILLME OPT %s\n", values->name);
+                values = values->next;
+            }
+        }
+        sec = sec->next;
+    }
     char *def = { "entry" };
     char *s = appconfig_get(&collector_config, CONFIG_SECTION_GLOBAL, "load", def);
+    if(s)
+    /*
     if (s)
+        select_collector_mode(s);
+     */
+
 
     return 0;
 }
