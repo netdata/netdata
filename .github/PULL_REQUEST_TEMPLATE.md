@@ -1,5 +1,5 @@
 <!--
-Describe the change in summary section, including rationale and degin decisions.
+Describe the change in summary section, including rationale and design decisions.
 Include "Fixes #nnn" if you are fixing an existing issue.
 
 In "Component Name" section write which component is changed in this PR. This
