@@ -57,7 +57,6 @@ jobs:
   - name: remote
     url: http://203.0.113.0:8080/_status/vars
 
-jobs:
   - name: remote_hostname
     url: http://cockroachdb.example.com:8080/_status/vars
 ```
@@ -70,8 +69,7 @@ jobs:
   - name: remote
     url: https://203.0.113.0:8080/_status/vars
     tls_skip_verify: yes # If your certificate is self-signed
-
-jobs:
+    
   - name: remote_hostname
     url: https://cockroachdb.example.com:8080/_status/vars
     tls_skip_verify: yes # If your certificate is self-signed
