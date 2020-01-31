@@ -196,28 +196,28 @@ static void netdata_global_charts_create() {
             , NETDATA_FILE_GROUP
             , 974);
 
-    netdata_create_chart(NETDATA_EBPF_FAMILY
-            , NETDATA_PROCESS_SYSCALL
-            , "Count the total of calls made to the operate system per period to start a process."
-            , "Number of calls"
-            , NETDATA_PROCESS_GROUP
-            , 975
-            , netdata_create_global_dimension
-            , &publish_aggregated[NETDATA_PROCESS_START]
-            , 2);
-
     if(kretprobe) {
         netdata_create_chart(NETDATA_EBPF_FAMILY
                 , NETDATA_VFS_FILE_ERR_COUNT
                 , "Count the total of errors"
                 , "Number of calls"
                 , NETDATA_FILE_GROUP
-                , 977
+                , 975
                 , netdata_create_global_dimension
                 , publish_aggregated
                 , NETDATA_FILE_ERRORS);
 
     }
+
+    netdata_create_chart(NETDATA_EBPF_FAMILY
+            , NETDATA_PROCESS_SYSCALL
+            , "Count the total of calls made to the operate system per period to start a process."
+            , "Number of calls"
+            , NETDATA_PROCESS_GROUP
+            , 976
+            , netdata_create_global_dimension
+            , &publish_aggregated[NETDATA_PROCESS_START]
+            , 2);
 
     netdata_create_chart(NETDATA_EBPF_FAMILY
             , NETDATA_EXIT_SYSCALL
@@ -228,6 +228,18 @@ static void netdata_global_charts_create() {
             , netdata_create_global_dimension
             , &publish_aggregated[NETDATA_EXIT_START]
             , 2);
+
+    if(kretprobe) {
+        netdata_create_chart(NETDATA_EBPF_FAMILY
+                , NETDATA_PROCESS_ERROR_NAME
+                , "Count the number of errors related to process"
+                , "Number of calls"
+                , NETDATA_PROCESS_GROUP
+                , 979
+                , netdata_create_global_dimension
+                , &publish_aggregated[NETDATA_EXIT_START]
+                , NETDATA_PROCESS_ERRORS);
+    }
 }
 
 
@@ -335,6 +347,7 @@ static void netdata_publish_data() {
     write_global_count_chart(NETDATA_PROCESS_SYSCALL, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_PROCESS_START], 2);
     if(kretprobe) {
         write_global_err_chart(NETDATA_VFS_FILE_ERR_COUNT, NETDATA_EBPF_FAMILY, publish_aggregated, NETDATA_FILE_ERRORS);
+        write_global_err_chart(NETDATA_PROCESS_ERROR_NAME, NETDATA_EBPF_FAMILY, &publish_aggregated[NETDATA_EXIT_START], NETDATA_PROCESS_ERRORS);
     }
 
     write_io_chart(NETDATA_EBPF_FAMILY, &pvc);
@@ -387,7 +400,7 @@ static void move_from_kernel2user_global() {
     aggregated_data[1].ecall = res[15]; //close
     aggregated_data[2].ecall = res[9]; //unlink
     aggregated_data[3].ecall = res[3]; //write
-    aggregated_data[6].ecall = res[6]; //read
+    aggregated_data[4].ecall = res[6]; //read
     aggregated_data[7].ecall = res[13]; //fork
     aggregated_data[8].ecall = res[17]; //thread
 
@@ -422,14 +435,14 @@ void *process_collector(void *ptr)
 void set_global_labels() {
     int i;
 
-    static char *file_names[NETDATA_MAX_FILE_VECTOR] = { "open", "close", "unlink", "write", "read", "exit", "release_task", "process", "thread" };
+    static char *file_names[NETDATA_MAX_MONITOR_VECTOR] = { "open", "close", "unlink", "write", "read", "exit", "release_task", "process", "thread" };
 
     netdata_syscall_stat_t *is = aggregated_data;
     netdata_syscall_stat_t *prev = NULL;
 
     netdata_publish_syscall_t *pio = publish_aggregated;
     netdata_publish_syscall_t *publish_prev = NULL;
-    for (i = 0; i < NETDATA_MAX_FILE_VECTOR; i++) {
+    for (i = 0; i < NETDATA_MAX_MONITOR_VECTOR; i++) {
         if(prev) {
             prev->next = &is[i];
         }
@@ -444,12 +457,12 @@ void set_global_labels() {
 }
 
 int allocate_global_vectors() {
-    aggregated_data = callocz(NETDATA_MAX_FILE_VECTOR, sizeof(netdata_syscall_stat_t));
+    aggregated_data = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_syscall_stat_t));
     if(!aggregated_data) {
         return -1;
     }
 
-    publish_aggregated = callocz(NETDATA_MAX_FILE_VECTOR, sizeof(netdata_publish_syscall_t));
+    publish_aggregated = callocz(NETDATA_MAX_MONITOR_VECTOR, sizeof(netdata_publish_syscall_t));
     if(!publish_aggregated) {
         return -1;
     }

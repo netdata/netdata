@@ -17,13 +17,15 @@
 # include <dlfcn.h>
 
 # define NETDATA_GLOBAL_VECTOR 18
-# define NETDATA_MAX_FILE_VECTOR 9
+# define NETDATA_MAX_MONITOR_VECTOR 9
 # define NETDATA_FILE_ERRORS 5
+# define NETDATA_PROCESS_ERRORS 4
 
 # define NETDATA_DEL_START 2
 # define NETDATA_IN_START_BYTE 3
 # define NETDATA_EXIT_START 5
 # define NETDATA_PROCESS_START 7
+# define NETDATA_PROCESS_RUNNING_COUNT 9
 
 # define NETDATA_VFS_THREAD (uint32_t)2
 
@@ -67,10 +69,12 @@ typedef struct netdata_publish_vfs_common {
 # define NETDATA_FILE_OPEN_CLOSE_COUNT "file_descriptor"
 # define NETDATA_VFS_FILE_CLEAN_COUNT "delete_files"
 # define NETDATA_VFS_FILE_IO_COUNT "io"
-# define NETDATA_VFS_FILE_ERR_COUNT "error_call"
+# define NETDATA_VFS_FILE_ERR_COUNT "io_error"
 
-# define NETDATA_EXIT_SYSCALL "exit_process"
-# define NETDATA_PROCESS_SYSCALL "start_process"
+# define NETDATA_EXIT_SYSCALL "exit"
+# define NETDATA_PROCESS_SYSCALL "process_thread"
+# define NETDATA_PROCESS_ERROR_NAME "task_error"
+# define NETDATA_PROCESS_RUNNING "running"
 
 # define NETDATA_VFS_IO_FILE_BYTES "file_IO_Bytes"
 # define NETDATA_VFS_DIM_IN_FILE_BYTES "write"
