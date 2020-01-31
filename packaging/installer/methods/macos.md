@@ -55,7 +55,7 @@ and install the [Judy library](https://sourceforge.net/projects/judy/) before pr
 Next, download Netdata from our GitHub repository:
 
 ```bash
-git clone https://github.com/netdata/netdata.git --depth=100
+git clone https://github.com/netdata/netdata.git
 ```
 
 Finally, `cd` into the newly-created directory and then start the installer script:
