@@ -429,6 +429,21 @@ html [data-md-color-primary="blue-grey"] .md-nav--primary .md-nav__title--site {
     font-size: 0.75rem;
 }
 
+/* Support figures and figcaptions with some styling. */
+.md-typeset figure img {
+    border-radius: 3px 3px 0 0;
+}
+
+.md-typeset figure figcaption {
+    font-size: 0.75rem;
+    font-style: italic;
+    margin-top: -8px;
+    padding: 0.5rem;
+    border-width: 0 1px 1px 1px;
+    border-color: black;
+    border-style: solid;
+}
+
 /*
    Installer grid
 */

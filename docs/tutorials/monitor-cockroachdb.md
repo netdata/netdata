@@ -23,7 +23,10 @@ complete. Restart Netdata with `service netdata restart`, or use the [appropriat
 method](../getting-started.md#start-stop-and-restart-netdata) for your system, and refresh your browser. You should see
 CockroachDB metrics in your Netdata dashboard!
 
-![CPU utilization charts from a CockrochDB database monitored by Netdata](https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png)
+<figure>
+  <img src="https://user-images.githubusercontent.com/1153921/73564467-d7e36b00-441c-11ea-9ec9-b5d5ea7277d4.png" alt="CPU utilization charts from a CockrochDB database monitored by Netdata">
+  <figcaption>CPU utilization charts from a CockrochDB database monitored by Netdata</figcaption>
+</figure>
 
 > Note: Netdata collects metrics from CockroachDB every 10 seconds, instead of our usual 1 second, because CockroachDB
 > only updates `_status/vars` every 10 seconds. You can't change this setting in CockroachDB.
