@@ -18,7 +18,7 @@ ACTION_DATA=$(echo "${ACTION_DATA}" | tr '"' "'")
 # -------------------------------------------------------------------------------------------------
 # check opt-out
 
-if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] || [ ! "$DO_NOT_TRACK" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
+if [ -f "@configdir_POST@/.opt-out-from-anonymous-statistics" ] || [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] || [ -n "$DO_NOT_TRACK" ]; then
   exit 0
 fi
 
