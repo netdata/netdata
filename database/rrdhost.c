@@ -156,6 +156,7 @@ RRDHOST *rrdhost_create(const char *hostname,
 
     netdata_mutex_init(&host->rrdpush_sender_buffer_mutex);
     netdata_rwlock_init(&host->rrdhost_rwlock);
+    netdata_rwlock_init(&host->labels_rwlock);
 
     rrdhost_init_hostname(host, hostname);
     rrdhost_init_machine_guid(host, guid);
@@ -664,6 +665,7 @@ void rrdhost_free(RRDHOST *host) {
     // free it
 
     freez((void *)host->tags);
+    free_host_labels(host->labels);
     freez((void *)host->os);
     freez((void *)host->timezone);
     freez(host->program_version);
@@ -680,6 +682,7 @@ void rrdhost_free(RRDHOST *host) {
     freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
+    netdata_rwlock_destroy(&host->labels_rwlock);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
     netdata_rwlock_destroy(&host->rrdhost_rwlock);
     freez(host);
@@ -842,6 +845,178 @@ struct label *load_config_labels()
     return l;
 }
 
+typedef enum strip_quotes {
+    DO_NOT_STRIP_QUOTES,
+    STRIP_QUOTES
+} STRIP_QUOTES_OPTION;
+
+typedef enum skip_escaped_characters {
+    DO_NOT_SKIP_ESCAPED_CHARACTERS,
+    SKIP_ESCAPED_CHARACTERS
+} SKIP_ESCAPED_CHARACTERS_OPTION;
+
+static inline void strip_last_symbol(
+    char *str,
+    char symbol,
+    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
+{
+    char *end = str;
+
+    while (*end && *end != symbol) {
+        if (unlikely(skip_escaped_characters && *end == '\\')) {
+            end++;
+            if (unlikely(!*end))
+                break;
+        }
+        end++;
+    }
+    if (likely(*end == symbol))
+        *end = '\0';
+}
+
+static inline char *strip_double_quotes(char *str, SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
+{
+    if (*str == '"') {
+        str++;
+        strip_last_symbol(str, '"', skip_escaped_characters);
+    }
+
+    return str;
+}
+
+struct label *parse_simple_tags(
+    struct label *label_list,
+    const char *tags,
+    char key_value_separator,
+    char label_separator,
+    STRIP_QUOTES_OPTION strip_quotes_from_key,
+    STRIP_QUOTES_OPTION strip_quotes_from_value,
+    SKIP_ESCAPED_CHARACTERS_OPTION skip_escaped_characters)
+{
+    const char *end = tags;
+
+    while (*end) {
+        const char *start = end;
+        char key[CONFIG_MAX_VALUE + 1];
+        char value[CONFIG_MAX_VALUE + 1];
+
+        while (*end && *end != key_value_separator)
+            end++;
+        strncpyz(key, start, end - start);
+
+        if (*end)
+            start = ++end;
+        while (*end && *end != label_separator)
+            end++;
+        strncpyz(value, start, end - start);
+
+        label_list = add_label_to_list(
+            label_list,
+            strip_quotes_from_key ? strip_double_quotes(trim(key), skip_escaped_characters) : trim(key),
+            strip_quotes_from_value ? strip_double_quotes(trim(value), skip_escaped_characters) : trim(value),
+            LABEL_SOURCE_NETDATA_CONF);
+
+        if (*end)
+            end++;
+    }
+
+    return label_list;
+}
+
+struct label *parse_json_tags(struct label *label_list, const char *tags)
+{
+    char tags_buf[CONFIG_MAX_VALUE + 1];
+    strncpy(tags_buf, tags, CONFIG_MAX_VALUE);
+    char *str = tags_buf;
+
+    switch (*str) {
+    case '{':
+        str++;
+        strip_last_symbol(str, '}', SKIP_ESCAPED_CHARACTERS);
+
+        label_list = parse_simple_tags(label_list, str, ':', ',', STRIP_QUOTES, STRIP_QUOTES, SKIP_ESCAPED_CHARACTERS);
+
+        break;
+    case '[':
+        str++;
+        strip_last_symbol(str, ']', SKIP_ESCAPED_CHARACTERS);
+
+        char *end = str + strlen(str);
+        size_t i = 0;
+
+        while (str < end) {
+            char key[CONFIG_MAX_VALUE + 1];
+            snprintfz(key, CONFIG_MAX_VALUE, "host_tag%zu", i);
+
+            str = strip_double_quotes(trim(str), SKIP_ESCAPED_CHARACTERS);
+
+            label_list = add_label_to_list(label_list, key, str, LABEL_SOURCE_NETDATA_CONF);
+
+            // skip to the next element in the array
+            str += strlen(str) + 1;
+            while (*str && *str != ',')
+                str++;
+            str++;
+            i++;
+        }
+
+        break;
+    case '"':
+        label_list = add_label_to_list(
+            label_list, "host_tag", strip_double_quotes(str, SKIP_ESCAPED_CHARACTERS), LABEL_SOURCE_NETDATA_CONF);
+        break;
+    default:
+        label_list = add_label_to_list(label_list, "host_tag", str, LABEL_SOURCE_NETDATA_CONF);
+        break;
+    }
+
+    return label_list;
+}
+
+struct label *load_labels_from_tags()
+{
+    if (!localhost->tags)
+        return NULL;
+
+    struct label *label_list = NULL;
+    BACKEND_TYPE type = BACKEND_TYPE_UNKNOWN;
+
+    if (config_exists(CONFIG_SECTION_BACKEND, "enabled")) {
+        if (config_get_boolean(CONFIG_SECTION_BACKEND, "enabled", CONFIG_BOOLEAN_NO) != CONFIG_BOOLEAN_NO) {
+            const char *type_name = config_get(CONFIG_SECTION_BACKEND, "type", "graphite");
+            type = backend_select_type(type_name);
+        }
+    }
+
+    switch (type) {
+        case BACKEND_TYPE_GRAPHITE:
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, '=', ';', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
+            break;
+        case BACKEND_TYPE_OPENTSDB_USING_TELNET:
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, '=', ' ', DO_NOT_STRIP_QUOTES, DO_NOT_STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
+            break;
+        case BACKEND_TYPE_OPENTSDB_USING_HTTP:
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, ':', ',', STRIP_QUOTES, STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
+            break;
+        case BACKEND_TYPE_JSON:
+            label_list = parse_json_tags(label_list, localhost->tags);
+            break;
+        default:
+            label_list = parse_simple_tags(
+                label_list, localhost->tags, '=', ',', DO_NOT_STRIP_QUOTES, STRIP_QUOTES,
+                DO_NOT_SKIP_ESCAPED_CHARACTERS);
+            break;
+    }
+
+    return label_list;
+}
+
 struct label *load_kubernetes_labels()
 {
     struct label *l=NULL;
@@ -931,6 +1106,7 @@ void free_host_labels(struct label *labels)
 
 void replace_label_list(RRDHOST *host, struct label *new_labels)
 {
+    rrdhost_check_rdlock(host);
     netdata_rwlock_wrlock(&host->labels_rwlock);
     struct label *old_labels = host->labels;
     host->labels = new_labels;
@@ -982,13 +1158,17 @@ void reload_host_labels()
     struct label *from_auto = load_auto_labels();
     struct label *from_k8s = load_kubernetes_labels();
     struct label *from_config = load_config_labels();
+    struct label *from_tags = load_labels_from_tags();
 
     struct label *new_labels = merge_label_lists(from_auto, from_k8s);
+    new_labels = merge_label_lists(new_labels, from_tags);
     new_labels = merge_label_lists(new_labels, from_config);
 
+    rrdhost_rdlock(localhost);
     replace_label_list(localhost, new_labels);
 
     health_label_log_save(localhost);
+    rrdhost_unlock(localhost);
 
     if(localhost->rrdpush_send_enabled && localhost->rrdpush_sender_buffer){
         localhost->labels_flag |= LABEL_FLAG_UPDATE_STREAM;

@@ -347,6 +347,7 @@ void rrdpush_send_labels(RRDHOST *host) {
         return;
 
     rrdpush_buffer_lock(host);
+    rrdhost_rdlock(host);
     netdata_rwlock_rdlock(&host->labels_rwlock);
 
     struct label *labels = host->labels;
@@ -364,6 +365,7 @@ void rrdpush_send_labels(RRDHOST *host) {
             , "OVERWRITE %s\n", "labels");
 
     netdata_rwlock_unlock(&host->labels_rwlock);
+    rrdhost_unlock(host);
 
     if(host->rrdpush_sender_pipe[PIPE_WRITE] != -1 && write(host->rrdpush_sender_pipe[PIPE_WRITE], " ", 1) == -1)
         error("STREAM %s [send]: cannot write to internal pipe", host->hostname);
