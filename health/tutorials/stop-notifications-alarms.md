@@ -28,8 +28,8 @@ In the `source` row, you see that this chart is getting its configuration from
 `4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. The relevant part of begins at `health.d`: `health.d/cpu.conf`. That's
 the file you need to edit if you want to silence this alarm.
 
-For more information about locating health configuration files on your system, see the [health
-quickstart](../QUICKSTART.md#locate-health-configuration-files).
+For more information about editing or referencing health configuration files on your system, see the [health
+quickstart](../QUICKSTART.md#edit-health-configuration-files).
 
 ## Edit the file to enable silencing
 
